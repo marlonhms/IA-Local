@@ -10,6 +10,8 @@ Arquitetura:
     4. Catálogo de Produtos com RAG Híbrido HNSW + GIN e Cache Semântico
     5. Telemetria SRE (PostgreSQL 16)
     6. Dados Cadastrais da Filial (empresa)
+    7. Previsão de Esgotamento de Combustível (Run-Out) & Sugestão de Pedidos (tanques + abastecimentos)
+    8. Auditoria de Fechamento de Turno & Conciliação de Pista (fechabomba + fechacaixa + CBC04)
 """
 
 import os
@@ -80,7 +82,57 @@ def classificar_intencao(pergunta: str) -> str:
         ]):
             return "auditoria_turno"
 
-    # 1. Perguntas sobre estoque, saldo e tanques de combustível
+    # 1. Previsão de Esgotamento de Combustível (Run-Out Forecast) & Sugestão de Pedidos
+    termos_previsao_exatos = [
+        "quando vai acabar", "quando acaba", "vai acabar", "vai secar", "quando seca", "quando vai secar",
+        "previsão de esgotamento", "previsao de esgotamento", "previsão dos tanques", "previsao dos tanques",
+        "previsão de tanque", "previsao de tanque", "esgotamento dos tanques", "esgotamento do tanque",
+        "esgotamento de combustível", "esgotamento de combustivel", "run-out", "run out", "runout",
+        "autonomia dos tanques", "autonomia do tanque", "autonomia de combustível", "autonomia de combustivel",
+        "autonomia de combustíveis", "autonomia de combustiveis", "qual a autonomia", "qual é a autonomia",
+        "quanto tempo dura", "quanto tempo resta", "duração do estoque", "duracao do estoque", "tempo de estoque",
+        "vai durar", "vai terminar", "quando termina", "tanque mais crítico", "tanque mais critico",
+        "qual tanque está mais crítico", "qual tanque esta mais critico",
+        "tanques mais críticos", "tanques mais criticos", "mais crítico hoje", "mais critico hoje",
+        "pedir combustível", "pedir combustivel", "pedir gasolina", "pedir diesel", "pedir etanol",
+        "preciso pedir", "preciso comprar combustível", "preciso comprar combustivel", "sugestão de pedido",
+        "sugestao de pedido", "sugestão de compra", "sugestao de compra", "pedido de carreta", "pedido de caminhão",
+        "pedido de caminhao", "espaço livre para descarga", "espaco livre para descarga", "espaço livre de descarga",
+        "espaco livre de descarga", "espaço de descarga", "espaco de descarga", "espaço para descarga", "espaco para descarga",
+        "espaço livre", "espaco livre", "ullage", "quanto cabe de descarga", "quantos compartimentos",
+        "quantos litros cabem", "quanto cabe no tanque"
+    ]
+    if any(t in p for t in termos_previsao_exatos):
+        return "previsao_tanques"
+
+    # Verificação contextual de previsão / run-out / fim de semana / autonomia / descarga / capacidade de recebimento
+    tem_termo_preditivo = any(k in p for k in [
+        "previsão", "previsao", "acabar", "acaba", "acabam", "secar", "seca", "secam",
+        "esgotamento", "esgotar", "esgota", "autonomia", "run-out", "runout", "run out",
+        "durar", "dura", "duram", "duração", "duracao", "resta", "restam", "terminar", "termina",
+        "pedir", "comprar", "compra", "pedido", "pedidos",
+        "descarga", "ullage", "carreta", "compartimento", "compartimentos", "cabe", "cabem"
+    ])
+    tem_termo_combustivel_ou_tanque = any(w in p for w in [
+        "gasolina", "diesel", "etanol", "álcool", "alcool", "arla", "combustível", "combustivel", "combustíveis", "combustiveis",
+        "tanque", "tanques", "tq"
+    ])
+
+    if tem_termo_preditivo and tem_termo_combustivel_ou_tanque:
+        if not any(preco_word in p for preco_word in ["preço", "preco", "custa", "valor"]):
+            return "previsao_tanques"
+
+    if "quanto tempo" in p and tem_termo_combustivel_ou_tanque:
+        return "previsao_tanques"
+
+    if "fim de semana" in p and any(w in p for w in ["combustível", "combustivel", "pedir", "comprar", "tanque", "tanques", "gasolina", "diesel", "etanol", "preciso"]):
+        return "previsao_tanques"
+
+    if "crítico" in p or "critico" in p:
+        if any(w in p for w in ["tanque", "tanques", "combustível", "combustivel", "hoje", "posto", "qual"]):
+            return "previsao_tanques"
+
+    # 2. Perguntas sobre estoque, saldo e tanques de combustível
     termos_estoque = [
         "estoque", "mais estoque", "maior estoque", "saldo de estoque", "saldo em estoque",
         "quanto tem de", "quanto tem no tanque", "nível do tanque", "nivel do tanque", "tanque", "tanques",
@@ -140,6 +192,39 @@ def extrair_grupo(pergunta: str) -> str:
     if "óleo" in p or "oleo" in p or "lubrificante" in p: return "LUBRIFICANTES"
     if "cigarro" in p or "tabaco" in p: return "TABACO"
     if "conveniência" in p or "salgadinho" in p or "doce" in p: return "CONVENIENCIA"
+    return None
+
+
+def extrair_combustivel(pergunta: str) -> Optional[str]:
+    """Extrai combustível ou código de tanque da pergunta do usuário."""
+    p = pergunta.lower()
+
+    # 1. Menção a tanque específico prioritária (evita falso positivo quando menciona tanque e combustível)
+    m_tanque = re.search(r"\b(?:tanque|tq)\s*[-_]?\s*0*([0-9]{1,3})\b", p)
+    if m_tanque:
+        num = int(m_tanque.group(1))
+        return f"{num:03d}"
+
+    # 2. Combustíveis específicos
+    if "gasolina aditivada" in p or "aditivada" in p or "grid" in p or "v-power" in p or "octapro" in p or "podium" in p or "premium" in p:
+        return "GASOLINA ADITIVADA"
+    if "gasolina comum" in p:
+        return "GASOLINA COMUM"
+    if "gasolinas" in p:
+        return "GASOLINA"
+    if "diesel s10" in p or "diesel s-10" in p or "s10" in p or "s-10" in p:
+        return "DIESEL S10"
+    if "diesel s500" in p or "diesel s-500" in p or "s500" in p or "s-500" in p or "diesel comum" in p:
+        return "DIESEL S500"
+    if "diesel" in p:
+        return "DIESEL"
+    if "etanol" in p or "álcool" in p or "alcool" in p:
+        return "ETANOL"
+    if "arla" in p:
+        return "ARLA"
+    if "gasolina" in p:
+        return "GASOLINA COMUM"
+
     return None
 
 
@@ -324,6 +409,15 @@ def main():
                 contexto_extra = f"Auditoria de Fechamento de Turno e Conciliação de Pista no ERP:\n{json.dumps(resultado_auditoria, ensure_ascii=False, indent=2, default=str)}\n"
                 tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
 
+            elif intencao == "previsao_tanques":
+                comb_filtro = extrair_combustivel(pergunta)
+                print(f"\n🔮 [ROTEADOR] Intenção detectada: Previsão de Esgotamento & Sugestão de Pedidos (Run-Out Forecast)...")
+                if comb_filtro:
+                    print(f"⛽ [FILTRO ATIVO] Analisando combustível/tanque: {comb_filtro}")
+                resultado_previsao = tools.prever_esgotamento_tanques(filtro_combustivel=comb_filtro)
+                contexto_extra = f"Previsão de Esgotamento de Combustível (Run-Out Forecast) e Sugestão de Pedidos no ERP:\n{json.dumps(resultado_previsao, ensure_ascii=False, indent=2, default=str)}\n"
+                tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
+
             elif intencao == "vendas_analitico":
                 print("\n🔀 [ROTEADOR] Intenção detectada: Análise de Vendas (ERP Tool)...")
                 resultado_vendas = tools.consultar_analise_vendas_erp(tipo="mais_vendidos")
@@ -429,6 +523,12 @@ Diretrizes:
      c) Fechamento de Caixa: apresente os valores declarados pelos operadores (dinheiro, cartão, a prazo, convênio), status dos caixas (abertos ou fechados) e aponte eventuais furos (falta) ou sobras financeiras frente ao faturamento de combustível.
      d) Balanço dos Tanques: informe se a variação volumétrica apurada nos tanques está dentro da tolerância oficial da ANP (±0.6%).
      e) Recomendações: liste as ações práticas sugeridas para o gestor e equipe de pista.
+8. Se a pergunta for sobre previsão de esgotamento de tanques (Run-Out Forecast), autonomia de combustível, espaço livre para descarga (ullage) ou sugestão de compra de carreta:
+   - Apresente um parecer preditivo claro, técnico e executivo contendo:
+     a) Tanque e Combustível Mais Crítico: identifique com destaque o tanque com menor autonomia em horas/dias e menor percentual de ocupação, informando se já está abaixo da margem de segurança de 15%.
+     b) Autonomia e Projeção de Run-Out: informe em quantos dias/horas o produto atingirá o nível crítico (15%) e quando secará completamente (0L), projetando a data e hora estimadas de esgotamento.
+     c) Espaço Livre para Descarga (Ullage): informe o volume livre disponível em cada tanque para recebimento de produto.
+     d) Sugestão Inteligente de Pedidos: apresente os volumes sugeridos de compra em múltiplos padrão de compartimento de carreta (5.000 L, 10.000 L, 15.000 L...), indicando a urgência e prazo ideal de compra (com atenção especial para abastecer preventivamente antes do fim de semana).
 """
 
             print("\n🤖 AGENTE (Streaming):\n")

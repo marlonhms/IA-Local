@@ -219,8 +219,10 @@ Para futuras integrações de consultas a clientes (cadastro, fidelidade, fatura
 
 ## 7. 📁 MAPEAMENTO DOS ARQUIVOS NO REPOSITÓRIO LOCAL
 
-- [`hybrid_rag.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/hybrid_rag.py): Módulo core com a classe `HybridRAGEngine` e coletores `get_sre_metrics()`.
-- [`agente_posto.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/agente_posto.py): Agente conversacional com Tool Routing e Streaming de tokens.
-- [`benchmark_rag.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/benchmark_rag.py): Suite de benchmark e validação comparativa (Dense vs Sparse vs RRF).
-- [`index_produtos.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/index_produtos.py): Pipeline de sincronização e indexação entre ERP e base vetorial.
-- [`walkthrough.md`](file:///C:/Users/Marlon/.gemini/antigravity-ide/brain/197d9cc1-5a3b-4b9f-8cb8-079fe5207172/walkthrough.md): Histórico completo de testes, benchmarks e validações.
+- [`core/rag_engine.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/rag_engine.py): Módulo core com a classe `HybridRAGEngine` (HNSW + GIN FTS + RRF) e cache semântico.
+- [`core/tools.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py): Ferramentas operacionais do agente (`PostoTools`), incluindo `auditar_fechamento_turno()` e `prever_esgotamento_tanques()`.
+- [`core/sanitizer.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/sanitizer.py): Blindagem LGPD de 24 categorias e defesa OWASP GenAI 2026.
+- [`main.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/main.py): CLI operacional com Intent Classifier e Streaming de tokens com Gemini.
+- [`scripts/test_previsao_tanques.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/test_previsao_tanques.py): Suíte de testes do motor preditivo e sugestão de compras.
+- [`scripts/test_conciliacao_turno.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/test_conciliacao_turno.py): Suíte de testes de conciliação e auditoria de pista.
+- [`scripts/test_sanitizer.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/test_sanitizer.py): Suíte de testes de sanitização e proteção de dados.

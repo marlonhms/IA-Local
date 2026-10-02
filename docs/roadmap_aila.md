@@ -1,8 +1,8 @@
 # 🚀 Roadmap Estratégico & Engenharia de Execução: Projeto Ai.la
 
 **Projeto:** Ai.la — IA Local Especialista em Postos de Combustíveis e PDV  
-**Versão:** 1.1.0-PRO  
-**Status Atual:** Fases 1 e 2 Concluídas (LGPD Sanitization + Motor de Conciliação de Turnos & Auditoria de Pista Homologados)  
+**Versão:** 1.2.0-PRO  
+**Status Atual:** Fases 1 e 2 Concluídas + Capacidade Preditiva da Fase 6 Homologada (LGPD + Conciliação de Turnos + Previsão de Esgotamento & Sugestão de Pedidos)  
 **Próxima Frente Imediata:** Fase 2.5 (Esteira de Deploy Automatizado & Onboarding Multi-Posto) $\rightarrow$ Fase 3 (MCP + LangGraph)  
 **Ambiente:** Edge AI Local (Posto) + Hub Central de Gestão/Telemetria | Docker + PostgreSQL 16 (Portas 5432/5433, 5434, 5678)  
 
@@ -267,9 +267,16 @@ flowchart TD
 ### 📈 FASE 6: Inteligência Preditiva & Módulo Fiscal Avançado (Prioridade P3 - Longo Prazo)
 > **Objetivo:** Transformar o Ai.la de um agente reativo em um consultor proativo de gestão, compras e conformidade fiscal de postos.
 
-- [ ] **Previsão de Esgotamento de Combustível (Run-Out Forecast):**
-  - Modelo baseado na média ponderada dos últimos 30 dias por dia da semana e sazonalidade/feriados.
-  - Recomendação precisa de compra de caminhão-tanque (ex: *"Pedir 15.000L de Gasolina Comum até quinta-feira às 14h para não secar no sábado"*).
+- [x] **Previsão de Esgotamento de Combustível (Run-Out Forecast) & Sugestão Inteligente de Pedidos (Concluído ✅):**
+  - Implementado em `core/tools.py` via `PostoTools.prever_esgotamento_tanques()`.
+  - Conexão e cruzamento em tempo real com PostgreSQL ERP na porta 5433 (`tanques`, `abastecimentos`, `bombas`, `produtos`).
+  - Taxa de consumo médio diário e horário por combustível e tanque com fallback inteligente para benchmarks de mercado em bases de teste com histórico reduzido.
+  - Cálculo de Autonomia em horas e dias com reserva crítica de segurança de 15%: $\text{Autonomia} = \frac{\text{Saldo Atual} - \text{Estoque Crítico (15%)}}{\text{Consumo Médio Diário}}$.
+  - Projeção de data e hora estimadas de esgotamento total (Run-Out / 0 Litros) e de alcance do ponto crítico.
+  - Cálculo de espaço livre para descarga (*ullage* = $\text{Capacidade} - \text{Saldo Atual}$).
+  - Sugestão inteligente de pedidos de compra em múltiplos de compartimento padrão de carreta (5.000 L, 10.000 L, 15.000 L...) e alerta preventivo de risco de esgotamento para o fim de semana.
+  - Rota e intenção `previsao_tanques` integrada em `main.py` com extrator de combustível/tanque e respostas via streaming.
+  - Suíte de testes automatizada `scripts/test_previsao_tanques.py` com 100% de aprovação e blindagem LGPD ativa.
 - [ ] **Auditoria Fiscal Contínua com `Agent Sefaz`:**
   - Cruzamento de cada cupom fiscal emitido (NFC-e) contra o cadastro de NCM/CEST e regras da Reforma Tributária (IBS/CBS).
   - Alerta de produtos cadastrados com tributação incorreta que estejam gerando pagamento a maior ou a menor de impostos.

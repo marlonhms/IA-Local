@@ -8,6 +8,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from decimal import Decimal
 from typing import Dict, Any, Optional, Tuple, List
+from datetime import datetime, date, timedelta
 
 from config.settings import DB_ERP_CONFIG
 from core.rag_engine import HybridRAGEngine
@@ -996,3 +997,677 @@ class PostoTools:
                 "status": "indisponivel",
                 "motivo": f"Falha na execução da auditoria de turno no ERP (porta 5433): {e}",
             }
+
+    @staticmethod
+    def obter_consumo_benchmark(combustivel_nome: str) -> float:
+        """
+        Retorna a taxa diária de consumo médio de referência (litros/dia)
+        típica do mercado brasileiro para postos de serviços urbanos e rodoviários.
+        """
+        c = (combustivel_nome or "").upper().strip()
+        if "ADITIVADA" in c or "GRID" in c or "V-POWER" in c or "OCTAPRO" in c:
+            return 1200.0
+        elif "COMUM" in c or "GASOLINA" in c:
+            return 3000.0
+        elif "ETANOL" in c or "ALCOOL" in c:
+            return 1500.0
+        elif "S10" in c or "S-10" in c:
+            return 4000.0
+        elif "S500" in c or "S-500" in c or "DIESEL" in c:
+            return 1800.0
+        elif "ARLA" in c:
+            return 150.0
+        else:
+            return 1000.0
+
+    @staticmethod
+    def calcular_autonomia_tanque(
+        saldo: Decimal,
+        capacidade: Decimal,
+        consumo_diario: Decimal,
+        margem_critica_pct: Decimal = Decimal("0.15"),
+        data_referencia: Optional[datetime] = None
+    ) -> dict:
+        """
+        Calcula a autonomia matemática (crítica e run-out total) de um tanque de combustível.
+        Fórmula Crítica: Autonomia = (Saldo Atual - Estoque Crítico 15%) / Consumo Médio Diário.
+        """
+        saldo = Decimal(str(saldo if saldo is not None else 0.0))
+        capacidade = Decimal(str(capacidade if capacidade is not None else 0.0))
+        consumo_diario = Decimal(str(consumo_diario if consumo_diario is not None else 0.0))
+        margem_critica_pct = Decimal(str(margem_critica_pct if margem_critica_pct is not None else 0.15))
+        agora = data_referencia or datetime.now()
+
+        pct_ocupacao = round(float(saldo / capacidade * Decimal("100.0")), 2) if capacidade > Decimal("0.0") else 0.0
+
+        estoque_critico = capacidade * margem_critica_pct
+        saldo_util_critico = saldo - estoque_critico
+
+        if consumo_diario <= Decimal("0.0"):
+            alerta_critico = saldo_util_critico <= Decimal("0.0")
+            if saldo <= Decimal("0.0"):
+                status_operacional = "ESGOTADO (SECO)"
+                data_hora_critico = "JÁ EM NÍVEL CRÍTICO (< 15%)"
+                data_hora_runout = "ESGOTADO (Tanque seco - 0 L)"
+            elif alerta_critico:
+                status_operacional = "NÍVEL CRÍTICO"
+                data_hora_critico = "JÁ EM NÍVEL CRÍTICO (< 15%)"
+                data_hora_runout = "SEM CONSUMO REGISTRADO"
+            else:
+                status_operacional = "SEM CONSUMO"
+                data_hora_critico = "SEM CONSUMO REGISTRADO"
+                data_hora_runout = "SEM CONSUMO REGISTRADO"
+
+            return {
+                "capacidade_litros": float(capacidade),
+                "saldo_atual_litros": float(saldo),
+                "ocupacao_pct": pct_ocupacao,
+                "estoque_critico_15pct_litros": float(round(estoque_critico, 2)),
+                "saldo_util_critico_litros": float(round(max(Decimal("0.0"), saldo_util_critico), 2)),
+                "consumo_diario_litros": 0.0,
+                "consumo_horario_litros": 0.0,
+                "autonomia_critica_dias": 0.0,
+                "autonomia_critica_horas": 0.0,
+                "autonomia_runout_dias": 0.0,
+                "autonomia_runout_horas": 0.0,
+                "data_hora_critico": data_hora_critico,
+                "data_hora_runout": data_hora_runout,
+                "alerta_critico": alerta_critico,
+                "status_operacional": status_operacional,
+            }
+
+        consumo_horario = consumo_diario / Decimal("24.0")
+
+        # 1. Autonomia até o Nível Crítico (15% da capacidade)
+        if saldo_util_critico <= Decimal("0.0"):
+            autonomia_critica_dias = Decimal("0.0")
+            autonomia_critica_horas = Decimal("0.0")
+            data_hora_critico = "JÁ EM NÍVEL CRÍTICO (< 15%)"
+            alerta_critico = True
+            status_operacional = "NÍVEL CRÍTICO" if saldo > Decimal("0.0") else "ESGOTADO (SECO)"
+        else:
+            autonomia_critica_dias = saldo_util_critico / consumo_diario
+            autonomia_critica_horas = autonomia_critica_dias * Decimal("24.0")
+            dt_crit = agora + timedelta(hours=float(autonomia_critica_horas))
+            data_hora_critico = dt_crit.strftime("%Y-%m-%d %H:%M")
+            alerta_critico = False
+            status_operacional = "OPERACIONAL NORMAL"
+
+        # 2. Autonomia até o Esgotamento Total (Run-Out / Tanque Seco 0 Litros)
+        if saldo <= Decimal("0.0"):
+            autonomia_runout_dias = Decimal("0.0")
+            autonomia_runout_horas = Decimal("0.0")
+            data_hora_runout = "ESGOTADO (Tanque seco - 0 L)"
+        else:
+            autonomia_runout_dias = saldo / consumo_diario
+            autonomia_runout_horas = autonomia_runout_dias * Decimal("24.0")
+            dt_ro = agora + timedelta(hours=float(autonomia_runout_horas))
+            data_hora_runout = dt_ro.strftime("%Y-%m-%d %H:%M")
+
+        return {
+            "capacidade_litros": float(round(capacidade, 2)),
+            "saldo_atual_litros": float(round(saldo, 2)),
+            "ocupacao_pct": pct_ocupacao,
+            "estoque_critico_15pct_litros": float(round(estoque_critico, 2)),
+            "saldo_util_critico_litros": float(round(max(Decimal("0.0"), saldo_util_critico), 2)),
+            "consumo_diario_litros": float(round(consumo_diario, 2)),
+            "consumo_horario_litros": float(round(consumo_horario, 2)),
+            "autonomia_critica_dias": float(round(autonomia_critica_dias, 2)),
+            "autonomia_critica_horas": float(round(autonomia_critica_horas, 2)),
+            "autonomia_runout_dias": float(round(autonomia_runout_dias, 2)),
+            "autonomia_runout_horas": float(round(autonomia_runout_horas, 2)),
+            "data_hora_critico": data_hora_critico,
+            "data_hora_runout": data_hora_runout,
+            "alerta_critico": alerta_critico,
+            "status_operacional": status_operacional,
+        }
+
+    @staticmethod
+    def calcular_sugestao_carreta(
+        capacidade: Decimal,
+        saldo: Decimal,
+        multiplo_compartimento: Decimal = Decimal("5000.0")
+    ) -> dict:
+        """
+        Calcula o espaço livre para descarga (ullage) e a sugestão de pedido
+        padronizado em compartimentos estanques de carreta/caminhão-tanque (5k, 10k, 15k L).
+        """
+        capacidade = Decimal(str(capacidade if capacidade is not None else 0.0))
+        saldo = Decimal(str(saldo if saldo is not None else 0.0))
+        multiplo = Decimal(str(multiplo_compartimento if multiplo_compartimento is not None else 5000.0))
+
+        # Espaço físico seguro limitado à capacidade total (evita transbordo em caso de saldo contábil negativo)
+        ullage = max(Decimal("0.0"), min(capacidade, capacidade - saldo))
+        pct_livre = round(float(ullage / capacidade * Decimal("100.0")), 2) if capacidade > Decimal("0.0") else 0.0
+
+        if multiplo > Decimal("0.0"):
+            compartimentos_5k = int(ullage // multiplo)
+            volume_sugerido = Decimal(str(compartimentos_5k)) * multiplo
+        else:
+            compartimentos_5k = 0
+            volume_sugerido = Decimal("0.0")
+
+        return {
+            "espaco_livre_ullage_litros": float(round(ullage, 2)),
+            "percentual_livre_pct": pct_livre,
+            "compartimentos_5k": compartimentos_5k,
+            "volume_sugerido_litros": float(round(volume_sugerido, 2)),
+            "multiplo_padrao_litros": float(multiplo),
+        }
+
+    def prever_esgotamento_tanques(
+        self,
+        filtro_combustivel: Optional[str] = None,
+        consumo_diario_custom: Optional[Dict[str, float]] = None,
+        margem_critica_pct: float = 0.15,
+        data_referencia: Optional[datetime] = None,
+    ) -> dict:
+        """
+        Motor de Previsão de Esgotamento de Combustível (Run-Out Forecast) &
+        Sugestão Inteligente de Pedidos de Caminhão-Tanque.
+        Conecta ao ERP PostgreSQL (porta 5433).
+        """
+        try:
+            conn = psycopg2.connect(**DB_ERP_CONFIG)
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # 1. Posição atual dos tanques (com fallback para produtos via codlmc)
+                cur.execute("""
+                    SELECT 
+                        TRIM(t.codtan) AS codtan,
+                        COALESCE(
+                            NULLIF(TRIM(t.prl_ds_produto_lmc), ''),
+                            NULLIF(TRIM(p.nompro), ''),
+                            'COMBUSTÍVEL ' || TRIM(t.codtan)
+                        ) AS combustivel,
+                        ROUND(COALESCE(t.capacidade, 0)::numeric, 2) AS capacidade_litros,
+                        ROUND(COALESCE(t.qtdeat, 0)::numeric, 2) AS saldo_atual_litros
+                    FROM tanques t
+                    LEFT JOIN (
+                        SELECT DISTINCT ON (TRIM(codlmc)) TRIM(codlmc) AS codlmc, nompro
+                        FROM produtos
+                        WHERE codlmc IS NOT NULL AND TRIM(codlmc) != ''
+                        ORDER BY TRIM(codlmc), codpro
+                    ) p ON p.codlmc = TRIM(t.codlmc)
+                    ORDER BY t.codtan;
+                """)
+                linhas_tanques = cur.fetchall()
+
+                # 2. Vínculos de bicos por tanque na tabela bombas
+                cur.execute("""
+                    SELECT 
+                        TRIM(b.codbom) AS codbom,
+                        TRIM(b.codtan) AS codtan,
+                        TRIM(b.codpro) AS codpro
+                    FROM bombas b
+                    WHERE b.codtan IS NOT NULL;
+                """)
+                linhas_bombas = cur.fetchall()
+
+                # 3. Telemetria de consumo em abastecimentos
+                cur.execute("""
+                    SELECT 
+                        COALESCE(TRIM(a.tanque), TRIM(b.codtan)) AS codtan,
+                        TRIM(a.codpro) AS codpro,
+                        COALESCE(TRIM(p.nompro), TRIM(t.prl_ds_produto_lmc)) AS produto_nome,
+                        COUNT(*)::int AS total_abastecimentos,
+                        ROUND(COALESCE(SUM(a.litros), 0)::numeric, 3) AS total_litros,
+                        MIN(a.data) AS data_min,
+                        MAX(a.data) AS data_max,
+                        COUNT(DISTINCT a.data)::int AS dias_com_venda
+                    FROM abastecimentos a
+                    LEFT JOIN bombas b ON b.codbom = a.bomba
+                    LEFT JOIN tanques t ON t.codtan = COALESCE(a.tanque, b.codtan)
+                    LEFT JOIN produtos p ON p.codpro = a.codpro
+                    WHERE a.abt_bl_venda_cancelada IS NOT TRUE
+                    GROUP BY COALESCE(TRIM(a.tanque), TRIM(b.codtan)), TRIM(a.codpro), p.nompro, t.prl_ds_produto_lmc;
+                """)
+                linhas_telemetria = cur.fetchall()
+
+                # 4. Total de abastecimentos gerais na base para metadados
+                cur.execute("""
+                    SELECT 
+                        COUNT(*)::int AS total_abast_geral,
+                        ROUND(COALESCE(SUM(litros), 0)::numeric, 3) AS total_litros_geral,
+                        MIN(data) AS primeira_data_abast,
+                        MAX(data) AS ultima_data_abast,
+                        COUNT(DISTINCT data)::int AS total_dias_base
+                    FROM abastecimentos
+                    WHERE abt_bl_venda_cancelada IS NOT TRUE;
+                """)
+                telemetria_geral = cur.fetchone() or {}
+
+                conn.close()
+
+            agora = data_referencia or datetime.now()
+
+            # Mapeamento de bicos por tanque
+            bicos_por_tanque: Dict[str, List[str]] = {}
+            for rb in linhas_bombas:
+                c_tan = rb['codtan']
+                if c_tan:
+                    bicos_por_tanque.setdefault(c_tan, []).append(rb['codbom'])
+
+            # Mapeamento de telemetria por tanque
+            telemetria_por_tanque: Dict[str, List[dict]] = {}
+            for rt in linhas_telemetria:
+                c_tan = rt['codtan']
+                if c_tan:
+                    telemetria_por_tanque.setdefault(c_tan, []).append(rt)
+
+            # Função auxiliar interna de normalização de categoria de combustível
+            def normalizar_categoria(nome: str) -> str:
+                n = (nome or "").upper().strip()
+                if "ADITIVADA" in n or "GRID" in n or "V-POWER" in n:
+                    return "GASOLINA ADITIVADA"
+                elif "COMUM" in n or "GASOLINA" in n:
+                    return "GASOLINA COMUM"
+                elif "ETANOL" in n or "ALCOOL" in n:
+                    return "ETANOL"
+                elif "S10" in n or "S-10" in n:
+                    return "DIESEL S10"
+                elif "S500" in n or "S-500" in n or "DIESEL" in n:
+                    return "DIESEL S500"
+                elif "ARLA" in n:
+                    return "ARLA"
+                return n or "OUTROS"
+
+            # Identificar tanques por categoria normalizada
+            tanques_por_cat: Dict[str, List[dict]] = {}
+            for t in linhas_tanques:
+                cat = normalizar_categoria(t['combustivel'])
+                tanques_por_cat.setdefault(cat, []).append(t)
+
+            # Determinar a taxa diária de consumo para cada combustível
+            consumo_combustivel_info: Dict[str, dict] = {}
+            dias_base = max(1, int(telemetria_geral.get('total_dias_base') or 1))
+
+            for cat, lista_tanques in tanques_por_cat.items():
+                # Verificar se há override explícito customizado
+                custom_rate = None
+                if consumo_diario_custom:
+                    for k, v in consumo_diario_custom.items():
+                        if k.upper() in cat or cat in k.upper():
+                            custom_rate = float(v)
+                            break
+
+                if custom_rate is not None:
+                    consumo_combustivel_info[cat] = {
+                        "taxa_diaria": custom_rate,
+                        "origem": "parametro_customizado",
+                        "aviso": None
+                    }
+                else:
+                    # Verificar telemetria real em abastecimentos
+                    abasts_cat = []
+                    for t in lista_tanques:
+                        abasts_cat.extend(telemetria_por_tanque.get(t['codtan'], []))
+
+                    total_litros_cat = sum(float(r['total_litros'] or 0.0) for r in abasts_cat)
+                    total_abast_cat = sum(int(r['total_abastecimentos'] or 0) for r in abasts_cat)
+
+                    # Critério para telemetria significativa: >= 100 L e >= 10 abastecimentos
+                    if total_litros_cat >= 100.0 and total_abast_cat >= 10:
+                        taxa_calc = round(total_litros_cat / dias_base, 2)
+                        consumo_combustivel_info[cat] = {
+                            "taxa_diaria": max(10.0, taxa_calc),
+                            "origem": "historico_telemetria",
+                            "aviso": f"Consumo calculado a partir de {total_abast_cat} abastecimentos ({total_litros_cat:.2f} L em {dias_base} dias)."
+                        }
+                    else:
+                        taxa_bm = self.obter_consumo_benchmark(cat)
+                        consumo_combustivel_info[cat] = {
+                            "taxa_diaria": taxa_bm,
+                            "origem": "referencia_mercado (fallback telemetria reduzida)",
+                            "aviso": f"Base local com registros reduzidos ({total_litros_cat:.2f} L em {total_abast_cat} abastecimentos). Aplicada taxa de referência de mercado ({taxa_bm:.1f} L/dia)."
+                        }
+
+            # Processamento individual de cada tanque
+            tanques_processados = []
+            sugestoes_pedidos = []
+
+            for t in linhas_tanques:
+                codtan = t['codtan']
+                comb = t['combustivel']
+                cat = normalizar_categoria(comb)
+                cap = Decimal(str(t['capacidade_litros'] or 0.0))
+                saldo = Decimal(str(t['saldo_atual_litros'] or 0.0))
+                bicos = bicos_por_tanque.get(codtan, [])
+
+                # Se o tanque for mini-tanque ou reserva inativa (capacidade <= 1000 e saldo == 0)
+                is_inativo = (cap <= Decimal("1000.0") and saldo == Decimal("0.0"))
+                tanques_cat_op = [tk for tk in tanques_por_cat.get(cat, []) if not (Decimal(str(tk['capacidade_litros'] or 0)) <= Decimal("1000.0") and Decimal(str(tk['saldo_atual_litros'] or 0)) == Decimal("0.0"))]
+
+                # Consumo específico do tanque (ou override por código de tanque)
+                consumo_tanque_custom = None
+                if consumo_diario_custom:
+                    if codtan in consumo_diario_custom:
+                        consumo_tanque_custom = float(consumo_diario_custom[codtan])
+                    elif f"tanque {codtan}".lower() in [k.lower() for k in consumo_diario_custom.keys()]:
+                        for k, v in consumo_diario_custom.items():
+                            if str(int(codtan)) in k:
+                                consumo_tanque_custom = float(v)
+                                break
+
+                info_comb = consumo_combustivel_info.get(cat, {"taxa_diaria": 1000.0, "origem": "referencia_mercado"})
+
+                if is_inativo:
+                    consumo_diario_tanque = Decimal("0.0")
+                    origem_taxa = "tanque_inativo"
+                elif consumo_tanque_custom is not None:
+                    consumo_diario_tanque = Decimal(str(consumo_tanque_custom))
+                    origem_taxa = "parametro_customizado_tanque"
+                else:
+                    taxa_total_cat = Decimal(str(info_comb["taxa_diaria"]))
+                    qtd_op = max(1, len(tanques_cat_op))
+                    # Distribuição igualitária entre os tanques operacionais da mesma categoria
+                    consumo_diario_tanque = round(taxa_total_cat / Decimal(str(qtd_op)), 2)
+                    origem_taxa = info_comb["origem"]
+
+                # Cálculos matemáticos
+                res_auto = self.calcular_autonomia_tanque(
+                    saldo=saldo,
+                    capacidade=cap,
+                    consumo_diario=consumo_diario_tanque,
+                    margem_critica_pct=Decimal(str(margem_critica_pct)),
+                    data_referencia=agora
+                )
+                res_carr = self.calcular_sugestao_carreta(
+                    capacidade=cap,
+                    saldo=saldo,
+                    multiplo_compartimento=Decimal("5000.0")
+                )
+
+                # Avaliação de Urgência e Prazo de Compra
+                if is_inativo:
+                    urgencia = "INATIVO"
+                    prazo_ideal = "Tanque inativo / reserva técnica desativada"
+                    status_operacional = "INATIVO"
+                elif saldo <= Decimal("0.0"):
+                    urgencia = "CRÍTICA / IMEDIATA"
+                    prazo_ideal = "Comprar IMEDIATAMENTE (tanque seco - 0 litros)"
+                    status_operacional = "ESGOTADO (SECO)"
+                elif res_auto["alerta_critico"]:
+                    urgencia = "CRÍTICA / IMEDIATA"
+                    prazo_ideal = "Comprar IMEDIATAMENTE hoje (saldo em nível de risco abaixo de 15%)"
+                    status_operacional = "NÍVEL CRÍTICO"
+                elif res_auto["autonomia_critica_horas"] <= 24.0:
+                    urgencia = "ALTA"
+                    prazo_ideal = "Emitir pedido hoje para entrega em até 24 horas"
+                    status_operacional = "ALERTA (Próximo do Crítico)"
+                elif res_auto["autonomia_critica_dias"] <= 3.0:
+                    urgencia = "MÉDIA"
+                    prazo_ideal = "Emitir pedido em até 48 horas (Atenção para o Fim de Semana)"
+                    status_operacional = "ATENÇÃO"
+                else:
+                    urgencia = "CONFORTÁVEL"
+                    dias_reaval = max(1, int(res_auto["autonomia_critica_dias"] - 2))
+                    prazo_ideal = f"Estoque regular. Reavaliar compra em {dias_reaval} dias"
+                    status_operacional = "OPERACIONAL NORMAL"
+
+                item_tanque = {
+                    "codtan": codtan,
+                    "combustivel": comb,
+                    "categoria": cat,
+                    "capacidade_litros": res_auto["capacidade_litros"],
+                    "saldo_atual_litros": res_auto["saldo_atual_litros"],
+                    "ocupacao_pct": res_auto["ocupacao_pct"],
+                    "estoque_critico_15pct_litros": res_auto["estoque_critico_15pct_litros"],
+                    "saldo_util_critico_litros": res_auto["saldo_util_critico_litros"],
+                    "consumo_diario_litros": res_auto["consumo_diario_litros"],
+                    "consumo_horario_litros": res_auto["consumo_horario_litros"],
+                    "origem_taxa_consumo": origem_taxa,
+                    "autonomia_critica_dias": res_auto["autonomia_critica_dias"],
+                    "autonomia_critica_horas": res_auto["autonomia_critica_horas"],
+                    "autonomia_runout_dias": res_auto["autonomia_runout_dias"],
+                    "autonomia_runout_horas": res_auto["autonomia_runout_horas"],
+                    "data_hora_critico": res_auto["data_hora_critico"],
+                    "data_hora_runout": res_auto["data_hora_runout"],
+                    "espaco_livre_ullage_litros": res_carr["espaco_livre_ullage_litros"],
+                    "percentual_livre_pct": res_carr["percentual_livre_pct"],
+                    "compartimentos_5k": res_carr["compartimentos_5k"],
+                    "volume_sugerido_litros": res_carr["volume_sugerido_litros"],
+                    "bicos_conectados": bicos,
+                    "alerta_critico": res_auto["alerta_critico"],
+                    "status_operacional": status_operacional,
+                    "urgencia_pedido": urgencia,
+                    "prazo_ideal_compra": prazo_ideal,
+                }
+                tanques_processados.append(item_tanque)
+
+                # Sugestão de pedido se o tanque for operacional e houver espaço para descarga
+                if not is_inativo and res_carr["volume_sugerido_litros"] > 0:
+                    sugestoes_pedidos.append({
+                        "tanque": codtan,
+                        "combustivel": comb,
+                        "categoria": cat,
+                        "volume_sugerido_litros": res_carr["volume_sugerido_litros"],
+                        "compartimentos_5k": res_carr["compartimentos_5k"],
+                        "espaco_livre_ullage_litros": res_carr["espaco_livre_ullage_litros"],
+                        "autonomia_critica_dias": res_auto["autonomia_critica_dias"],
+                        "autonomia_runout_horas": res_auto["autonomia_runout_horas"],
+                        "urgencia": urgencia,
+                        "prazo_ideal": prazo_ideal,
+                        "justificativa": (
+                            f"Saldo atual de {res_auto['saldo_atual_litros']} L ({res_auto['ocupacao_pct']}%) "
+                            f"com autonomia de {res_auto['autonomia_runout_horas']:.1f}h. "
+                            f"Espaço livre comporta {res_carr['compartimentos_5k']} compartimento(s) de 5.000 L ({res_carr['volume_sugerido_litros']} L)."
+                        )
+                    })
+
+            # Consolidação por Categoria de Combustível
+            resumo_combustiveis = []
+            for cat, t_list in tanques_por_cat.items():
+                t_processados_cat = [t for t in tanques_processados if t['categoria'] == cat and t['status_operacional'] != 'INATIVO']
+                if not t_processados_cat:
+                    continue
+
+                cap_tot = sum(t['capacidade_litros'] for t in t_processados_cat)
+                saldo_tot = sum(t['saldo_atual_litros'] for t in t_processados_cat)
+                crit_tot = sum(t['estoque_critico_15pct_litros'] for t in t_processados_cat)
+                ullage_tot = sum(t['espaco_livre_ullage_litros'] for t in t_processados_cat)
+                vol_sug_tot = sum(t['volume_sugerido_litros'] for t in t_processados_cat)
+                bocas_tot = sum(t['compartimentos_5k'] for t in t_processados_cat)
+
+                taxa_dia_tot = consumo_combustivel_info.get(cat, {}).get("taxa_diaria", 1000.0)
+                taxa_hora_tot = round(taxa_dia_tot / 24.0, 2) if taxa_dia_tot > 0 else 0.0
+
+                saldo_util_tot = max(0.0, saldo_tot - crit_tot)
+                pct_ocup_media = round((saldo_tot / cap_tot * 100.0), 2) if cap_tot > 0 else 0.0
+
+                if taxa_dia_tot <= 0.0:
+                    auto_crit_dias = 0.0
+                    auto_crit_horas = 0.0
+                    auto_ro_dias = 0.0
+                    auto_ro_horas = 0.0
+                    alerta_crit = saldo_util_tot <= 0.0
+                    dt_crit_txt = "JÁ EM NÍVEL CRÍTICO (< 15%)" if alerta_crit else "SEM CONSUMO REGISTRADO"
+                    dt_ro_txt = "ESGOTADO (Tanque seco - 0 L)" if saldo_tot <= 0.0 else "SEM CONSUMO REGISTRADO"
+                    urg_comb = "CRÍTICA / IMEDIATA" if alerta_crit else "SEM CONSUMO"
+                    prazo_comb = "Comprar IMEDIATAMENTE (reserva de segurança de 15% atingida)" if alerta_crit else "Sem consumo para estimar prazo"
+                else:
+                    if saldo_util_tot <= 0.0:
+                        auto_crit_dias = 0.0
+                        auto_crit_horas = 0.0
+                        dt_crit_txt = "JÁ EM NÍVEL CRÍTICO (< 15%)"
+                        alerta_crit = True
+                    else:
+                        auto_crit_dias = round(saldo_util_tot / taxa_dia_tot, 2)
+                        auto_crit_horas = round(auto_crit_dias * 24.0, 2)
+                        dt_c = agora + timedelta(hours=auto_crit_horas)
+                        dt_crit_txt = dt_c.strftime("%Y-%m-%d %H:%M")
+                        alerta_crit = False
+
+                    if saldo_tot <= 0.0:
+                        auto_ro_dias = 0.0
+                        auto_ro_horas = 0.0
+                        dt_ro_txt = "ESGOTADO (Tanque seco - 0 L)"
+                    else:
+                        auto_ro_dias = round(saldo_tot / taxa_dia_tot, 2)
+                        auto_ro_horas = round(auto_ro_dias * 24.0, 2)
+                        dt_ro = agora + timedelta(hours=auto_ro_horas)
+                        dt_ro_txt = dt_ro.strftime("%Y-%m-%d %H:%M")
+
+                    if alerta_crit:
+                        urg_comb = "CRÍTICA / IMEDIATA"
+                        prazo_comb = "Comprar IMEDIATAMENTE (reserva de segurança de 15% atingida)"
+                    elif auto_crit_horas <= 24.0:
+                        urg_comb = "ALTA"
+                        prazo_comb = "Emitir pedido hoje para entrega em até 24h"
+                    elif auto_crit_dias <= 3.0:
+                        urg_comb = "MÉDIA"
+                        prazo_comb = "Emitir pedido em até 48h (Atenção para o Fim de Semana)"
+                    else:
+                        urg_comb = "CONFORTÁVEL"
+                        prazo_comb = f"Estoque regular. Reavaliar em {max(1, int(auto_crit_dias - 2))} dias"
+
+                resumo_combustiveis.append({
+                    "combustivel": cat,
+                    "tanques_vinculados": [t['codtan'] for t in t_processados_cat],
+                    "capacidade_total_litros": cap_tot,
+                    "saldo_total_litros": round(saldo_tot, 2),
+                    "ocupacao_media_pct": pct_ocup_media,
+                    "estoque_critico_15pct_litros": round(crit_tot, 2),
+                    "saldo_util_critico_litros": round(saldo_util_tot, 2),
+                    "consumo_medio_diario_litros": round(taxa_dia_tot, 2),
+                    "consumo_medio_horario_litros": taxa_hora_tot,
+                    "origem_consumo": consumo_combustivel_info.get(cat, {}).get("origem"),
+                    "aviso_consumo": consumo_combustivel_info.get(cat, {}).get("aviso"),
+                    "autonomia_critica_dias": auto_crit_dias,
+                    "autonomia_critica_horas": auto_crit_horas,
+                    "autonomia_runout_dias": auto_ro_dias,
+                    "autonomia_runout_horas": auto_ro_horas,
+                    "data_hora_critico": dt_crit_txt,
+                    "data_hora_runout": dt_ro_txt,
+                    "espaco_livre_descarga_ullage": round(ullage_tot, 2),
+                    "volume_sugerido_compra_litros": vol_sug_tot,
+                    "compartimentos_5k_sugeridos": bocas_tot,
+                    "alerta_critico": alerta_crit,
+                    "urgencia_pedido": urg_comb,
+                    "prazo_ideal_compra": prazo_comb,
+                })
+
+            # Ordenação de urgência: prioridade para tanques com menor autonomia
+            sugestoes_pedidos.sort(key=lambda s: (s['autonomia_critica_dias'], s['autonomia_runout_horas']))
+
+            # Aplicação do Filtro de Combustível / Tanque (se especificado)
+            tanques_retorno = tanques_processados
+            combustiveis_retorno = resumo_combustiveis
+            sugestoes_retorno = sugestoes_pedidos
+
+            if filtro_combustivel:
+                filtro_clean = str(filtro_combustivel).upper().strip()
+                tanques_retorno = [
+                    t for t in tanques_processados
+                    if filtro_clean in t['combustivel'].upper() or filtro_clean in t['categoria'].upper() or filtro_clean == t['codtan'] or filtro_clean in f"TANQUE {t['codtan']}".upper()
+                ]
+                combustiveis_retorno = [
+                    c for c in resumo_combustiveis
+                    if filtro_clean in c['combustivel'].upper() or any(filtro_clean == t_cod or filtro_clean in f"TANQUE {t_cod}".upper() for t_cod in c.get('tanques_vinculados', []))
+                ]
+                sugestoes_retorno = [
+                    s for s in sugestoes_pedidos
+                    if filtro_clean in s['combustivel'].upper() or filtro_clean in s['categoria'].upper() or filtro_clean == s['tanque'] or filtro_clean in f"TANQUE {s['tanque']}".upper()
+                ]
+
+            tot_vol_sugerido = sum(s['volume_sugerido_litros'] for s in sugestoes_retorno)
+            tot_bocas_5k = sum(s['compartimentos_5k'] for s in sugestoes_retorno)
+
+            # Tanque Mais Crítico (calculado no escopo filtrado do retorno)
+            tanques_ativos = [t for t in tanques_retorno if t['status_operacional'] != 'INATIVO']
+            tanque_mais_critico = None
+            tanque_operacional_mais_critico = None
+            tanques_zerados_secos = [t['codtan'] for t in tanques_ativos if t['saldo_atual_litros'] <= 0]
+
+            if tanques_ativos:
+                tanque_mais_critico = min(tanques_ativos, key=lambda t: (t['autonomia_runout_horas'], t['ocupacao_pct']))
+                tanques_com_saldo = [t for t in tanques_ativos if t['saldo_atual_litros'] > 0]
+                if tanques_com_saldo:
+                    tanque_operacional_mais_critico = min(tanques_com_saldo, key=lambda t: (t['autonomia_runout_horas'], t['ocupacao_pct']))
+                else:
+                    tanque_operacional_mais_critico = tanque_mais_critico
+
+            # Combustível Mais Urgente (calculado no escopo filtrado do retorno)
+            combustivel_mais_urgente = None
+            if combustiveis_retorno:
+                combustivel_mais_urgente = min(combustiveis_retorno, key=lambda c: (c['autonomia_critica_dias'], c['autonomia_runout_horas']))
+
+            # Alerta Preventivo de Fim de Semana (calculado no escopo filtrado do retorno)
+            combustiveis_em_risco_fds = [
+                c['combustivel'] for c in combustiveis_retorno
+                if c['autonomia_runout_dias'] < 4.0 or c['autonomia_critica_dias'] < 2.5
+            ]
+            alerta_fim_de_semana = len(combustiveis_em_risco_fds) > 0
+            if alerta_fim_de_semana:
+                diag_fds = (
+                    f"ALERTA FIM DE SEMANA ATIVO: {len(combustiveis_em_risco_fds)} combustível(is) "
+                    f"({', '.join(combustiveis_em_risco_fds)}) possuem autonomia inferior a 4 dias e podem secar "
+                    f"durante o pico de movimento do sábado/domingo. Como as bases das distribuidoras não faturam no domingo, "
+                    f"recomenda-se emitir os pedidos imediatamente para recebimento até sexta-feira."
+                )
+            elif not combustiveis_retorno:
+                diag_fds = "Nenhum combustível encontrado para o filtro aplicado."
+            else:
+                diag_fds = "Estoque suficiente para atravessar o fim de semana com margem de segurança confortável nos combustíveis analisados."
+
+            # Montagem do Resultado Estruturado
+            resultado = {
+                "status": "ok",
+                "timestamp_previsao": agora.strftime("%Y-%m-%d %H:%M"),
+                "filtro_aplicado": filtro_combustivel,
+                "resumo_executivo": {
+                    "status_geral": "ALERTA_ESTOQUE_CRITICO" if any(t.get('alerta_critico') for t in tanques_retorno) else ("ESTOQUE_ESTAVEL" if tanques_retorno else "SEM_REGISTROS"),
+                    "tanque_mais_critico": {
+                        "codtan": tanque_mais_critico['codtan'],
+                        "combustivel": tanque_mais_critico['combustivel'],
+                        "saldo_atual_litros": tanque_mais_critico['saldo_atual_litros'],
+                        "capacidade_litros": tanque_mais_critico['capacidade_litros'],
+                        "ocupacao_pct": tanque_mais_critico['ocupacao_pct'],
+                        "autonomia_critica_horas": tanque_mais_critico['autonomia_critica_horas'],
+                        "autonomia_runout_horas": tanque_mais_critico['autonomia_runout_horas'],
+                        "autonomia_runout_dias": tanque_mais_critico['autonomia_runout_dias'],
+                        "run_out_estimado": tanque_mais_critico['data_hora_runout'],
+                        "urgencia": tanque_mais_critico['urgencia_pedido'],
+                        "prazo_ideal": tanque_mais_critico['prazo_ideal_compra']
+                    } if tanque_mais_critico else None,
+                    "tanque_operacional_mais_critico": {
+                        "codtan": tanque_operacional_mais_critico['codtan'],
+                        "combustivel": tanque_operacional_mais_critico['combustivel'],
+                        "saldo_atual_litros": tanque_operacional_mais_critico['saldo_atual_litros'],
+                        "capacidade_litros": tanque_operacional_mais_critico['capacidade_litros'],
+                        "ocupacao_pct": tanque_operacional_mais_critico['ocupacao_pct'],
+                        "autonomia_critica_horas": tanque_operacional_mais_critico['autonomia_critica_horas'],
+                        "autonomia_runout_horas": tanque_operacional_mais_critico['autonomia_runout_horas'],
+                        "autonomia_runout_dias": tanque_operacional_mais_critico['autonomia_runout_dias'],
+                        "run_out_estimado": tanque_operacional_mais_critico['data_hora_runout'],
+                        "urgencia": tanque_operacional_mais_critico['urgencia_pedido'],
+                        "prazo_ideal": tanque_operacional_mais_critico['prazo_ideal_compra']
+                    } if tanque_operacional_mais_critico else None,
+                    "tanques_zerados_secos": tanques_zerados_secos,
+                    "combustivel_mais_urgente": combustivel_mais_urgente['combustivel'] if combustivel_mais_urgente else None,
+                    "total_volume_sugerido_litros": tot_vol_sugerido,
+                    "total_compartimentos_5k": tot_bocas_5k,
+                    "alerta_fim_de_semana": alerta_fim_de_semana,
+                    "combustiveis_em_risco_fim_de_semana": combustiveis_em_risco_fds,
+                    "diagnostico_fim_de_semana": diag_fds,
+                },
+                "previsao_por_combustivel": combustiveis_retorno,
+                "detalhamento_tanques": tanques_retorno,
+                "sugestoes_pedidos_carreta": sugestoes_retorno,
+                "telemetria_consumo": {
+                    "total_abastecimentos_base": telemetria_geral.get('total_abast_geral', 0),
+                    "total_litros_base": float(telemetria_geral.get('total_litros_geral') or 0.0),
+                    "periodo_analisado": f"{telemetria_geral.get('primeira_data_abast')} a {telemetria_geral.get('ultima_data_abast')}",
+                    "margem_critica_adotada_pct": margem_critica_pct * 100.0,
+                    "multiplo_padrao_compartimento_litros": 5000.0
+                }
+            }
+
+            resultado_limpo, _ = sanitize_dict(resultado)
+            return resultado_limpo
+
+        except Exception as e:
+            return {
+                "status": "indisponivel",
+                "motivo": f"Falha na previsão de esgotamento de tanques no ERP (porta 5433): {e}",
+            }
+
