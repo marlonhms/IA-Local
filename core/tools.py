@@ -8,7 +8,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from decimal import Decimal
 from typing import Dict, Any, Optional, Tuple, List
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, time, timedelta
 
 from config.settings import DB_ERP_CONFIG
 from core.rag_engine import HybridRAGEngine
@@ -1670,4 +1670,777 @@ class PostoTools:
                 "status": "indisponivel",
                 "motivo": f"Falha na previsão de esgotamento de tanques no ERP (porta 5433): {e}",
             }
+
+    @staticmethod
+    def calcular_vazao_bico(litros: Any, tempo: Any, produto_nome: str = "") -> dict:
+        """
+        Calcula a vazão em Litros/Minuto (L/min) a partir do volume e do tempo de abastecimento.
+        Avalia se a vazão está normal (35-45 L/min), lenta (25-30 L/min) ou crítica (< 25 L/min).
+        """
+        if tempo is None or str(tempo).strip() == "":
+            return {
+                "tempo_segundos": None,
+                "vazao_l_min": None,
+                "status_vazao": "SEM_REGISTRO_TEMPO",
+                "alerta_filtro_lento": False,
+                "recomendacao": "Tempo de abastecimento não registrado pela automação CBC04."
+            }
+
+        segundos = 0.0
+        try:
+            if isinstance(tempo, (int, float, Decimal)):
+                segundos = float(tempo)
+            else:
+                t_str = str(tempo).strip()
+                if ":" in t_str:
+                    parts = t_str.split(":")
+                    if len(parts) == 2:
+                        segundos = float(parts[0]) * 60.0 + float(parts[1])
+                    elif len(parts) == 3:
+                        segundos = float(parts[0]) * 3600.0 + float(parts[1]) * 60.0 + float(parts[2])
+                    else:
+                        segundos = float(parts[0])
+                else:
+                    clean = re.sub(r"[^\d.]", "", t_str)
+                    segundos = float(clean) if clean else 0.0
+        except Exception:
+            segundos = 0.0
+
+        vol = float(litros or 0.0)
+        if segundos <= 0.0 or vol <= 0.0:
+            return {
+                "tempo_segundos": segundos,
+                "vazao_l_min": 0.0,
+                "status_vazao": "SEM_FLUXO",
+                "alerta_filtro_lento": False,
+                "recomendacao": "Abastecimento sem volume ou tempo computado."
+            }
+
+        vazao = round((vol / (segundos / 60.0)), 2)
+
+        # Regra de Arla32 (vazão nominal reduzida ~15-20 L/min)
+        is_arla = "ARLA" in (produto_nome or "").upper()
+        limite_critico = 10.0 if is_arla else 25.0
+        limite_alerta = 15.0 if is_arla else 30.0
+
+        if vazao < limite_critico:
+            status = "CRÍTICO_FILTRO_OBSTRUÍDO"
+            alerta = True
+            rec = (
+                f"Alerta crítico: Vazão média de {vazao:.1f} L/min severamente abaixo de {limite_critico} L/min. "
+                f"Filtro de linha/bomba obstruído. Trocar elemento filtrante com urgência para evitar "
+                f"aquecimento e travamento do motor da bomba."
+            )
+        elif vazao < limite_alerta:
+            status = "ALERTA_VAZAO_LENTA"
+            alerta = True
+            rec = (
+                f"Atenção operacional: Vazão lenta de {vazao:.1f} L/min (abaixo de {limite_alerta} L/min). "
+                f"Início de colmatação do filtro de combustível. Agendar substituição preventiva do filtro."
+            )
+        elif vazao <= 50.0:
+            status = "REGULAR_NORMAL"
+            alerta = False
+            rec = f"Vazão de {vazao:.1f} L/min em faixa operacional padrão comercial (35 a 45 L/min)."
+        else:
+            status = "ALTA_VAZAO"
+            alerta = False
+            rec = "Vazão de alto fluxo (bomba especial para caminhões/diesel ou descalibração volumétrica)."
+
+        return {
+            "tempo_segundos": round(segundos, 1),
+            "vazao_l_min": vazao,
+            "status_vazao": status,
+            "alerta_filtro_lento": alerta,
+            "recomendacao": rec
+        }
+
+    @staticmethod
+    def calcular_conversao_aditivada(litros_comum: Any, litros_aditivada: Any) -> dict:
+        """
+        Calcula o índice de conversão de Gasolina Aditivada sobre o total de Gasolina vendida.
+        """
+        l_comum = max(0.0, float(litros_comum or 0.0))
+        l_adit = max(0.0, float(litros_aditivada or 0.0))
+        total_gas = l_comum + l_adit
+
+        if total_gas <= 0.0:
+            return {
+                "total_gasolina_litros": 0.0,
+                "gasolina_comum_litros": 0.0,
+                "gasolina_aditivada_litros": 0.0,
+                "conversao_aditivada_pct": 0.0,
+                "classificacao_conversao": "SEM_VENDAS_GASOLINA",
+                "avaliacao": "Sem volume de gasolina registrado no período."
+            }
+
+        taxa = round((l_adit / total_gas) * 100.0, 2)
+        if taxa >= 30.0:
+            clas = "EXCELENTE"
+            aval = f"Alta performance comercial ({taxa}%). Superou a meta de mercado (30%) com alta geração de margem líquida."
+        elif taxa >= 15.0:
+            clas = "BOM"
+            aval = f"Desempenho satisfatório ({taxa}%). Conversão dentro da média recomendada para postos urbanos."
+        elif taxa >= 5.0:
+            clas = "REGULAR"
+            aval = f"Conversão moderada ({taxa}%). Oportunidade de alavancagem de margem via abordagem ativa de aditivada no box."
+        else:
+            clas = "BAIXO"
+            aval = f"Baixa conversão ({taxa}%). Concentração excessiva em Gasolina Comum de baixa margem. Recomendado treinamento de vendas."
+
+        return {
+            "total_gasolina_litros": round(total_gas, 3),
+            "gasolina_comum_litros": round(l_comum, 3),
+            "gasolina_aditivada_litros": round(l_adit, 3),
+            "conversao_aditivada_pct": taxa,
+            "classificacao_conversao": clas,
+            "avaliacao": aval
+        }
+
+    def auditar_desempenho_pista_frentistas(
+        self,
+        filtro: Optional[str] = None,
+        data: Optional[str] = None,
+        turno: Optional[str] = None,
+        frentista: Optional[str] = None,
+        bico: Optional[str] = None,
+        vazao_bicos_custom: Optional[Dict[str, float]] = None
+    ) -> dict:
+        """
+        Auditoria Operacional de Pista & Desempenho de Frentistas no ERP (porta 5433).
+        
+        Funcionalidades:
+        1. Detecção de Bicos com Vazão Lenta (Alerta Preventivo de Filtro Sujo < 25-30 L/min).
+        2. Ranking de Produtividade dos Frentistas (Volume L, Faturamento R$, Ticket Médio e Conversão de Aditivada).
+        3. Detecção de Anomalias de Pista (micro-abastecimentos, valores repetidos, abastecimentos manuais e cancelamentos).
+        4. Blindagem LGPD de identificadores e conformidade com boas práticas operacionais.
+        """
+        conn = None
+        try:
+            conn = psycopg2.connect(**DB_ERP_CONFIG)
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # 1. Resolução inteligente de parâmetros e filtros
+                filtro_str = (filtro or "").strip()
+                data_alvo = data
+                turno_alvo = turno
+                frentista_alvo = frentista
+                bico_alvo = bico
+
+                if filtro_str:
+                    f_low = filtro_str.lower()
+                    if f_low in ["hoje", "ontem", "anteontem"]:
+                        data_alvo = f_low
+                    elif re.search(r"\b\d{4}[-/.]\d{1,2}[-/.]\d{1,2}\b", filtro_str) or re.search(r"\b\d{1,2}[-/.]\d{1,2}(?:[-/.]\d{4})?\b", filtro_str):
+                        data_alvo = filtro_str
+                    elif any(t in f_low for t in ["1º", "2º", "3º", "1o", "2o", "3o", "primeiro", "segundo", "terceiro"]):
+                        turno_alvo = filtro_str
+                    elif re.search(r"\b(?:bico|bomba)\s*0*([0-9]{1,3})\b", f_low):
+                        m_b = re.search(r"\b(?:bico|bomba)\s*0*([0-9]{1,3})\b", f_low)
+                        bico_alvo = f"{int(m_b.group(1)):03d}"
+                    elif any(w in f_low for w in ["italo", "botan", "marcio", "sergio", "erivas", "cristian", "marlon", "davi", "samarina", "frentista", "operador", "colaborador", "matrícula", "matricula"]):
+                        frentista_alvo = filtro_str
+
+                # Resolução de data
+                cur.execute("SELECT CURRENT_DATE;")
+                data_hoje = cur.fetchone()['current_date']
+                aviso_periodo = None
+                data_filtro_db = None
+
+                if data_alvo:
+                    if str(data_alvo).lower() == "hoje":
+                        cur.execute("SELECT COUNT(*) as c FROM abastecimentos WHERE data = %s;", (data_hoje,))
+                        if cur.fetchone()['c'] > 0:
+                            data_filtro_db = str(data_hoje)
+                        else:
+                            cur.execute("SELECT MAX(data) as max_d FROM abastecimentos;")
+                            max_d = cur.fetchone()['max_d']
+                            data_filtro_db = str(max_d) if max_d else str(data_hoje)
+                            aviso_periodo = f"Sem abastecimentos registrados para a data de hoje ({data_hoje}). Exibindo data mais recente com movimentação: {data_filtro_db}."
+                    elif str(data_alvo).lower() == "ontem":
+                        dt_ontem = data_hoje - timedelta(days=1)
+                        data_filtro_db = str(dt_ontem)
+                    elif str(data_alvo).lower() == "anteontem":
+                        dt_ante = data_hoje - timedelta(days=2)
+                        data_filtro_db = str(dt_ante)
+                    else:
+                        m_iso = re.search(r"\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b", str(data_alvo))
+                        if m_iso:
+                            y, m, d = m_iso.groups()
+                            data_filtro_db = f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
+                        else:
+                            m_br = re.search(r"\b(\d{1,2})[-/.](\d{1,2})(?:[-/.](\d{4}))?\b", str(data_alvo))
+                            if m_br:
+                                d, m, y = m_br.groups()
+                                ano = int(y) if y else 2026
+                                data_filtro_db = f"{ano:04d}-{int(m):02d}-{int(d):02d}"
+                            else:
+                                data_filtro_db = str(data_alvo)
+
+                # 2. Consultar Abastecimentos no ERP
+                query_abast = """
+                    SELECT 
+                        a.controle,
+                        TRIM(a.bomba) AS bico,
+                        a.data,
+                        a.hora,
+                        ROUND(COALESCE(a.litros, 0)::numeric, 3) AS litros,
+                        ROUND(COALESCE(a.total, 0)::numeric, 2) AS total,
+                        ROUND(COALESCE(a.pu, 0)::numeric, 3) AS pu,
+                        TRIM(a.codpro) AS codpro,
+                        COALESCE(TRIM(p.nompro), 'COMBUSTÍVEL ' || TRIM(a.codpro)) AS nompro,
+                        TRIM(a.idfrentista) AS idfrentista,
+                        COALESCE(TRIM(f.nome), 'PISTA NÃO IDENTIFICADA') AS frentista_nome,
+                        a.tempo,
+                        a.abt_ds_tempo,
+                        COALESCE(a.abt_bl_venda_cancelada, False) AS venda_cancelada,
+                        a.string_full,
+                        TRIM(a.turno) AS turno
+                    FROM abastecimentos a
+                    LEFT JOIN produtos p ON p.codpro = a.codpro
+                    LEFT JOIN funcionarios f ON (TRIM(f.matr) = TRIM(a.idfrentista) OR TRIM(f.cartaoidentfid) = TRIM(a.idfrentista))
+                    WHERE 1=1
+                """
+                params_abast = []
+                if data_filtro_db:
+                    query_abast += " AND a.data = %s"
+                    params_abast.append(data_filtro_db)
+                if turno_alvo:
+                    t_dig = re.search(r"(\d)", str(turno_alvo))
+                    if t_dig:
+                        query_abast += " AND a.turno ILIKE %s"
+                        params_abast.append(f"%{t_dig.group(1)}%")
+                if frentista_alvo:
+                    frent_termo = re.sub(r"^(?:frentista|operador|colaborador|matr[ií]cula)\s*", "", str(frentista_alvo), flags=re.IGNORECASE).strip()
+                    if frent_termo.isdigit():
+                        num_mat = int(frent_termo)
+                        matr_5d = f"{num_mat:05d}"
+                        query_abast += " AND (TRIM(a.idfrentista) = %s OR TRIM(a.idfrentista) = %s OR f.nome ILIKE %s)"
+                        params_abast.extend([matr_5d, str(num_mat), f"%{frent_termo}%"])
+                    else:
+                        query_abast += " AND (f.nome ILIKE %s OR a.idfrentista ILIKE %s)"
+                        params_abast.extend([f"%{frent_termo}%", f"%{frent_termo}%"])
+                if bico_alvo:
+                    b_num = str(bico_alvo).strip()
+                    if b_num.isdigit():
+                        b_pad = f"{int(b_num):03d}"
+                        b_clean = b_num.lstrip("0") or "0"
+                        query_abast += " AND (TRIM(a.bomba) = %s OR TRIM(a.bomba) = %s)"
+                        params_abast.extend([b_pad, b_clean])
+                    else:
+                        query_abast += " AND TRIM(a.bomba) ILIKE %s"
+                        params_abast.append(f"%{b_num}%")
+
+                query_abast += " ORDER BY a.data DESC, a.hora DESC;"
+                cur.execute(query_abast, params_abast)
+                linhas_abastecimentos = cur.fetchall()
+
+                # Se nenhum abastecimento com a data especificada, verificar se há dados na base
+                cur.execute("""
+                    SELECT 
+                        COUNT(*) AS total_geral,
+                        MIN(data) AS min_data,
+                        MAX(data) AS max_data
+                    FROM abastecimentos;
+                """)
+                stats_base = cur.fetchone()
+
+                # 3. Consultar Bicos físicos cadastrados em bombas
+                cur.execute("""
+                    SELECT 
+                        TRIM(b.codbom) AS bico,
+                        TRIM(b.bom_ds_referencia) AS bomba_fisica,
+                        TRIM(b.codtan) AS tanque,
+                        TRIM(b.codpro) AS codpro,
+                        COALESCE(TRIM(p.nompro), 'COMBUSTÍVEL ' || TRIM(b.codpro)) AS nompro,
+                        COALESCE(b.bic_fl_ativo, 'S') AS ativo,
+                        COALESCE(b.bic_fl_abastecimento_manual, 'N') AS manual_permitido
+                    FROM bombas b
+                    LEFT JOIN produtos p ON p.codpro = b.codpro
+                    ORDER BY b.codbom;
+                """)
+                bicos_cadastrados = cur.fetchall()
+
+            # Função auxiliar de categorização de combustível
+            def categorizar_combustivel(nome: str) -> str:
+                n = (nome or "").upper().strip()
+                if "ADITIVADA" in n or "GRID" in n or "V-POWER" in n or "OCTAPRO" in n or "PODIUM" in n:
+                    return "GASOLINA ADITIVADA"
+                elif "COMUM" in n or "GASOLINA" in n:
+                    return "GASOLINA COMUM"
+                elif "ETANOL" in n or "ALCOOL" in n or "ÁLCOOL" in n:
+                    return "ETANOL"
+                elif "S10" in n or "S-10" in n:
+                    return "DIESEL S10"
+                elif "S500" in n or "S-500" in n or "DIESEL" in n:
+                    return "DIESEL S500"
+                elif "ARLA" in n:
+                    return "ARLA"
+                return "OUTROS"
+
+            # 4. Agrupamento de Abastecimentos por Bico e por Frentista
+            abasts_por_bico: Dict[str, List[dict]] = {}
+            abasts_por_frentista: Dict[str, List[dict]] = {}
+
+            for a in linhas_abastecimentos:
+                c_bico = a['bico']
+                if c_bico:
+                    abasts_por_bico.setdefault(c_bico, []).append(a)
+
+                c_frent = a['idfrentista'] or "SEM_IDENTIFICACAO"
+                abasts_por_frentista.setdefault(c_frent, []).append(a)
+
+            # 5. Auditoria de Vazão dos Bicos (Detecção de Filtro Lento)
+            bicos_auditoria = []
+            bicos_com_alerta = []
+
+            for b in bicos_cadastrados:
+                cod_bico = b['bico']
+                bomba_fisica = b['bomba_fisica']
+                comb_bico = b['nompro']
+                cat_bico = categorizar_combustivel(comb_bico)
+                is_ativo = (b['ativo'] == 'S')
+                abasts_bico = abasts_por_bico.get(cod_bico, [])
+                qtd_abast_bico = len(abasts_bico)
+                vol_tot_bico = sum(float(x['litros'] or 0.0) for x in abasts_bico)
+
+                if not is_ativo:
+                    bicos_auditoria.append({
+                        "bico": cod_bico,
+                        "bomba_fisica": bomba_fisica,
+                        "tanque": b['tanque'],
+                        "combustivel": comb_bico,
+                        "categoria": cat_bico,
+                        "status_operacional": "INATIVO / DESATIVADO",
+                        "total_abastecimentos": qtd_abast_bico,
+                        "volume_total_litros": round(vol_tot_bico, 3),
+                        "vazao_media_l_min": 0.0,
+                        "status_vazao": "INATIVO",
+                        "origem_vazao": "cadastro_erp",
+                        "alerta_filtro_lento": False,
+                        "recomendacao": "Bico desativado no cadastro do ERP."
+                    })
+                    continue
+
+                # Determinação da vazão do bico
+                # 1. Verificar override customizado (ex: aferição manual com proveta)
+                vazao_custom = None
+                if vazao_bicos_custom:
+                    clean_bico = cod_bico.lstrip("0") or "0"
+                    if cod_bico in vazao_bicos_custom:
+                        vazao_custom = float(vazao_bicos_custom[cod_bico])
+                    elif clean_bico in vazao_bicos_custom:
+                        vazao_custom = float(vazao_bicos_custom[clean_bico])
+
+                if vazao_custom is not None:
+                    res_vazao = self.calcular_vazao_bico(litros=vazao_custom, tempo=60.0, produto_nome=comb_bico)
+                    origem_vazao = "medicao_afericao_custom"
+                    vazao_media = vazao_custom
+                    rec_bico = res_vazao["recomendacao"]
+                else:
+                    # 2. Verificar telemetria real de tempo nos abastecimentos do bico
+                    vazoes_reais = []
+                    for x in abasts_bico:
+                        tempo_reg = x.get('tempo') or x.get('abt_ds_tempo')
+                        if tempo_reg:
+                            res_x = self.calcular_vazao_bico(litros=x['litros'], tempo=tempo_reg, produto_nome=comb_bico)
+                            if res_x['vazao_l_min'] and res_x['vazao_l_min'] > 0:
+                                vazoes_reais.append(res_x['vazao_l_min'])
+
+                    if vazoes_reais:
+                        vazao_media = round(sum(vazoes_reais) / len(vazoes_reais), 2)
+                        res_vazao = self.calcular_vazao_bico(litros=vazao_media, tempo=60.0, produto_nome=comb_bico)
+                        origem_vazao = "telemetria_tempo_cbc04"
+                        rec_bico = res_vazao["recomendacao"]
+                    else:
+                        # 3. Baseline calibrado nominal de pista
+                        if cat_bico == "ARLA":
+                            vazao_media = 18.0
+                        elif "DIESEL" in cat_bico:
+                            vazao_media = 42.0
+                        else:
+                            vazao_media = 38.0
+                        res_vazao = self.calcular_vazao_bico(litros=vazao_media, tempo=60.0, produto_nome=comb_bico)
+                        if qtd_abast_bico > 0:
+                            origem_vazao = "estimativa_nominal_calibrada"
+                            rec_bico = f"Vazão estimada por baseline nominal ({vazao_media:.1f} L/min). Automação CBC04 sem telemetria de duração registrada nos abastecimentos deste período."
+                        else:
+                            origem_vazao = "sem_movimento_periodo"
+                            rec_bico = f"Sem abastecimentos registrados para este bico no período analisado. Baseline de referência da bomba: {vazao_media:.1f} L/min."
+
+                item_bico = {
+                    "bico": cod_bico,
+                    "bomba_fisica": bomba_fisica,
+                    "tanque": b['tanque'],
+                    "combustivel": comb_bico,
+                    "categoria": cat_bico,
+                    "status_operacional": "ATIVO",
+                    "total_abastecimentos": qtd_abast_bico,
+                    "volume_total_litros": round(vol_tot_bico, 3),
+                    "vazao_media_l_min": vazao_media,
+                    "status_vazao": res_vazao["status_vazao"],
+                    "origem_vazao": origem_vazao,
+                    "alerta_filtro_lento": res_vazao["alerta_filtro_lento"],
+                    "recomendacao": rec_bico
+                }
+                bicos_auditoria.append(item_bico)
+                if res_vazao["alerta_filtro_lento"]:
+                    bicos_com_alerta.append(item_bico)
+
+            # Ordenação dos bicos fora do laço principal
+            bicos_auditoria.sort(key=lambda item: (not item['alerta_filtro_lento'], item['vazao_media_l_min']))
+
+            # 6. Produtividade & Ranking dos Frentistas
+            frentistas_processados = []
+
+            for mat, abasts_f in abasts_por_frentista.items():
+                nome_f = next((x['frentista_nome'] for x in abasts_f if x.get('frentista_nome') and x['frentista_nome'] != 'PISTA NÃO IDENTIFICADA'), abasts_f[0]['frentista_nome'] if abasts_f else "Frentista")
+                tot_abast_f = len(abasts_f)
+                tot_litros_f = sum(float(x['litros'] or 0.0) for x in abasts_f)
+                tot_fat_f = sum(float(x['total'] or 0.0) for x in abasts_f)
+                ticket_medio_f = round((tot_fat_f / tot_abast_f), 2) if tot_abast_f > 0 else 0.0
+                vol_medio_f = round((tot_litros_f / tot_abast_f), 3) if tot_abast_f > 0 else 0.0
+
+                l_gas_comum = sum(float(x['litros'] or 0.0) for x in abasts_f if categorizar_combustivel(x['nompro']) == "GASOLINA COMUM")
+                l_gas_adit = sum(float(x['litros'] or 0.0) for x in abasts_f if categorizar_combustivel(x['nompro']) == "GASOLINA ADITIVADA")
+                l_die_s500 = sum(float(x['litros'] or 0.0) for x in abasts_f if categorizar_combustivel(x['nompro']) == "DIESEL S500")
+                l_die_s10 = sum(float(x['litros'] or 0.0) for x in abasts_f if categorizar_combustivel(x['nompro']) == "DIESEL S10")
+                l_etanol = sum(float(x['litros'] or 0.0) for x in abasts_f if categorizar_combustivel(x['nompro']) == "ETANOL")
+                l_arla = sum(float(x['litros'] or 0.0) for x in abasts_f if categorizar_combustivel(x['nompro']) == "ARLA")
+
+                res_conv_adit = self.calcular_conversao_aditivada(litros_comum=l_gas_comum, litros_aditivada=l_gas_adit)
+                tot_die = l_die_s500 + l_die_s10
+                taxa_s10 = round((l_die_s10 / tot_die * 100.0), 2) if tot_die > 0 else 0.0
+
+                frentistas_processados.append({
+                    "matricula": mat,
+                    "nome": nome_f,
+                    "identificado": (mat != "SEM_IDENTIFICACAO"),
+                    "total_abastecimentos": tot_abast_f,
+                    "total_litros": round(tot_litros_f, 3),
+                    "faturamento_reais": round(tot_fat_f, 2),
+                    "ticket_medio_reais": ticket_medio_f,
+                    "volume_medio_litros": vol_medio_f,
+                    "litros_gasolina_comum": round(l_gas_comum, 3),
+                    "litros_gasolina_aditivada": round(l_gas_adit, 3),
+                    "total_gasolina_litros": res_conv_adit["total_gasolina_litros"],
+                    "conversao_aditivada_pct": res_conv_adit["conversao_aditivada_pct"],
+                    "classificacao_conversao": res_conv_adit["classificacao_conversao"],
+                    "litros_diesel_s500": round(l_die_s500, 3),
+                    "litros_diesel_s10": round(l_die_s10, 3),
+                    "total_diesel_litros": round(tot_die, 3),
+                    "conversao_diesel_s10_pct": taxa_s10,
+                    "litros_etanol": round(l_etanol, 3),
+                    "litros_arla": round(l_arla, 3),
+                })
+
+            # Ordenação do Ranking (prioridade: colaboradores identificados primeiro, depois volume e faturamento)
+            frentistas_processados.sort(key=lambda f: (f['identificado'], f['total_litros'], f['faturamento_reais']), reverse=True)
+
+            ranking_frentistas = []
+            pos_colaborador = 1
+            for f in frentistas_processados:
+                f_item = dict(f)
+                if f['identificado']:
+                    f_item["posicao_ranking"] = pos_colaborador
+                    pos_colaborador += 1
+                else:
+                    f_item["posicao_ranking"] = None
+
+                destaques = []
+                if f['conversao_aditivada_pct'] >= 25.0 and f['litros_gasolina_aditivada'] > 0:
+                    destaques.append("Top Conversão de Aditivada")
+                if f['ticket_medio_reais'] >= 80.0:
+                    destaques.append("Alto Ticket Médio")
+                if f_item["posicao_ranking"] == 1:
+                    destaques.append("Líder de Litragem da Pista")
+                if not f['identificado']:
+                    destaques.append("Abastecimentos sem Cartão/FID")
+
+                f_item["destaque_performance"] = " | ".join(destaques) if destaques else "Operação Padrão"
+                ranking_frentistas.append(f_item)
+
+            # Identificação de Campeões Individuais (somente colaboradores identificados)
+            colaboradores = [f for f in ranking_frentistas if f['identificado']]
+            campeao_volume = max(colaboradores, key=lambda f: f['total_litros']) if colaboradores else None
+            campeao_faturamento = max(colaboradores, key=lambda f: f['faturamento_reais']) if colaboradores else None
+            colaboradores_com_adit = [f for f in colaboradores if f['litros_gasolina_aditivada'] > 0]
+            if colaboradores_com_adit:
+                campeao_aditivada = max(colaboradores_com_adit, key=lambda f: (f['litros_gasolina_aditivada'], f['conversao_aditivada_pct']))
+            else:
+                campeao_aditivada = None
+            maior_ticket_medio = max(colaboradores, key=lambda f: f['ticket_medio_reais']) if colaboradores else None
+
+            # 7. Detecção de Anomalias de Pista
+            anomalias = []
+            abasts_ordenados_tempo = sorted(linhas_abastecimentos, key=lambda x: (x['data'], x['hora']))
+
+            for idx, a in enumerate(abasts_ordenados_tempo):
+                ctrl = a['controle']
+                bico_reg = a['bico']
+                dt_str = str(a['data'])
+                hr_str = str(a['hora'])
+                vol = float(a['litros'] or 0.0)
+                tot = float(a['total'] or 0.0)
+                string_full = str(a.get('string_full') or "")
+
+                # Anomalia 1: Micro-abastecimento (< 1.0 L ou < R$ 5.00)
+                if 0.0 < vol < 1.0 or (0.0 < tot < 5.00 and vol < 2.0):
+                    anomalias.append({
+                        "controle": ctrl,
+                        "tipo": "MICRO_ABASTECIMENTO",
+                        "gravidade": "MEDIA",
+                        "bico": bico_reg,
+                        "data_hora": f"{dt_str} {hr_str}",
+                        "litros": vol,
+                        "total_reais": tot,
+                        "frentista": a['frentista_nome'],
+                        "motivo": f"Volume atípico de {vol:.3f} L (R$ {tot:.2f}). Possível teste de bico, gotejamento ou acionamento indevido."
+                    })
+
+                # Anomalia 2: Abastecimento Manual
+                if "MANUAL" in string_full.upper():
+                    anomalias.append({
+                        "controle": ctrl,
+                        "tipo": "ABASTECIMENTO_MANUAL",
+                        "gravidade": "ALTA",
+                        "bico": bico_reg,
+                        "data_hora": f"{dt_str} {hr_str}",
+                        "litros": vol,
+                        "total_reais": tot,
+                        "frentista": a['frentista_nome'],
+                        "motivo": f"Abastecimento inserido manualmente no PDV ({string_full}) sem captura direta do concentrador CBC04."
+                    })
+
+                # Anomalia 3: Venda Cancelada
+                if a.get('venda_cancelada'):
+                    anomalias.append({
+                        "controle": ctrl,
+                        "tipo": "VENDA_CANCELADA",
+                        "gravidade": "ALTA",
+                        "bico": bico_reg,
+                        "data_hora": f"{dt_str} {hr_str}",
+                        "litros": vol,
+                        "total_reais": tot,
+                        "frentista": a['frentista_nome'],
+                        "motivo": "Abastecimento com venda cancelada no PDV/Pista."
+                    })
+
+                # Anomalia 4: Horário Atípico (madrugada entre 23:00 e 05:00)
+                if a.get('hora') is not None:
+                    hr_val = a['hora']
+                    if hasattr(hr_val, 'hour'):
+                        hr_num = hr_val.hour
+                    else:
+                        try:
+                            hr_num = int(str(hr_val).strip().split(":")[0])
+                        except Exception:
+                            hr_num = -1
+                    if hr_num >= 23 or (0 <= hr_num < 5):
+                        anomalias.append({
+                            "controle": ctrl,
+                            "tipo": "HORARIO_ATIPICO",
+                            "gravidade": "BAIXA",
+                            "bico": bico_reg,
+                            "data_hora": f"{dt_str} {hr_str}",
+                            "litros": vol,
+                            "total_reais": tot,
+                            "frentista": a['frentista_nome'],
+                            "motivo": f"Abastecimento realizado fora do horário de pico comercial ({hr_str})."
+                        })
+
+                # Anomalia 5: Valores Idênticos Consecutivos (intervalo curto na pista)
+                if idx > 0:
+                    prev = abasts_ordenados_tempo[idx - 1]
+                    mesmo_valor = (float(prev['total'] or 0.0) == tot and tot > 0)
+                    if mesmo_valor:
+                        intervalo_seg = None
+                        try:
+                            d_curr = a['data'] if isinstance(a.get('data'), date) else datetime.strptime(str(a.get('data')), "%Y-%m-%d").date() if a.get('data') else None
+                            d_prev = prev['data'] if isinstance(prev.get('data'), date) else datetime.strptime(str(prev.get('data')), "%Y-%m-%d").date() if prev.get('data') else None
+                            
+                            def parse_time(t_val):
+                                if t_val is None:
+                                    return None
+                                if hasattr(t_val, 'hour'):
+                                    return t_val
+                                parts = str(t_val).strip().split(":")
+                                return time(int(parts[0]), int(parts[1]), int(float(parts[2])) if len(parts) > 2 else 0)
+
+                            t_curr = parse_time(a.get('hora'))
+                            t_prev = parse_time(prev.get('hora'))
+
+                            if d_curr and t_curr and d_prev and t_prev:
+                                dt_curr = datetime.combine(d_curr, t_curr)
+                                dt_prev = datetime.combine(d_prev, t_prev)
+                                intervalo_seg = abs((dt_curr - dt_prev).total_seconds())
+                        except Exception:
+                            intervalo_seg = None
+
+                        is_repetido = False
+                        if intervalo_seg is not None:
+                            # Mesmo bico em menos de 10 min OU qualquer bico em menos de 2 min
+                            if prev['bico'] == bico_reg and intervalo_seg <= 600:
+                                is_repetido = True
+                            elif intervalo_seg <= 120:
+                                is_repetido = True
+                        elif prev['bico'] == bico_reg and dt_str == str(prev.get('data')):
+                            is_repetido = True
+
+                        if is_repetido:
+                            anomalias.append({
+                                "controle": ctrl,
+                                "tipo": "VALORES_REPETIDOS_CONSECUTIVOS",
+                                "gravidade": "MEDIA",
+                                "bico": bico_reg,
+                                "data_hora": f"{dt_str} {hr_str}",
+                                "litros": vol,
+                                "total_reais": tot,
+                                "frentista": a['frentista_nome'],
+                                "motivo": f"Abastecimento em sequência imediata com valor idêntico ao controle anterior {prev['controle']} (R$ {tot:.2f})."
+                            })
+
+            # 8. Consolidação Geral dos Dados
+            tot_litros_pista = sum(float(x['litros'] or 0.0) for x in linhas_abastecimentos)
+            tot_fat_pista = sum(float(x['total'] or 0.0) for x in linhas_abastecimentos)
+            tot_abast_count = len(linhas_abastecimentos)
+            ticket_medio_pista = round(tot_fat_pista / tot_abast_count, 2) if tot_abast_count > 0 else 0.0
+            vol_medio_pista = round(tot_litros_pista / tot_abast_count, 3) if tot_abast_count > 0 else 0.0
+
+            gas_comum_pista = sum(float(x['litros'] or 0.0) for x in linhas_abastecimentos if categorizar_combustivel(x['nompro']) == "GASOLINA COMUM")
+            gas_adit_pista = sum(float(x['litros'] or 0.0) for x in linhas_abastecimentos if categorizar_combustivel(x['nompro']) == "GASOLINA ADITIVADA")
+            res_conv_geral = self.calcular_conversao_aditivada(litros_comum=gas_comum_pista, litros_aditivada=gas_adit_pista)
+
+            die_s500_pista = sum(float(x['litros'] or 0.0) for x in linhas_abastecimentos if categorizar_combustivel(x['nompro']) == "DIESEL S500")
+            die_s10_pista = sum(float(x['litros'] or 0.0) for x in linhas_abastecimentos if categorizar_combustivel(x['nompro']) == "DIESEL S10")
+            tot_die_pista = die_s500_pista + die_s10_pista
+            taxa_die_s10_pista = round((die_s10_pista / tot_die_pista * 100.0), 2) if tot_die_pista > 0 else 0.0
+
+            # Avaliação do Status Geral da Pista
+            if any(b.get('status_vazao') == "CRÍTICO_FILTRO_OBSTRUÍDO" for b in bicos_com_alerta):
+                status_geral = "CRÍTICO_MANUTENÇÃO"
+            elif bicos_com_alerta or any(an['gravidade'] == "ALTA" for an in anomalias):
+                status_geral = "ALERTA_PISTA"
+            else:
+                status_geral = "OPERACIONAL_NORMAL"
+
+            # 9. Geração de Recomendações Operacionais
+            recomendacoes = []
+            if bicos_com_alerta:
+                bicos_str = ", ".join(f"Bico {b['bico']} ({b['vazao_media_l_min']:.1f} L/min)" for b in bicos_com_alerta)
+                recomendacoes.append(
+                    f"Manutenção Preventiva: Providenciar a troca imediata do filtro de combustível em: {bicos_str}. "
+                    f"Vazão abaixo do limite mínimo de 30 L/min gera lentidão no atendimento e sobrecarga na bomba."
+                )
+            else:
+                recomendacoes.append("Vazão Hidráulica: Todos os bicos operacionais avaliados operam em fluxo comercial adequado (35 a 45 L/min).")
+
+            if res_conv_geral["conversao_aditivada_pct"] < 20.0 and res_conv_geral["total_gasolina_litros"] > 0:
+                recomendacoes.append(
+                    f"Incentivo Comercial: A taxa de conversão de Gasolina Aditivada da pista está em {res_conv_geral['conversao_aditivada_pct']}% "
+                    f"(abaixo da meta de 25-30%). Capacitar a equipe de frentistas para oferta ativa no primeiro contato com o motorista."
+                )
+            elif res_conv_geral["total_gasolina_litros"] > 0:
+                recomendacoes.append(
+                    f"Vendas de Aditivada: Bom índice de conversão de aditivada apurado ({res_conv_geral['conversao_aditivada_pct']}%), "
+                    f"garantindo margem líquida superior na pista."
+                )
+
+            anomalias_altas = [an for an in anomalias if an['gravidade'] == "ALTA"]
+            if anomalias_altas:
+                recomendacoes.append(
+                    f"Controle de Perdas: Foram detectadas {len(anomalias_altas)} anomalia(s) de alta prioridade "
+                    f"(abastecimentos manuais ou cancelados). Auditar a liberação de pista com o gerente do posto."
+                )
+
+            sem_ident = [f for f in ranking_frentistas if not f['identificado']]
+            if sem_ident and sem_ident[0]['total_abastecimentos'] > 0:
+                recomendacoes.append(
+                    f"Rastreabilidade: {sem_ident[0]['total_abastecimentos']} abastecimento(s) foram finalizados sem "
+                    f"identificação do colaborador via cartão RFID/Fid. Reforçar o uso do cartão em cada abastecimento."
+                )
+
+            bico_destaque = None
+            if bico_alvo:
+                b_pad = f"{int(bico_alvo):03d}" if str(bico_alvo).isdigit() else str(bico_alvo)
+                bico_destaque = next((b for b in bicos_auditoria if b['bico'] == b_pad or b['bico'].lstrip('0') == b_pad.lstrip('0')), None)
+
+            resultado = {
+                "status": "ok",
+                "timestamp_auditoria": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "periodo_analisado": {
+                    "data_filtro": data_filtro_db,
+                    "turno_filtro": turno_alvo,
+                    "frentista_filtro": frentista_alvo,
+                    "bico_filtro": bico_alvo,
+                    "primeira_data_base": str(stats_base['min_data']) if stats_base else None,
+                    "ultima_data_base": str(stats_base['max_data']) if stats_base else None,
+                    "aviso_periodo": aviso_periodo,
+                },
+                "resumo_executivo": {
+                    "status_geral": status_geral,
+                    "total_abastecimentos": tot_abast_count,
+                    "total_litros": round(tot_litros_pista, 3),
+                    "faturamento_total_reais": round(tot_fat_pista, 2),
+                    "ticket_medio_pista_reais": ticket_medio_pista,
+                    "volume_medio_abastecimento_litros": vol_medio_pista,
+                    "taxa_conversao_aditivada_geral_pct": res_conv_geral["conversao_aditivada_pct"],
+                    "classificacao_conversao_aditivada": res_conv_geral["classificacao_conversao"],
+                    "total_gasolina_comum_litros": round(gas_comum_pista, 3),
+                    "total_gasolina_aditivada_litros": round(gas_adit_pista, 3),
+                    "total_diesel_s500_litros": round(die_s500_pista, 3),
+                    "total_diesel_s10_litros": round(die_s10_pista, 3),
+                    "total_diesel_litros": round(tot_die_pista, 3),
+                    "taxa_conversao_diesel_s10_pct": taxa_die_s10_pista,
+                    "mensagem_aditivada": (
+                        f"Líder em Aditivada: {campeao_aditivada['nome']} ({campeao_aditivada['conversao_aditivada_pct']}% de conversão)"
+                        if campeao_aditivada else "Nenhum frentista registrou vendas de gasolina aditivada no período analisado."
+                    ),
+                    "bico_alvo_destaque": bico_destaque,
+                    "campeao_volume": {
+                        "matricula": campeao_volume['matricula'],
+                        "nome": campeao_volume['nome'],
+                        "total_litros": campeao_volume['total_litros'],
+                        "total_abastecimentos": campeao_volume['total_abastecimentos']
+                    } if campeao_volume else None,
+                    "campeao_faturamento": {
+                        "matricula": campeao_faturamento['matricula'],
+                        "nome": campeao_faturamento['nome'],
+                        "faturamento_reais": campeao_faturamento['faturamento_reais'],
+                        "ticket_medio_reais": campeao_faturamento['ticket_medio_reais']
+                    } if campeao_faturamento else None,
+                    "campeao_aditivada": {
+                        "matricula": campeao_aditivada['matricula'],
+                        "nome": campeao_aditivada['nome'],
+                        "litros_aditivada": campeao_aditivada['litros_gasolina_aditivada'],
+                        "conversao_pct": campeao_aditivada['conversao_aditivada_pct']
+                    } if campeao_aditivada else None,
+                    "maior_ticket_medio": {
+                        "matricula": maior_ticket_medio['matricula'],
+                        "nome": maior_ticket_medio['nome'],
+                        "ticket_medio_reais": maior_ticket_medio['ticket_medio_reais'],
+                        "faturamento_reais": maior_ticket_medio['faturamento_reais']
+                    } if maior_ticket_medio else None,
+                    "bicos_com_alerta_filtro": len(bicos_com_alerta),
+                    "total_anomalias_detectadas": len(anomalias)
+                },
+                "ranking_frentistas": ranking_frentistas,
+                "auditoria_vazao_bicos": bicos_auditoria,
+                "anomalias_detectadas": anomalias,
+                "recomendacoes_operacionais": recomendacoes
+            }
+
+            resultado_limpo, _ = sanitize_dict(resultado)
+            return resultado_limpo
+
+        except Exception as e:
+            return {
+                "status": "indisponivel",
+                "motivo": f"Falha na auditoria de pista e frentistas no ERP (porta 5433): {e}",
+            }
+        finally:
+            if conn and not conn.closed:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 

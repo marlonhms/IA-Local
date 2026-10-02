@@ -1,8 +1,8 @@
 # 🚀 Roadmap Estratégico & Engenharia de Execução: Projeto Ai.la
 
 **Projeto:** Ai.la — IA Local Especialista em Postos de Combustíveis e PDV  
-**Versão:** 1.2.0-PRO  
-**Status Atual:** Fases 1 e 2 Concluídas + Capacidade Preditiva da Fase 6 Homologada (LGPD + Conciliação de Turnos + Previsão de Esgotamento & Sugestão de Pedidos)  
+**Versão:** 1.3.0-PRO  
+**Status Atual:** Fases 1 e 2 Concluídas + Capacidade Preditiva e Auditoria Operacional de Pista/Frentistas Homologadas (LGPD + Conciliação de Turnos + Previsão de Esgotamento + Desempenho de Frentistas & Filtro Lento)  
 **Próxima Frente Imediata:** Fase 2.5 (Esteira de Deploy Automatizado & Onboarding Multi-Posto) $\rightarrow$ Fase 3 (MCP + LangGraph)  
 **Ambiente:** Edge AI Local (Posto) + Hub Central de Gestão/Telemetria | Docker + PostgreSQL 16 (Portas 5432/5433, 5434, 5678)  
 
@@ -277,6 +277,14 @@ flowchart TD
   - Sugestão inteligente de pedidos de compra em múltiplos de compartimento padrão de carreta (5.000 L, 10.000 L, 15.000 L...) e alerta preventivo de risco de esgotamento para o fim de semana.
   - Rota e intenção `previsao_tanques` integrada em `main.py` com extrator de combustível/tanque e respostas via streaming.
   - Suíte de testes automatizada `scripts/test_previsao_tanques.py` com 100% de aprovação e blindagem LGPD ativa.
+- [x] **Auditoria Operacional de Pista & Desempenho de Frentistas (Concluído ✅):**
+  - Implementado em `core/tools.py` via `PostoTools.auditar_desempenho_pista_frentistas()`, `PostoTools.calcular_vazao_bico()` e `PostoTools.calcular_conversao_aditivada()`.
+  - Cruzamento de dados de pista em tempo real com PostgreSQL ERP na porta 5433 (`abastecimentos`, `bombas`, `funcionarios`, `produtos`).
+  - **Detecção de Bicos com Vazão Lenta (Alerta Preventivo de Filtro Sujo):** Monitoramento contínuo da vazão em Litros/Minuto (L/min) dos bicos ativos (nominal comercial: 35 a 45 L/min). Emissão de alertas automáticos quando a vazão fica abaixo de 30 L/min (`ALERTA_VAZAO_LENTA`) ou abaixo de 25 L/min (`CRÍTICO_FILTRO_OBSTRUÍDO`), indicando necessidade de troca preventiva do filtro da bomba.
+  - **Ranking de Produtividade & Conversão de Aditivadas:** Ranking consolidado de operadores por volume faturado (L) e receita (R$), ticket médio por abastecimento e índice de conversão de Gasolina Aditivada (identificando frentistas de alta performance de margem líquida $\ge 25\%$).
+  - **Detecção Inteligente de Anomalias de Pista:** Rastreamento de micro-abastecimentos suspeitos ($< 1.0$ L ou $< R\$\,5,00$), abastecimentos inseridos manualmente no PDV sem pulso CBC04, vendas canceladas, valores idênticos repetidos em curto intervalo e horários atípicos.
+  - **Roteamento & Streaming no Agente:** Nova intenção `desempenho_pista_frentistas` em `main.py` com extratores inteligentes de colaborador/data/turno e respostas executivas via streaming no Gemini.
+  - **Validação e Blindagem:** Suíte de testes automatizada `scripts/test_desempenho_frentistas.py` com 100% de aprovação, testes de não-regressão e conformidade com `sanitize_dict` (LGPD).
 - [ ] **Auditoria Fiscal Contínua com `Agent Sefaz`:**
   - Cruzamento de cada cupom fiscal emitido (NFC-e) contra o cadastro de NCM/CEST e regras da Reforma Tributária (IBS/CBS).
   - Alerta de produtos cadastrados com tributação incorreta que estejam gerando pagamento a maior ou a menor de impostos.
@@ -299,6 +307,6 @@ flowchart TD
 
 ## 🎯 6. Próximo Passo Recomendado
 
-Com a **Fase 1 (Sanitizador LGPD)** e a **Fase 2 (Motor de Conciliação de Turnos)** concluídas e aprovadas, e com a **Fase 2.5 (Esteira de Deploy Automatizado: criação futura do script `deploy_posto.ps1` e `docker-compose.yml`)** devidamente planejada no roadmap:
+Com a **Fase 1 (Sanitizador LGPD)**, a **Fase 2 (Motor de Conciliação de Turnos)** e os módulos analíticos da **Fase 6 (Previsão Preditiva de Tanques & Auditoria Operacional de Pista e Frentistas)** concluídos, testados e homologados:
 
-O foco atual segue no aprofundamento do núcleo e cruzamento do banco de dados local no diretório [`ia-banco-local`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local).
+O próximo passo prioritário é prosseguir com a **Fase 2.5 (Esteira de Deploy Automatizado: criação do script `deploy_posto.ps1` e template `docker-compose.yml`)** e a **Fase 3 (Desacoplamento de Arquitetura: Servidor MCP local, FastAPI assíncrono e LangGraph)**.

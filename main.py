@@ -12,6 +12,7 @@ Arquitetura:
     6. Dados Cadastrais da Filial (empresa)
     7. Previsão de Esgotamento de Combustível (Run-Out) & Sugestão de Pedidos (tanques + abastecimentos)
     8. Auditoria de Fechamento de Turno & Conciliação de Pista (fechabomba + fechacaixa + CBC04)
+    9. Auditoria de Desempenho de Frentistas & Pista (vazão de bicos, conversão de aditivada, anomalias)
 """
 
 import os
@@ -74,7 +75,9 @@ def classificar_intencao(pergunta: str) -> str:
         "turno", "fechamento", "concilia", "furo", "quebra", "auditar", "auditoria", 
         "conferência", "conferencia", "encerramento", "divergência", "divergencia", "encerrante"
     ])
-    if tem_raiz_auditoria:
+    if ("frentista" in p or "frentistas" in p) and not any(k in p for k in ["furo", "quebra", "bateu", "sobra", "falta", "concilia"]):
+        pass
+    elif tem_raiz_auditoria:
         if any(w in p for w in [
             "hoje", "ontem", "anteontem", "como foi", "como fechou", "qual foi", "qual o", "resumo",
             "bateu", "caixa", "bomba", "bico", "sobra", "falta", "1º", "2º", "3º", "1o", "2o", "3o",
@@ -151,6 +154,57 @@ def classificar_intencao(pergunta: str) -> str:
     if any(t in p for t in termos_clientes) or ("cliente" in p and any(w in p for w in ["mais", "quem", "qual", "comprou", "gasta", "ranking", "total", "cadastrado", "cadastro"])):
         return "clientes_ranking"
 
+    # 2.5. Desempenho de Frentistas, Vazão de Bicos & Auditoria Operacional de Pista (Fase 6 / Sugestão 1)
+    termos_pista_exatos = [
+        "ranking dos frentistas", "ranking de frentistas", "ranking frentistas",
+        "desempenho dos frentistas", "desempenho de frentistas", "desempenho da equipe",
+        "desempenho da equipe de pista", "desempenho da pista", "desempenho de pista",
+        "equipe de pista", "time de pista", "produtividade dos frentistas", "produtividade da pista",
+        "produtividade da equipe", "vazão dos bicos", "vazao dos bicos", "vazão das bombas",
+        "vazao das bombas", "vazão do bico", "vazao do bico", "vazão da bomba", "vazao da bomba",
+        "bico com problema", "bicos com problema", "vazão lenta", "vazao lenta", "vazão baixa",
+        "vazao baixa", "bico lento", "bicos lentos", "filtro sujo", "filtro lento", "filtro obstruído",
+        "filtro obstruido", "filtro da bomba", "filtro do bico", "bomba lenta", "bombas lentas",
+        "troca de filtro", "trocar filtro", "conversão de aditivada", "conversao de aditivada",
+        "conversão de gasolina aditivada", "conversao de gasolina aditivada", "vendas de aditivada",
+        "venda de aditivada", "quem vendeu mais aditivada", "vendeu mais gasolina aditivada",
+        "vendeu mais aditivada", "maior conversão", "maior conversao", "ticket médio dos frentistas",
+        "ticket medio dos frentistas", "ticket médio por frentista", "ticket medio por frentista",
+        "maior ticket médio", "maior ticket medio", "qual frentista tem o maior ticket médio",
+        "qual frentista tem o maior ticket medio", "anomalias na pista", "anomalias de pista",
+        "anomalia na pista", "anomalia de pista", "anomalias da pista", "filtro de combustível",
+        "filtro de combustivel"
+    ]
+    if any(t in p for t in termos_pista_exatos):
+        return "desempenho_pista_frentistas"
+
+    # Verificação contextual: menção a frentista
+    if "frentista" in p or "frentistas" in p:
+        return "desempenho_pista_frentistas"
+
+    # Menção a vazão ou filtro de bico / bomba
+    if any(w in p for w in ["vazão", "vazao", "filtro"]) and any(w in p for w in ["bico", "bicos", "bomba", "bombas", "lenta", "lento", "sujo", "suja", "problema", "obstruído", "obstruido", "baixa", "baixo"]):
+        return "desempenho_pista_frentistas"
+
+    # Menção a aditivada com venda / conversão / frentista
+    if "aditivada" in p and any(w in p for w in ["vendeu", "vendeu mais", "conversão", "conversao", "ranking", "quem", "campeão", "campeao", "líder", "lider"]):
+        return "desempenho_pista_frentistas"
+
+    # Ticket médio relacionado a frentista / equipe / pista
+    if ("ticket médio" in p or "ticket medio" in p) and any(w in p for w in ["frentista", "frentistas", "pista", "maior", "quem", "qual", "equipe"]):
+        return "desempenho_pista_frentistas"
+
+    # Anomalias na pista / abastecimentos suspeitos
+    if any(w in p for w in ["anomalia", "anomalias", "suspeito", "suspeitos", "suspeita", "suspeitas", "irregular", "irregulares", "atípico", "atipico"]) and any(w in p for w in ["pista", "bico", "bomba", "abastecimento", "abastecimentos"]):
+        return "desempenho_pista_frentistas"
+
+    # Equipe / Time de pista
+    if any(w in p for w in ["equipe", "time"]) and any(w in p for w in ["pista", "frentista", "frentistas"]):
+        return "desempenho_pista_frentistas"
+
+    if "desempenho" in p and any(w in p for w in ["equipe", "time", "pista", "frentista", "frentistas"]):
+        return "desempenho_pista_frentistas"
+
     # 2. Perguntas sobre vendas, faturamento, último produto vendido e abastecimentos
     termos_vendas = [
         "mais vendido", "mais vendidos", "ranking de vendas", "ranking", "campeão de venda", 
@@ -177,7 +231,11 @@ def classificar_intencao(pergunta: str) -> str:
         return "sre_metricas"
 
     # 4. Perguntas cadastrais da filial
-    termos_filial = ["qual é a filial", "qual o nome do posto", "qual o cnpj", "endereço da filial", "qual o pdv"]
+    termos_filial = [
+        "qual é a filial", "qual o nome do posto", "qual o cnpj", "endereço da filial", 
+        "endereco da filial", "endereço do posto", "endereco do posto", "qual o pdv",
+        "dados da filial", "dados do posto"
+    ]
     if any(t in p for t in termos_filial):
         return "dados_filial"
 
@@ -278,6 +336,51 @@ def extrair_data_turno(pergunta: str) -> Tuple[Optional[str], Optional[str]]:
                             data = f"{ano:04d}-{meses[mes_prefix]:02d}-{int(d):02d}"
 
     return data, turno
+
+
+def extrair_bico(pergunta: str) -> Optional[str]:
+    """Extrai número de bico ou bomba a partir da pergunta."""
+    p = pergunta.lower()
+    m_b = re.search(r"\b(?:bico|bomba)\s*0*([0-9]{1,3})\b", p)
+    if m_b:
+        num = int(m_b.group(1))
+        return f"{num:03d}"
+    return None
+
+
+def extrair_frentista(pergunta: str) -> Optional[str]:
+    """Extrai identificação ou nome de frentista a partir da pergunta."""
+    p = pergunta.lower()
+
+    # 1. Padrão numérico (matrícula / frentista / operador / colaborador)
+    m_mat = re.search(r"\b(?:matr[ií]cula|frentista|operador|colaborador)\s*0*([0-9]{1,5})\b", p)
+    if m_mat:
+        num = int(m_mat.group(1))
+        return f"{num:05d}"
+
+    # 2. Padrão nominal precedido por 'frentista', 'operador' ou 'colaborador'
+    m_nome = re.search(r"\b(?:frentista|operador|colaborador)\s+([a-zA-ZÀ-ÿ]{3,})\b", p)
+    stop_words = {
+        "hoje", "ontem", "anteontem", "com", "sem", "que", "mais", "menos", "qual", "quem",
+        "tem", "teve", "houve", "de", "do", "da", "no", "na", "em", "um", "uma", "para", "por",
+        "geral", "ranking", "pista", "equipe", "time", "vendeu", "faturou", "melhor", "maior",
+        "pior", "menor", "bico", "bomba", "turno"
+    }
+    if m_nome:
+        candidato = m_nome.group(1).lower()
+        if candidato not in stop_words:
+            return candidato.upper()
+
+    # 3. Nomes conhecidos da equipe cadastrada no ERP
+    nomes = [
+        "italo", "botan", "marcio", "sergio", "erivas", "cristian", "marlon",
+        "davi", "ruan", "vinicius", "robson", "gabriel", "ludmila", "samarina"
+    ]
+    for n in nomes:
+        if re.search(rf"\b{n}\b", p):
+            return n.upper()
+
+    return None
 
 
 def responder_com_streaming(prompt_sistema: str):
@@ -418,6 +521,21 @@ def main():
                 contexto_extra = f"Previsão de Esgotamento de Combustível (Run-Out Forecast) e Sugestão de Pedidos no ERP:\n{json.dumps(resultado_previsao, ensure_ascii=False, indent=2, default=str)}\n"
                 tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
 
+            elif intencao == "desempenho_pista_frentistas":
+                data_p, turno_p = extrair_data_turno(pergunta)
+                frent_p = extrair_frentista(pergunta)
+                bico_p = extrair_bico(pergunta)
+                print(f"\n⛽ [ROTEADOR] Intenção detectada: Auditoria Operacional de Pista & Desempenho de Frentistas (ERP Tool)...")
+                if frent_p:
+                    print(f"👤 [FILTRO ATIVO] Analisando frentista: {frent_p}")
+                if bico_p:
+                    print(f"⛽ [FILTRO ATIVO] Analisando bico: {bico_p}")
+                if data_p:
+                    print(f"📅 [FILTRO ATIVO] Data alvo: {data_p}")
+                resultado_pista = tools.auditar_desempenho_pista_frentistas(data=data_p, turno=turno_p, frentista=frent_p, bico=bico_p)
+                contexto_extra = f"Auditoria Operacional de Pista, Vazão de Bicos e Desempenho de Frentistas no ERP:\n{json.dumps(resultado_pista, ensure_ascii=False, indent=2, default=str)}\n"
+                tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
+
             elif intencao == "vendas_analitico":
                 print("\n🔀 [ROTEADOR] Intenção detectada: Análise de Vendas (ERP Tool)...")
                 resultado_vendas = tools.consultar_analise_vendas_erp(tipo="mais_vendidos")
@@ -529,6 +647,12 @@ Diretrizes:
      b) Autonomia e Projeção de Run-Out: informe em quantos dias/horas o produto atingirá o nível crítico (15%) e quando secará completamente (0L), projetando a data e hora estimadas de esgotamento.
      c) Espaço Livre para Descarga (Ullage): informe o volume livre disponível em cada tanque para recebimento de produto.
      d) Sugestão Inteligente de Pedidos: apresente os volumes sugeridos de compra em múltiplos padrão de compartimento de carreta (5.000 L, 10.000 L, 15.000 L...), indicando a urgência e prazo ideal de compra (com atenção especial para abastecer preventivamente antes do fim de semana).
+9. Se a pergunta for sobre desempenho da equipe de pista, ranking de frentistas, conversão de aditivada, vazão de bicos (alerta preventivo de filtro lento/sujo) ou anomalias operacionais de pista, utilize os dados da ferramenta de auditoria de pista e frentistas do ERP:
+   - Responda primeiro de forma direta, clara e objetiva à pergunta específica feita pelo usuário (ex: declare imediatamente o campeão de aditivada, o frentista com maior ticket médio, ou a vazão/alerta do bico consultado). Em seguida, apresente os pontos operacionais complementares:
+     a) Desempenho dos Frentistas & Ranking: destaque os colaboradores líderes em volume (L) e faturamento (R$), ticket médio por atendimento e o índice de conversão de Gasolina Aditivada (meta recomendada: 25-30% para maximização de margem líquida). Caso a pesquisa seja de uma data específica sem vendas de aditivada pelos frentistas, informe com fidelidade aos dados.
+     b) Vazão dos Bicos & Alerta Preventivo de Filtro Lento: informe o status de vazão dos bicos. Em bombas comerciais, a vazão normal é de 35 a 45 L/min. Se algum bico estiver com vazão lenta ou crítica (< 25-30 L/min), emita alerta imediato de manutenção preventiva para troca do elemento filtrante da bomba. Caso o bico não tenha tido movimentação no período ou tenha operado em estimativa nominal, esclareça com transparência.
+     c) Detecção de Anomalias de Pista: reporte micro-abastecimentos suspeitos (< 1.0 L / < R$ 5), abastecimentos manuais sem automação CBC04, cancelamentos de venda, horários atípicos ou valores repetidos consecutivos.
+     d) Recomendações Práticas: liste ações imediatas sugeridas para a gerência do posto.
 """
 
             print("\n🤖 AGENTE (Streaming):\n")
