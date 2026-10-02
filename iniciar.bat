@@ -3,7 +3,7 @@ chcp 65001 > nul
 title IA Posto & PDV (pgvector + Gemini)
 
 echo ========================================================
-echo   Iniciando IA do Posto (pgvector + Gemini 2.5 Flash)
+echo   Iniciando IA do Posto (pgvector + Gemini 3.1 Flash)
 echo ========================================================
 echo.
 

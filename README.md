@@ -4,21 +4,22 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20Relational%20%2B%20Vector-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![pgvector](https://img.shields.io/badge/pgvector-0.8.6%2B%20HNSW-336791?style=for-the-badge&logoColor=white)](https://github.com/pgvector/pgvector)
+[![pgvector](https://img.shields.io/badge/pgvector-0.8.6%2B%20HNSW-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://github.com/pgvector/pgvector)
 [![Google Gemini](https://img.shields.io/badge/Google%20Gemini-3.1%20Flash%20%7C%20768d%20Embeddings-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white)](https://ai.google.dev/)
 [![Docker](https://img.shields.io/badge/Docker-Postgres%205434-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![LGPD Compliant](https://img.shields.io/badge/LGPD-24%20Categorias%20Sanitizadas-28A745?style=for-the-badge&logo=shield&logoColor=white)](#-blindagem-lgpd--segurança-owasp-genai)
-[![ANP Ready](https://img.shields.io/badge/ANP-Tolerância%20Volumétrica%20±0.6%25-FF6F00?style=for-the-badge)](#-motor-de-conciliação-de-turnos--auditoria-de-pista)
-[![Companytec CBC04](https://img.shields.io/badge/Hardware-Companytec%20CBC04-0052CC?style=for-the-badge)](#-integração-com-concentrador-companytec-cbc04)
+[![LGPD Compliant](https://img.shields.io/badge/LGPD-24%20Categorias%20Sanitizadas-28A745?style=for-the-badge)](#blindagem-lgpd)
+[![ANP Ready](https://img.shields.io/badge/ANP-Toler%C3%A2ncia%20Volum%C3%A9trica%20%C2%B10.6%25-FF6F00?style=for-the-badge)](#conciliacao-turnos)
+[![Companytec CBC04](https://img.shields.io/badge/Hardware-Companytec%20CBC04-0052CC?style=for-the-badge)](#automação-companytec-cbc04)
 
 **Edge AI On-Premises para Operação de Pista, Gestão de Turnos, Catálogo Inteligente e Observabilidade de Postos e Redes de Varejo.**
 
-[Topologia Arquitetural](#-topologia-e-arquitetura-do-sistema) •
-[Pilares e Princípios](#-princípios-arquiteturais) •
-[Recursos e Módulos](#-módulos-e-capacidades-do-sistema) •
-[Início Rápido](#-guia-de-inicialização-rápida) •
-[Estrutura de Pastas](#-estrutura-do-projeto) •
-[Validação e Testes](#-validação-e-testes-automatizados)
+[Topologia Arquitetural](#topologia-e-arquitetura-do-sistema) •
+[Pilares e Princípios](#princípios-arquiteturais) •
+[Recursos e Módulos](#módulos-e-capacidades-do-sistema) •
+[Automação CBC04](#automação-companytec-cbc04) •
+[Início Rápido](#guia-de-inicialização-rápida) •
+[Estrutura de Pastas](#estrutura-do-projeto) •
+[Validação e Testes](#validação-e-testes-automatizados)
 
 </div>
 
@@ -38,6 +39,7 @@ Com processamento local e sanitização de dados em tempo de execução, o Ai.la
 
 ---
 
+<a id="topologia-e-arquitetura-do-sistema"></a>
 ## 🏛️ Topologia e Arquitetura do Sistema
 
 O ecossistema adota uma **Topologia Híbrida de Borda (Edge AI On-Premises + Hub Central de Gestão)**:
@@ -81,6 +83,7 @@ flowchart TB
 
 ---
 
+<a id="princípios-arquiteturais"></a>
 ## 💎 Princípios Arquiteturais
 
 ### 1. Estratégia Zero-Disruption no ERP Legado
@@ -98,8 +101,10 @@ flowchart TB
 
 ---
 
+<a id="módulos-e-capacidades-do-sistema"></a>
 ## 🚀 Módulos e Capacidades do Sistema
 
+<a id="busca-hibrida"></a>
 ### 🔍 1. Mecanismo de Busca Híbrida: Dual Retrieval + Native RRF
 
 O motor [`HybridRAGEngine`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/rag_engine.py) combina busca vetorial densa com busca textual esparsa utilizando uma única transação SQL no PostgreSQL 16 com **Reciprocal Rank Fusion (RRF)**:
@@ -120,10 +125,15 @@ flowchart LR
 #### Características de Indexação do pgvector:
 * **Índice HNSW Densa:** `idx_produtos_vetores_hnsw` com `m = 16`, `ef_construction = 64` e `ef_search = 100` em tempo de execução.
 * **Índice GIN Esparsa:** `idx_produtos_vetores_tsv_gin` com dicionário `portuguese` para correspondência exata de viscosidades (`5W30`, `15W40`), marcas (`Havoline`, `Lubrax`, `Mobil`) e códigos de barras.
-* **Score RRF Ponderado:** $RRF(d) = \sum_{m \in M} \frac{1}{k + r_m(d)}$ com $k=60$.
+* **Score RRF Ponderado:**
+
+$$
+RRF(d) = \sum_{m \in M} \frac{1}{k + r_m(d)} \quad \text{com } k = 60
+$$
 
 ---
 
+<a id="conciliacao-turnos"></a>
 ### 📊 2. Motor de Conciliação de Turnos & Auditoria de Pista
 
 O módulo [`PostoTools.auditar_fechamento_turno`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py) realiza a triangulação contábil e operacional completa entre os diferentes registros do posto:
@@ -144,17 +154,29 @@ flowchart TD
 
 #### Regras de Negócio e Cálculos Auditados:
 * **Fórmula Física do Encerrante:**
-  $$\text{Volume Bruto} = \text{Encerrante Final} - \text{Encerrante Inicial}$$
-  $$\text{Volume Faturado} = \max(0, \text{Volume Bruto} - \text{Litros de Aferição})$$
+
+$$
+\text{Volume Bruto} = \text{Encerrante Final} - \text{Encerrante Inicial}
+$$
+
+$$
+\text{Volume Faturado} = \max(0, \text{Volume Bruto} - \text{Litros de Aferição})
+$$
+
 * **Tratamento de Virada de Odômetro (Rollover):**
   Identifica automaticamente quando o totalizador físico do bico atinge o limite do relógio (99.999, 999.999 ou 9.999.999 litros) e recomeça do zero, sem acusar furos falsos:
-  $$\text{Volume Rollover} = (\text{Limite} - \text{Encerrante Inicial}) + \text{Encerrante Final} - \text{Aferição}$$
+
+$$
+\text{Volume Rollover} = (\text{Limite} - \text{Encerrante Inicial}) + \text{Encerrante Final} - \text{Aferição}
+$$
+
 * **Tolerância Volumétrica ANP:**
-  Monitora a variação física entre o estoque contábil e a medição dos tanques dentro da faixa de conformidade de **$\pm 0.6\%$**.
+  Monitora a variação física entre o estoque contábil e a medição dos tanques dentro da faixa de conformidade oficial de **±0.6%**.
 * **Status Auditados do Turno:** `CONCILIADO_COM_SUCESSO`, `DIVERGENCIA_DETECTADA`, `DIVERGENCIA_CRITICA`, `TURNO_EM_ANDAMENTO`, `SEM_MOVIMENTO`.
 
 ---
 
+<a id="blindagem-lgpd"></a>
 ### 🛡️ 3. Blindagem LGPD & Segurança OWASP GenAI
 
 O módulo [`CentralLogSanitizer`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/sanitizer.py) executa higienização determinística com **24 categorias de proteção de dados sensíveis e segurança**:
@@ -175,6 +197,45 @@ O módulo [`CentralLogSanitizer`](file:///C:/Users/Marlon/Documents/Agent%20PC/i
 
 ---
 
+<a id="automação-companytec-cbc04"></a>
+### 🎛️ 4. Integração com Concentrador Companytec CBC04
+
+O Ai.la audita diretamente os dados emitidos pelo concentrador de pista **Companytec CBC04** (e compatíveis CBC02 / CBC06), que interliga eletronicamente as bombas de combustível ao ERP:
+
+```mermaid
+flowchart LR
+    subgraph PISTA["⛽ Pista de Abastecimento"]
+        BOMBA1["Bomba 01 (Gasolina Comum)"]
+        BOMBA2["Bomba 02 (Etanol Hidratado)"]
+        BOMBA3["Bomba 03 (Diesel S10)"]
+    end
+
+    subgraph HARDWARE["📡 Concentrador Companytec CBC04"]
+        CBC["Loop de Corrente / RS485 / TCP\nCompanytec CBC04"]
+    end
+
+    subgraph ERP_DB["💾 Banco ERP Transacional"]
+        TAB_ABAST["Tabela: abastecimentos\n• bico / bomba\n• tanque\n• ei (encerrante inicial)\n• encerrante (final)\n• litros apurados\n• total faturado\n• abt_bl_venda_cancelada"]
+    end
+
+    subgraph AILA["⚡ Motor de Auditoria Ai.la"]
+        AUDITOR["Triangulação Pista vs Automação:\n• Confronto CBC04 vs fechabomba\n• Detecção de Abastecimento não Digitado\n• Validação de Preço de Bomba"]
+    end
+
+    PISTA -->|Pulsadores Eletrônicos| CBC
+    CBC -->|Sincronização Serial / IP| TAB_ABAST
+    TAB_ABAST -->|SELECT Read-Only| AUDITOR
+```
+
+#### Capacidades da Auditoria da Automação CBC04:
+1. **Leitura Ponto-a-Ponto dos Pulsadores:** Coleta de `ei` (encerrante inicial do bico) e `encerrante` (encerrante final) registrados diretamente pelo hardware a cada desarme do bico, com precisão de milésimos de litro.
+2. **Identificação de Abastecimentos Fantasmas:** Alerta imediato caso a automação CBC04 tenha registrado fluxo volumétrico mas o operador não tenha lançado os encerrantes no fechamento (`PENDENTE_ENCERRANTE`).
+3. **Filtro de Desvios e Cancelamentos:** Expurgo automático de abastecimentos cancelados em pista (`abt_bl_venda_cancelada IS NOT TRUE`), evitando distorções contábeis.
+4. **Detecção de Divergências de Preço de Bomba:** Compara o valor faturado por litro na pista com o preço vigente no cadastro de produtos do ERP, identificando frentistas vendendo com preço desatualizado ou divergente.
+
+---
+
+<a id="guia-de-inicialização-rápida"></a>
 ## ⚡ Guia de Inicialização Rápida
 
 ### Pré-requisitos
@@ -229,7 +290,7 @@ DEFAULT_LLM_MODEL=models/gemini-3.1-flash-lite
 ### 4. Subir o Container Docker do pgvector
 Caso ainda não tenha o container criado:
 ```powershell
-docker run -d --name pgvector-posto -p 5434:5432 -e POSTGRES_DB=posto_ai -e POSTGRES_PASSWORD=123456 pgvector/pgvector:pg16
+docker run -d --name pgvector-posto -p 5434:5432 -e POSTGRES_DB=posto_ai -e POSTGRES_PASSWORD=sua_senha_pgvector pgvector/pgvector:pg16
 ```
 
 ### 5. Iniciar a Aplicação
@@ -248,6 +309,7 @@ python main.py
 
 ---
 
+<a id="estrutura-do-projeto"></a>
 ## 📁 Estrutura do Projeto
 
 ```text
@@ -268,7 +330,7 @@ ia-banco-local/
 │   ├── __init__.py
 │   ├── rag_engine.py         # Motor HybridRAGEngine (HNSW + FTS GIN + RRF nativo SQL)
 │   ├── sanitizer.py          # CentralLogSanitizer (LGPD 24 categorias + OWASP GenAI)
-│   └── tools.py              # PostoTools (Auditoria de Turnos, Vendas PDV, Estoque, Tanques)
+│   └── tools.py              # PostoTools (Auditoria de Turnos, Automação CBC04, PDV, Tanques)
 │
 ├── scripts/                  # Scripts de automação, manutenção e testes
 │   ├── __init__.py
@@ -288,6 +350,7 @@ ia-banco-local/
 
 ---
 
+<a id="validação-e-testes-automatizados"></a>
 ## 🧪 Validação e Testes Automatizados
 
 O sistema conta com suítes de testes unitários e de integração de ponta a ponta:
@@ -300,7 +363,7 @@ python scripts/test_sanitizer.py
 *Resultado: **100% dos testes aprovados**.*
 
 ### 2. Testes do Motor de Conciliação de Turnos
-Valida o classificador semântico de intenções, normalizadores de data/turno, regras de virada de odômetro, tolerância ANP ($\pm 0.6\%$) e triangulação contábil com o ERP:
+Valida o classificador semântico de intenções, normalizadores de data/turno, regras de virada de odômetro, telemetria da Companytec CBC04, tolerância ANP (±0.6%) e triangulação contábil com o ERP:
 ```powershell
 python scripts/test_conciliacao_turno.py
 ```
@@ -314,6 +377,7 @@ python scripts/benchmark_rag.py
 
 ---
 
+<a id="segurança-e-conformidade"></a>
 ## 🔒 Segurança e Conformidade
 
 1. **Blindagem de Segredos:** O `.gitignore` é configurado para impedir sumariamente o commit de arquivos `.env`, chaves de API, senhas do ERP (`erp_password.txt`) e arquivos de dump (`*.backup`).

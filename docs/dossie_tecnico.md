@@ -31,14 +31,14 @@ O ecossistema local é composto por duas instâncias de banco de dados PostgreSQ
 1. **Banco ERP Transacional (Relacional)**:
    - **Host:** `localhost` | **Porta:** `5433` | **Database:** `posto`
    - **Serviço Windows:** `postgresql-x64-16` (`C:\Program Files\PostgreSQL\16\data`)
-   - **Usuário Padrão:** `postgres` | **Senha:** `123456`
+   - **Usuário Padrão:** `suporte` / `postgres` | **Senha:** Carregada via `.env` (`ERP_DB_PASSWORD`)
    - **Tabelas Principais Validadas:** `produtos` (238 itens), `grupos`, `empresa`, `itemsai`, `abastecimentos`.
-   - **Status da Conexão:** 🟢 **OPERACIONAL / DESBLOQUEADA** (Autenticação local via `pg_hba.conf` e senha `123456` ativas).
+   - **Status da Conexão:** 🟢 **OPERACIONAL / DESBLOQUEADA** (Autenticação local via `pg_hba.conf` e credenciais seguras do `.env`).
 
 2. **Banco de Inteligência e Vetores (pgvector)**:
    - **Host:** `localhost` | **Porta:** `5434` | **Database:** `posto_ai`
    - **Ambiente:** Container Docker com PostgreSQL 16.15 e extensão `vector 0.8.6`
-   - **Usuário:** `postgres` | **Senha:** `123456`
+   - **Usuário:** `postgres` | **Senha:** Carregada via `.env` (`VECTOR_DB_PASSWORD`)
    - **Função:** Armazenamento dos vetores de 768 dimensões, busca semântica densa, busca lexical esparsa e fusão de rankings.
 
 ---

@@ -23,12 +23,12 @@ class PostoTools:
     def dados_cadastrais_filial(self) -> dict:
         """Retorna os dados cadastrais da empresa/filial do ERP ou fallback."""
         info = {
-            "idempresa": "59050",
-            "nome": "ANÁLISE TÉCNICA",
-            "razao_social": "ANÁLISE TÉCNICA",
-            "cnpj": "10.353.336/0001-91",
-            "endereco": "Avenida ADALTO SANTOS, 100 - Praia da Costa - VILA VELHA/ES",
-            "pdv": "007",
+            "idempresa": "00001",
+            "nome": "POSTO PILOTO MODELO",
+            "razao_social": "POSTO PILOTO MODELO LTDA",
+            "cnpj": "00.000.000/0001-00",
+            "endereco": "Avenida Central, 1000 - Centro",
+            "pdv": "001",
         }
         try:
             conn = psycopg2.connect(**DB_ERP_CONFIG)
