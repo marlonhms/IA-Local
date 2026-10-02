@@ -1,0 +1,44 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.pyo
+
+# Ambientes virtuais
+venv/
+.venv/
+env/
+ENV/
+
+# Configurações e segredos locais (LGPD & Security)
+.env
+*.env
+*.env.*
+!.env.example
+erp_password.txt
+**/erp_password.txt
+*password*.txt
+*.secret
+*.key
+*.pem
+
+# Backups e dumps de banco de dados
+backups/*
+!backups/.gitkeep
+*.backup
+*.bak
+*.dump
+*.sql
+
+# Logs e arquivos temporários
+*.log
+*.tmp
+*.temp
+
+# Agentes locais e IDEs
+.agents/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
