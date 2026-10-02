@@ -16,6 +16,7 @@
 [Topologia Arquitetural](#topologia-e-arquitetura-do-sistema) •
 [Pilares e Princípios](#princípios-arquiteturais) •
 [Recursos e Módulos](#módulos-e-capacidades-do-sistema) •
+[Fórmulas e Concatenações](#fórmulas-e-concatenações-de-dados) •
 [Automação CBC04](#automação-companytec-cbc04) •
 [Início Rápido](#guia-de-inicialização-rápida) •
 [Estrutura de Pastas](#estrutura-do-projeto) •
@@ -235,6 +236,168 @@ flowchart LR
 
 ---
 
+<a id="fórmulas-e-concatenações-de-dados"></a>
+### 📐 5. Fórmulas Matemáticas, Previsões & Concatenações de Dados
+
+O Ai.la substitui achismos empíricos por **modelagem matemática e estatística rigorosa**. Abaixo estão formalizadas as formulações contábeis, físicas e preditivas executadas pelo núcleo em tempo real:
+
+#### A. Triangulação de Turnos e Conciliação Contábil-Física
+Confronta o faturamento físico dos bicos, as declarações financeiras de caixa e a telemetria da automação:
+
+* **Volume Faturado por Bico ($V_{\text{fat}}$):**
+
+$$
+V_{\text{bruto}} = \text{Enclts} - \text{Encltsa}
+$$
+
+$$
+V_{\text{fat}} = \max(0, V_{\text{bruto}} - \text{Qtdeaf})
+$$
+
+* **Algoritmo de Virada de Odômetro (Rollover Mecânico/Digital):**
+Detecta quando o encerrante atinge a capacidade máxima do totalizador ($L_{\text{max}} \in \{10^5, 10^6, 10^7\}$ Litros) e reinicia do zero:
+
+$$
+V_{\text{rollover}} = (L_{\text{max}} - \text{Encltsa}) + \text{Enclts} - \text{Qtdeaf}
+$$
+
+* **Faturamento Esperado de Pista ($F_{\text{esperado}}$):**
+
+$$
+F_{\text{esperado}} = \sum_{b \in \text{Bicos}} (V_{\text{fat}, b} \times P_{\text{unitário}, b})
+$$
+
+* **Divergência Contábil de Caixa ($\Delta_{\text{caixa}}$):**
+
+$$
+\Delta_{\text{caixa}} = (\text{Dinheiro} + \text{Cartões} + \text{A Prazo} + \text{Convênios}) - F_{\text{esperado}}
+$$
+
+* **Balanço Físico de Tanques (Conformidade ANP):**
+
+$$
+|\text{Variação Físico-Contábil}| \le 0.006 \times \text{Movimentação Total} \quad (\pm 0.6\%)
+$$
+
+---
+
+#### B. Motor Preditivo de Esgotamento de Combustíveis (Run-Out Forecast)
+Cruza o histórico de queima da pista com a capacidade volumétrica e o saldo em régua dos tanques:
+
+* **Taxa de Queima Média Diária ($T_{\text{dia}}$) e Horária ($T_{\text{hora}}$):**
+
+$$
+T_{\text{dia}} = \frac{\sum_{i=1}^{N} V_{\text{abastecido}, i}}{\Delta \text{Dias Históricos}}, \quad T_{\text{hora}} = \frac{T_{\text{dia}}}{24}
+$$
+
+* **Reserva de Segurança Crítica ($15\%$ da Capacidade):**
+
+$$
+S_{\text{crítico}} = C_{\text{tanque}} \times 0.15
+$$
+
+* **Autonomia Operacional até o Nível Crítico (Dias):**
+
+$$
+\text{Autonomia}_{\text{crítica}} = \max\left(0, \frac{S_{\text{atual}} - S_{\text{crítico}}}{T_{\text{dia}}}\right)
+$$
+
+* **Autonomia Total de Pista até a Seca Total / Run-Out ($0\text{ Litros}$):**
+
+$$
+\text{Autonomia}_{\text{run-out}} = \frac{S_{\text{atual}}}{T_{\text{dia}}} \quad [\text{Dias}] \quad \text{ou} \quad \frac{S_{\text{atual}}}{T_{\text{hora}}} \quad [\text{Horas}]
+$$
+
+* **Timestamp Projetado de Esgotamento ($t_{\text{run-out}}$):**
+
+$$
+t_{\text{run-out}} = t_{\text{atual}} + \Delta t(\text{Autonomia}_{\text{run-out}})
+$$
+
+* **Espaço Livre para Descarga de Carreta (*Ullage* com Teto Anti-Transbordo):**
+Impede transbordamentos na pista mesmo em caso de divergência ou saldo negativo no ERP:
+
+$$
+\text{Ullage} = \max\left(0, \min(C_{\text{tanque}}, C_{\text{tanque}} - S_{\text{atual}})\right)
+$$
+
+* **Sugestão Otimizada de Compra em Múltiplos de Compartimento ($5.000\text{ L}$):**
+
+$$
+\text{Compartimentos} = \left\lfloor \frac{\text{Ullage}}{5.000} \right\rfloor
+$$
+
+$$
+V_{\text{sugerido}} = \text{Compartimentos} \times 5.000\text{ L}
+$$
+
+* **Gatilho de Alerta de Fim de Semana:**
+Disparado quando $\text{Autonomia}_{\text{run-out}} \le 4.0\text{ dias}$ ou $\text{Autonomia}_{\text{crítica}} \le 1.5\text{ dias}$, prevenindo desabastecimento durante o fechamento dominical das distribuidoras de combustíveis.
+
+---
+
+#### C. Diagnóstico Hidráulico de Vazão & Alerta Preventivo de Filtro
+Monitora a velocidade de entrega das bombas para antecipar entupimentos de filtros antes que o cliente reclame:
+
+* **Vazão Real do Bico ($Q$ em $\text{L/min}$):**
+
+$$
+Q = \frac{V_{\text{abastecido}} \, [\text{Litros}]}{\Delta t \, [\text{Segundos}]} \times 60
+$$
+
+* **Matriz de Diagnóstico Hidráulico (Bombas Comerciais):**
+
+| Faixa de Vazão ($Q$) | Status Operacional | Diagnóstico Físico / Ação Recomendada |
+| :--- | :--- | :--- |
+| **$Q \ge 35\text{ L/min}$** | `REGULAR_NORMAL` | Fluxo perfeito. Bomba e filtro em condições ideais. |
+| **$25 \le Q < 35\text{ L/min}$** | `ALERTA_VAZAO_LENTA` | Saturação inicial do elemento filtrante. Programar troca preventiva. |
+| **$Q < 25\text{ L/min}$** | `CRÍTICO_FILTRO_OBSTRUÍDO` | Filtro entupido ou estrangulamento de sucção. Troca imediata necessária. |
+| **$Q \ge 60\text{ L/min}$** | `ALTA_VAZAO` | Padrão exclusivo de bicos industriais de Diesel Truck / Alto Fluxo. |
+| **$Q \le 15\text{ L/min}$** | `REGULAR_NORMAL_ARLA` | Padrão específico para bombas dosadoras de Arla 32. |
+
+---
+
+#### D. Desempenho Comercial & Conversão de Margem dos Frentistas
+Avalia a eficiência de venda dos colaboradores na pista, focando na rentabilidade do negócio:
+
+* **Índice de Conversão de Gasolina Aditivada ($\tau_{\text{aditivada}}$):**
+
+$$
+\tau_{\text{aditivada}} = \frac{\sum V_{\text{Gasolina Aditivada}}}{\sum V_{\text{Gasolina Comum}} + \sum V_{\text{Gasolina Aditivada}}} \times 100
+$$
+
+* **Índice de Conversão de Diesel S10 ($\tau_{\text{s10}}$):**
+
+$$
+\tau_{\text{s10}} = \frac{\sum V_{\text{Diesel S10}}}{\sum V_{\text{Diesel S500}} + \sum V_{\text{Diesel S10}}} \times 100
+$$
+
+* **Classificação de Performance Comercial:**
+  * $\tau \ge 25\%$: **Excelente** (Alto gerador de margem líquida).
+  * $15\% \le \tau < 25\%$: **Padrão Regular**.
+  * $\tau < 15\%$: **Baixo Desempenho** (Necessidade de treinamento e incentivo de pista).
+
+* **Ticket Médio por Atendimento:**
+
+$$
+\text{Ticket Médio} = \frac{\sum_{\text{turno}} \text{Faturamento do Frentista}}{\text{Qtd Total de Abastecimentos do Frentista}}
+$$
+
+---
+
+#### E. Concatenação de Anomalias de Pista e Defesa Contra Fraudes
+Cruzamento temporal e relacional para identificação de irregularidades operacionais:
+
+1. **Abastecimentos Manuais sem Concentrador:**
+   $$\text{Venda no PDV} \wedge (\text{Pulso CBC04} = \emptyset) \implies \text{Alerta de Burla de Automação}$$
+2. **Micro-Abastecimentos Suspeitos:**
+   $$(V < 1.0\text{ Litro}) \vee (\text{Valor} < \text{R\$\,} 5,00) \implies \text{Alerta de Teste Indevido de Bico}$$
+3. **Concatenação de Transações Idênticas Consecutivas:**
+   Detecta duplicações de venda ou travamentos de bico:
+   $$(\text{Valor}_A = \text{Valor}_B) \wedge \left( (\text{Bico}_A = \text{Bico}_B \wedge \Delta t \le 600\text{s}) \vee (\text{Bico}_A \ne \text{Bico}_B \wedge \Delta t \le 120\text{s}) \right)$$
+
+---
+
 <a id="guia-de-inicialização-rápida"></a>
 ## ⚡ Guia de Inicialização Rápida
 
@@ -338,7 +501,9 @@ ia-banco-local/
 │   ├── sync_daemon.py        # Daemon de sincronização contínua ERP -> pgvector
 │   ├── benchmark_rag.py      # Benchmark comparativo de precisão, recall e latência
 │   ├── test_sanitizer.py     # Suíte de testes da blindagem LGPD e sanitização
-│   └── test_conciliacao_turno.py # Suíte de testes do motor de conciliação de turnos
+│   ├── test_conciliacao_turno.py # Suíte de testes do motor de conciliação de turnos
+│   ├── test_previsao_tanques.py  # Suíte de testes do motor preditivo de esgotamento e carretas
+│   └── test_desempenho_frentistas.py # Suíte de testes da auditoria de pista e frentistas
 │
 ├── docs/                     # Documentação de arquitetura e roadmap
 │   ├── dossie_tecnico.md     # Dossiê técnico completo de infraestrutura e SRE
@@ -369,7 +534,21 @@ python scripts/test_conciliacao_turno.py
 ```
 *Resultado: **100% dos testes aprovados**.*
 
-### 3. Benchmark de Recuperação Vetorial
+### 3. Testes do Motor Preditivo de Esgotamento & Carretas
+Valida o cálculo de consumo médio diário/horário, projeção de timestamp de esgotamento (Run-Out), cálculo de espaço livre de descarga (*ullage* anti-transbordo), múltiplos de compartimentos de carreta (5.000 L) e alerta de fim de semana:
+```powershell
+python scripts/test_previsao_tanques.py
+```
+*Resultado: **100% dos testes aprovados**.*
+
+### 4. Testes de Auditoria de Pista & Desempenho de Frentistas
+Valida o diagnóstico de vazão hidráulica de bicos (L/min), alertas preventivos de filtro de bomba entupido (< 25-30 L/min), ranking de frentistas, taxas de conversão de Gasolina Aditivada e Diesel S10, e detecção de anomalias sem falsos positivos:
+```powershell
+python scripts/test_desempenho_frentistas.py
+```
+*Resultado: **100% dos testes aprovados**.*
+
+### 5. Benchmark de Recuperação Vetorial
 Executa comparativo de latência e qualidade entre Busca Densa Pura (HNSW), Busca Esparsa Pura (GIN) e a Fusão Híbrida (RRF):
 ```powershell
 python scripts/benchmark_rag.py
