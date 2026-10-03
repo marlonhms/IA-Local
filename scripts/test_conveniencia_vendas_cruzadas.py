@@ -118,10 +118,18 @@ def run_tests():
     casos_extracao = [
         ("O que mais vende junto com cerveja?", "cerveja"),
         ("Quais os combos para Cerveja Heineken?", "Cerveja Heineken"),
+        ("Quais os combos para a Cerveja Heineken?", "Cerveja Heineken"),
         ("O que os clientes compram junto com Coca-Cola na conveniência?", "Coca-Cola"),
         ("O que vende junto com café?", "café"),
+        ("O que vende com o café?", "café"),
+        ("O que comprar com Red Bull?", "red bull"),
+        ("O que vender com cerveja?", "cerveja"),
         ("Vendas cruzadas do Red Bull", "red bull"),
         ("O que sai junto com pão de queijo?", "pão de queijo"),
+        ("O que sai com o pão de queijo?", "pão de queijo"),
+        ("Combos para cerveja gelada na conveniência", "cerveja"),
+        ("Combos para o código 22", "22"),
+        ("Combos do produto 00022", "00022"),
         ("Quais são os combos mais vendidos da conveniência?", None),
         ("Market basket analysis da loja de conveniência", None),
     ]
@@ -259,6 +267,38 @@ def run_tests():
         assert "cerveja" in nom_origem or "cerveja" in nom_dest
     print(f"   [OK] Filtro 'cerveja' isolou {len(res_cerveja['top_combos_cross_selling'])} combos vinculados a cerveja")
 
+    # Filtro Exemplo Canônico 1: Coca-Cola (com hífen vs espaço no cadastro do ERP)
+    res_coca = tools.auditar_cesta_conveniencia_vendas_cruzadas(filtro_produto="Coca-Cola", limit=5)
+    assert res_coca["status"] == "ok"
+    assert len(res_coca["top_combos_cross_selling"]) > 0, "Filtro 'Coca-Cola' com hífen deve casar COCA COLA ZERO"
+    combo_coca = res_coca["top_combos_cross_selling"][0]
+    assert any("coca" in c["produto_origem"]["nompro"].lower() or "coca" in c["produto_recomendado"]["nompro"].lower() for c in res_coca["top_combos_cross_selling"])
+    print(f"   [OK] Exemplo Canônico 1: Filtro 'Coca-Cola' com hífen casou com sucesso ({len(res_coca['top_combos_cross_selling'])} combos)")
+
+    # Filtro Exemplo Canônico 2: Cerveja Heineken (espaçamento simples vs duplo no cadastro ERP)
+    res_heineken = tools.auditar_cesta_conveniencia_vendas_cruzadas(filtro_produto="Cerveja Heineken", limit=5)
+    assert res_heineken["status"] == "ok"
+    assert len(res_heineken["top_combos_cross_selling"]) > 0, "Filtro 'Cerveja Heineken' deve casar CERVEJA  HEINEKEN"
+    print(f"   [OK] Exemplo Canônico 2: Filtro 'Cerveja Heineken' casou com sucesso ({len(res_heineken['top_combos_cross_selling'])} combos)")
+
+    # Filtro por SKU sem zeros à esquerda: '22' -> casa '00022'
+    res_sku22 = tools.auditar_cesta_conveniencia_vendas_cruzadas(filtro_produto="22", limit=5)
+    assert res_sku22["status"] == "ok"
+    assert len(res_sku22["top_combos_cross_selling"]) > 0, "Filtro SKU '22' deve casar código '00022'"
+    print(f"   [OK] Filtro por SKU numérico '22' casou com precisão código '00022'")
+
+    # Filtro por prefixo de código: 'código 22'
+    res_cod22 = tools.auditar_cesta_conveniencia_vendas_cruzadas(filtro_produto="código 22", limit=5)
+    assert res_cod22["status"] == "ok"
+    assert len(res_cod22["top_combos_cross_selling"]) > 0, "Filtro 'código 22' deve casar"
+    print(f"   [OK] Filtro com prefixo 'código 22' normalizado e casado")
+
+    # Filtro com adjetivo conversacional: 'cerveja gelada'
+    res_gelada = tools.auditar_cesta_conveniencia_vendas_cruzadas(filtro_produto="cerveja gelada", limit=5)
+    assert res_gelada["status"] == "ok"
+    assert len(res_gelada["top_combos_cross_selling"]) > 0, "Filtro 'cerveja gelada' deve casar cerveja"
+    print(f"   [OK] Filtro conversacional 'cerveja gelada' casou cerveja")
+
     # Filtro Café
     res_cafe = tools.auditar_cesta_conveniencia_vendas_cruzadas(filtro_produto="café", limit=5)
     assert res_cafe["status"] == "ok"
@@ -268,11 +308,17 @@ def run_tests():
     assert recomenda_pao, "Combo Café -> Pão de Queijo não encontrado"
     print(f"   [OK] Filtro 'café' recomendou com sucesso Pão de Queijo como venda cruzada")
 
+    # Filtro com normalização de data (BR DD/MM/YYYY)
+    res_data = tools.auditar_cesta_conveniencia_vendas_cruzadas(data_inicio="01/09/2026", data_fim="01/09/2026", limit=5)
+    assert res_data["status"] == "ok"
+    assert res_data["resumo_executivo"]["total_transacoes_analisadas"] > 0
+    print(f"   [OK] Filtro com formato de data brasileira '01/09/2026' normalizado e executado com sucesso")
+
     # Filtro Produto Inexistente
     res_inexistente = tools.auditar_cesta_conveniencia_vendas_cruzadas(filtro_produto="ProdutoInexistenteXYZ123")
     assert res_inexistente["status"] == "ok"
     assert len(res_inexistente["top_combos_cross_selling"]) == 0
-    print("   [OK] Filtro de produto inexistente tratado graciosamente (0 combos sem erros)")
+    print(f"   [OK] Filtro de produto inexistente tratado graciosamente (0 combos sem erros)")
 
     # ------------------------------------------------------------------
     # 8. TESTE DE BLINDAGEM LGPD DO RELATÓRIO DE CONVENIÊNCIA

@@ -3124,8 +3124,8 @@ class PostoTools:
                     if c_sku not in produtos_info:
                         produtos_info[c_sku] = {
                             "codpro": c_sku,
-                            "nompro": str(item.get("nompro", "")).strip(),
-                            "grupo": str(item.get("grupo", "CONVENIÊNCIA")).strip(),
+                            "nompro": str(item.get("nompro") or item.get("codpro") or c_sku).strip(),
+                            "grupo": str(item.get("grupo") or "CONVENIÊNCIA").strip(),
                             "preco_unitario": float(item.get("preco_unitario") or item.get("preco") or 0.0),
                         }
 
@@ -3141,12 +3141,55 @@ class PostoTools:
         def _norm_str(s: Any) -> str:
             if not s:
                 return ""
-            return "".join(
-                c for c in unicodedata.normalize("NFD", str(s))
-                if unicodedata.category(c) != "Mn"
-            ).lower().strip()
+            n = unicodedata.normalize("NFD", str(s))
+            n = "".join(c for c in n if unicodedata.category(c) != "Mn").lower()
+            n = re.sub(r"[^a-z0-9]+", " ", n)
+            return re.sub(r"\s+", " ", n).strip()
 
-        filtro_norm = _norm_str(filtro_produto)
+        STOP_FILTER_WORDS = {
+            "o", "a", "os", "as", "um", "uma", "uns", "umas",
+            "de", "do", "da", "dos", "das", "no", "na", "nos", "nas",
+            "com", "para", "pra", "por", "produto", "mercadoria",
+            "codigo", "cod", "item", "sku", "gelada", "gelado", "quente", "fria", "frio"
+        }
+
+        def _match_produto(filtro_txt: str, p_sku: str, p_nome: str) -> bool:
+            fn = _norm_str(filtro_txt)
+            if not fn:
+                return True
+            sku_n = _norm_str(p_sku)
+            nom_n = _norm_str(p_nome)
+
+            # 1. Match SKU (com ou sem zeros à esquerda se numérico)
+            if fn == sku_n or (fn.isdigit() and sku_n.isdigit() and fn.lstrip("0") == sku_n.lstrip("0")):
+                return True
+
+            # 2. Substring direta no nome
+            if fn in nom_n:
+                return True
+
+            # 3. Limpeza de stop words/artigos/adjetivos do filtro
+            tokens = [t for t in fn.split() if t not in STOP_FILTER_WORDS and len(t) >= 1]
+            if not tokens:
+                tokens = [t for t in fn.split() if len(t) >= 1]
+
+            frase_limpa = " ".join(tokens)
+            if frase_limpa:
+                if frase_limpa in nom_n:
+                    return True
+                if frase_limpa.isdigit() and sku_n.isdigit() and frase_limpa.lstrip("0") == sku_n.lstrip("0"):
+                    return True
+
+            # Checa se algum token numérico bate com o SKU
+            for t in tokens:
+                if t.isdigit() and sku_n.isdigit() and t.lstrip("0") == sku_n.lstrip("0"):
+                    return True
+
+            # Checa se todos os tokens significativos estão presentes no nome do produto
+            if tokens and all(t in nom_n for t in tokens):
+                return True
+
+            return False
 
         regras: List[Dict[str, Any]] = []
 
@@ -3192,17 +3235,23 @@ class PostoTools:
                 ticket_combo = round(p_orig + p_rec, 2)
                 incr_pct = round((p_rec / p_orig) * 100.0, 1) if p_orig > 0 else 0.0
 
-                script = (
-                    f"Cliente comprou {a_info['nompro']}, ofereça {b_info['nompro']} "
-                    f"por R$ {p_rec:.2f} (+{incr_pct:.1f}% no ticket)"
-                )
+                if p_rec > 0.0:
+                    script = (
+                        f"Cliente comprou {a_info['nompro']}, ofereça {b_info['nompro']} "
+                        f"por R$ {p_rec:.2f} (+{incr_pct:.1f}% no ticket)"
+                    )
+                else:
+                    script = (
+                        f"Cliente comprou {a_info['nompro']}, ofereça {b_info['nompro']} "
+                        f"como complemento da compra"
+                    )
 
                 # Relevância com Filtro
                 match_origem = False
                 match_destino = False
-                if filtro_norm:
-                    match_origem = (filtro_norm in _norm_str(a_info['nompro']) or filtro_norm == _norm_str(a_info['codpro']))
-                    match_destino = (filtro_norm in _norm_str(b_info['nompro']) or filtro_norm == _norm_str(b_info['codpro']))
+                if filtro_produto:
+                    match_origem = _match_produto(filtro_produto, a_info.get("codpro", ""), a_info.get("nompro", ""))
+                    match_destino = _match_produto(filtro_produto, b_info.get("codpro", ""), b_info.get("nompro", ""))
                     if not (match_origem or match_destino):
                         continue
 
@@ -3265,6 +3314,14 @@ class PostoTools:
         """
         conn = None
         try:
+            min_lift = float(min_lift) if min_lift is not None else 1.2
+            min_suporte = float(min_suporte) if min_suporte is not None else 0.005
+            min_confianca = float(min_confianca) if min_confianca is not None else 0.05
+            limit = int(limit) if limit is not None else 10
+
+            dt_ini_norm = self.normalizar_data(data_inicio) if data_inicio else None
+            dt_fim_norm = self.normalizar_data(data_fim) if data_fim else None
+
             conn = get_erp_connection()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 where_clauses = [
@@ -3273,12 +3330,22 @@ class PostoTools:
                 ]
                 params: List[Any] = []
 
-                if data_inicio:
-                    where_clauses.append("p.dtem >= %s")
-                    params.append(data_inicio)
-                if data_fim:
-                    where_clauses.append("p.dtem <= %s")
-                    params.append(data_fim)
+                if dt_ini_norm:
+                    if dt_ini_norm == "hoje":
+                        where_clauses.append("p.dtem = CURRENT_DATE")
+                    elif dt_ini_norm == "ontem":
+                        where_clauses.append("p.dtem = CURRENT_DATE - INTERVAL '1 day'")
+                    else:
+                        where_clauses.append("p.dtem >= %s")
+                        params.append(dt_ini_norm)
+                if dt_fim_norm:
+                    if dt_fim_norm == "hoje":
+                        where_clauses.append("p.dtem <= CURRENT_DATE")
+                    elif dt_fim_norm == "ontem":
+                        where_clauses.append("p.dtem <= CURRENT_DATE - INTERVAL '1 day'")
+                    else:
+                        where_clauses.append("p.dtem <= %s")
+                        params.append(dt_fim_norm)
 
                 where_sql = " AND ".join(where_clauses)
 
@@ -3325,6 +3392,11 @@ class PostoTools:
                     "total_item": float(r["total_item"] or 0.0),
                 })
                 todos_skus.add(r["codpro"])
+
+            # Corrige totais de pedidos que possam ter vindo zerados do ERP
+            for idx, (ped_id, itens) in enumerate(transacoes_map.items()):
+                if idx < len(totais_pedidos) and totais_pedidos[idx] <= 0.0:
+                    totais_pedidos[idx] = round(sum(it["total_item"] for it in itens), 2)
 
             lista_transacoes = list(transacoes_map.values())
             total_transacoes = len(lista_transacoes)

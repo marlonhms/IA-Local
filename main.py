@@ -201,6 +201,33 @@ def extrair_frentista(pergunta: str) -> Optional[str]:
     return None
 
 
+def limpar_termo_produto(prod: str) -> Optional[str]:
+    """Limpa ruído léxico, preposições, artigos e sufixos de um produto extraído."""
+    if not prod:
+        return None
+    p = prod.strip().strip("\"'[](){}<>")
+    # Remove artigos e preposições iniciais: 'o ', 'a ', 'os ', 'as ', 'um ', 'uma ', 'de ', 'do ', 'da ', 'no ', 'na '
+    p = re.sub(r"^(?:o|a|os|as|um|uma|uns|umas|de|do|da|dos|das|no|na|nos|nas|com|para|pra|por)\s+", "", p, flags=re.IGNORECASE).strip()
+    # Remove prefixos como 'produto ', 'item ', 'codigo ', 'código ', 'sku ', 'mercadoria '
+    p = re.sub(r"^(?:produto|mercadoria|c[oó]digo|cod|item|sku)\s*", "", p, flags=re.IGNORECASE).strip()
+    # Remove complementos de localização ou tempo ao final
+    p = re.sub(r"\b(?:na|no|da|do|em)\s+conveni[eê]ncia\b.*", "", p, flags=re.IGNORECASE).strip()
+    p = re.sub(r"\b(?:na|no|da|do|em)\s+loja\b.*", "", p, flags=re.IGNORECASE).strip()
+    p = re.sub(r"\b(?:hoje|ontem|no\s+caixa|no\s+pdv|no\s+balc[aã]o|no\s+posto)\b.*", "", p, flags=re.IGNORECASE).strip()
+    # Remove adjetivos conversacionais soltos no final: 'gelada', 'gelado', 'quente', etc.
+    p = re.sub(r"\s+\b(?:gelad[ao]s?|fria?s?|frio?s?|quentes?|trincando)\b", "", p, flags=re.IGNORECASE).strip()
+    p = p.rstrip("?.,;! ")
+
+    stop_generic = {
+        "conveniencia", "conveniência", "loja", "pdv", "caixa", "produtos", "mercadorias",
+        "produto", "mercadoria", "isso", "ele", "ela", "eles", "elas", "combo", "combos",
+        "cesta", "vendas", "cross-sell", "cross sell"
+    }
+    if not p or len(p) < 2 or p.lower() in stop_generic:
+        return None
+    return p
+
+
 def extrair_produto_cesta(pergunta: str) -> Optional[str]:
     """Extrai produto alvo para análise de vendas cruzadas (Market Basket)."""
     p = (pergunta or "").strip()
@@ -208,29 +235,23 @@ def extrair_produto_cesta(pergunta: str) -> Optional[str]:
     # 1. Padrões com 'junto com', 'junto de', 'junto a'
     m_junto = re.search(r"\bjunto\s+(?:com|de|a|ao|à)\s+([^?.,;!\n]+)", p, re.IGNORECASE)
     if m_junto:
-        prod = m_junto.group(1).strip()
-        prod = re.sub(r"\b(?:na|no|da|do|em)\s+conveni[eê]ncia\b.*", "", prod, flags=re.IGNORECASE).strip()
-        prod = re.sub(r"\b(?:hoje|ontem|no\s+caixa|no\s+pdv)\b.*", "", prod, flags=re.IGNORECASE).strip()
-        if prod and len(prod) >= 2 and prod.lower() not in ["isso", "ele", "ela", "o", "a"]:
-            return prod
+        res = limpar_termo_produto(m_junto.group(1))
+        if res:
+            return res
 
     # 2. Padrões 'combos? (?:para|pra|de|do|da)'
     m_combo = re.search(r"\bcombos?\s+(?:para|pra|de|do|da)\s+([^?.,;!\n]+)", p, re.IGNORECASE)
     if m_combo:
-        prod = m_combo.group(1).strip()
-        prod = re.sub(r"\b(?:na|no|da|do|em)\s+conveni[eê]ncia\b.*", "", prod, flags=re.IGNORECASE).strip()
-        prod = re.sub(r"\b(?:hoje|ontem|no\s+caixa|no\s+pdv)\b.*", "", prod, flags=re.IGNORECASE).strip()
-        stop_generic = ["conveniencia", "conveniência", "loja", "pdv", "caixa", "produtos", "mercadorias"]
-        if prod and len(prod) >= 2 and prod.lower() not in stop_generic:
-            return prod
+        res = limpar_termo_produto(m_combo.group(1))
+        if res:
+            return res
 
-    # 3. Padrões 'vende|sai|compra com <produto>'
-    m_com = re.search(r"\b(?:vende|sai|compra)\s+com\s+([^?.,;!\n]+)", p, re.IGNORECASE)
+    # 3. Padrões 'vende|sai|compra|oferece com <produto>'
+    m_com = re.search(r"\b(?:vende[rm]?|sai[rm]?|compra[rm]?|oferece[rm]?|levar?)\s+com\s+([^?.,;!\n]+)", p, re.IGNORECASE)
     if m_com:
-        prod = m_com.group(1).strip()
-        prod = re.sub(r"\b(?:na|no|da|do|em)\s+conveni[eê]ncia\b.*", "", prod, flags=re.IGNORECASE).strip()
-        if prod and len(prod) >= 2:
-            return prod
+        res = limpar_termo_produto(m_com.group(1))
+        if res:
+            return res
 
     # 4. Checagem direta de termos comuns de conveniência se presentes na pergunta
     termos_comuns = [

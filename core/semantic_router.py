@@ -361,7 +361,8 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
         "o que compra junto", "o que mais compra junto", "comprados juntos", "vendidos juntos",
         "saem juntos", "compram juntos", "vender junto", "vende junto", "sai junto",
         "sinergia de produtos", "sinergia de vendas", "sinergia de venda",
-        "análise de cesta", "analise de cesta", "o que vende com", "o que sai com"
+        "análise de cesta", "analise de cesta", "o que vende com", "o que sai com",
+        "o que comprar com", "o que vender com", "o que compra com", "o que levar com", "o que oferecer com"
     ]
     if any(t in p for t in termos_cesta_exatos):
         return "conveniencia_vendas_cruzadas"
@@ -369,7 +370,7 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     if re.search(r"\bcombos?\b", p) and not any(w in p for w in ["combustível", "combustivel", "carreta", "bico", "tanque"]):
         return "conveniencia_vendas_cruzadas"
 
-    if re.search(r"\b(vende|sai|compra|levar?|oferecer?)\s+(junto|com)\b", p) or "junto com" in p or "junto de" in p:
+    if re.search(r"\b(vende[rm]?|sai[rm]?|compra[rm]?|levar?|oferece[rm]?)\s+(junto|com)\b", p) or "junto com" in p or "junto de" in p or "junto a" in p:
         return "conveniencia_vendas_cruzadas"
 
     # 2. Perguntas sobre estoque, saldo e tanques de combustível
