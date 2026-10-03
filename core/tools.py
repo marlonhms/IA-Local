@@ -18,7 +18,7 @@ from core.sanitizer import sanitize_dict
 _last_working_erp_port: Optional[int] = None
 
 
-def get_erp_connection(timeout: int = 2) -> psycopg2.extensions.connection:
+def get_erp_connection(timeout: Optional[int] = None) -> psycopg2.extensions.connection:
     """
     Obtém conexão com o banco de dados ERP do posto.
     Tenta primeiramente a última porta funcional ou a configurada no .env (5433).
@@ -28,6 +28,7 @@ def get_erp_connection(timeout: int = 2) -> psycopg2.extensions.connection:
     global _last_working_erp_port
     config = dict(DB_ERP_CONFIG)
     configured_port = int(config.get("port", 5433))
+    effective_timeout = timeout if timeout is not None else int(config.get("connect_timeout", 5))
 
     ports_to_try = []
     if _last_working_erp_port:
@@ -42,7 +43,7 @@ def get_erp_connection(timeout: int = 2) -> psycopg2.extensions.connection:
     for port in ports_to_try:
         try_config = dict(config)
         try_config["port"] = port
-        try_config["connect_timeout"] = timeout
+        try_config["connect_timeout"] = effective_timeout
         try:
             conn = psycopg2.connect(**try_config)
             _last_working_erp_port = port
@@ -52,7 +53,7 @@ def get_erp_connection(timeout: int = 2) -> psycopg2.extensions.connection:
             continue
 
     raise last_err or psycopg2.OperationalError(
-        f"Não foi possível conectar ao banco ERP nas portas testadas ({ports_to_try})."
+        f"Não foi possível conectar ao banco ERP ({config.get('host')}) nas portas testadas ({ports_to_try})."
     )
 
 

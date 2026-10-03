@@ -650,6 +650,39 @@ python main.py
 
 ---
 
+<a id="desenvolvimento-remoto-tailscale"></a>
+### 6. Desenvolvimento Remoto via Tailscale (Notebook ↔ PC de Casa)
+
+Se você desenvolve a partir de outra máquina (ex: Computador de Casa) e deseja consumir os bancos de dados que rodam no Notebook:
+
+1. **No Notebook (Servidor de Banco de Dados):**
+   Execute o script de liberação do Firewall do Windows (solicita elevação UAC automaticamente):
+   ```powershell
+   .\liberar_firewall_tailscale.bat
+   ```
+   *O script libera as portas 5433 (ERP) e 5434 (pgvector) vinculadas ao adaptador Tailscale e à sub-rede (`100.64.0.0/10`), além de garantir que os serviços estejam ativos.*
+
+2. **No PC de Casa (Estação de Desenvolvimento):**
+   Clone o repositório, instale as dependências e configure o `.env` apontando para o IP Tailscale ou hostname MagicDNS do Notebook:
+   ```ini
+   ERP_DB_HOST=100.77.164.17       # ou use o MagicDNS: marlonh-supwp
+   ERP_DB_PORT=5433
+   VECTOR_DB_HOST=100.77.164.17    # ou use o MagicDNS: marlonh-supwp
+   VECTOR_DB_PORT=5434
+   ```
+
+3. **Validar a Conectividade de Ponta a Ponta:**
+   Execute o script de diagnóstico automatizado (suporta testar via `.env` ou passando o host diretamente):
+   ```powershell
+   python scripts/test_ponte_tailscale.py
+   # Ou testando diretamente via CLI:
+   python scripts/test_ponte_tailscale.py marlonh-supwp
+   ```
+
+> 📖 **Guia Passo a Passo Completo:** Consulte o [`docs/guia_ponte_desenvolvimento_remoto_tailscale.md`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/guia_ponte_desenvolvimento_remoto_tailscale.md) para o comparativo detalhado entre **Git Clone Local** vs **VS Code Remote Tunnels / SSH**.
+
+---
+
 <a id="estrutura-do-projeto"></a>
 ## 📁 Estrutura do Projeto
 
@@ -768,6 +801,17 @@ Valida classificação da 11ª intenção `conveniencia_vendas_cruzadas` (heurí
 python scripts/test_conveniencia_vendas_cruzadas.py
 ```
 *Resultado: **100% dos testes aprovados**.*
+
+### 10. Diagnóstico da Ponte Tailscale (Rede Remota Notebook ↔ PC de Casa)
+Valida a conectividade TCP pura de socket dual-stack, autenticação no PostgreSQL 16 ERP (porta 5433), banco vetorial Docker pgvector (porta 5434), presença da extensão `pgvector` e tabelas de embeddings, além de aferir a latência média de rede (SLA < 100ms):
+```powershell
+# Testa alvos definidos no .env:
+python scripts/test_ponte_tailscale.py
+
+# Ou testa um IP/hostname remoto diretamente via CLI:
+python scripts/test_ponte_tailscale.py marlonh-supwp
+```
+*Resultado: **100% aprovado (latência ~50ms no ERP e ~25ms no pgvector, SLA Excelente)**.*
 
 ---
 

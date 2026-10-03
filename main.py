@@ -329,7 +329,7 @@ def main():
     tools = PostoTools(rag_engine)
     router = SemanticRouter(rag_engine=rag_engine)
 
-    print("\n0. Autenticando no Banco ERP (5433)...")
+    print(f"\n0. Autenticando no Banco ERP ({DB_ERP_CONFIG['host']}:{DB_ERP_CONFIG['port']})...")
     senha_arquivo = BASE_DIR / "backups" / "erp_password.txt"
     if senha_arquivo.exists():
         try:

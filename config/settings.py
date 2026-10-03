@@ -25,11 +25,21 @@ if GEMINI_API_KEY:
 
 
 def get_erp_password() -> str:
-    """Busca a senha do ERP no arquivo de senha diário ou no .env."""
+    """
+    Busca a senha do ERP.
+    Prioridade:
+    1. Variável de ambiente ERP_DB_PASSWORD (se definida no .env)
+    2. Arquivo de senha diário/local (backups/erp_password.txt)
+    3. Senha padrão de desenvolvimento ('899007')
+    """
+    env_pass = os.getenv("ERP_DB_PASSWORD")
+    if env_pass:
+        return env_pass
+
     caminhos_senha = [
         BASE_DIR / "backups" / "erp_password.txt",
         BASE_DIR / "erp_password.txt",
-        BASE_DIR.parent / "erp_password.txt"
+        BASE_DIR.parent / "erp_password.txt",
     ]
     for p in caminhos_senha:
         if p.exists():
@@ -40,7 +50,7 @@ def get_erp_password() -> str:
                         return s
             except Exception:
                 pass
-    return os.getenv("ERP_DB_PASSWORD", "")
+    return "899007"
 
 
 # Configuração do Banco ERP (PostgreSQL 16 Windows Service - Porta 5433)
@@ -50,6 +60,7 @@ DB_ERP_CONFIG = {
     "dbname": os.getenv("ERP_DB_NAME", "posto"),
     "user": os.getenv("ERP_DB_USER", "suporte"),
     "password": get_erp_password(),
+    "connect_timeout": int(os.getenv("ERP_DB_CONNECT_TIMEOUT", "5")),
 }
 
 # Configuração do Banco Vetorial (PostgreSQL 16 Docker pgvector - Porta 5434)
@@ -58,7 +69,8 @@ DB_VECTOR_CONFIG = {
     "port": int(os.getenv("VECTOR_DB_PORT", "5434")),
     "dbname": os.getenv("VECTOR_DB_NAME", "posto_ai"),
     "user": os.getenv("VECTOR_DB_USER", "postgres"),
-    "password": os.getenv("VECTOR_DB_PASSWORD", ""),
+    "password": os.getenv("VECTOR_DB_PASSWORD", "123456"),
+    "connect_timeout": int(os.getenv("VECTOR_DB_CONNECT_TIMEOUT", "5")),
 }
 
 # Modelos do Google Gemini
