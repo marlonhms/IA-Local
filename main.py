@@ -390,8 +390,8 @@ def main():
             else:
                 # Catálogo de produtos (RAG Híbrido HNSW + GIN) com Cache Semântico
                 print("\n⚙️  [ROTEADOR] Intenção detectada: Catálogo (Busca Híbrida RRF)...")
-                cache_data = tools.rag.check_semantic_cache(pergunta)
-                query_vector = cache_data.get("query_vector")
+                cache_data = tools.rag.check_semantic_cache(pergunta, query_vector=query_vector)
+                query_vector = cache_data.get("query_vector") or query_vector
                 
                 if cache_data.get("resposta_llm"):
                     cache_hit = True

@@ -207,12 +207,13 @@ def main():
     router = SemanticRouter(db_config=DB_VECTOR_CONFIG)
     router.init_table()
     total_intents = router.count_intents()
-    if total_intents == 0 or args.seed_intencoes:
-        print(f"\n[ROTEADOR] Indexando intenções operacionais ({total_intents} existentes)...")
+    distinct_intents = router.count_distinct_intents()
+    if total_intents < 9 or distinct_intents < 9 or args.seed_intencoes:
+        print(f"\n[ROTEADOR] Indexando intenções operacionais ({total_intents} exemplares, {distinct_intents} intenções)...")
         total_seeded = router.seed_intents(force=args.seed_intencoes)
         print(f"   [OK] {total_seeded} intenções semânticas indexadas em 'intencoes_vetores'.")
     else:
-        print(f"   [OK] Catálogo de Intenções Semânticas OK ({total_intents} intenções indexadas).")
+        print(f"   [OK] Catálogo de Intenções Semânticas OK ({total_intents} exemplares nas {distinct_intents} intenções).")
 
     if not conn_erp:
         print("\n[INFO] O banco ERP não está acessível no momento para nova sincronização.")

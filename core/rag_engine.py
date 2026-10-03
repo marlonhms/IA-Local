@@ -30,14 +30,14 @@ from config.settings import (
 
 logger = logging.getLogger("HybridRAG")
 
-# Regex para detecção de viscosidades de óleos lubrificantes
+# Regex para detecção de viscosidades de óleos lubrificantes (com suporte a hífen, espaço ou colado)
 VISCOSITY_REGEX = re.compile(
-    r'\b(0W[-]?20|0W[-]?30|5W[-]?20|5W[-]?30|5W[-]?40|10W[-]?30|10W[-]?40|15W[-]?40|20W[-]?50|80W[-]?90|75W[-]?90|85W[-]?140)\b',
+    r'\b(0W[-\s]?20|0W[-\s]?30|5W[-\s]?20|5W[-\s]?30|5W[-\s]?40|10W[-\s]?30|10W[-\s]?40|15W[-\s]?40|20W[-\s]?50|80W[-\s]?90|75W[-\s]?90|85W[-\s]?140)\b',
     re.IGNORECASE
 )
 
 # Regex para detecção de códigos numéricos (código de barras EAN-13, EAN-8 ou codpro)
-CODE_PATTERN = re.compile(r'\b\d{3,14}\b')
+CODE_PATTERN = re.compile(r'\b\d{1,14}\b')
 
 
 def formatar_tsquery_portugues(texto: str) -> str:
@@ -48,7 +48,7 @@ def formatar_tsquery_portugues(texto: str) -> str:
     visc_match = VISCOSITY_REGEX.search(texto)
     visc_tokens = []
     if visc_match:
-        raw_v = visc_match.group(0).lower().replace("-", "")
+        raw_v = visc_match.group(0).lower().replace("-", "").replace(" ", "")
         visc_tokens.append(raw_v)
 
     termos = re.findall(r"[\w]+", texto.lower())
@@ -96,9 +96,15 @@ class HybridRAGEngine:
         )
         return res["embedding"]
 
-    def check_semantic_cache(self, query_text: str, similarity_threshold: float = 0.96) -> Optional[Dict[str, Any]]:
+    def check_semantic_cache(
+        self,
+        query_text: str,
+        similarity_threshold: float = 0.96,
+        query_vector: Optional[List[float]] = None,
+    ) -> Optional[Dict[str, Any]]:
         """Verifica se há resposta idêntica ou equivalente já armazenada em cache."""
-        query_vector = self.gerar_embedding(query_text, task_type="retrieval_query")
+        if not query_vector:
+            query_vector = self.gerar_embedding(query_text, task_type="retrieval_query")
         sql = """
         SELECT resposta_llm, json_produtos, 
                1 - (pergunta_vetor <=> %s::halfvec) AS cosine_similarity
@@ -169,21 +175,27 @@ class HybridRAGEngine:
         tsquery_str = formatar_tsquery_portugues(query_text)
         like_term = f"%{query_text.strip()}%"
 
-        # Detecção de código de barras ou código exato
+        # Detecção de código de produto ou código de barras
         clean_query = query_text.strip()
-        code_match = CODE_PATTERN.search(clean_query)
-        exact_code = code_match.group(0) if code_match else (clean_query if clean_query.isdigit() else "")
+        prefix_match = re.search(r'(?:c[oó]digo|cod|item|produto|ean|barras|ref)\s*[:#]?\s*(\d{1,14})\b', clean_query, re.IGNORECASE)
+        if prefix_match:
+            exact_code = prefix_match.group(1)
+        elif clean_query.isdigit():
+            exact_code = clean_query
+        else:
+            code_match = re.search(r'\b\d{3,14}\b(?!\s*(?:ml|l|litros?|g|kg|graus?|gr|m|cm|mm|un|und)\b)', clean_query, re.IGNORECASE)
+            exact_code = code_match.group(0) if code_match else ""
 
-        # Detecção de viscosidade de lubrificante
+        # Detecção de viscosidade de lubrificante (com suporte a hífen ou espaço)
         visc_match = VISCOSITY_REGEX.search(query_text)
         viscosity_sql_regex = ""
         viscosity_token = ""
         if visc_match:
-            raw_v = visc_match.group(0).upper().replace("-", "")
+            raw_v = visc_match.group(0).upper().replace("-", "").replace(" ", "")
             viscosity_token = raw_v
             if "W" in raw_v:
                 part1, part2 = raw_v.split("W")
-                viscosity_sql_regex = rf"\y{part1}W[-]?{part2}\y"
+                viscosity_sql_regex = rf"\y{part1}W[-\s]?{part2}\y"
 
         grupo_condition = ""
         if grupo_filter:
@@ -212,8 +224,8 @@ class HybridRAGEngine:
                 END AS fts_score,
                 ROW_NUMBER() OVER (
                     ORDER BY 
-                        -- Prioridade 1: Match exato de código de barras ou código do produto
-                        (CASE WHEN %s <> '' AND (TRIM(codbar) = %s OR TRIM(codpro) = %s) THEN 1 ELSE 0 END) DESC,
+                        -- Prioridade 1: Match exato de código de barras ou código do produto (com tolerância a zero à esquerda)
+                        (CASE WHEN %s <> '' AND (TRIM(codbar) = %s OR TRIM(codpro) = %s OR (LTRIM(TRIM(codpro), '0') <> '' AND LTRIM(TRIM(codpro), '0') = LTRIM(%s, '0'))) THEN 1 ELSE 0 END) DESC,
                         -- Prioridade 2: Match exato de viscosidade de lubrificante
                         (CASE WHEN %s <> '' AND nompro ~* %s THEN 1 ELSE 0 END) DESC,
                         -- Prioridade 3: Score do FTS e proximidade de nome
@@ -226,9 +238,9 @@ class HybridRAGEngine:
                OR nompro ILIKE %s
                OR codbar ILIKE %s
                OR codpro ILIKE %s
-               OR (%s <> '' AND (TRIM(codbar) = %s OR TRIM(codpro) = %s))
+               OR (%s <> '' AND (TRIM(codbar) = %s OR TRIM(codpro) = %s OR (LTRIM(TRIM(codpro), '0') <> '' AND LTRIM(TRIM(codpro), '0') = LTRIM(%s, '0'))))
                OR (%s <> '' AND nompro ~* %s)) {grupo_condition}
-            ORDER BY fts_score DESC
+            ORDER BY sparse_rank ASC
             LIMIT %s
         )
         SELECT 
@@ -247,7 +259,7 @@ class HybridRAGEngine:
                 {dense_weight} * COALESCE(1.0 / ({self.rrf_k} + d.dense_rank), 0.0) +
                 {sparse_weight} * COALESCE(1.0 / ({self.rrf_k} + s.sparse_rank), 0.0) +
                 -- Boost imediato de Código de Barras / Código de Produto (+1.0)
-                (CASE WHEN %s <> '' AND (TRIM(COALESCE(d.codbar, s.codbar)) = %s OR TRIM(COALESCE(d.codpro, s.codpro)) = %s) THEN 1.0 ELSE 0.0 END) +
+                (CASE WHEN %s <> '' AND (TRIM(COALESCE(d.codbar, s.codbar)) = %s OR TRIM(COALESCE(d.codpro, s.codpro)) = %s OR (LTRIM(TRIM(COALESCE(d.codpro, s.codpro)), '0') <> '' AND LTRIM(TRIM(COALESCE(d.codpro, s.codpro)), '0') = LTRIM(%s, '0'))) THEN 1.0 ELSE 0.0 END) +
                 -- Boost de Viscosidade de Lubrificante (+0.08)
                 (CASE WHEN %s <> '' AND COALESCE(d.nompro, s.nompro) ~* %s THEN 0.08 ELSE 0.0 END)
             ) AS rrf_score
@@ -269,15 +281,15 @@ class HybridRAGEngine:
 
         # Parâmetros para sparse_search
         params.extend([
-            tsquery_str, tsquery_str, tsquery_str,        # CASE ts_rank_cd
-            exact_code, exact_code, exact_code,            # ORDER BY match exato
-            viscosity_sql_regex, viscosity_sql_regex,      # ORDER BY viscosidade
-            tsquery_str, tsquery_str,                      # ORDER BY ts_rank_cd
-            like_term,                                     # ORDER BY nompro ILIKE
-            tsquery_str, tsquery_str,                      # WHERE tsv @@
-            like_term, like_term, like_term,               # WHERE nompro / codbar / codpro ILIKE
-            exact_code, exact_code, exact_code,            # WHERE match exato
-            viscosity_sql_regex, viscosity_sql_regex,      # WHERE viscosidade
+            tsquery_str, tsquery_str, tsquery_str,                                              # CASE ts_rank_cd
+            exact_code, exact_code, exact_code, exact_code,                                    # ORDER BY match exato
+            viscosity_sql_regex, viscosity_sql_regex,                                          # ORDER BY viscosidade
+            tsquery_str, tsquery_str,                                                          # ORDER BY ts_rank_cd
+            like_term,                                                                         # ORDER BY nompro ILIKE
+            tsquery_str, tsquery_str,                                                          # WHERE tsv @@
+            like_term, like_term, like_term,                                                   # WHERE nompro / codbar / codpro ILIKE
+            exact_code, exact_code, exact_code, exact_code,                                    # WHERE match exato
+            viscosity_sql_regex, viscosity_sql_regex,                                          # WHERE viscosidade
         ])
         if grupo_filter:
             params.append(grupo_filter)
@@ -285,9 +297,9 @@ class HybridRAGEngine:
 
         # Parâmetros para SELECT final (boosts RRF)
         params.extend([
-            exact_code, exact_code, exact_code,            # Boost exato codbar/codpro
-            viscosity_sql_regex, viscosity_sql_regex,      # Boost viscosidade
-            top_k                                          # LIMIT final
+            exact_code, exact_code, exact_code, exact_code,                                    # Boost exato codbar/codpro
+            viscosity_sql_regex, viscosity_sql_regex,                                          # Boost viscosidade
+            top_k                                                                              # LIMIT final
         ])
 
         with self._get_connection() as conn:

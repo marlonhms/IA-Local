@@ -385,6 +385,16 @@ class SemanticRouter:
         self.confidence_threshold = confidence_threshold
         self.cache_max_size = cache_max_size
 
+        # Conexão reutilizável com PostgreSQL
+        self._conn = None
+
+        if GEMINI_API_KEY:
+            try:
+                import google.generativeai as genai
+                genai.configure(api_key=GEMINI_API_KEY)
+            except Exception:
+                pass
+
         # Cache em memória para consultas idênticas ou normalizadas (latência < 0.1ms)
         self._memory_cache: Dict[str, Tuple[str, float, Dict[str, Any]]] = {}
 
@@ -399,39 +409,61 @@ class SemanticRouter:
         }
 
     def _get_connection(self):
-        """Retorna uma nova conexão com o PostgreSQL do pgvector."""
-        return psycopg2.connect(**self.db_config)
+        """Retorna conexão ativa com o PostgreSQL do pgvector, reconectando se necessário."""
+        if self._conn is None or self._conn.closed:
+            self._conn = psycopg2.connect(**self.db_config)
+        return self._conn
+
+    def close(self):
+        """Fecha conexão com o banco de dados se aberta."""
+        if self._conn and not self._conn.closed:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            self._conn = None
 
     def init_table(self):
         """Garante a existência da tabela intencoes_vetores e índice HNSW no posto_ai."""
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS intencoes_vetores (
-                        id SERIAL PRIMARY KEY,
-                        intencao VARCHAR(50) NOT NULL,
-                        descricao TEXT NOT NULL,
-                        exemplo_frase TEXT NOT NULL,
-                        embedding halfvec(768),
-                        criado_em TIMESTAMP DEFAULT NOW()
-                    );
-                """)
-                cur.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_intencoes_vetores_hnsw 
-                    ON intencoes_vetores USING hnsw (embedding halfvec_cosine_ops)
-                    WITH (m = 16, ef_construction = 64);
-                """)
-                conn.commit()
+        conn = self._get_connection()
+        with conn.cursor() as cur:
+            cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS intencoes_vetores (
+                    id SERIAL PRIMARY KEY,
+                    intencao VARCHAR(50) NOT NULL,
+                    descricao TEXT NOT NULL,
+                    exemplo_frase TEXT NOT NULL,
+                    embedding halfvec(768),
+                    criado_em TIMESTAMP DEFAULT NOW()
+                );
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_intencoes_vetores_hnsw 
+                ON intencoes_vetores USING hnsw (embedding halfvec_cosine_ops)
+                WITH (m = 16, ef_construction = 64);
+            """)
+            conn.commit()
 
     def count_intents(self) -> int:
         """Retorna o número de exemplos de intenções indexados."""
         try:
-            with self._get_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT count(*) FROM intencoes_vetores WHERE embedding IS NOT NULL;")
-                    row = cur.fetchone()
-                    return row[0] if row else 0
+            conn = self._get_connection()
+            with conn.cursor() as cur:
+                cur.execute("SELECT count(*) FROM intencoes_vetores WHERE embedding IS NOT NULL;")
+                row = cur.fetchone()
+                return row[0] if row else 0
+        except Exception:
+            return 0
+
+    def count_distinct_intents(self) -> int:
+        """Retorna o número de intenções canônicas distintas indexadas."""
+        try:
+            conn = self._get_connection()
+            with conn.cursor() as cur:
+                cur.execute("SELECT count(DISTINCT intencao) FROM intencoes_vetores WHERE embedding IS NOT NULL;")
+                row = cur.fetchone()
+                return row[0] if row else 0
         except Exception:
             return 0
 
@@ -442,8 +474,9 @@ class SemanticRouter:
         """
         self.init_table()
         current_count = self.count_intents()
-        if current_count > 0 and not force:
-            logger.info(f"Tabela 'intencoes_vetores' já possui {current_count} registros. Seeding ignorado.")
+        distinct_count = self.count_distinct_intents()
+        if current_count >= len(INTENT_EXEMPLARS) and distinct_count >= len(INTENT_EXEMPLARS) and not force:
+            logger.info(f"Tabela 'intencoes_vetores' já possui {current_count} registros ({distinct_count} distintas). Seeding ignorado.")
             return current_count
 
         if not self.rag_engine:
@@ -509,7 +542,22 @@ class SemanticRouter:
         """
         t0 = time.perf_counter()
         self._metrics["total_routes"] += 1
-        query_norm = query_text.strip().lower()
+        query_norm = (query_text or "").strip().lower()
+
+        # 0. Consulta vazia ou somente espaços - retorno imediato sem chamada externa
+        if not query_norm:
+            telemetry = {
+                "intent": "catalogo_produtos",
+                "confidence": 0.0,
+                "method": "empty_query_fallback",
+                "matched_phrase": "Consulta vazia",
+                "pgvector_latency_ms": 0.0,
+                "embedding_latency_ms": 0.0,
+                "total_routing_latency_ms": 0.0,
+                "confidence_threshold": self.confidence_threshold,
+                "query_vector": None,
+            }
+            return "catalogo_produtos", 0.0, telemetry
 
         # 1. Checa cache em memória
         if use_cache and query_norm in self._memory_cache:
@@ -525,6 +573,7 @@ class SemanticRouter:
         pg_latency_ms = 0.0
         emb_latency_ms = 0.0
         emb_gerado = query_vector
+        last_similarity = 0.0
 
         try:
             if not emb_gerado:
@@ -548,16 +597,17 @@ class SemanticRouter:
                 LIMIT 1;
             """
             vec_str = str(emb_gerado)
-            with self._get_connection() as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute(sql, (vec_str, vec_str))
-                    melhor_match = cur.fetchone()
+            conn = self._get_connection()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(sql, (vec_str, vec_str))
+                melhor_match = cur.fetchone()
 
             pg_latency_ms = (time.perf_counter() - t_pg) * 1000
             self._metrics["total_pgvector_latency_ms"] += pg_latency_ms
 
             if melhor_match:
                 similarity = float(melhor_match["similarity"])
+                last_similarity = similarity
                 intencao_detectada = melhor_match["intencao"]
 
                 # Verifica se atinge o threshold de confiança
@@ -586,6 +636,7 @@ class SemanticRouter:
 
         except Exception as e:
             logger.warning(f"Roteamento vetorial falhou ({e}). Acionando fallback heurístico.")
+            self.close()
 
         # 3. Fallback Gracioso para Heurísticas Determinísticas
         self._metrics["heuristic_fallbacks"] += 1
@@ -596,6 +647,7 @@ class SemanticRouter:
         telemetry = {
             "intent": intencao_heuristica,
             "confidence": 0.50,
+            "low_vector_similarity": round(last_similarity, 4) if last_similarity > 0 else None,
             "method": "heuristic_fallback",
             "matched_phrase": "Heurística regex/keywords",
             "pgvector_latency_ms": round(pg_latency_ms, 2),

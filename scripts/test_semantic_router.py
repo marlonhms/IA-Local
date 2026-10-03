@@ -131,6 +131,13 @@ def run_tests():
     assert res_pg is not None
     print(f"   [OK] Latência de consulta vetorial pgvector: {lat_pg_query_ms:.2f}ms (< 5ms SLA alcançado)")
 
+    # Testa consulta vazia (deve retornar imediatamente com empty_query_fallback e 0 custo de API)
+    int_vazia, conf_vazia, tel_vazia = router.route("   ")
+    assert int_vazia == "catalogo_produtos"
+    assert tel_vazia["method"] == "empty_query_fallback"
+    assert tel_vazia["total_routing_latency_ms"] < 1.0
+    print(f"   [OK] Consulta vazia resolvida imediatamente sem chamada de API ({tel_vazia['method']})")
+
     # -------------------------------------------------------------------------
     # 4. Testando Fallback Gracioso para Heurísticas Determinísticas
     # -------------------------------------------------------------------------
@@ -175,7 +182,7 @@ def run_tests():
     print("\n6. Testando Reciprocal Rank Fusion (RRF) Calibrado...")
     engine = HybridRAGEngine(db_config=DB_VECTOR_CONFIG)
 
-    # Teste 1: Priorização de Viscosidade de Óleo Lubrificante
+    # Teste 1: Priorização de Viscosidade de Óleo Lubrificante (colado e com espaço)
     busca_oleo = engine.search_hybrid("óleo 5w30", top_k=3)
     primeiro_oleo = busca_oleo["results"][0]
     assert "5W30" in primeiro_oleo["nompro"].upper(), (
@@ -184,17 +191,37 @@ def run_tests():
     assert busca_oleo["telemetry"]["viscosity_detected"] == "5W30", "Viscosidade 5W30 não detectada na telemetria"
     print(f"   [OK] Priorização de Viscosidade validada: Top 1 = '{primeiro_oleo['nompro']}' (RRF Score: {primeiro_oleo['rrf_score']:.4f})")
 
-    # Teste 2: Boost Imediato de Código do Produto / Código de Barras
+    busca_oleo_espaco = engine.search_hybrid("óleo 5w 30", top_k=2)
+    assert "5W30" in busca_oleo_espaco["results"][0]["nompro"].upper()
+    assert busca_oleo_espaco["telemetry"]["viscosity_detected"] == "5W30"
+    print(f"   [OK] Viscosidade com espaçamento '5w 30' validada: Top 1 = '{busca_oleo_espaco['results'][0]['nompro']}'")
+
+    # Teste 2: Boost Imediato de Código do Produto / Código de Barras (com e sem zeros à esquerda, e com prefixo)
     busca_codigo = engine.search_hybrid("00150", top_k=1)
     primeiro_codigo = busca_codigo["results"][0]
     assert primeiro_codigo["codpro"] == "00150", (
         f"Match exato de código '00150' deveria ser Top 1, obtido: {primeiro_codigo['codpro']}"
     )
-    # Com boost de +1.0, o RRF score deve ser > 1.0
     assert float(primeiro_codigo["rrf_score"]) >= 1.0, (
         f"RRF score com boost exato deveria ser >= 1.0, obtido {primeiro_codigo['rrf_score']}"
     )
-    print(f"   [OK] Boost de Código Exato validado: Top 1 = [{primeiro_codigo['codpro']}] {primeiro_codigo['nompro']} (RRF Score: {primeiro_codigo['rrf_score']:.4f})")
+    print(f"   [OK] Boost de Código Exato [00150] validado: Top 1 = [{primeiro_codigo['codpro']}] {primeiro_codigo['nompro']} (RRF Score: {primeiro_codigo['rrf_score']:.4f})")
+
+    busca_cod_prefix = engine.search_hybrid("código 150", top_k=1)
+    assert busca_cod_prefix["results"][0]["codpro"] == "00150", "Falha ao resolver código com prefixo 'código 150'"
+    assert float(busca_cod_prefix["results"][0]["rrf_score"]) >= 1.0
+    print(f"   [OK] Boost com prefixo 'código 150' validado: Top 1 = [{busca_cod_prefix['results'][0]['codpro']}] {busca_cod_prefix['results'][0]['nompro']}")
+
+    busca_cod_sem_zero = engine.search_hybrid("150", top_k=1)
+    assert busca_cod_sem_zero["results"][0]["codpro"] == "00150", "Falha ao resolver código sem zeros à esquerda '150'"
+    assert float(busca_cod_sem_zero["results"][0]["rrf_score"]) >= 1.0
+    print(f"   [OK] Boost sem zeros '150' -> '00150' validado: Top 1 = [{busca_cod_sem_zero['results'][0]['codpro']}] {busca_cod_sem_zero['results'][0]['nompro']}")
+
+    # Teste 3: Reuso de query_vector no Semantic Cache
+    vec_dummy = [0.01] * 768
+    cache_res = engine.check_semantic_cache("produto teste", query_vector=vec_dummy)
+    assert cache_res.get("query_vector") == vec_dummy
+    print("   [OK] Reuso de query_vector no Semantic Cache validado (zero chamada redundante de API).")
 
     # -------------------------------------------------------------------------
     # 7. Testando Métricas de Observabilidade SRE

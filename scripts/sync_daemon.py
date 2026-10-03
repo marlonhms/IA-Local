@@ -33,18 +33,7 @@ from config.settings import (
 )
 
 
-def calcular_hash_produto(nompro: str, grupo: str, codbar: str, preco: float, unidade: str) -> str:
-    """Calcula hash MD5 determinístico para Change Data Capture (CDC)."""
-    nompro_c = (nompro or "").strip().upper()
-    grupo_c = (grupo or "GERAL").strip().upper()
-    codbar_c = (codbar or "").strip()
-    unidade_c = (unidade or "UN").strip().upper()
-    try:
-        preco_c = f"{float(preco):.2f}"
-    except (ValueError, TypeError):
-        preco_c = "0.00"
-    payload = f"{nompro_c}|{grupo_c}|{codbar_c}|{preco_c}|{unidade_c}"
-    return hashlib.md5(payload.encode("utf-8")).hexdigest()
+from scripts.index_produtos import calcular_hash_produto
 
 
 def sync_cycle(conn_erp, conn_vec) -> int:
@@ -79,31 +68,43 @@ def sync_cycle(conn_erp, conn_vec) -> int:
     if a_atualizar:
         print(f"[{time.strftime('%H:%M:%S')}] CDC: Detectados {len(a_atualizar)} produtos alterados/novos de {len(produtos_erp)} totais. Sincronizando...")
 
+        batch_size = 20
+        sucessos = 0
         with conn_vec.cursor() as cur_vec:
-            for p, h in a_atualizar:
-                texto_busca = f"Produto: {p['nompro']} | Grupo: {p['grupo']} | Unidade: {p['unidade']} | Preço: R$ {p['preco']:.2f}"
-                if p['codbar']:
-                    texto_busca += f" | Cód. Barras: {p['codbar']}"
+            for i in range(0, len(a_atualizar), batch_size):
+                lote = a_atualizar[i:i + batch_size]
+                textos_lote = []
+                for p, h in lote:
+                    texto_busca = f"Produto: {p['nompro']} | Grupo: {p['grupo']} | Unidade: {p['unidade']} | Preço: R$ {p['preco']:.2f}"
+                    if p['codbar']:
+                        texto_busca += f" | Cód. Barras: {p['codbar']}"
+                    textos_lote.append(texto_busca)
 
-                res = genai.embed_content(
-                    model=DEFAULT_EMBEDDING_MODEL,
-                    content=texto_busca,
-                    output_dimensionality=768,
-                    task_type="retrieval_document"
-                )
-                vetor = res["embedding"]
+                try:
+                    res = genai.embed_content(
+                        model=DEFAULT_EMBEDDING_MODEL,
+                        content=textos_lote,
+                        output_dimensionality=768,
+                        task_type="retrieval_document"
+                    )
+                    vetores = res["embedding"]
 
-                cur_vec.execute("""
-                    INSERT INTO produtos_vetores (codpro, nompro, grupo, codbar, unidade, preco, texto_busca, embedding, hash_md5, atualizado_em)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s::halfvec, %s, NOW())
-                    ON CONFLICT (codpro) DO UPDATE SET
-                        nompro = EXCLUDED.nompro, grupo = EXCLUDED.grupo, codbar = EXCLUDED.codbar,
-                        unidade = EXCLUDED.unidade, preco = EXCLUDED.preco, texto_busca = EXCLUDED.texto_busca,
-                        embedding = EXCLUDED.embedding, hash_md5 = EXCLUDED.hash_md5, atualizado_em = NOW();
-                """, (p['codpro'], p['nompro'], p['grupo'], p['codbar'], p['unidade'], p['preco'], texto_busca, str(vetor), h))
+                    for (p, h), vetor, texto_busca in zip(lote, vetores, textos_lote):
+                        cur_vec.execute("""
+                            INSERT INTO produtos_vetores (codpro, nompro, grupo, codbar, unidade, preco, texto_busca, embedding, hash_md5, atualizado_em)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s::halfvec, %s, NOW())
+                            ON CONFLICT (codpro) DO UPDATE SET
+                                nompro = EXCLUDED.nompro, grupo = EXCLUDED.grupo, codbar = EXCLUDED.codbar,
+                                unidade = EXCLUDED.unidade, preco = EXCLUDED.preco, texto_busca = EXCLUDED.texto_busca,
+                                embedding = EXCLUDED.embedding, hash_md5 = EXCLUDED.hash_md5, atualizado_em = NOW();
+                        """, (p['codpro'], p['nompro'], p['grupo'], p['codbar'], p['unidade'], p['preco'], texto_busca, str(vetor), h))
 
-            conn_vec.commit()
-        print(f"[{time.strftime('%H:%M:%S')}] Sincronização CDC concluída com sucesso ({len(a_atualizar)} atualizados).")
+                    conn_vec.commit()
+                    sucessos += len(lote)
+                except Exception as e:
+                    print(f"[{time.strftime('%H:%M:%S')}] Erro ao sincronizar lote CDC: {e}")
+
+        print(f"[{time.strftime('%H:%M:%S')}] Sincronização CDC concluída ({sucessos}/{len(a_atualizar)} atualizados).")
     else:
         economia_pct = 100.0 if produtos_erp else 0.0
         print(f"[{time.strftime('%H:%M:%S')}] CDC Hit: Todos os {len(produtos_erp)} produtos idênticos ({economia_pct:.1f}% economia API).")
@@ -122,6 +123,9 @@ def sync_loop(interval_seconds: int = 300, run_once: bool = False):
 
     while True:
         try:
+            from config.settings import get_erp_password
+            DB_ERP_CONFIG["password"] = get_erp_password()
+
             conn_erp = psycopg2.connect(**DB_ERP_CONFIG)
             conn_vec = psycopg2.connect(**DB_VECTOR_CONFIG)
 
@@ -131,7 +135,11 @@ def sync_loop(interval_seconds: int = 300, run_once: bool = False):
             conn_vec.close()
 
         except Exception as e:
-            print(f"[{time.strftime('%H:%M:%S')}] Erro no sync daemon: {e}")
+            msg = str(e)
+            if "utf-8" in msg.lower() or "password" in msg.lower() or "autenticação" in msg.lower():
+                print(f"[{time.strftime('%H:%M:%S')}] [AVISO ERP] Senha do ERP inválida ou expirada para a data atual. Atualize 'backups/erp_password.txt'.")
+            else:
+                print(f"[{time.strftime('%H:%M:%S')}] Erro no sync daemon: {e}")
 
         if run_once:
             break
