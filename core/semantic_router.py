@@ -28,6 +28,20 @@ from config.settings import (
 
 logger = logging.getLogger("SemanticRouter")
 
+# Termos léxicos e técnicos canônicos da Portaria ANP 26/1992 (LMC)
+TERMOS_LMC_EXATOS = [
+    "lmc", "livro de movimentação", "livro de movimentacao", "livro de combustíveis",
+    "livro de combustiveis", "livro fiscal anp", "portaria anp", "portaria 26",
+    "portaria 26/1992", "tolerância da anp", "tolerancia da anp", "tolerância anp",
+    "tolerancia anp", "margem da anp", "margem anp", "0.6%", "0,6%", "0.6 por cento",
+    "0,6 por cento", "estoque escriturado", "fechamento escriturado",
+    "variação volumétrica", "variacao volumetrica", "perda volumétrica", "perda volumetrica",
+    "quebra volumétrica", "quebra volumetrica", "ganho volumétrico", "ganho volumetrico",
+    "sobra volumétrica", "sobra volumetrica", "perda térmica", "perda termica",
+    "ganho térmico", "ganho termico", "conformidade anp", "tolerância regulamentar",
+    "tolerancia regulamentar"
+]
+
 # Catálogo canônico das 10 intenções operacionais do sistema
 INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
     "lmc_anp": {
@@ -48,6 +62,11 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
             "Extrato do LMC com perdas e sobras volumétricas",
             "Teve tanque fora da tolerância de 0,6% no LMC?",
             "Fechamento escriturado do LMC de ontem",
+            "Qual foi a perda ou ganho térmico dos tanques?",
+            "Como está a perda térmica dos tanques?",
+            "Variação térmica do LMC dos tanques",
+            "O LMC de ontem fechou dentro da tolerância da ANP?",
+            "Teve variação do LMC acima de 0.6%?",
         ]
     },
     "auditoria_turno": {
@@ -201,19 +220,7 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     p = pergunta.lower()
 
     # -1. Livro de Movimentação de Combustíveis (LMC Oficial ANP Portaria 26/1992)
-    termos_lmc_exatos = [
-        "lmc", "livro de movimentação", "livro de movimentacao", "livro de combustíveis",
-        "livro de combustiveis", "livro fiscal anp", "portaria anp", "portaria 26",
-        "portaria 26/1992", "tolerância da anp", "tolerancia da anp", "tolerância anp",
-        "tolerancia anp", "margem da anp", "margem anp", "0.6%", "0,6%", "0.6 por cento",
-        "0,6 por cento", "estoque escriturado", "fechamento escriturado",
-        "variação volumétrica", "variacao volumetrica", "perda volumétrica", "perda volumetrica",
-        "quebra volumétrica", "quebra volumetrica", "ganho volumétrico", "ganho volumetrico",
-        "sobra volumétrica", "sobra volumetrica", "perda térmica", "perda termica",
-        "ganho térmico", "ganho termico", "conformidade anp", "tolerância regulamentar",
-        "tolerancia regulamentar"
-    ]
-    if any(t in p for t in termos_lmc_exatos):
+    if any(t in p for t in TERMOS_LMC_EXATOS):
         return "lmc_anp"
 
     if re.search(r"\blmc\b", p):
@@ -667,6 +674,12 @@ class SemanticRouter:
                 similarity = float(melhor_match["similarity"])
                 last_similarity = similarity
                 intencao_detectada = melhor_match["intencao"]
+
+                # Priorização de termos técnicos determinísticos do LMC ANP
+                if intencao_detectada != "lmc_anp":
+                    if any(t in query_norm for t in TERMOS_LMC_EXATOS) or re.search(r"\blmc\b", query_norm):
+                        intencao_detectada = "lmc_anp"
+                        similarity = max(similarity, 0.88)
 
                 # Verifica se atinge o threshold de confiança
                 if similarity >= self.confidence_threshold:

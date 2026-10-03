@@ -2538,13 +2538,6 @@ class PostoTools:
         ee = round(ea + rec - v, 3)
         var_litros = round(ef - ee, 3)
 
-        if v > 0:
-            var_pct = round((var_litros / v) * 100.0, 4)
-            tol_max_litros = round(v * (tol_pct / 100.0), 3)
-        else:
-            var_pct = 0.0
-            tol_max_litros = 0.0
-
         if var_litros > 0.0001:
             tipo_variacao = "ganho"
             nome_variacao = "Sobra / Ganho Volumétrico (Dilatação / Térmico)"
@@ -2555,38 +2548,62 @@ class PostoTools:
             tipo_variacao = "nula"
             nome_variacao = "Sem variação (Perfeito alinhamento)"
 
-        # Margem de tolerância da ANP (com epsilon 1e-7 para estabilidade numérica em exatamente 0.6%)
-        if abs(var_pct) <= (tol_pct + 1e-7):
-            status_anp = "CONFORME_ANP"
-            dentro_tolerancia = True
-            descricao_status = f"Dentro da margem de tolerância regulamentar da ANP (±{tol_pct}%)."
-        else:
-            status_anp = "ALERTA_FORA_TOLERANCIA_ANP"
-            dentro_tolerancia = False
-            descricao_status = f"FORA DA TOLERÂNCIA ANP: variação de {var_pct:+.2f}% excede a margem permitida de ±{tol_pct}%."
+        if v > 0:
+            var_pct = round((var_litros / v) * 100.0, 4)
+            tol_max_litros = round(v * (tol_pct / 100.0), 3)
 
-        if status_anp == "CONFORME_ANP":
-            if tipo_variacao == "ganho":
-                diagnostico = f"Variação positiva de +{abs(var_litros):.3f} L ({var_pct:+.2f}%) dentro da tolerância de ±{tol_pct}%. Provável expansão volumétrica por temperatura."
-            elif tipo_variacao == "perda":
-                diagnostico = f"Perda volumétrica de -{abs(var_litros):.3f} L ({var_pct:+.2f}%) dentro da tolerância de ±{tol_pct}%. Provável evaporação ou contração térmica natural."
+            # Margem de tolerância da ANP (com epsilon 1e-7 para estabilidade numérica em exatamente 0.6%)
+            if abs(var_pct) <= (tol_pct + 1e-7):
+                status_anp = "CONFORME_ANP"
+                dentro_tolerancia = True
+                descricao_status = f"Dentro da margem de tolerância regulamentar da ANP (±{tol_pct}%)."
+                if tipo_variacao == "ganho":
+                    diagnostico = f"Variação positiva de +{abs(var_litros):.3f} L ({var_pct:+.2f}%) dentro da tolerância de ±{tol_pct}%. Provável expansão volumétrica por temperatura."
+                elif tipo_variacao == "perda":
+                    diagnostico = f"Perda volumétrica de -{abs(var_litros):.3f} L ({var_pct:+.2f}%) dentro da tolerância de ±{tol_pct}%. Provável evaporação ou contração térmica natural."
+                else:
+                    diagnostico = "Estoque físico medido coincide perfeitamente com o saldo contábil escriturado."
             else:
-                diagnostico = "Estoque físico medido coincide perfeitamente com o saldo contábil escriturado."
+                status_anp = "ALERTA_FORA_TOLERANCIA_ANP"
+                dentro_tolerancia = False
+                descricao_status = f"FORA DA TOLERÂNCIA ANP: variação de {var_pct:+.2f}% excede a margem permitida de ±{tol_pct}%."
+                if tipo_variacao == "perda":
+                    diagnostico = (
+                        f"Alerta Crítico: Perda excessiva de -{abs(var_litros):.3f} L ({var_pct:+.2f}% das vendas). "
+                        f"Supera a tolerância legal de ±{tol_pct}%. Investigar imediatamente: "
+                        f"possível vazamento no tanque ou linha de sucção, bicos entregando combustível a mais por descalibração, "
+                        f"ou erro de leitura na régua/sonda."
+                    )
+                else:
+                    diagnostico = (
+                        f"Alerta Crítico: Ganho volumétrico excessivo de +{abs(var_litros):.3f} L ({var_pct:+.2f}% das vendas). "
+                        f"Supera a tolerância legal de ±{tol_pct}%. Investigar imediatamente: "
+                        f"falta de registro de descarga de combustível, bicos entregando a menos por desgaste, "
+                        f"ou erro na tabela de arqueação do tanque."
+                    )
         else:
-            if tipo_variacao == "perda":
-                diagnostico = (
-                    f"Alerta Crítico: Perda excessiva de -{abs(var_litros):.3f} L ({var_pct:+.2f}% das vendas). "
-                    f"Supera a tolerância legal de ±{tol_pct}%. Investigar imediatamente: "
-                    f"possível vazamento no tanque ou linha de sucção, bicos entregando combustível a mais por descalibração, "
-                    f"ou erro de leitura na régua/sonda."
-                )
+            # Sem vendas no período: a tolerância permitida sobre vendas é de 0 litros
+            var_pct = 0.0
+            tol_max_litros = 0.0
+            if abs(var_litros) <= 0.001:
+                status_anp = "CONFORME_ANP"
+                dentro_tolerancia = True
+                descricao_status = f"Sem vendas registradas no período e estoque físico perfeitamente alinhado ao escriturado (±{tol_pct}%)."
+                diagnostico = "Tanque sem vendas no período; estoque físico coincide perfeitamente com o saldo contábil escriturado."
             else:
-                diagnostico = (
-                    f"Alerta Crítico: Ganho volumétrico excessivo de +{abs(var_litros):.3f} L ({var_pct:+.2f}% das vendas). "
-                    f"Supera a tolerância legal de ±{tol_pct}%. Investigar imediatamente: "
-                    f"falta de registro de descarga de combustível, bicos entregando a menos por desgaste, "
-                    f"ou erro na tabela de arqueação do tanque."
-                )
+                status_anp = "ALERTA_FORA_TOLERANCIA_ANP"
+                dentro_tolerancia = False
+                descricao_status = f"FORA DA TOLERÂNCIA ANP: Variação física de {var_litros:+.3f} L sem vendas no período (tolerância sobre vendas é 0 L)."
+                if tipo_variacao == "perda":
+                    diagnostico = (
+                        f"Alerta Crítico: Perda volumétrica de -{abs(var_litros):.3f} L sem movimentação de vendas no período. "
+                        f"Supera a tolerância permitida (0 L). Investigar imediatamente risco de vazamento subterrâneo, furto ou erro de régua."
+                    )
+                else:
+                    diagnostico = (
+                        f"Alerta Crítico: Sobra volumétrica de +{abs(var_litros):.3f} L sem movimentação de vendas no período. "
+                        f"Supera a tolerância permitida (0 L). Investigar descarga de combustível não escriturada ou erro na medição da régua/sonda."
+                    )
 
         return {
             "estoque_abertura": round(ea, 3),
@@ -2662,11 +2679,53 @@ class PostoTools:
                 elif data_param == "ontem":
                     cur.execute("SELECT (CURRENT_DATE - INTERVAL '1 day')::date as ontem;")
                     data_alvo = str(cur.fetchone()['ontem'])
+                    cur.execute("SELECT COUNT(*) as c FROM abastecimentos WHERE data = %s AND abt_bl_venda_cancelada IS NOT TRUE;", (data_alvo,))
+                    c_ab = cur.fetchone()['c']
+                    cur.execute("SELECT COUNT(*) as c FROM fechabomba WHERE dtmov = %s;", (data_alvo,))
+                    c_fb = cur.fetchone()['c']
+                    if c_ab == 0 and c_fb == 0:
+                        cur.execute("""
+                            SELECT GREATEST(
+                                (SELECT MAX(data) FROM abastecimentos WHERE abt_bl_venda_cancelada IS NOT TRUE),
+                                (SELECT MAX(dtmov) FROM fechabomba)
+                            ) as max_d;
+                        """)
+                        max_d = cur.fetchone()['max_d']
+                        if max_d:
+                            aviso_data = (
+                                f"Nenhuma movimentação registrada para ontem ({data_alvo}). "
+                                f"Exibindo LMC da data mais recente com movimentação: {max_d}."
+                            )
+                            data_alvo = str(max_d)
                 elif data_param == "anteontem":
                     cur.execute("SELECT (CURRENT_DATE - INTERVAL '2 days')::date as anteontem;")
                     data_alvo = str(cur.fetchone()['anteontem'])
+                    cur.execute("SELECT COUNT(*) as c FROM abastecimentos WHERE data = %s AND abt_bl_venda_cancelada IS NOT TRUE;", (data_alvo,))
+                    c_ab = cur.fetchone()['c']
+                    cur.execute("SELECT COUNT(*) as c FROM fechabomba WHERE dtmov = %s;", (data_alvo,))
+                    c_fb = cur.fetchone()['c']
+                    if c_ab == 0 and c_fb == 0:
+                        cur.execute("""
+                            SELECT GREATEST(
+                                (SELECT MAX(data) FROM abastecimentos WHERE abt_bl_venda_cancelada IS NOT TRUE),
+                                (SELECT MAX(dtmov) FROM fechabomba)
+                            ) as max_d;
+                        """)
+                        max_d = cur.fetchone()['max_d']
+                        if max_d:
+                            aviso_data = (
+                                f"Nenhuma movimentação registrada para anteontem ({data_alvo}). "
+                                f"Exibindo LMC da data mais recente com movimentação: {max_d}."
+                            )
+                            data_alvo = str(max_d)
                 else:
                     data_alvo = data_param
+                    cur.execute("SELECT COUNT(*) as c FROM abastecimentos WHERE data = %s AND abt_bl_venda_cancelada IS NOT TRUE;", (data_alvo,))
+                    c_ab = cur.fetchone()['c']
+                    cur.execute("SELECT COUNT(*) as c FROM fechabomba WHERE dtmov = %s;", (data_alvo,))
+                    c_fb = cur.fetchone()['c']
+                    if c_ab == 0 and c_fb == 0:
+                        aviso_data = f"Nenhuma movimentação de vendas ou encerrantes registrada para a data {data_alvo}."
 
                 # 2. Dados Cadastrais dos Tanques
                 cur.execute("""
@@ -2770,8 +2829,12 @@ class PostoTools:
             # Normaliza filtros de tanque e combustível
             tanque_filtro_pad = None
             if tanque:
-                t_str = str(tanque).strip()
-                tanque_filtro_pad = f"{int(t_str):03d}" if t_str.isdigit() else t_str
+                t_str = str(tanque).strip().lower()
+                m_dig = re.search(r"\d+", t_str)
+                if m_dig:
+                    tanque_filtro_pad = f"{int(m_dig.group(0)):03d}"
+                else:
+                    tanque_filtro_pad = t_str
 
             combustivel_filtro_cat = None
             if combustivel:
@@ -2783,8 +2846,11 @@ class PostoTools:
                 cat_comb = self.categorizar_combustivel(nome_comb)
 
                 # Aplica filtros se especificados
-                if tanque_filtro_pad and cod_tan != tanque_filtro_pad and cod_tan.lstrip('0') != tanque_filtro_pad.lstrip('0'):
-                    continue
+                if tanque_filtro_pad:
+                    t_pad_num = tanque_filtro_pad.lstrip('0') or '0'
+                    c_tan_num = cod_tan.lstrip('0') or '0'
+                    if cod_tan != tanque_filtro_pad and c_tan_num != t_pad_num:
+                        continue
 
                 if combustivel_filtro_cat and combustivel_filtro_cat != "OUTROS" and cat_comb != combustivel_filtro_cat:
                     if combustivel.strip().lower() not in nome_comb.lower():

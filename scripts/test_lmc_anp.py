@@ -78,7 +78,7 @@ def run_tests():
     try:
         router = SemanticRouter()
         print("\n   [ROTEADOR PGVECTOR] Validando busca vetorial com halfvec(768)...")
-        for f in frases_lmc[:5]:
+        for f in frases_lmc:
             intencao, conf, tele = router.route(f)
             assert intencao == "lmc_anp", f"Erro no SemanticRouter para '{f}': obtido '{intencao}'"
             metodo = tele.get("method")
@@ -242,7 +242,10 @@ def run_tests():
     zero_vendas_disc = PostoTools.calcular_lmc_tanque(5000.0, 0.0, 0.0, 4980.0, tolerancia_pct=0.6)
     assert zero_vendas_disc["variacao_litros"] == -20.0
     assert zero_vendas_disc["variacao_pct"] == 0.0  # Protegido contra divisão por zero
-    print("   [OK] Tanque sem vendas com diferença física: divisão por zero evitada com sucesso")
+    assert zero_vendas_disc["status_anp"] == "ALERTA_FORA_TOLERANCIA_ANP"
+    assert zero_vendas_disc["dentro_tolerancia"] is False
+    assert "Alerta Crítico" in zero_vendas_disc["diagnostico"]
+    print("   [OK] Tanque sem vendas com diferença física: divisão por zero evitada com sucesso e alerta disparado")
 
     # ------------------------------------------------------------------
     # 5. INTEGRAÇÃO REAL COM O BANCO ERP POSTGRESQL 16
@@ -283,7 +286,7 @@ def run_tests():
         assert tg["categoria_combustivel"] == "GASOLINA COMUM"
     print(f"   [OK] Filtro 'GASOLINA COMUM' isolou os 4 tanques de gasolina comum ({[t['tanque'] for t in tanques_gas]})")
 
-    # 5.4 Filtro por Código de Tanque ('001' e '1')
+    # 5.4 Filtro por Código de Tanque ('001', '1', 'tanque 1' e 'TQ-01')
     rel_tq001 = tools.gerar_relatorio_lmc_anp(data="2026-09-02", tanque="001")
     assert rel_tq001.get("status") == "ok"
     assert len(rel_tq001["tanques"]) == 1
@@ -292,7 +295,21 @@ def run_tests():
     rel_tq1_raw = tools.gerar_relatorio_lmc_anp(data="2026-09-02", tanque="1")
     assert len(rel_tq1_raw["tanques"]) == 1
     assert rel_tq1_raw["tanques"][0]["tanque"] == "001"
-    print("   [OK] Filtros de tanque '001' e '1' normalizados e validados com precisão")
+
+    rel_tq_str = tools.gerar_relatorio_lmc_anp(data="2026-09-02", tanque="tanque 1")
+    assert len(rel_tq_str["tanques"]) == 1
+    assert rel_tq_str["tanques"][0]["tanque"] == "001"
+
+    rel_tq_dash = tools.gerar_relatorio_lmc_anp(data="2026-09-02", tanque="TQ-01")
+    assert len(rel_tq_dash["tanques"]) == 1
+    assert rel_tq_dash["tanques"][0]["tanque"] == "001"
+    print("   [OK] Filtros de tanque '001', '1', 'tanque 1' e 'TQ-01' normalizados e validados com precisão")
+
+    # 5.5 Consulta com Data Relativa ('ontem') com fallback transparente
+    rel_ontem = tools.gerar_relatorio_lmc_anp(data="ontem")
+    assert rel_ontem.get("status") == "ok"
+    assert rel_ontem["periodo_analisado"]["aviso_data"] is not None
+    print(f"   [OK] Fallback inteligente de data relativa 'ontem' validado: {rel_ontem['periodo_analisado']['aviso_data'][:65]}...")
 
     # ------------------------------------------------------------------
     # 6. SIMULAÇÃO DE MEDIÇÕES FÍSICAS E ALERTAS OPERACIONAIS
