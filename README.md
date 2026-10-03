@@ -194,8 +194,8 @@ flowchart LR
 ```
 
 #### Capacidades Chave do Roteador Semântico:
-* **Tabela Dedicada `intencoes_vetores`:** Armazena exemplares vetoriais das 9 rotas operacionais do sistema: `auditoria_turno`, `previsao_tanques`, `desempenho_pista_frentistas`, `vendas_analitico`, `estoque_posicao`, `clientes_ranking`, `sre_metricas`, `dados_filial` e `catalogo_produtos`.
-* **Imunidade a Variações Coloquiais e Gírias:** Compreende perfeitamente frases como *"deu ruim no fechamento?"*, *"vai faltar gasosa no fim de semana?"*, *"os frentista renderam bem?"* e *"tem bico lerdo na bomba 2?"*.
+* **Tabela Dedicada `intencoes_vetores`:** Armazena exemplares vetoriais das 11 rotas operacionais canônicas do sistema: `auditoria_turno`, `previsao_tanques`, `desempenho_pista_frentistas`, `lmc_anp`, `conveniencia_vendas_cruzadas`, `vendas_analitico`, `estoque_posicao`, `clientes_ranking`, `sre_metricas`, `dados_filial` e `catalogo_produtos`.
+* **Imunidade a Variações Coloquiais e Gírias:** Compreende perfeitamente frases como *"deu ruim no fechamento?"*, *"vai faltar gasosa no fim de semana?"*, *"os frentista renderam bem?"*, *"o que vende junto com café?"* e *"tem bico lerdo na bomba 2?"*.
 * **Cache em Memória de Duplo Nível:** Respostas a perguntas recorrentes ou idênticas despachadas em `< 0.01ms`.
 * **Latência de Busca Vetorial pgvector:** Execução da consulta vetorial SQL em `< 3.5ms` com índice HNSW.
 * **Degradação Graciosa:** Se a similaridade for inferior a 0.58 ou houver indisponibilidade momentânea da rede, aciona automaticamente as regras determinísticas sem interromper a operação.
@@ -531,6 +531,51 @@ Cruzamento temporal e relacional para identificação de irregularidades operaci
 
 ---
 
+#### F. Motor de Inteligência de Conveniência: Market Basket Analysis & Vendas Cruzadas
+Mineração estatística de regras de associação (Algoritmo Apriori otimizado) sobre cupons de PDV (`pedido` e `itemped`) para maximizar o ticket médio e rentabilidade da loja de conveniência:
+
+* **Suporte Conjunto da Cesta ($Support(A \cup B)$):**
+  Fração do total de transações ($N$) que contêm simultaneamente o item $A$ e o item $B$:
+
+$$
+Support(A \cup B) = \frac{\text{Transações}(A \cap B)}{N_{\text{total}}}
+$$
+
+* **Confiança da Regra ($Confidence(A \rightarrow B)$):**
+  Probabilidade condicional de aquisição do produto $B$ dado que o cliente comprou o produto $A$:
+
+$$
+Confidence(A \rightarrow B) = \frac{\text{Transações}(A \cap B)}{\text{Transações}(A)} = \frac{Support(A \cup B)}{Support(A)}
+$$
+
+* **Alavancagem / Lift de Sinergia ($Lift(A \rightarrow B)$):**
+  Mede quantas vezes mais provável é a compra do produto $B$ na presença do produto $A$ em relação à compra aleatória de $B$:
+
+$$
+Lift(A \rightarrow B) = \frac{Confidence(A \rightarrow B)}{Support(B)} = \frac{P(A \cap B)}{P(A) \times P(B)}
+$$
+
+* **Matriz de Interpretação do Lift:**
+
+| Faixa de Lift | Grau de Associação | Ação Operacional Recomendada |
+| :--- | :--- | :--- |
+| **$Lift \ge 2.0$** | **Sinergia Forte (Alta Atração)** | Criação de combo promocional, cross-merchandising de balcão e script de caixa obrigatório. |
+| **$1.0 < Lift < 2.0$** | **Sinergia Moderada** | Produtos complementares com atração positiva. Bom para layout de gôndola próximo. |
+| **$Lift = 1.0$** | **Independência Estatística** | A compra de $A$ não influencia em nada a compra de $B$. |
+| **$Lift < 1.0$** | **Repulsão / Canibalização** | A compra de $A$ diminui a probabilidade de compra de $B$ (itens concorrentes/substitutos). |
+
+* **Convicção Direcional ($Conviction(A \rightarrow B)$):**
+  Mensura o grau de dependência da regra em relação a uma coincidência aleatória:
+
+$$
+Conviction(A \rightarrow B) = \frac{1 - Support(B)}{1 - Confidence(A \rightarrow B)}
+$$
+
+* **Incremento Financeiro do Ticket Médio ($\Delta R\$$) & Scripts de Caixa:**
+  Quantifica o ganho marginal direto por transação convertida e fornece scripts acionáveis para o operador de caixa (ex: *"Que tal levar um Pão de Queijo por apenas +R$ 5,50 com seu Café Expresso?"*).
+
+---
+
 <a id="guia-de-inicialização-rápida"></a>
 ## ⚡ Guia de Inicialização Rápida
 
@@ -642,7 +687,10 @@ ia-banco-local/
 │   ├── test_previsao_tanques.py  # Suíte de testes do motor preditivo de esgotamento e carretas
 │   ├── test_desempenho_frentistas.py # Suíte de testes da auditoria de pista e frentistas
 │   ├── test_rag_hierarquico.py   # Suíte de testes do RAG Hierárquico Multi-Filial & MapReduce
-│   └── test_semantic_router.py   # Suíte de testes do Roteador Semântico Vetorial e CDC Delta Hash
+│   ├── test_semantic_router.py   # Suíte de testes do Roteador Semântico Vetorial e CDC Delta Hash
+│   ├── test_lmc_anp.py           # Suíte de testes da automação do LMC oficial da ANP
+│   ├── seed_conveniencia_vendas.py # Carga controlada de transações de conveniência no ERP
+│   └── test_conveniencia_vendas_cruzadas.py # Suíte de testes de Market Basket Analysis e vendas cruzadas
 │
 ├── docs/                     # Documentação de arquitetura e roadmap
 │   ├── dossie_tecnico.md     # Dossiê técnico completo de infraestrutura e SRE
@@ -714,6 +762,13 @@ Executa comparativo de latência e qualidade entre Busca Densa Pura (HNSW), Busc
 python scripts/benchmark_rag.py
 ```
 
+### 9. Testes de Market Basket Analysis & Vendas Cruzadas (Fase 6.4)
+Valida classificação da 11ª intenção `conveniencia_vendas_cruzadas` (heurística e pgvector), não-regressão das 10 rotas operacionais anteriores, extração inteligente de produtos alvo, formulações de regras de associação (Suporte, Confiança, Lift $\ge 2.0$, Convicção finita), simulação sintética de transações, integração transacional real com o banco ERP (`pedido` e `itemped`) e blindagem LGPD ativa via `sanitize_dict`:
+```powershell
+python scripts/test_conveniencia_vendas_cruzadas.py
+```
+*Resultado: **100% dos testes aprovados**.*
+
 ---
 
 <a id="roadmap-de-evolução"></a>
@@ -728,12 +783,13 @@ O desenvolvimento do **Ai.la** segue um cronograma rigoroso de engenharia focado
 | **Fase 6.1** | **Previsão de Esgotamento de Tanques (Run-Out)** | ✅ Concluída | Autonomia em horas/dias, projeção de estoque zero, espaço de descarga (*ullage*), compra em múltiplos de 5.000 L. |
 | **Fase 6.2** | **Auditoria de Pista & Desempenho de Frentistas** | ✅ Concluída | Vazão hidráulica (L/min) com alerta de filtro sujo, conversão de aditivada $\ge 25\%$, anomalias de pista. |
 | **Fase 6.3** | **Automação do LMC Oficial da ANP (Portaria 26/1992)** | ✅ Concluída | Balanço escriturado vs físico, tolerância $\pm 0.6\%$, diagnóstico de quebras/sobras, 10ª rota semântica. |
+| **Fase 6.4** | **Inteligência de Conveniência & Vendas Cruzadas** | ✅ Concluída | Market Basket Analysis, métricas de associação (Suporte, Confiança, Lift $\ge 2.0$, Convicção), scripts de caixa, 11ª rota semântica. |
 | **Fase 2.5** | **Esteira de Deploy Automatizado & Onboarding** | 🚀 Próxima | `docker-compose.yml`, `scripts/deploy_posto.ps1` (1-clique), validação de portas. |
 | **Fase 3** | **Desacoplamento MCP & LangGraph Local** | 🔌 Próxima | Servidor MCP Python local, FastAPI assíncrono (SSE streaming), StateGraph local. |
 | **Fase 3.5** | **Escalabilidade Multi-Filial (RAG Hierárquico MapReduce)** | 🌐 Planejada | Maestro Fan-Out assíncrono (`asyncio`), Edge Workers Docker (JSON Pydantic), resiliência 5s e Síntese Executiva LLM. |
 | **Fase 4** | **Canal WhatsApp & Notificações Proativas** | 📱 Planejada | n8n + Evolution API, relatórios automáticos pós-turno (06h, 14h, 22h), áudio/voz. |
 | **Fase 5** | **Dashboard Web & PWA Mobile** | 💻 Planejada | Painel gerencial responsivo, visão gráfica dos tanques, monitor de frentistas em tempo real. |
-| **Fase 6.4+** | **Módulo Fiscal Avançado (Agent SEFAZ)** | 📈 Planejada | Auditoria contínua de NFC-e com Reforma Tributária (IBS/CBS) e conformidade NCM/CEST. |
+| **Fase 6.5+** | **Módulo Fiscal Avançado (Agent SEFAZ)** | 📈 Planejada | Auditoria contínua de NFC-e com Reforma Tributária (IBS/CBS) e conformidade NCM/CEST. |
 
 > *Para o detalhamento arquitetural completo, especificações e matriz de priorização, consulte o documento oficial [`docs/roadmap_aila.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap_aila.md).*
 

@@ -42,7 +42,7 @@ TERMOS_LMC_EXATOS = [
     "tolerancia regulamentar"
 ]
 
-# Catálogo canônico das 10 intenções operacionais do sistema
+# Catálogo canônico das 11 intenções operacionais do sistema
 INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
     "lmc_anp": {
         "descricao": "Livro de Movimentação de Combustíveis (LMC Oficial ANP Portaria 26/1992), balanço escriturado vs físico e tolerância de ±0.6%",
@@ -209,6 +209,33 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
             "tem cigarro e qual o preço?",
         ]
     },
+    "conveniencia_vendas_cruzadas": {
+        "descricao": "Motor de Inteligência de Loja de Conveniência, Market Basket Analysis, vendas cruzadas, combos de produtos e cross-selling",
+        "exemplos": [
+            "Quais são os combos mais vendidos da conveniência?",
+            "O que mais vende junto com cerveja?",
+            "Market basket analysis da loja de conveniência",
+            "Vendas cruzadas e cross-sell na conveniência",
+            "Quais produtos saem juntos na cesta de compras?",
+            "Recomendações de combos para aumentar o ticket médio",
+            "O que os clientes compram junto com Coca-Cola?",
+            "Quais os combos para Cerveja Heineken?",
+            "Análise de cesta de compras da loja",
+            "Cross-selling e sugestão de combos no PDV",
+            "O que vende junto com café?",
+            "Produtos com maior afinidade de compra na conveniência",
+            "Regras de associação e afinidade de produtos no caixa",
+            "Quais produtos têm maior sinergia de venda cruzada?",
+            "Combos sugeridos para o operador de caixa",
+            "O que sai junto com pão de queijo?",
+            "Cesta de compras da loja de conveniência",
+            "O que mais vende junto com energético?",
+            "Sugestões de cross selling para aumentar a margem",
+            "Quais itens vendem juntos na conveniência?",
+            "Combos para cerveja gelada na conveniência",
+            "O que vender junto para aumentar o ticket?",
+        ]
+    },
 }
 
 
@@ -318,6 +345,33 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
         if any(w in p for w in ["tanque", "tanques", "combustível", "combustivel", "hoje", "posto", "qual"]):
             return "previsao_tanques"
 
+    # 1.5 Inteligência de Loja de Conveniência (Market Basket Analysis & Vendas Cruzadas)
+    termos_cesta_exatos = [
+        "venda cruzada", "vendas cruzadas", "venda cruzadas", "vendas cruzada",
+        "cross-sell", "cross sell", "cross selling", "cross-selling",
+        "market basket", "basket analysis", "cesta de compras", "cesta de compra",
+        "cesta da loja", "afinidade de produtos", "afinidade de compra", "afinidade entre produtos",
+        "regras de associação", "regras de associacao", "regra de associação", "regra de associacao",
+        "combos da conveniência", "combos da conveniencia", "combo da conveniência", "combo da conveniencia",
+        "combos de conveniência", "combos de conveniencia", "combos na conveniência", "combos na conveniencia",
+        "combos do pdv", "combo do pdv", "combos do caixa", "combo do caixa",
+        "combos mais vendidos", "combo mais vendido", "sugestão de combo", "sugestao de combo",
+        "sugestão de combos", "sugestao de combos", "sugestões de combo", "sugestoes de combos",
+        "o que vende junto", "o que mais vende junto", "o que sai junto", "o que mais sai junto",
+        "o que compra junto", "o que mais compra junto", "comprados juntos", "vendidos juntos",
+        "saem juntos", "compram juntos", "vender junto", "vende junto", "sai junto",
+        "sinergia de produtos", "sinergia de vendas", "sinergia de venda",
+        "análise de cesta", "analise de cesta", "o que vende com", "o que sai com"
+    ]
+    if any(t in p for t in termos_cesta_exatos):
+        return "conveniencia_vendas_cruzadas"
+
+    if re.search(r"\bcombos?\b", p) and not any(w in p for w in ["combustível", "combustivel", "carreta", "bico", "tanque"]):
+        return "conveniencia_vendas_cruzadas"
+
+    if re.search(r"\b(vende|sai|compra|levar?|oferecer?)\s+(junto|com)\b", p) or "junto com" in p or "junto de" in p:
+        return "conveniencia_vendas_cruzadas"
+
     # 2. Perguntas sobre estoque, saldo e tanques de combustível
     termos_estoque = [
         "estoque", "mais estoque", "maior estoque", "saldo de estoque", "saldo em estoque",
@@ -423,7 +477,7 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
 class SemanticRouter:
     """
     Roteador Semântico Vetorial utilizando PostgreSQL 16 + pgvector.
-    Mapeia perguntas em linguagem natural para as 9 intenções operacionais do Ai.la.
+    Mapeia perguntas em linguagem natural para as 11 intenções operacionais do Ai.la.
     """
 
     def __init__(

@@ -13,6 +13,8 @@ Arquitetura:
     7. Previsão de Esgotamento de Combustível (Run-Out) & Sugestão de Pedidos (tanques + abastecimentos)
     8. Auditoria de Fechamento de Turno & Conciliação de Pista (fechabomba + fechacaixa + CBC04)
     9. Auditoria de Desempenho de Frentistas & Pista (vazão de bicos, conversão de aditivada, anomalias)
+    10. Livro de Movimentação de Combustíveis (LMC Oficial ANP Portaria 26/1992)
+    11. Inteligência de Loja de Conveniência (Market Basket Analysis, Vendas Cruzadas & Combos)
 """
 
 import os
@@ -195,6 +197,52 @@ def extrair_frentista(pergunta: str) -> Optional[str]:
     for n in nomes:
         if re.search(rf"\b{n}\b", p):
             return n.upper()
+
+    return None
+
+
+def extrair_produto_cesta(pergunta: str) -> Optional[str]:
+    """Extrai produto alvo para análise de vendas cruzadas (Market Basket)."""
+    p = (pergunta or "").strip()
+
+    # 1. Padrões com 'junto com', 'junto de', 'junto a'
+    m_junto = re.search(r"\bjunto\s+(?:com|de|a|ao|à)\s+([^?.,;!\n]+)", p, re.IGNORECASE)
+    if m_junto:
+        prod = m_junto.group(1).strip()
+        prod = re.sub(r"\b(?:na|no|da|do|em)\s+conveni[eê]ncia\b.*", "", prod, flags=re.IGNORECASE).strip()
+        prod = re.sub(r"\b(?:hoje|ontem|no\s+caixa|no\s+pdv)\b.*", "", prod, flags=re.IGNORECASE).strip()
+        if prod and len(prod) >= 2 and prod.lower() not in ["isso", "ele", "ela", "o", "a"]:
+            return prod
+
+    # 2. Padrões 'combos? (?:para|pra|de|do|da)'
+    m_combo = re.search(r"\bcombos?\s+(?:para|pra|de|do|da)\s+([^?.,;!\n]+)", p, re.IGNORECASE)
+    if m_combo:
+        prod = m_combo.group(1).strip()
+        prod = re.sub(r"\b(?:na|no|da|do|em)\s+conveni[eê]ncia\b.*", "", prod, flags=re.IGNORECASE).strip()
+        prod = re.sub(r"\b(?:hoje|ontem|no\s+caixa|no\s+pdv)\b.*", "", prod, flags=re.IGNORECASE).strip()
+        stop_generic = ["conveniencia", "conveniência", "loja", "pdv", "caixa", "produtos", "mercadorias"]
+        if prod and len(prod) >= 2 and prod.lower() not in stop_generic:
+            return prod
+
+    # 3. Padrões 'vende|sai|compra com <produto>'
+    m_com = re.search(r"\b(?:vende|sai|compra)\s+com\s+([^?.,;!\n]+)", p, re.IGNORECASE)
+    if m_com:
+        prod = m_com.group(1).strip()
+        prod = re.sub(r"\b(?:na|no|da|do|em)\s+conveni[eê]ncia\b.*", "", prod, flags=re.IGNORECASE).strip()
+        if prod and len(prod) >= 2:
+            return prod
+
+    # 4. Checagem direta de termos comuns de conveniência se presentes na pergunta
+    termos_comuns = [
+        "cerveja heineken", "heineken", "cerveja", "coca-cola", "coca cola", "coca",
+        "cafe expresso", "café expresso", "café", "cafe", "pao de queijo", "pão de queijo",
+        "red bull", "energetico", "energético", "kit kat", "chocolate", "gelo", "carvao", "carvão",
+        "halls", "mentos", "salgado"
+    ]
+    p_lower = p.lower()
+    for t in termos_comuns:
+        if t in p_lower and any(w in p_lower for w in ["para", "com", "junto", "do", "da", "de"]):
+            return t
 
     return None
 
@@ -394,6 +442,19 @@ def main():
                 contexto_extra = f"Consulta de Histórico de Vendas no ERP:\n{json.dumps(resultado_vendas, ensure_ascii=False, indent=2, default=str)}\n"
                 tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
 
+            elif intencao == "conveniencia_vendas_cruzadas":
+                filtro_prod = extrair_produto_cesta(pergunta)
+                print(f"\n🛒 [ROTEADOR] Intenção detectada: Inteligência de Conveniência (Market Basket Analysis & Vendas Cruzadas)...")
+                if filtro_prod:
+                    print(f"🎯 [FILTRO ATIVO] Analisando afinidade do produto: '{filtro_prod}'")
+                resultado_cesta = tools.auditar_cesta_conveniencia_vendas_cruzadas(
+                    filtro_produto=filtro_prod,
+                    min_lift=1.2,
+                    limit=10,
+                )
+                contexto_extra = f"Market Basket Analysis & Vendas Cruzadas da Loja de Conveniência no ERP:\n{json.dumps(resultado_cesta, ensure_ascii=False, indent=2, default=str)}\n"
+                tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
+
             elif intencao == "sre_metricas":
                 print("\n🔀 [ROTEADOR] Intenção detectada: Telemetria SRE (PostgreSQL & Semantic Router Tool)...")
                 sre_metricas = tools.obter_telemetria_sre()
@@ -513,6 +574,12 @@ Diretrizes:
       c) Auditoria de Variação (Δ): informe a quebra ou sobra em litros (Δ_litros = E_f - E_e) e o percentual sobre as vendas (Δ% = (Δ_litros / V) * 100), comparando rigorosamente com a margem legal de ±0.6%.
       d) Diagnóstico Operacional: esclareça se a variação decorre de contração/expansão térmica natural dentro da tolerância ou se exige abertura imediata de sindicância para apurar vazamento em tubulações ou descalibração de bicos.
       e) Ações Obrigatórias: instrua sobre registros diários no livro e retenção fiscal por 5 anos para fiscalização da ANP/SEFAZ.
+11. Se a pergunta for sobre inteligência de conveniência, vendas cruzadas, combos de produtos, cesta de compras (Market Basket Analysis) ou produtos vendidos juntos:
+    - Apresente um parecer comercial e estratégico claro, prático e orientado a aumento de margem contendo:
+      a) Diagnóstico Executivo: informe o total de cupons analisados, percentual de cestas com múltiplos itens, maior Lift identificado e o ticket médio da conveniência.
+      b) Top Recomendações de Combos: para cada combo relevante, liste o produto de entrada (origem) e o produto recomendado (destino), o índice de Lift (destacando quando >= 2.0x por forte sinergia comercial), o percentual de Confiança e o incremento financeiro e percentual no ticket médio.
+      c) Script de Abordagem para o Caixa: instrua o operador do caixa sobre a frase persuasiva exata a ser dita ao cliente (ex: "Cliente comprou Café Expresso, ofereça Pão de Queijo por R$ 5,00 para elevar o ticket em +71,4%").
+      d) Recomendações de Merchandising: sugira ações físicas de loja (posicionamento lado a lado no balcão, cross-merchandising e promoções casadas).
 """
 
             print("\n🤖 AGENTE (Streaming):\n")

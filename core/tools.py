@@ -4,10 +4,11 @@ Conecta o Agente às bases relacionais (ERP na porta 5433) e vetoriais (pgvector
 """
 
 import re
+import unicodedata
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from decimal import Decimal
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional, Tuple, List, Set
 from datetime import datetime, date, time, timedelta
 
 from config.settings import DB_ERP_CONFIG
@@ -3029,6 +3030,409 @@ class PostoTools:
             return {
                 "status": "indisponivel",
                 "motivo": f"Falha na geração do LMC Oficial da ANP no ERP (porta 5433/5435): {e}",
+            }
+        finally:
+            if conn and not conn.closed:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+    @staticmethod
+    def calcular_metricas_associacao(
+        total_transacoes: int,
+        freq_a: int,
+        freq_b: int,
+        freq_ab: int,
+    ) -> Dict[str, float]:
+        """
+        Calcula as métricas matemáticas canônicas de Market Basket Analysis (Regras de Associação):
+        - Suporte(A -> B) = freq_ab / total_transacoes
+        - Confiança(A -> B) = freq_ab / freq_a
+        - Lift(A -> B) = Confiança(A -> B) / Suporte(B) = (freq_ab * total_transacoes) / (freq_a * freq_b)
+        - Conviction(A -> B) = (1 - Suporte(B)) / (1 - Confiança(A -> B))
+        Protegido contra divisão por zero e transações vazias.
+        """
+        if total_transacoes <= 0 or freq_a <= 0 or freq_b <= 0 or freq_ab <= 0:
+            return {
+                "suporte": 0.0,
+                "suporte_a": 0.0,
+                "suporte_b": 0.0,
+                "confianca": 0.0,
+                "lift": 0.0,
+                "conviction": 1.0,
+            }
+
+        suporte_ab = freq_ab / total_transacoes
+        suporte_a = freq_a / total_transacoes
+        suporte_b = freq_b / total_transacoes
+        confianca = freq_ab / freq_a
+
+        if suporte_b > 0:
+            lift = confianca / suporte_b
+        else:
+            lift = 0.0
+
+        if confianca >= 1.0:
+            conviction = 999.0  # Infinito prático
+        elif confianca < 1.0 and (1.0 - confianca) > 0:
+            conviction = (1.0 - suporte_b) / (1.0 - confianca)
+        else:
+            conviction = 1.0
+
+        return {
+            "suporte": round(suporte_ab, 4),
+            "suporte_a": round(suporte_a, 4),
+            "suporte_b": round(suporte_b, 4),
+            "confianca": round(confianca, 4),
+            "lift": round(lift, 4),
+            "conviction": round(conviction, 4),
+        }
+
+    @staticmethod
+    def calcular_regras_associacao(
+        transacoes: List[List[Dict[str, Any]]],
+        min_suporte: float = 0.005,
+        min_confianca: float = 0.05,
+        min_lift: float = 1.0,
+        filtro_produto: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Minera regras de associação direcionadas (A -> B) a partir de listas de transações de conveniência.
+        Gera métricas completas, impacto no ticket médio e scripts persuasivos para os operadores de caixa.
+        """
+        if not transacoes:
+            return []
+
+        total_transacoes = len(transacoes)
+        if total_transacoes == 0:
+            return []
+
+        # 1. Contagem de frequências univariadas e bivariadas
+        freq_itens: Dict[str, int] = {}
+        produtos_info: Dict[str, Dict[str, Any]] = {}
+        freq_pares: Dict[Tuple[str, str], int] = {}
+
+        for cesta in transacoes:
+            if not cesta:
+                continue
+            itens_unicos: Dict[str, Dict[str, Any]] = {}
+            for item in cesta:
+                c_sku = str(item.get("codpro", "")).strip()
+                if c_sku and c_sku not in itens_unicos:
+                    itens_unicos[c_sku] = item
+                    if c_sku not in produtos_info:
+                        produtos_info[c_sku] = {
+                            "codpro": c_sku,
+                            "nompro": str(item.get("nompro", "")).strip(),
+                            "grupo": str(item.get("grupo", "CONVENIÊNCIA")).strip(),
+                            "preco_unitario": float(item.get("preco_unitario") or item.get("preco") or 0.0),
+                        }
+
+            skus = sorted(itens_unicos.keys())
+            for sku in skus:
+                freq_itens[sku] = freq_itens.get(sku, 0) + 1
+
+            for i in range(len(skus)):
+                for j in range(i + 1, len(skus)):
+                    p_par = (skus[i], skus[j])
+                    freq_pares[p_par] = freq_pares.get(p_par, 0) + 1
+
+        def _norm_str(s: Any) -> str:
+            if not s:
+                return ""
+            return "".join(
+                c for c in unicodedata.normalize("NFD", str(s))
+                if unicodedata.category(c) != "Mn"
+            ).lower().strip()
+
+        filtro_norm = _norm_str(filtro_produto)
+
+        regras: List[Dict[str, Any]] = []
+
+        # 2. Avaliação de regras direcionadas (A -> B e B -> A)
+        for (sku1, sku2), count_ab in freq_pares.items():
+            sup_ab = count_ab / total_transacoes
+            if sup_ab < min_suporte:
+                continue
+
+            info1 = produtos_info.get(sku1, {"codpro": sku1, "nompro": sku1, "preco_unitario": 0.0, "grupo": "CONVENIÊNCIA"})
+            info2 = produtos_info.get(sku2, {"codpro": sku2, "nompro": sku2, "preco_unitario": 0.0, "grupo": "CONVENIÊNCIA"})
+
+            direcoes = [(sku1, sku2, info1, info2), (sku2, sku1, info2, info1)]
+
+            for a_sku, b_sku, a_info, b_info in direcoes:
+                f_a = freq_itens.get(a_sku, 0)
+                f_b = freq_itens.get(b_sku, 0)
+
+                metricas = PostoTools.calcular_metricas_associacao(
+                    total_transacoes=total_transacoes,
+                    freq_a=f_a,
+                    freq_b=f_b,
+                    freq_ab=count_ab,
+                )
+
+                if metricas["confianca"] < min_confianca or metricas["lift"] < min_lift:
+                    continue
+
+                # Classificação da Sinergia
+                lift_val = metricas["lift"]
+                if lift_val >= 2.0:
+                    classificacao = "FORTE_SINERGIA_CROSS_SELL"
+                elif lift_val > 1.0:
+                    classificacao = "ASSOCIACAO_POSITIVA"
+                elif lift_val == 1.0:
+                    classificacao = "INDEPENDENTE"
+                else:
+                    classificacao = "ASSOCIACAO_NEGATIVA"
+
+                # Impacto Financeiro no Ticket Médio
+                p_orig = float(a_info.get("preco_unitario", 0.0))
+                p_rec = float(b_info.get("preco_unitario", 0.0))
+                ticket_combo = round(p_orig + p_rec, 2)
+                incr_pct = round((p_rec / p_orig) * 100.0, 1) if p_orig > 0 else 0.0
+
+                script = (
+                    f"Cliente comprou {a_info['nompro']}, ofereça {b_info['nompro']} "
+                    f"por R$ {p_rec:.2f} (+{incr_pct:.1f}% no ticket)"
+                )
+
+                # Relevância com Filtro
+                match_origem = False
+                match_destino = False
+                if filtro_norm:
+                    match_origem = (filtro_norm in _norm_str(a_info['nompro']) or filtro_norm == _norm_str(a_info['codpro']))
+                    match_destino = (filtro_norm in _norm_str(b_info['nompro']) or filtro_norm == _norm_str(b_info['codpro']))
+                    if not (match_origem or match_destino):
+                        continue
+
+                regra_item = {
+                    "produto_origem": a_info,
+                    "produto_recomendado": b_info,
+                    "metricas": {
+                        "frequencia_conjunta": count_ab,
+                        "suporte": metricas["suporte"],
+                        "suporte_origem": metricas["suporte_a"],
+                        "suporte_recomendado": metricas["suporte_b"],
+                        "confianca": metricas["confianca"],
+                        "lift": metricas["lift"],
+                        "conviction": metricas["conviction"],
+                    },
+                    "impacto_financeiro": {
+                        "preco_origem": p_orig,
+                        "preco_recomendado": p_rec,
+                        "ticket_combo": ticket_combo,
+                        "incremento_ticket_reais": p_rec,
+                        "incremento_ticket_pct": incr_pct,
+                    },
+                    "classificacao_sinergia": classificacao,
+                    "script_sugerido_caixa": script,
+                    "relevancia_filtro": "origem" if match_origem else ("destino" if match_destino else "geral"),
+                }
+                regras.append(regra_item)
+
+        # 3. Ordenação: Prioridade para quando o produto filtrado é a origem (cross-sell direto)
+        def chave_ordenacao(r):
+            prioridade_filtro = 1 if r.get("relevancia_filtro") == "origem" else 0
+            return (prioridade_filtro, r["metricas"]["lift"], r["metricas"]["confianca"], r["metricas"]["frequencia_conjunta"])
+
+        regras.sort(key=chave_ordenacao, reverse=True)
+        return regras
+
+    def auditar_cesta_conveniencia_vendas_cruzadas(
+        self,
+        filtro_produto: Optional[str] = None,
+        min_lift: float = 1.2,
+        min_suporte: float = 0.005,
+        min_confianca: float = 0.05,
+        limit: int = 10,
+        data_inicio: Optional[str] = None,
+        data_fim: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Motor de Inteligência de Loja de Conveniência (Market Basket Analysis & Vendas Cruzadas).
+        Analisa o comportamento de compra em cupons fiscais e pedidos do PDV (`pedido` + `itemped`),
+        descobrindo afinidades entre mercadorias, minerando regras de associação (Suporte, Confiança e Lift)
+        e gerando recomendações acionáveis de combos para alavancagem de ticket médio e margem de lucro.
+
+        Parâmetros:
+        - filtro_produto: Nome ou SKU para busca direcionada (ex: 'cerveja', 'coca-cola', '00022')
+        - min_lift: Limiar mínimo de Lift (default 1.2; >= 2.0 indica forte sinergia comercial)
+        - min_suporte: Suporte conjunto mínimo (default 0.005 ou 0.5% das vendas)
+        - min_confianca: Confiança mínima (default 0.05 ou 5%)
+        - limit: Quantidade máxima de recomendações de combos no ranking
+        - data_inicio / data_fim: Intervalo opcional de datas YYYY-MM-DD
+        """
+        conn = None
+        try:
+            conn = get_erp_connection()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                where_clauses = [
+                    "(p.situ IS NULL OR p.situ != 'C')",
+                    "(p.dtcanc IS NULL)",
+                ]
+                params: List[Any] = []
+
+                if data_inicio:
+                    where_clauses.append("p.dtem >= %s")
+                    params.append(data_inicio)
+                if data_fim:
+                    where_clauses.append("p.dtem <= %s")
+                    params.append(data_fim)
+
+                where_sql = " AND ".join(where_clauses)
+
+                query = f"""
+                    SELECT 
+                        TRIM(p.codi) AS pedido_id,
+                        TRIM(p.cupom) AS cupom,
+                        TRIM(p.pdv) AS pdv,
+                        p.dtem AS data_venda,
+                        ROUND(COALESCE(p.valortotal, 0)::numeric, 2) AS total_pedido,
+                        TRIM(i.codpec) AS codpro,
+                        COALESCE(NULLIF(TRIM(pr.nompro), ''), 'PRODUTO ' || TRIM(i.codpec)) AS nompro,
+                        COALESCE(NULLIF(TRIM(g.grupo), ''), 'CONVENIÊNCIA') AS grupo,
+                        ROUND(COALESCE(pr.valvenda, i.valunit, 0)::numeric, 2) AS preco_unitario,
+                        ROUND(COALESCE(i.quant, 1)::numeric, 2) AS quantidade,
+                        ROUND(COALESCE(i.valitem, 0)::numeric, 2) AS total_item
+                    FROM pedido p
+                    JOIN itemped i ON TRIM(i.pedido) = TRIM(p.codi)
+                    LEFT JOIN produtos pr ON TRIM(pr.codpro) = TRIM(i.codpec)
+                    LEFT JOIN grupos g ON TRIM(g.codi) = TRIM(pr.codgru)
+                    WHERE {where_sql}
+                    ORDER BY p.codi, i.controle;
+                """
+                cur.execute(query, params)
+                linhas = cur.fetchall()
+
+            # Agrupa itens por pedido
+            transacoes_map: Dict[str, List[Dict[str, Any]]] = {}
+            totais_pedidos: List[float] = []
+            todos_skus: Set[str] = set()
+
+            for r in linhas:
+                ped_id = r["pedido_id"]
+                if ped_id not in transacoes_map:
+                    transacoes_map[ped_id] = []
+                    totais_pedidos.append(float(r["total_pedido"] or 0.0))
+                
+                transacoes_map[ped_id].append({
+                    "codpro": r["codpro"],
+                    "nompro": r["nompro"],
+                    "grupo": r["grupo"],
+                    "preco_unitario": float(r["preco_unitario"] or 0.0),
+                    "quantidade": float(r["quantidade"] or 1.0),
+                    "total_item": float(r["total_item"] or 0.0),
+                })
+                todos_skus.add(r["codpro"])
+
+            lista_transacoes = list(transacoes_map.values())
+            total_transacoes = len(lista_transacoes)
+            transacoes_multiplas = [t for t in lista_transacoes if len(t) >= 2]
+            total_multiplas = len(transacoes_multiplas)
+            pct_multiplas = round((total_multiplas / total_transacoes) * 100.0, 2) if total_transacoes > 0 else 0.0
+
+            ticket_medio_geral = round(sum(totais_pedidos) / total_transacoes, 2) if total_transacoes > 0 else 0.0
+
+            # Minera regras de associação completas
+            todas_regras = self.calcular_regras_associacao(
+                transacoes=lista_transacoes,
+                min_suporte=min_suporte,
+                min_confianca=min_confianca,
+                min_lift=min_lift,
+                filtro_produto=filtro_produto,
+            )
+
+            top_combos = todas_regras[:limit]
+            for idx, combo in enumerate(top_combos, start=1):
+                combo["ranking"] = idx
+
+            count_forte_sinergia = sum(1 for r in todas_regras if r["metricas"]["lift"] >= 2.0)
+            maior_lift = max((r["metricas"]["lift"] for r in todas_regras), default=0.0)
+
+            # Diagnóstico Estratégico
+            if total_transacoes == 0:
+                diagnostico = "Nenhuma venda registrada no período selecionado."
+            elif total_multiplas == 0:
+                diagnostico = (
+                    "Todos os cupons emitidos continham apenas 1 único item. "
+                    "Oportunidade urgente para implantar cultura ativa de vendas cruzadas e combos no PDV."
+                )
+            elif count_forte_sinergia > 0:
+                diagnostico = (
+                    f"Excelente potencial de cross-selling: {count_forte_sinergia} combo(s) identificados com Lift >= 2.0 "
+                    f"(forte afinidade de consumo). Maior Lift apurado: {maior_lift:.2f}x."
+                )
+            elif len(todas_regras) > 0:
+                diagnostico = (
+                    f"Identificadas {len(todas_regras)} associações com correlação positiva (Lift entre {min_lift} e 2.0). "
+                    "Boa oportunidade para agrupamento físico na loja."
+                )
+            else:
+                diagnostico = (
+                    f"Nenhuma regra atendeu ao critério mínimo de Lift >= {min_lift} para o filtro solicitado."
+                )
+
+            # Recomendações Práticas para o Gestor e Operadores de Caixa
+            recomendacoes = []
+            if top_combos:
+                c_top = top_combos[0]
+                recomendacoes.append(
+                    f"Combo Destaque no PDV: Estimular ativamente a venda de '{c_top['produto_origem']['nompro']}' "
+                    f"em conjunto com '{c_top['produto_recomendado']['nompro']}' (Lift {c_top['metricas']['lift']:.2f}x, "
+                    f"Confiança {c_top['metricas']['confianca']*100:.1f}%), gerando aumento de {c_top['impacto_financeiro']['incremento_ticket_pct']:.1f}% no ticket médio."
+                )
+                recomendacoes.append(
+                    "Layout & Merchandising: Posicionar produtos com alta afinidade lado a lado no balcão ou criar ilhas temáticas "
+                    "(ex: carvão e gelo próximos aos refrigeradores de cerveja; balas e chocolates junto ao caixa)."
+                )
+                recomendacoes.append(
+                    "Treinamento do Caixa: Capacitar os operadores para utilizar os scripts persuasivos sugeridos "
+                    "sempre que o cliente apresentar o primeiro item da cesta."
+                )
+            else:
+                recomendacoes.append(
+                    "Promoções de Entrada: Criar combos promocionais iniciais (ex: 'Na compra de 1 café, leve 1 salgado por R$ X') "
+                    "para estimular o hábito de compra de múltiplos itens."
+                )
+
+            resultado = {
+                "status": "ok",
+                "timestamp_geracao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "parametros_consulta": {
+                    "filtro_produto": filtro_produto,
+                    "min_lift": min_lift,
+                    "min_suporte": min_suporte,
+                    "min_confianca": min_confianca,
+                    "limit": limit,
+                    "periodo": {
+                        "data_inicio": data_inicio,
+                        "data_fim": data_fim,
+                    },
+                },
+                "resumo_executivo": {
+                    "total_transacoes_analisadas": total_transacoes,
+                    "total_transacoes_multiplos_itens": total_multiplas,
+                    "pct_cestas_multiplos_itens": pct_multiplas,
+                    "total_itens_distintos_conveniencia": len(todos_skus),
+                    "total_regras_geradas": len(todas_regras),
+                    "regras_com_forte_sinergia_lift_2": count_forte_sinergia,
+                    "maior_lift_encontrado": round(maior_lift, 4),
+                    "ticket_medio_conveniencia": ticket_medio_geral,
+                    "diagnostico_estrategico": diagnostico,
+                },
+                "top_combos_cross_selling": top_combos,
+                "regras_associacao_detalhadas": todas_regras,
+                "recomendacoes_pdv_gestor": recomendacoes,
+            }
+
+            resultado_limpo, _ = sanitize_dict(resultado)
+            return resultado_limpo
+
+        except Exception as e:
+            return {
+                "status": "indisponivel",
+                "motivo": f"Falha na análise de Market Basket da Loja de Conveniência no ERP: {e}",
             }
         finally:
             if conn and not conn.closed:

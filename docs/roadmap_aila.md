@@ -2,7 +2,7 @@
 
 **Projeto:** Ai.la — IA Local Especialista em Postos de Combustíveis e PDV  
 **Versão:** 1.6.0-PRO  
-**Status Atual:** MVP Local de Nó Único Consolidado (Fases 1, 2, 6.1, 6.2 e 6.3: LMC Oficial ANP Homologadas + Sugestão 1: Roteador Semântico Vetorial pgvector e Sugestão 2: Otimização RAG CDC Delta Hash & RRF Calibrado Concluídas com 100% de Aprovação)  
+**Status Atual:** MVP Local de Nó Único Consolidado (Fases 1, 2, 6.1, 6.2, 6.3 e 6.4: LMC Oficial ANP e Loja de Conveniência / Market Basket Analysis & Vendas Cruzadas Homologadas + Sugestão 1: Roteador Semântico Vetorial pgvector e Sugestão 2: Otimização RAG CDC Delta Hash & RRF Calibrado Concluídas com 100% de Aprovação)  
 **Próximas Frentes:** Fase 2.5 (Esteira de Deploy Automatizado & Onboarding Multi-Posto) $\rightarrow$ Fase 3 (MCP + LangGraph) $\rightarrow$ Fase 3.5 (RAG Hierárquico Multi-Filial & MapReduce)  
 **Ambiente:** Edge AI Local (Postos) + Maestro Central de Gestão/Telemetria | Docker + PostgreSQL 16 (Portas 5432/5433, 5434, 5678)  
 
@@ -157,7 +157,7 @@ flowchart TD
     Fase35["🌐 FASE 3.5: RAG Hierárquico Multi-Filial & MapReduce\n(P1 - Macro-Fase 2 de Escala)"]
     Fase4["📱 FASE 4: Canal WhatsApp & Notificações Proativas\n(P1 - Curto Prazo)"]
     Fase5["💻 FASE 5: Painel Web Dashboard & Mobile PWA\n(P2 - Médio Prazo)"]
-    Fase6["📈 FASE 6: Inteligência Preditiva & Módulo Fiscal ANP\n(P3 - Módulos 6.1 e 6.2 Concluídos ✅)"]
+    Fase6["📈 FASE 6: Inteligência Preditiva, LMC & Varejo de Conveniência\n(P3 - Módulos 6.1, 6.2, 6.3 e 6.4 Concluídos ✅)"]
 
     Fase1 --> Fase2 --> Fase25 --> Fase3 --> Fase35 --> Fase4 --> Fase5 --> Fase6
 ```
@@ -435,6 +435,18 @@ flowchart TD
   - **Ferramentas e Arquitetura:** Implementação do método `PostoTools.gerar_relatorio_lmc_anp()` e método estático `PostoTools.calcular_lmc_tanque()` em `core/tools.py`, com conexão resiliente `get_erp_connection()` com fallback automático de portas (5433/5435) e blindagem LGPD via `sanitize_dict`.
   - **Roteamento Semântico Canônico:** 10ª intenção canônica (`lmc_anp`) indexada com halfvec(768) em `intencoes_vetores` no pgvector e regras determinísticas em `core/semantic_router.py` e `main.py`.
   - **Suíte de Testes Automatizada:** Script `scripts/test_lmc_anp.py` com cobertura de 100% (classificação de intenções, não-regressão, extração de parâmetros, limites de borda ±0.6%, zero vendas, alertas regulamentares e integração ERP).
+- [x] **Motor de Inteligência de Loja de Conveniência: Market Basket Analysis & Vendas Cruzadas (Concluído ✅):**
+  - **Algoritmo e Mineração de Associação:** Motor de Análise de Cesta de Compras (Market Basket Analysis / Apriori otimizado) em Python conectando em tempo real às tabelas transacionais do ERP (`pedido` $\leftrightarrow$ `itemped` $\leftrightarrow$ `produtos` $\leftrightarrow$ `grupos`).
+  - **Métricas Científicas de Associação:**
+    - **Suporte ($P(A \cap B)$):** Frequência conjunta dos produtos no total de transações de conveniência.
+    - **Confiança ($P(B|A) = \frac{P(A \cap B)}{P(A)}$):** Probabilidade condicional de o cliente comprar o produto complementar $B$ ao adquirir o item âncora $A$.
+    - **Lift ($\frac{P(A \cap B)}{P(A) \times P(B)}$):** Grau de sinergia e alavancagem de compra. Classificação automática em combos altamente atrativos ($\text{Lift} \ge 2.0$), compra independente ($\text{Lift} \approx 1.0$) ou repulsão ($\text{Lift} < 1.0$).
+    - **Convicção ($Conv(A \rightarrow B) = \frac{1 - P(B)}{1 - Conf(A \rightarrow B)}$):** Força direcional da regra com tratamento robusto para valor infinito e divisão por zero.
+    - **Incremento de Ticket Médio ($\Delta R\$$) & Scripts de Abordagem:** Cálculo do ganho monetário direto por venda cruzada e geração de scripts práticos de PDV para atendentes sugerirem itens de alto valor agregado no checkout.
+  - **Ferramentas e Normalização:** Métodos `PostoTools.auditar_cesta_conveniencia_vendas_cruzadas()`, `PostoTools.calcular_metricas_associacao()` e `PostoTools.calcular_regras_associacao()` em `core/tools.py`. Normalização NFD unicode para suporte a produtos com e sem acento (ex: `café` $\leftrightarrow$ `cafe expresso`, `pão de queijo` $\leftrightarrow$ `po de queijo`).
+  - **Roteamento Semântico Canônico:** 11ª intenção canônica (`conveniencia_vendas_cruzadas`) indexada com halfvec(768) na tabela `intencoes_vetores` do pgvector (porta 5434) e regras heurísticas determinísticas em `core/semantic_router.py`.
+  - **CLI e Prompt de Sistema:** Integrado em `main.py` com extrator semântico `extrair_produto_cesta()`, streaming token-a-token e diretrizes estratégicas de merchandising, combo matinal/tarde e posicionamento de balcão.
+  - **Suíte de Testes Automatizada:** Script `scripts/test_conveniencia_vendas_cruzadas.py` com 100% de aprovação (classificação de intenções, não-regressão das 10 rotas, isolamento de parâmetros, matemática de associação, base seed do ERP e blindagem LGPD).
 
 ---
 
@@ -447,13 +459,13 @@ flowchart TD
 | **Sprint 2** | Semanas 3 e 4 | **Fase 2.5 (Deploy-Ready) & Fase 3** | Template `docker-compose.yml` + Script `deploy_posto.ps1` de onboarding em 1-clique + Servidor MCP + FastAPI + LangGraph local na pasta `core/`. |
 | **Sprint 3** | Semanas 5 e 6 | **Fase 3.5 & Fase 4** | RAG Hierárquico Multi-Filial (Maestro Fan-Out + Edge Workers Docker + Sintetizador MapReduce) + n8n WhatsApp disparando relatórios e alertas críticos. |
 | **Sprint 4** | Semanas 7 e 8 | **Fase 5** | Web Dashboard + PWA Android com gráficos de tanques, vendas e chat com streaming. |
-| **Sprint 5** | Semanas 9 e 10 | **Fase 6** | Previsão preditiva de compra de tanques + auditoria fiscal NFC-e com Agent Sefaz (Módulos 6.1 e 6.2 Concluídos ✅). |
+| **Sprint 5** | Semanas 9 e 10 | **Fase 6** | Previsão de compra de tanques (6.1) + auditoria de pista e frentistas (6.2) + LMC ANP (6.3) + Market Basket Analysis de conveniência (6.4) Concluídos ✅. |
 
 ---
 
 ## 🎯 6. Próximo Passo Recomendado
 
-Com o **MVP Local de Nó Único plenamente consolidado** — abrangendo a **Fase 1 (Sanitizador LGPD)**, a **Fase 2 (Motor de Conciliação de Turnos)**, os motores analíticos da **Fase 6 (Previsão Preditiva de Tanques 6.1 & Auditoria Operacional de Pista e Frentistas 6.2)** e as **Sugestões 1 e 2 (Roteador Semântico Vetorial e RAG CDC com RRF Calibrado)** concluídos, testados e homologados com 100% de aprovação:
+Com o **MVP Local de Nó Único plenamente consolidado** — abrangendo a **Fase 1 (Sanitizador LGPD)**, a **Fase 2 (Motor de Conciliação de Turnos)**, os motores analíticos da **Fase 6 (Previsão Preditiva de Tanques 6.1, Auditoria Operacional de Pista e Frentistas 6.2, Automação LMC ANP 6.3 e Market Basket Analysis de Conveniência 6.4)** e as **Sugestões 1 e 2 (Roteador Semântico Vetorial e RAG CDC com RRF Calibrado)** concluídos, testados e homologados com 100% de aprovação:
 
 A esteira de execução avança imediatamente para a **Fase 2.5 (Esteira de Deploy Automatizado: criação do script `deploy_posto.ps1` e template `docker-compose.yml`)** e a **Fase 3 (Desacoplamento de Arquitetura: Servidor MCP local, FastAPI assíncrono e LangGraph)**, que formam a fundação técnica indispensável para destravar a **Fase 3.5 (Escalabilidade de Rede Multi-Filial via RAG Hierárquico e MapReduce Fan-Out/Fan-In)**.
 
