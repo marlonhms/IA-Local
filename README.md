@@ -70,6 +70,7 @@ flowchart TB
 
     subgraph HUB["🏢 HUB CENTRAL DE GESTÃO / MONITORAMENTO"]
         direction TB
+        MAESTRO_HUB["🎼 Maestro Orquestrador Central\n(LangGraph + FastAPI / RAG Hierárquico)"]
         SRE["📈 Telemetria Sentinel SRE\n(QPS, Cache Hit Ratio, Latência)"]
         N8N["📲 Gateway de Notificações\n(n8n + WhatsApp Evolution API)"]
         REPO["📦 Esteira de Deploy & Versionamento Git"]
@@ -93,48 +94,51 @@ Para grupos econômicos e redes de postos, o Ai.la adota uma arquitetura distrib
 
 ```mermaid
 flowchart TB
-    USER["👤 Dono da Rede / Gestor Geral\nConsulta Global: 'Qual o status de estoque de gasolina comum de toda a rede?'"]
+    USER["👤 Dono da Rede / Gestor Geral\nConsulta: 'Qual o status de estoque de gasolina de toda a rede?'"]
 
     subgraph HUB["🏢 NÓ CENTRAL / MAESTRO ORQUESTRADOR (LangGraph + FastAPI)"]
         MAESTRO["🎼 Maestro Orquestrador Central"]
         ROUTER{"Roteador de Escopo\n(Global vs Filial Específica?)"}
-        DISPATCH["⚡ Fan-Out Assíncrono (asyncio)\nTimeout: 5.0s | Resiliência Ativa"]
+        DISPATCH["⚡ Fan-Out Assíncrono (asyncio)\nTimeout SLA: 5.0s | Concorrência Não-Bloqueante"]
+        UNICAST["🎯 Despacho Unicast Direto\n(Bypassa Fan-Out da Rede)"]
         COLLECTOR["📥 Coletor de Payloads (Fan-In)\n+ Tratador de Nós Offline (Graceful Degradation)"]
-        SYNTH["🤖 Agente Sintetizador Executivo (LLM)\n[Ranqueamento Crítico → Confortável | Economia de Tokens]"]
+        FALLBACK_HUB["🛡️ Fallback de Resiliência (Gerado no Hub)\n{'aviso': 'Filial Posto Sul offline, dados não incluídos.'}"]
+        SYNTH["🤖 Agente Sintetizador Executivo (LLM)\n[Ranqueamento Crítico → Confortável | Economia >85% Tokens]"]
     end
 
     subgraph NETWORK["🌐 REDE DISTRIBUÍDA DE FILIAIS (Edge Computing On-Premises)"]
         subgraph POSTO1["⛽ Filial 01 - Posto Centro"]
             EDGE1["Worker Docker Local (FastAPI)\n• SQL Seguro (SELECT-only)\n• pgvector + ERP Local\n• Sanitização spaCy (LGPD)"]
-            JSON1["Payload JSON Pydantic\n{'filial': 'Centro', 'combustivel': 'Gasolina Comum', 'status': 'Critico', 'autonomia_horas': 14}"]
+            JSON1["Payload JSON Pydantic v2\n{'filial': 'Centro', 'combustivel': 'Gasolina Comum', 'status': 'Critico', 'autonomia_horas': 14}"]
         end
 
         subgraph POSTO2["⛽ Filial 02 - Posto Norte"]
             EDGE2["Worker Docker Local (FastAPI)\n• SQL Seguro (SELECT-only)\n• pgvector + ERP Local\n• Sanitização spaCy (LGPD)"]
-            JSON2["Payload JSON Pydantic\n{'filial': 'Norte', 'combustivel': 'Gasolina Comum', 'status': 'Regular', 'autonomia_horas': 96}"]
+            JSON2["Payload JSON Pydantic v2\n{'filial': 'Norte', 'combustivel': 'Gasolina Comum', 'status': 'Regular', 'autonomia_horas': 96}"]
         end
 
-        subgraph POSTO3["⛽ Filial 03 - Posto Sul (Sem Internet / Queda de Link)"]
-            EDGE3["Worker Docker Local (Timeout 5s)"]
-            JSON3["Flag de Degradação Graciosa\n{'aviso': 'Filial Posto Sul offline, dados não incluídos.'}"]
+        subgraph POSTO3["⛽ Filial 03 - Posto Sul (Link Down / Sem Internet)"]
+            EDGE3["Worker Docker Local (Inacessível / Timeout SLA 5s)"]
         end
     end
 
     USER --> MAESTRO
     MAESTRO --> ROUTER
-    ROUTER -->|Escopo Global| DISPATCH
+    ROUTER -->|Escopo Global (Toda a Rede)| DISPATCH
+    ROUTER -->|Escopo Local (Filial Única)| UNICAST
 
     DISPATCH -->|Async HTTP GET/POST| EDGE1
     DISPATCH -->|Async HTTP GET/POST| EDGE2
-    DISPATCH -.->|Timeout 5s / Fallback| EDGE3
+    DISPATCH -.->|Timeout 5s / Conexão Recusada| EDGE3
+    UNICAST -->|Async HTTP GET/POST| EDGE1
 
     EDGE1 --> JSON1
     EDGE2 --> JSON2
-    EDGE3 -.-> JSON3
 
     JSON1 --> COLLECTOR
     JSON2 --> COLLECTOR
-    JSON3 --> COLLECTOR
+    DISPATCH -.->|Injeção no SLA Expirado| FALLBACK_HUB
+    FALLBACK_HUB --> COLLECTOR
 
     COLLECTOR --> SYNTH
     SYNTH -->|Relatório Gerencial Consolidado| USER
@@ -558,6 +562,9 @@ ia-banco-local/
 │   ├── __init__.py
 │   ├── rag_engine.py         # Motor HybridRAGEngine (HNSW + FTS GIN + RRF nativo SQL)
 │   ├── sanitizer.py          # CentralLogSanitizer (LGPD 24 categorias + OWASP GenAI)
+│   ├── schemas/              # Contratos Pydantic v2 para rede e microsserviços
+│   │   ├── __init__.py
+│   │   └── network.py        # Schemas de Fan-Out, Fan-In, Payloads e Resiliência
 │   └── tools.py              # PostoTools (Auditoria de Turnos, Automação CBC04, PDV, Tanques)
 │
 ├── scripts/                  # Scripts de automação, manutenção e testes
@@ -568,7 +575,8 @@ ia-banco-local/
 │   ├── test_sanitizer.py     # Suíte de testes da blindagem LGPD e sanitização
 │   ├── test_conciliacao_turno.py # Suíte de testes do motor de conciliação de turnos
 │   ├── test_previsao_tanques.py  # Suíte de testes do motor preditivo de esgotamento e carretas
-│   └── test_desempenho_frentistas.py # Suíte de testes da auditoria de pista e frentistas
+│   ├── test_desempenho_frentistas.py # Suíte de testes da auditoria de pista e frentistas
+│   └── test_rag_hierarquico.py   # Suíte de testes do RAG Hierárquico Multi-Filial & MapReduce
 │
 ├── docs/                     # Documentação de arquitetura e roadmap
 │   ├── dossie_tecnico.md     # Dossiê técnico completo de infraestrutura e SRE
@@ -613,7 +621,14 @@ python scripts/test_desempenho_frentistas.py
 ```
 *Resultado: **100% dos testes aprovados**.*
 
-### 5. Benchmark de Recuperação Vetorial
+### 5. Testes do RAG Hierárquico Multi-Filial & MapReduce (Fase 3.5)
+Valida contratos Pydantic v2 de rede, simulação de Fan-Out concorrente de 50 filiais com `asyncio`, resiliência com SLA de 5.0s, degradação graciosa para nós offline e economia drástica de tokens (>85%):
+```powershell
+python scripts/test_rag_hierarquico.py
+```
+*Resultado: **100% dos testes aprovados (5/5 testes em 5.0s)**.*
+
+### 6. Benchmark de Recuperação Vetorial
 Executa comparativo de latência e qualidade entre Busca Densa Pura (HNSW), Busca Esparsa Pura (GIN) e a Fusão Híbrida (RRF):
 ```powershell
 python scripts/benchmark_rag.py

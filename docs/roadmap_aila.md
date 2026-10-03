@@ -30,6 +30,7 @@ flowchart TB
 
     subgraph HUB["🏢 HUB CENTRAL DE GESTÃO (PC Marlon / VPS Econômica)"]
         direction TB
+        MAESTRO_HUB["🎼 Maestro Orquestrador Central\n(LangGraph + FastAPI / RAG Hierárquico)"]
         SRE["Telemetria Central SRE\n[Métricas de latência, QPS, cache hit, alertas]"]
         N8N["Gateway WhatsApp (n8n + Evolution API)\nPorta 5678\n[Disparo de Relatórios de Turno aos Gestores]"]
         REPO["Esteira de Deploy & Releases\n[Versionamento Git, Atualização de Prompts/Schemas]"]
@@ -55,7 +56,7 @@ flowchart TB
    - **Processamento 100% Local no Posto:** RAG híbrido, vetorização, enriquecimento léxico e consultas de banco rodam diretamente no hardware já existente no posto.
    - **Latência Ultra-Baixa (<80ms):** Consultas ao catálogo e conciliações de turno ocorrem localmente sem round-trip desnecessário para data centers na nuvem.
    - **Blindagem LGPD Absoluta:** Dados de vendas, faturamento, identificação de frentistas e documentos de clientes jamais trafegam abertos pela internet. Antes de qualquer envio de prompt para a API do Google Gemini, a camada local `CentralLogSanitizer` ofusca deterministicamente 24 categorias de PII (CPFs validados, placas Mercosul, cartões TEF, telefones).
-   - **Hub Central Leve:** O ambiente de gestão central (PC Marlon ou VPS econômica de baixo custo) atua exclusivamente como concentrador de telemetria SRE anônima (saúde e performance), versionador de código e gateway de WhatsApp via n8n.
+   - **Hub Central Leve:** O ambiente de gestão central (PC Marlon ou VPS econômica de baixo custo) atua como concentrador de telemetria SRE anônima (saúde e performance), versionador de código, orquestrador Maestro de consultas de rede e gateway de WhatsApp via n8n.
 
 3. **Isolamento Contextual por Posto (Tenant-Isolated RAG):**
    - Cada posto de combustível possui seu próprio banco vetorial isolado (`posto_ai` ou `posto_{tenant_id}`).
@@ -71,54 +72,57 @@ flowchart TB
 5. **Topologia de Rede Distribuída: RAG Hierárquico Multi-Filial (MapReduce Fan-Out / Fan-In):**
    - Para donos e gestores de redes de postos, o Ai.la transcende o nó único local e opera como um ecossistema distribuído de alta eficiência de tokens e blindagem LGPD.
    - **O Maestro Central (LangGraph + FastAPI)** atua no Hub ou nuvem privada: recebe consultas executivas globais (*"Qual o status de estoque de gasolina comum de toda a rede?"*), divide a demanda e efetua um **Fan-Out assíncrono** com `asyncio` e HTTP/REST para os Edge Workers em contêineres Docker de todas as filiais simultaneamente.
-   - **Os Edge Workers Locais** processam a consulta na borda: executam SQL read-only seguro no banco ERP local e no `pgvector` local, higienizam os dados com spaCy e retornam apenas um payload **JSON estruturado validado via Pydantic**, sem gerar texto livre prolixo.
+   - **Os Edge Workers Locais** processam a consulta na borda: executam SQL read-only seguro no banco ERP local e no `pgvector` local, higienizam os dados com spaCy e retornam apenas um payload **JSON estruturado validado via Pydantic v2**, sem gerar texto livre prolixo.
    - **Resiliência e Tolerância a Falhas com SLA de 5s:** O Maestro opera com timeout estrito de 5 segundos e mecanismo de **Degradação Graciosa (Graceful Degradation)**: se um posto estiver sem internet, o sistema não sofre crash; consolida os postos online e adiciona uma flag informativa para a unidade inacessível.
    - **Fan-In e Síntese Executiva via LLM:** O Maestro agrega os JSONs recebidos e submete a um **Agente LLM Sintetizador** especializado, que ranqueia as filiais da mais crítica para a mais confortável e gera o parecer executivo consolidado com consumo mínimo de tokens.
 
 ```mermaid
 flowchart TB
-    USER["👤 Dono da Rede / Gestor Geral\nConsulta Global: 'Qual o status de estoque de gasolina comum de toda a rede?'"]
+    USER["👤 Dono da Rede / Gestor Geral\nConsulta: 'Qual o status de estoque de gasolina de toda a rede?'"]
 
     subgraph HUB["🏢 NÓ CENTRAL / MAESTRO ORQUESTRADOR (LangGraph + FastAPI)"]
         MAESTRO["🎼 Maestro Orquestrador Central"]
         ROUTER{"Roteador de Escopo\n(Global vs Filial Específica?)"}
-        DISPATCH["⚡ Fan-Out Assíncrono (asyncio)\nTimeout: 5.0s | Resiliência Ativa"]
+        DISPATCH["⚡ Fan-Out Assíncrono (asyncio)\nTimeout SLA: 5.0s | Concorrência Não-Bloqueante"]
+        UNICAST["🎯 Despacho Unicast Direto\n(Bypassa Fan-Out da Rede)"]
         COLLECTOR["📥 Coletor de Payloads (Fan-In)\n+ Tratador de Nós Offline (Graceful Degradation)"]
-        SYNTH["🤖 Agente Sintetizador Executivo (LLM)\n[Ranqueamento Crítico → Confortável | Economia de Tokens]"]
+        FALLBACK_HUB["🛡️ Fallback de Resiliência (Gerado no Hub)\n{'aviso': 'Filial Posto Sul offline, dados não incluídos.'}"]
+        SYNTH["🤖 Agente Sintetizador Executivo (LLM)\n[Ranqueamento Crítico → Confortável | Economia >85% Tokens]"]
     end
 
     subgraph NETWORK["🌐 REDE DISTRIBUÍDA DE FILIAIS (Edge Computing On-Premises)"]
         subgraph POSTO1["⛽ Filial 01 - Posto Centro"]
             EDGE1["Worker Docker Local (FastAPI)\n• SQL Seguro (SELECT-only)\n• pgvector + ERP Local\n• Sanitização spaCy (LGPD)"]
-            JSON1["Payload JSON Pydantic\n{'filial': 'Centro', 'combustivel': 'Gasolina Comum', 'status': 'Critico', 'autonomia_horas': 14}"]
+            JSON1["Payload JSON Pydantic v2\n{'filial': 'Centro', 'combustivel': 'Gasolina Comum', 'status': 'Critico', 'autonomia_horas': 14}"]
         end
 
         subgraph POSTO2["⛽ Filial 02 - Posto Norte"]
             EDGE2["Worker Docker Local (FastAPI)\n• SQL Seguro (SELECT-only)\n• pgvector + ERP Local\n• Sanitização spaCy (LGPD)"]
-            JSON2["Payload JSON Pydantic\n{'filial': 'Norte', 'combustivel': 'Gasolina Comum', 'status': 'Regular', 'autonomia_horas': 96}"]
+            JSON2["Payload JSON Pydantic v2\n{'filial': 'Norte', 'combustivel': 'Gasolina Comum', 'status': 'Regular', 'autonomia_horas': 96}"]
         end
 
-        subgraph POSTO3["⛽ Filial 03 - Posto Sul (Sem Internet / Queda de Link)"]
-            EDGE3["Worker Docker Local (Timeout 5s)"]
-            JSON3["Flag de Degradação Graciosa\n{'aviso': 'Filial Posto Sul offline, dados não incluídos.'}"]
+        subgraph POSTO3["⛽ Filial 03 - Posto Sul (Link Down / Sem Internet)"]
+            EDGE3["Worker Docker Local (Inacessível / Timeout SLA 5s)"]
         end
     end
 
     USER --> MAESTRO
     MAESTRO --> ROUTER
-    ROUTER -->|Escopo Global| DISPATCH
+    ROUTER -->|Escopo Global (Toda a Rede)| DISPATCH
+    ROUTER -->|Escopo Local (Filial Única)| UNICAST
 
     DISPATCH -->|Async HTTP GET/POST| EDGE1
     DISPATCH -->|Async HTTP GET/POST| EDGE2
-    DISPATCH -.->|Timeout 5s / Fallback| EDGE3
+    DISPATCH -.->|Timeout 5s / Conexão Recusada| EDGE3
+    UNICAST -->|Async HTTP GET/POST| EDGE1
 
     EDGE1 --> JSON1
     EDGE2 --> JSON2
-    EDGE3 -.-> JSON3
 
     JSON1 --> COLLECTOR
     JSON2 --> COLLECTOR
-    JSON3 --> COLLECTOR
+    DISPATCH -.->|Injeção no SLA Expirado| FALLBACK_HUB
+    FALLBACK_HUB --> COLLECTOR
 
     COLLECTOR --> SYNTH
     SYNTH -->|Relatório Gerencial Consolidado| USER
@@ -282,7 +286,8 @@ flowchart TD
 ---
 
 ### 🌐 FASE 3.5: Escalabilidade de Rede Multi-Filial — RAG Hierárquico Distribuído & MapReduce (Macro-Fase 2 de Escala)
-> **Condição de Destravamento (Gate Inegociável):** Esta fase será destravada **SOMENTE APÓS a consolidação plena do MVP Local de nó único** com `pgvector`, Docker, guardrails de SQL e sanitização via spaCy operando com zero alucinação e cálculos preditivos 100% precisos (atualmente com Fases 1, 2, 6.1 e 6.2 homologadas).
+> **Nomenclatura Estratégica:** Denominada originalmente pelo solicitante como **"Fase 2 - Escalabilidade Multi-Filial (RAG Hierárquico e MapReduce)"**, esta macro-etapa foi posicionada na esteira técnica como **Fase 3.5**, logo após o onboarding e deploy automatizado em 1-clique (Fase 2.5) e alinhada ao desacoplamento MCP/FastAPI/LangGraph (Fase 3).  
+> **Condição de Destravamento (Gate Inegociável):** Esta fase será destravada **SOMENTE APÓS a consolidação plena do MVP Local de nó único** com `pgvector`, Docker, guardrails de SQL e sanitização via spaCy operando com zero alucinação e cálculos preditivos 100% precisos (atualmente com Fases 1, 2, 6.1 e 6.2 homologadas com 100% de testes).  
 > **Objetivo:** Evoluir a arquitetura de um agente local isolado para um ecossistema de **RAG Hierárquico Multi-Agente (MapReduce)**. O objetivo é permitir que donos e diretores de redes de postos façam consultas globais em linguagem natural (ex: *"Qual o status de estoque de gasolina comum de toda a rede?"* ou *"Quais postos tiveram furo de caixa no turno da noite ontem?"*) e recebam um relatório gerencial consolidado, processado de forma distribuída para economizar dezenas de milhares de tokens e garantir a segurança e isolamento LGPD.
 
 - [ ] **1. O Maestro (Agente Orquestrador Central):**
@@ -335,11 +340,11 @@ flowchart TD
   - **Validação de Schemas Pydantic v2:** Modelos estritos de entrada (`NetworkQueryRequest`, `BranchProbeRequest`) e saída (`BranchMetricPayload`, `NetworkConsolidatedReport`).
   - **SRE Node Healthchecks & Telemetria:** Monitoramento proativo da saúde dos contêineres Docker locais via rotas `/health/edge`, checagem de latência por filial e heartbeat periódico para a telemetria central Sentinel.
 
-- [ ] **Entregáveis Planejados para a Fase 3.5:**
-  - `core/network_orchestrator.py` (Maestro com roteador global/local e despacho assíncrono Fan-Out).
-  - `core/schemas/network.py` (Contratos Pydantic v2 para comunicação nó-a-nó).
-  - `core/synthesizer.py` (Agente Sintetizador com prompt executivo e ranqueamento de criticidade).
-  - `scripts/test_rag_hierarquico.py` (Suíte de testes de simulação de rede com nós online, offline e validação de SLA 5s).
+- [ ] **Entregáveis da Fase 3.5:**
+  - [x] `core/schemas/network.py` (Contratos Pydantic v2 para comunicação nó-a-nó, validação de limites e cálculo de economia >85% de tokens — Concluído ✅).
+  - [x] `scripts/test_rag_hierarquico.py` (Suíte de testes automatizada com simulação de 50 filiais concorrentes em asyncio, validação de SLA 5.0s, resiliência e degradação graciosa de nós offline — 100% de Aprovação ✅).
+  - [ ] `core/network_orchestrator.py` (Maestro com roteador global/local e despacho assíncrono Fan-Out com httpx/LangGraph).
+  - [ ] `core/synthesizer.py` (Agente Sintetizador com prompt executivo e ranqueamento de criticidade).
 
 ---
 
