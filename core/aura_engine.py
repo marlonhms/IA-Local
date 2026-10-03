@@ -44,7 +44,7 @@ from config.settings import (
 from core.rag_engine import HybridRAGEngine
 from core.tools import PostoTools, get_erp_connection
 from core.sanitizer import central_log_sanitizer
-from core.semantic_router import SemanticRouter, classificar_intencao_heuristica
+from core.semantic_router import SemanticRouter, classificar_intencao_heuristica, RETRY_REGEX
 
 
 # =============================================================================
@@ -978,9 +978,36 @@ Diretrizes Específicas por Assunto:
             yield AuraChunk(chunk_type=AuraChunkType.DONE, text=msg_vazia, session_id=sess_id)
             return
 
-        # 1. Roteamento Semântico Vetorial / Heurístico
-        intencao, confianca, telemetria_rota = self.router.route(q_limpa)
+        # 1. Tratamento de Comandos de Repetição/Retry (Multi-turn Context)
+        is_retry = bool(RETRY_REGEX.match(q_limpa))
+        pergunta_efetiva = q_limpa
+        retry_pergunta_anterior: Optional[str] = None
+
+        if is_retry:
+            historico_prev = self.session_memory.get_history(sess_id, limit=10)
+            for msg in reversed(historico_prev):
+                if msg.get("role") == "user":
+                    content_ant = (msg.get("content") or "").strip()
+                    if content_ant and not RETRY_REGEX.match(content_ant):
+                        retry_pergunta_anterior = content_ant
+                        pergunta_efetiva = content_ant
+                        break
+
+            if not retry_pergunta_anterior:
+                msg_aviso = "Não identifiquei uma consulta anterior nesta sessão para tentar novamente. Como posso ajudar você no posto ou na conveniência?"
+                yield AuraChunk(chunk_type=AuraChunkType.DELTA, text=msg_aviso, session_id=sess_id)
+                yield AuraChunk(chunk_type=AuraChunkType.DONE, text=msg_aviso, session_id=sess_id)
+                return
+
+        # 2. Roteamento Semântico Vetorial / Heurístico (sobre a pergunta efetiva)
+        intencao, confianca, telemetria_rota = self.router.route(pergunta_efetiva)
         query_vector = telemetria_rota.get("query_vector")
+
+        tool_start_msg = (
+            f"Repetindo consulta anterior: '{retry_pergunta_anterior}'..."
+            if is_retry
+            else f"Executando ferramenta para intenção '{intencao}'..."
+        )
 
         yield AuraChunk(
             chunk_type=AuraChunkType.INTENT,
@@ -989,18 +1016,20 @@ Diretrizes Específicas por Assunto:
                 "intent": intencao,
                 "confidence": confianca,
                 "routing_telemetry": telemetria_rota,
+                "is_retry": is_retry,
+                "retry_target": retry_pergunta_anterior,
             },
             session_id=sess_id,
         )
 
         yield AuraChunk(
             chunk_type=AuraChunkType.TOOL_START,
-            text=f"Executando ferramenta para intenção '{intencao}'...",
+            text=tool_start_msg,
             data={"intent": intencao, "tool_name": intencao},
             session_id=sess_id,
         )
 
-        # 2. Execução da Ferramenta correspondente
+        # 3. Execução da Ferramenta correspondente
         (
             contexto_extra,
             resultado_bruto,
@@ -1009,7 +1038,7 @@ Diretrizes Específicas por Assunto:
             tool_latency_ms,
         ) = await asyncio.to_thread(
             self._resolver_contexto_ferramenta,
-            q_limpa,
+            pergunta_efetiva,
             intencao,
             query_vector,
         )
@@ -1042,6 +1071,7 @@ Diretrizes Específicas por Assunto:
                 intent=intencao,
                 tenant_id=t_id,
                 filial_id=f_id,
+                metadata={"is_retry": is_retry, "target_query": retry_pergunta_anterior} if is_retry else None,
             )
             self.session_memory.save_message(
                 session_id=sess_id,
@@ -1066,6 +1096,7 @@ Diretrizes Específicas por Assunto:
             yield AuraChunk(
                 chunk_type=AuraChunkType.DONE,
                 text=resposta_cache,
+                data={"session_id": sess_id, "intent": intencao, "cache_hit": True},
                 session_id=sess_id,
             )
             return
@@ -1091,8 +1122,16 @@ Diretrizes Específicas por Assunto:
             except Exception:
                 contexto_extra = f"Contexto Operacional do Chamador:\n{str(context)}\n\n" + contexto_extra
 
+        if is_retry and retry_pergunta_anterior:
+            pergunta_para_prompt = (
+                f"O usuário solicitou tentar novamente a consulta anterior: '{retry_pergunta_anterior}' "
+                f"(comando digitado agora: '{q_limpa}'). Responda diretamente à consulta original com os dados recuperados da ferramenta."
+            )
+        else:
+            pergunta_para_prompt = q_limpa
+
         contexto_sanitizado, counts_ctx = central_log_sanitizer.sanitize_text(contexto_extra)
-        pergunta_sanitizada, counts_perg = central_log_sanitizer.sanitize_text(q_limpa)
+        pergunta_sanitizada, counts_perg = central_log_sanitizer.sanitize_text(pergunta_para_prompt)
         total_redacted = sum(counts_ctx.values()) + sum(counts_perg.values())
 
         # 5. Recuperação de Histórico de Continuidade
@@ -1183,6 +1222,7 @@ Diretrizes Específicas por Assunto:
             intent=intencao,
             tenant_id=t_id,
             filial_id=f_id,
+            metadata={"is_retry": is_retry, "target_query": retry_pergunta_anterior} if is_retry else None,
         )
         self.session_memory.save_message(
             session_id=sess_id,

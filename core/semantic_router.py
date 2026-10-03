@@ -239,12 +239,32 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
 }
 
 
+RETRY_REGEX = re.compile(
+    r"^\s*(?:por\s+favor\s*,?\s*)?"
+    r"(?:tente|tenta|tentei|tentar|repita|repete|repetir|refaça|refaca|refaz|refazer)"
+    r"(?:\s+(?:novamente|de\s+novo|outra\s+vez|mais\s+uma\s+vez|a[íi]|agora|por\s+favor))?"
+    r"\s*[!?.]*$"
+    r"|^\s*(?:novamente|de\s+novo|mais\s+uma\s+vez|outra\s+vez)\s*[!?.]*$"
+    r"|^\s*(?:e\s+agora\??|tenta\s+a[íi]\s+agora|pode\s+tentar\s+de\s+novo\??)\s*[!?.]*$",
+    re.IGNORECASE,
+)
+
+CONVERSATIONAL_WORDS = {
+    "ola", "olá", "oi", "bom dia", "boa tarde", "boa noite", "ok", "obrigado", "obrigada",
+    "valeu", "show", "beleza", "legal", "certo", "entendido", "ajuda", "menu"
+}
+
+
 def classificar_intencao_heuristica(pergunta: str) -> str:
     """
     Classificador determinístico baseado em regras léxicas e heurísticas de posto.
     Usado como fallback ultrarrápido (sub-milissegundo) para o roteador semântico.
     """
-    p = pergunta.lower()
+    p = pergunta.lower().strip()
+
+    # -2. Comandos de repetição / saudações neutras não devem disparar ferramentas operacionais
+    if RETRY_REGEX.match(p) or p in CONVERSATIONAL_WORDS:
+        return "catalogo_produtos"
 
     # -1. Livro de Movimentação de Combustíveis (LMC Oficial ANP Portaria 26/1992)
     if any(t in p for t in TERMOS_LMC_EXATOS):
@@ -678,6 +698,23 @@ class SemanticRouter:
                 "query_vector": None,
             }
             return "catalogo_produtos", 0.0, telemetry
+
+        # 0.1 Comandos de repetição / saudações genéricas - neutralização de falsos positivos operacionais
+        if RETRY_REGEX.match(query_norm) or query_norm in CONVERSATIONAL_WORDS:
+            total_ms = (time.perf_counter() - t0) * 1000
+            method_desc = "retry_command_heuristics" if RETRY_REGEX.match(query_norm) else "conversational_greeting_fallback"
+            telemetry = {
+                "intent": "catalogo_produtos",
+                "confidence": 0.50,
+                "method": method_desc,
+                "matched_phrase": "Comando de repetição ou conversa geral",
+                "pgvector_latency_ms": 0.0,
+                "embedding_latency_ms": 0.0,
+                "total_routing_latency_ms": round(total_ms, 3),
+                "confidence_threshold": self.confidence_threshold,
+                "query_vector": None,
+            }
+            return "catalogo_produtos", 0.50, telemetry
 
         # 1. Checa cache em memória
         if use_cache and query_norm in self._memory_cache:
