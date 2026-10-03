@@ -892,4 +892,180 @@ body {
   }
 }
 
+/* Visibilidade adaptativa dos badges táticos do HUD */
+#hud-hz-badge {
+  display: flex;
+}
+@media (max-width: 640px) {
+  #hud-hz-badge {
+    display: none !important;
+  }
+}
+
+#btn-open-palette {
+  display: flex;
+}
+@media (max-width: 1024px) {
+  #btn-open-palette {
+    display: none !important;
+  }
+}
+
+/* ==========================================================================
+   AURA BOREALIS AMBIENT CANVAS & FLUIDEZ SINCRONIZADA EM HZ
+   ========================================================================== */
+.aura-borealis-layer {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.85;
+  filter: blur(48px);
+  mix-blend-mode: screen;
+  transform: translate3d(0, 0, 0);
+  will-change: transform, opacity;
+}
+
+@media (max-width: 768px) {
+  .aura-borealis-layer {
+    filter: blur(28px);
+    opacity: 0.65;
+  }
+}
+
+/* ==========================================================================
+   EFEITOS GLANCE & SPECULAR MOUSE LIGHTING (DESKTOP)
+   ========================================================================== */
+.glass-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+[data-device="desktop"] .glass-panel::after,
+[data-device="desktop"] .glance-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    380px circle at var(--mouse-x, -500px) var(--mouse-y, -500px),
+    rgba(6, 182, 212, 0.09) 0%,
+    rgba(16, 185, 129, 0.05) 30%,
+    rgba(124, 58, 237, 0.03) 60%,
+    transparent 80%
+  );
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 2;
+}
+
+[data-device="desktop"] .glass-panel:hover::after,
+[data-device="desktop"] .glance-card:hover::after {
+  opacity: 1;
+}
+
+[data-device="desktop"] .glass-panel-interactive {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s ease,
+              box-shadow 0.2s ease;
+}
+
+[data-device="desktop"] .glass-panel-interactive:hover {
+  transform: translateY(-2px);
+  border-color: rgba(6, 182, 212, 0.45);
+  box-shadow: 0 12px 32px -4px rgba(7, 9, 14, 0.7),
+              0 0 24px -2px rgba(6, 182, 212, 0.12);
+}
+
+/* ==========================================================================
+   DESKTOP EXECUTIVE GLANCE BAR (4-METRIC STRIP)
+   ========================================================================== */
+.desktop-glance-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.glance-stat-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: rgba(12, 18, 30, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  user-select: none;
+}
+
+.glance-stat-pill:hover {
+  background: rgba(18, 28, 48, 0.95);
+  border-color: var(--cyan-main);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(6, 182, 212, 0.12);
+}
+
+/* ==========================================================================
+   COMMAND PALETTE EXECUTIVA DESKTOP (CTRL+K)
+   ========================================================================== */
+.palette-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(4, 6, 11, 0.8);
+  backdrop-filter: blur(16px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  animation: fadeInPalette 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeInPalette {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.palette-container {
+  width: 100%;
+  max-width: 680px;
+  background: rgba(11, 16, 27, 0.95);
+  border: 1px solid rgba(6, 182, 212, 0.35);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px -8px rgba(0, 0, 0, 0.85),
+              0 0 32px rgba(6, 182, 212, 0.15);
+  overflow: hidden;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.palette-item:hover,
+.palette-item.active {
+  background: rgba(6, 182, 212, 0.12);
+  border-left: 3px solid var(--cyan-main);
+  padding-left: 13px;
+}
+
+/* Fluidez e Aceleração de Hardware para Monitores High Refresh */
+[data-hz="120"] *, [data-hz="144"] *, [data-hz="165"] *, [data-hz="240"] * {
+  backface-visibility: hidden;
+}
+
+
 

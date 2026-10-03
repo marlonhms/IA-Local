@@ -98,7 +98,26 @@
       </div>
 
       <!-- Lado Direito: Relógio BRT, Auto-refresh & Navegação -->
-      <div class="flex items-center gap-2 w-full md:w-auto justify-end">
+      <div class="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
+        
+        <!-- Badge de Dispositivo Inteligente (Desktop vs Mobile) -->
+        <div id="hud-device-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-900/90 border border-slate-800 text-[11px] font-mono text-slate-300 cursor-pointer hover:border-auraCyan transition-all shadow-sm" title="Dispositivo Detectado (Clique para alternar)">
+          <span id="hud-device-icon" class="w-2 h-2 rounded-full bg-auraCyan animate-pulse"></span>
+          <span id="hud-device-label">DESKTOP</span>
+        </div>
+
+        <!-- Telemetria de Taxa de Atualização do Monitor (Hz) -->
+        <div id="hud-hz-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-900/90 border border-slate-800 text-[11px] font-mono text-cyan-300 shadow-sm" title="Taxa de Atualização do Monitor Sincronizada">
+          <span id="hud-hz-value">⚡ 60 Hz</span>
+        </div>
+
+        <!-- Botão Command Palette Executiva (Ctrl+K) -->
+        <button id="btn-open-palette" class="flex items-center gap-2 px-2.5 py-1 rounded bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 font-mono text-xs transition-colors" title="Abrir AURA Command Palette (Ctrl+K)">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-auraCyan"></i>
+          <span class="text-[11px]">Comandos</span>
+          <kbd class="px-1 py-0.2 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-mono">⌘K</kbd>
+        </button>
+
         <div class="flex items-center gap-2 px-2.5 py-1 rounded bg-slate-900/90 border border-slate-800 font-mono text-xs text-slate-300">
           <span id="hud-live-clock" class="text-white font-bold">--:--:--</span>
           <span class="text-slate-600">|</span>
@@ -154,7 +173,42 @@
   <!-- =========================================================================
        CORPO PRINCIPAL (CONTAINER DE VIEWS)
        ========================================================================= -->
-  <main class="flex-1 max-w-7xl w-full mx-auto p-4 space-y-6">
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 space-y-4 relative z-10">
+
+    <!-- DESKTOP EXECUTIVE GLANCE BAR (4-METRIC QUICK GLANCE STRIP) -->
+    <div id="desktop-glance-bar" class="desktop-glance-bar">
+      <div onclick="window.auraChat.sendUserPrompt('Qual a autonomia e situação dos tanques agora?')" class="glance-stat-pill group border-l-2 border-l-auraEmerald" data-glance-tip="Previsão de Run-Out dos tanques">
+        <div class="flex items-center gap-2">
+          <i data-lucide="fuel" class="w-3.5 h-3.5 text-auraEmerald"></i>
+          <span class="text-slate-400 group-hover:text-slate-200">Tanques:</span>
+        </div>
+        <span class="font-bold text-emerald-400 font-mono">Autonomia Ativa</span>
+      </div>
+
+      <div onclick="window.auraChat.sendUserPrompt('O LMC de ontem fechou dentro da tolerância da ANP?')" class="glance-stat-pill group border-l-2 border-l-auraCyan" data-glance-tip="Auditoria fiscal Portaria ANP 26">
+        <div class="flex items-center gap-2">
+          <i data-lucide="book-check" class="w-3.5 h-3.5 text-auraCyan"></i>
+          <span class="text-slate-400 group-hover:text-slate-200">LMC ANP:</span>
+        </div>
+        <span class="font-bold text-cyan-300 font-mono">Margem ±0.6%</span>
+      </div>
+
+      <div onclick="window.auraChat.sendUserPrompt('Como fechou o último turno? Teve furo de caixa?')" class="glance-stat-pill group border-l-2 border-l-auraPurple" data-glance-tip="Triangulação de encerrantes e caixa">
+        <div class="flex items-center gap-2">
+          <i data-lucide="receipt" class="w-3.5 h-3.5 text-auraPurple-light"></i>
+          <span class="text-slate-400 group-hover:text-slate-200">Turno & Caixa:</span>
+        </div>
+        <span class="font-bold text-purple-300 font-mono">Triangulação OK</span>
+      </div>
+
+      <div onclick="window.auraChat.sendUserPrompt('Quais os melhores combos de vendas cruzadas na conveniência?')" class="glance-stat-pill group border-l-2 border-l-amber-500" data-glance-tip="Regras de associação Apriori Market Basket">
+        <div class="flex items-center gap-2">
+          <i data-lucide="shopping-bag" class="w-3.5 h-3.5 text-amber-400"></i>
+          <span class="text-slate-400 group-hover:text-slate-200">Loja PDV:</span>
+        </div>
+        <span class="font-bold text-amber-300 font-mono">Cross-Selling</span>
+      </div>
+    </div>
 
     <!-- =======================================================================
          VIEW 1: COCKPIT OPERACIONAL (PISTA, TANQUES, TURNO & BICOS)
@@ -466,7 +520,7 @@
     <!-- =======================================================================
          VIEW 3: CONSOLE COGNITIVO AURA (MOBILE-FIRST COGNITIVE ASSISTANT WORKSPACE)
          ======================================================================= -->
-    <div id="view-console" class="space-y-4 animate-fade-in flex flex-col h-[calc(100vh-140px)]">
+    <div id="view-console" class="space-y-3 animate-fade-in flex flex-col h-[calc(100vh-215px)]">
       
       <!-- Topo do Console: Status da Sessão e Blindagem LGPD -->
       <div class="glass-panel px-4 py-2.5 flex items-center justify-between border-auraPurple/30">
@@ -639,6 +693,128 @@
   </main>
 
   <!-- =========================================================================
+       AURA COMMAND PALETTE MODAL EXECUTIVA (CTRL+K / CMD+K)
+       ========================================================================= -->
+  <div id="aura-command-palette-modal" class="palette-modal-backdrop hidden">
+    <div class="palette-container">
+      <!-- Input de Pesquisa Rápida -->
+      <div class="p-3.5 border-b border-slate-800 flex items-center gap-3 bg-slate-900/90">
+        <i data-lucide="sparkles" class="w-5 h-5 text-auraCyan"></i>
+        <input 
+          id="palette-search-input"
+          type="text" 
+          placeholder="Digite um comando, diagnóstico ou pergunta para a AURA... (ex: tanques, ANP, furos, combos)" 
+          class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none font-mono"
+        />
+        <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-mono">ESC</kbd>
+      </div>
+
+      <!-- Lista de Comandos Rápidos e Diagnósticos de 1-Clique -->
+      <div id="palette-items-list" class="max-h-[380px] overflow-y-auto divide-y divide-slate-800/40 text-xs font-mono">
+        
+        <div onclick="window.auraGlance.executePaletteAction('Qual a previsão de esgotamento e a autonomia estimada dos tanques?')" class="palette-item">
+          <div class="flex items-center gap-3">
+            <span class="p-1.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">⛽</span>
+            <div>
+              <div class="font-bold text-slate-100">Autonomia & Run-Out dos Tanques</div>
+              <div class="text-[11px] text-slate-400 font-sans">Calcula horas restantes, reserva crítica 15% e pedido de carreta.</div>
+            </div>
+          </div>
+          <span class="text-[11px] text-auraCyan font-semibold">Executar ↵</span>
+        </div>
+
+        <div onclick="window.auraGlance.executePaletteAction('O LMC de ontem fechou dentro da tolerância oficial da ANP?')" class="palette-item">
+          <div class="flex items-center gap-3">
+            <span class="p-1.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">📋</span>
+            <div>
+              <div class="font-bold text-slate-100">Auditoria LMC ANP (Portaria 26)</div>
+              <div class="text-[11px] text-slate-400 font-sans">Conferência de perdas e ganhos físicos vs escriturados (±0.6%).</div>
+            </div>
+          </div>
+          <span class="text-[11px] text-auraCyan font-semibold">Executar ↵</span>
+        </div>
+
+        <div onclick="window.auraGlance.executePaletteAction('Como fechou o último turno? Teve quebra ou furo de caixa?')" class="palette-item">
+          <div class="flex items-center gap-3">
+            <span class="p-1.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">💰</span>
+            <div>
+              <div class="font-bold text-slate-100">Conciliação de Turno & Caixa</div>
+              <div class="text-[11px] text-slate-400 font-sans">Triangulação de encerrantes Companytec vs fechamento financeiro.</div>
+            </div>
+          </div>
+          <span class="text-[11px] text-auraCyan font-semibold">Executar ↵</span>
+        </div>
+
+        <div onclick="window.auraGlance.executePaletteAction('Quais os combos de vendas cruzadas com maior Lift na conveniência?')" class="palette-item">
+          <div class="flex items-center gap-3">
+            <span class="p-1.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">🛒</span>
+            <div>
+              <div class="font-bold text-slate-100">Vendas Cruzadas da Conveniência (Market Basket)</div>
+              <div class="text-[11px] text-slate-400 font-sans">Pares com Lift &gt; 1.2x e scripts para aumento de ticket no caixa.</div>
+            </div>
+          </div>
+          <span class="text-[11px] text-auraCyan font-semibold">Executar ↵</span>
+        </div>
+
+        <div onclick="window.auraGlance.executePaletteAction('Há algum bico com vazão lenta ou alerta na pista?')" class="palette-item">
+          <div class="flex items-center gap-3">
+            <span class="p-1.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30">⚠️</span>
+            <div>
+              <div class="font-bold text-slate-100">Vazão de Bicos & Desempenho de Frentistas</div>
+              <div class="text-[11px] text-slate-400 font-sans">Alerta preventivo de filtro sujo (&lt;30 L/min) e ranking de pista.</div>
+            </div>
+          </div>
+          <span class="text-[11px] text-auraCyan font-semibold">Executar ↵</span>
+        </div>
+
+        <div onclick="window.auraGlance.executePaletteAction('Quem são os 10 maiores clientes da revenda?')" class="palette-item">
+          <div class="flex items-center gap-3">
+            <span class="p-1.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">🏆</span>
+            <div>
+              <div class="font-bold text-slate-100">Ranking & Perfil de Clientes VIP</div>
+              <div class="text-[11px] text-slate-400 font-sans">Identificação de frotas e compradores de maior faturamento.</div>
+            </div>
+          </div>
+          <span class="text-[11px] text-auraCyan font-semibold">Executar ↵</span>
+        </div>
+
+        <div onclick="window.auraApp.switchTab('cockpit'); window.auraGlance.closeCommandPalette();" class="palette-item">
+          <div class="flex items-center gap-3">
+            <span class="p-1.5 rounded bg-slate-800 text-slate-300">📊</span>
+            <div>
+              <div class="font-bold text-slate-100">Alternar para Cockpit Operacional 3D</div>
+              <div class="text-[11px] text-slate-400 font-sans">Visão volumétrica dos cilindros de combustível e bicos.</div>
+            </div>
+          </div>
+          <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-mono">2</kbd>
+        </div>
+
+        <div onclick="window.auraApp.switchTab('split'); window.auraGlance.closeCommandPalette();" class="palette-item">
+          <div class="flex items-center gap-3">
+            <span class="p-1.5 rounded bg-slate-800 text-slate-300">🖥️</span>
+            <div>
+              <div class="font-bold text-slate-100">Alternar para Visão Split Widescreen</div>
+              <div class="text-[11px] text-slate-400 font-sans">Cockpit e Chat lado a lado para monitores desktop.</div>
+            </div>
+          </div>
+          <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-mono">4</kbd>
+        </div>
+
+      </div>
+
+      <!-- Rodapé da Paleta -->
+      <div class="px-4 py-2 bg-slate-950/90 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+        <div class="flex items-center gap-3">
+          <span><kbd class="text-slate-400">↑↓</kbd> navegar</span>
+          <span><kbd class="text-slate-400">↵</kbd> selecionar</span>
+          <span><kbd class="text-slate-400">esc</kbd> fechar</span>
+        </div>
+        <span class="text-auraCyan/80">AURA Command HUD</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
        SCRIPTS JAVASCRIPT MODULARES DA AURA
        ========================================================================= -->
   <script src="/static/js/aura-api.js"></script>
@@ -646,5 +822,6 @@
   <script src="/static/js/aura-triggers.js"></script>
   <script src="/static/js/aura-chat.js"></script>
   <script src="/static/js/aura-app.js"></script>
+  <script src="/static/js/aura-fx.js"></script>
 </body>
 </html>

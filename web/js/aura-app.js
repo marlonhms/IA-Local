@@ -76,6 +76,7 @@ function applyIconsFallback() {
     'shopping-bag': '<svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0"/></svg>',
     'sparkles': '<svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12 3l1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5L12 3z"/></svg>',
     'square': '<svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
+    'monitor': '<svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" stroke-width="2"/><line x1="8" y1="21" x2="16" y2="21" stroke-width="2"/><line x1="12" y1="17" x2="12" y2="21" stroke-width="2"/></svg>',
   };
 
   document.querySelectorAll('i[data-lucide]').forEach(el => {
@@ -235,11 +236,11 @@ class AuraApp {
     } else if (tabName === 'console') {
       if (viewConsole) viewConsole.classList.remove('hidden');
       const input = document.getElementById('chat-input-text');
-      if (input) input.focus();
+      if (input) input.focus({ preventScroll: true });
     } else if (tabName === 'split') {
       if (viewSplit) viewSplit.classList.remove('hidden');
       const splitInput = document.getElementById('split-chat-input-text');
-      if (splitInput) splitInput.focus();
+      if (splitInput) splitInput.focus({ preventScroll: true });
       // Assegura tanques renderizados
       if (window.auraCockpit && window.auraCockpit.tanksData) {
         window.auraCockpit.renderSplitTanks(window.auraCockpit.tanksData);

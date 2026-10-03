@@ -83,6 +83,7 @@ def run_tests():
         ("/static/js/aura-triggers.js", "AuraTriggersController", "Triggers Controller JS"),
         ("/static/js/aura-chat.js", "AuraChatController", "Chat Controller JS"),
         ("/static/js/aura-app.js", "AuraApp", "App Coordinator JS"),
+        ("/static/js/aura-fx.js", "AuraBorealisEngine", "FX & Desktop Engine JS"),
     ]
 
     for path, expected_snippet, label in assets:
