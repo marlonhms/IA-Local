@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AURA // Cognitive Operations Cockpit</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            obsidian: '#07090e',
+            slateSurface: '#0c121e',
+            slateCard: '#0f172a',
+            auraEmerald: {
+              DEFAULT: '#10b981',
+              light: '#34d399',
+              dark: '#047857'
+            },
+            auraCyan: {
+              DEFAULT: '#06b6d4',
+              light: '#22d3ee',
+              dark: '#0891b2'
+            },
+            auraPurple: {
+              DEFAULT: '#7c3aed',
+              light: '#a855f7',
+              dark: '#581c87'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Marked.js para renderização de Markdown no streaming -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Folha de Estilos Customizada do Design System AURA -->
+  <link rel="stylesheet" href="/static/css/aura.css">
+</head>
+<body class="min-h-screen flex flex-col bg-obsidian text-slate-200 antialiased selection:bg-auraCyan/30 selection:text-white">
+
+  <!-- =========================================================================
+       HEADER TÁTICO HUD & BARRA DE TELEMETRIA SRE
+       ========================================================================= -->
+  <header class="sticky top-0 z-50 glass-panel border-b border-white/10 px-4 py-2.5 backdrop-blur-xl bg-obsidian/90">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+      
+      <!-- Lado Esquerdo: Identidade da AURA & Filial -->
+      <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
+        <div class="flex items-center gap-3">
+          <!-- Núcleo Holográfico AURA -->
+          <div class="neural-core-orb"></div>
+          
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-display-title font-bold text-lg tracking-wider text-white">AURA</span>
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-auraPurple/20 text-auraPurple-light border border-auraPurple/40">
+                v1.0 HEADLESS
+              </span>
+            </div>
+            <div id="hud-filial-name" class="text-xs text-slate-400 font-mono">
+              Carregando filial...
+            </div>
+          </div>
+        </div>
+
+        <!-- Telemetria Rápida no Mobile -->
+        <div class="md:hidden text-right font-mono text-[11px] text-slate-400">
+          <span id="hud-live-clock-mobile">--:--:--</span>
+        </div>
+      </div>
+
+      <!-- Centro: Badges de Observabilidade SRE dos Bancos -->
+      <div class="flex flex-wrap items-center justify-center gap-2 font-mono text-xs">
+        <div id="hud-erp-badge" class="flex items-center gap-2 px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-400">
+          <span class="pulse-indicator emerald"></span> ERP :5433 (CONECTANDO)
+        </div>
+
+        <div id="hud-vector-badge" class="flex items-center gap-2 px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-400">
+          <span class="pulse-indicator cyan"></span> PGVECTOR :5434
+        </div>
+
+        <div class="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded bg-auraPurple/10 border border-auraPurple/20 text-auraPurple-light text-[11px]">
+          <span class="pulse-indicator purple"></span> WAL SQLite
+        </div>
+
+        <div id="hud-cache-badge" class="hidden sm:block px-2 py-1 rounded bg-slate-900 border border-slate-800 text-slate-400 text-[11px]">
+          Hit: 99.9%
+        </div>
+      </div>
+
+      <!-- Lado Direito: Relógio BRT, Auto-refresh & Navegação -->
+      <div class="flex items-center gap-2 w-full md:w-auto justify-end">
+        <div class="flex items-center gap-2 px-2.5 py-1 rounded bg-slate-900/90 border border-slate-800 font-mono text-xs text-slate-300">
+          <span id="hud-live-clock" class="text-white font-bold">--:--:--</span>
+          <span class="text-slate-600">|</span>
+          <span class="text-[11px] text-slate-400 flex items-center gap-1" title="Próxima sincronização automática">
+            <span>Sync:</span>
+            <span id="hud-refresh-countdown" class="text-auraCyan-light font-semibold">30s</span>
+          </span>
+        </div>
+
+        <!-- Botão SFX Audio Tático -->
+        <button id="btn-toggle-sfx" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-colors" title="Alternar Efeitos Sonoros Táticos">
+          <i data-lucide="volume-2" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Botão Refresh Manual -->
+        <button id="btn-refresh-cockpit" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors" title="Atualizar Agora">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Barra de Abas de Navegação -->
+    <div class="max-w-7xl mx-auto mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between overflow-x-auto">
+      <div class="flex items-center gap-1">
+        <button class="nav-tab-btn tab-cockpit active" data-tab="cockpit">
+          <i data-lucide="gauge" class="w-4 h-4"></i>
+          <span>Cockpit Operacional</span>
+        </button>
+
+        <button class="nav-tab-btn tab-triggers" data-tab="triggers">
+          <i data-lucide="zap" class="w-4 h-4"></i>
+          <span>Radar 1-Clique (11)</span>
+        </button>
+
+        <button class="nav-tab-btn tab-console" data-tab="console">
+          <i data-lucide="terminal" class="w-4 h-4"></i>
+          <span>Console Cognitivo</span>
+        </button>
+
+        <button class="nav-tab-btn tab-split" data-tab="split">
+          <i data-lucide="layout-grid" class="w-4 h-4"></i>
+          <span>Visão Split</span>
+        </button>
+      </div>
+
+      <div id="hud-last-sync" class="hidden md:block font-mono text-[10px] text-slate-500">
+        Sincronizando...
+      </div>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       CORPO PRINCIPAL (CONTAINER DE VIEWS)
+       ========================================================================= -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 space-y-6">
+
+    <!-- =======================================================================
+         VIEW 1: COCKPIT OPERACIONAL (PISTA, TANQUES, TURNO & BICOS)
+         ======================================================================= -->
+    <div id="view-cockpit" class="space-y-6 animate-fade-in">
+      
+      <!-- Banner Resumo Executivo da Pista -->
+      <div class="glass-panel p-4 border-l-4 border-l-auraEmerald bg-gradient-to-r from-auraEmerald/5 via-slateSurface to-transparent">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-mono font-bold uppercase tracking-wider text-auraEmerald">Telemetria ao Vivo</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-auraEmerald/20 text-auraEmerald-light border border-auraEmerald/30">
+                Posto em Operação
+              </span>
+            </div>
+            <h2 class="text-lg font-bold text-white mt-0.5">Visão Integrada de Estoques, Pista e Conformidade Fiscal</h2>
+          </div>
+          <div id="cockpit-runout-summary">
+            <!-- Injetado dinamicamente via JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Seção 1: Matriz de Tanques Volumétricos (Run-Out Forecast) -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="fuel" class="w-5 h-5 text-auraEmerald"></i>
+            <h3 class="font-bold text-base text-white tracking-wide">Tanques Volumétricos & Previsão de Esgotamento (Run-Out)</h3>
+          </div>
+          <span class="text-xs font-mono text-slate-400">Reserva Crítica Padrão: &lt;15%</span>
+        </div>
+
+        <!-- Grid de Tanques com Cilindros Visuais 3D -->
+        <div id="cockpit-tanks-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div class="glass-panel p-6 col-span-full text-center text-slate-400 font-mono text-sm">
+            <i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto mb-2 text-auraEmerald"></i>
+            Carregando telemetria volumétrica dos tanques...
+          </div>
+        </div>
+      </div>
+
+      <!-- Gêmeo Digital da Estação & Topologia CBC04 -->
+      <div class="glass-panel p-4 space-y-3 border-l-4 border-l-auraCyan bg-gradient-to-r from-auraCyan/5 via-slateSurface to-transparent">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2">
+          <div class="flex items-center gap-2">
+            <i data-lucide="layers" class="w-4 h-4 text-auraCyan"></i>
+            <h4 class="font-bold text-sm text-white font-mono">Gêmeo Digital da Estação & Topologia CBC04</h4>
+          </div>
+          <div class="flex items-center gap-2 font-mono text-[10px]">
+            <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">CBC04 ATIVO</span>
+            <span class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">ERP :5433</span>
+            <span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30">PGVECTOR :5434</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 font-mono text-xs">
+          <!-- Ilhas de Abastecimento -->
+          <div class="p-3 rounded bg-slate-900/90 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-slate-300 font-bold text-[11px] border-b border-slate-800 pb-1">
+              <span>⛽ ILHAS DE ABASTECIMENTO</span>
+              <span class="text-emerald-400 text-[10px]">16 Bicos</span>
+            </div>
+            <div class="text-[11px] text-slate-400 space-y-1">
+              <div class="flex justify-between"><span>Ilha 01 (Bombas 01-02):</span> <strong class="text-slate-200">Gasolina / Etanol</strong></div>
+              <div class="flex justify-between"><span>Ilha 02 (Bombas 03-04):</span> <strong class="text-slate-200">Diesel S10 / S500 / ARLA</strong></div>
+              <div class="flex justify-between pt-1 border-t border-slate-800/80"><span>Protocolo Automação:</span> <strong class="text-cyan-300">Companytec CBC04</strong></div>
+            </div>
+          </div>
+
+          <!-- Subsolo (Tanques) -->
+          <div class="p-3 rounded bg-slate-900/90 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-slate-300 font-bold text-[11px] border-b border-slate-800 pb-1">
+              <span>🛢️ SUBSOLO (TANQUES)</span>
+              <span class="text-cyan-300 text-[10px]">Ullage Dinâmico</span>
+            </div>
+            <div class="text-[11px] text-slate-400 space-y-1">
+              <div class="flex justify-between"><span>Capacidade Instalada:</span> <strong class="text-slate-200">180.000 L</strong></div>
+              <div class="flex justify-between"><span>Monitoramento ANP:</span> <strong class="text-emerald-400">Portaria 26/1992</strong></div>
+              <div class="flex justify-between pt-1 border-t border-slate-800/80"><span>Padrão Descarga Carreta:</span> <strong class="text-purple-300">Múltiplos de 5.000 L</strong></div>
+            </div>
+          </div>
+
+          <!-- Loja e PDV -->
+          <div class="p-3 rounded bg-slate-900/90 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-slate-300 font-bold text-[11px] border-b border-slate-800 pb-1">
+              <span>🏪 LOJA & RETAGUARDA</span>
+              <span class="text-purple-300 text-[10px]">PDV 01</span>
+            </div>
+            <div class="text-[11px] text-slate-400 space-y-1">
+              <div class="flex justify-between"><span>Triangulação de Vendas:</span> <strong class="text-slate-200">Pista vs Caixa</strong></div>
+              <div class="flex justify-between"><span>Motor Cross-Selling:</span> <strong class="text-purple-300">Apriori + RAG</strong></div>
+              <div class="flex justify-between pt-1 border-t border-slate-800/80"><span>Blindagem Dados:</span> <strong class="text-emerald-400">LGPD Sanitizer Ativo</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seção 2: Pista em Tempo Real (Bicos, Frentistas e Anomalias) -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Coluna 1: Bicos de Abastecimento & Vazão L/min -->
+        <div class="glass-panel p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div class="flex items-center gap-2">
+              <i data-lucide="gauge" class="w-4 h-4 text-auraCyan"></i>
+              <h4 class="font-bold text-sm text-slate-100">Bicos & Vazão da Pista</h4>
+            </div>
+            <span class="text-[11px] font-mono text-slate-400">Min. Ideal: 30 L/min</span>
+          </div>
+
+          <div id="cockpit-bicos-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[380px] overflow-y-auto pr-1">
+            <div class="text-slate-500 font-mono text-xs col-span-full py-4 text-center">Carregando bicos...</div>
+          </div>
+        </div>
+
+        <!-- Coluna 2: Ranking de Frentistas & Conversão de Aditivada -->
+        <div class="glass-panel p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div class="flex items-center gap-2">
+              <i data-lucide="users" class="w-4 h-4 text-auraPurple"></i>
+              <h4 class="font-bold text-sm text-slate-100">Performance de Frentistas</h4>
+            </div>
+            <span class="text-[11px] font-mono text-slate-400">Turno Atual</span>
+          </div>
+
+          <div id="cockpit-frentistas-table" class="max-h-[380px] overflow-y-auto pr-1">
+            <div class="text-slate-500 font-mono text-xs py-4 text-center">Carregando frentistas...</div>
+          </div>
+        </div>
+
+        <!-- Coluna 3: Anomalias de Pista & Prevenção de Perdas -->
+        <div class="glass-panel p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div class="flex items-center gap-2">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-amber-400"></i>
+              <h4 class="font-bold text-sm text-slate-100">Auditoria & Anomalias</h4>
+            </div>
+            <span class="text-[11px] font-mono text-amber-400">CBC04 vs PDV</span>
+          </div>
+
+          <div id="cockpit-anomalias-list" class="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+            <div class="text-slate-500 font-mono text-xs py-4 text-center">Auditando eventos de pista...</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Seção 3: Fechamento de Turno & LMC Oficial ANP -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Card 1: Conciliação de Fechamento de Turno -->
+        <div class="glass-panel p-4 space-y-3 glass-card-cyan">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div class="flex items-center gap-2">
+              <i data-lucide="receipt" class="w-4 h-4 text-auraCyan"></i>
+              <h4 class="font-bold text-sm text-slate-100">Conciliação de Turno (Caixa vs Pista)</h4>
+            </div>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-auraCyan/10 text-auraCyan border border-auraCyan/30">
+              AUDITORIA
+            </span>
+          </div>
+
+          <div id="cockpit-turno-content">
+            <div class="text-slate-500 font-mono text-xs py-4 text-center">Carregando conciliação...</div>
+          </div>
+        </div>
+
+        <!-- Card 2: LMC Oficial ANP (Portaria 26/1992) -->
+        <div class="glass-panel p-4 space-y-3 glass-card-emerald">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div class="flex items-center gap-2">
+              <i data-lucide="book-check" class="w-4 h-4 text-auraEmerald"></i>
+              <h4 class="font-bold text-sm text-slate-100">LMC Oficial ANP (Portaria 26/1992)</h4>
+            </div>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-auraEmerald/10 text-auraEmerald border border-auraEmerald/30">
+              REGULATÓRIO
+            </span>
+          </div>
+
+          <div id="cockpit-lmc-content">
+            <div class="text-slate-500 font-mono text-xs py-4 text-center">Auditando conformidade ANP...</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Seção 4: Cesta de Compras & Inteligência da Conveniência (Apriori) -->
+      <div class="glass-panel p-4 space-y-3 glass-card-purple">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div class="flex items-center gap-2">
+            <i data-lucide="shopping-bag" class="w-4 h-4 text-auraPurple-light"></i>
+            <h4 class="font-bold text-sm text-slate-100">Oportunidades de Vendas Cruzadas na Conveniência (Market Basket)</h4>
+          </div>
+          <span class="text-xs font-mono text-auraPurple-light font-semibold">Lift &gt; 1.2x | Scripts PDV</span>
+        </div>
+
+        <div id="cockpit-combos-container" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="text-slate-500 font-mono text-xs col-span-full py-3 text-center">
+            Processando regras de associação da conveniência...
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+
+    <!-- =======================================================================
+         VIEW 2: RADAR DE GATILHOS ANALÍTICOS EM 1-CLIQUE (11 FERRAMENTAS)
+         ======================================================================= -->
+    <div id="view-triggers" class="space-y-6 hidden animate-fade-in">
+      
+      <div class="glass-panel p-4 border-l-4 border-l-auraCyan bg-gradient-to-r from-auraCyan/5 via-slateSurface to-transparent">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-mono font-bold uppercase tracking-wider text-auraCyan">Execução Direta Headless</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-auraCyan/20 text-auraCyan-light border border-auraCyan/30">
+                0 Tokens LLM • Sub-100ms
+              </span>
+            </div>
+            <h2 class="text-lg font-bold text-white mt-0.5">Matriz de 11 Gatilhos Especializados de Posto & PDV</h2>
+          </div>
+          <p class="text-xs text-slate-400 font-mono max-w-md">
+            Invoque diagnósticos fiscais, operacionais e preditivos com 1 clique direto no banco PostgreSQL.
+          </p>
+        </div>
+      </div>
+
+      <!-- Filtros por Categoria -->
+      <div class="flex flex-wrap items-center gap-2 font-mono text-xs">
+        <button class="trigger-filter-btn px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-white font-semibold transition-colors" data-filter="todos">
+          Todos (11)
+        </button>
+        <button class="trigger-filter-btn px-3 py-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-white transition-colors" data-filter="combustiveis">
+          Combustíveis & Tanques
+        </button>
+        <button class="trigger-filter-btn px-3 py-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-white transition-colors" data-filter="fiscal">
+          Fiscal & ANP
+        </button>
+        <button class="trigger-filter-btn px-3 py-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-white transition-colors" data-filter="caixa">
+          Pista & Caixa
+        </button>
+        <button class="trigger-filter-btn px-3 py-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-white transition-colors" data-filter="loja">
+          Conveniência & RAG
+        </button>
+        <button class="trigger-filter-btn px-3 py-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-white transition-colors" data-filter="sre">
+          SRE & Sistema
+        </button>
+      </div>
+
+      <!-- Grid dos 11 Gatilhos -->
+      <div id="triggers-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <!-- Renderizado dinamicamente via aura-triggers.js -->
+      </div>
+
+      <!-- Inspetor de Resultado do Gatilho Executado -->
+      <div id="trigger-inspector-card" class="glass-panel p-5 space-y-4 hidden border-auraCyan/40">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div class="flex items-center gap-3">
+            <h3 id="inspector-tool-title" class="font-bold text-base text-white">Resultado do Gatilho</h3>
+            <span id="inspector-status-badge" class="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+              200 OK
+            </span>
+            <span id="inspector-latency-badge" class="font-mono text-xs text-auraCyan font-semibold">
+              ⚡ 25 ms
+            </span>
+          </div>
+
+          <!-- Ações e Abas do Inspetor -->
+          <div class="flex items-center gap-2">
+            <div class="flex items-center rounded-lg bg-slate-900 p-0.5 border border-slate-800 text-xs font-mono">
+              <button id="tab-inspector-formatted" class="px-2.5 py-1 rounded bg-slate-800 text-white font-semibold">
+                Visão Formatada
+              </button>
+              <button id="tab-inspector-json" class="px-2.5 py-1 rounded text-slate-400 hover:text-white">
+                Payload JSON
+              </button>
+            </div>
+
+            <button id="btn-copy-json" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono border border-slate-700 transition-colors">
+              Copiar JSON
+            </button>
+
+            <button id="btn-send-to-aura" class="px-3 py-1 rounded bg-auraPurple hover:bg-auraPurple-light text-white text-xs font-mono font-bold transition-colors flex items-center gap-1.5">
+              <span>Enviar p/ AURA</span>
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="trigger-inspector-loading" class="py-8 text-center text-slate-400 font-mono text-sm hidden">
+          <i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto mb-2 text-auraCyan"></i>
+          Consultando banco de dados ERP e calculando análises...
+        </div>
+
+        <!-- Conteúdo do Resultado -->
+        <div id="trigger-inspector-result">
+          <div id="inspector-content-formatted" class="space-y-3"></div>
+          <pre id="inspector-content-json" class="hidden max-h-[420px] overflow-y-auto bg-obsidian p-4 rounded-lg border border-slate-800 font-mono text-xs text-slate-300"></pre>
+        </div>
+      </div>
+
+    </div>
+
+
+    <!-- =======================================================================
+         VIEW 3: CONSOLE COGNITIVO AURA (STREAMING SSE TOKEN-A-TOKEN)
+         ======================================================================= -->
+    <div id="view-console" class="space-y-4 hidden animate-fade-in flex flex-col h-[calc(100vh-140px)]">
+      
+      <!-- Topo do Console: Status da Sessão e Blindagem LGPD -->
+      <div class="glass-panel px-4 py-2.5 flex items-center justify-between border-auraPurple/30">
+        <div class="flex items-center gap-3">
+          <div class="w-3 h-3 rounded-full bg-auraEmerald animate-pulse"></div>
+          <span class="font-bold text-sm text-slate-100 font-mono">Terminal Cognitivo AURA</span>
+          <span id="chat-session-badge" class="px-2 py-0.5 rounded text-[11px] font-mono bg-slate-800 text-slate-300 border border-slate-700">
+            Sessão Ativa
+          </span>
+        </div>
+
+        <div class="flex items-center gap-3 font-mono text-xs">
+          <div class="hidden sm:flex items-center gap-1.5 text-emerald-400">
+            <i data-lucide="shield-check" class="w-4 h-4"></i>
+            <span>LGPD BLINDAGEM ATIVA</span>
+          </div>
+
+          <button id="btn-chat-clear" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors flex items-center gap-1">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span>Nova Sessão</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Feed de Mensagens (Scrollable) -->
+      <div id="chat-feed-container" class="glass-panel flex-1 p-4 overflow-y-auto space-y-4 font-sans border-slate-800">
+        <!-- Mensagens inseridas dinamicamente via aura-chat.js -->
+      </div>
+
+      <!-- Drawer de Sugestões de Prompts Rápidos -->
+      <div class="flex flex-wrap items-center gap-1.5 font-mono text-[11px]">
+        <span class="text-slate-500 mr-1">Sugestões Rápidas:</span>
+        <button onclick="window.auraChat.sendUserPrompt('Quando vai acabar a Gasolina Comum?')" class="px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors">
+          ⛽ Run-Out Gasolina
+        </button>
+        <button onclick="window.auraChat.sendUserPrompt('Qual o status do LMC da ANP de hoje?')" class="px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors">
+          📋 LMC ANP Oficial
+        </button>
+        <button onclick="window.auraChat.sendUserPrompt('Como está a conciliação do turno atual?')" class="px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors">
+          💰 Conciliação de Turno
+        </button>
+        <button onclick="window.auraChat.sendUserPrompt('Quais os combos com maior lift na conveniência?')" class="px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors">
+          🛒 Combos da Loja
+        </button>
+        <button onclick="window.auraChat.sendUserPrompt('Quem vendeu mais gasolina aditivada?')" class="px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors">
+          🏆 Frentistas Aditivada
+        </button>
+        <button onclick="window.auraChat.sendUserPrompt('Há algum bico com vazão lenta ou alerta?')" class="px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors">
+          ⚠️ Alerta de Vazão Bicos
+        </button>
+      </div>
+
+      <!-- Barra de Entrada de Mensagem HUD -->
+      <div class="glass-panel p-2 flex items-center gap-2 border-slate-700/80 bg-slate-950/80">
+        <textarea 
+          id="chat-input-text" 
+          rows="1"
+          placeholder="Pergunte à AURA sobre a operação do posto, estoques, tanques, frentistas ou vendas..."
+          class="flex-1 bg-transparent px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none resize-none font-sans"
+        ></textarea>
+
+        <button 
+          id="btn-chat-send" 
+          class="px-4 py-2 rounded-lg bg-gradient-to-r from-auraEmerald to-auraCyan hover:brightness-110 text-slate-950 font-bold text-sm font-mono transition-all flex items-center gap-1.5 shadow-md">
+          <span>Enviar</span>
+          <i data-lucide="send" class="w-4 h-4"></i>
+        </button>
+
+        <button 
+          id="btn-chat-stop" 
+          class="hidden px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm font-mono transition-all flex items-center gap-1.5 animate-pulse">
+          <span>Parar</span>
+          <i data-lucide="square" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+    </div>
+
+
+    <!-- =======================================================================
+         VIEW 4: VISÃO SPLIT WIDESCREEN (COCKPIT + CONSOLE LADO A LADO)
+         ======================================================================= -->
+    <div id="view-split" class="hidden animate-fade-in">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 h-[calc(100vh-140px)]">
+        
+        <!-- Esquerda: Cockpit Resumido (7 colunas) -->
+        <div class="lg:col-span-7 overflow-y-auto space-y-4 pr-1">
+          <!-- Banner Rápido -->
+          <div class="glass-panel p-3 border-l-3 border-l-auraEmerald font-mono text-xs text-slate-300 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-auraEmerald animate-pulse"></span>
+              <strong>Cockpit em Tempo Real</strong>
+            </div>
+            <button onclick="window.auraCockpit.refreshAllData()" class="text-auraCyan hover:underline">Atualizar ↺</button>
+          </div>
+
+          <!-- Tanques Compactos -->
+          <div class="glass-panel p-4 space-y-3">
+            <h4 class="font-bold text-sm text-white font-mono flex items-center gap-2">
+              <i data-lucide="fuel" class="w-4 h-4 text-auraEmerald"></i>
+              <span>Autonomia de Tanques</span>
+            </h4>
+            <div class="text-xs text-slate-400">
+              Clique em qualquer tanque para projetar compra de combustível ou conferir ullage de carreta.
+            </div>
+            <div id="split-tanks-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div class="col-span-full py-4 text-center text-slate-500 font-mono text-xs">
+                Sincronizando telemetria dos tanques ao vivo...
+              </div>
+            </div>
+          </div>
+
+          <!-- Pista & Fechamento Resumido -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="glass-panel p-3 font-mono text-xs space-y-1">
+              <span class="text-slate-400">LMC ANP Portaria 26:</span>
+              <div class="text-emerald-400 font-bold">✓ Conforme (±0.6%)</div>
+              <div class="text-[10px] text-slate-400">10 de 10 tanques auditados</div>
+            </div>
+
+            <div class="glass-panel p-3 font-mono text-xs space-y-1">
+              <span class="text-slate-400">Conciliação Turno:</span>
+              <div class="text-cyan-300 font-bold">Turno em Andamento</div>
+              <div class="text-[10px] text-slate-400">Score de Triangulação: 85%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Direita: Console Cognitivo Integrado (5 colunas) -->
+        <div class="lg:col-span-5 flex flex-col h-full space-y-3">
+          <div class="glass-panel px-3 py-2 flex items-center justify-between border-auraPurple/30">
+            <div class="flex items-center gap-2">
+              <div class="w-2.5 h-2.5 rounded-full bg-auraPurple-light animate-pulse"></div>
+              <span class="font-mono text-xs font-bold text-white">Console AURA Split</span>
+            </div>
+            <button onclick="window.auraApp.switchTab('console')" class="text-xs font-mono text-auraCyan hover:underline">
+              Expandir ↗
+            </button>
+          </div>
+
+          <!-- Feed de Mensagens no Split (espelhado com o Console) -->
+          <div id="split-chat-feed-container" class="glass-panel flex-1 p-3 overflow-y-auto font-sans text-xs space-y-3">
+            <div class="p-3 rounded bg-slate-900 border border-slate-800 text-slate-300 font-mono text-xs">
+              💡 Modo Split Widescreen ativo. O feed é sincronizado em tempo real com o Console Cognitivo.
+            </div>
+          </div>
+
+          <!-- Input Split com envio direto -->
+          <div class="glass-panel p-2 flex items-center gap-2 border-slate-700/80 bg-slate-950/80">
+            <input 
+              id="split-chat-input-text"
+              type="text" 
+              placeholder="Pergunte à AURA mantendo o Cockpit à vista..." 
+              class="flex-1 bg-transparent px-2 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none font-sans"
+            />
+            <button 
+              id="btn-split-chat-send" 
+              class="px-3 py-1.5 rounded bg-gradient-to-r from-auraEmerald to-auraCyan hover:brightness-110 text-slate-950 font-bold text-xs font-mono transition-all">
+              Enviar
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- =========================================================================
+       SCRIPTS JAVASCRIPT MODULARES DA AURA
+       ========================================================================= -->
+  <script src="/static/js/aura-api.js"></script>
+  <script src="/static/js/aura-cockpit.js"></script>
+  <script src="/static/js/aura-triggers.js"></script>
+  <script src="/static/js/aura-chat.js"></script>
+  <script src="/static/js/aura-app.js"></script>
+</body>
+</html>

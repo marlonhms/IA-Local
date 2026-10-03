@@ -13,9 +13,12 @@ from __future__ import annotations
 
 import json
 import asyncio
+from pathlib import Path
 from typing import Optional, Dict, Any, List
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from core.aura_engine import (
@@ -170,5 +173,30 @@ def create_aura_app(engine: Optional[AuraEngine] = None) -> FastAPI:
         description="Motor Cognitivo Headless Desacoplado para Postos de Combustíveis e PDV",
         version="1.0.0",
     )
+
+    # Middleware CORS para integração local fluida
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Registra rotas da API
     app.include_router(router)
+
+    # Montagem do Painel Web SPA Local da AURA
+    web_dir = Path(__file__).resolve().parent.parent / "web"
+    if web_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(web_dir)), name="static")
+
+        @app.get("/", include_in_schema=False)
+        @app.get("/dashboard", include_in_schema=False)
+        async def serve_dashboard():
+            index_file = web_dir / "index.html"
+            if index_file.exists():
+                return FileResponse(str(index_file))
+            return {"service": "AURA Core Engine API", "status": "online"}
+
     return app

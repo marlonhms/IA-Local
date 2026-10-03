@@ -636,15 +636,20 @@ docker run -d --name pgvector-posto -p 5434:5432 -e POSTGRES_DB=posto_ai -e POST
 
 ### 5. Iniciar a Aplicação
 
-#### Opção A: Launcher 1-Clique (Recomendado no Posto)
+#### Opção A: Painel Web Próprio da AURA (Cockpit Operacional & Console Cognitivo)
+Dê um duplo clique no arquivo [`iniciar_painel.bat`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/iniciar_painel.bat) ou execute no PowerShell:
+```powershell
+.\iniciar_painel.bat
+# ou via Python direto
+python server.py
+```
+*Inicia o servidor local FastAPI com Uvicorn e abre automaticamente o navegador em `http://127.0.0.1:8000`, carregando o Cockpit Operacional da Pista (tanques cilíndricos com simulação de fluido, bicos e frentistas), a Matriz de 11 Gatilhos Analíticos em 1-Clique (0 tokens LLM) e o Console Cognitivo com Streaming SSE.*
+
+#### Opção B: Launcher CLI 1-Clique (Terminal Interativo)
 Dê um duplo clique no arquivo [`iniciar.bat`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/iniciar.bat) ou execute no PowerShell:
 ```powershell
 .\iniciar.bat
-```
-*O script verifica se o Docker e o serviço do PostgreSQL estão ativos, inicializa os serviços necessários e abre o terminal interativo da IA.*
-
-#### Opção B: Via Linha de Comando Direta
-```powershell
+# ou
 python main.py
 ```
 

@@ -729,7 +729,7 @@ class AuraEngine:
                 "catalogo_produtos", "buscar_produtos_catalogo", "catalogo",
                 "produtos", "busca_produtos"
             ):
-                query_txt = p.get("termo") or p.get("query") or ""
+                query_txt = (p.get("termo") or p.get("query") or "").strip() or "combustivel"
                 return self.tools.buscar_produtos_catalogo(
                     termo=query_txt,
                     top_k=int(p.get("top_k", 5)),
