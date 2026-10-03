@@ -14,6 +14,46 @@ from config.settings import DB_ERP_CONFIG
 from core.rag_engine import HybridRAGEngine
 from core.sanitizer import sanitize_dict
 
+_last_working_erp_port: Optional[int] = None
+
+
+def get_erp_connection(timeout: int = 2) -> psycopg2.extensions.connection:
+    """
+    Obtém conexão com o banco de dados ERP do posto.
+    Tenta primeiramente a última porta funcional ou a configurada no .env (5433).
+    Se a conexão for recusada ou falhar (ex: serviço parado no Windows),
+    realiza fallback automático para a porta 5435 (ou vice-versa), garantindo resiliência.
+    """
+    global _last_working_erp_port
+    config = dict(DB_ERP_CONFIG)
+    configured_port = int(config.get("port", 5433))
+
+    ports_to_try = []
+    if _last_working_erp_port:
+        ports_to_try.append(_last_working_erp_port)
+    if configured_port not in ports_to_try:
+        ports_to_try.append(configured_port)
+    for alt in (5435, 5433):
+        if alt not in ports_to_try:
+            ports_to_try.append(alt)
+
+    last_err = None
+    for port in ports_to_try:
+        try_config = dict(config)
+        try_config["port"] = port
+        try_config["connect_timeout"] = timeout
+        try:
+            conn = psycopg2.connect(**try_config)
+            _last_working_erp_port = port
+            return conn
+        except Exception as e:
+            last_err = e
+            continue
+
+    raise last_err or psycopg2.OperationalError(
+        f"Não foi possível conectar ao banco ERP nas portas testadas ({ports_to_try})."
+    )
+
 
 class PostoTools:
     """Conjunto de ferramentas operacionais executáveis pelo Agente."""
@@ -32,7 +72,7 @@ class PostoTools:
             "pdv": "001",
         }
         try:
-            conn = psycopg2.connect(**DB_ERP_CONFIG)
+            conn = get_erp_connection()
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT idempresa, nome, razao_social, cnpj, endereco, numero, bairro, cidade, estado 
@@ -63,7 +103,7 @@ class PostoTools:
         dados de hoje e ranking dos mais vendidos.
         """
         try:
-            conn = psycopg2.connect(**DB_ERP_CONFIG)
+            conn = get_erp_connection()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 1. Últimos produtos vendidos na loja de conveniência (pedido + itemped)
                 cur.execute("""
@@ -230,7 +270,7 @@ class PostoTools:
         Retorna maiores estoques, estoques críticos e saldo volumétrico de cada tanque.
         """
         try:
-            conn = psycopg2.connect(**DB_ERP_CONFIG)
+            conn = get_erp_connection()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 1. Top produtos com maior estoque cadastrado
                 cur.execute("""
@@ -280,7 +320,7 @@ class PostoTools:
         Retorna clientes que mais compraram e busca específica com mascaramento LGPD.
         """
         try:
-            conn = psycopg2.connect(**DB_ERP_CONFIG)
+            conn = get_erp_connection()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 1. Ranking de compras por cliente na tabela pedido
                 cur.execute("""
@@ -462,7 +502,7 @@ class PostoTools:
         Calcula quebras, sobras, furos e divergências de pista/caixa com conformidade LGPD.
         """
         try:
-            conn = psycopg2.connect(**DB_ERP_CONFIG)
+            conn = get_erp_connection()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 1. Determinação da Data Alvo
                 data_param = self.normalizar_data(data)
@@ -1168,7 +1208,7 @@ class PostoTools:
         Conecta ao ERP PostgreSQL (porta 5433).
         """
         try:
-            conn = psycopg2.connect(**DB_ERP_CONFIG)
+            conn = get_erp_connection()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 1. Posição atual dos tanques (com fallback para produtos via codlmc)
                 cur.execute("""
@@ -1817,7 +1857,7 @@ class PostoTools:
         """
         conn = None
         try:
-            conn = psycopg2.connect(**DB_ERP_CONFIG)
+            conn = get_erp_connection()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 1. Resolução inteligente de parâmetros e filtros
                 filtro_str = (filtro or "").strip()
@@ -2443,4 +2483,492 @@ class PostoTools:
                     conn.close()
                 except Exception:
                     pass
+
+    @staticmethod
+    def categorizar_combustivel(nome: str) -> str:
+        """Categoriza o nome do combustível em grupos canônicos para relatórios operacionais."""
+        n = (nome or "").upper().strip()
+        if "ADITIVADA" in n or "GRID" in n or "V-POWER" in n or "OCTAPRO" in n or "PODIUM" in n:
+            return "GASOLINA ADITIVADA"
+        elif "COMUM" in n or "GASOLINA" in n:
+            return "GASOLINA COMUM"
+        elif "ETANOL" in n or "ALCOOL" in n or "ÁLCOOL" in n:
+            return "ETANOL"
+        elif "S10" in n or "S-10" in n:
+            return "DIESEL S10"
+        elif "S500" in n or "S-500" in n or "DIESEL" in n:
+            return "DIESEL S500"
+        elif "ARLA" in n:
+            return "ARLA"
+        return "OUTROS"
+
+    @staticmethod
+    def calcular_lmc_tanque(
+        estoque_abertura: float,
+        recebimento: float,
+        vendas: float,
+        estoque_fisico: float,
+        tolerancia_pct: float = 0.6,
+    ) -> Dict[str, Any]:
+        """
+        Cálculo do Livro de Movimentação de Combustíveis (LMC) segundo Portaria ANP nº 26/1992.
+
+        Equações Oficiais ANP:
+        1. Fechamento Escriturado:
+           E_e = E_a + R - V
+           (E_a: Estoque de abertura, R: Recebimento/Descargas, V: Vendas totais registradas nos bicos)
+
+        2. Estoque Físico:
+           E_f: Medição direta na régua milimetrada (tabela de arqueação) ou sonda de telemetria Veeder-Root.
+
+        3. Variação Volumétrica (Sobra / Falta):
+           Δ_litros = E_f - E_e
+           Δ_pct = (Δ_litros / V) * 100  (quando V > 0; se V == 0, 0.0)
+
+        4. Margem Legal de Tolerância (±0.6%):
+           |Δ_pct| <= 0.6% -> CONFORME_ANP
+           |Δ_pct| >  0.6% -> ALERTA_FORA_TOLERANCIA_ANP
+        """
+        ea = float(estoque_abertura or 0.0)
+        rec = float(recebimento or 0.0)
+        v = float(vendas or 0.0)
+        ef = float(estoque_fisico or 0.0)
+        tol_pct = float(tolerancia_pct if tolerancia_pct is not None else 0.6)
+
+        ee = round(ea + rec - v, 3)
+        var_litros = round(ef - ee, 3)
+
+        if v > 0:
+            var_pct = round((var_litros / v) * 100.0, 4)
+            tol_max_litros = round(v * (tol_pct / 100.0), 3)
+        else:
+            var_pct = 0.0
+            tol_max_litros = 0.0
+
+        if var_litros > 0.0001:
+            tipo_variacao = "ganho"
+            nome_variacao = "Sobra / Ganho Volumétrico (Dilatação / Térmico)"
+        elif var_litros < -0.0001:
+            tipo_variacao = "perda"
+            nome_variacao = "Perda / Quebra Volumétrica (Evaporação / Contração)"
+        else:
+            tipo_variacao = "nula"
+            nome_variacao = "Sem variação (Perfeito alinhamento)"
+
+        # Margem de tolerância da ANP (com epsilon 1e-7 para estabilidade numérica em exatamente 0.6%)
+        if abs(var_pct) <= (tol_pct + 1e-7):
+            status_anp = "CONFORME_ANP"
+            dentro_tolerancia = True
+            descricao_status = f"Dentro da margem de tolerância regulamentar da ANP (±{tol_pct}%)."
+        else:
+            status_anp = "ALERTA_FORA_TOLERANCIA_ANP"
+            dentro_tolerancia = False
+            descricao_status = f"FORA DA TOLERÂNCIA ANP: variação de {var_pct:+.2f}% excede a margem permitida de ±{tol_pct}%."
+
+        if status_anp == "CONFORME_ANP":
+            if tipo_variacao == "ganho":
+                diagnostico = f"Variação positiva de +{abs(var_litros):.3f} L ({var_pct:+.2f}%) dentro da tolerância de ±{tol_pct}%. Provável expansão volumétrica por temperatura."
+            elif tipo_variacao == "perda":
+                diagnostico = f"Perda volumétrica de -{abs(var_litros):.3f} L ({var_pct:+.2f}%) dentro da tolerância de ±{tol_pct}%. Provável evaporação ou contração térmica natural."
+            else:
+                diagnostico = "Estoque físico medido coincide perfeitamente com o saldo contábil escriturado."
+        else:
+            if tipo_variacao == "perda":
+                diagnostico = (
+                    f"Alerta Crítico: Perda excessiva de -{abs(var_litros):.3f} L ({var_pct:+.2f}% das vendas). "
+                    f"Supera a tolerância legal de ±{tol_pct}%. Investigar imediatamente: "
+                    f"possível vazamento no tanque ou linha de sucção, bicos entregando combustível a mais por descalibração, "
+                    f"ou erro de leitura na régua/sonda."
+                )
+            else:
+                diagnostico = (
+                    f"Alerta Crítico: Ganho volumétrico excessivo de +{abs(var_litros):.3f} L ({var_pct:+.2f}% das vendas). "
+                    f"Supera a tolerância legal de ±{tol_pct}%. Investigar imediatamente: "
+                    f"falta de registro de descarga de combustível, bicos entregando a menos por desgaste, "
+                    f"ou erro na tabela de arqueação do tanque."
+                )
+
+        return {
+            "estoque_abertura": round(ea, 3),
+            "recebimento": round(rec, 3),
+            "vendas": round(v, 3),
+            "estoque_escriturado": round(ee, 3),
+            "estoque_fisico": round(ef, 3),
+            "variacao_litros": round(var_litros, 3),
+            "variacao_pct": round(var_pct, 4),
+            "tolerancia_pct": tol_pct,
+            "tolerancia_max_litros": round(tol_max_litros, 3),
+            "dentro_tolerancia": dentro_tolerancia,
+            "status_anp": status_anp,
+            "tipo_variacao": tipo_variacao,
+            "nome_variacao": nome_variacao,
+            "descricao_status": descricao_status,
+            "diagnostico": diagnostico,
+        }
+
+    def gerar_relatorio_lmc_anp(
+        self,
+        data: Optional[str] = None,
+        combustivel: Optional[str] = None,
+        tanque: Optional[str] = None,
+        medicoes_fisicas_custom: Optional[Dict[str, float]] = None,
+        recebimentos_custom: Optional[Dict[str, float]] = None,
+        estoque_abertura_custom: Optional[Dict[str, float]] = None,
+    ) -> dict:
+        """
+        Gera o Relatório Oficial do LMC (Livro de Movimentação de Combustíveis)
+        conforme exigências da Portaria ANP nº 26/1992 e normas complementares.
+
+        Realiza a conciliação entre estoque físico (medição régua/telemetria)
+        e escriturado (abertura + recebimentos - vendas) para cada tanque,
+        auditando a margem legal de tolerância de ±0.6%.
+        """
+        conn = None
+        try:
+            conn = get_erp_connection()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # 1. Determinação da Data Alvo
+                data_param = self.normalizar_data(data)
+                aviso_data = None
+                data_alvo = None
+
+                cur.execute("SELECT CURRENT_DATE;")
+                data_hoje = cur.fetchone()['current_date']
+
+                if not data_param or data_param == "hoje":
+                    cur.execute("SELECT COUNT(*) as c FROM abastecimentos WHERE data = %s AND abt_bl_venda_cancelada IS NOT TRUE;", (data_hoje,))
+                    c_ab = cur.fetchone()['c']
+                    cur.execute("SELECT COUNT(*) as c FROM fechabomba WHERE dtmov = %s;", (data_hoje,))
+                    c_fb = cur.fetchone()['c']
+
+                    if c_ab > 0 or c_fb > 0:
+                        data_alvo = str(data_hoje)
+                    else:
+                        cur.execute("""
+                            SELECT GREATEST(
+                                (SELECT MAX(data) FROM abastecimentos WHERE abt_bl_venda_cancelada IS NOT TRUE),
+                                (SELECT MAX(dtmov) FROM fechabomba)
+                            ) as max_d;
+                        """)
+                        max_d = cur.fetchone()['max_d']
+                        if max_d:
+                            data_alvo = str(max_d)
+                            aviso_data = (
+                                f"Nenhuma movimentação registrada para hoje ({data_hoje}). "
+                                f"Exibindo LMC da data mais recente com movimentação: {data_alvo}."
+                            )
+                        else:
+                            data_alvo = str(data_hoje)
+                elif data_param == "ontem":
+                    cur.execute("SELECT (CURRENT_DATE - INTERVAL '1 day')::date as ontem;")
+                    data_alvo = str(cur.fetchone()['ontem'])
+                elif data_param == "anteontem":
+                    cur.execute("SELECT (CURRENT_DATE - INTERVAL '2 days')::date as anteontem;")
+                    data_alvo = str(cur.fetchone()['anteontem'])
+                else:
+                    data_alvo = data_param
+
+                # 2. Dados Cadastrais dos Tanques
+                cur.execute("""
+                    SELECT 
+                        TRIM(t.codtan) AS codtan,
+                        COALESCE(
+                            NULLIF(TRIM(t.prl_ds_produto_lmc), ''),
+                            NULLIF(TRIM(p.nompro), ''),
+                            'COMBUSTÍVEL ' || TRIM(t.codtan)
+                        ) AS combustivel,
+                        TRIM(t.codlmc) AS codlmc,
+                        ROUND(COALESCE(t.capacidade, 0)::numeric, 3) AS capacidade_litros,
+                        ROUND(COALESCE(t.qtdeat, 0)::numeric, 3) AS saldo_atual_litros,
+                        ROUND(COALESCE(t.qtdean, 0)::numeric, 3) AS qtdean,
+                        ROUND(COALESCE(t.iniciodia, 0)::numeric, 3) AS iniciodia,
+                        ROUND(COALESCE(t.tan_vl_quantidade_fim, 0)::numeric, 3) AS tan_vl_quantidade_fim,
+                        ROUND(COALESCE(t.volume, 0)::numeric, 3) AS volume
+                    FROM tanques t
+                    LEFT JOIN (
+                        SELECT DISTINCT ON (TRIM(codlmc)) TRIM(codlmc) AS codlmc, nompro
+                        FROM produtos
+                        WHERE codlmc IS NOT NULL AND TRIM(codlmc) != ''
+                        ORDER BY TRIM(codlmc), codpro
+                    ) p ON p.codlmc = TRIM(t.codlmc)
+                    ORDER BY t.codtan;
+                """)
+                linhas_tanques = cur.fetchall()
+
+                # 3. Mapeamento de Bicos por Tanque
+                cur.execute("""
+                    SELECT 
+                        TRIM(b.codbom) AS codbom,
+                        TRIM(b.codtan) AS codtan,
+                        TRIM(b.codpro) AS codpro
+                    FROM bombas b
+                    WHERE b.codtan IS NOT NULL;
+                """)
+                linhas_bombas = cur.fetchall()
+                bicos_por_tanque: Dict[str, List[str]] = {}
+                for rb in linhas_bombas:
+                    c_tan = rb['codtan']
+                    if c_tan:
+                        bicos_por_tanque.setdefault(c_tan, []).append(rb['codbom'])
+
+                # 4. Vendas do Dia por Tanque (abastecimentos Companytec)
+                cur.execute("""
+                    SELECT 
+                        COALESCE(TRIM(a.tanque), TRIM(b.codtan)) AS codtan,
+                        COUNT(*)::int AS total_abastecimentos,
+                        ROUND(COALESCE(SUM(a.litros), 0)::numeric, 3) AS total_litros,
+                        ROUND(COALESCE(SUM(a.total), 0)::numeric, 2) AS total_reais
+                    FROM abastecimentos a
+                    LEFT JOIN bombas b ON b.codbom = a.bomba
+                    WHERE a.data = %s AND a.abt_bl_venda_cancelada IS NOT TRUE
+                    GROUP BY COALESCE(TRIM(a.tanque), TRIM(b.codtan));
+                """, (data_alvo,))
+                vendas_abastecimentos = {r['codtan']: r for r in cur.fetchall() if r['codtan']}
+
+                # 5. Vendas por Encerrantes do Dia (fechabomba)
+                cur.execute("""
+                    SELECT 
+                        TRIM(fb.codtan) AS codtan,
+                        COUNT(*)::int AS bicos_fechados,
+                        ROUND(COALESCE(SUM(fb.qtdeaf), SUM(GREATEST(fb.enclts - fb.encltsa, 0)), 0)::numeric, 3) AS litros_encerrantes
+                    FROM fechabomba fb
+                    WHERE fb.dtmov = %s
+                    GROUP BY TRIM(fb.codtan);
+                """, (data_alvo,))
+                vendas_encerrantes = {r['codtan']: r for r in cur.fetchall() if r['codtan']}
+
+            # Helper para buscar parâmetros customizados com correspondência flexível
+            def _obter_custom(mapa: Optional[Dict[str, float]], cod_t: str, nome_c: str) -> Optional[float]:
+                if not mapa:
+                    return None
+                if cod_t in mapa:
+                    return float(mapa[cod_t])
+                try:
+                    num = int(cod_t)
+                    if str(num) in mapa:
+                        return float(mapa[str(num)])
+                    if num in mapa:
+                        return float(mapa[num])
+                except Exception:
+                    pass
+                for k, val in mapa.items():
+                    ks = str(k).strip().lower()
+                    if ks in [f"tanque {cod_t}", f"tq {cod_t}", f"tanque {int(cod_t) if cod_t.isdigit() else cod_t}", f"tq{int(cod_t) if cod_t.isdigit() else cod_t}"]:
+                        return float(val)
+                    if nome_c and ks in nome_c.lower():
+                        return float(val)
+                return None
+
+            tanques_relatorio = []
+            tanques_alerta = []
+            tot_vendas = 0.0
+            tot_rec = 0.0
+            tot_escriturado = 0.0
+            tot_fisico = 0.0
+            tot_var_litros = 0.0
+
+            # Normaliza filtros de tanque e combustível
+            tanque_filtro_pad = None
+            if tanque:
+                t_str = str(tanque).strip()
+                tanque_filtro_pad = f"{int(t_str):03d}" if t_str.isdigit() else t_str
+
+            combustivel_filtro_cat = None
+            if combustivel:
+                combustivel_filtro_cat = self.categorizar_combustivel(combustivel)
+
+            for t in linhas_tanques:
+                cod_tan = t['codtan']
+                nome_comb = t['combustivel']
+                cat_comb = self.categorizar_combustivel(nome_comb)
+
+                # Aplica filtros se especificados
+                if tanque_filtro_pad and cod_tan != tanque_filtro_pad and cod_tan.lstrip('0') != tanque_filtro_pad.lstrip('0'):
+                    continue
+
+                if combustivel_filtro_cat and combustivel_filtro_cat != "OUTROS" and cat_comb != combustivel_filtro_cat:
+                    if combustivel.strip().lower() not in nome_comb.lower():
+                        continue
+
+                # Vendas do dia (V)
+                v_abast = vendas_abastecimentos.get(cod_tan)
+                v_enc = vendas_encerrantes.get(cod_tan)
+
+                vendas_l = 0.0
+                total_reais = 0.0
+                qtd_abast = 0
+                if v_abast:
+                    vendas_l = float(v_abast['total_litros'] or 0.0)
+                    total_reais = float(v_abast['total_reais'] or 0.0)
+                    qtd_abast = int(v_abast['total_abastecimentos'] or 0)
+                elif v_enc:
+                    vendas_l = float(v_enc['litros_encerrantes'] or 0.0)
+
+                # Recebimentos / Descargas (R)
+                rec_custom = _obter_custom(recebimentos_custom, cod_tan, nome_comb)
+                recebimento_l = rec_custom if rec_custom is not None else 0.0
+
+                # Estoque de Abertura (Ea)
+                ea_custom = _obter_custom(estoque_abertura_custom, cod_tan, nome_comb)
+                if ea_custom is not None:
+                    abertura_l = ea_custom
+                else:
+                    iniciodia = float(t['iniciodia'] or 0.0)
+                    qtdean = float(t['qtdean'] or 0.0)
+                    saldo_at = float(t['saldo_atual_litros'] or 0.0)
+                    if iniciodia > 0:
+                        abertura_l = iniciodia
+                    elif qtdean > 0:
+                        abertura_l = qtdean
+                    else:
+                        calc_ea = saldo_at + vendas_l - recebimento_l
+                        abertura_l = calc_ea if calc_ea >= 0 else saldo_at
+
+                # Estoque Físico Medido (Ef)
+                ef_custom = _obter_custom(medicoes_fisicas_custom, cod_tan, nome_comb)
+                if ef_custom is not None:
+                    fisico_l = ef_custom
+                else:
+                    tan_fim = float(t['tan_vl_quantidade_fim'] or 0.0)
+                    vol = float(t['volume'] or 0.0)
+                    saldo_at = float(t['saldo_atual_litros'] or 0.0)
+                    if tan_fim > 0:
+                        fisico_l = tan_fim
+                    elif vol > 0:
+                        fisico_l = vol
+                    else:
+                        fisico_l = saldo_at
+
+                # Cálculo LMC Oficial
+                calc = self.calcular_lmc_tanque(
+                    estoque_abertura=abertura_l,
+                    recebimento=recebimento_l,
+                    vendas=vendas_l,
+                    estoque_fisico=fisico_l,
+                    tolerancia_pct=0.6,
+                )
+
+                bicos = bicos_por_tanque.get(cod_tan, [])
+
+                item_tanque = {
+                    "tanque": cod_tan,
+                    "combustivel": nome_comb,
+                    "categoria_combustivel": cat_comb,
+                    "codlmc_anp": t['codlmc'] or "N/D",
+                    "capacidade_litros": float(t['capacidade_litros'] or 0.0),
+                    "bicos_vinculados": bicos,
+                    "total_abastecimentos": qtd_abast,
+                    "faturamento_vendas_reais": total_reais,
+                    "movimentacao": {
+                        "estoque_abertura_litros": calc["estoque_abertura"],
+                        "recebimentos_descargas_litros": calc["recebimento"],
+                        "vendas_bicos_litros": calc["vendas"],
+                        "estoque_escriturado_litros": calc["estoque_escriturado"],
+                        "estoque_fisico_medido_litros": calc["estoque_fisico"],
+                    },
+                    "auditoria_anp": {
+                        "variacao_litros": calc["variacao_litros"],
+                        "variacao_pct": calc["variacao_pct"],
+                        "tolerancia_pct": calc["tolerancia_pct"],
+                        "tolerancia_max_litros": calc["tolerancia_max_litros"],
+                        "dentro_tolerancia": calc["dentro_tolerancia"],
+                        "status_anp": calc["status_anp"],
+                        "tipo_variacao": calc["tipo_variacao"],
+                        "nome_variacao": calc["nome_variacao"],
+                        "descricao_status": calc["descricao_status"],
+                        "diagnostico": calc["diagnostico"],
+                    }
+                }
+
+                tanques_relatorio.append(item_tanque)
+
+                if not calc["dentro_tolerancia"]:
+                    tanques_alerta.append({
+                        "tanque": cod_tan,
+                        "combustivel": nome_comb,
+                        "variacao_litros": calc["variacao_litros"],
+                        "variacao_pct": calc["variacao_pct"],
+                        "tolerancia_max_litros": calc["tolerancia_max_litros"],
+                        "diagnostico": calc["diagnostico"]
+                    })
+
+                tot_vendas += calc["vendas"]
+                tot_rec += calc["recebimento"]
+                tot_escriturado += calc["estoque_escriturado"]
+                tot_fisico += calc["estoque_fisico"]
+                tot_var_litros += calc["variacao_litros"]
+
+            var_geral_pct = round((tot_var_litros / tot_vendas) * 100.0, 4) if tot_vendas > 0 else 0.0
+
+            status_geral = "CONFORME_ANP" if len(tanques_alerta) == 0 else "ALERTA_FORA_TOLERANCIA_ANP"
+
+            recomendacoes = []
+            if len(tanques_alerta) > 0:
+                t_nomes = ", ".join(f"Tanque {a['tanque']} ({a['combustivel']}: {a['variacao_pct']:+.2f}%)" for a in tanques_alerta)
+                recomendacoes.append(
+                    f"Ação Imediata ANP: Foi detectada variação volumétrica fora da margem regulamentar de ±0,6% em: {t_nomes}. "
+                    f"Conforme a Portaria ANP nº 26/1992, proceder com apuração imediata das causas."
+                )
+                perdas = [a for a in tanques_alerta if a['variacao_litros'] < 0]
+                if perdas:
+                    recomendacoes.append(
+                        "Investigação de Perdas: Realizar teste de estanqueidade nos tanques com quebra volumétrica excessiva "
+                        "e aferição de bicos medidores com medida-padrão de 20 litros calibrada pelo INMETRO para descartar vazamentos ou sobre-entrega."
+                    )
+                sobras = [a for a in tanques_alerta if a['variacao_litros'] > 0]
+                if sobras:
+                    recomendacoes.append(
+                        "Investigação de Sobras: Auditar notas fiscais de entrada e registros de descarga de caminhão-tanque "
+                        "para verificar se houve descarga sem escrituração no LMC ou recalibrar a régua de medição."
+                    )
+            else:
+                recomendacoes.append(
+                    "Conformidade Regulamentar: Todos os tanques auditados operaram estritamente dentro da margem legal de tolerância de ±0,6% da Portaria ANP 26/1992."
+                )
+
+            recomendacoes.append(
+                "Guarda de Documentos: Manter os registros diários do LMC arquivados e à disposição da fiscalização da ANP e órgãos fazendários pelo prazo regulamentar de 5 anos."
+            )
+
+            resultado = {
+                "status": "ok",
+                "timestamp_geracao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "periodo_analisado": {
+                    "data_lmc": data_alvo,
+                    "aviso_data": aviso_data,
+                    "filtro_combustivel": combustivel,
+                    "filtro_tanque": tanque,
+                },
+                "resumo_executivo": {
+                    "status_geral_anp": status_geral,
+                    "total_tanques_analisados": len(tanques_relatorio),
+                    "total_tanques_conformes": len(tanques_relatorio) - len(tanques_alerta),
+                    "total_tanques_alerta": len(tanques_alerta),
+                    "total_vendas_litros": round(tot_vendas, 3),
+                    "total_recebimentos_litros": round(tot_rec, 3),
+                    "total_estoque_escriturado_litros": round(tot_escriturado, 3),
+                    "total_estoque_fisico_litros": round(tot_fisico, 3),
+                    "variacao_volumetrica_total_litros": round(tot_var_litros, 3),
+                    "variacao_volumetrica_geral_pct": var_geral_pct,
+                    "tanques_em_alerta": tanques_alerta,
+                },
+                "tanques": tanques_relatorio,
+                "recomendacoes_operacionais": recomendacoes,
+            }
+
+            resultado_limpo, _ = sanitize_dict(resultado)
+            return resultado_limpo
+
+        except Exception as e:
+            return {
+                "status": "indisponivel",
+                "motivo": f"Falha na geração do LMC Oficial da ANP no ERP (porta 5433/5435): {e}",
+            }
+        finally:
+            if conn and not conn.closed:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
 

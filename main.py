@@ -41,7 +41,7 @@ from config.settings import (
     BASE_DIR,
 )
 from core.rag_engine import HybridRAGEngine
-from core.tools import PostoTools
+from core.tools import PostoTools, get_erp_connection
 from core.sanitizer import central_log_sanitizer
 from core.semantic_router import SemanticRouter, classificar_intencao_heuristica
 
@@ -271,7 +271,7 @@ def main():
 
     while True:
         try:
-            conn = psycopg2.connect(**DB_ERP_CONFIG)
+            conn = get_erp_connection()
             conn.close()
             print("   [OK] Conectado ao ERP com sucesso.")
             # Salva a senha validada
@@ -355,6 +355,37 @@ def main():
                     print(f"📅 [FILTRO ATIVO] Data alvo: {data_p}")
                 resultado_pista = tools.auditar_desempenho_pista_frentistas(data=data_p, turno=turno_p, frentista=frent_p, bico=bico_p)
                 contexto_extra = f"Auditoria Operacional de Pista, Vazão de Bicos e Desempenho de Frentistas no ERP:\n{json.dumps(resultado_pista, ensure_ascii=False, indent=2, default=str)}\n"
+                tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
+
+            elif intencao == "lmc_anp":
+                data_p, _ = extrair_data_turno(pergunta)
+                comb_ou_tanque = extrair_combustivel(pergunta)
+                tanque_filtro = None
+                comb_filtro = None
+                if comb_ou_tanque:
+                    if comb_ou_tanque.isdigit() or (len(comb_ou_tanque) == 3 and comb_ou_tanque.isnumeric()):
+                        tanque_filtro = comb_ou_tanque
+                    else:
+                        comb_filtro = comb_ou_tanque
+                if not tanque_filtro:
+                    m_tanque = re.search(r"\b(?:tanque|tq)\s*[-_]?\s*0*([0-9]{1,3})\b", pergunta.lower())
+                    if m_tanque:
+                        tanque_filtro = f"{int(m_tanque.group(1)):03d}"
+
+                print(f"\n📋 [ROTEADOR] Intenção detectada: Livro de Movimentação de Combustíveis (LMC Oficial ANP)...")
+                if data_p:
+                    print(f"📅 [FILTRO ATIVO] Data LMC: {data_p}")
+                if tanque_filtro:
+                    print(f"⛽ [FILTRO ATIVO] Tanque LMC: {tanque_filtro}")
+                elif comb_filtro:
+                    print(f"⛽ [FILTRO ATIVO] Combustível LMC: {comb_filtro}")
+
+                resultado_lmc = tools.gerar_relatorio_lmc_anp(
+                    data=data_p,
+                    combustivel=comb_filtro,
+                    tanque=tanque_filtro
+                )
+                contexto_extra = f"Livro de Movimentação de Combustíveis (LMC ANP Portaria 26/1992):\n{json.dumps(resultado_lmc, ensure_ascii=False, indent=2, default=str)}\n"
                 tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
 
             elif intencao == "vendas_analitico":
@@ -475,6 +506,13 @@ Diretrizes:
      b) Vazão dos Bicos & Alerta Preventivo de Filtro Lento: informe o status de vazão dos bicos. Em bombas comerciais, a vazão normal é de 35 a 45 L/min. Se algum bico estiver com vazão lenta ou crítica (< 25-30 L/min), emita alerta imediato de manutenção preventiva para troca do elemento filtrante da bomba. Caso o bico não tenha tido movimentação no período ou tenha operado em estimativa nominal, esclareça com transparência.
      c) Detecção de Anomalias de Pista: reporte micro-abastecimentos suspeitos (< 1.0 L / < R$ 5), abastecimentos manuais sem automação CBC04, cancelamentos de venda, horários atípicos ou valores repetidos consecutivos.
      d) Recomendações Práticas: liste ações imediatas sugeridas para a gerência do posto.
+10. Se a pergunta for sobre Livro de Movimentação de Combustíveis (LMC Oficial ANP Portaria 26/1992), balanço escriturado vs físico ou conformidade de tolerância regulamentar (±0.6%):
+    - Apresente um parecer regulamentar e executivo claro contendo:
+      a) Status Geral ANP (CONFORME_ANP ou ALERTA_FORA_TOLERANCIA_ANP) e período analisado.
+      b) Balanço Volumétrico dos Tanques: detalhe para cada tanque o estoque de abertura (E_a), recebimentos/descargas (R), vendas faturadas nos bicos (V), estoque escriturado contábil (E_e = E_a + R - V) e estoque físico medido (E_f apurado por régua ou telemetria).
+      c) Auditoria de Variação (Δ): informe a quebra ou sobra em litros (Δ_litros = E_f - E_e) e o percentual sobre as vendas (Δ% = (Δ_litros / V) * 100), comparando rigorosamente com a margem legal de ±0.6%.
+      d) Diagnóstico Operacional: esclareça se a variação decorre de contração/expansão térmica natural dentro da tolerância ou se exige abertura imediata de sindicância para apurar vazamento em tubulações ou descalibração de bicos.
+      e) Ações Obrigatórias: instrua sobre registros diários no livro e retenção fiscal por 5 anos para fiscalização da ANP/SEFAZ.
 """
 
             print("\n🤖 AGENTE (Streaming):\n")

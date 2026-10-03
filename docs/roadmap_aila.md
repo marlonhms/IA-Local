@@ -1,8 +1,8 @@
 # 🚀 Roadmap Estratégico & Engenharia de Execução: Projeto Ai.la
 
 **Projeto:** Ai.la — IA Local Especialista em Postos de Combustíveis e PDV  
-**Versão:** 1.5.0-PRO  
-**Status Atual:** MVP Local de Nó Único Consolidado (Fases 1, 2, 6.1 e 6.2 Homologadas + Sugestão 1: Roteador Semântico Vetorial pgvector e Sugestão 2: Otimização RAG CDC Delta Hash & RRF Calibrado Concluídas com 100% de Aprovação)  
+**Versão:** 1.6.0-PRO  
+**Status Atual:** MVP Local de Nó Único Consolidado (Fases 1, 2, 6.1, 6.2 e 6.3: LMC Oficial ANP Homologadas + Sugestão 1: Roteador Semântico Vetorial pgvector e Sugestão 2: Otimização RAG CDC Delta Hash & RRF Calibrado Concluídas com 100% de Aprovação)  
 **Próximas Frentes:** Fase 2.5 (Esteira de Deploy Automatizado & Onboarding Multi-Posto) $\rightarrow$ Fase 3 (MCP + LangGraph) $\rightarrow$ Fase 3.5 (RAG Hierárquico Multi-Filial & MapReduce)  
 **Ambiente:** Edge AI Local (Postos) + Maestro Central de Gestão/Telemetria | Docker + PostgreSQL 16 (Portas 5432/5433, 5434, 5678)  
 
@@ -429,8 +429,12 @@ flowchart TD
 - [ ] **Auditoria Fiscal Contínua com `Agent Sefaz`:**
   - Cruzamento de cada cupom fiscal emitido (NFC-e) contra o cadastro de NCM/CEST e regras da Reforma Tributária (IBS/CBS).
   - Alerta de produtos cadastrados com tributação incorreta que estejam gerando pagamento a maior ou a menor de impostos.
-- [ ] **Automação do LMC (Livro de Movimentação de Combustíveis):**
-  - Geração prévia dos relatórios exigidos pela ANP com 100% de consistência entre estoque de abertura, descargas, vendas e estoque de fechamento.
+- [x] **Automação do LMC (Livro de Movimentação de Combustíveis - Concluído ✅):**
+  - **Normativa e Balanço Oficial:** Conciliação estrita entre estoque físico ($E_f$, régua milimetrada/sonda Veeder-Root) e estoque escriturado contábil ($E_e = E_a + R - V$) segundo a Portaria ANP nº 26/1992 e resoluções vigentes.
+  - **Margem de Tolerância Regulamentar (±0.6%):** Auditoria volumétrica automática por tanque ($\Delta_{\text{litros}} = E_f - E_e$, $\Delta\% = (\Delta / V) \times 100$). Classificação automática entre `CONFORME_ANP` e `ALERTA_FORA_TOLERANCIA_ANP`, com diagnóstico operacional preventivo para quebras (evaporação vs vazamento em linha/tanque ou bico descalibrado) e sobras (expansão térmica vs falta de escrituração de descarga).
+  - **Ferramentas e Arquitetura:** Implementação do método `PostoTools.gerar_relatorio_lmc_anp()` e método estático `PostoTools.calcular_lmc_tanque()` em `core/tools.py`, com conexão resiliente `get_erp_connection()` com fallback automático de portas (5433/5435) e blindagem LGPD via `sanitize_dict`.
+  - **Roteamento Semântico Canônico:** 10ª intenção canônica (`lmc_anp`) indexada com halfvec(768) em `intencoes_vetores` no pgvector e regras determinísticas em `core/semantic_router.py` e `main.py`.
+  - **Suíte de Testes Automatizada:** Script `scripts/test_lmc_anp.py` com cobertura de 100% (classificação de intenções, não-regressão, extração de parâmetros, limites de borda ±0.6%, zero vendas, alertas regulamentares e integração ERP).
 
 ---
 

@@ -478,6 +478,46 @@ $$
 
 ---
 
+#### D. Automação do LMC Oficial da ANP (Portaria ANP nº 26/1992)
+Auditoria volumétrica diária obrigatória por tanque, conciliando estoque físico de réguas/sondas contra a escrituração contábil:
+
+* **Fechamento Escriturado Contábil ($E_e$):**
+
+$$
+E_e = E_a + R - V
+$$
+
+Onde:
+- $E_a$: Estoque de Abertura apurado no início do dia (L).
+- $R$: Recebimentos e descargas de combustível por notas fiscais de compra (L).
+- $V$: Vendas totais faturadas e registradas nos bicos no dia (L).
+- $E_e$: Estoque Escriturado Contábil no encerramento do dia (L).
+
+* **Estoque Físico Medido ($E_f$):**
+Medição diária realizada em régua milimetrada (convertida via tabela oficial de arqueação volumétrica do tanque) ou sonda eletrônica de telemetria Veeder-Root.
+
+* **Variação Volumétrica Absoluta ($\Delta_{\text{litros}}$) e Percentual ($\Delta_{\text{pct}}$):**
+
+$$
+\Delta_{\text{litros}} = E_f - E_e
+$$
+
+$$
+\Delta_{\text{pct}} = \left(\frac{\Delta_{\text{litros}}}{V}\right) \times 100 \quad (\text{para } V > 0)
+$$
+
+* **Margem Legal de Tolerância Regulamentar ($\pm 0.6\%$):**
+
+$$
+\text{Status ANP} = \begin{cases} \text{CONFORME\_ANP}, & \text{se } |\Delta_{\text{pct}}| \le 0.6\% \\ \text{ALERTA\_FORA\_TOLERANCIA\_ANP}, & \text{se } |\Delta_{\text{pct}}| > 0.6\% \end{cases}
+$$
+
+* **Diagnóstico Operacional Preventivo:**
+  * **Sobra Volumétrica ($\Delta_{\text{litros}} > 0$):** Se $\le 0.6\%$, expansão volumétrica natural por dilatação térmica; se $> 0.6\%$, alerta para erro de lançamento de descarga de caminhão-tanque ou bicos entregando combustível a menos por desgaste mecânico.
+  * **Perda Volumétrica ($\Delta_{\text{litros}} < 0$):** Se $\ge -0.6\%$, quebra natural por evaporação e contração térmica; se $< -0.6\%$, alerta crítico para teste imediato de estanqueidade em tanques e tubulações (risco ambiental de contaminação) e aferição de bicos medidores com medida-padrão de 20 L calibrada pelo INMETRO.
+
+---
+
 #### E. Concatenação de Anomalias de Pista e Defesa Contra Fraudes
 Cruzamento temporal e relacional para identificação de irregularidades operacionais:
 
@@ -661,7 +701,14 @@ python scripts/test_semantic_router.py
 ```
 *Resultado: **100% dos testes aprovados**.*
 
-### 7. Benchmark de Recuperação Vetorial
+### 7. Testes de Automação do LMC Oficial da ANP (Fase 6.3)
+Valida classificação da 10ª intenção `lmc_anp` (heurística e pgvector), não-regressão das 9 rotas anteriores, extração de parâmetros de data/tanque/combustível, fórmulas de fechamento escriturado, cálculo de variações volumétricas nos limites de borda exatos $\pm 0.6\%$, tratamento de zero vendas sem ZeroDivisionError, injeção de descargas customizadas e simulação de alertas regulamentares com recomendações de estanqueidade:
+```powershell
+python scripts/test_lmc_anp.py
+```
+*Resultado: **100% dos testes aprovados**.*
+
+### 8. Benchmark de Recuperação Vetorial
 Executa comparativo de latência e qualidade entre Busca Densa Pura (HNSW), Busca Esparsa Pura (GIN) e a Fusão Híbrida (RRF):
 ```powershell
 python scripts/benchmark_rag.py
@@ -680,12 +727,13 @@ O desenvolvimento do **Ai.la** segue um cronograma rigoroso de engenharia focado
 | **Fase 2** | **Motor de Conciliação de Turnos & Pista** | ✅ Concluída | Triangulação `fechabomba` $\leftrightarrow$ `fechacaixa` $\leftrightarrow$ CBC04, rollover, ANP $\pm 0.6\%$. |
 | **Fase 6.1** | **Previsão de Esgotamento de Tanques (Run-Out)** | ✅ Concluída | Autonomia em horas/dias, projeção de estoque zero, espaço de descarga (*ullage*), compra em múltiplos de 5.000 L. |
 | **Fase 6.2** | **Auditoria de Pista & Desempenho de Frentistas** | ✅ Concluída | Vazão hidráulica (L/min) com alerta de filtro sujo, conversão de aditivada $\ge 25\%$, anomalias de pista. |
+| **Fase 6.3** | **Automação do LMC Oficial da ANP (Portaria 26/1992)** | ✅ Concluída | Balanço escriturado vs físico, tolerância $\pm 0.6\%$, diagnóstico de quebras/sobras, 10ª rota semântica. |
 | **Fase 2.5** | **Esteira de Deploy Automatizado & Onboarding** | 🚀 Próxima | `docker-compose.yml`, `scripts/deploy_posto.ps1` (1-clique), validação de portas. |
 | **Fase 3** | **Desacoplamento MCP & LangGraph Local** | 🔌 Próxima | Servidor MCP Python local, FastAPI assíncrono (SSE streaming), StateGraph local. |
 | **Fase 3.5** | **Escalabilidade Multi-Filial (RAG Hierárquico MapReduce)** | 🌐 Planejada | Maestro Fan-Out assíncrono (`asyncio`), Edge Workers Docker (JSON Pydantic), resiliência 5s e Síntese Executiva LLM. |
 | **Fase 4** | **Canal WhatsApp & Notificações Proativas** | 📱 Planejada | n8n + Evolution API, relatórios automáticos pós-turno (06h, 14h, 22h), áudio/voz. |
 | **Fase 5** | **Dashboard Web & PWA Mobile** | 💻 Planejada | Painel gerencial responsivo, visão gráfica dos tanques, monitor de frentistas em tempo real. |
-| **Fase 6.3+** | **Módulo Fiscal Avançado (Agent SEFAZ & LMC)** | 📈 Planejada | Auditoria de NFC-e com Reforma Tributária e geração automatizada de LMC ANP. |
+| **Fase 6.4+** | **Módulo Fiscal Avançado (Agent SEFAZ)** | 📈 Planejada | Auditoria contínua de NFC-e com Reforma Tributária (IBS/CBS) e conformidade NCM/CEST. |
 
 > *Para o detalhamento arquitetural completo, especificações e matriz de priorização, consulte o documento oficial [`docs/roadmap_aila.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap_aila.md).*
 

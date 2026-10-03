@@ -28,8 +28,28 @@ from config.settings import (
 
 logger = logging.getLogger("SemanticRouter")
 
-# Catálogo canônico das 9 intenções operacionais do sistema
+# Catálogo canônico das 10 intenções operacionais do sistema
 INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
+    "lmc_anp": {
+        "descricao": "Livro de Movimentação de Combustíveis (LMC Oficial ANP Portaria 26/1992), balanço escriturado vs físico e tolerância de ±0.6%",
+        "exemplos": [
+            "Gerar relatório do LMC da ANP",
+            "Como está o LMC de hoje?",
+            "Relatório do Livro de Movimentação de Combustíveis",
+            "Auditoria do LMC e tolerância de 0,6% da ANP",
+            "Qual a variação volumétrica dos tanques no LMC?",
+            "Teve perda térmica ou ganho volumétrico acima de 0.6%?",
+            "Verificar estoque escriturado e estoque físico no LMC",
+            "Como ficou o LMC do dia 02/09/2026?",
+            "Relatório LMC da Gasolina Comum",
+            "LMC do tanque 1 está dentro da margem da ANP?",
+            "Os tanques estão em conformidade com a tolerância da ANP?",
+            "Conferência do Livro de Movimentação de Combustíveis Portaria 26",
+            "Extrato do LMC com perdas e sobras volumétricas",
+            "Teve tanque fora da tolerância de 0,6% no LMC?",
+            "Fechamento escriturado do LMC de ontem",
+        ]
+    },
     "auditoria_turno": {
         "descricao": "Auditoria de fechamento de turno, conciliação de pista e caixa, furos e quebras",
         "exemplos": [
@@ -179,6 +199,32 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     Usado como fallback ultrarrápido (sub-milissegundo) para o roteador semântico.
     """
     p = pergunta.lower()
+
+    # -1. Livro de Movimentação de Combustíveis (LMC Oficial ANP Portaria 26/1992)
+    termos_lmc_exatos = [
+        "lmc", "livro de movimentação", "livro de movimentacao", "livro de combustíveis",
+        "livro de combustiveis", "livro fiscal anp", "portaria anp", "portaria 26",
+        "portaria 26/1992", "tolerância da anp", "tolerancia da anp", "tolerância anp",
+        "tolerancia anp", "margem da anp", "margem anp", "0.6%", "0,6%", "0.6 por cento",
+        "0,6 por cento", "estoque escriturado", "fechamento escriturado",
+        "variação volumétrica", "variacao volumetrica", "perda volumétrica", "perda volumetrica",
+        "quebra volumétrica", "quebra volumetrica", "ganho volumétrico", "ganho volumetrico",
+        "sobra volumétrica", "sobra volumetrica", "perda térmica", "perda termica",
+        "ganho térmico", "ganho termico", "conformidade anp", "tolerância regulamentar",
+        "tolerancia regulamentar"
+    ]
+    if any(t in p for t in termos_lmc_exatos):
+        return "lmc_anp"
+
+    if re.search(r"\blmc\b", p):
+        return "lmc_anp"
+
+    if "anp" in p and any(w in p for w in [
+        "livro", "tolerância", "tolerancia", "tanque", "tanques", "combustível", "combustivel",
+        "perda", "sobra", "variação", "variacao", "conformidade", "fiscal", "0.6", "0,6", "margem",
+        "quebra", "ganho", "regulamentar"
+    ]):
+        return "lmc_anp"
 
     # 0. Conciliação de Turnos & Auditoria de Pista
     termos_auditoria_exatos = [
@@ -485,20 +531,32 @@ class SemanticRouter:
 
         total_inseridos = 0
         exemplos_lote = []
-        for intencao, dados in INTENT_EXEMPLARS.items():
+
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                if force:
+                    cur.execute("TRUNCATE TABLE intencoes_vetores RESTART IDENTITY;")
+                    conn.commit()
+                    intents_to_seed = INTENT_EXEMPLARS
+                else:
+                    cur.execute("SELECT DISTINCT intencao FROM intencoes_vetores WHERE embedding IS NOT NULL;")
+                    existing_intents = {r[0] for r in cur.fetchall()}
+                    intents_to_seed = {k: v for k, v in INTENT_EXEMPLARS.items() if k not in existing_intents}
+
+        if not intents_to_seed:
+            return current_count
+
+        for intencao, dados in intents_to_seed.items():
             desc = dados["descricao"]
             for frase in dados["exemplos"]:
                 exemplos_lote.append((intencao, desc, frase))
 
-        logger.info(f"Gerando embeddings para {len(exemplos_lote)} frases de intenções...")
+        logger.info(f"Gerando embeddings para {len(exemplos_lote)} frases de intenções ({list(intents_to_seed.keys())})...")
 
         # Gera embeddings em lotes para respeitar limites da API
         batch_size = 20
         with self._get_connection() as conn:
             with conn.cursor() as cur:
-                if force:
-                    cur.execute("TRUNCATE TABLE intencoes_vetores RESTART IDENTITY;")
-
                 for i in range(0, len(exemplos_lote), batch_size):
                     chunk = exemplos_lote[i:i + batch_size]
                     textos = [f"Intenção: {item[0]} | Pergunta Típica: {item[2]}" for item in chunk]
