@@ -62,12 +62,12 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="font-display-title font-bold text-lg tracking-wider text-white">AURA</span>
-              <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-auraPurple/20 text-auraPurple-light border border-auraPurple/40">
-                v1.0 HEADLESS
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-auraEmerald/20 text-auraEmerald-light border border-auraEmerald/40">
+                ASSISTENTE DE PRONTIDÃO
               </span>
             </div>
             <div id="hud-filial-name" class="text-xs text-slate-400 font-mono">
-              Carregando filial...
+              Gerente Supervisora do Posto & PDV
             </div>
           </div>
         </div>
@@ -124,7 +124,12 @@
     <!-- Barra de Abas de Navegação -->
     <div class="max-w-7xl mx-auto mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between overflow-x-auto">
       <div class="flex items-center gap-1">
-        <button class="nav-tab-btn tab-cockpit active" data-tab="cockpit">
+        <button class="nav-tab-btn tab-console active" data-tab="console">
+          <i data-lucide="terminal" class="w-4 h-4"></i>
+          <span>Console Cognitivo</span>
+        </button>
+
+        <button class="nav-tab-btn tab-cockpit" data-tab="cockpit">
           <i data-lucide="gauge" class="w-4 h-4"></i>
           <span>Cockpit Operacional</span>
         </button>
@@ -132,11 +137,6 @@
         <button class="nav-tab-btn tab-triggers" data-tab="triggers">
           <i data-lucide="zap" class="w-4 h-4"></i>
           <span>Radar 1-Clique (11)</span>
-        </button>
-
-        <button class="nav-tab-btn tab-console" data-tab="console">
-          <i data-lucide="terminal" class="w-4 h-4"></i>
-          <span>Console Cognitivo</span>
         </button>
 
         <button class="nav-tab-btn tab-split" data-tab="split">
@@ -159,7 +159,7 @@
     <!-- =======================================================================
          VIEW 1: COCKPIT OPERACIONAL (PISTA, TANQUES, TURNO & BICOS)
          ======================================================================= -->
-    <div id="view-cockpit" class="space-y-6 animate-fade-in">
+    <div id="view-cockpit" class="space-y-6 hidden animate-fade-in">
       
       <!-- Banner Resumo Executivo da Pista -->
       <div class="glass-panel p-4 border-l-4 border-l-auraEmerald bg-gradient-to-r from-auraEmerald/5 via-slateSurface to-transparent">
@@ -464,15 +464,15 @@
 
 
     <!-- =======================================================================
-         VIEW 3: CONSOLE COGNITIVO AURA (STREAMING SSE TOKEN-A-TOKEN)
+         VIEW 3: CONSOLE COGNITIVO AURA (MOBILE-FIRST COGNITIVE ASSISTANT WORKSPACE)
          ======================================================================= -->
-    <div id="view-console" class="space-y-4 hidden animate-fade-in flex flex-col h-[calc(100vh-140px)]">
+    <div id="view-console" class="space-y-4 animate-fade-in flex flex-col h-[calc(100vh-140px)]">
       
       <!-- Topo do Console: Status da Sessão e Blindagem LGPD -->
       <div class="glass-panel px-4 py-2.5 flex items-center justify-between border-auraPurple/30">
         <div class="flex items-center gap-3">
           <div class="w-3 h-3 rounded-full bg-auraEmerald animate-pulse"></div>
-          <span class="font-bold text-sm text-slate-100 font-mono">Terminal Cognitivo AURA</span>
+          <span class="font-bold text-sm text-slate-100 font-mono">Terminal Cognitivo AURA // Assistente de Prontidão</span>
           <span id="chat-session-badge" class="px-2 py-0.5 rounded text-[11px] font-mono bg-slate-800 text-slate-300 border border-slate-700">
             Sessão Ativa
           </span>
@@ -496,26 +496,29 @@
         <!-- Mensagens inseridas dinamicamente via aura-chat.js -->
       </div>
 
-      <!-- Drawer de Sugestões de Prompts Rápidos -->
-      <div class="flex flex-wrap items-center gap-1.5 font-mono text-[11px]">
-        <span class="text-slate-500 mr-1">Sugestões Rápidas:</span>
-        <button onclick="window.auraChat.sendUserPrompt('Quando vai acabar a Gasolina Comum?')" class="px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors">
-          ⛽ Run-Out Gasolina
+      <!-- Barra de Sugestões de Perguntas Rápidas (Mobile-First 1-Touch) -->
+      <div class="quick-prompts-bar">
+        <span class="text-slate-500 font-mono text-[11px] px-1 flex-shrink-0">⚡ Decisão Rápida:</span>
+        <button onclick="window.auraChat.sendUserPrompt('Como fechou o turno da manhã?')" class="quick-prompt-chip">
+          💰 Como fechou o turno da manhã?
         </button>
-        <button onclick="window.auraChat.sendUserPrompt('Qual o status do LMC da ANP de hoje?')" class="px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors">
+        <button onclick="window.auraChat.sendUserPrompt('Qual a autonomia da gasolina comum?')" class="quick-prompt-chip">
+          ⛽ Qual a autonomia da gasolina comum?
+        </button>
+        <button onclick="window.auraChat.sendUserPrompt('Teve furo no caixa?')" class="quick-prompt-chip">
+          🚨 Teve furo no caixa?
+        </button>
+        <button onclick="window.auraChat.sendUserPrompt('Combos para vender mais Heineken?')" class="quick-prompt-chip">
+          🛒 Combos para vender mais Heineken?
+        </button>
+        <button onclick="window.auraChat.sendUserPrompt('Qual o status do LMC da ANP de hoje?')" class="quick-prompt-chip">
           📋 LMC ANP Oficial
         </button>
-        <button onclick="window.auraChat.sendUserPrompt('Como está a conciliação do turno atual?')" class="px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors">
-          💰 Conciliação de Turno
+        <button onclick="window.auraChat.sendUserPrompt('Há algum bico com vazão lenta ou alerta?')" class="quick-prompt-chip">
+          ⚠️ Alerta Vazão Bicos
         </button>
-        <button onclick="window.auraChat.sendUserPrompt('Quais os combos com maior lift na conveniência?')" class="px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors">
-          🛒 Combos da Loja
-        </button>
-        <button onclick="window.auraChat.sendUserPrompt('Quem vendeu mais gasolina aditivada?')" class="px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors">
+        <button onclick="window.auraChat.sendUserPrompt('Quem vendeu mais gasolina aditivada?')" class="quick-prompt-chip">
           🏆 Frentistas Aditivada
-        </button>
-        <button onclick="window.auraChat.sendUserPrompt('Há algum bico com vazão lenta ou alerta?')" class="px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors">
-          ⚠️ Alerta de Vazão Bicos
         </button>
       </div>
 
@@ -524,7 +527,7 @@
         <textarea 
           id="chat-input-text" 
           rows="1"
-          placeholder="Pergunte à AURA sobre a operação do posto, estoques, tanques, frentistas ou vendas..."
+          placeholder="Tirou o celular do bolso? Pergunte à AURA sobre tanques, fechamento de turno, furos de caixa ou conveniência..."
           class="flex-1 bg-transparent px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none resize-none font-sans"
         ></textarea>
 

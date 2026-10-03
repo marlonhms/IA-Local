@@ -611,3 +611,282 @@ body {
   .xl\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
+/* ==========================================================================
+   WIDGETS INLINE INTERATIVOS DA AURA (CHAT COGNITIVO SOB DEMANDA)
+   Visual limpo, executivo, focado em suporte à decisão rápida no celular.
+   ========================================================================== */
+
+.widget-inline-container {
+  background: rgba(10, 16, 28, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+}
+
+.widget-inline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* --- Widget 1: Tanques e Autonomia (Run-Out Forecast) --- */
+.widget-tank-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+
+.widget-tank-track {
+  width: 100%;
+  height: 10px;
+  background: rgba(30, 41, 59, 0.8);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 6px;
+  margin-bottom: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
+}
+
+.widget-tank-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.widget-tank-fill.critical {
+  background: linear-gradient(90deg, #f43f5e, #e11d48);
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.4);
+}
+
+.widget-tank-fill.warning {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+}
+
+.widget-tank-fill.normal {
+  background: linear-gradient(90deg, #10b981, #059669);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+}
+
+/* --- Widget 2: Régua Visual da ANP [-0.6% a +0.6%] --- */
+.widget-anp-ruler-container {
+  padding: 8px 4px;
+  background: rgba(15, 23, 42, 0.7);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.widget-anp-track {
+  position: relative;
+  width: 100%;
+  height: 16px;
+  background: linear-gradient(90deg, 
+    rgba(244, 63, 94, 0.35) 0%, 
+    rgba(244, 63, 94, 0.15) 20%, 
+    rgba(16, 185, 129, 0.25) 25%, 
+    rgba(16, 185, 129, 0.4) 50%, 
+    rgba(16, 185, 129, 0.25) 75%, 
+    rgba(244, 63, 94, 0.15) 80%, 
+    rgba(244, 63, 94, 0.35) 100%
+  );
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  margin-top: 14px;
+  margin-bottom: 6px;
+}
+
+.widget-anp-safezone-mark {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 50%;
+  left: 25%;
+  border-left: 1px dashed rgba(16, 185, 129, 0.6);
+  border-right: 1px dashed rgba(16, 185, 129, 0.6);
+  pointer-events: none;
+}
+
+.widget-anp-needle {
+  position: absolute;
+  top: -6px;
+  width: 14px;
+  height: 28px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: left 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 10;
+}
+
+.widget-anp-needle-pin {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.widget-anp-needle-line {
+  width: 2px;
+  height: 16px;
+  background: currentColor;
+}
+
+/* --- Widget 3: Conciliação de Turno & Furo de Caixa --- */
+.widget-turno-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.widget-turno-cell {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+/* --- Widget 4: Cards de Combos de Conveniência (Market Basket) --- */
+.widget-combo-card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.widget-combo-card:hover {
+  border-color: rgba(168, 85, 247, 0.5);
+  transform: translateY(-1px);
+}
+
+.widget-combo-script-box {
+  background: rgba(10, 14, 23, 0.9);
+  border-left: 3px solid #a855f7;
+  padding: 8px 10px;
+  border-radius: 0 6px 6px 0;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: #e2e8f0;
+}
+
+/* --- Botões de Ação de Decisão Rápida nos Widgets --- */
+.widget-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.widget-action-btn:hover {
+  background: rgba(51, 65, 85, 0.9);
+  border-color: var(--cyan-main);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.widget-action-btn:active {
+  transform: translateY(0);
+}
+
+.widget-action-btn.emerald {
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+.widget-action-btn.emerald:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+}
+
+.widget-action-btn.purple {
+  border-color: rgba(124, 58, 237, 0.4);
+  color: #c084fc;
+}
+.widget-action-btn.purple:hover {
+  background: rgba(124, 58, 237, 0.2);
+  border-color: #a855f7;
+}
+
+/* Barra de Sugestões de Perguntas Rápidas Touch-Friendly (Mobile-First) */
+.quick-prompts-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 6px 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.quick-prompts-bar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.quick-prompt-chip {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.quick-prompt-chip:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: var(--cyan-main);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.quick-prompt-chip:active {
+  transform: translateY(0);
+}
+
+/* Otimização Mobile para o Workspace do Chat */
+@media (max-width: 640px) {
+  .chat-bubble-aura {
+    max-width: 100% !important;
+  }
+  .chat-bubble-user {
+    max-width: 90% !important;
+  }
+  .widget-inline-container {
+    padding: 10px 8px;
+  }
+}
+
+

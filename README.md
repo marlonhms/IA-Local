@@ -28,17 +28,31 @@
 
 ---
 
-## 📌 Visão Geral do Produto
+## 📌 Visão Geral do Produto: AURA (Assistente de Prontidão)
 
-O **Ai.la** é uma solução de **Edge AI de altíssima performance** desenvolvida especificamente para a realidade operacional de postos de combustíveis e lojas de conveniência no Brasil. 
+A **AURA** (antigo Ai.la) é a **Assistente de Prontidão Executiva e Gerente Supervisora de Postos de Combustíveis e Lojas de Conveniência**, com foco absoluto em **chat inteligente sob demanda e suporte à tomada de decisão rápida**.
+
+> 💡 **Conceito de Uso ("Mobile-First On-Demand"):**  
+> *"Tirou o celular do bolso na correria da pista ou da retaguarda, precisou de uma tomada de decisão rápida, perguntou pra AURA, a AURA iluminou com diagnósticos diretos, insights visuais/gráficos inline e cálculos matemáticos comprovados, e o gestor tomou a decisão na hora."*
+
+### 🧭 Demarcação Tática: AURA vs ERP vs SENTINEL
+* **Não é um ERP nem dashboard estático de telas:** O posto já possui ERP legado consolidado para telas e relatórios estáticos. A AURA consulta e calcula sob demanda.
+* **Não é um painel SRE de TI:** O **Sentinel** já cuida da engenharia de confiabilidade de TI e infraestrutura de forma autônoma.
+* **AURA é a Gerente Supervisora do Posto:** Foco total no **negócio, faturamento, estoques, tanques, quebras de caixa, conformidade ANP e loja de conveniência**, com anatomia executiva de resposta em 3 passos:
+  1. **🚨 Diagnóstico Direto no Topo** (1 linha com status e ícone claro);
+  2. **🔢 Números e Cálculos Comprovados** (litros, faturamento R$, quebras, comparativos matemáticos);
+  3. **👉 Ação Recomendada para Decisão** (o que o gestor deve fazer imediatamente).
 
 Construído sobre o princípio inegociável de que **o posto não pode parar e nenhum dado de cliente ou faturamento pode vazar**, o sistema executa inferência híbrida na borda local, integrando o banco transacional legado do posto (**ERP em PostgreSQL 9.5 a 16**) a um mecanismo de banco vetorial (**PostgreSQL 16 com `pgvector`**) e aos modelos de última geração **Google Gemini (3.1 Flash / 768d Embeddings)**.
 
-Com processamento local e sanitização de dados em tempo de execução, o Ai.la entrega:
+Com processamento local, sanitização LGPD em tempo de execução e interface Mobile-First, a AURA entrega:
 1. **Auditoria de Pista e Fechamento de Turno em Segundos** com conciliação automática de encerrantes físicos, automação de bombas **Companytec CBC04**, aferições, quebras/sobras de caixa e regras de conformidade da **ANP (Agência Nacional do Petróleo)**.
-2. **Busca Semântica & Lexical Híbrida (HNSW + GIN FTS + RRF)** no catálogo de conveniência e lubrificantes, resolvendo linguagem natural coloquial do frentista/gerente com tolerância a erros e resposta em menos de 80ms.
-3. **Blindagem LGPD & OWASP GenAI 2026** com expurgo estrito de 24 categorias de PII (CPFs validados, placas Mercosul, cartões TEF, telefones, chaves SEFAZ) antes de qualquer interação externa.
-4. **Custo de Nuvem Quase Zero** através de cache semântico com vetor de meia precisão (`halfvec`) e execução 100% on-premises no hardware existente do posto.
+2. **Previsão de Esgotamento de Tanques (Run-Out Forecast)** com autonomia em horas, espaço livre (ullage) e sugestão de compras em múltiplos de compartimento de carreta (5k/10k/15k).
+3. **Livro de Movimentação de Combustíveis (LMC Oficial ANP Portaria 26/1992)** com régua visual de tolerância ($\pm 0.6\%$) e balanço volumétrico.
+4. **Inteligência de Vendas Cruzadas na Conveniência (Market Basket Analysis)** com identificação de combos, cálculo de Lift/Confiança e scripts persuasivos de balcão para os caixas.
+5. **Busca Semântica & Lexical Híbrida (HNSW + GIN FTS + RRF)** no catálogo de conveniência e lubrificantes (<80ms).
+6. **Blindagem LGPD & OWASP GenAI 2026** com expurgo estrito de 24 categorias de PII antes de qualquer interação externa.
+7. **Custo de Nuvem Quase Zero** através de cache semântico com vetor de meia precisão (`halfvec`) e execução on-premises.
 
 ---
 

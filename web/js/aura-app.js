@@ -88,7 +88,7 @@ function applyIconsFallback() {
 
 class AuraApp {
   constructor() {
-    this.currentTab = 'cockpit';
+    this.currentTab = 'console';
     this.autoRefreshInterval = 30; // segundos
     this.refreshTimer = null;
     this.countdownSeconds = 30;
@@ -103,6 +103,9 @@ class AuraApp {
     window.auraCockpit.init();
     window.auraTriggers.renderGrid();
     window.auraChat.init();
+
+    // Inicia diretamente no Console Cognitivo (Mobile-First Workspace)
+    this.switchTab('console');
 
     applyIconsFallback();
   }

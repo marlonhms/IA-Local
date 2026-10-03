@@ -47,22 +47,27 @@ flowchart TB
 
 ---
 
-### 🛡️ 1.1 Princípio Arquitetural de Desacoplamento: AURA vs SENTINEL
+### 🛡️ 1.1 Princípio Arquitetural de Desacoplamento: AURA (Assistente de Prontidão) vs SENTINEL (SRE de TI)
 
-O ecossistema adota uma separação de domínios estrita e intencional: **duas inteligências autônomas, zero acoplamento de backend, reaproveitamento estratégico de frontend.**
+O ecossistema adota uma separação de domínios estrita e intencional: **duas inteligências autônomas, zero acoplamento de backend, papéis táticos distintos e complementares.**
 
 1. **AURA (Autonomous Unified Retail Assistant):**
-   - **Domínio:** Especialista exclusivo no **negócio** de postos de combustíveis e lojas de conveniência.
-   - **Responsabilidades:** Auditoria contábil de turnos, conciliação de encerrantes (`fechabomba` $\leftrightarrow$ `fechacaixa` $\leftrightarrow$ Companytec CBC04), previsão de esgotamento de tanques (*run-out*), conformidade do LMC da ANP ($\pm 0.6\%$), auditoria de vazão de bicos/frentistas e inteligência de vendas cruzadas da conveniência (*Market Basket Analysis*).
-   - **Arquitetura:** Processo autônomo e desacoplado operando via `AuraEngine` (`core/aura_engine.py`) e servido por sua própria API FastAPI assíncrona (`core/aura_api.py`).
+   - **Posicionamento Definitivo:** **Assistente de Prontidão Executiva & Gerente Supervisora do Posto e PDV**.
+   - **Conceito de Uso ("Mobile-First On-Demand"):** *"Tirou o celular do bolso na correria da pista ou da retaguarda, precisou de uma tomada de decisão rápida, perguntou pra AURA, a AURA iluminou com insights visuais/gráficos inline e cálculos matemáticos, e o gestor tomou a decisão com segurança."*
+   - **Não é um Painel SRE nem Dashboard Estático:** O cliente já possui ERP legado consolidado para telas e relatórios estáticos de retaguarda. A AURA não concorre com o ERP nem atua como monitor de infraestrutura de TI passivo; seu foco é o **chat inteligente sob demanda, com widgets visuais inline e suporte à decisão rápida**.
+   - **Anatomia Executiva de Resposta (Padrão 3 Passos):**
+     1. *Diagnóstico Direto no Topo:* Resposta direta em 1 linha com veredito operacional (ex: *"🚨 Atenção: Tanque 1 de Gasolina Comum crítico com 14h de autonomia"*).
+     2. *Números e Cálculos Comprovados:* Dados matemáticos reais do ERP (litros, faturamento R$, quebras, conformidade ANP).
+     3. *Ação Recomendada:* Decisão sugerida imediatamente para o gestor bater o martelo.
+   - **Arquitetura:** Processo autônomo e desacoplado operando via `AuraEngine` (`core/aura_engine.py`) e servido por sua própria API FastAPI assíncrona (`core/aura_api.py`), com interface web Mobile-First e widgets interativos.
 
 2. **SENTINEL (N3 Agent Hub):**
-   - **Domínio:** Especialista exclusivo na **engenharia de confiabilidade de TI** (SRE, suporte N3, incidentes de PDV travado, conectividade de autorizadores fiscais e concentradores).
+   - **Domínio:** Especialista exclusivo na **engenharia de confiabilidade de TI (SRE)** (suporte N3 autônomo, incidentes de PDV travado, conectividade de autorizadores fiscais e concentradores CBC04).
    - **Responsabilidades:** Monitoramento de logs em tempo real, sandbox AST de SQL, runbooks de remediação de incidentes de infraestrutura.
 
-3. **Diretriz de Integração (Zero Acoplamento de Inteligências no Backend):**
+3. **Diretriz de Integração (Zero Acoplamento no Backend):**
    - **Sem Mistura no Backend:** AURA e SENTINEL **NÃO têm integração de lógica nem dependência de backend**. Não compartilham modelos de LLM, prompts, grafos de agentes ou bases vetoriais. AURA opera 100% independente do Sentinel.
-   - **Reaproveitamento do Frontend (Fase 5):** Em vez de desenvolver uma interface web do zero, a aplicação React 18 + Vite do Sentinel (`RAG WP/frontend`) é aproveitada como casca visual, recebendo uma **sessão/seção dedicada e rica para a AURA**, que consome exclusivamente a API da AURA (`/api/v1/aura/chat` e rotas analíticas) via requisições REST/SSE diretas.
+   - **Consumo de Frontend Desacoplado:** A AURA possui seu próprio workspace de chat web cognitivo (`/` e `/dashboard`) e expõe endpoints SSE/REST limpos (`/api/v1/aura/chat`), podendo ser acoplada em qualquer aplicação externa ou WhatsApp via n8n sem amarras.
 
 ---
 
