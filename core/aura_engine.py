@@ -996,7 +996,7 @@ Diretrizes Específicas por Assunto:
         yield AuraChunk(
             chunk_type=AuraChunkType.TOOL_START,
             text=f"Executando ferramenta para intenção '{intencao}'...",
-            data={"intent": intencao},
+            data={"intent": intencao, "tool_name": intencao},
             session_id=sess_id,
         )
 
@@ -1074,6 +1074,7 @@ Diretrizes Específicas por Assunto:
             chunk_type=AuraChunkType.TOOL_RESULT,
             data={
                 "intent": intencao,
+                "tool_name": intencao,
                 "latency_ms": round(tool_latency_ms, 2),
                 "has_structured_data": resultado_bruto is not None,
                 "result": resultado_bruto,

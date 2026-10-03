@@ -110,9 +110,9 @@ class AuraChatController {
    */
   sendUserPrompt(text) {
     const input = document.getElementById('chat-input-text');
-    if (input) input.value = text;
+    if (input) input.value = '';
     const splitInput = document.getElementById('split-chat-input-text');
-    if (splitInput) splitInput.value = text;
+    if (splitInput) splitInput.value = '';
     this.handleSendMessage(text);
   }
 
@@ -131,6 +131,11 @@ class AuraChatController {
         query = splitInput.value.trim();
         splitInput.value = '';
       }
+    } else {
+      const input = document.getElementById('chat-input-text');
+      if (input) input.value = '';
+      const splitInput = document.getElementById('split-chat-input-text');
+      if (splitInput) splitInput.value = '';
     }
 
     if (!query || this.isStreaming) return;
@@ -165,11 +170,13 @@ class AuraChatController {
             this.updateIntentChip(messageContainerId, currentIntent);
           } 
           else if (type === 'tool_start') {
-            this.updateToolStartStatus(messageContainerId, chunk.data?.tool_name || chunk.tool_name);
+            const toolName = chunk.data?.tool_name || chunk.data?.intent || chunk.tool_name || chunk.intent || 'ferramenta';
+            this.updateToolStartStatus(messageContainerId, toolName);
           } 
           else if (type === 'tool_result') {
+            const toolName = chunk.data?.tool_name || chunk.data?.intent || chunk.tool_name || chunk.intent || 'ferramenta';
             currentToolResult = chunk.data?.result || chunk.data || {};
-            this.updateToolResultCard(messageContainerId, chunk.data?.tool_name || 'ferramenta', currentToolResult);
+            this.updateToolResultCard(messageContainerId, toolName, currentToolResult);
           } 
           else if (type === 'delta') {
             const token = chunk.text || chunk.data?.text || '';
@@ -368,12 +375,32 @@ class AuraChatController {
     });
   }
 
+  formatToolDisplayName(toolName) {
+    const map = {
+      'previsao_tanques': 'Tanques & Autonomia',
+      'run_out': 'Tanques & Autonomia',
+      'lmc_anp': 'LMC ANP Oficial',
+      'auditoria_turno': 'Conciliação de Turno & Caixa',
+      'conciliacao_turno': 'Conciliação de Turno & Caixa',
+      'conveniencia_vendas_cruzadas': 'Combos & Cross-Selling',
+      'desempenho_pista_frentistas': 'Performance da Pista',
+      'catalogo_produtos': 'Catálogo de Produtos',
+      'vendas_analitico': 'Histórico de Vendas',
+      'estoque_posicao': 'Posição de Estoque',
+      'clientes_ranking': 'Ranking de Clientes',
+      'dados_filial': 'Dados da Filial',
+      'sre_metricas': 'Observabilidade SRE',
+    };
+    return map[toolName] || toolName;
+  }
+
   updateToolStartStatus(containerId, toolName) {
     const ids = [containerId + '-tool-chip', containerId + '-split-tool-chip'];
+    const displayName = this.formatToolDisplayName(toolName);
     ids.forEach(id => {
       const chip = document.getElementById(id);
       if (chip) {
-        chip.innerHTML = `⚡ Executando ${toolName}...`;
+        chip.innerHTML = `⚡ Consultando ${this.escapeHtml(displayName)}...`;
         chip.classList.remove('hidden');
       }
     });
@@ -382,11 +409,12 @@ class AuraChatController {
   updateToolResultCard(containerId, toolName, resultData) {
     const cardIds = [containerId + '-tool-card', containerId + '-split-tool-card'];
     const chipIds = [containerId + '-tool-chip', containerId + '-split-tool-chip'];
+    const displayName = this.formatToolDisplayName(toolName);
 
     chipIds.forEach(id => {
       const chip = document.getElementById(id);
       if (chip) {
-        chip.innerHTML = `✓ ${toolName} concluído`;
+        chip.innerHTML = `✓ ${this.escapeHtml(displayName)} apurado`;
         chip.className = 'chip-intent text-emerald-300 border-emerald-500/30 bg-emerald-500/10';
       }
     });
@@ -411,32 +439,61 @@ class AuraChatController {
   renderToolInlineWidget(toolName, data) {
     if (!data || typeof data !== 'object') return '';
 
-    // 1. Previsão de Tanques & Autonomia (Run-Out Forecast)
-    if (toolName === 'previsao_tanques' || toolName === 'run_out' || Array.isArray(data.tanques)) {
-      return this.renderTankAutonomyWidget(data);
-    }
-
-    // 2. Livro de Movimentação de Combustíveis (LMC Oficial ANP Portaria 26/1992)
-    if (toolName === 'lmc_anp' || Array.isArray(data.demonstrativo_por_combustivel)) {
+    // 1. Roteamento prioritário por toolName canônico
+    if (toolName === 'lmc_anp' || toolName === 'gerar_relatorio_lmc_anp') {
       return this.renderLmcAnpWidget(data);
     }
-
-    // 3. Conciliação de Fechamento de Turno & Furo de Caixa
-    if (toolName === 'auditoria_turno' || toolName === 'conciliacao_turno' || data.triangulacao_volumes || data.fechamento_caixa) {
+    if (toolName === 'previsao_tanques' || toolName === 'run_out' || toolName === 'prever_esgotamento_tanques') {
+      return this.renderTankAutonomyWidget(data);
+    }
+    if (toolName === 'auditoria_turno' || toolName === 'conciliacao_turno' || toolName === 'auditar_fechamento_turno') {
       return this.renderTurnoWidget(data);
     }
-
-    // 4. Vendas Cruzadas & Combos de Conveniência (Market Basket Analysis)
-    if (toolName === 'conveniencia_vendas_cruzadas' || Array.isArray(data.top_combos_oportunidades)) {
+    if (toolName === 'conveniencia_vendas_cruzadas' || toolName === 'auditar_cesta_conveniencia_vendas_cruzadas') {
       return this.renderCombosWidget(data);
     }
-
-    // 5. Performance de Pista, Frentistas & Vazão de Bicos
-    if (toolName === 'desempenho_pista_frentistas' || Array.isArray(data.ranking_frentistas)) {
+    if (toolName === 'desempenho_pista_frentistas' || toolName === 'auditar_desempenho_pista_frentistas') {
       return this.renderDesempenhoPistaWidget(data);
     }
 
-    // Fallback genérico executivo
+    // 2. Roteamento por assinatura estrutural dos dados (fallback inteligente)
+    if (
+      data.resumo_executivo?.status_geral_anp ||
+      Array.isArray(data.demonstrativo_por_combustivel) ||
+      (Array.isArray(data.tanques) && data.tanques[0]?.auditoria_anp)
+    ) {
+      return this.renderLmcAnpWidget(data);
+    }
+    if (
+      data.triangulacao_pista ||
+      data.triangulacao_caixa ||
+      data.triangulacao_volumes ||
+      data.fechamento_caixa
+    ) {
+      return this.renderTurnoWidget(data);
+    }
+    if (
+      Array.isArray(data.top_combos_cross_selling) ||
+      Array.isArray(data.top_combos_oportunidades) ||
+      Array.isArray(data.regras_associacao_detalhadas)
+    ) {
+      return this.renderCombosWidget(data);
+    }
+    if (
+      Array.isArray(data.ranking_frentistas) ||
+      Array.isArray(data.auditoria_vazao_bicos)
+    ) {
+      return this.renderDesempenhoPistaWidget(data);
+    }
+    if (
+      Array.isArray(data.detalhamento_tanques) ||
+      data.previsao_por_combustivel ||
+      Array.isArray(data.tanques)
+    ) {
+      return this.renderTankAutonomyWidget(data);
+    }
+
+    // 3. Fallback genérico executivo
     return this.renderGenericToolWidget(toolName, data);
   }
 
@@ -445,31 +502,36 @@ class AuraChatController {
    */
   renderTankAutonomyWidget(data) {
     const resumo = data.resumo_executivo || {};
-    const tanques = data.tanques || [];
+    const tanques = data.detalhamento_tanques || data.tanques || [];
     const statusGeral = resumo.status_geral || 'ESTÁVEL';
-    const menorAutonomia = resumo.menor_autonomia_horas;
+    const menorAutonomia = resumo.tanque_mais_critico?.autonomia_runout_horas ?? resumo.menor_autonomia_horas;
 
     let badgeStatus = '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓ ESTÁVEL</span>';
-    if (statusGeral === 'CRÍTICO') {
+    if (statusGeral === 'ALERTA_ESTOQUE_CRITICO' || statusGeral === 'CRÍTICO') {
       badgeStatus = '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">🚨 CRÍTICO</span>';
-    } else if (statusGeral === 'ATENÇÃO') {
+    } else if (String(statusGeral).includes('ATENÇÃO')) {
       badgeStatus = '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">⚠️ ATENÇÃO</span>';
     }
 
     let tanksHtml = '';
     tanques.forEach(t => {
-      const pct = Math.min(100, Math.max(0, parseFloat(t.ocupacao_percentual || 0)));
-      const vol = parseFloat(t.volume_atual_litros || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
-      const cap = parseFloat(t.capacidade_litros || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
-      const horas = t.autonomia_horas ? `${parseFloat(t.autonomia_horas).toFixed(1)}h restantes` : 'N/A';
-      const ullage = t.espaco_livre_descarga_litros ? parseFloat(t.espaco_livre_descarga_litros).toLocaleString('pt-BR', { maximumFractionDigits: 0 }) : 'N/A';
+      const cod = t.codtan || t.tanque || '000';
+      const comb = t.combustivel || 'Combustível';
+      const pct = Math.min(100, Math.max(0, parseFloat(t.ocupacao_pct ?? t.ocupacao_percentual ?? 0)));
+      const vol = parseFloat(t.saldo_atual_litros ?? t.volume_atual_litros ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+      const cap = parseFloat(t.capacidade_litros ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+      const horasVal = t.autonomia_runout_horas ?? t.autonomia_horas;
+      const horas = (horasVal !== undefined && horasVal !== null && !isNaN(horasVal)) ? `${parseFloat(horasVal).toFixed(1)}h restantes` : 'N/A';
+      const ullageVal = t.espaco_livre_ullage_litros ?? t.espaco_livre_descarga_litros;
+      const ullage = (ullageVal !== undefined && ullageVal !== null) ? parseFloat(ullageVal).toLocaleString('pt-BR', { maximumFractionDigits: 0 }) : 'N/A';
 
       let fillClass = 'normal';
       let statusIcon = '🟢';
-      if (pct < 15 || t.status_nivel === 'CRÍTICO') {
+      const statusOp = String(t.status_operacional || t.status_nivel || '').toUpperCase();
+      if (pct < 15 || statusOp.includes('CRÍTICO')) {
         fillClass = 'critical';
         statusIcon = '🚨';
-      } else if (pct < 30 || t.status_nivel === 'ATENÇÃO') {
+      } else if (pct < 30 || statusOp.includes('ATENÇÃO')) {
         fillClass = 'warning';
         statusIcon = '🟡';
       }
@@ -479,7 +541,7 @@ class AuraChatController {
           <div class="flex items-center justify-between text-xs font-mono">
             <span class="font-bold text-white flex items-center gap-1.5">
               <span>${statusIcon}</span>
-              <span>TQ ${t.tanque} • ${this.escapeHtml(t.combustivel)}</span>
+              <span>TQ ${cod} • ${this.escapeHtml(comb)}</span>
             </span>
             <span class="text-slate-300 font-semibold">${pct.toFixed(1)}% <span class="text-slate-500 font-normal">(${vol} / ${cap} L)</span></span>
           </div>
@@ -494,7 +556,7 @@ class AuraChatController {
               <span class="text-slate-600">|</span>
               <span class="text-slate-300">📦 Ullage livre: ${ullage} L</span>
             </div>
-            <button class="widget-action-btn emerald" onclick="window.auraChat.sendUserPrompt('Qual a melhor sugestão de pedido de carreta para o Tanque ${t.tanque}?')">
+            <button class="widget-action-btn emerald" onclick="window.auraChat.sendUserPrompt('Qual a melhor sugestão de pedido de carreta para o Tanque ${cod}?')">
               🚚 Pedir Carreta
             </button>
           </div>
@@ -510,7 +572,7 @@ class AuraChatController {
             <strong class="text-xs font-mono text-white uppercase tracking-wider">Tanques Volumétricos & Previsão de Run-Out</strong>
           </div>
           <div class="flex items-center gap-2">
-            ${menorAutonomia ? `<span class="text-[11px] font-mono text-cyan-300 font-bold">Mín: ${parseFloat(menorAutonomia).toFixed(1)}h</span>` : ''}
+            ${menorAutonomia !== undefined && menorAutonomia !== null ? `<span class="text-[11px] font-mono text-cyan-300 font-bold">Mín: ${parseFloat(menorAutonomia).toFixed(1)}h</span>` : ''}
             ${badgeStatus}
           </div>
         </div>
@@ -524,7 +586,7 @@ class AuraChatController {
    */
   renderLmcAnpWidget(data) {
     const resumo = data.resumo_executivo || {};
-    const combs = data.demonstrativo_por_combustivel || [];
+    const items = data.demonstrativo_por_combustivel || data.tanques || [];
     const statusGeral = resumo.status_geral_anp || 'CONFORME_ANP';
     const isConforme = statusGeral === 'CONFORME_ANP' || statusGeral === 'CONFORME';
 
@@ -533,17 +595,19 @@ class AuraChatController {
       : '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">🚨 FORA DA TOLERÂNCIA</span>';
 
     // Determina o desvio de maior magnitude para a régua
-    let maxVarPct = 0;
-    if (combs.length > 0) {
-      maxVarPct = combs.reduce((max, c) => {
-        const v = Math.abs(parseFloat(c.variacao_percentual || 0));
-        return v > Math.abs(max) ? parseFloat(c.variacao_percentual) : max;
-      }, parseFloat(combs[0].variacao_percentual || 0));
+    let maxVarPct = resumo.variacao_volumetrica_geral_pct !== undefined ? parseFloat(resumo.variacao_volumetrica_geral_pct) : 0;
+    if (items.length > 0) {
+      items.forEach(c => {
+        const vPct = parseFloat(c.auditoria_anp?.variacao_pct ?? c.variacao_percentual ?? c.variacao_pct ?? 0);
+        if (Math.abs(vPct) > Math.abs(maxVarPct)) {
+          maxVarPct = vPct;
+        }
+      });
     }
 
-    // Escala [-0.8% a +0.8%] na régua com margem
-    const minScale = -0.8;
-    const maxScale = 0.8;
+    // Escala [-1.2% a +1.2%] na régua para alinhar com a safezone CSS (25% a 75% = ±0.6%)
+    const minScale = -1.2;
+    const maxScale = 1.2;
     const clampedPct = Math.max(minScale, Math.min(maxScale, maxVarPct));
     let needleLeft = ((clampedPct - minScale) / (maxScale - minScale)) * 100;
     needleLeft = Math.max(4, Math.min(96, needleLeft));
@@ -552,19 +616,23 @@ class AuraChatController {
     const needleText = `${maxVarPct > 0 ? '+' : ''}${maxVarPct.toFixed(2)}%`;
 
     let rowsHtml = '';
-    combs.forEach(c => {
-      const vL = parseFloat(c.variacao_litros || 0);
-      const vP = parseFloat(c.variacao_percentual || 0);
+    items.forEach(c => {
+      const vL = parseFloat(c.auditoria_anp?.variacao_litros ?? c.variacao_litros ?? 0);
+      const vP = parseFloat(c.auditoria_anp?.variacao_pct ?? c.variacao_percentual ?? c.variacao_pct ?? 0);
       const cConf = Math.abs(vP) <= 0.6;
       const tagConf = cConf
         ? '<span class="text-emerald-400 font-bold">Conforme</span>'
         : '<span class="text-rose-400 font-bold">Alerta ANP</span>';
 
+      const escLitros = parseFloat(c.movimentacao?.estoque_escriturado_litros ?? c.estoque_escriturado_litros ?? 0).toLocaleString('pt-BR');
+      const fisLitros = parseFloat(c.movimentacao?.estoque_fisico_medido_litros ?? c.estoque_fisico_litros ?? 0).toLocaleString('pt-BR');
+      const nome = c.combustivel || (c.tanque ? `Tanque ${c.tanque}` : 'Combustível');
+
       rowsHtml += `
         <div class="p-2 rounded bg-slate-900/60 border border-slate-800 text-xs font-mono flex items-center justify-between gap-2">
           <div>
-            <div class="font-bold text-slate-200">${this.escapeHtml(c.combustivel)}</div>
-            <div class="text-[10px] text-slate-400">Escriturado: ${(c.estoque_escriturado_litros || 0).toLocaleString('pt-BR')} L | Físico: ${(c.estoque_fisico_litros || 0).toLocaleString('pt-BR')} L</div>
+            <div class="font-bold text-slate-200">${this.escapeHtml(nome)}</div>
+            <div class="text-[10px] text-slate-400">Escriturado: ${escLitros} L | Físico: ${fisLitros} L</div>
           </div>
           <div class="text-right">
             <div class="${cConf ? 'text-emerald-300' : 'text-rose-400'} font-bold">
@@ -609,7 +677,7 @@ class AuraChatController {
           </div>
         </div>
 
-        <div class="space-y-1 mt-2">${rowsHtml}</div>
+        <div class="space-y-1 mt-2">${rowsHtml || '<div class="text-xs font-mono text-slate-400">Nenhum tanque auditado no LMC.</div>'}</div>
 
         <div class="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between">
           <span class="text-[10px] font-mono text-slate-400">Tolerância Portaria 26: ±0.6%</span>
@@ -626,31 +694,33 @@ class AuraChatController {
    */
   renderTurnoWidget(data) {
     const resumo = data.resumo_executivo || {};
-    const tri = data.triangulacao_volumes || {};
-    const caixa = data.fechamento_caixa || {};
+    const tri = data.triangulacao_pista || data.triangulacao_volumes || {};
+    const caixa = data.triangulacao_caixa || data.fechamento_caixa || {};
     const status = resumo.status_conciliacao || 'CONCILIADO';
-    const score = resumo.score_conformidade_percentual || 100;
+    const score = resumo.score_conformidade_pct ?? resumo.score_conformidade_percentual ?? 100;
 
-    const diffReais = parseFloat(caixa.diferenca_reais || 0);
+    const diffReais = parseFloat(resumo.diferenca_financeira_caixa ?? caixa.diferenca_reais ?? 0);
     let diffBadge = '<span class="text-emerald-300 font-bold">✓ Caixa Zerado</span>';
-    if (diffReais < 0) {
+    if (diffReais < -0.01) {
       diffBadge = `<span class="text-rose-400 font-bold">🚨 Furo de R$ ${Math.abs(diffReais).toFixed(2)}</span>`;
-    } else if (diffReais > 0) {
+    } else if (diffReais > 0.01) {
       diffBadge = `<span class="text-emerald-400 font-bold">🟢 Sobra de R$ ${diffReais.toFixed(2)}</span>`;
     }
 
-    const modal = caixa.modalidades || {};
+    const modal = caixa.totais_caixa || caixa.modalidades || {};
     const din = parseFloat(modal.dinheiro || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    const carCred = parseFloat(modal.cartao_credito || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const carCred = parseFloat(modal.cartao_credito || modal.cartao || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const carDeb = parseFloat(modal.cartao_debito || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const pix = parseFloat(modal.pix || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-    const faturado = parseFloat(caixa.total_combustivel_faturado_reais || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    const declarado = parseFloat(caixa.total_declarado_operador_reais || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const faturadoVal = resumo.faturamento_pista_total ?? caixa.total_combustivel_faturado_reais ?? 0;
+    const faturado = parseFloat(faturadoVal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const declaradoVal = modal.total_declarado ?? caixa.total_declarado_operador_reais ?? 0;
+    const declarado = parseFloat(declaradoVal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-    const encLitros = parseFloat(tri.encerrantes_litros || 0).toLocaleString('pt-BR');
-    const cbcLitros = parseFloat(tri.abastecimentos_cbc04_litros || 0).toLocaleString('pt-BR');
-    const divPista = parseFloat(tri.divergencia_litros || 0);
+    const encLitros = parseFloat(tri.total_litros_encerrante ?? tri.encerrantes_litros ?? 0).toLocaleString('pt-BR');
+    const cbcLitros = parseFloat(tri.total_litros_automacao ?? tri.abastecimentos_cbc04_litros ?? 0).toLocaleString('pt-BR');
+    const divPista = parseFloat(tri.diferenca_litros_pista ?? tri.divergencia_litros ?? 0);
 
     return `
       <div class="widget-inline-container border-l-4 border-l-auraCyan">
@@ -682,7 +752,7 @@ class AuraChatController {
             </div>
             <div class="text-xs font-mono flex justify-between pt-1 border-t border-slate-800">
               <span class="text-slate-400">Divergência Pista:</span>
-              <strong class="${divPista === 0 ? 'text-emerald-300' : 'text-rose-400'}">${divPista > 0 ? '+' : ''}${divPista.toFixed(1)} L</strong>
+              <strong class="${Math.abs(divPista) < 0.01 ? 'text-emerald-300' : 'text-rose-400'}">${divPista > 0 ? '+' : ''}${divPista.toFixed(1)} L</strong>
             </div>
           </div>
 
@@ -728,32 +798,37 @@ class AuraChatController {
    */
   renderCombosWidget(data) {
     const resumo = data.resumo_executivo || {};
-    const combos = data.top_combos_oportunidades || [];
-    const maxLift = resumo.max_lift ? `${parseFloat(resumo.max_lift).toFixed(2)}x` : '2.85x';
+    const combos = data.top_combos_cross_selling || data.top_combos_oportunidades || data.regras_associacao_detalhadas || [];
+    const maxLiftVal = resumo.maior_lift_encontrado ?? resumo.max_lift ?? (combos[0]?.metricas?.lift ?? combos[0]?.lift ?? 2.85);
+    const maxLift = `${parseFloat(maxLiftVal).toFixed(2)}x`;
 
     let cardsHtml = '';
     combos.slice(0, 3).forEach(c => {
-      const lift = parseFloat(c.lift || 1.5).toFixed(2);
-      const conf = parseFloat(c.confianca_percentual || 50).toFixed(0);
-      const prodDest = c.produto_recomendado || '';
-      const prodDestShort = prodDest.split(' ').slice(0, 2).join(' ');
+      const lift = parseFloat(c.metricas?.lift ?? c.lift ?? 1.5).toFixed(2);
+      const conf = parseFloat((c.metricas?.confianca ? c.metricas.confianca * 100 : c.confianca_percentual) ?? 50).toFixed(0);
+      const cupons = c.metricas?.frequencia_conjunta ?? c.frequencia_conjunta_cupons ?? 10;
+
+      const prodOrig = typeof c.produto_origem === 'object' ? (c.produto_origem?.nompro || 'Item Origem') : (c.produto_origem || 'Item Origem');
+      const prodDest = typeof c.produto_recomendado === 'object' ? (c.produto_recomendado?.nompro || 'Item Recomendado') : (c.produto_recomendado || 'Item Recomendado');
+      const prodDestShort = String(prodDest).split(' ').slice(0, 2).join(' ');
+      const script = c.script_sugerido_caixa || c.script_sugestao_pdv || 'Ofereça o combo ao registrar o item.';
 
       cardsHtml += `
         <div class="widget-combo-card">
           <div class="flex items-center justify-between text-xs font-mono mb-1">
-            <span class="font-bold text-white">${this.escapeHtml(c.produto_origem)}</span>
+            <span class="font-bold text-white">${this.escapeHtml(prodOrig)}</span>
             <span class="text-purple-400">➔</span>
-            <span class="font-bold text-auraCyan-light">${this.escapeHtml(c.produto_recomendado)}</span>
+            <span class="font-bold text-auraCyan-light">${this.escapeHtml(prodDest)}</span>
           </div>
 
           <div class="flex items-center gap-2 font-mono text-[10px] text-slate-400 my-1">
             <span class="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">⚡ Lift ${lift}x</span>
             <span class="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">🎯 Confiança ${conf}%</span>
-            <span>📦 ${c.frequencia_conjunta_cupons || 10} cupons</span>
+            <span>📦 ${cupons} cupons</span>
           </div>
 
           <div class="widget-combo-script-box">
-            <strong>🗣 Script no Balcão:</strong> "${this.escapeHtml(c.script_sugestao_pdv || 'Ofereça o combo ao registrar o item.')}"
+            <strong>🗣 Script no Balcão:</strong> "${this.escapeHtml(script)}"
           </div>
 
           <div class="flex justify-end mt-2">
@@ -786,22 +861,23 @@ class AuraChatController {
    */
   renderDesempenhoPistaWidget(data) {
     const frents = data.ranking_frentistas || [];
-    const bicos = data.vazao_bicos || [];
-    const lider = data.resumo_executivo?.lider_faturamento || (frents[0]?.frentista || 'N/A');
+    const bicos = data.auditoria_vazao_bicos || data.vazao_bicos || [];
+    const lider = data.resumo_executivo?.campeao_faturamento?.nome || data.resumo_executivo?.lider_faturamento || (frents[0]?.nome || frents[0]?.frentista || 'N/A');
 
     let frentsHtml = '';
     frents.slice(0, 3).forEach((f, idx) => {
       const medals = ['🥇', '🥈', '🥉'];
       const med = medals[idx] || '👤';
+      const nomeFrent = f.nome || f.frentista || 'Colaborador';
       const fat = parseFloat(f.faturamento_reais || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-      const adit = parseFloat(f.percentual_aditivada || 0).toFixed(1);
-      const isMeta = parseFloat(f.percentual_aditivada || 0) >= 25.0;
+      const adit = parseFloat(f.conversao_aditivada_pct ?? f.percentual_aditivada ?? 0).toFixed(1);
+      const isMeta = parseFloat(adit) >= 25.0;
 
       frentsHtml += `
         <div class="flex items-center justify-between p-1.5 rounded bg-slate-900/50 border border-slate-800 text-xs font-mono">
           <div class="flex items-center gap-1.5 font-bold text-white">
             <span>${med}</span>
-            <span>${this.escapeHtml(f.frentista)}</span>
+            <span>${this.escapeHtml(nomeFrent)}</span>
           </div>
           <div class="flex items-center gap-2">
             <span class="text-slate-300">${fat}</span>
@@ -812,12 +888,16 @@ class AuraChatController {
     });
 
     let bicosAlertHtml = '';
-    const bicosAlerta = bicos.filter(b => b.alerta_vazao || parseFloat(b.vazao_media_litros_minuto || 35) < 25.0);
+    const bicosAlerta = bicos.filter(b => b.alerta_filtro || b.alerta_vazao || parseFloat(b.vazao_litros_minuto ?? b.vazao_media_litros_minuto ?? 35) < 25.0);
     if (bicosAlerta.length > 0) {
       bicosAlertHtml = `
         <div class="mt-2 p-2 rounded bg-amber-950/30 border border-amber-500/30 text-amber-300 text-xs font-mono space-y-1">
           <strong class="text-[10px] uppercase tracking-wider text-amber-400">⚠️ Alerta de Vazão Lenta nos Bicos:</strong>
-          ${bicosAlerta.map(b => `<div>Bico ${b.bico} (${this.escapeHtml(b.combustivel)}): <strong>${parseFloat(b.vazao_media_litros_minuto).toFixed(1)} L/min</strong> (Filtro/Bomba requer checagem)</div>`).join('')}
+          ${bicosAlerta.map(b => {
+            const vazao = parseFloat(b.vazao_litros_minuto ?? b.vazao_media_litros_minuto ?? 0).toFixed(1);
+            const prod = b.produto_nome || b.combustivel || 'Combustível';
+            return `<div>Bico ${b.bico} (${this.escapeHtml(prod)}): <strong>${vazao} L/min</strong> (Filtro/Bomba requer checagem)</div>`;
+          }).join('')}
         </div>
       `;
     }
@@ -843,12 +923,13 @@ class AuraChatController {
   renderGenericToolWidget(toolName, data) {
     if (!data.resumo_executivo && !data.status) return '';
     const r = data.resumo_executivo || data;
+    const displayName = this.formatToolDisplayName(toolName);
     return `
       <div class="widget-inline-container border-l-4 border-l-slate-600">
         <div class="widget-inline-header">
           <div class="flex items-center gap-2">
             <span class="text-sm">📊</span>
-            <strong class="text-xs font-mono text-white uppercase tracking-wider">Diagnóstico: ${this.escapeHtml(toolName)}</strong>
+            <strong class="text-xs font-mono text-white uppercase tracking-wider">Diagnóstico: ${this.escapeHtml(displayName)}</strong>
           </div>
           <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-300 border border-slate-700">OK</span>
         </div>

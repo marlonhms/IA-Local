@@ -878,6 +878,9 @@ body {
 
 /* Otimização Mobile para o Workspace do Chat */
 @media (max-width: 640px) {
+  #view-console {
+    height: calc(100dvh - 165px) !important;
+  }
   .chat-bubble-aura {
     max-width: 100% !important;
   }
