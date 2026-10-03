@@ -14,12 +14,14 @@
 **Edge AI On-Premises para Operação de Pista, Gestão de Turnos, Catálogo Inteligente e Observabilidade de Postos e Redes de Varejo.**
 
 [Topologia Arquitetural](#topologia-e-arquitetura-do-sistema) •
+[RAG Multi-Filial](#arquitetura-multi-filial) •
 [Pilares e Princípios](#princípios-arquiteturais) •
 [Recursos e Módulos](#módulos-e-capacidades-do-sistema) •
 [Fórmulas e Concatenações](#fórmulas-e-concatenações-de-dados) •
 [Automação CBC04](#automação-companytec-cbc04) •
 [Início Rápido](#guia-de-inicialização-rápida) •
 [Estrutura de Pastas](#estrutura-do-projeto) •
+[Roadmap de Fases](#roadmap-de-evolução) •
 [Validação e Testes](#validação-e-testes-automatizados)
 
 </div>
@@ -81,6 +83,69 @@ flowchart TB
     ENGINE -. "Métricas Anônimas & Heartbeat" .-> SRE
     ENGINE -. "Fechamento de Turno & Alertas" .-> N8N
 ```
+
+---
+
+<a id="arquitetura-multi-filial"></a>
+### 🌐 Arquitetura de Rede Multi-Filial: RAG Hierárquico Distribuído & MapReduce (Fan-Out / Fan-In)
+
+Para grupos econômicos e redes de postos, o Ai.la adota uma arquitetura distribuída de **RAG Hierárquico Multi-Agente baseada no paradigma MapReduce**. Em vez de sincronizar massas de dados transacionais para a nuvem ou transferir textos livres volumosos entre instâncias, o sistema distribui a execução analítica para contêineres Docker locais e sintetiza apenas payloads JSON compactados:
+
+```mermaid
+flowchart TB
+    USER["👤 Dono da Rede / Gestor Geral\nConsulta Global: 'Qual o status de estoque de gasolina comum de toda a rede?'"]
+
+    subgraph HUB["🏢 NÓ CENTRAL / MAESTRO ORQUESTRADOR (LangGraph + FastAPI)"]
+        MAESTRO["🎼 Maestro Orquestrador Central"]
+        ROUTER{"Roteador de Escopo\n(Global vs Filial Específica?)"}
+        DISPATCH["⚡ Fan-Out Assíncrono (asyncio)\nTimeout: 5.0s | Resiliência Ativa"]
+        COLLECTOR["📥 Coletor de Payloads (Fan-In)\n+ Tratador de Nós Offline (Graceful Degradation)"]
+        SYNTH["🤖 Agente Sintetizador Executivo (LLM)\n[Ranqueamento Crítico → Confortável | Economia de Tokens]"]
+    end
+
+    subgraph NETWORK["🌐 REDE DISTRIBUÍDA DE FILIAIS (Edge Computing On-Premises)"]
+        subgraph POSTO1["⛽ Filial 01 - Posto Centro"]
+            EDGE1["Worker Docker Local (FastAPI)\n• SQL Seguro (SELECT-only)\n• pgvector + ERP Local\n• Sanitização spaCy (LGPD)"]
+            JSON1["Payload JSON Pydantic\n{'filial': 'Centro', 'combustivel': 'Gasolina Comum', 'status': 'Critico', 'autonomia_horas': 14}"]
+        end
+
+        subgraph POSTO2["⛽ Filial 02 - Posto Norte"]
+            EDGE2["Worker Docker Local (FastAPI)\n• SQL Seguro (SELECT-only)\n• pgvector + ERP Local\n• Sanitização spaCy (LGPD)"]
+            JSON2["Payload JSON Pydantic\n{'filial': 'Norte', 'combustivel': 'Gasolina Comum', 'status': 'Regular', 'autonomia_horas': 96}"]
+        end
+
+        subgraph POSTO3["⛽ Filial 03 - Posto Sul (Sem Internet / Queda de Link)"]
+            EDGE3["Worker Docker Local (Timeout 5s)"]
+            JSON3["Flag de Degradação Graciosa\n{'aviso': 'Filial Posto Sul offline, dados não incluídos.'}"]
+        end
+    end
+
+    USER --> MAESTRO
+    MAESTRO --> ROUTER
+    ROUTER -->|Escopo Global| DISPATCH
+
+    DISPATCH -->|Async HTTP GET/POST| EDGE1
+    DISPATCH -->|Async HTTP GET/POST| EDGE2
+    DISPATCH -.->|Timeout 5s / Fallback| EDGE3
+
+    EDGE1 --> JSON1
+    EDGE2 --> JSON2
+    EDGE3 -.-> JSON3
+
+    JSON1 --> COLLECTOR
+    JSON2 --> COLLECTOR
+    JSON3 --> COLLECTOR
+
+    COLLECTOR --> SYNTH
+    SYNTH -->|Relatório Gerencial Consolidado| USER
+```
+
+#### Mecânica Operacional do Fluxo MapReduce:
+1. **O Maestro Central (Roteamento & Fan-Out Assíncrono):** Avalia se a consulta do usuário tem escopo local (uma filial) ou global (toda a rede). Em consultas globais, utiliza Python `asyncio` (`asyncio.gather`) e requisições HTTP assíncronas para disparar simultaneamente a requisição para os endpoints/IPs dos contêineres Docker de todas as filiais.
+2. **Edge Workers nos Contêineres Docker (Processamento na Borda):** Cada filial processa a consulta localmente em SQL seguro e estritamente read-only (`SELECT`-only, sem locks), consultando seu `pgvector` local (porta 5434) e banco ERP local (porta 5432/5433). As lógicas de negócio e sanitização de dados (`CentralLogSanitizer` / spaCy) são aplicadas diretamente no nó de borda.
+3. **Retorno Enxuto Pydantic (Economia de >85% de Tokens):** A borda **não gera texto natural prolixo**. Retorna um payload JSON compacto e validado com schema Pydantic v2 (ex: `{"filial": "Posto Centro", "combustivel": "Gasolina Comum", "status": "Critico", "autonomia_horas": 14}`).
+4. **Resiliência e Degradação Graciosa (Graceful Degradation):** Com SLA rígido de **5.0 segundos de timeout**, eventuais falhas de conectividade de postos individuais não travam a resposta da rede. Os postos online são agregados normalmente e os nós inacessíveis recebem a flag `{"aviso": "Filial Posto Sul offline, dados não incluídos."}` sem crash.
+5. **Agente Sintetizador (Fan-In e Parecer Executivo):** O Maestro coleta todos os JSONs (Fan-In) e passa o bloco estruturado para o Agente LLM Sintetizador. O modelo ranqueia as unidades da mais crítica para a mais confortável e entrega um relatório gerencial consolidado de alto valor decisório para a diretoria da rede (em texto formatado ou áudio via WhatsApp).
 
 ---
 
@@ -553,6 +618,28 @@ Executa comparativo de latência e qualidade entre Busca Densa Pura (HNSW), Busc
 ```powershell
 python scripts/benchmark_rag.py
 ```
+
+---
+
+<a id="roadmap-de-evolução"></a>
+## 🗺️ Roadmap de Evolução & Fases do Projeto
+
+O desenvolvimento do **Ai.la** segue um cronograma rigoroso de engenharia focado em entregar valor com zero impacto operacional ao ERP legado:
+
+| Fase | Título & Foco | Status | Entregáveis Principais |
+| :---: | :--- | :---: | :--- |
+| **Fase 1** | **Blindagem LGPD & Sanitização de Dados** | ✅ Concluída | `core/sanitizer.py`, 24 categorias de PII ofuscadas, testes automatizados 100%. |
+| **Fase 2** | **Motor de Conciliação de Turnos & Pista** | ✅ Concluída | Triangulação `fechabomba` $\leftrightarrow$ `fechacaixa` $\leftrightarrow$ CBC04, rollover, ANP $\pm 0.6\%$. |
+| **Fase 6.1** | **Previsão de Esgotamento de Tanques (Run-Out)** | ✅ Concluída | Autonomia em horas/dias, projeção de estoque zero, espaço de descarga (*ullage*), compra em múltiplos de 5.000 L. |
+| **Fase 6.2** | **Auditoria de Pista & Desempenho de Frentistas** | ✅ Concluída | Vazão hidráulica (L/min) com alerta de filtro sujo, conversão de aditivada $\ge 25\%$, anomalias de pista. |
+| **Fase 2.5** | **Esteira de Deploy Automatizado & Onboarding** | 🚀 Próxima | `docker-compose.yml`, `scripts/deploy_posto.ps1` (1-clique), validação de portas. |
+| **Fase 3** | **Desacoplamento MCP & LangGraph Local** | 🔌 Próxima | Servidor MCP Python local, FastAPI assíncrono (SSE streaming), StateGraph local. |
+| **Fase 3.5** | **Escalabilidade Multi-Filial (RAG Hierárquico MapReduce)** | 🌐 Planejada | Maestro Fan-Out assíncrono (`asyncio`), Edge Workers Docker (JSON Pydantic), resiliência 5s e Síntese Executiva LLM. |
+| **Fase 4** | **Canal WhatsApp & Notificações Proativas** | 📱 Planejada | n8n + Evolution API, relatórios automáticos pós-turno (06h, 14h, 22h), áudio/voz. |
+| **Fase 5** | **Dashboard Web & PWA Mobile** | 💻 Planejada | Painel gerencial responsivo, visão gráfica dos tanques, monitor de frentistas em tempo real. |
+| **Fase 6.3+** | **Módulo Fiscal Avançado (Agent SEFAZ & LMC)** | 📈 Planejada | Auditoria de NFC-e com Reforma Tributária e geração automatizada de LMC ANP. |
+
+> *Para o detalhamento arquitetural completo, especificações e matriz de priorização, consulte o documento oficial [`docs/roadmap_aila.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap_aila.md).*
 
 ---
 

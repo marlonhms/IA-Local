@@ -1,10 +1,10 @@
 # 🚀 Roadmap Estratégico & Engenharia de Execução: Projeto Ai.la
 
 **Projeto:** Ai.la — IA Local Especialista em Postos de Combustíveis e PDV  
-**Versão:** 1.3.0-PRO  
-**Status Atual:** Fases 1 e 2 Concluídas + Capacidade Preditiva e Auditoria Operacional de Pista/Frentistas Homologadas (LGPD + Conciliação de Turnos + Previsão de Esgotamento + Desempenho de Frentistas & Filtro Lento)  
-**Próxima Frente Imediata:** Fase 2.5 (Esteira de Deploy Automatizado & Onboarding Multi-Posto) $\rightarrow$ Fase 3 (MCP + LangGraph)  
-**Ambiente:** Edge AI Local (Posto) + Hub Central de Gestão/Telemetria | Docker + PostgreSQL 16 (Portas 5432/5433, 5434, 5678)  
+**Versão:** 1.4.0-PRO  
+**Status Atual:** MVP Local de Nó Único Consolidado (Fases 1 e 2 Concluídas + Fases 6.1 e 6.2 Homologadas com Zero Alucinação, LGPD, Conciliação de Turnos, Previsão de Esgotamento e Auditoria de Pista)  
+**Próximas Frentes:** Fase 2.5 (Esteira de Deploy Automatizado & Onboarding Multi-Posto) $\rightarrow$ Fase 3 (MCP + LangGraph) $\rightarrow$ Fase 3.5 (RAG Hierárquico Multi-Filial & MapReduce)  
+**Ambiente:** Edge AI Local (Postos) + Maestro Central de Gestão/Telemetria | Docker + PostgreSQL 16 (Portas 5432/5433, 5434, 5678)  
 
 ---
 
@@ -68,6 +68,61 @@ flowchart TB
      - **Nó 2 (SQL Data Gathering):** Coleta paralela de `fechabomba`, `fechacaixa` e telemetria da Companytec CBC04.
      - **Nó 3 (Auditor Matemático & ANP):** Aplicação de fórmulas de encerrante, rollover de hodômetro e regra volumétrica de $\pm 0.6\%$.
      - **Nó 4 (Diagnóstico SRE & Parecer Executivo):** Formatação com streaming token-a-token para o gestor.
+5. **Topologia de Rede Distribuída: RAG Hierárquico Multi-Filial (MapReduce Fan-Out / Fan-In):**
+   - Para donos e gestores de redes de postos, o Ai.la transcende o nó único local e opera como um ecossistema distribuído de alta eficiência de tokens e blindagem LGPD.
+   - **O Maestro Central (LangGraph + FastAPI)** atua no Hub ou nuvem privada: recebe consultas executivas globais (*"Qual o status de estoque de gasolina comum de toda a rede?"*), divide a demanda e efetua um **Fan-Out assíncrono** com `asyncio` e HTTP/REST para os Edge Workers em contêineres Docker de todas as filiais simultaneamente.
+   - **Os Edge Workers Locais** processam a consulta na borda: executam SQL read-only seguro no banco ERP local e no `pgvector` local, higienizam os dados com spaCy e retornam apenas um payload **JSON estruturado validado via Pydantic**, sem gerar texto livre prolixo.
+   - **Resiliência e Tolerância a Falhas com SLA de 5s:** O Maestro opera com timeout estrito de 5 segundos e mecanismo de **Degradação Graciosa (Graceful Degradation)**: se um posto estiver sem internet, o sistema não sofre crash; consolida os postos online e adiciona uma flag informativa para a unidade inacessível.
+   - **Fan-In e Síntese Executiva via LLM:** O Maestro agrega os JSONs recebidos e submete a um **Agente LLM Sintetizador** especializado, que ranqueia as filiais da mais crítica para a mais confortável e gera o parecer executivo consolidado com consumo mínimo de tokens.
+
+```mermaid
+flowchart TB
+    USER["👤 Dono da Rede / Gestor Geral\nConsulta Global: 'Qual o status de estoque de gasolina comum de toda a rede?'"]
+
+    subgraph HUB["🏢 NÓ CENTRAL / MAESTRO ORQUESTRADOR (LangGraph + FastAPI)"]
+        MAESTRO["🎼 Maestro Orquestrador Central"]
+        ROUTER{"Roteador de Escopo\n(Global vs Filial Específica?)"}
+        DISPATCH["⚡ Fan-Out Assíncrono (asyncio)\nTimeout: 5.0s | Resiliência Ativa"]
+        COLLECTOR["📥 Coletor de Payloads (Fan-In)\n+ Tratador de Nós Offline (Graceful Degradation)"]
+        SYNTH["🤖 Agente Sintetizador Executivo (LLM)\n[Ranqueamento Crítico → Confortável | Economia de Tokens]"]
+    end
+
+    subgraph NETWORK["🌐 REDE DISTRIBUÍDA DE FILIAIS (Edge Computing On-Premises)"]
+        subgraph POSTO1["⛽ Filial 01 - Posto Centro"]
+            EDGE1["Worker Docker Local (FastAPI)\n• SQL Seguro (SELECT-only)\n• pgvector + ERP Local\n• Sanitização spaCy (LGPD)"]
+            JSON1["Payload JSON Pydantic\n{'filial': 'Centro', 'combustivel': 'Gasolina Comum', 'status': 'Critico', 'autonomia_horas': 14}"]
+        end
+
+        subgraph POSTO2["⛽ Filial 02 - Posto Norte"]
+            EDGE2["Worker Docker Local (FastAPI)\n• SQL Seguro (SELECT-only)\n• pgvector + ERP Local\n• Sanitização spaCy (LGPD)"]
+            JSON2["Payload JSON Pydantic\n{'filial': 'Norte', 'combustivel': 'Gasolina Comum', 'status': 'Regular', 'autonomia_horas': 96}"]
+        end
+
+        subgraph POSTO3["⛽ Filial 03 - Posto Sul (Sem Internet / Queda de Link)"]
+            EDGE3["Worker Docker Local (Timeout 5s)"]
+            JSON3["Flag de Degradação Graciosa\n{'aviso': 'Filial Posto Sul offline, dados não incluídos.'}"]
+        end
+    end
+
+    USER --> MAESTRO
+    MAESTRO --> ROUTER
+    ROUTER -->|Escopo Global| DISPATCH
+
+    DISPATCH -->|Async HTTP GET/POST| EDGE1
+    DISPATCH -->|Async HTTP GET/POST| EDGE2
+    DISPATCH -.->|Timeout 5s / Fallback| EDGE3
+
+    EDGE1 --> JSON1
+    EDGE2 --> JSON2
+    EDGE3 -.-> JSON3
+
+    JSON1 --> COLLECTOR
+    JSON2 --> COLLECTOR
+    JSON3 --> COLLECTOR
+
+    COLLECTOR --> SYNTH
+    SYNTH -->|Relatório Gerencial Consolidado| USER
+```
 
 ---
 
@@ -77,8 +132,8 @@ flowchart TB
         ▲ ALTO
         │  [Fase 1: Sanitizador LGPD]       [Fase 2: Conciliação de Turnos]
         │  [Fase 2.5: Deploy Multi-Posto]   [Fase 3: Servidor MCP / LangGraph]
-        │  [Fase 4: Alertas WhatsApp]       [Fase 6: IA Preditiva & LMC]
-IMPACTO │
+        │  [Fase 4: Alertas WhatsApp]       [Fase 3.5: RAG Multi-Filial MapReduce]
+IMPACTO │                                   [Fase 6: IA Preditiva & LMC]
         │  [Fase 5: Dashboard Web PWA]      
         │
         └─────────────────────────────────────────────────────────────►
@@ -95,11 +150,12 @@ flowchart TD
     Fase2["📊 FASE 2: Motor de Auditoria & Conciliação de Turno\n(P0 - Concluída ✅)"]
     Fase25["🚀 FASE 2.5: Esteira de Deploy & Onboarding Multi-Posto\n(P0 - Imediata / Deploy-Ready)"]
     Fase3["🔌 FASE 3: Desacoplamento MCP & LangGraph Local\n(P1 - Curto Prazo)"]
+    Fase35["🌐 FASE 3.5: RAG Hierárquico Multi-Filial & MapReduce\n(P1 - Macro-Fase 2 de Escala)"]
     Fase4["📱 FASE 4: Canal WhatsApp & Notificações Proativas\n(P1 - Curto Prazo)"]
     Fase5["💻 FASE 5: Painel Web Dashboard & Mobile PWA\n(P2 - Médio Prazo)"]
-    Fase6["📈 FASE 6: Inteligência Preditiva & Módulo Fiscal ANP\n(P3 - Longo Prazo)"]
+    Fase6["📈 FASE 6: Inteligência Preditiva & Módulo Fiscal ANP\n(P3 - Módulos 6.1 e 6.2 Concluídos ✅)"]
 
-    Fase1 --> Fase2 --> Fase25 --> Fase3 --> Fase4 --> Fase5 --> Fase6
+    Fase1 --> Fase2 --> Fase25 --> Fase3 --> Fase35 --> Fase4 --> Fase5 --> Fase6
 ```
 
 ---
@@ -225,6 +281,68 @@ flowchart TD
 
 ---
 
+### 🌐 FASE 3.5: Escalabilidade de Rede Multi-Filial — RAG Hierárquico Distribuído & MapReduce (Macro-Fase 2 de Escala)
+> **Condição de Destravamento (Gate Inegociável):** Esta fase será destravada **SOMENTE APÓS a consolidação plena do MVP Local de nó único** com `pgvector`, Docker, guardrails de SQL e sanitização via spaCy operando com zero alucinação e cálculos preditivos 100% precisos (atualmente com Fases 1, 2, 6.1 e 6.2 homologadas).
+> **Objetivo:** Evoluir a arquitetura de um agente local isolado para um ecossistema de **RAG Hierárquico Multi-Agente (MapReduce)**. O objetivo é permitir que donos e diretores de redes de postos façam consultas globais em linguagem natural (ex: *"Qual o status de estoque de gasolina comum de toda a rede?"* ou *"Quais postos tiveram furo de caixa no turno da noite ontem?"*) e recebam um relatório gerencial consolidado, processado de forma distribuída para economizar dezenas de milhares de tokens e garantir a segurança e isolamento LGPD.
+
+- [ ] **1. O Maestro (Agente Orquestrador Central):**
+  - **Roteamento de Intenção e Escopo:** O Maestro avalia deterministicamente se o prompt do usuário é destinado a uma filial específica (*"Como está o fechamento do Posto Centro?"*) ou à rede global (*"Qual o status de estoque de gasolina de toda a rede?"*).
+  - **Fan-Out (Disparo Assíncrono Paralelo):** Utilizando Python `asyncio` (`asyncio.gather`) e requisições HTTP assíncronas via `httpx`/FastAPI (ou mensageria leve via Redis/MQTT), o Maestro dispara a requisição simultaneamente para os endpoints/IPs dos contêineres Docker de todas as filiais cadastradas na rede.
+  - **Isolamento de Credenciais:** O nó central gerencia apenas o catálogo de endereçamento dos postos e tokens mTLS/Bearer de serviço, sem armazenar dados brutos de transações ou dados pessoais (PII).
+
+- [ ] **2. Edge Computing (Agentes Trabalhadores Locais na Borda):**
+  - **Processamento na Borda (Edge Nodes):** Cada contêiner Docker local recebe o gatilho assíncrono do Maestro, converte o comando em consulta SQL segura e estritamente read-only (`SELECT`-only, sem permissão de escrita e sem locks de tabela).
+  - **Execução Local com pgvector + ERP:** Consulta a instância vetorial local (`pgvector` porta 5434) e o banco ERP local (porta 5432/5433), aplicando as regras de negócio locais (autonomia de tanques, conciliação de encerrantes, vazão de bicos).
+  - **Sanitização Determinística spaCy:** Antes de formatar o retorno, o worker local submete quaisquer strings ao `CentralLogSanitizer` (LGPD ativa na borda).
+  - **Retorno Enxuto (Pydantic JSON Schema):** Para economizar banda, latência e custos de LLM, o agente local **NÃO gera texto natural prolixo**. Ele retorna estritamente um payload JSON estruturado e tipado validado via Pydantic v2:
+    ```json
+    {
+      "filial_id": "posto_centro_01",
+      "filial_nome": "Posto Centro",
+      "combustivel": "Gasolina Comum",
+      "saldo_litros": 2450.0,
+      "capacidade_litros": 30000.0,
+      "status": "Critico",
+      "autonomia_horas": 14.2,
+      "consumo_medio_dia": 4140.0,
+      "alerta_fim_de_semana": true,
+      "timestamp": "2026-10-03T02:00:00Z"
+    }
+    ```
+
+- [ ] **3. Resiliência, Timeouts & Degradação Graciosa (Graceful Degradation):**
+  - **Timeouts Rígidos de Disparo (SLA de 5.0 Segundos):** O Maestro aguarda as respostas de rede com timeout configurável de 5 segundos via `asyncio.wait_for()`, evitando que nós lentos congelem a experiência do gestor.
+  - **Degradação Graciosa (Fault Tolerance Ativa):** Se uma ou mais filiais estiverem sem internet, com link instável ou contêiner reiniciando (ex: *Posto Sul sem conexão*), o sistema **NÃO sofre crash nem interrompe o processamento**.
+  - **Injeção de Metadados de Contingência:** O Maestro consolida normalmente os dados dos postos que responderam dentro do SLA e injeta uma flag explícita de alerta no payload consolidado:
+    ```json
+    {
+      "filial_id": "posto_sul_03",
+      "filial_nome": "Posto Sul",
+      "status": "OFFLINE",
+      "aviso": "Filial Posto Sul offline (sem resposta em 5s), dados não incluídos."
+    }
+    ```
+
+- [ ] **4. O Agente Sintetizador (Fan-In e Consolidação Gerencial via LLM):**
+  - **Fan-In (Agregação de Payloads):** O Maestro recolhe todos os JSONs recebidos dos Edge Workers e compõe uma estrutura tabular compacta.
+  - **Economia Drástica de Tokens:** Como cada filial transmitiu apenas ~150 bytes de JSON puro em vez de 1.000 tokens de texto conversacional, uma rede de 50 postos consome menos de 4.000 tokens no prompt de síntese (redução de $>85\%$ nos custos operacionais de IA).
+  - **Síntese Final via LLM Especialista:** Um Agente LLM final (Google Gemini) recebe o consolidado estruturado e um System Prompt focado exclusivamente em **análise gerencial executiva de redes**.
+  - **Ranqueamento Crítico $\rightarrow$ Confortável:** O sintetizador ordena automaticamente as filiais pela urgência operacional (ex: postos com risco iminente de esgotamento de combustível em primeiro lugar, seguidos por postos estáveis), destaca eventuais filiais offline e sugere o plano de ação logístico para o diretor da rede (em texto formatado ou áudio via WhatsApp).
+
+- [ ] **5. Stack Técnica, Protocolos & Observabilidade SRE:**
+  - **LangGraph Distribuído:** Orquestração de grafos de decisão com nós paralelos para fan-out e nó de agregação (*Fan-In reducer*).
+  - **AsyncIO & HTTPX Assíncrono:** Conexões concorrentes não-bloqueantes com *connection pooling* reaproveitável.
+  - **Validação de Schemas Pydantic v2:** Modelos estritos de entrada (`NetworkQueryRequest`, `BranchProbeRequest`) e saída (`BranchMetricPayload`, `NetworkConsolidatedReport`).
+  - **SRE Node Healthchecks & Telemetria:** Monitoramento proativo da saúde dos contêineres Docker locais via rotas `/health/edge`, checagem de latência por filial e heartbeat periódico para a telemetria central Sentinel.
+
+- [ ] **Entregáveis Planejados para a Fase 3.5:**
+  - `core/network_orchestrator.py` (Maestro com roteador global/local e despacho assíncrono Fan-Out).
+  - `core/schemas/network.py` (Contratos Pydantic v2 para comunicação nó-a-nó).
+  - `core/synthesizer.py` (Agente Sintetizador com prompt executivo e ranqueamento de criticidade).
+  - `scripts/test_rag_hierarquico.py` (Suíte de testes de simulação de rede com nós online, offline e validação de SLA 5s).
+
+---
+
 ### 📱 FASE 4: Canal WhatsApp & Notificações Proativas (Prioridade P1 - Curto Prazo)
 > **Objetivo:** O gestor do posto não precisa abrir um aplicativo para ser informado. A IA o notifica proativamente no WhatsApp ao final de cada turno e responde perguntas em linguagem natural por texto ou áudio.
 
@@ -299,14 +417,14 @@ flowchart TD
 | :---: | :---: | :--- | :--- |
 | **Sprint 1** | Semanas 1 e 2 | **Fases 1 e 2 (Concluídas ✅)** | Sanitizador LGPD ativo + Motor de conciliação de turno (`fechabomba` $\leftrightarrow$ `fechacaixa` $\leftrightarrow$ `abastecimentos` CBC04) testado e homologado com 100% de aprovação. |
 | **Sprint 2** | Semanas 3 e 4 | **Fase 2.5 (Deploy-Ready) & Fase 3** | Template `docker-compose.yml` + Script `deploy_posto.ps1` de onboarding em 1-clique + Servidor MCP + FastAPI + LangGraph local na pasta `core/`. |
-| **Sprint 3** | Semanas 5 e 6 | **Fase 4** | n8n WhatsApp disparando fechamentos de turno automáticos às 06h, 14h e 22h com suporte a comandos de áudio e alertas críticos. |
+| **Sprint 3** | Semanas 5 e 6 | **Fase 3.5 & Fase 4** | RAG Hierárquico Multi-Filial (Maestro Fan-Out + Edge Workers Docker + Sintetizador MapReduce) + n8n WhatsApp disparando relatórios e alertas críticos. |
 | **Sprint 4** | Semanas 7 e 8 | **Fase 5** | Web Dashboard + PWA Android com gráficos de tanques, vendas e chat com streaming. |
-| **Sprint 5** | Semanas 9 e 10 | **Fase 6** | Previsão preditiva de compra de tanques + auditoria fiscal NFC-e com Agent Sefaz. |
+| **Sprint 5** | Semanas 9 e 10 | **Fase 6** | Previsão preditiva de compra de tanques + auditoria fiscal NFC-e com Agent Sefaz (Módulos 6.1 e 6.2 Concluídos ✅). |
 
 ---
 
 ## 🎯 6. Próximo Passo Recomendado
 
-Com a **Fase 1 (Sanitizador LGPD)**, a **Fase 2 (Motor de Conciliação de Turnos)** e os módulos analíticos da **Fase 6 (Previsão Preditiva de Tanques & Auditoria Operacional de Pista e Frentistas)** concluídos, testados e homologados:
+Com o **MVP Local de Nó Único plenamente consolidado** — abrangendo a **Fase 1 (Sanitizador LGPD)**, a **Fase 2 (Motor de Conciliação de Turnos)** e os motores analíticos da **Fase 6 (Previsão Preditiva de Tanques 6.1 & Auditoria Operacional de Pista e Frentistas 6.2)** concluídos, testados e homologados com 100% de aprovação:
 
-O próximo passo prioritário é prosseguir com a **Fase 2.5 (Esteira de Deploy Automatizado: criação do script `deploy_posto.ps1` e template `docker-compose.yml`)** e a **Fase 3 (Desacoplamento de Arquitetura: Servidor MCP local, FastAPI assíncrono e LangGraph)**.
+A esteira de execução avança imediatamente para a **Fase 2.5 (Esteira de Deploy Automatizado: criação do script `deploy_posto.ps1` e template `docker-compose.yml`)** e a **Fase 3 (Desacoplamento de Arquitetura: Servidor MCP local, FastAPI assíncrono e LangGraph)**, que formam a fundação técnica indispensável para destravar a **Fase 3.5 (Escalabilidade de Rede Multi-Filial via RAG Hierárquico e MapReduce Fan-Out/Fan-In)**.
