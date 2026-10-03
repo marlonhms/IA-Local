@@ -1,12 +1,12 @@
 """
-Motor de Busca Vetorial e RAG Híbrido (HNSW + Full-Text Search + RRF)
+Motor de Busca Vetorial e RAG Híbrido (HNSW + Full-Text Search + RRF Calibrado)
 com Telemetria para Observabilidade SRE.
 
 Tecnologias:
 - PostgreSQL 16 + pgvector (0.8.6+)
-- HNSW (Hierarchical Navigable Small World) com vector_cosine_ops e tuning ef_search
+- HNSW (Hierarchical Navigable Small World) com vector_cosine_ops e tuning ef_search = 128
 - GIN Index com tsvector (Full-Text Search em Português)
-- Reciprocal Rank Fusion (RRF) nativo em SQL via CTEs
+- Reciprocal Rank Fusion (RRF) Calibrado com Boost de Código de Barras/EAN-13 e Viscosidades de Lubrificantes
 - Google Gemini Embedding API (gemini-embedding-001)
 """
 
@@ -30,22 +30,38 @@ from config.settings import (
 
 logger = logging.getLogger("HybridRAG")
 
+# Regex para detecção de viscosidades de óleos lubrificantes
+VISCOSITY_REGEX = re.compile(
+    r'\b(0W[-]?20|0W[-]?30|5W[-]?20|5W[-]?30|5W[-]?40|10W[-]?30|10W[-]?40|15W[-]?40|20W[-]?50|80W[-]?90|75W[-]?90|85W[-]?140)\b',
+    re.IGNORECASE
+)
+
+# Regex para detecção de códigos numéricos (código de barras EAN-13, EAN-8 ou codpro)
+CODE_PATTERN = re.compile(r'\b\d{3,14}\b')
+
 
 def formatar_tsquery_portugues(texto: str) -> str:
     """
     Limpa caracteres especiais e formata a query para full-text search flexível com operador OR (|).
+    Preserva especificações de viscosidades de lubrificantes (ex: 5w30, 10w40).
     """
+    visc_match = VISCOSITY_REGEX.search(texto)
+    visc_tokens = []
+    if visc_match:
+        raw_v = visc_match.group(0).lower().replace("-", "")
+        visc_tokens.append(raw_v)
+
     termos = re.findall(r"[\w]+", texto.lower())
     termos_uteis = [t for t in termos if len(t) > 1 and not t.isdigit()]
     numeros = [t for t in termos if t.isdigit() or any(c.isdigit() for c in t)]
-    todos = list(dict.fromkeys(termos_uteis + numeros))
+    todos = list(dict.fromkeys(visc_tokens + termos_uteis + numeros))
     if not todos:
         return ""
     return " | ".join(todos)
 
 
 class HybridRAGEngine:
-    """Motor de recuperação híbrida (Dense + Sparse) com RRF e métricas SRE."""
+    """Motor de recuperação híbrida (Dense + Sparse) com RRF calibrado e métricas SRE."""
 
     def __init__(
         self,
@@ -53,7 +69,7 @@ class HybridRAGEngine:
         gemini_api_key: Optional[str] = None,
         embedding_model: str = DEFAULT_EMBEDDING_MODEL,
         llm_model: str = DEFAULT_LLM_MODEL,
-        ef_search: int = 100,
+        ef_search: int = 128,
         rrf_k: int = 60,
     ):
         self.db_config = db_config or DB_VECTOR_CONFIG
@@ -136,7 +152,12 @@ class HybridRAGEngine:
         query_vector: Optional[List[float]] = None,
         grupo_filter: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Busca híbrida usando Reciprocal Rank Fusion (RRF) em SQL nativo."""
+        """
+        Busca híbrida usando Reciprocal Rank Fusion (RRF) Calibrado em SQL nativo:
+        - Boost imediato (+1.0) para correspondência exata de Código de Barras (EAN-13) ou código de produto (codpro)
+        - Priorização léxica de viscosidades de lubrificantes (+0.08 de boost no RRF)
+        - Tuning dinâmico de HNSW ef_search = 128
+        """
         ef = ef_search or self.ef_search
         t0 = time.perf_counter()
 
@@ -147,6 +168,22 @@ class HybridRAGEngine:
 
         tsquery_str = formatar_tsquery_portugues(query_text)
         like_term = f"%{query_text.strip()}%"
+
+        # Detecção de código de barras ou código exato
+        clean_query = query_text.strip()
+        code_match = CODE_PATTERN.search(clean_query)
+        exact_code = code_match.group(0) if code_match else (clean_query if clean_query.isdigit() else "")
+
+        # Detecção de viscosidade de lubrificante
+        visc_match = VISCOSITY_REGEX.search(query_text)
+        viscosity_sql_regex = ""
+        viscosity_token = ""
+        if visc_match:
+            raw_v = visc_match.group(0).upper().replace("-", "")
+            viscosity_token = raw_v
+            if "W" in raw_v:
+                part1, part2 = raw_v.split("W")
+                viscosity_sql_regex = rf"\y{part1}W[-]?{part2}\y"
 
         grupo_condition = ""
         if grupo_filter:
@@ -175,6 +212,11 @@ class HybridRAGEngine:
                 END AS fts_score,
                 ROW_NUMBER() OVER (
                     ORDER BY 
+                        -- Prioridade 1: Match exato de código de barras ou código do produto
+                        (CASE WHEN %s <> '' AND (TRIM(codbar) = %s OR TRIM(codpro) = %s) THEN 1 ELSE 0 END) DESC,
+                        -- Prioridade 2: Match exato de viscosidade de lubrificante
+                        (CASE WHEN %s <> '' AND nompro ~* %s THEN 1 ELSE 0 END) DESC,
+                        -- Prioridade 3: Score do FTS e proximidade de nome
                         (CASE WHEN %s <> '' THEN ts_rank_cd(tsv, to_tsquery('portuguese', %s)) ELSE 0.0 END) DESC,
                         (nompro ILIKE %s) DESC,
                         nompro ASC
@@ -183,7 +225,9 @@ class HybridRAGEngine:
             WHERE ((%s <> '' AND tsv @@ to_tsquery('portuguese', %s))
                OR nompro ILIKE %s
                OR codbar ILIKE %s
-               OR codpro ILIKE %s) {grupo_condition}
+               OR codpro ILIKE %s
+               OR (%s <> '' AND (TRIM(codbar) = %s OR TRIM(codpro) = %s))
+               OR (%s <> '' AND nompro ~* %s)) {grupo_condition}
             ORDER BY fts_score DESC
             LIMIT %s
         )
@@ -201,7 +245,11 @@ class HybridRAGEngine:
             s.sparse_rank,
             (
                 {dense_weight} * COALESCE(1.0 / ({self.rrf_k} + d.dense_rank), 0.0) +
-                {sparse_weight} * COALESCE(1.0 / ({self.rrf_k} + s.sparse_rank), 0.0)
+                {sparse_weight} * COALESCE(1.0 / ({self.rrf_k} + s.sparse_rank), 0.0) +
+                -- Boost imediato de Código de Barras / Código de Produto (+1.0)
+                (CASE WHEN %s <> '' AND (TRIM(COALESCE(d.codbar, s.codbar)) = %s OR TRIM(COALESCE(d.codpro, s.codpro)) = %s) THEN 1.0 ELSE 0.0 END) +
+                -- Boost de Viscosidade de Lubrificante (+0.08)
+                (CASE WHEN %s <> '' AND COALESCE(d.nompro, s.nompro) ~* %s THEN 0.08 ELSE 0.0 END)
             ) AS rrf_score
         FROM dense_search d
         FULL OUTER JOIN sparse_search s ON d.codpro = s.codpro
@@ -213,20 +261,34 @@ class HybridRAGEngine:
         fetch_limit = top_k * 3
         vec_str = str(query_vector)
 
+        # Parâmetros para dense_search
         params = [vec_str, vec_str, vec_str]
         if grupo_filter:
             params.append(grupo_filter)
         params.append(fetch_limit)
 
+        # Parâmetros para sparse_search
         params.extend([
-            tsquery_str, tsquery_str, tsquery_str,
-            tsquery_str, tsquery_str, like_term,
-            tsquery_str, tsquery_str,
-            like_term, like_term, like_term
+            tsquery_str, tsquery_str, tsquery_str,        # CASE ts_rank_cd
+            exact_code, exact_code, exact_code,            # ORDER BY match exato
+            viscosity_sql_regex, viscosity_sql_regex,      # ORDER BY viscosidade
+            tsquery_str, tsquery_str,                      # ORDER BY ts_rank_cd
+            like_term,                                     # ORDER BY nompro ILIKE
+            tsquery_str, tsquery_str,                      # WHERE tsv @@
+            like_term, like_term, like_term,               # WHERE nompro / codbar / codpro ILIKE
+            exact_code, exact_code, exact_code,            # WHERE match exato
+            viscosity_sql_regex, viscosity_sql_regex,      # WHERE viscosidade
         ])
         if grupo_filter:
             params.append(grupo_filter)
-        params.extend([fetch_limit, top_k])
+        params.append(fetch_limit)
+
+        # Parâmetros para SELECT final (boosts RRF)
+        params.extend([
+            exact_code, exact_code, exact_code,            # Boost exato codbar/codpro
+            viscosity_sql_regex, viscosity_sql_regex,      # Boost viscosidade
+            top_k                                          # LIMIT final
+        ])
 
         with self._get_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -239,6 +301,8 @@ class HybridRAGEngine:
         telemetry = {
             "query": query_text,
             "tsquery_used": tsquery_str,
+            "exact_code_detected": exact_code or None,
+            "viscosity_detected": viscosity_token or None,
             "embedding_latency_ms": round(emb_latency_ms, 2),
             "db_rrf_latency_ms": round(db_latency_ms, 2),
             "total_retrieval_latency_ms": round(total_latency_ms, 2),
@@ -246,6 +310,7 @@ class HybridRAGEngine:
             "rrf_k": self.rrf_k,
             "dense_weight": dense_weight,
             "sparse_weight": sparse_weight,
+            "calibrated_rrf": True,
             "results_count": len(results),
         }
 
@@ -352,6 +417,14 @@ class HybridRAGEngine:
 
                 cur.execute("""
                     SELECT 
+                        count(*) AS total_intencoes,
+                        pg_size_pretty(pg_total_relation_size('intencoes_vetores')) AS intencoes_total_size
+                    FROM intencoes_vetores;
+                """)
+                metrics["intencoes_stats"] = cur.fetchone()
+
+                cur.execute("""
+                    SELECT 
                         i.relname AS index_name,
                         am.amname AS index_type,
                         pg_size_pretty(pg_relation_size(i.oid)) AS index_size,
@@ -361,7 +434,14 @@ class HybridRAGEngine:
                     FROM pg_class i
                     JOIN pg_am am ON am.oid = i.relam
                     LEFT JOIN pg_stat_user_indexes stat ON stat.indexrelid = i.oid
-                    WHERE i.relname IN ('idx_produtos_vetores_hnsw', 'idx_produtos_vetores_tsv_gin', 'produtos_vetores_pkey')
+                    WHERE i.relname IN (
+                        'idx_produtos_vetores_hnsw', 
+                        'idx_produtos_vetores_tsv_gin', 
+                        'produtos_vetores_pkey',
+                        'idx_produtos_vetores_hash_md5',
+                        'idx_intencoes_vetores_hnsw',
+                        'intencoes_vetores_pkey'
+                    )
                     ORDER BY pg_relation_size(i.oid) DESC;
                 """)
                 metrics["index_stats"] = cur.fetchall()

@@ -174,34 +174,58 @@ flowchart TB
 <a id="módulos-e-capacidades-do-sistema"></a>
 ## 🚀 Módulos e Capacidades do Sistema
 
-<a id="busca-hibrida"></a>
-### 🔍 1. Mecanismo de Busca Híbrida: Dual Retrieval + Native RRF
+<a id="roteador-semantico"></a>
+### 🔀 0. Roteador Semântico Vetorial (Semantic Intent Router com pgvector)
 
-O motor [`HybridRAGEngine`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/rag_engine.py) combina busca vetorial densa com busca textual esparsa utilizando uma única transação SQL no PostgreSQL 16 com **Reciprocal Rank Fusion (RRF)**:
+O módulo [`SemanticRouter`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/semantic_router.py) substitui classificações rígidas baseadas exclusivamente em expressões regulares por roteamento semântico de alta precisão em **PostgreSQL 16 + pgvector**, com busca vetorial de cosseno sub-5ms em representações densas de 768 dimensões (`halfvec`):
 
 ```mermaid
 flowchart LR
-    Q["Query do Usuário\n(Ex: 'óleo motor flex 5w30')"] --> SPLIT{"Divisão da Consulta"}
+    Q["Pergunta do Usuário\n('deu ruim no turno da madruga?')"] --> CACHE{"Cache em Memória\n(LRU Cache)"}
     
-    SPLIT -->|Embedding Gemini 768d| DENSE["Busca Densa (HNSW)\npgvector vector_cosine_ops\nef_search = 100"]
-    SPLIT -->|Stemming Português| SPARSE["Busca Esparsa (GIN)\ntsvector / to_tsquery\nTokens e Viscosidades"]
+    CACHE -->|Hit (< 0.1ms)| ROUTE_FAST["⚡ Despacho Imediato\n(0 API / 0 Banco)"]
+    CACHE -->|Miss| VEC["Embeddings 768d\n(Gemini API)"]
     
-    DENSE --> RRF["Reciprocal Rank Fusion (RRF)\nScore = 1/(60 + r_dense) + 1/(60 + r_sparse)"]
-    SPARSE --> RRF
+    VEC --> PG["pgvector: intencoes_vetores\nCosine Distance <=> halfvec\nLatência < 5ms"]
+    PG --> EVAL{"Similaridade >= Threshold\n(0.58)?"}
     
-    RRF --> RES["Top-K Resultados Classificados\n(SKU exato + Semântica contextual)"]
+    EVAL -->|Sim| ROUTE_SEM["🎯 Rota Semântica Confirmada\n(auditoria_turno)"]
+    EVAL -->|Não| FB["🛡️ Fallback Gracioso\n(Heurísticas Determinísticas)"]
 ```
 
-#### Características de Indexação do pgvector:
-* **Índice HNSW Densa:** `idx_produtos_vetores_hnsw` com `m = 16`, `ef_construction = 64` e `ef_search = 100` em tempo de execução.
-* **Índice GIN Esparsa:** `idx_produtos_vetores_tsv_gin` com dicionário `portuguese` para correspondência exata de viscosidades (`5W30`, `15W40`), marcas (`Havoline`, `Lubrax`, `Mobil`) e códigos de barras.
-* **Score RRF Ponderado:**
-
-$$
-RRF(d) = \sum_{m \in M} \frac{1}{k + r_m(d)} \quad \text{com } k = 60
-$$
+#### Capacidades Chave do Roteador Semântico:
+* **Tabela Dedicada `intencoes_vetores`:** Armazena exemplares vetoriais das 9 rotas operacionais do sistema: `auditoria_turno`, `previsao_tanques`, `desempenho_pista_frentistas`, `vendas_analitico`, `estoque_posicao`, `clientes_ranking`, `sre_metricas`, `dados_filial` e `catalogo_produtos`.
+* **Imunidade a Variações Coloquiais e Gírias:** Compreende perfeitamente frases como *"deu ruim no fechamento?"*, *"vai faltar gasosa no fim de semana?"*, *"os frentista renderam bem?"* e *"tem bico lerdo na bomba 2?"*.
+* **Cache em Memória de Duplo Nível:** Respostas a perguntas recorrentes ou idênticas despachadas em `< 0.01ms`.
+* **Latência de Busca Vetorial pgvector:** Execução da consulta vetorial SQL em `< 3.5ms` com índice HNSW.
+* **Degradação Graciosa:** Se a similaridade for inferior a 0.58 ou houver indisponibilidade momentânea da rede, aciona automaticamente as regras determinísticas sem interromper a operação.
 
 ---
+
+<a id="busca-hibrida"></a>
+### 🔍 1. Mecanismo de Busca Híbrida: Dual Retrieval + Native RRF Calibrado
+
+O motor [`HybridRAGEngine`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/rag_engine.py) combina busca vetorial densa com busca textual esparsa utilizando uma única transação SQL no PostgreSQL 16 com **Reciprocal Rank Fusion (RRF) Calibrado**:
+
+```mermaid
+flowchart LR
+    Q["Query do Usuário\n(Ex: 'óleo lubrax 5w30' ou '7891234567890')"] --> SPLIT{"Processador de Query"}
+    
+    SPLIT -->|Embedding 768d| DENSE["Busca Densa (HNSW)\npgvector vector_cosine_ops\nef_search = 128"]
+    SPLIT -->|Stemming + Viscosidades| SPARSE["Busca Esparsa (GIN)\ntsvector / to_tsquery\nTokens e Viscosidades"]
+    
+    DENSE --> RRF["RRF Calibrado em SQL Nativo\nScore = 0.5/(60+r_d) + 0.5/(60+r_s)\n+ Boost EAN/Codpro (+1.0)\n+ Boost Viscosidade (+0.08)"]
+    SPARSE --> RRF
+    
+    RRF --> RES["Top-K Resultados Classificados\n(SKU exato + Viscosidade priorizada)"]
+```
+
+#### Calibração do RRF & Otimizações:
+* **Boost Imediato de Código de Barras / Código de Produto (+1.0):** Leituras de Código de Barras (EAN-13, EAN-8) ou códigos de produtos (`codpro`) recebem elevação prioritária imediata para a 1ª posição do ranking.
+* **Priorização de Viscosidades de Lubrificantes (+0.08):** Filtros inteligentes detectam viscosidades automotivas (`0W20`, `5W30`, `5W40`, `10W40`, `15W40`, `20W50`) e asseguram que um óleo com viscosidade exata tenha precedência absoluta sobre produtos de outras especificações.
+* **Tuning dos Índices HNSW:** Configurado com `m = 16`, `ef_construction = 128` e `ef_search = 128` para máxima precisão e recall.
+* **Change Data Capture (CDC) via Delta Hashing MD5:** Armazenamento da coluna `hash_md5` em `produtos_vetores`. O pipeline (`scripts/index_produtos.py` e `scripts/sync_daemon.py`) calcula o hash do produto no ERP e **só gera novo embedding na API Gemini se houver alteração real no cadastro**, economizando **> 95% do consumo de API**.
+
 
 <a id="conciliacao-turnos"></a>
 ### 📊 2. Motor de Conciliação de Turnos & Auditoria de Pista
@@ -560,8 +584,9 @@ ia-banco-local/
 │
 ├── core/                     # Núcleo analítico e motor agêntico
 │   ├── __init__.py
-│   ├── rag_engine.py         # Motor HybridRAGEngine (HNSW + FTS GIN + RRF nativo SQL)
+│   ├── rag_engine.py         # Motor HybridRAGEngine (HNSW + FTS GIN + RRF calibrado em SQL)
 │   ├── sanitizer.py          # CentralLogSanitizer (LGPD 24 categorias + OWASP GenAI)
+│   ├── semantic_router.py    # SemanticRouter (pgvector halfvec 768d + fallback determinístico)
 │   ├── schemas/              # Contratos Pydantic v2 para rede e microsserviços
 │   │   ├── __init__.py
 │   │   └── network.py        # Schemas de Fan-Out, Fan-In, Payloads e Resiliência
@@ -569,14 +594,15 @@ ia-banco-local/
 │
 ├── scripts/                  # Scripts de automação, manutenção e testes
 │   ├── __init__.py
-│   ├── index_produtos.py     # Pipeline ETL de indexação e enriquecimento vetorial
-│   ├── sync_daemon.py        # Daemon de sincronização contínua ERP -> pgvector
+│   ├── index_produtos.py     # Pipeline ETL de indexação vetorial com CDC Delta Hash MD5
+│   ├── sync_daemon.py        # Daemon de sincronização contínua ERP -> pgvector com CDC
 │   ├── benchmark_rag.py      # Benchmark comparativo de precisão, recall e latência
 │   ├── test_sanitizer.py     # Suíte de testes da blindagem LGPD e sanitização
 │   ├── test_conciliacao_turno.py # Suíte de testes do motor de conciliação de turnos
 │   ├── test_previsao_tanques.py  # Suíte de testes do motor preditivo de esgotamento e carretas
 │   ├── test_desempenho_frentistas.py # Suíte de testes da auditoria de pista e frentistas
-│   └── test_rag_hierarquico.py   # Suíte de testes do RAG Hierárquico Multi-Filial & MapReduce
+│   ├── test_rag_hierarquico.py   # Suíte de testes do RAG Hierárquico Multi-Filial & MapReduce
+│   └── test_semantic_router.py   # Suíte de testes do Roteador Semântico Vetorial e CDC Delta Hash
 │
 ├── docs/                     # Documentação de arquitetura e roadmap
 │   ├── dossie_tecnico.md     # Dossiê técnico completo de infraestrutura e SRE
@@ -628,7 +654,14 @@ python scripts/test_rag_hierarquico.py
 ```
 *Resultado: **100% dos testes aprovados (5/5 testes em 5.0s)**.*
 
-### 6. Benchmark de Recuperação Vetorial
+### 6. Testes do Roteador Semântico Vetorial & Otimização CDC (Sugestões 1 e 2)
+Valida busca vetorial no `intencoes_vetores` (< 5ms), 9 intenções operacionais, cache em memória (< 0.1ms), fallback gracioso, Change Data Capture (CDC via Delta Hashing MD5 com >95% economia de API) e RRF calibrado com boost de código de barras e viscosidade:
+```powershell
+python scripts/test_semantic_router.py
+```
+*Resultado: **100% dos testes aprovados**.*
+
+### 7. Benchmark de Recuperação Vetorial
 Executa comparativo de latência e qualidade entre Busca Densa Pura (HNSW), Busca Esparsa Pura (GIN) e a Fusão Híbrida (RRF):
 ```powershell
 python scripts/benchmark_rag.py

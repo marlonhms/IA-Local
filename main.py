@@ -43,204 +43,20 @@ from config.settings import (
 from core.rag_engine import HybridRAGEngine
 from core.tools import PostoTools
 from core.sanitizer import central_log_sanitizer
+from core.semantic_router import SemanticRouter, classificar_intencao_heuristica
 
 
-def classificar_intencao(pergunta: str) -> str:
-    """Classifica a intenção da pergunta do usuário para acionar a ferramenta adequada."""
-    p = pergunta.lower()
+def classificar_intencao(pergunta: str, router: Optional[SemanticRouter] = None) -> str:
+    """
+    Classifica a intenção da pergunta do usuário.
+    Se o SemanticRouter for fornecido, executa roteamento semântico vetorial com pgvector.
+    Caso contrário, executa as heurísticas determinísticas com latência ultrarrápida.
+    """
+    if router is not None:
+        intencao, _, _ = router.route(pergunta)
+        return intencao
+    return classificar_intencao_heuristica(pergunta)
 
-    # 0. Conciliação de Turnos & Auditoria de Pista (Fase 2 - P0)
-    termos_auditoria_exatos = [
-        "fechamento de turno", "fechamento do turno", "fechar turno", "fechou o turno",
-        "fechou o 1º turno", "fechou o 2º turno", "fechou o 3º turno",
-        "fechou o 1o turno", "fechou o 2o turno", "fechou o 3o turno",
-        "fechou o primeiro turno", "fechou o segundo turno", "fechou o terceiro turno",
-        "auditar fechamento", "auditoria de turno", "auditoria de pista", "auditoria do turno",
-        "conciliação de turno", "conciliacao de turno", "conciliação de turnos", "conciliacao de turnos",
-        "conciliar turno", "conciliar turnos", "conciliação", "conciliacao",
-        "furo de caixa", "furo de pista", "furo de bico", "furos de caixa",
-        "sobra de caixa", "falta de caixa", "quebra de caixa", "quebra de pista",
-        "caixa bateu", "bateu o caixa", "bateu com a pista", "bateu com o caixa",
-        "saiu dos bicos", "saiu do bico", "conferir turno", "conferência de turno", "conferencia de turno",
-        "auditar turno", "auditar pista", "auditar o turno", "conferência de pista", "conferencia de pista",
-        "relatório de fechamento", "relatorio de fechamento", "divergência na pista", "divergencia na pista",
-        "divergência de pista", "divergencia de pista", "diferença de caixa", "diferenca de caixa",
-        "diferença no turno", "diferenca no turno", "sobrou ou faltou", "o encerrante bateu", "bateu os bicos",
-        "bateu o turno"
-    ]
-    if any(t in p for t in termos_auditoria_exatos):
-        return "auditoria_turno"
-
-    tem_raiz_auditoria = any(k in p for k in [
-        "turno", "fechamento", "concilia", "furo", "quebra", "auditar", "auditoria", 
-        "conferência", "conferencia", "encerramento", "divergência", "divergencia", "encerrante"
-    ])
-    if ("frentista" in p or "frentistas" in p) and not any(k in p for k in ["furo", "quebra", "bateu", "sobra", "falta", "concilia"]):
-        pass
-    elif tem_raiz_auditoria:
-        if any(w in p for w in [
-            "hoje", "ontem", "anteontem", "como foi", "como fechou", "qual foi", "qual o", "resumo",
-            "bateu", "caixa", "bomba", "bico", "sobra", "falta", "1º", "2º", "3º", "1o", "2o", "3o",
-            "primeiro", "segundo", "terceiro", "manhã", "manha", "tarde", "noite", "madrugada", "teve", "houve"
-        ]):
-            return "auditoria_turno"
-
-    # 1. Previsão de Esgotamento de Combustível (Run-Out Forecast) & Sugestão de Pedidos
-    termos_previsao_exatos = [
-        "quando vai acabar", "quando acaba", "vai acabar", "vai secar", "quando seca", "quando vai secar",
-        "previsão de esgotamento", "previsao de esgotamento", "previsão dos tanques", "previsao dos tanques",
-        "previsão de tanque", "previsao de tanque", "esgotamento dos tanques", "esgotamento do tanque",
-        "esgotamento de combustível", "esgotamento de combustivel", "run-out", "run out", "runout",
-        "autonomia dos tanques", "autonomia do tanque", "autonomia de combustível", "autonomia de combustivel",
-        "autonomia de combustíveis", "autonomia de combustiveis", "qual a autonomia", "qual é a autonomia",
-        "quanto tempo dura", "quanto tempo resta", "duração do estoque", "duracao do estoque", "tempo de estoque",
-        "vai durar", "vai terminar", "quando termina", "tanque mais crítico", "tanque mais critico",
-        "qual tanque está mais crítico", "qual tanque esta mais critico",
-        "tanques mais críticos", "tanques mais criticos", "mais crítico hoje", "mais critico hoje",
-        "pedir combustível", "pedir combustivel", "pedir gasolina", "pedir diesel", "pedir etanol",
-        "preciso pedir", "preciso comprar combustível", "preciso comprar combustivel", "sugestão de pedido",
-        "sugestao de pedido", "sugestão de compra", "sugestao de compra", "pedido de carreta", "pedido de caminhão",
-        "pedido de caminhao", "espaço livre para descarga", "espaco livre para descarga", "espaço livre de descarga",
-        "espaco livre de descarga", "espaço de descarga", "espaco de descarga", "espaço para descarga", "espaco para descarga",
-        "espaço livre", "espaco livre", "ullage", "quanto cabe de descarga", "quantos compartimentos",
-        "quantos litros cabem", "quanto cabe no tanque"
-    ]
-    if any(t in p for t in termos_previsao_exatos):
-        return "previsao_tanques"
-
-    # Verificação contextual de previsão / run-out / fim de semana / autonomia / descarga / capacidade de recebimento
-    tem_termo_preditivo = any(k in p for k in [
-        "previsão", "previsao", "acabar", "acaba", "acabam", "secar", "seca", "secam",
-        "esgotamento", "esgotar", "esgota", "autonomia", "run-out", "runout", "run out",
-        "durar", "dura", "duram", "duração", "duracao", "resta", "restam", "terminar", "termina",
-        "pedir", "comprar", "compra", "pedido", "pedidos",
-        "descarga", "ullage", "carreta", "compartimento", "compartimentos", "cabe", "cabem"
-    ])
-    tem_termo_combustivel_ou_tanque = any(w in p for w in [
-        "gasolina", "diesel", "etanol", "álcool", "alcool", "arla", "combustível", "combustivel", "combustíveis", "combustiveis",
-        "tanque", "tanques", "tq"
-    ])
-
-    if tem_termo_preditivo and tem_termo_combustivel_ou_tanque:
-        if not any(preco_word in p for preco_word in ["preço", "preco", "custa", "valor"]):
-            return "previsao_tanques"
-
-    if "quanto tempo" in p and tem_termo_combustivel_ou_tanque:
-        return "previsao_tanques"
-
-    if "fim de semana" in p and any(w in p for w in ["combustível", "combustivel", "pedir", "comprar", "tanque", "tanques", "gasolina", "diesel", "etanol", "preciso"]):
-        return "previsao_tanques"
-
-    if "crítico" in p or "critico" in p:
-        if any(w in p for w in ["tanque", "tanques", "combustível", "combustivel", "hoje", "posto", "qual"]):
-            return "previsao_tanques"
-
-    # 2. Perguntas sobre estoque, saldo e tanques de combustível
-    termos_estoque = [
-        "estoque", "mais estoque", "maior estoque", "saldo de estoque", "saldo em estoque",
-        "quanto tem de", "quanto tem no tanque", "nível do tanque", "nivel do tanque", "tanque", "tanques",
-        "quantidade em estoque", "itens em estoque", "saldo físico", "saldo fisico", "falta de produto",
-        "estoque baixo", "acabando", "tem no estoque", "tem em estoque", "com mais estoque", "com maior estoque"
-    ]
-    if any(t in p for t in termos_estoque) or (("saldo" in p or "estoque" in p) and any(w in p for w in ["produto", "mais", "tem", "qual", "quanto", "hoje", "maior", "nível", "nivel"])):
-        return "estoque_posicao"
-
-    # 1. Perguntas sobre clientes, ranking de compradores e cadastros
-    termos_clientes = [
-        "cliente", "clientes", "mais comprou", "maior comprador", "ranking de clientes",
-        "quem mais comprou", "qual cliente", "cadastro de cliente", "clientes cadastrados",
-        "consumidor final", "compras do cliente", "gasto por cliente"
-    ]
-    if any(t in p for t in termos_clientes) or ("cliente" in p and any(w in p for w in ["mais", "quem", "qual", "comprou", "gasta", "ranking", "total", "cadastrado", "cadastro"])):
-        return "clientes_ranking"
-
-    # 2.5. Desempenho de Frentistas, Vazão de Bicos & Auditoria Operacional de Pista (Fase 6 / Sugestão 1)
-    termos_pista_exatos = [
-        "ranking dos frentistas", "ranking de frentistas", "ranking frentistas",
-        "desempenho dos frentistas", "desempenho de frentistas", "desempenho da equipe",
-        "desempenho da equipe de pista", "desempenho da pista", "desempenho de pista",
-        "equipe de pista", "time de pista", "produtividade dos frentistas", "produtividade da pista",
-        "produtividade da equipe", "vazão dos bicos", "vazao dos bicos", "vazão das bombas",
-        "vazao das bombas", "vazão do bico", "vazao do bico", "vazão da bomba", "vazao da bomba",
-        "bico com problema", "bicos com problema", "vazão lenta", "vazao lenta", "vazão baixa",
-        "vazao baixa", "bico lento", "bicos lentos", "filtro sujo", "filtro lento", "filtro obstruído",
-        "filtro obstruido", "filtro da bomba", "filtro do bico", "bomba lenta", "bombas lentas",
-        "troca de filtro", "trocar filtro", "conversão de aditivada", "conversao de aditivada",
-        "conversão de gasolina aditivada", "conversao de gasolina aditivada", "vendas de aditivada",
-        "venda de aditivada", "quem vendeu mais aditivada", "vendeu mais gasolina aditivada",
-        "vendeu mais aditivada", "maior conversão", "maior conversao", "ticket médio dos frentistas",
-        "ticket medio dos frentistas", "ticket médio por frentista", "ticket medio por frentista",
-        "maior ticket médio", "maior ticket medio", "qual frentista tem o maior ticket médio",
-        "qual frentista tem o maior ticket medio", "anomalias na pista", "anomalias de pista",
-        "anomalia na pista", "anomalia de pista", "anomalias da pista", "filtro de combustível",
-        "filtro de combustivel"
-    ]
-    if any(t in p for t in termos_pista_exatos):
-        return "desempenho_pista_frentistas"
-
-    # Verificação contextual: menção a frentista
-    if "frentista" in p or "frentistas" in p:
-        return "desempenho_pista_frentistas"
-
-    # Menção a vazão ou filtro de bico / bomba
-    if any(w in p for w in ["vazão", "vazao", "filtro"]) and any(w in p for w in ["bico", "bicos", "bomba", "bombas", "lenta", "lento", "sujo", "suja", "problema", "obstruído", "obstruido", "baixa", "baixo"]):
-        return "desempenho_pista_frentistas"
-
-    # Menção a aditivada com venda / conversão / frentista
-    if "aditivada" in p and any(w in p for w in ["vendeu", "vendeu mais", "conversão", "conversao", "ranking", "quem", "campeão", "campeao", "líder", "lider"]):
-        return "desempenho_pista_frentistas"
-
-    # Ticket médio relacionado a frentista / equipe / pista
-    if ("ticket médio" in p or "ticket medio" in p) and any(w in p for w in ["frentista", "frentistas", "pista", "maior", "quem", "qual", "equipe"]):
-        return "desempenho_pista_frentistas"
-
-    # Anomalias na pista / abastecimentos suspeitos
-    if any(w in p for w in ["anomalia", "anomalias", "suspeito", "suspeitos", "suspeita", "suspeitas", "irregular", "irregulares", "atípico", "atipico"]) and any(w in p for w in ["pista", "bico", "bomba", "abastecimento", "abastecimentos"]):
-        return "desempenho_pista_frentistas"
-
-    # Equipe / Time de pista
-    if any(w in p for w in ["equipe", "time"]) and any(w in p for w in ["pista", "frentista", "frentistas"]):
-        return "desempenho_pista_frentistas"
-
-    if "desempenho" in p and any(w in p for w in ["equipe", "time", "pista", "frentista", "frentistas"]):
-        return "desempenho_pista_frentistas"
-
-    # 2. Perguntas sobre vendas, faturamento, último produto vendido e abastecimentos
-    termos_vendas = [
-        "mais vendido", "mais vendidos", "ranking de vendas", "ranking", "campeão de venda", 
-        "quanto vendeu", "faturamento", "total de vendas", "histórico de venda", "vendas hoje",
-        "vendas de hoje", "como estao as vendas", "como estão as vendas", "vendas do dia",
-        "quanto faturou", "total faturado", "resumo do dia", "resumo de vendas", "relatório de vendas",
-        "abastecimentos", "quantos abastecimentos", "movimento de hoje", "movimento do caixa",
-        "litros vendidos", "litragem", "ultimo produto", "último produto", "ultimo produto vendido",
-        "último produto vendido", "última venda", "ultima venda", "ultimas vendas", "últimas vendas",
-        "o que vendeu por ultimo", "o que vendeu por último", "o que foi vendido", "vendeu agora",
-        "último item vendido", "ultimo item vendido", "venda recente", "vendas recentes",
-        "último item", "ultimo item", "itens vendidos", "produtos vendidos", "o que vendeu",
-        "ultimo vendido", "último vendido"
-    ]
-    if any(t in p for t in termos_vendas) or (
-        ("venda" in p or "vendas" in p or "vendido" in p or "vendidos" in p or "vendeu" in p) and 
-        any(w in p for w in ["hoje", "ontem", "dia", "como", "quanto", "total", "geral", "resumo", "ultimo", "último", "recente", "recentes", "agora", "foi", "qual", "identifica", "identificar"])
-    ):
-        return "vendas_analitico"
-
-    # 3. Perguntas sobre SRE, banco de dados e observabilidade
-    termos_sre = ["métrica", "metricas", "sre", "cache hit", "latência", "índice hnsw", "saúde do banco", "pg_stat"]
-    if any(t in p for t in termos_sre):
-        return "sre_metricas"
-
-    # 4. Perguntas cadastrais da filial
-    termos_filial = [
-        "qual é a filial", "qual o nome do posto", "qual o cnpj", "endereço da filial", 
-        "endereco da filial", "endereço do posto", "endereco do posto", "qual o pdv",
-        "dados da filial", "dados do posto"
-    ]
-    if any(t in p for t in termos_filial):
-        return "dados_filial"
-
-    # Padrão: busca no catálogo de produtos (RAG Híbrido)
-    return "catalogo_produtos"
 
 
 def extrair_grupo(pergunta: str) -> str:
@@ -439,9 +255,10 @@ def main():
         print("\n[ERRO] Chave GEMINI_API_KEY não configurada no arquivo .env!")
         return
 
-    # Inicializa motor e ferramentas
+    # Inicializa motor, ferramentas e roteador semântico vetorial
     rag_engine = HybridRAGEngine()
     tools = PostoTools(rag_engine)
+    router = SemanticRouter(rag_engine=rag_engine)
 
     print("\n0. Autenticando no Banco ERP (5433)...")
     senha_arquivo = BASE_DIR / "backups" / "erp_password.txt"
@@ -498,12 +315,16 @@ def main():
                 print("Encerrando sessão. Até logo!")
                 break
 
-            intencao = classificar_intencao(pergunta)
+            t_tool_start = time.perf_counter()
+            intencao, confianca, telemetria_rota = router.route(pergunta)
+            query_vector = telemetria_rota.get("query_vector")
             contexto_extra = ""
             telemetria_retrieval = None
-            t_tool_start = time.perf_counter()
-            query_vector = None
             cache_hit = False
+
+            metodo_label = "pgvector (halfvec 768d)" if telemetria_rota.get("method") == "vector_pgvector" else telemetria_rota.get("method")
+            pg_lat = telemetria_rota.get("pgvector_latency_ms", 0.0)
+            print(f"\n🔀 [ROTEADOR SEMÂNTICO] Intenção: {intencao.upper()} (Confiança: {confianca*100:.1f}% | Rota: {metodo_label} | Latência pgvector: {pg_lat:.2f}ms)")
 
             if intencao == "auditoria_turno":
                 data_p, turno_p = extrair_data_turno(pergunta)
@@ -543,9 +364,10 @@ def main():
                 tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
 
             elif intencao == "sre_metricas":
-                print("\n🔀 [ROTEADOR] Intenção detectada: Telemetria SRE (PostgreSQL Tool)...")
+                print("\n🔀 [ROTEADOR] Intenção detectada: Telemetria SRE (PostgreSQL & Semantic Router Tool)...")
                 sre_metricas = tools.obter_telemetria_sre()
-                contexto_extra = f"Métricas de Observabilidade SRE do Banco PostgreSQL 16:\n{json.dumps(sre_metricas, ensure_ascii=False, indent=2, default=str)}\n"
+                sre_metricas["semantic_router_metrics"] = router.get_sre_telemetry()
+                contexto_extra = f"Métricas de Observabilidade SRE do Banco PostgreSQL 16 e Roteador Semântico:\n{json.dumps(sre_metricas, ensure_ascii=False, indent=2, default=str)}\n"
                 tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
 
             elif intencao == "dados_filial":
