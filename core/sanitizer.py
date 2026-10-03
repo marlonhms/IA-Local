@@ -631,11 +631,9 @@ class SpacyLogNLPProcessor:
         )
 
     def extract_entities(self, text: str) -> SpacyExtractedEntities:
-        """Extrai entidades estruturadas usando o pipeline do spaCy."""
-        if not text or not self.nlp:
+        """Extrai entidades estruturadas usando o pipeline do spaCy ou fallback determinístico."""
+        if not text:
             return SpacyExtractedEntities()
-
-        doc = self.nlp(text[:25000])
 
         tables: Set[str] = set()
         constraints: Set[str] = set()
@@ -643,27 +641,46 @@ class SpacyLogNLPProcessor:
         services: Set[str] = set()
         sql_ops: Set[str] = set()
 
-        # 1. Varredura via PhraseMatcher
-        matches = self.phrase_matcher(doc)
-        for match_id, start, end in matches:
-            span = doc[start:end]
-            label = self.nlp.vocab.strings[match_id]
-            clean_text = span.text.strip().lower()
+        if not self.nlp:
+            text_lower = text[:25000].lower()
+            for cat, phrases in POSTO_VOCABULARY.items():
+                for phrase in phrases:
+                    p_lower = phrase.lower()
+                    if re.search(r'\b' + re.escape(p_lower) + r'\b', text_lower):
+                        if cat == "DB_TABLE":
+                            tables.add(p_lower)
+                        elif cat == "DB_CONSTRAINT":
+                            constraints.add(p_lower)
+                        elif cat == "ERROR_SIGNATURE":
+                            errors.add(phrase)
+                        elif cat == "SERVICE_NAME":
+                            services.add(phrase)
+            for m in re.finditer(r'\b(update|insert|delete|alter|select|truncate|drop)\b', text_lower):
+                sql_ops.add(m.group(1).upper())
+        else:
+            doc = self.nlp(text[:25000])
 
-            if label == "DB_TABLE":
-                tables.add(clean_text)
-            elif label == "DB_CONSTRAINT":
-                constraints.add(clean_text)
-            elif label == "ERROR_SIGNATURE":
-                errors.add(span.text.strip())
-            elif label == "SERVICE_NAME":
-                services.add(span.text.strip())
+            # 1. Varredura via PhraseMatcher
+            matches = self.phrase_matcher(doc)
+            for match_id, start, end in matches:
+                span = doc[start:end]
+                label = self.nlp.vocab.strings[match_id]
+                clean_text = span.text.strip().lower()
 
-        # 2. Varredura via Token Matcher (SQL Operations)
-        sql_matches = self.matcher(doc)
-        for match_id, start, end in sql_matches:
-            span = doc[start:end]
-            sql_ops.add(span.text.strip().upper())
+                if label == "DB_TABLE":
+                    tables.add(clean_text)
+                elif label == "DB_CONSTRAINT":
+                    constraints.add(clean_text)
+                elif label == "ERROR_SIGNATURE":
+                    errors.add(span.text.strip())
+                elif label == "SERVICE_NAME":
+                    services.add(span.text.strip())
+
+            # 2. Varredura via Token Matcher (SQL Operations)
+            sql_matches = self.matcher(doc)
+            for match_id, start, end in sql_matches:
+                span = doc[start:end]
+                sql_ops.add(span.text.strip().upper())
 
         # 3. Varredura Regex de apoio para foreign keys dinâmicas
         fk_match = re.findall(r'constraint\s+"([^"]+)"', text, re.IGNORECASE)

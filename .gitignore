@@ -30,6 +30,11 @@ backups/*
 *.bak
 *.dump
 *.sql
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+data/*.sqlite*
 
 # Logs e arquivos temporários
 *.log

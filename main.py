@@ -1,20 +1,15 @@
 """
-Ponto de Entrada Principal (Main CLI) do Agente Inteligente do Posto & PDV.
-Arquitetura:
-- Motor: HybridRAGEngine (PostgreSQL 16 pgvector + GIN FTS + Reciprocal Rank Fusion)
-- LLM: Google Gemini com Streaming de Resposta (TTFT reduzido para tempo real)
-- Roteador de Ferramentas (Tool Routing):
-    1. Vendas e Movimentação do PDV (pedido + itemped + abastecimentos)
-    2. Posição de Estoque e Tanques (produtos + tanques)
-    3. Análise de Clientes e Faturamento (clientes + pedido)
-    4. Catálogo de Produtos com RAG Híbrido HNSW + GIN e Cache Semântico
-    5. Telemetria SRE (PostgreSQL 16)
-    6. Dados Cadastrais da Filial (empresa)
-    7. Previsão de Esgotamento de Combustível (Run-Out) & Sugestão de Pedidos (tanques + abastecimentos)
-    8. Auditoria de Fechamento de Turno & Conciliação de Pista (fechabomba + fechacaixa + CBC04)
-    9. Auditoria de Desempenho de Frentistas & Pista (vazão de bicos, conversão de aditivada, anomalias)
-    10. Livro de Movimentação de Combustíveis (LMC Oficial ANP Portaria 26/1992)
-    11. Inteligência de Loja de Conveniência (Market Basket Analysis, Vendas Cruzadas & Combos)
+Ponto de Entrada Principal (Main CLI) do Agente Inteligente AURA.
+(Autonomous Unified Retail Assistant - Postos de Combustíveis & PDV)
+
+Arquitetura Headless (Fase 1):
+- Motor Cognitivo: AuraEngine (core/aura_engine.py)
+- Roteador Vetorial: SemanticRouter (pgvector HNSW + heurísticas de baixa latência)
+- RAG Híbrido: HybridRAGEngine (GIN FTS + pgvector HNSW + RRF Boost + Cache Semântico)
+- 11 Ferramentas Especializadas: PostoTools (ERP PostgreSQL porta 5433)
+- Blindagem e Privacidade: CentralLogSanitizer (LGPD & OWASP)
+- Memória de Sessão: AuraSessionMemory (SQLite persistente)
+- LLM: Google Gemini com Streaming de Resposta em Tempo Real
 """
 
 import os
@@ -22,14 +17,14 @@ import sys
 import time
 import json
 import re
-from typing import Tuple, Optional
-import psycopg2
-import google.generativeai as genai
+import uuid
+import asyncio
+from typing import Tuple, Optional, Any, Dict
 
 # Garante saída em UTF-8 no terminal Windows
-if sys.stdout.encoding != 'utf-8':
+if hasattr(sys.stdout, "reconfigure"):
     try:
-        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
         pass
 
@@ -42,234 +37,31 @@ from config.settings import (
     FALLBACK_MODELS,
     BASE_DIR,
 )
-from core.rag_engine import HybridRAGEngine
-from core.tools import PostoTools, get_erp_connection
-from core.sanitizer import central_log_sanitizer
+from core.aura_engine import (
+    AuraEngine,
+    AuraChunk,
+    AuraChunkType,
+    AuraSessionMemory,
+    classificar_intencao,
+    extrair_combustivel,
+    extrair_data_turno,
+    extrair_frentista,
+    extrair_bico,
+    extrair_produto_cesta,
+    extrair_grupo,
+    limpar_termo_produto,
+)
+from core.tools import get_erp_connection
 from core.semantic_router import SemanticRouter, classificar_intencao_heuristica
+import google.generativeai as genai
 
 
-def classificar_intencao(pergunta: str, router: Optional[SemanticRouter] = None) -> str:
-    """
-    Classifica a intenção da pergunta do usuário.
-    Se o SemanticRouter for fornecido, executa roteamento semântico vetorial com pgvector.
-    Caso contrário, executa as heurísticas determinísticas com latência ultrarrápida.
-    """
-    if router is not None:
-        intencao, _, _ = router.route(pergunta)
-        return intencao
-    return classificar_intencao_heuristica(pergunta)
-
-
-
-def extrair_grupo(pergunta: str) -> str:
-    """Extrai intenção de grupo (Metadata Filter) via palavras-chave."""
-    p = pergunta.lower()
-    if "cerveja" in p or "bebida" in p: return "BEBIDAS"
-    if "óleo" in p or "oleo" in p or "lubrificante" in p: return "LUBRIFICANTES"
-    if "cigarro" in p or "tabaco" in p: return "TABACO"
-    if "conveniência" in p or "salgadinho" in p or "doce" in p: return "CONVENIENCIA"
-    return None
-
-
-def extrair_combustivel(pergunta: str) -> Optional[str]:
-    """Extrai combustível ou código de tanque da pergunta do usuário."""
-    p = pergunta.lower()
-
-    # 1. Menção a tanque específico prioritária (evita falso positivo quando menciona tanque e combustível)
-    m_tanque = re.search(r"\b(?:tanque|tq)\s*[-_]?\s*0*([0-9]{1,3})\b", p)
-    if m_tanque:
-        num = int(m_tanque.group(1))
-        return f"{num:03d}"
-
-    # 2. Combustíveis específicos
-    if "gasolina aditivada" in p or "aditivada" in p or "grid" in p or "v-power" in p or "octapro" in p or "podium" in p or "premium" in p:
-        return "GASOLINA ADITIVADA"
-    if "gasolina comum" in p:
-        return "GASOLINA COMUM"
-    if "gasolinas" in p:
-        return "GASOLINA"
-    if "diesel s10" in p or "diesel s-10" in p or "s10" in p or "s-10" in p:
-        return "DIESEL S10"
-    if "diesel s500" in p or "diesel s-500" in p or "s500" in p or "s-500" in p or "diesel comum" in p:
-        return "DIESEL S500"
-    if "diesel" in p:
-        return "DIESEL"
-    if "etanol" in p or "álcool" in p or "alcool" in p:
-        return "ETANOL"
-    if "arla" in p:
-        return "ARLA"
-    if "gasolina" in p:
-        return "GASOLINA COMUM"
-
-    return None
-
-
-def extrair_data_turno(pergunta: str) -> Tuple[Optional[str], Optional[str]]:
-    """Extrai parâmetros de data e turno a partir da pergunta em linguagem natural."""
-    p = pergunta.lower()
-    
-    # Identificação do Turno
-    turno = None
-    if re.search(r"\b(1[º°ªo]|primeir[oa]|manh[aã]|turno\s*1|1\s*turno)\b", p):
-        turno = "1º TURNO"
-    elif re.search(r"\b(2[º°ªo]|segund[oa]|tarde|turno\s*2|2\s*turno)\b", p):
-        turno = "2º TURNO"
-    elif re.search(r"\b(3[º°ªo]|terceir[oa]|noite|madrugada|turno\s*3|3\s*turno)\b", p):
-        turno = "3º TURNO"
-
-    # Identificação da Data
-    data = None
-    if "hoje" in p:
-        data = "hoje"
-    elif "anteontem" in p:
-        data = "anteontem"
-    elif "ontem" in p:
-        data = "ontem"
-    else:
-        m_iso = re.search(r"\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b", p)
-        if m_iso:
-            y, m, d = m_iso.groups()
-            data = f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
-        else:
-            m_br = re.search(r"\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})\b", p)
-            if m_br:
-                d, m, y = m_br.groups()
-                data = f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
-            else:
-                m_dia_mes = re.search(r"\b(\d{1,2})[-/](\d{1,2})\b", p)
-                if m_dia_mes:
-                    d, m = m_dia_mes.groups()
-                    data = f"2026-{int(m):02d}-{int(d):02d}"
-                else:
-                    meses = {
-                        "jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6,
-                        "jul": 7, "ago": 8, "set": 9, "out": 10, "nov": 11, "dez": 12
-                    }
-                    m_ext = re.search(r"\b(\d{1,2})\s+de\s+([a-zçãõ]+)(?:\s+de\s+(\d{4}))?", p)
-                    if m_ext:
-                        d, mes_str, ano_str = m_ext.groups()
-                        mes_prefix = mes_str[:3]
-                        if mes_prefix in meses:
-                            ano = int(ano_str) if ano_str else 2026
-                            data = f"{ano:04d}-{meses[mes_prefix]:02d}-{int(d):02d}"
-
-    return data, turno
-
-
-def extrair_bico(pergunta: str) -> Optional[str]:
-    """Extrai número de bico ou bomba a partir da pergunta."""
-    p = pergunta.lower()
-    m_b = re.search(r"\b(?:bico|bomba)\s*0*([0-9]{1,3})\b", p)
-    if m_b:
-        num = int(m_b.group(1))
-        return f"{num:03d}"
-    return None
-
-
-def extrair_frentista(pergunta: str) -> Optional[str]:
-    """Extrai identificação ou nome de frentista a partir da pergunta."""
-    p = pergunta.lower()
-
-    # 1. Padrão numérico (matrícula / frentista / operador / colaborador)
-    m_mat = re.search(r"\b(?:matr[ií]cula|frentista|operador|colaborador)\s*0*([0-9]{1,5})\b", p)
-    if m_mat:
-        num = int(m_mat.group(1))
-        return f"{num:05d}"
-
-    # 2. Padrão nominal precedido por 'frentista', 'operador' ou 'colaborador'
-    m_nome = re.search(r"\b(?:frentista|operador|colaborador)\s+([a-zA-ZÀ-ÿ]{3,})\b", p)
-    stop_words = {
-        "hoje", "ontem", "anteontem", "com", "sem", "que", "mais", "menos", "qual", "quem",
-        "tem", "teve", "houve", "de", "do", "da", "no", "na", "em", "um", "uma", "para", "por",
-        "geral", "ranking", "pista", "equipe", "time", "vendeu", "faturou", "melhor", "maior",
-        "pior", "menor", "bico", "bomba", "turno"
-    }
-    if m_nome:
-        candidato = m_nome.group(1).lower()
-        if candidato not in stop_words:
-            return candidato.upper()
-
-    # 3. Nomes conhecidos da equipe cadastrada no ERP
-    nomes = [
-        "italo", "botan", "marcio", "sergio", "erivas", "cristian", "marlon",
-        "davi", "ruan", "vinicius", "robson", "gabriel", "ludmila", "samarina"
-    ]
-    for n in nomes:
-        if re.search(rf"\b{n}\b", p):
-            return n.upper()
-
-    return None
-
-
-def limpar_termo_produto(prod: str) -> Optional[str]:
-    """Limpa ruído léxico, preposições, artigos e sufixos de um produto extraído."""
-    if not prod:
-        return None
-    p = prod.strip().strip("\"'[](){}<>")
-    # Remove artigos e preposições iniciais: 'o ', 'a ', 'os ', 'as ', 'um ', 'uma ', 'de ', 'do ', 'da ', 'no ', 'na '
-    p = re.sub(r"^(?:o|a|os|as|um|uma|uns|umas|de|do|da|dos|das|no|na|nos|nas|com|para|pra|por)\s+", "", p, flags=re.IGNORECASE).strip()
-    # Remove prefixos como 'produto ', 'item ', 'codigo ', 'código ', 'sku ', 'mercadoria '
-    p = re.sub(r"^(?:produto|mercadoria|c[oó]digo|cod|item|sku)\s*", "", p, flags=re.IGNORECASE).strip()
-    # Remove complementos de localização ou tempo ao final
-    p = re.sub(r"\b(?:na|no|da|do|em)\s+conveni[eê]ncia\b.*", "", p, flags=re.IGNORECASE).strip()
-    p = re.sub(r"\b(?:na|no|da|do|em)\s+loja\b.*", "", p, flags=re.IGNORECASE).strip()
-    p = re.sub(r"\b(?:hoje|ontem|no\s+caixa|no\s+pdv|no\s+balc[aã]o|no\s+posto)\b.*", "", p, flags=re.IGNORECASE).strip()
-    # Remove adjetivos conversacionais soltos no final: 'gelada', 'gelado', 'quente', etc.
-    p = re.sub(r"\s+\b(?:gelad[ao]s?|fria?s?|frio?s?|quentes?|trincando)\b", "", p, flags=re.IGNORECASE).strip()
-    p = p.rstrip("?.,;! ")
-
-    stop_generic = {
-        "conveniencia", "conveniência", "loja", "pdv", "caixa", "produtos", "mercadorias",
-        "produto", "mercadoria", "isso", "ele", "ela", "eles", "elas", "combo", "combos",
-        "cesta", "vendas", "cross-sell", "cross sell"
-    }
-    if not p or len(p) < 2 or p.lower() in stop_generic:
-        return None
-    return p
-
-
-def extrair_produto_cesta(pergunta: str) -> Optional[str]:
-    """Extrai produto alvo para análise de vendas cruzadas (Market Basket)."""
-    p = (pergunta or "").strip()
-
-    # 1. Padrões com 'junto com', 'junto de', 'junto a'
-    m_junto = re.search(r"\bjunto\s+(?:com|de|a|ao|à)\s+([^?.,;!\n]+)", p, re.IGNORECASE)
-    if m_junto:
-        res = limpar_termo_produto(m_junto.group(1))
-        if res:
-            return res
-
-    # 2. Padrões 'combos? (?:para|pra|de|do|da)'
-    m_combo = re.search(r"\bcombos?\s+(?:para|pra|de|do|da)\s+([^?.,;!\n]+)", p, re.IGNORECASE)
-    if m_combo:
-        res = limpar_termo_produto(m_combo.group(1))
-        if res:
-            return res
-
-    # 3. Padrões 'vende|sai|compra|oferece com <produto>'
-    m_com = re.search(r"\b(?:vende[rm]?|sai[rm]?|compra[rm]?|oferece[rm]?|levar?)\s+com\s+([^?.,;!\n]+)", p, re.IGNORECASE)
-    if m_com:
-        res = limpar_termo_produto(m_com.group(1))
-        if res:
-            return res
-
-    # 4. Checagem direta de termos comuns de conveniência se presentes na pergunta
-    termos_comuns = [
-        "cerveja heineken", "heineken", "cerveja", "coca-cola", "coca cola", "coca",
-        "cafe expresso", "café expresso", "café", "cafe", "pao de queijo", "pão de queijo",
-        "red bull", "energetico", "energético", "kit kat", "chocolate", "gelo", "carvao", "carvão",
-        "halls", "mentos", "salgado"
-    ]
-    p_lower = p.lower()
-    for t in termos_comuns:
-        if t in p_lower and any(w in p_lower for w in ["para", "com", "junto", "do", "da", "de"]):
-            return t
-
-    return None
-
+# =============================================================================
+# COMPATIBILIDADE RETROATIVA (LEGACY WRAPPERS)
+# =============================================================================
 
 def responder_com_streaming(prompt_sistema: str):
-    """Gera resposta do Gemini com Streaming de tokens em tempo real."""
+    """Gera resposta do Gemini com Streaming de tokens em tempo real (compatibilidade legada)."""
     t0 = time.perf_counter()
     ttft_ms = None
     primeiro_chunk = True
@@ -281,7 +73,7 @@ def responder_com_streaming(prompt_sistema: str):
             response = model.generate_content(
                 prompt_sistema,
                 stream=True,
-                request_options={"timeout": 8}
+                request_options={"timeout": 10}
             )
 
             for chunk in response:
@@ -314,20 +106,103 @@ def responder_com_streaming(prompt_sistema: str):
     return msg_erro, 0.0, (time.perf_counter() - t0) * 1000
 
 
+# =============================================================================
+# CLI INTERATIVO CONSUMINDO O MOTOR HEADLESS AURA
+# =============================================================================
+
+async def _processar_pergunta_cli(engine: AuraEngine, pergunta: str, session_id: str):
+    """Processa a pergunta via stream assíncrono do AuraEngine exibindo saída em tempo real."""
+    ttft_exibido = False
+    telemetria_recebida = None
+    cache_atingido = False
+
+    async for chunk in engine.ask_stream(pergunta, session_id=session_id):
+        if chunk.chunk_type == AuraChunkType.INTENT and chunk.data:
+            intencao = chunk.data.get("intent", "").upper()
+            conf = chunk.data.get("confidence", 0.0) * 100
+            rota_info = chunk.data.get("routing_telemetry", {})
+            metodo = rota_info.get("method", "heuristica")
+            metodo_label = "pgvector (halfvec 768d)" if metodo == "vector_pgvector" else metodo
+            pg_lat = rota_info.get("pgvector_latency_ms", 0.0)
+            print(f"\n🔀 [ROTEADOR SEMÂNTICO] Intenção: {intencao} (Confiança: {conf:.1f}% | Rota: {metodo_label} | Latência pgvector: {pg_lat:.2f}ms)")
+
+        elif chunk.chunk_type == AuraChunkType.TOOL_START:
+            intencao_raw = chunk.data.get("intent", "") if chunk.data else ""
+            if intencao_raw == "auditoria_turno":
+                print(f"🔀 [ROTEADOR] Intenção detectada: Auditoria de Pista & Conciliação de Turnos (ERP Tool)...")
+            elif intencao_raw == "previsao_tanques":
+                print(f"🔮 [ROTEADOR] Intenção detectada: Previsão de Esgotamento & Sugestão de Pedidos (Run-Out Forecast)...")
+            elif intencao_raw == "desempenho_pista_frentistas":
+                print(f"⛽ [ROTEADOR] Intenção detectada: Auditoria Operacional de Pista & Desempenho de Frentistas (ERP Tool)...")
+            elif intencao_raw == "lmc_anp":
+                print(f"📋 [ROTEADOR] Intenção detectada: Livro de Movimentação de Combustíveis (LMC Oficial ANP)...")
+            elif intencao_raw == "vendas_analitico":
+                print(f"🔀 [ROTEADOR] Intenção detectada: Análise de Vendas (ERP Tool)...")
+            elif intencao_raw == "conveniencia_vendas_cruzadas":
+                print(f"🛒 [ROTEADOR] Intenção detectada: Inteligência de Conveniência (Market Basket Analysis & Vendas Cruzadas)...")
+            elif intencao_raw == "sre_metricas":
+                print(f"🔀 [ROTEADOR] Intenção detectada: Telemetria SRE (PostgreSQL & Semantic Router Tool)...")
+            elif intencao_raw == "dados_filial":
+                print(f"🔀 [ROTEADOR] Intenção detectada: Cadastro da Filial...")
+            elif intencao_raw == "estoque_posicao":
+                print(f"🔀 [ROTEADOR] Intenção detectada: Consulta de Estoque e Tanques (ERP Tool)...")
+            elif intencao_raw == "clientes_ranking":
+                print(f"🔀 [ROTEADOR] Intenção detectada: Análise de Clientes e Faturamento (ERP Tool)...")
+            else:
+                print(f"⚙️  [ROTEADOR] Intenção detectada: Catálogo (Busca Híbrida RRF)...")
+
+        elif chunk.chunk_type == AuraChunkType.CACHE_HIT:
+            cache_atingido = True
+            sim = chunk.data.get("similarity", 1.0) if chunk.data else 1.0
+            print(f"⚡ [CACHE SEMÂNTICO] Hit de cache semântico (Similaridade: {sim:.4f})")
+            print("\n🤖 AURA (Cache):\n")
+
+        elif chunk.chunk_type == AuraChunkType.DELTA:
+            if not ttft_exibido and not cache_atingido:
+                print("\n🤖 AURA (Streaming):\n")
+                ttft_exibido = True
+            if chunk.text:
+                sys.stdout.write(chunk.text)
+                sys.stdout.flush()
+
+        elif chunk.chunk_type == AuraChunkType.TELEMETRY:
+            telemetria_recebida = chunk.data or {}
+
+        elif chunk.chunk_type == AuraChunkType.DONE:
+            print("\n")
+            if telemetria_recebida:
+                print("-" * 75)
+                print("📊 [TELEMETRIA SRE DA REQUISIÇÃO]")
+                print(f"  • Rota / Ferramenta:   {telemetria_recebida.get('intent', '').upper()}")
+                if telemetria_recebida.get('cache_hit'):
+                    print(f"  • ⚡ Hit Cache Semântico: SIM (Custo Zero)")
+                print(f"  • Latência Ferramenta: {telemetria_recebida.get('tool_latency_ms', 0.0)} ms")
+                if telemetria_recebida.get('lgpd_redacted_count', 0) > 0:
+                    print(f"  • 🛡️ LGPD Protegido:    {telemetria_recebida['lgpd_redacted_count']} dado(s) sensível(is) mascarado(s)")
+                retrieval = telemetria_recebida.get("retrieval")
+                if retrieval:
+                    print(f"    - Embedding Gemini:  {retrieval.get('embedding_latency_ms', 0)} ms")
+                    print(f"    - PostgreSQL RRF:    {retrieval.get('db_rrf_latency_ms', 0)} ms (HNSW ef={retrieval.get('hnsw_ef_search', 100)})")
+                if telemetria_recebida.get('ttft_ms'):
+                    print(f"  • ⚡ Time-To-First-Token: {telemetria_recebida.get('ttft_ms', 0.0)} ms (Início da Resposta)")
+                if telemetria_recebida.get('llm_total_ms'):
+                    print(f"  • ⏳ Duração Total LLM:   {telemetria_recebida.get('llm_total_ms', 0.0)} ms")
+                print(f"  • 🏁 Latência Total E2E:  {telemetria_recebida.get('total_e2e_ms', 0.0)} ms")
+                print("-" * 75)
+
+
 def main():
     print("=" * 75)
-    print("  AGENTE INTELIGENTE DO POSTO & PDV (Híbrido HNSW + Gemini Streaming)")
-    print("  (PostgreSQL 16 pgvector + GIN FTS + Integração ERP)")
+    print("  AURA - Autonomous Unified Retail Assistant")
+    print("  Agente Cognitivo do Posto & PDV (Híbrido HNSW + pgvector + Gemini)")
     print("=" * 75)
 
     if not GEMINI_API_KEY:
         print("\n[ERRO] Chave GEMINI_API_KEY não configurada no arquivo .env!")
         return
 
-    # Inicializa motor, ferramentas e roteador semântico vetorial
-    rag_engine = HybridRAGEngine()
-    tools = PostoTools(rag_engine)
-    router = SemanticRouter(rag_engine=rag_engine)
+    # Inicializa o Motor Central Headless
+    engine = AuraEngine()
 
     print(f"\n0. Autenticando no Banco ERP ({DB_ERP_CONFIG['host']}:{DB_ERP_CONFIG['port']})...")
     senha_arquivo = BASE_DIR / "backups" / "erp_password.txt"
@@ -343,7 +218,6 @@ def main():
             conn = get_erp_connection()
             conn.close()
             print("   [OK] Conectado ao ERP com sucesso.")
-            # Salva a senha validada
             senha_arquivo.parent.mkdir(parents=True, exist_ok=True)
             with open(senha_arquivo, "w", encoding="utf-8") as f:
                 f.write(DB_ERP_CONFIG["password"])
@@ -357,22 +231,24 @@ def main():
                 print(f"   [ERRO] Falha ao conectar no ERP: {e}")
                 break
 
-    print("\n1. Verificando métricas de saúde do banco de dados (SRE)...")
+    print("\n1. Verificando métricas de saúde operacional da estação (SRE)...")
     try:
-        sre_data = tools.obter_telemetria_sre()
-        t_stats = sre_data.get("table_stats", {})
-        db_stats = sre_data.get("database_health", {})
-        print(f"   [OK] Base Vetorial: {t_stats.get('total_rows')} produtos indexados")
-        print(f"   [OK] Cache Hit Ratio: {db_stats.get('cache_hit_ratio_percent')}% | Conexões: {db_stats.get('active_connections')}")
+        status_estacao = engine.get_stations_status()
+        print(f"   [OK] ERP Online: {status_estacao.erp_online} ({status_estacao.erp_host}:{status_estacao.erp_port})")
+        print(f"   [OK] Base Vetorial: {status_estacao.total_products_indexed or 0} produtos indexados")
+        print(f"   [OK] Cache Hit Ratio: {status_estacao.cache_hit_ratio_percent or 0}% | Conexões: {status_estacao.active_connections or 0}")
     except Exception as e:
         print(f"   [AVISO] Telemetria inicial: {e}")
 
     print("\n2. Carregando dados cadastrais da filial...")
-    dados_filial = tools.dados_cadastrais_filial()
+    dados_filial = engine.get_dados_filial()
     print(f"   [OK] Filial Conectada: {dados_filial.get('idempresa')} - {dados_filial.get('nome')} (PDV {dados_filial.get('pdv')})")
 
+    cli_session_id = f"cli_{uuid.uuid4().hex[:8]}"
+    print(f"   [OK] Sessão de Memória Iniciada: {cli_session_id}")
+
     print("\n" + "-" * 75)
-    print("Agente pronto! Digite sua pergunta (ex: vendas, estoque, catálogo) ou 'sair':")
+    print("AURA pronta! Digite sua pergunta (ex: vendas, estoque, catálogo) ou 'sair':")
     print("-" * 75)
 
     while True:
@@ -381,251 +257,10 @@ def main():
             if not pergunta:
                 continue
             if pergunta.lower() in ["sair", "exit", "quit"]:
-                print("Encerrando sessão. Até logo!")
+                print("Encerrando sessão AURA. Até logo!")
                 break
 
-            t_tool_start = time.perf_counter()
-            intencao, confianca, telemetria_rota = router.route(pergunta)
-            query_vector = telemetria_rota.get("query_vector")
-            contexto_extra = ""
-            telemetria_retrieval = None
-            cache_hit = False
-
-            metodo_label = "pgvector (halfvec 768d)" if telemetria_rota.get("method") == "vector_pgvector" else telemetria_rota.get("method")
-            pg_lat = telemetria_rota.get("pgvector_latency_ms", 0.0)
-            print(f"\n🔀 [ROTEADOR SEMÂNTICO] Intenção: {intencao.upper()} (Confiança: {confianca*100:.1f}% | Rota: {metodo_label} | Latência pgvector: {pg_lat:.2f}ms)")
-
-            if intencao == "auditoria_turno":
-                data_p, turno_p = extrair_data_turno(pergunta)
-                print(f"\n🔀 [ROTEADOR] Intenção detectada: Auditoria de Pista & Conciliação de Turnos (ERP Tool)...")
-                resultado_auditoria = tools.auditar_fechamento_turno(data=data_p, turno=turno_p)
-                contexto_extra = f"Auditoria de Fechamento de Turno e Conciliação de Pista no ERP:\n{json.dumps(resultado_auditoria, ensure_ascii=False, indent=2, default=str)}\n"
-                tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
-
-            elif intencao == "previsao_tanques":
-                comb_filtro = extrair_combustivel(pergunta)
-                print(f"\n🔮 [ROTEADOR] Intenção detectada: Previsão de Esgotamento & Sugestão de Pedidos (Run-Out Forecast)...")
-                if comb_filtro:
-                    print(f"⛽ [FILTRO ATIVO] Analisando combustível/tanque: {comb_filtro}")
-                resultado_previsao = tools.prever_esgotamento_tanques(filtro_combustivel=comb_filtro)
-                contexto_extra = f"Previsão de Esgotamento de Combustível (Run-Out Forecast) e Sugestão de Pedidos no ERP:\n{json.dumps(resultado_previsao, ensure_ascii=False, indent=2, default=str)}\n"
-                tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
-
-            elif intencao == "desempenho_pista_frentistas":
-                data_p, turno_p = extrair_data_turno(pergunta)
-                frent_p = extrair_frentista(pergunta)
-                bico_p = extrair_bico(pergunta)
-                print(f"\n⛽ [ROTEADOR] Intenção detectada: Auditoria Operacional de Pista & Desempenho de Frentistas (ERP Tool)...")
-                if frent_p:
-                    print(f"👤 [FILTRO ATIVO] Analisando frentista: {frent_p}")
-                if bico_p:
-                    print(f"⛽ [FILTRO ATIVO] Analisando bico: {bico_p}")
-                if data_p:
-                    print(f"📅 [FILTRO ATIVO] Data alvo: {data_p}")
-                resultado_pista = tools.auditar_desempenho_pista_frentistas(data=data_p, turno=turno_p, frentista=frent_p, bico=bico_p)
-                contexto_extra = f"Auditoria Operacional de Pista, Vazão de Bicos e Desempenho de Frentistas no ERP:\n{json.dumps(resultado_pista, ensure_ascii=False, indent=2, default=str)}\n"
-                tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
-
-            elif intencao == "lmc_anp":
-                data_p, _ = extrair_data_turno(pergunta)
-                comb_ou_tanque = extrair_combustivel(pergunta)
-                tanque_filtro = None
-                comb_filtro = None
-                if comb_ou_tanque:
-                    if comb_ou_tanque.isdigit() or (len(comb_ou_tanque) == 3 and comb_ou_tanque.isnumeric()):
-                        tanque_filtro = comb_ou_tanque
-                    else:
-                        comb_filtro = comb_ou_tanque
-                if not tanque_filtro:
-                    m_tanque = re.search(r"\b(?:tanque|tq)\s*[-_]?\s*0*([0-9]{1,3})\b", pergunta.lower())
-                    if m_tanque:
-                        tanque_filtro = f"{int(m_tanque.group(1)):03d}"
-
-                print(f"\n📋 [ROTEADOR] Intenção detectada: Livro de Movimentação de Combustíveis (LMC Oficial ANP)...")
-                if data_p:
-                    print(f"📅 [FILTRO ATIVO] Data LMC: {data_p}")
-                if tanque_filtro:
-                    print(f"⛽ [FILTRO ATIVO] Tanque LMC: {tanque_filtro}")
-                elif comb_filtro:
-                    print(f"⛽ [FILTRO ATIVO] Combustível LMC: {comb_filtro}")
-
-                resultado_lmc = tools.gerar_relatorio_lmc_anp(
-                    data=data_p,
-                    combustivel=comb_filtro,
-                    tanque=tanque_filtro
-                )
-                contexto_extra = f"Livro de Movimentação de Combustíveis (LMC ANP Portaria 26/1992):\n{json.dumps(resultado_lmc, ensure_ascii=False, indent=2, default=str)}\n"
-                tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
-
-            elif intencao == "vendas_analitico":
-                print("\n🔀 [ROTEADOR] Intenção detectada: Análise de Vendas (ERP Tool)...")
-                resultado_vendas = tools.consultar_analise_vendas_erp(tipo="mais_vendidos")
-                contexto_extra = f"Consulta de Histórico de Vendas no ERP:\n{json.dumps(resultado_vendas, ensure_ascii=False, indent=2, default=str)}\n"
-                tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
-
-            elif intencao == "conveniencia_vendas_cruzadas":
-                filtro_prod = extrair_produto_cesta(pergunta)
-                print(f"\n🛒 [ROTEADOR] Intenção detectada: Inteligência de Conveniência (Market Basket Analysis & Vendas Cruzadas)...")
-                if filtro_prod:
-                    print(f"🎯 [FILTRO ATIVO] Analisando afinidade do produto: '{filtro_prod}'")
-                resultado_cesta = tools.auditar_cesta_conveniencia_vendas_cruzadas(
-                    filtro_produto=filtro_prod,
-                    min_lift=1.2,
-                    limit=10,
-                )
-                contexto_extra = f"Market Basket Analysis & Vendas Cruzadas da Loja de Conveniência no ERP:\n{json.dumps(resultado_cesta, ensure_ascii=False, indent=2, default=str)}\n"
-                tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
-
-            elif intencao == "sre_metricas":
-                print("\n🔀 [ROTEADOR] Intenção detectada: Telemetria SRE (PostgreSQL & Semantic Router Tool)...")
-                sre_metricas = tools.obter_telemetria_sre()
-                sre_metricas["semantic_router_metrics"] = router.get_sre_telemetry()
-                contexto_extra = f"Métricas de Observabilidade SRE do Banco PostgreSQL 16 e Roteador Semântico:\n{json.dumps(sre_metricas, ensure_ascii=False, indent=2, default=str)}\n"
-                tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
-
-            elif intencao == "dados_filial":
-                print("\n🔀 [ROTEADOR] Intenção detectada: Cadastro da Filial...")
-                contexto_extra = f"Dados da Filial:\n{json.dumps(dados_filial, ensure_ascii=False, indent=2, default=str)}\n"
-                tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
-
-            elif intencao == "estoque_posicao":
-                print("\n🔀 [ROTEADOR] Intenção detectada: Consulta de Estoque e Tanques (ERP Tool)...")
-                resultado_estoque = tools.consultar_estoque_erp(termo=pergunta)
-                contexto_extra = f"Posição Real de Estoque e Tanques no ERP (porta 5433):\n{json.dumps(resultado_estoque, ensure_ascii=False, indent=2, default=str)}\n"
-                tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
-
-            elif intencao == "clientes_ranking":
-                print("\n🔀 [ROTEADOR] Intenção detectada: Análise de Clientes e Faturamento (ERP Tool)...")
-                resultado_clientes = tools.consultar_clientes_erp(termo=pergunta)
-                contexto_extra = f"Dados de Clientes e Histórico de Compras no ERP (porta 5433):\n{json.dumps(resultado_clientes, ensure_ascii=False, indent=2, default=str)}\n"
-                tool_latency_ms = (time.perf_counter() - t_tool_start) * 1000
-
-            else:
-                # Catálogo de produtos (RAG Híbrido HNSW + GIN) com Cache Semântico
-                print("\n⚙️  [ROTEADOR] Intenção detectada: Catálogo (Busca Híbrida RRF)...")
-                cache_data = tools.rag.check_semantic_cache(pergunta, query_vector=query_vector)
-                query_vector = cache_data.get("query_vector") or query_vector
-                
-                if cache_data.get("resposta_llm"):
-                    cache_hit = True
-                    print(f"⚡ [CACHE SEMÂNTICO] Hit de cache semântico (Similaridade: {cache_data['cosine_similarity']:.4f})")
-                    print("\n🤖 AGENTE (Cache):\n")
-                    print(cache_data["resposta_llm"])
-                    print("\n")
-                    total_e2e_ms = (time.perf_counter() - t_tool_start) * 1000
-                    print("-" * 75)
-                    print("📊 [TELEMETRIA SRE DA REQUISIÇÃO]")
-                    print(f"  • Rota: CATÁLOGO_PRODUTOS (CACHE HIT)")
-                    print(f"  • 🏁 Latência Total E2E:  {round(total_e2e_ms, 2)} ms (Custo Zero)")
-                    print("-" * 75)
-                    continue
-                
-                grupo_filtro = extrair_grupo(pergunta)
-                if grupo_filtro:
-                    print(f"🔍 [FILTRO ATIVO] Limitando busca apenas à categoria: {grupo_filtro}")
-
-                busca = tools.buscar_produtos_catalogo(pergunta, top_k=5, query_vector=query_vector, grupo_filter=grupo_filtro)
-                produtos = busca["results"]
-                telemetria_retrieval = busca["telemetry"]
-                tool_latency_ms = telemetria_retrieval["total_retrieval_latency_ms"]
-
-                contexto_extra = "Produtos recuperados do catálogo por RAG Híbrido (HNSW + Full-Text Search + RRF):\n"
-                for p in produtos:
-                    contexto_extra += (
-                        f"- [{p.get('codpro')}] {p.get('nompro')} | Grupo: {p.get('grupo')} | "
-                        f"Preço: R$ {p.get('preco', 0.0):.2f} (RRF: {p.get('rrf_score', 0.0):.4f} | "
-                        f"Cosine: {p.get('cosine_similarity', 0.0):.2f} | FTS: {p.get('fts_score', 0.0):.2f})\n"
-                    )
-
-            # Blindagem de Privacidade e LGPD (Fase 1)
-            contexto_sanitizado, counts_ctx = central_log_sanitizer.sanitize_text(contexto_extra)
-            pergunta_sanitizada, counts_perg = central_log_sanitizer.sanitize_text(pergunta)
-            total_redacted = sum(counts_ctx.values()) + sum(counts_perg.values())
-            if total_redacted > 0:
-                detalhes_redacted = ", ".join(f"{k}: {v}" for k, v in {**counts_ctx, **counts_perg}.items() if v > 0)
-                print(f"🛡️  [LGPD SANITIZER] {total_redacted} dado(s) sensível(is) ofuscado(s) pré-prompt ({detalhes_redacted})")
-
-            prompt_sistema = f"""
-Você é o Agente Inteligente do Posto de Combustíveis e Loja de Conveniência.
-Seu objetivo é orientar o atendente, operador do caixa ou cliente com clareza, rapidez e precisão.
-
-Dados Cadastrais da Unidade:
-- Filial: {dados_filial.get('idempresa')} - {dados_filial.get('nome')}
-- Razão Social: {dados_filial.get('razao_social')}
-- CNPJ: {dados_filial.get('cnpj')}
-- Endereço: {dados_filial.get('endereco')}
-- PDV: {dados_filial.get('pdv')}
-
-Informações Recuperadas pelas Ferramentas do Sistema:
-{contexto_sanitizado}
-
-Pergunta do Usuário:
-"{pergunta_sanitizada}"
-
-Diretrizes:
-1. Responda de forma direta, prestativa e profissional.
-2. Se a pergunta for sobre produtos, indique claramente o nome, código (SKU) e preço.
-3. Se a pergunta for sobre vendas, faturamento ou abastecimentos, utilize os dados fornecidos pelo ERP. Se o usuário perguntar sobre o último produto vendido ou últimas vendas, cite diretamente os dados da seção 'ultimo_produto_vendido_destaque' e 'ultimos_produtos_conveniencia' / 'ultimos_abastecimentos_pista', informando o nome do produto, código SKU, data e hora exata da venda, quantidade e valor total. Só mencione erro de credenciais se a ferramenta retornar status 'indisponivel'.
-4. Se for sobre métricas ou SRE, explique a saúde do banco (cache hit ratio, status dos índices) de maneira técnica e clara.
-5. Se a pergunta for sobre estoque, saldo disponível ou tanques de combustível, utilize os dados reais fornecidos pelo ERP. Apresente os saldos físicos (unidades ou litros), códigos (SKU) e percentuais de ocupação dos tanques de forma organizada e limpa.
-6. Se a pergunta for sobre clientes, ranking de compradores ou dados cadastrais, utilize os dados da ferramenta de clientes do ERP. Respeite as boas práticas de LGPD mantendo CPF/CNPJ mascarados e explique com clareza a realidade operacional do PDV (onde o maior volume em postos é emitido sob 'CONSUMIDOR FINAL', a menos que cadastrado nominalmente).
-7. Se a pergunta for sobre conciliação de turnos, fechamento de turno, furo de caixa ou auditoria de pista, utilize os dados da ferramenta de auditoria de turnos do ERP:
-   - Apresente um parecer executivo claro e objetivo contendo:
-     a) Status Geral da Conciliação (CONCILIADO, DIVERGÊNCIA DE PISTA, FURO DE CAIXA, SOBRA ou TURNO EM ANDAMENTO) e Score de Conformidade (%).
-     b) Triangulação de Pista: compare o volume e faturamento teórico dos encerrantes físicos (fechabomba) com a telemetria em tempo real da automação Companytec CBC04 (abastecimentos), detalhando eventuais bicos divergentes ou pendências de digitação de encerrantes.
-     c) Fechamento de Caixa: apresente os valores declarados pelos operadores (dinheiro, cartão, a prazo, convênio), status dos caixas (abertos ou fechados) e aponte eventuais furos (falta) ou sobras financeiras frente ao faturamento de combustível.
-     d) Balanço dos Tanques: informe se a variação volumétrica apurada nos tanques está dentro da tolerância oficial da ANP (±0.6%).
-     e) Recomendações: liste as ações práticas sugeridas para o gestor e equipe de pista.
-8. Se a pergunta for sobre previsão de esgotamento de tanques (Run-Out Forecast), autonomia de combustível, espaço livre para descarga (ullage) ou sugestão de compra de carreta:
-   - Apresente um parecer preditivo claro, técnico e executivo contendo:
-     a) Tanque e Combustível Mais Crítico: identifique com destaque o tanque com menor autonomia em horas/dias e menor percentual de ocupação, informando se já está abaixo da margem de segurança de 15%.
-     b) Autonomia e Projeção de Run-Out: informe em quantos dias/horas o produto atingirá o nível crítico (15%) e quando secará completamente (0L), projetando a data e hora estimadas de esgotamento.
-     c) Espaço Livre para Descarga (Ullage): informe o volume livre disponível em cada tanque para recebimento de produto.
-     d) Sugestão Inteligente de Pedidos: apresente os volumes sugeridos de compra em múltiplos padrão de compartimento de carreta (5.000 L, 10.000 L, 15.000 L...), indicando a urgência e prazo ideal de compra (com atenção especial para abastecer preventivamente antes do fim de semana).
-9. Se a pergunta for sobre desempenho da equipe de pista, ranking de frentistas, conversão de aditivada, vazão de bicos (alerta preventivo de filtro lento/sujo) ou anomalias operacionais de pista, utilize os dados da ferramenta de auditoria de pista e frentistas do ERP:
-   - Responda primeiro de forma direta, clara e objetiva à pergunta específica feita pelo usuário (ex: declare imediatamente o campeão de aditivada, o frentista com maior ticket médio, ou a vazão/alerta do bico consultado). Em seguida, apresente os pontos operacionais complementares:
-     a) Desempenho dos Frentistas & Ranking: destaque os colaboradores líderes em volume (L) e faturamento (R$), ticket médio por atendimento e o índice de conversão de Gasolina Aditivada (meta recomendada: 25-30% para maximização de margem líquida). Caso a pesquisa seja de uma data específica sem vendas de aditivada pelos frentistas, informe com fidelidade aos dados.
-     b) Vazão dos Bicos & Alerta Preventivo de Filtro Lento: informe o status de vazão dos bicos. Em bombas comerciais, a vazão normal é de 35 a 45 L/min. Se algum bico estiver com vazão lenta ou crítica (< 25-30 L/min), emita alerta imediato de manutenção preventiva para troca do elemento filtrante da bomba. Caso o bico não tenha tido movimentação no período ou tenha operado em estimativa nominal, esclareça com transparência.
-     c) Detecção de Anomalias de Pista: reporte micro-abastecimentos suspeitos (< 1.0 L / < R$ 5), abastecimentos manuais sem automação CBC04, cancelamentos de venda, horários atípicos ou valores repetidos consecutivos.
-     d) Recomendações Práticas: liste ações imediatas sugeridas para a gerência do posto.
-10. Se a pergunta for sobre Livro de Movimentação de Combustíveis (LMC Oficial ANP Portaria 26/1992), balanço escriturado vs físico ou conformidade de tolerância regulamentar (±0.6%):
-    - Apresente um parecer regulamentar e executivo claro contendo:
-      a) Status Geral ANP (CONFORME_ANP ou ALERTA_FORA_TOLERANCIA_ANP) e período analisado.
-      b) Balanço Volumétrico dos Tanques: detalhe para cada tanque o estoque de abertura (E_a), recebimentos/descargas (R), vendas faturadas nos bicos (V), estoque escriturado contábil (E_e = E_a + R - V) e estoque físico medido (E_f apurado por régua ou telemetria).
-      c) Auditoria de Variação (Δ): informe a quebra ou sobra em litros (Δ_litros = E_f - E_e) e o percentual sobre as vendas (Δ% = (Δ_litros / V) * 100), comparando rigorosamente com a margem legal de ±0.6%.
-      d) Diagnóstico Operacional: esclareça se a variação decorre de contração/expansão térmica natural dentro da tolerância ou se exige abertura imediata de sindicância para apurar vazamento em tubulações ou descalibração de bicos.
-      e) Ações Obrigatórias: instrua sobre registros diários no livro e retenção fiscal por 5 anos para fiscalização da ANP/SEFAZ.
-11. Se a pergunta for sobre inteligência de conveniência, vendas cruzadas, combos de produtos, cesta de compras (Market Basket Analysis) ou produtos vendidos juntos:
-    - Apresente um parecer comercial e estratégico claro, prático e orientado a aumento de margem contendo:
-      a) Diagnóstico Executivo: informe o total de cupons analisados, percentual de cestas com múltiplos itens, maior Lift identificado e o ticket médio da conveniência.
-      b) Top Recomendações de Combos: para cada combo relevante, liste o produto de entrada (origem) e o produto recomendado (destino), o índice de Lift (destacando quando >= 2.0x por forte sinergia comercial), o percentual de Confiança e o incremento financeiro e percentual no ticket médio.
-      c) Script de Abordagem para o Caixa: instrua o operador do caixa sobre a frase persuasiva exata a ser dita ao cliente (ex: "Cliente comprou Café Expresso, ofereça Pão de Queijo por R$ 5,00 para elevar o ticket em +71,4%").
-      d) Recomendações de Merchandising: sugira ações físicas de loja (posicionamento lado a lado no balcão, cross-merchandising e promoções casadas).
-"""
-
-            print("\n🤖 AGENTE (Streaming):\n")
-            resposta_texto, ttft_ms, total_llm_ms = responder_com_streaming(prompt_sistema)
-            print("\n")
-
-            if intencao == "catalogo_produtos" and not cache_hit and query_vector:
-                frases_bloqueio = ["não há registros", "erro", "indisponível", "não foi possível", "não encontrei", "no momento"]
-                if not any(fb in resposta_texto.lower() for fb in frases_bloqueio):
-                    tools.rag.save_semantic_cache(pergunta, query_vector, resposta_texto, produtos)
-
-            total_e2e_ms = tool_latency_ms + total_llm_ms
-            print("-" * 75)
-            print("📊 [TELEMETRIA SRE DA REQUISIÇÃO]")
-            print(f"  • Rota / Ferramenta:   {intencao.upper()}")
-            print(f"  • Latência Ferramenta: {round(tool_latency_ms, 2)} ms")
-            if total_redacted > 0:
-                print(f"  • 🛡️ LGPD Protegido:    {total_redacted} dado(s) sensível(is) mascarado(s)")
-            if telemetria_retrieval:
-                print(f"    - Embedding Gemini:  {telemetria_retrieval.get('embedding_latency_ms', 0)} ms")
-                print(f"    - PostgreSQL RRF:    {telemetria_retrieval.get('db_rrf_latency_ms', 0)} ms (HNSW ef={telemetria_retrieval.get('hnsw_ef_search', 100)})")
-            print(f"  • ⚡ Time-To-First-Token: {round(ttft_ms, 2)} ms (Início da Resposta)")
-            print(f"  • ⏳ Duração Total LLM:   {round(total_llm_ms, 2)} ms")
-            print(f"  • 🏁 Latência Total E2E:  {round(total_e2e_ms, 2)} ms")
-            print("-" * 75)
+            asyncio.run(_processar_pergunta_cli(engine, pergunta, cli_session_id))
 
         except KeyboardInterrupt:
             print("\nEncerrado.")
