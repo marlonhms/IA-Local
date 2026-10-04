@@ -378,8 +378,12 @@ flowchart TD
   - Testado em `scripts/test_lmc_anp.py` com 100% de aprovação.
 - [x] **Motor de Inteligência de Loja de Conveniência: Market Basket Analysis & Vendas Cruzadas (Concluído ✅):**
   - Implementado em `core/tools.py` via `PostoTools.auditar_cesta_conveniencia_vendas_cruzadas()`.
-  - Regras de associação Apriori: Suporte, Confiança, Lift ($\ge 2.0$), Convicção e scripts de venda para o operador de PDV.
-  - Testado em `scripts/test_conveniencia_vendas_cruzadas.py` com 100% de aprovação.
+- [x] **Painel Executivo Próprio da AURA (Concluído ✅):**
+  - Frontend SPA executivo (`web/` com `index.html`, `aura.css`, `aura-chat.js`, `aura-fx.js`, `aura-cockpit.js`).
+  - Zero ruído de infraestrutura ou ferramentas de DevOps (sem badges SRE, sem portas de banco expostas, sem telemetria intrusiva).
+  - Consultas 100% sob demanda: desativação total de loops de polling e auto-refresh em segundo plano; ativação estrita mediante chat ou clique do gestor.
+  - Experiência visual humanizada, acolhedora e fluida com ambiência de Aurora Boreal (cores Esmeralda, Ciano e Roxo), sincronização de taxa de quadros (Hz) e 6 cartões de decisão rápida no onboarding.
+  - Suíte de testes automatizados em `scripts/test_painel_aura.py` validando rotas, assets e 11 ferramentas com 100% de aprovação.
 
 ---
 
@@ -389,6 +393,7 @@ flowchart TD
 | :---: | :---: | :--- | :--- |
 | **Sprint 1** | Semanas 1 e 2 | **Fases 1 e 2 (Concluídas ✅)** | Sanitizador LGPD + AuraEngine Headless com FastAPI SSE + Conciliação de turno (`fechabomba` $\leftrightarrow$ `fechacaixa` $\leftrightarrow$ CBC04) homologados com 100% de aprovação. |
 | **Sprint 1.5** | Semanas 2 e 3 | **Fase 6 Analítica (Concluída ✅)** | Run-Out Forecast (6.1) + Auditoria de Pista/Frentistas (6.2) + LMC ANP (6.3) + Market Basket Conveniência (6.4) + Roteador pgvector e RAG CDC homologados. |
+| **Sprint 1.8** | Semana 3 | **Painel Executivo AURA (Concluído ✅)** | Interface web SPA própria da AURA, acolhedora, 100% sob demanda, sem poluição SRE, com Aurora Boreal e widgets inline de decisão rápida. |
 | **Sprint 2** | Semanas 3 e 4 | **Fase 2.5 (Deploy-Ready) & Fase 3** | Template `docker-compose.yml` + Script `deploy_posto.ps1` de onboarding em 1-clique + Servidor MCP local e LangGraph local. |
 | **Sprint 2.5** | Semanas 4 e 5 | **Fase 5 (Frontend Unificado)** | **Sessão AURA no Frontend Web do Sentinel (`RAG WP/frontend`)**: Chat SSE token-a-token, seletor de postos e cockpit analítico em 1-clique sem acoplamento de backend. |
 | **Sprint 3** | Semanas 5 e 6 | **Fase 3.5 & Fase 4** | RAG Hierárquico Multi-Filial (Maestro Fan-Out + Edge Workers Docker + Sintetizador MapReduce) + n8n WhatsApp disparando relatórios de turno. |
@@ -397,7 +402,7 @@ flowchart TD
 
 ## 🎯 6. Próximo Passo Recomendado
 
-Com o **Motor Cognitivo Headless AURA (Fase 1)** e todas as **ferramentas analíticas da Fase 6** plenamente consolidados e testados com 100% de aprovação:
+Com o **Motor Cognitivo Headless AURA (Fase 1)**, todas as **ferramentas analíticas da Fase 6** e o **Painel Executivo Próprio da AURA** plenamente consolidados e testados com 100% de aprovação:
 
 A esteira de execução está posicionada para:
 1. **Fase 2.5: Esteira de Deploy Automatizado (`docker-compose.yml` e `deploy_posto.ps1`)**: Garantir que o container pgvector suba liso em qualquer posto cliente.
