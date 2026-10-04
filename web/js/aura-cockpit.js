@@ -54,6 +54,15 @@ class AuraCockpitController {
           Consultas 100% sob demanda. Pergunte no chat ao lado ou <button onclick="window.auraCockpit.refreshAllData()" class="text-cyan-400 hover:underline font-bold">clique aqui</button> para apurar.
         </div>`;
     }
+
+    const summaryEl = document.getElementById('cockpit-runout-summary');
+    if (summaryEl) {
+      summaryEl.innerHTML = `
+        <div class="text-xs text-slate-400 font-sans flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          <span>Consultas 100% sob demanda</span>
+        </div>`;
+    }
   }
 
   /**
@@ -65,7 +74,7 @@ class AuraCockpitController {
     this.setRefreshSpinner(true);
 
     try {
-      // 1. Status da Estação e SRE
+      // 1. Identificação da Estação
       const stationPromise = window.auraApi.getStationStatus().catch(err => {
         console.warn('Erro ao carregar status da estação:', err);
         return null;
@@ -118,10 +127,10 @@ class AuraCockpitController {
         const container = document.getElementById('cockpit-tanks-grid');
         if (container && (!this.tanksData || this.tanksData.length === 0)) {
           container.innerHTML = `
-            <div class="col-span-full py-8 text-center text-amber-400 font-mono text-sm glass-panel p-4">
-              ⚠️ Telemetria volumétrica temporariamente indisponível. Verifique a conexão com o banco ERP (:5433).
+            <div class="col-span-full py-8 text-center text-amber-400 font-sans text-sm glass-panel p-4">
+              ⚠️ Dados volumétricos temporariamente indisponíveis no momento.
               <button onclick="window.auraCockpit.refreshAllData()" class="mt-2 block mx-auto px-3 py-1 bg-slate-800 text-cyan-300 rounded border border-slate-700 hover:bg-slate-700 text-xs">
-                Tentar Reconectar ↺
+                Tentar Novamente ↺
               </button>
             </div>`;
         }
@@ -365,16 +374,23 @@ class AuraCockpitController {
 
     // Atualiza resumo executivo do Run-Out se disponível
     const summaryEl = document.getElementById('cockpit-runout-summary');
-    if (summaryEl && rawRunOut && rawRunOut.resumo_executivo) {
-      const r = rawRunOut.resumo_executivo;
+    if (summaryEl && tanks && tanks.length > 0) {
+      const activeTanks = tanks.filter(t => t.status_operacional !== 'INATIVO');
+      const totalAtivos = activeTanks.length;
+      const emRisco = activeTanks.filter(t => t.alerta_critico).length;
+      const capTot = activeTanks.reduce((sum, t) => sum + (Number(t.capacidade_litros) || 0), 0);
+      const saldoTot = activeTanks.reduce((sum, t) => sum + (Number(t.saldo_atual_litros) || 0), 0);
+      const ullageTot = activeTanks.reduce((sum, t) => sum + (Number(t.espaco_livre_ullage_litros) || 0), 0);
+      const ocupMedia = capTot > 0 ? (saldoTot / capTot) * 100 : 0;
+
       summaryEl.innerHTML = `
         <div class="flex flex-wrap items-center gap-4 text-xs font-mono text-slate-300">
-          <div>Tanques Ativos: <strong class="text-emerald-400">${r.total_tanques_ativos || 0}</strong></div>
-          <div>Em Risco Crítico: <strong class="text-rose-400">${r.tanques_nivel_critico || 0}</strong></div>
-          <div>Capacidade Total: <strong class="text-slate-200">${(r.capacidade_total_instalada_litros || 0).toLocaleString('pt-BR')} L</strong></div>
-          <div>Saldo Geral: <strong class="text-slate-200">${(r.saldo_total_estoque_litros || 0).toLocaleString('pt-BR')} L</strong></div>
-          <div>Ocupação Média: <strong class="text-cyan-400">${(r.taxa_ocupacao_geral_pct || 0).toFixed(1)}%</strong></div>
-          <div>Ullage Total: <strong class="text-purple-300">${(r.espaco_livre_total_ullage_litros || 0).toLocaleString('pt-BR')} L</strong></div>
+          <div>Tanques Ativos: <strong class="text-emerald-400">${totalAtivos}</strong></div>
+          <div>Em Risco Crítico: <strong class="text-rose-400">${emRisco}</strong></div>
+          <div>Capacidade Total: <strong class="text-slate-200">${capTot.toLocaleString('pt-BR')} L</strong></div>
+          <div>Saldo Geral: <strong class="text-slate-200">${saldoTot.toLocaleString('pt-BR')} L</strong></div>
+          <div>Ocupação Média: <strong class="text-cyan-400">${ocupMedia.toFixed(1)}%</strong></div>
+          <div>Ullage Total: <strong class="text-purple-300">${ullageTot.toLocaleString('pt-BR')} L</strong></div>
         </div>
       `;
     }

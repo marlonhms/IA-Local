@@ -72,7 +72,11 @@ def run_tests():
     assert "WAL SQLite" not in html_text, "Badge SRE WAL SQLite ainda presente no HTML"
     assert "Sync: 30s" not in html_text, "Contador de auto-refresh ainda presente no HTML"
     assert "data-filter=\"sre\"" not in html_text, "Filtro SRE ainda presente no HTML"
-    print(" [OK] GET / -> 200 OK (SPA HTML carregada e elementos SRE removidos).")
+    assert "hud-device-badge" not in html_text, "Badge de hardware DESKTOP ainda presente no HTML"
+    assert "hud-hz-badge" not in html_text, "Badge de Hz do monitor ainda presente no HTML"
+    assert "desktop-glance-bar" not in html_text, "Glance bar estática ainda presente no HTML"
+    assert "Console Cognitivo" not in html_text, "Termo de terminal 'Console Cognitivo' ainda presente na navegação"
+    print(" [OK] GET / -> 200 OK (SPA HTML carregada, elementos SRE e telemetrias de cockpit removidos).")
 
     resp_dash = client.get("/dashboard")
     assert resp_dash.status_code == 200, f"Esperava 200 em /dashboard, obteve {resp_dash.status_code}"
@@ -104,6 +108,9 @@ def run_tests():
             assert "autoRefreshInterval" not in resp.text, "autoRefreshInterval ainda existe em aura-app.js"
         if path == "/static/js/aura-triggers.js":
             assert "id: 'sre_metricas'" not in resp.text, "sre_metricas ainda catalogada em aura-triggers.js"
+            assert "ERP 5433" not in resp.text, "Badge 'ERP 5433' ainda presente em aura-triggers.js"
+        if path == "/static/js/aura-cockpit.js":
+            assert "(:5433)" not in resp.text, "Porta de banco :5433 ainda visível em mensagem de erro de aura-cockpit.js"
             
         print(f" [OK] {label}: {path} -> 200 OK ({len(resp.text)} bytes).")
 

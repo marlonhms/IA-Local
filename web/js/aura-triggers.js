@@ -71,7 +71,7 @@ class AuraTriggersController {
         category: 'combustiveis',
         icon: 'package',
         color: 'emerald',
-        badge: 'ERP 5433',
+        badge: 'Estoque Central',
         desc: 'Consulta o saldo contábil, custos e posições de estoque em tempo real das mercadorias cadastradas.',
         defaultParams: { termo: '' },
       },
@@ -283,17 +283,21 @@ class AuraTriggersController {
         `;
       });
 
+      const tanksList = data.detalhamento_tanques || [];
+      const totalAtivos = tanksList.filter(t => t.status_operacional !== 'INATIVO').length;
+      const emRisco = tanksList.filter(t => t.alerta_critico).length;
+      const saldoTot = tanksList.reduce((acc, t) => acc + (Number(t.saldo_atual_litros) || 0), 0);
+      const ullageTot = tanksList.reduce((acc, t) => acc + (Number(t.espaco_livre_ullage_litros) || 0), 0);
+
       return `
         <div class="space-y-4">
           <div class="p-3 rounded bg-slate-900/80 border border-slate-800 font-mono text-xs text-slate-300">
-            ${data.resumo_executivo ? `
-              <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div>Tanques Ativos: <strong class="text-emerald-400">${data.resumo_executivo.total_tanques_ativos}</strong></div>
-                <div>Nível Crítico (&lt;15%): <strong class="text-rose-400">${data.resumo_executivo.tanques_nivel_critico}</strong></div>
-                <div>Saldo Total: <strong class="text-slate-100">${(data.resumo_executivo.saldo_total_estoque_litros || 0).toLocaleString('pt-BR')} L</strong></div>
-                <div>Ullage Total: <strong class="text-cyan-300">${(data.resumo_executivo.espaco_livre_total_ullage_litros || 0).toLocaleString('pt-BR')} L</strong></div>
-              </div>
-            ` : ''}
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div>Tanques Ativos: <strong class="text-emerald-400">${totalAtivos}</strong></div>
+              <div>Nível Crítico (&lt;15%): <strong class="text-rose-400">${emRisco}</strong></div>
+              <div>Saldo Total: <strong class="text-slate-100">${saldoTot.toLocaleString('pt-BR')} L</strong></div>
+              <div>Ullage Total: <strong class="text-cyan-300">${ullageTot.toLocaleString('pt-BR')} L</strong></div>
+            </div>
           </div>
 
           <div class="overflow-x-auto">
@@ -567,28 +571,7 @@ class AuraTriggersController {
       `;
     }
 
-    // 9. Telemetria SRE
-    if (toolId === 'sre_metricas') {
-      const dbH = data.database_health || {};
-      const tStats = data.table_stats || {};
-      const routerStats = data.semantic_router_metrics || {};
-      return `
-        <div class="space-y-4 font-mono text-xs">
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded bg-slate-900 border border-slate-800">
-            <div>Cache Hit Ratio: <strong class="text-emerald-400">${dbH.cache_hit_ratio_percent || 99.9}%</strong></div>
-            <div>Conexões Ativas: <strong class="text-cyan-300">${dbH.active_connections || 1}</strong></div>
-            <div>SKUs Indexados: <strong class="text-purple-300">${tStats.total_rows || 250}</strong></div>
-            <div>Roteador Semântico: <strong class="text-emerald-300">${routerStats.cached_routes || 11} rotas</strong></div>
-          </div>
-          <div class="p-3 rounded bg-slate-900/60 border border-slate-800 text-slate-300">
-            <div><strong>Tamanho do Banco ERP:</strong> ${dbH.database_size || 'N/A'}</div>
-            <div class="mt-1"><strong>Extensões PostgreSQL:</strong> ${(data.extensions || []).join(', ') || 'vector, pg_stat_statements'}</div>
-          </div>
-        </div>
-      `;
-    }
-
-    // 10. Dados Cadastrais da Filial
+    // 9. Dados Cadastrais da Filial
     if (toolId === 'dados_filial') {
       return `
         <div class="space-y-3 font-mono text-xs p-4 rounded-lg bg-slate-900/80 border border-slate-800">

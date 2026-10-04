@@ -1,7 +1,7 @@
 /**
  * AURA Core Engine API Client
  * Comunicação direta com a API FastAPI local (/api/v1/aura)
- * Suporte a Server-Sent Events (SSE) via POST stream, execução de intenções e telemetria SRE.
+ * Suporte a Server-Sent Events (SSE) via POST stream, execução de intenções e suporte analítico sob demanda.
  */
 
 class AuraApiClient {
@@ -19,7 +19,7 @@ class AuraApiClient {
   }
 
   /**
-   * Obtém diagnóstico da estação e status dos bancos PostgreSQL (5433 e 5434)
+   * Obtém identificação e status da estação
    */
   async getStationStatus() {
     const res = await fetch(`${this.baseUrl}/api/v1/aura/stations`);

@@ -3,7 +3,7 @@
    Cores Principais:
    - Fundo Profundo: Obsidian / Slate (#07090e, #0a0e17, #0f172a)
    - Verde Esmeralda: #10b981 / #059669 / #34d399 (Operação, ANP, Segurança)
-   - Azul Ciano: #06b6d4 / #0891b2 / #22d3ee (Dados, SRE, Fluxo de Pista)
+   - Azul Ciano: #06b6d4 / #0891b2 / #22d3ee (Dados, Indicadores e Fluxo de Pista)
    - Roxo Gameplay Refinado: #7c3aed / #8b5cf6 / #a855f7 (Núcleo Cognitivo)
    - Alertas Operacionais: #f59e0b (Âmbar) / #ef4444 (Crítico)
    ========================================================================== */
@@ -879,7 +879,7 @@ body {
 /* Otimização Mobile para o Workspace do Chat */
 @media (max-width: 640px) {
   #view-console {
-    height: calc(100dvh - 165px) !important;
+    height: calc(100dvh - 135px) !important;
   }
   .chat-bubble-aura {
     max-width: 100% !important;
@@ -889,16 +889,6 @@ body {
   }
   .widget-inline-container {
     padding: 10px 8px;
-  }
-}
-
-/* Visibilidade adaptativa dos badges táticos do HUD */
-#hud-hz-badge {
-  display: flex;
-}
-@media (max-width: 640px) {
-  #hud-hz-badge {
-    display: none !important;
   }
 }
 
