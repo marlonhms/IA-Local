@@ -246,8 +246,14 @@
         <span class="text-slate-400 text-[11px]">Consultas 100% sob demanda</span>
       </div>
 
-      <!-- Lado Direito: Comandos Executivos & Relógio -->
-      <div class="flex items-center gap-2.5">
+      <!-- Lado Direito: Nova Conversa, Comandos Executivos & Relógio -->
+      <div class="flex items-center gap-2">
+        <!-- Botão Nova Conversa (Header Superior Direito) -->
+        <button id="btn-chat-clear" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 font-sans text-xs transition-colors shadow-sm active:scale-95 group" title="Iniciar Nova Conversa (Limpar Chat)">
+          <i data-lucide="plus-circle" class="w-3.5 h-3.5 text-auraEmerald group-hover:rotate-90 transition-transform"></i>
+          <span class="text-[11px] font-medium hidden sm:inline">Nova Conversa</span>
+        </button>
+
         <!-- Botão Command Palette Executiva (Ctrl+K) -->
         <button id="btn-open-palette" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 font-sans text-xs transition-colors shadow-sm" title="Abrir Comandos Rápidos (Ctrl+K)">
           <i data-lucide="sparkles" class="w-3.5 h-3.5 text-auraCyan"></i>
@@ -261,6 +267,8 @@
           <span id="hud-live-clock" class="text-white font-medium">--:--:--</span>
           <span id="hud-live-clock-mobile" class="hidden">--:--:--</span>
         </div>
+
+        <span id="chat-session-badge" class="hidden">Sessão Ativa</span>
       </div>
 
     </div>
@@ -585,35 +593,11 @@
 
 
     <!-- =======================================================================
-         VIEW 3: WORKSPACE DE ASSISTÊNCIA DA AURA
+         VIEW 3: WORKSPACE DE ASSISTÊNCIA DA AURA (IMERSIVO TOTAL)
          ========================================================================= -->
-    <div id="view-console" class="space-y-3 animate-fade-in flex flex-col h-[calc(100vh-90px)] min-h-[500px]">
+    <div id="view-console" class="space-y-3 animate-fade-in flex flex-col h-[calc(100vh-80px)] min-h-[520px]">
       
-      <!-- Topo do Console: Status da Sessão e Blindagem LGPD -->
-      <div class="glass-panel px-4 py-2.5 flex items-center justify-between border-auraPurple/30 rounded-xl">
-        <div class="flex items-center gap-3">
-          <div class="w-2.5 h-2.5 rounded-full bg-auraEmerald animate-pulse"></div>
-          <span class="font-bold text-sm text-slate-100 font-sans">Assistente Executiva AURA</span>
-          <span class="hidden sm:inline-block text-xs text-slate-400 font-sans">• Supervisão do Posto</span>
-          <span id="chat-session-badge" class="px-2 py-0.5 rounded-full text-[11px] font-mono bg-purple-950/40 text-purple-300 border border-purple-500/20">
-            Sessão Ativa
-          </span>
-        </div>
-
-        <div class="flex items-center gap-3 font-sans text-xs">
-          <div class="hidden sm:flex items-center gap-1.5 text-emerald-400">
-            <i data-lucide="shield-check" class="w-4 h-4"></i>
-            <span class="font-medium">Privacidade & LGPD Ativas</span>
-          </div>
-
-          <button id="btn-chat-clear" class="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors flex items-center gap-1.5 text-xs shadow-sm">
-            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-            <span>Nova Conversa</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Feed de Mensagens (Scrollable) -->
+      <!-- Feed de Mensagens (Scrollable) - Ocupa 100% da altura e largura -->
       <div id="chat-feed-container" class="glass-panel flex-1 p-5 overflow-y-auto space-y-4 font-sans border-slate-800 rounded-2xl">
         <!-- Mensagens inseridas dinamicamente via aura-chat.js -->
       </div>

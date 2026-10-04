@@ -94,7 +94,7 @@ class AuraChatController {
             <span>Por onde deseja começar? Escolha uma sugestão ou pergunte diretamente:</span>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full">
             <button onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" class="group p-3 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-emerald-500/40 text-left transition-all shadow-sm">
               <div class="flex items-center gap-2 mb-1">
                 <span class="text-base">⛽</span>
@@ -315,9 +315,9 @@ class AuraChatController {
 
     feeds.forEach(feed => {
       const div = document.createElement('div');
-      div.className = 'flex justify-end animate-fade-in';
+      div.className = 'flex justify-end w-full animate-fade-in';
       div.innerHTML = `
-        <div class="chat-bubble-user max-w-[85%] md:max-w-[70%] p-3.5 text-slate-100 text-sm">
+        <div class="chat-bubble-user max-w-[85%] md:max-w-[70%] lg:max-w-[60%] ml-auto p-3.5 text-slate-100 text-sm">
           <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 mb-1">
             <span class="font-bold text-cyan-400">OPERADOR</span>
             <span>${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
@@ -340,9 +340,9 @@ class AuraChatController {
     feeds.forEach(({ el, suffix }) => {
       const div = document.createElement('div');
       div.id = containerId + suffix;
-      div.className = 'flex justify-start animate-fade-in';
+      div.className = 'flex justify-start w-full animate-fade-in';
       div.innerHTML = `
-        <div class="chat-bubble-aura max-w-[95%] md:max-w-[85%] p-4 text-slate-100 text-sm space-y-3">
+        <div class="chat-bubble-aura w-full max-w-full p-4.5 text-slate-100 text-sm space-y-3">
           <!-- Header da Resposta com Núcleo e Tags -->
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-purple-900/40 pb-2">
             <div class="flex items-center gap-2">
@@ -359,7 +359,7 @@ class AuraChatController {
           </div>
 
           <!-- Card de Resultado da Ferramenta Estruturada (se houver) -->
-          <div id="${containerId + suffix}-tool-card" class="hidden"></div>
+          <div id="${containerId + suffix}-tool-card" class="hidden w-full"></div>
 
           <!-- Texto em Streaming -->
           <div id="${containerId + suffix}-text" class="prose-aura typing-cursor">
@@ -386,9 +386,9 @@ class AuraChatController {
 
     feeds.forEach(feed => {
       const div = document.createElement('div');
-      div.className = 'flex justify-start animate-fade-in';
+      div.className = 'flex justify-start w-full animate-fade-in';
       div.innerHTML = `
-        <div class="chat-bubble-aura max-w-[95%] md:max-w-[85%] p-4 text-slate-100 text-sm space-y-3">
+        <div class="chat-bubble-aura w-full max-w-full p-4.5 text-slate-100 text-sm space-y-3">
           <div class="flex items-center gap-2 border-b border-purple-900/40 pb-2">
             <div class="w-5 h-5 rounded-full bg-gradient-to-tr from-emerald-500 via-cyan-500 to-purple-600 flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
               A
@@ -396,7 +396,7 @@ class AuraChatController {
             <span class="font-bold font-sans text-xs text-purple-200">AURA</span>
             ${opts.isWelcome ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-sans font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Pronta para Atendimento</span>' : ''}
           </div>
-          <div>${htmlContent}</div>
+          <div class="w-full">${htmlContent}</div>
         </div>
       `;
       feed.appendChild(div);

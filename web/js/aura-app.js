@@ -81,6 +81,8 @@ function applyIconsFallback() {
     'message-square': '<svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
     'menu': '<svg class="w-5 h-5 text-auraCyan" fill="none" stroke="currentColor" viewBox="0 0 24 24"><line stroke-width="2" x1="3" y1="12" x2="21" y2="12"/><line stroke-width="2" x1="3" y1="6" x2="21" y2="6"/><line stroke-width="2" x1="3" y1="18" x2="21" y2="18"/></svg>',
     'x': '<svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><line stroke-width="2" x1="18" y1="6" x2="6" y2="18"/><line stroke-width="2" x1="6" y1="6" x2="18" y2="18"/></svg>',
+    'plus': '<svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><line stroke-width="2" x1="12" y1="5" x2="12" y2="19"/><line stroke-width="2" x1="5" y1="12" x2="19" y2="12"/></svg>',
+    'plus-circle': '<svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><line stroke-width="2" x1="12" y1="8" x2="12" y2="16"/><line stroke-width="2" x1="8" y1="12" x2="16" y2="12"/></svg>',
   };
 
   document.querySelectorAll('i[data-lucide]').forEach(el => {
