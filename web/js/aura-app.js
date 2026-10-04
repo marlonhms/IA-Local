@@ -79,6 +79,8 @@ function applyIconsFallback() {
     'monitor': '<svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" stroke-width="2"/><line x1="8" y1="21" x2="16" y2="21" stroke-width="2"/><line x1="12" y1="17" x2="12" y2="21" stroke-width="2"/></svg>',
     'clock': '<svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><polyline points="12 6 12 12 16 14"/></svg>',
     'message-square': '<svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+    'menu': '<svg class="w-5 h-5 text-auraCyan" fill="none" stroke="currentColor" viewBox="0 0 24 24"><line stroke-width="2" x1="3" y1="12" x2="21" y2="12"/><line stroke-width="2" x1="3" y1="6" x2="21" y2="6"/><line stroke-width="2" x1="3" y1="18" x2="21" y2="18"/></svg>',
+    'x': '<svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><line stroke-width="2" x1="18" y1="6" x2="6" y2="18"/><line stroke-width="2" x1="6" y1="6" x2="18" y2="18"/></svg>',
   };
 
   document.querySelectorAll('i[data-lucide]').forEach(el => {
@@ -92,10 +94,12 @@ function applyIconsFallback() {
 class AuraApp {
   constructor() {
     this.currentTab = 'console';
+    this.sidebarOpen = false;
   }
 
   init() {
     this.bindNavigationTabs();
+    this.bindSidebarEvents();
     this.startClock();
 
     // Inicializa subsistemas
@@ -109,6 +113,129 @@ class AuraApp {
     applyIconsFallback();
   }
 
+  bindSidebarEvents() {
+    const btnToggle = document.getElementById('btn-toggle-sidebar');
+    const btnClose = document.getElementById('btn-close-sidebar');
+    const overlay = document.getElementById('aura-sidebar-overlay');
+
+    if (btnToggle) {
+      btnToggle.addEventListener('click', () => {
+        this.toggleSidebar();
+      });
+    }
+
+    if (btnClose) {
+      btnClose.addEventListener('click', () => {
+        this.closeSidebar();
+      });
+    }
+
+    if (overlay) {
+      overlay.addEventListener('click', () => {
+        this.closeSidebar();
+      });
+    }
+
+    // Atalho ESC para fechar gaveta
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.sidebarOpen) {
+        this.closeSidebar();
+      }
+    });
+
+    // Botão Limpar Chat na Gaveta
+    const btnSidebarClear = document.getElementById('sidebar-btn-chat-clear');
+    if (btnSidebarClear) {
+      btnSidebarClear.addEventListener('click', () => {
+        window.auraAudio.playChime(500, 0.05);
+        if (window.auraChat) window.auraChat.clearChat();
+        this.closeSidebar();
+      });
+    }
+
+    // Botão Command Palette na Gaveta
+    const btnSidebarPalette = document.getElementById('sidebar-btn-palette');
+    if (btnSidebarPalette) {
+      btnSidebarPalette.addEventListener('click', () => {
+        this.closeSidebar();
+        if (window.auraGlance && typeof window.auraGlance.openCommandPalette === 'function') {
+          window.auraGlance.openCommandPalette();
+        } else {
+          const btnPalette = document.getElementById('btn-open-palette');
+          if (btnPalette) btnPalette.click();
+        }
+      });
+    }
+
+    // Botão SFX na Gaveta
+    const btnSidebarSfx = document.getElementById('sidebar-btn-toggle-sfx');
+    if (btnSidebarSfx) {
+      btnSidebarSfx.addEventListener('click', () => {
+        const isMuted = window.auraAudio.toggleMute();
+        this.syncSfxButtons(isMuted);
+      });
+    }
+  }
+
+  openSidebar() {
+    this.sidebarOpen = true;
+    const drawer = document.getElementById('aura-sidebar-drawer');
+    const overlay = document.getElementById('aura-sidebar-overlay');
+    if (drawer) drawer.classList.add('open');
+    if (overlay) overlay.classList.add('open');
+    window.auraAudio.playChime(660, 0.05);
+  }
+
+  closeSidebar() {
+    this.sidebarOpen = false;
+    const drawer = document.getElementById('aura-sidebar-drawer');
+    const overlay = document.getElementById('aura-sidebar-overlay');
+    if (drawer) drawer.classList.remove('open');
+    if (overlay) overlay.classList.remove('open');
+  }
+
+  toggleSidebar() {
+    if (this.sidebarOpen) {
+      this.closeSidebar();
+    } else {
+      this.openSidebar();
+    }
+  }
+
+  askFrequent(prompt) {
+    this.closeSidebar();
+    if (this.currentTab !== 'console') {
+      this.switchTab('console');
+    }
+    if (window.auraChat) {
+      window.auraChat.sendUserPrompt(prompt);
+    }
+  }
+
+  syncSfxButtons(isMuted) {
+    const btnToggleSfx = document.getElementById('btn-toggle-sfx');
+    const sfxBadge = document.getElementById('sidebar-sfx-badge');
+    const sfxIcon = document.getElementById('sidebar-sfx-icon');
+
+    if (btnToggleSfx) {
+      btnToggleSfx.title = isMuted ? 'Áudio Mudo (Clique para Ativar SFX)' : 'Áudio Ativo (Clique para Mutar)';
+      btnToggleSfx.className = isMuted 
+        ? 'p-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition-colors shadow-sm'
+        : 'p-1.5 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 transition-colors shadow-sm';
+    }
+
+    if (sfxBadge) {
+      sfxBadge.textContent = isMuted ? 'Mudo' : 'Ativo';
+      sfxBadge.className = isMuted 
+        ? 'px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400' 
+        : 'px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+    }
+
+    if (sfxIcon) {
+      sfxIcon.className = isMuted ? 'w-4 h-4 text-slate-400' : 'w-4 h-4 text-emerald-400';
+    }
+  }
+
   bindNavigationTabs() {
     const tabs = document.querySelectorAll('.nav-tab-btn');
     tabs.forEach(btn => {
@@ -117,6 +244,7 @@ class AuraApp {
         if (target) {
           window.auraAudio.playChime(600, 0.05);
           this.switchTab(target);
+          this.closeSidebar();
         }
       });
     });
@@ -143,15 +271,12 @@ class AuraApp {
       });
     }
 
-    // Botão SFX Audio
+    // Botão SFX Audio no Header
     const btnToggleSfx = document.getElementById('btn-toggle-sfx');
     if (btnToggleSfx) {
       btnToggleSfx.addEventListener('click', () => {
         const isMuted = window.auraAudio.toggleMute();
-        btnToggleSfx.title = isMuted ? 'Áudio Mudo (Clique para Ativar SFX)' : 'Áudio Ativo (Clique para Mutar)';
-        btnToggleSfx.className = isMuted 
-          ? 'p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-colors'
-          : 'p-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 transition-colors';
+        this.syncSfxButtons(isMuted);
       });
     }
 

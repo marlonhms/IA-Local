@@ -186,8 +186,11 @@ class AuraCockpitController {
    */
   renderStationHeader(st) {
     const filialEl = document.getElementById('hud-filial-name');
-    if (filialEl && st) {
-      filialEl.textContent = `${st.filial_nome || 'Posto Piloto'} (Filial ${st.filial_id || '59050'})`;
+    const sidebarFilialEl = document.getElementById('sidebar-filial-name');
+    if (st) {
+      const text = `${st.filial_nome || 'Posto Piloto'} (Filial ${st.filial_id || '59050'})`;
+      if (filialEl) filialEl.textContent = text;
+      if (sidebarFilialEl) sidebarFilialEl.textContent = text;
     }
   }
 

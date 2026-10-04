@@ -76,7 +76,13 @@ def run_tests():
     assert "hud-hz-badge" not in html_text, "Badge de Hz do monitor ainda presente no HTML"
     assert "desktop-glance-bar" not in html_text, "Glance bar estática ainda presente no HTML"
     assert "Console Cognitivo" not in html_text, "Termo de terminal 'Console Cognitivo' ainda presente na navegação"
-    print(" [OK] GET / -> 200 OK (SPA HTML carregada, elementos SRE e telemetrias de cockpit removidos).")
+
+    # Verificações do Menu Hambúrguer Lateral Liquid Glass Acrílico
+    assert "btn-toggle-sidebar" in html_text, "Botão hambúrguer btn-toggle-sidebar não encontrado no HTML"
+    assert "aura-sidebar-drawer" in html_text, "Gaveta lateral aura-sidebar-drawer não encontrada no HTML"
+    assert "aura-sidebar-overlay" in html_text, "Backdrop aura-sidebar-overlay não encontrado no HTML"
+    assert "liquid-glass-acrylic" in html_text, "Classe de estilo liquid-glass-acrylic não encontrada no HTML"
+    print(" [OK] GET / -> 200 OK (SPA HTML carregada, Menu Hambúrguer Liquid Glass Acrílico validado).")
 
     resp_dash = client.get("/dashboard")
     assert resp_dash.status_code == 200, f"Esperava 200 em /dashboard, obteve {resp_dash.status_code}"

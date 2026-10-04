@@ -1057,5 +1057,106 @@ body {
   backface-visibility: hidden;
 }
 
+/* ==========================================================================
+   AURA LIQUID GLASS ACRYLIC SIDEBAR & MODAL SYSTEM (DELUXE)
+   ========================================================================== */
+.liquid-glass-acrylic {
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(6, 182, 212, 0.03) 25%,
+    rgba(124, 58, 237, 0.02) 65%,
+    rgba(16, 185, 129, 0.03) 100%
+  ), rgba(7, 10, 18, 0.88);
+  backdrop-filter: blur(28px) saturate(190%) contrast(102%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%) contrast(102%);
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 
+    inset 1px 0 0 0 rgba(255, 255, 255, 0.12),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.15),
+    0 25px 60px -10px rgba(0, 0, 0, 0.85),
+    0 0 35px rgba(6, 182, 212, 0.08);
+}
+
+.liquid-glass-acrylic::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  pointer-events: none;
+}
+
+/* Transições do Drawer Lateral */
+#aura-sidebar-drawer {
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+#aura-sidebar-drawer.open {
+  transform: translateX(0) !important;
+}
+
+#aura-sidebar-overlay {
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity;
+}
+
+#aura-sidebar-overlay.open {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Itens de Navegação no Menu Lateral */
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidebar-nav-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(6, 182, 212, 0.3);
+  color: #ffffff;
+  transform: translateX(3px);
+}
+
+.sidebar-nav-item.active {
+  background: linear-gradient(90deg, rgba(124, 58, 237, 0.18) 0%, rgba(6, 182, 212, 0.09) 100%);
+  border-color: rgba(124, 58, 237, 0.4);
+  color: #ffffff;
+  box-shadow: inset 3px 0 0 0 #a855f7, 0 4px 16px rgba(124, 58, 237, 0.15);
+}
+
+.sidebar-nav-item.active.tab-cockpit {
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.18) 0%, rgba(6, 182, 212, 0.09) 100%);
+  border-color: rgba(16, 185, 129, 0.4);
+  box-shadow: inset 3px 0 0 0 #34d399, 0 4px 16px rgba(16, 185, 129, 0.15);
+}
+
+.sidebar-nav-item.active.tab-triggers {
+  background: linear-gradient(90deg, rgba(6, 182, 212, 0.18) 0%, rgba(56, 189, 248, 0.09) 100%);
+  border-color: rgba(6, 182, 212, 0.4);
+  box-shadow: inset 3px 0 0 0 #22d3ee, 0 4px 16px rgba(6, 182, 212, 0.15);
+}
+
+.sidebar-nav-item.active.tab-split {
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.18) 0%, rgba(124, 58, 237, 0.09) 100%);
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: inset 3px 0 0 0 #38bdf8, 0 4px 16px rgba(56, 189, 248, 0.15);
+}
+
+
 
 
