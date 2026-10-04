@@ -33,7 +33,7 @@ from config.settings import (
 )
 
 
-from scripts.index_produtos import calcular_hash_produto
+from scripts.index_produtos import calcular_hash_produto, gerar_texto_busca_produto
 
 
 def sync_cycle(conn_erp, conn_vec) -> int:
@@ -75,9 +75,7 @@ def sync_cycle(conn_erp, conn_vec) -> int:
                 lote = a_atualizar[i:i + batch_size]
                 textos_lote = []
                 for p, h in lote:
-                    texto_busca = f"Produto: {p['nompro']} | Grupo: {p['grupo']} | Unidade: {p['unidade']} | Preço: R$ {p['preco']:.2f}"
-                    if p['codbar']:
-                        texto_busca += f" | Cód. Barras: {p['codbar']}"
+                    texto_busca = gerar_texto_busca_produto(p['nompro'], p['grupo'], p['unidade'], p['preco'], p['codbar'])
                     textos_lote.append(texto_busca)
 
                 try:

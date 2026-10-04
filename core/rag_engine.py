@@ -70,7 +70,7 @@ class HybridRAGEngine:
         embedding_model: str = DEFAULT_EMBEDDING_MODEL,
         llm_model: str = DEFAULT_LLM_MODEL,
         ef_search: int = 128,
-        rrf_k: int = 60,
+        rrf_k: int = 20,
     ):
         self.db_config = db_config or DB_VECTOR_CONFIG
         self.api_key = gemini_api_key or GEMINI_API_KEY
@@ -204,110 +204,185 @@ class HybridRAGEngine:
                 viscosity_sql_regex = rf"\y{part1}W[-\s]?{part2}\y"
 
         grupo_condition = ""
+        iterative_scan_sql = ""
         if grupo_filter:
             grupo_condition = "AND grupo ILIKE %s"
+            iterative_scan_sql = """
+        LOAD 'vector';
+        SET LOCAL hnsw.iterative_scan = 'relaxed_order';
+        SET LOCAL hnsw.max_scan_tuples = 20000;
+            """
 
-        sql_rrf = f"""
-        SET LOCAL hnsw.ef_search = {ef};
+        fetch_limit = min(50, top_k * 10)
 
-        WITH dense_search AS (
+        if query_vector is not None:
+            sql_rrf = f"""
+            SET LOCAL hnsw.ef_search = {ef};
+            {iterative_scan_sql}
+
+            WITH dense_search AS (
+                SELECT 
+                    codpro, nompro, grupo, codbar, unidade, preco, texto_busca,
+                    1 - (embedding <=> %s::halfvec) AS cosine_similarity,
+                    ROW_NUMBER() OVER (ORDER BY embedding <=> %s::halfvec) AS dense_rank
+                FROM produtos_vetores
+                WHERE embedding IS NOT NULL {grupo_condition}
+                ORDER BY embedding <=> %s::halfvec
+                LIMIT %s
+            ),
+            sparse_search AS (
+                SELECT 
+                    codpro, nompro, grupo, codbar, unidade, preco, texto_busca,
+                    CASE 
+                        WHEN %s <> '' AND to_tsquery('portuguese', %s) IS NOT NULL THEN
+                            ts_rank_cd(tsv, to_tsquery('portuguese', %s))
+                        ELSE 0.0
+                    END AS fts_score,
+                    ROW_NUMBER() OVER (
+                        ORDER BY 
+                            -- Prioridade 1: Match exato de código de barras ou código do produto (com tolerância a zero à esquerda)
+                            (CASE WHEN %s <> '' AND (TRIM(codbar) = %s OR TRIM(codpro) = %s OR (LTRIM(TRIM(codpro), '0') <> '' AND LTRIM(TRIM(codpro), '0') = LTRIM(%s, '0'))) THEN 1 ELSE 0 END) DESC,
+                            -- Prioridade 2: Match exato de viscosidade de lubrificante
+                            (CASE WHEN %s <> '' AND nompro ~* %s THEN 1 ELSE 0 END) DESC,
+                            -- Prioridade 3: Score do FTS e proximidade de nome
+                            (CASE WHEN %s <> '' THEN ts_rank_cd(tsv, to_tsquery('portuguese', %s)) ELSE 0.0 END) DESC,
+                            (nompro ILIKE %s) DESC,
+                            nompro ASC
+                    ) AS sparse_rank
+                FROM produtos_vetores
+                WHERE ((%s <> '' AND tsv @@ to_tsquery('portuguese', %s))
+                   OR nompro ILIKE %s
+                   OR codbar ILIKE %s
+                   OR codpro ILIKE %s
+                   OR (%s <> '' AND (TRIM(codbar) = %s OR TRIM(codpro) = %s OR (LTRIM(TRIM(codpro), '0') <> '' AND LTRIM(TRIM(codpro), '0') = LTRIM(%s, '0'))))
+                   OR (%s <> '' AND nompro ~* %s)) {grupo_condition}
+                ORDER BY sparse_rank ASC
+                LIMIT %s
+            )
             SELECT 
-                codpro, nompro, grupo, codbar, unidade, preco, texto_busca,
-                1 - (embedding <=> %s::halfvec) AS cosine_similarity,
-                ROW_NUMBER() OVER (ORDER BY embedding <=> %s::halfvec) AS dense_rank
-            FROM produtos_vetores
-            WHERE embedding IS NOT NULL {grupo_condition}
-            ORDER BY embedding <=> %s::halfvec
-            LIMIT %s
-        ),
-        sparse_search AS (
+                COALESCE(d.codpro, s.codpro) AS codpro,
+                COALESCE(d.nompro, s.nompro) AS nompro,
+                COALESCE(d.grupo, s.grupo) AS grupo,
+                COALESCE(d.codbar, s.codbar) AS codbar,
+                COALESCE(d.unidade, s.unidade) AS unidade,
+                COALESCE(d.preco, s.preco) AS preco,
+                COALESCE(d.texto_busca, s.texto_busca) AS texto_busca,
+                COALESCE(d.cosine_similarity, 0.0) AS cosine_similarity,
+                COALESCE(s.fts_score, 0.0) AS fts_score,
+                d.dense_rank,
+                s.sparse_rank,
+                (
+                    {dense_weight} * COALESCE(1.0 / ({self.rrf_k} + d.dense_rank), 0.0) +
+                    {sparse_weight} * COALESCE(1.0 / ({self.rrf_k} + s.sparse_rank), 0.0) +
+                    -- Boost normalizado de Código de Barras / Código de Produto (+0.050)
+                    (CASE WHEN %s <> '' AND (TRIM(COALESCE(d.codbar, s.codbar)) = %s OR TRIM(COALESCE(d.codpro, s.codpro)) = %s OR (LTRIM(TRIM(COALESCE(d.codpro, s.codpro)), '0') <> '' AND LTRIM(TRIM(COALESCE(d.codpro, s.codpro)), '0') = LTRIM(%s, '0'))) THEN 0.050 ELSE 0.0 END) +
+                    -- Boost normalizado de Viscosidade de Lubrificante (+0.015)
+                    (CASE WHEN %s <> '' AND COALESCE(d.nompro, s.nompro) ~* %s THEN 0.015 ELSE 0.0 END) +
+                    -- Desempate semântico contínuo proporcional à similaridade de cosseno (+0.02 * cosine)
+                    (0.02 * COALESCE(d.cosine_similarity, 0.0))
+                ) AS rrf_score
+            FROM dense_search d
+            FULL OUTER JOIN sparse_search s ON d.codpro = s.codpro
+            ORDER BY rrf_score DESC
+            LIMIT %s;
+            """
+
+            vec_str = str(query_vector)
+            # Parâmetros para dense_search (alinhados com a ordem do SQL)
+            params = [vec_str, vec_str]
+            if grupo_filter:
+                params.append(grupo_filter)
+            params.extend([vec_str, fetch_limit])
+
+            # Parâmetros para sparse_search
+            params.extend([
+                tsquery_str, tsquery_str, tsquery_str,                                              # CASE ts_rank_cd
+                exact_code, exact_code, exact_code, exact_code,                                    # ORDER BY match exato
+                viscosity_sql_regex, viscosity_sql_regex,                                          # ORDER BY viscosidade
+                tsquery_str, tsquery_str,                                                          # ORDER BY ts_rank_cd
+                like_term,                                                                         # ORDER BY nompro ILIKE
+                tsquery_str, tsquery_str,                                                          # WHERE tsv @@
+                like_term, like_term, like_term,                                                   # WHERE nompro / codbar / codpro ILIKE
+                exact_code, exact_code, exact_code, exact_code,                                    # WHERE match exato
+                viscosity_sql_regex, viscosity_sql_regex,                                          # WHERE viscosidade
+            ])
+            if grupo_filter:
+                params.append(grupo_filter)
+            params.append(fetch_limit)
+
+            # Parâmetros para SELECT final (boosts RRF)
+            params.extend([
+                exact_code, exact_code, exact_code, exact_code,                                    # Boost exato codbar/codpro
+                viscosity_sql_regex, viscosity_sql_regex,                                          # Boost viscosidade
+                top_k                                                                              # LIMIT final
+            ])
+        else:
+            # Fallback gracioso para recuperação esparsa (GIN FTS + Boosts + RRF) quando embedding não disponível
+            sql_rrf = f"""
+            SET LOCAL hnsw.ef_search = {ef};
+
+            WITH sparse_search AS (
+                SELECT 
+                    codpro, nompro, grupo, codbar, unidade, preco, texto_busca,
+                    CASE 
+                        WHEN %s <> '' AND to_tsquery('portuguese', %s) IS NOT NULL THEN
+                            ts_rank_cd(tsv, to_tsquery('portuguese', %s))
+                        ELSE 0.0
+                    END AS fts_score,
+                    ROW_NUMBER() OVER (
+                        ORDER BY 
+                            (CASE WHEN %s <> '' AND (TRIM(codbar) = %s OR TRIM(codpro) = %s OR (LTRIM(TRIM(codpro), '0') <> '' AND LTRIM(TRIM(codpro), '0') = LTRIM(%s, '0'))) THEN 1 ELSE 0 END) DESC,
+                            (CASE WHEN %s <> '' AND nompro ~* %s THEN 1 ELSE 0 END) DESC,
+                            (CASE WHEN %s <> '' THEN ts_rank_cd(tsv, to_tsquery('portuguese', %s)) ELSE 0.0 END) DESC,
+                            (nompro ILIKE %s) DESC,
+                            nompro ASC
+                    ) AS sparse_rank
+                FROM produtos_vetores
+                WHERE ((%s <> '' AND tsv @@ to_tsquery('portuguese', %s))
+                   OR nompro ILIKE %s
+                   OR codbar ILIKE %s
+                   OR codpro ILIKE %s
+                   OR (%s <> '' AND (TRIM(codbar) = %s OR TRIM(codpro) = %s OR (LTRIM(TRIM(codpro), '0') <> '' AND LTRIM(TRIM(codpro), '0') = LTRIM(%s, '0'))))
+                   OR (%s <> '' AND nompro ~* %s)) {grupo_condition}
+                ORDER BY sparse_rank ASC
+                LIMIT %s
+            )
             SELECT 
-                codpro, nompro, grupo, codbar, unidade, preco, texto_busca,
-                CASE 
-                    WHEN %s <> '' AND to_tsquery('portuguese', %s) IS NOT NULL THEN
-                        ts_rank_cd(tsv, to_tsquery('portuguese', %s))
-                    ELSE 0.0
-                END AS fts_score,
-                ROW_NUMBER() OVER (
-                    ORDER BY 
-                        -- Prioridade 1: Match exato de código de barras ou código do produto (com tolerância a zero à esquerda)
-                        (CASE WHEN %s <> '' AND (TRIM(codbar) = %s OR TRIM(codpro) = %s OR (LTRIM(TRIM(codpro), '0') <> '' AND LTRIM(TRIM(codpro), '0') = LTRIM(%s, '0'))) THEN 1 ELSE 0 END) DESC,
-                        -- Prioridade 2: Match exato de viscosidade de lubrificante
-                        (CASE WHEN %s <> '' AND nompro ~* %s THEN 1 ELSE 0 END) DESC,
-                        -- Prioridade 3: Score do FTS e proximidade de nome
-                        (CASE WHEN %s <> '' THEN ts_rank_cd(tsv, to_tsquery('portuguese', %s)) ELSE 0.0 END) DESC,
-                        (nompro ILIKE %s) DESC,
-                        nompro ASC
-                ) AS sparse_rank
-            FROM produtos_vetores
-            WHERE ((%s <> '' AND tsv @@ to_tsquery('portuguese', %s))
-               OR nompro ILIKE %s
-               OR codbar ILIKE %s
-               OR codpro ILIKE %s
-               OR (%s <> '' AND (TRIM(codbar) = %s OR TRIM(codpro) = %s OR (LTRIM(TRIM(codpro), '0') <> '' AND LTRIM(TRIM(codpro), '0') = LTRIM(%s, '0'))))
-               OR (%s <> '' AND nompro ~* %s)) {grupo_condition}
-            ORDER BY sparse_rank ASC
-            LIMIT %s
-        )
-        SELECT 
-            COALESCE(d.codpro, s.codpro) AS codpro,
-            COALESCE(d.nompro, s.nompro) AS nompro,
-            COALESCE(d.grupo, s.grupo) AS grupo,
-            COALESCE(d.codbar, s.codbar) AS codbar,
-            COALESCE(d.unidade, s.unidade) AS unidade,
-            COALESCE(d.preco, s.preco) AS preco,
-            COALESCE(d.texto_busca, s.texto_busca) AS texto_busca,
-            COALESCE(d.cosine_similarity, 0.0) AS cosine_similarity,
-            COALESCE(s.fts_score, 0.0) AS fts_score,
-            d.dense_rank,
-            s.sparse_rank,
-            (
-                {dense_weight} * COALESCE(1.0 / ({self.rrf_k} + d.dense_rank), 0.0) +
-                {sparse_weight} * COALESCE(1.0 / ({self.rrf_k} + s.sparse_rank), 0.0) +
-                -- Boost imediato de Código de Barras / Código de Produto (+1.0)
-                (CASE WHEN %s <> '' AND (TRIM(COALESCE(d.codbar, s.codbar)) = %s OR TRIM(COALESCE(d.codpro, s.codpro)) = %s OR (LTRIM(TRIM(COALESCE(d.codpro, s.codpro)), '0') <> '' AND LTRIM(TRIM(COALESCE(d.codpro, s.codpro)), '0') = LTRIM(%s, '0'))) THEN 1.0 ELSE 0.0 END) +
-                -- Boost de Viscosidade de Lubrificante (+0.08)
-                (CASE WHEN %s <> '' AND COALESCE(d.nompro, s.nompro) ~* %s THEN 0.08 ELSE 0.0 END)
-            ) AS rrf_score
-        FROM dense_search d
-        FULL OUTER JOIN sparse_search s ON d.codpro = s.codpro
-        ORDER BY rrf_score DESC
-        LIMIT %s;
-        """
+                s.codpro, s.nompro, s.grupo, s.codbar, s.unidade, s.preco, s.texto_busca,
+                0.0 AS cosine_similarity,
+                s.fts_score,
+                NULL::bigint AS dense_rank,
+                s.sparse_rank,
+                (
+                    {sparse_weight} * (1.0 / ({self.rrf_k} + s.sparse_rank)) +
+                    (CASE WHEN %s <> '' AND (TRIM(s.codbar) = %s OR TRIM(s.codpro) = %s OR (LTRIM(TRIM(s.codpro), '0') <> '' AND LTRIM(TRIM(s.codpro), '0') = LTRIM(%s, '0'))) THEN 0.050 ELSE 0.0 END) +
+                    (CASE WHEN %s <> '' AND s.nompro ~* %s THEN 0.015 ELSE 0.0 END)
+                ) AS rrf_score
+            FROM sparse_search s
+            ORDER BY rrf_score DESC
+            LIMIT %s;
+            """
+            params = [
+                tsquery_str, tsquery_str, tsquery_str,
+                exact_code, exact_code, exact_code, exact_code,
+                viscosity_sql_regex, viscosity_sql_regex,
+                tsquery_str, tsquery_str,
+                like_term,
+                tsquery_str, tsquery_str,
+                like_term, like_term, like_term,
+                exact_code, exact_code, exact_code, exact_code,
+                viscosity_sql_regex, viscosity_sql_regex,
+            ]
+            if grupo_filter:
+                params.append(grupo_filter)
+            params.extend([
+                fetch_limit,
+                exact_code, exact_code, exact_code, exact_code,
+                viscosity_sql_regex, viscosity_sql_regex,
+                top_k
+            ])
 
         t_db_start = time.perf_counter()
-        fetch_limit = top_k * 3
-        vec_str = str(query_vector)
-
-        # Parâmetros para dense_search
-        params = [vec_str, vec_str, vec_str]
-        if grupo_filter:
-            params.append(grupo_filter)
-        params.append(fetch_limit)
-
-        # Parâmetros para sparse_search
-        params.extend([
-            tsquery_str, tsquery_str, tsquery_str,                                              # CASE ts_rank_cd
-            exact_code, exact_code, exact_code, exact_code,                                    # ORDER BY match exato
-            viscosity_sql_regex, viscosity_sql_regex,                                          # ORDER BY viscosidade
-            tsquery_str, tsquery_str,                                                          # ORDER BY ts_rank_cd
-            like_term,                                                                         # ORDER BY nompro ILIKE
-            tsquery_str, tsquery_str,                                                          # WHERE tsv @@
-            like_term, like_term, like_term,                                                   # WHERE nompro / codbar / codpro ILIKE
-            exact_code, exact_code, exact_code, exact_code,                                    # WHERE match exato
-            viscosity_sql_regex, viscosity_sql_regex,                                          # WHERE viscosidade
-        ])
-        if grupo_filter:
-            params.append(grupo_filter)
-        params.append(fetch_limit)
-
-        # Parâmetros para SELECT final (boosts RRF)
-        params.extend([
-            exact_code, exact_code, exact_code, exact_code,                                    # Boost exato codbar/codpro
-            viscosity_sql_regex, viscosity_sql_regex,                                          # Boost viscosidade
-            top_k                                                                              # LIMIT final
-        ])
-
         with self._get_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(sql_rrf, tuple(params))
@@ -326,10 +401,14 @@ class HybridRAGEngine:
             "total_retrieval_latency_ms": round(total_latency_ms, 2),
             "hnsw_ef_search": ef,
             "rrf_k": self.rrf_k,
+            "fetch_limit": fetch_limit,
             "dense_weight": dense_weight,
             "sparse_weight": sparse_weight,
+            "grupo_filter": grupo_filter or None,
+            "iterative_scan": bool(grupo_filter),
             "calibrated_rrf": True,
             "results_count": len(results),
+            "retrieval_mode": "hybrid_hnsw_rrf" if query_vector is not None else "sparse_fts_fallback",
         }
 
         return {
@@ -373,7 +452,7 @@ class HybridRAGEngine:
 
         tsquery_str = formatar_tsquery_portugues(q_clean)
         like_term = f"%{q_clean}%"
-        fetch_limit = top_k * 3
+        fetch_limit = min(50, top_k * 10)
 
         t_db_start = time.perf_counter()
 
@@ -517,7 +596,7 @@ class HybridRAGEngine:
                         SELECT 
                             id, modulo, topico, titulo, subtitulo, conteudo, elementos_ui, ui_action, tags,
                             0.0 AS cosine_similarity, 0.0 AS fts_score, NULL::bigint AS dense_rank, 1::bigint AS sparse_rank,
-                            0.01639 AS rrf_score
+                            0.04762 AS rrf_score
                         FROM aura_conhecimento_vetores
                         WHERE topico = 'panorama_operacional'
                         LIMIT 1;
@@ -535,8 +614,6 @@ class HybridRAGEngine:
             "total_retrieval_latency_ms": round(total_latency_ms, 2),
             "hnsw_ef_search": ef,
             "rrf_k": self.rrf_k,
-            "dense_weight": dense_weight,
-            "sparse_weight": sparse_weight,
             "top_k": top_k,
             "results_count": len(results),
             "retrieval_mode": "hybrid_hnsw_rrf" if query_vector is not None else "sparse_fts_fallback",
@@ -547,28 +624,82 @@ class HybridRAGEngine:
             "telemetry": telemetry,
         }
 
-    def search_dense_only(self, query_text: str, top_k: int = 5, ef_search: Optional[int] = None) -> Dict[str, Any]:
-        """Busca puramente semântica (HNSW)."""
+    def search_dense_only(
+        self,
+        query_text: str,
+        top_k: int = 5,
+        ef_search: Optional[int] = None,
+        grupo_filter: Optional[str] = None,
+        query_vector: Optional[List[float]] = None
+    ) -> Dict[str, Any]:
+        """Busca puramente semântica (HNSW) com suporte a filtro relacional e iterative scan."""
         ef = ef_search or self.ef_search
         t0 = time.perf_counter()
-        query_vector = self.gerar_embedding(query_text, task_type="retrieval_query")
+
+        clean_query = (query_text or "").strip()
+        if not clean_query and query_vector is None:
+            return {
+                "results": [],
+                "telemetry": {
+                    "type": "dense_hnsw",
+                    "embedding_latency_ms": 0.0,
+                    "db_latency_ms": 0.0,
+                    "total_latency_ms": 0.0,
+                    "iterative_scan": bool(grupo_filter),
+                    "grupo_filter": grupo_filter or None,
+                    "results_count": 0,
+                }
+            }
+
+        if query_vector is None:
+            try:
+                query_vector = self.gerar_embedding(clean_query, task_type="retrieval_query")
+            except Exception as e:
+                logger.warning(f"Erro ao gerar embedding em search_dense_only: {e}")
+                return {
+                    "results": [],
+                    "telemetry": {
+                        "type": "dense_hnsw",
+                        "error": str(e),
+                        "embedding_latency_ms": round((time.perf_counter() - t0) * 1000, 2),
+                        "db_latency_ms": 0.0,
+                        "total_latency_ms": round((time.perf_counter() - t0) * 1000, 2),
+                        "iterative_scan": bool(grupo_filter),
+                        "grupo_filter": grupo_filter or None,
+                        "results_count": 0,
+                    }
+                }
+
         emb_ms = (time.perf_counter() - t0) * 1000
+
+        grupo_condition = ""
+        iterative_scan_sql = ""
+        params = [str(query_vector)]
+        if grupo_filter:
+            grupo_condition = "AND grupo ILIKE %s"
+            iterative_scan_sql = """
+            LOAD 'vector';
+            SET LOCAL hnsw.iterative_scan = 'relaxed_order';
+            SET LOCAL hnsw.max_scan_tuples = 20000;
+            """
+            params.append(grupo_filter)
+        params.extend([str(query_vector), top_k])
 
         sql = f"""
         SET LOCAL hnsw.ef_search = {ef};
+        {iterative_scan_sql}
         SELECT 
             codpro, nompro, grupo, codbar, unidade, preco, texto_busca,
             1 - (embedding <=> %s::halfvec) AS cosine_similarity
         FROM produtos_vetores
-        WHERE embedding IS NOT NULL
+        WHERE embedding IS NOT NULL {grupo_condition}
         ORDER BY embedding <=> %s::halfvec
         LIMIT %s;
         """
         t_db = time.perf_counter()
         with self._get_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                vec_str = str(query_vector)
-                cur.execute(sql, (vec_str, vec_str, top_k))
+                cur.execute(sql, tuple(params))
                 results = cur.fetchall()
         db_ms = (time.perf_counter() - t_db) * 1000
 
@@ -579,16 +710,36 @@ class HybridRAGEngine:
                 "embedding_latency_ms": round(emb_ms, 2),
                 "db_latency_ms": round(db_ms, 2),
                 "total_latency_ms": round(emb_ms + db_ms, 2),
+                "iterative_scan": bool(grupo_filter),
+                "grupo_filter": grupo_filter or None,
+                "results_count": len(results),
             }
         }
 
-    def search_sparse_only(self, query_text: str, top_k: int = 5) -> Dict[str, Any]:
+    def search_sparse_only(
+        self,
+        query_text: str,
+        top_k: int = 5,
+        grupo_filter: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Busca puramente lexical (GIN Full-Text Search)."""
         t0 = time.perf_counter()
-        tsquery_str = formatar_tsquery_portugues(query_text)
-        like_term = f"%{query_text.strip()}%"
+        clean_query = (query_text or "").strip()
+        tsquery_str = formatar_tsquery_portugues(clean_query)
+        like_term = f"%{clean_query}%"
 
-        sql = """
+        grupo_condition = ""
+        params = [
+            tsquery_str, tsquery_str, tsquery_str,
+            tsquery_str, tsquery_str,
+            like_term, like_term, like_term,
+        ]
+        if grupo_filter:
+            grupo_condition = "AND grupo ILIKE %s"
+            params.append(grupo_filter)
+        params.append(top_k)
+
+        sql = f"""
         SELECT 
             codpro, nompro, grupo, codbar, unidade, preco, texto_busca,
             CASE 
@@ -597,24 +748,16 @@ class HybridRAGEngine:
                 ELSE 0.0
             END AS fts_score
         FROM produtos_vetores
-        WHERE (%s <> '' AND tsv @@ to_tsquery('portuguese', %s))
+        WHERE ((%s <> '' AND tsv @@ to_tsquery('portuguese', %s))
            OR nompro ILIKE %s
            OR codbar ILIKE %s
-           OR codpro ILIKE %s
+           OR codpro ILIKE %s) {grupo_condition}
         ORDER BY fts_score DESC, nompro ASC
         LIMIT %s;
         """
         with self._get_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(
-                    sql,
-                    (
-                        tsquery_str, tsquery_str, tsquery_str,
-                        tsquery_str, tsquery_str,
-                        like_term, like_term, like_term,
-                        top_k
-                    )
-                )
+                cur.execute(sql, tuple(params))
                 results = cur.fetchall()
         db_ms = (time.perf_counter() - t0) * 1000
 
@@ -625,6 +768,8 @@ class HybridRAGEngine:
                 "tsquery_used": tsquery_str,
                 "db_latency_ms": round(db_ms, 2),
                 "total_latency_ms": round(db_ms, 2),
+                "grupo_filter": grupo_filter or None,
+                "results_count": len(results),
             }
         }
 

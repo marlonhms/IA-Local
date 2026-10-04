@@ -368,7 +368,8 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     elif tem_raiz_auditoria:
         if any(w in p for w in [
             "hoje", "ontem", "anteontem", "como foi", "como fechou", "qual foi", "qual o", "resumo",
-            "bateu", "caixa", "bomba", "bico", "sobra", "falta", "1º", "2º", "3º", "1o", "2o", "3o",
+            "bateu", "caixa", "bomba", "bico", "sobra", "sobro", "sobrou", "falta", "faltou", "troco",
+            "1º", "2º", "3º", "1o", "2o", "3o", "1", "2", "3",
             "primeiro", "segundo", "terceiro", "manhã", "manha", "tarde", "noite", "madrugada", "teve", "houve"
         ]):
             return "auditoria_turno"
@@ -398,13 +399,15 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
 
     tem_termo_preditivo = any(k in p for k in [
         "previsão", "previsao", "acabar", "acaba", "acabam", "secar", "seca", "secam",
+        "faltar", "falta", "faltam",
         "esgotamento", "esgotar", "esgota", "autonomia", "run-out", "runout", "run out",
         "durar", "dura", "duram", "duração", "duracao", "resta", "restam", "terminar", "termina",
         "pedir", "comprar", "compra", "pedido", "pedidos",
         "descarga", "ullage", "carreta", "compartimento", "compartimentos", "cabe", "cabem"
     ])
     tem_termo_combustivel_ou_tanque = any(w in p for w in [
-        "gasolina", "diesel", "etanol", "álcool", "alcool", "arla", "combustível", "combustivel", "combustíveis", "combustiveis",
+        "gasolina", "diesel", "etanol", "álcool", "alcool", "arla", "gasosa",
+        "combustível", "combustivel", "combustíveis", "combustiveis",
         "tanque", "tanques", "tq"
     ])
 
@@ -415,7 +418,7 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     if "quanto tempo" in p and tem_termo_combustivel_ou_tanque:
         return "previsao_tanques"
 
-    if "fim de semana" in p and any(w in p for w in ["combustível", "combustivel", "pedir", "comprar", "tanque", "tanques", "gasolina", "diesel", "etanol", "preciso"]):
+    if "fim de semana" in p and any(w in p for w in ["combustível", "combustivel", "pedir", "comprar", "tanque", "tanques", "gasolina", "gasosa", "diesel", "etanol", "preciso", "faltar"]):
         return "previsao_tanques"
 
     if "crítico" in p or "critico" in p:
@@ -496,6 +499,9 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     if "frentista" in p or "frentistas" in p:
         return "desempenho_pista_frentistas"
 
+    if any(w in p for w in ["bico", "bicos", "bomba", "bombas"]) and any(w in p for w in ["vazão", "vazao", "filtro", "lenta", "lento", "lerdo", "lerda", "sujo", "suja", "problema", "obstruído", "obstruido", "baixa", "baixo"]):
+        return "desempenho_pista_frentistas"
+
     if any(w in p for w in ["vazão", "vazao", "filtro"]) and any(w in p for w in ["bico", "bicos", "bomba", "bombas", "lenta", "lento", "sujo", "suja", "problema", "obstruído", "obstruido", "baixa", "baixo"]):
         return "desempenho_pista_frentistas"
 
@@ -535,8 +541,11 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
         return "vendas_analitico"
 
     # 6. Perguntas sobre SRE, banco de dados e observabilidade
-    termos_sre = ["métrica", "metricas", "sre", "cache hit", "latência", "índice hnsw", "saúde do banco", "pg_stat"]
-    if any(t in p for t in termos_sre):
+    termos_sre = [
+        "métrica", "metricas", "sre", "cache hit", "latência", "índice hnsw", "saúde do banco", "pg_stat",
+        "postgres", "postgresql"
+    ]
+    if any(t in p for t in termos_sre) or ("postgres" in p and any(w in p for w in ["memoria", "memória", "cpu", "disco", "banco", "conexao", "conexão", "status"])) or ("memória" in p and "consumo" in p) or ("memoria" in p and "consumo" in p):
         return "sre_metricas"
 
     # 7. Perguntas cadastrais da filial
@@ -545,7 +554,7 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
         "endereco da filial", "endereço do posto", "endereco do posto", "qual o pdv",
         "dados da filial", "dados do posto"
     ]
-    if any(t in p for t in termos_filial):
+    if any(t in p for t in termos_filial) or any(w in p for w in ["cnpj", "razao social", "razão social", "inscrição estadual", "inscricao estadual"]):
         return "dados_filial"
 
     # Padrão: busca no catálogo de produtos (RAG Híbrido)
@@ -609,7 +618,7 @@ class SemanticRouter:
             self._conn = None
 
     def init_table(self):
-        """Garante a existência da tabela intencoes_vetores e índice HNSW no posto_ai."""
+        """Garante a existência da tabela intencoes_vetores e índice HNSW otimizado (m=32, ef_construction=256) no posto_ai."""
         conn = self._get_connection()
         with conn.cursor() as cur:
             cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
@@ -623,12 +632,34 @@ class SemanticRouter:
                     criado_em TIMESTAMP DEFAULT NOW()
                 );
             """)
+
+            # Verifica se o índice já existe com m=32 e ef_construction=256; caso contrário, recompila
+            cur.execute("SELECT indexdef FROM pg_indexes WHERE indexname = 'idx_intencoes_vetores_hnsw';")
+            idx_row = cur.fetchone()
+            idx_def = idx_row[0] if idx_row else ""
+            m_ok = bool(re.search(r"\bm\s*=\s*'?32'?", idx_def))
+            ef_ok = bool(re.search(r"\bef_construction\s*=\s*'?256'?", idx_def))
+            if not idx_row or not m_ok or not ef_ok:
+                cur.execute("DROP INDEX IF EXISTS idx_intencoes_vetores_hnsw;")
+                cur.execute("""
+                    CREATE INDEX idx_intencoes_vetores_hnsw 
+                    ON intencoes_vetores USING hnsw (embedding halfvec_cosine_ops)
+                    WITH (m = 32, ef_construction = 256);
+                """)
+            conn.commit()
+
+    def recompile_hnsw_index(self):
+        """Recompila explicitamente o índice HNSW de intenções com m=32 e ef_construction=256."""
+        conn = self._get_connection()
+        with conn.cursor() as cur:
+            cur.execute("DROP INDEX IF EXISTS idx_intencoes_vetores_hnsw;")
             cur.execute("""
-                CREATE INDEX IF NOT EXISTS idx_intencoes_vetores_hnsw 
+                CREATE INDEX idx_intencoes_vetores_hnsw 
                 ON intencoes_vetores USING hnsw (embedding halfvec_cosine_ops)
-                WITH (m = 16, ef_construction = 64);
+                WITH (m = 32, ef_construction = 256);
             """)
             conn.commit()
+        logger.info("Índice 'idx_intencoes_vetores_hnsw' recompilado com m=32, ef_construction=256.")
 
     def count_intents(self) -> int:
         """Retorna o número de exemplos de intenções indexados."""

@@ -155,7 +155,14 @@ def run_tests():
 
     # Validação de latência do banco vetorial
     t0 = time.perf_counter()
-    emb_dummy = rag.gerar_embedding("cockpit")
+    try:
+        emb_dummy = rag.gerar_embedding("cockpit")
+    except Exception:
+        # Fallback para vetor armazenado no banco quando a cota externa da API Gemini atingir o limite diário
+        with psycopg2.connect(**DB_VECTOR_CONFIG) as conn_test:
+            with conn_test.cursor() as cur_test:
+                cur_test.execute("SELECT embedding FROM aura_conhecimento_vetores WHERE embedding IS NOT NULL LIMIT 1;")
+                emb_dummy = cur_test.fetchone()[0]
     res_lat = rag.search_hybrid_conhecimento("cockpit", query_vector=emb_dummy)
     db_ms = res_lat["telemetry"]["db_rrf_latency_ms"]
     print(f"   [OK] Latência de recuperação híbrida no pgvector: {db_ms:.2f}ms")

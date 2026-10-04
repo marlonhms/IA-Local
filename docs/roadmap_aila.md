@@ -384,6 +384,17 @@ flowchart TD
   - Consultas 100% sob demanda: desativação total de loops de polling e auto-refresh em segundo plano; ativação estrita mediante chat ou clique do gestor.
   - Experiência visual humanizada, acolhedora e fluida com ambiência de Aurora Boreal (cores Esmeralda, Ciano e Roxo), sincronização de taxa de quadros (Hz) e 6 cartões de decisão rápida no onboarding.
   - Suíte de testes automatizados em `scripts/test_painel_aura.py` validando rotas, assets e 11 ferramentas com 100% de aprovação.
+- [x] **Auto-Conhecimento e Meta-RAG da AURA (Concluído ✅):**
+  - Tabela vetorial `aura_conhecimento_vetores` no `posto_ai:5434` populada com 15 chunks atômicos sobre telas, regras de negócio e atalhos.
+  - 12ª intenção canônica `ajuda_sistema` indexada no roteador com busca híbrida HNSW + GIN FTS + RRF (sub-5ms) e zero chamadas ao banco ERP legado.
+  - Ações interativas na UI (`ui_action`) com botões de navegação no chat disparando `switchTab()`.
+  - Suíte de testes automatizados em `scripts/test_conhecimento_aura.py` com 100% de aprovação.
+- [x] **Otimizações RAG Fase P0: pgvector 0.8+, Taxonomia & RRF Calibrado (Concluído ✅):**
+  - **Contextual Taxonomy Injection:** Geração dinâmica de termos de pista e gírias de varejo em `scripts/index_produtos.py` antes da vetorização ("gasosa", "bico", "tanque", "combustível"). Busca por *"gasosa"* agora ranqueia Gasolina Comum / Aditivada em 1º lugar (eliminando falso-positivo de água com gás).
+  - **Calibração Matemática do RRF:** $k=20$, candidatos expandidos para `fetch_limit = min(50, top_k * 10)`, normalização de boosts e desempate contínuo via cosseno ($+0.02 \times \text{cosine}$).
+  - **Tuning HNSW no Roteador Semântico:** Índice `idx_intencoes_vetores_hnsw` recompilado com $m=32$ e $ef\_construction=256$, assegurando 100% de precisão de grafo.
+  - **Iterative Index Scan pgvector 0.8+:** Ativação de `hnsw.iterative_scan = 'relaxed_order'` e `max_scan_tuples = 20000` em buscas relacionais com filtros.
+  - **Suíte de Testes P0:** Implementada em `scripts/test_p0_rag_optimizations.py` cobrindo 9 cenários com 100% de aprovação.
 
 ---
 

@@ -11,6 +11,7 @@ Melhorias:
 """
 
 import os
+import re
 import sys
 import time
 import hashlib
@@ -41,7 +42,85 @@ from config.settings import (
 from core.semantic_router import SemanticRouter
 
 
-def calcular_hash_produto(nompro: str, grupo: str, codbar: str, preco: float, unidade: str) -> str:
+def gerar_taxonomia_contextual(nompro: str, grupo: str) -> list:
+    """
+    Gera termos taxonômicos contextuais, sinônimos e gírias de pista do varejo brasileiro.
+    Resolve discrepâncias semânticas (ex: 'gasosa' -> GASOLINA COMUM / ADITIVADA).
+    """
+    nom_upper = (nompro or "").upper()
+    grp_upper = (grupo or "").upper()
+    taxonomias = []
+
+    # 1. Combustíveis e Pista
+    is_combustivel = (
+        "COMBUSTIVEL" in grp_upper
+        or "COMBUSTIVEIS" in grp_upper
+        or any(k in nom_upper for k in ["GASOLINA", "ETANOL", "DIESEL", "ARLA"])
+    )
+    if is_combustivel:
+        taxonomias.extend(["combustível", "combustivel", "bico de pista", "tanque", "abastecimento", "litro", "pista"])
+        if "GASOLINA" in nom_upper or "GASOLINA" in grp_upper:
+            taxonomias.extend(["gasosa", "gasolina"])
+            if "ADITIVADA" in nom_upper:
+                taxonomias.extend(["gasosa aditivada", "aditivada", "gasolina aditivada", "aditivação", "grid"])
+            elif "COMUM" in nom_upper:
+                taxonomias.extend(["gasosa comum", "comum", "gasolina comum"])
+            else:
+                taxonomias.extend(["gasosa comum", "gasosa aditivada"])
+        if "ETANOL" in nom_upper or "ALCOOL" in nom_upper:
+            taxonomias.extend(["etanol", "álcool", "alcool"])
+        if "DIESEL" in nom_upper:
+            taxonomias.extend(["diesel", "óleo diesel", "oleo diesel"])
+            if "S10" in nom_upper:
+                taxonomias.extend(["diesel s10", "s10"])
+            elif "S500" in nom_upper:
+                taxonomias.extend(["diesel s500", "s500"])
+        if "ARLA" in nom_upper:
+            taxonomias.extend(["arla", "arla 32", "catalisador"])
+
+    # 2. Lubrificantes e Troca de Óleo
+    is_lubrificante = (
+        "LUBRIFICANTE" in grp_upper
+        or "OLEO" in grp_upper
+        or "ADITIVO" in grp_upper
+        or any(k in nom_upper for k in ["OLEO", "ÓLEO", "LUBRAX", "MOBIL", "CASTROL", "HAVOLINE", "SHELL HELIX", "SELENIA", "IPIRANGA F1"])
+        or any(w in nom_upper for w in ["5W30", "5W40", "10W40", "15W40", "20W50", "0W20"])
+    )
+    if is_lubrificante:
+        taxonomias.extend(["óleo de motor", "oleo de motor", "lubrificante", "cárter", "carter", "viscosidade", "troca de óleo", "troca de oleo", "motor", "automotivo"])
+
+    # 3. Loja de Conveniência, Bebidas e Snacks
+    is_conveniencia = (
+        any(k in grp_upper for k in ["BEBIDA", "CONVENI", "PADARIA", "BOMBONIERE", "BALA", "PICOLE", "GULOSEIMA", "SNACK", "TABACARIA"])
+        or any(k in nom_upper for k in ["CERVEJA", "REFRIGERANTE", "AGUA", "ÁGUA", "SUCO", "ENERGETICO", "SALGADO", "PAO", "PÃO", "CHOCOLATE", "SNACK", "CHIPS", "CIGARRO"])
+    )
+    if is_conveniencia:
+        taxonomias.extend(["conveniência", "conveniencia", "loja de conveniência"])
+        if any(k in nom_upper or k in grp_upper for k in ["CERVEJA", "ALCO", "CHOPP", "HEINEKEN", "SKOL", "BRAHMA", "AMSTEL", "BUDWEISER", "CORONA", "EISENBAHN"]):
+            taxonomias.extend(["cerveja", "gelada", "breja", "bebida gelada", "latão", "long neck"])
+        elif any(k in nom_upper or k in grp_upper for k in ["REFRIGERANTE", "COCA", "GUARANA", "PEPSI", "SUCO", "AGUA", "ÁGUA", "RED BULL", "ENERGETICO"]):
+            taxonomias.extend(["bebida", "gelada", "refresco", "refrigerante"])
+        if any(k in grp_upper or k in nom_upper for k in ["PADARIA", "SNACK", "SALGADO", "PAO", "PÃO", "BOLO", "BISCOITO", "BOMBONIERE", "BALA", "CHIPS"]):
+            taxonomias.extend(["snack", "lanche", "comida", "padaria", "tira-gosto"])
+        if "TABACARIA" in grp_upper or "CIGARRO" in nom_upper:
+            taxonomias.extend(["tabacaria", "cigarro", "fumo"])
+
+    return list(dict.fromkeys(taxonomias))
+
+
+def gerar_texto_busca_produto(nompro: str, grupo: str, unidade: str, preco: float, codbar: str = "") -> str:
+    """Gera o texto_busca canônico enriquecido com taxonomias contextuais e gírias de varejo/posto."""
+    taxonomias = gerar_taxonomia_contextual(nompro, grupo)
+    taxo_str = ", ".join(taxonomias) if taxonomias else ""
+    texto_busca = f"Produto: {nompro} | Grupo: {grupo} | Unidade: {unidade} | Preço: R$ {preco:.2f}"
+    if codbar:
+        texto_busca += f" | Cód. Barras: {codbar}"
+    if taxo_str:
+        texto_busca += f" | Taxonomia/Sinônimos: {taxo_str}"
+    return texto_busca
+
+
+def calcular_hash_produto(nompro: str, grupo: str, codbar: str, preco: float, unidade: str, versao_taxonomia: str = "v2") -> str:
     """Calcula hash MD5 determinístico para Change Data Capture (CDC)."""
     nompro_c = (nompro or "").strip().upper()
     grupo_c = (grupo or "GERAL").strip().upper()
@@ -51,7 +130,7 @@ def calcular_hash_produto(nompro: str, grupo: str, codbar: str, preco: float, un
         preco_c = f"{float(preco):.2f}"
     except (ValueError, TypeError):
         preco_c = "0.00"
-    payload = f"{nompro_c}|{grupo_c}|{codbar_c}|{preco_c}|{unidade_c}"
+    payload = f"{nompro_c}|{grupo_c}|{codbar_c}|{preco_c}|{unidade_c}|{versao_taxonomia}"
     return hashlib.md5(payload.encode("utf-8")).hexdigest()
 
 
@@ -78,18 +157,49 @@ def inicializar_banco_vetorial(conn_vec):
         cur.execute("ALTER TABLE produtos_vetores ADD COLUMN IF NOT EXISTS hash_md5 VARCHAR(32);")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_produtos_vetores_hash_md5 ON produtos_vetores (hash_md5);")
 
+        # Migração e garantia de que tsv indexe também texto_busca (taxonomias e gírias)
         cur.execute("""
-            ALTER TABLE produtos_vetores 
-            ADD COLUMN IF NOT EXISTS tsv tsvector 
-            GENERATED ALWAYS AS (
-                to_tsvector('portuguese', 
-                    coalesce(nompro, '') || ' ' || 
-                    coalesce(grupo, '') || ' ' || 
-                    coalesce(codbar, '') || ' ' || 
-                    coalesce(codpro, '') || ' ' ||
-                    coalesce(unidade, '')
-                )
-            ) STORED;
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'produtos_vetores' AND column_name = 'tsv'
+                ) THEN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_name = 'produtos_vetores' 
+                        AND column_name = 'tsv' 
+                        AND generation_expression ILIKE '%texto_busca%'
+                    ) THEN
+                        ALTER TABLE produtos_vetores DROP COLUMN tsv CASCADE;
+                        ALTER TABLE produtos_vetores ADD COLUMN tsv tsvector GENERATED ALWAYS AS (
+                            to_tsvector('portuguese', 
+                                coalesce(nompro, '') || ' ' || 
+                                coalesce(grupo, '') || ' ' || 
+                                coalesce(codbar, '') || ' ' || 
+                                coalesce(codpro, '') || ' ' ||
+                                coalesce(unidade, '') || ' ' ||
+                                coalesce(texto_busca, '')
+                            )
+                        ) STORED;
+                        CREATE INDEX IF NOT EXISTS idx_produtos_vetores_tsv_gin 
+                        ON produtos_vetores USING gin (tsv);
+                    END IF;
+                ELSE
+                    ALTER TABLE produtos_vetores ADD COLUMN tsv tsvector GENERATED ALWAYS AS (
+                        to_tsvector('portuguese', 
+                            coalesce(nompro, '') || ' ' || 
+                            coalesce(grupo, '') || ' ' || 
+                            coalesce(codbar, '') || ' ' || 
+                            coalesce(codpro, '') || ' ' ||
+                            coalesce(unidade, '') || ' ' ||
+                            coalesce(texto_busca, '')
+                        )
+                    ) STORED;
+                    CREATE INDEX IF NOT EXISTS idx_produtos_vetores_tsv_gin 
+                        ON produtos_vetores USING gin (tsv);
+                END IF;
+            END $$;
         """)
 
         cur.execute("""
@@ -121,7 +231,7 @@ def inicializar_banco_vetorial(conn_vec):
         """)
 
         conn_vec.commit()
-    print("   [OK] Tabela 'produtos_vetores' e índices HNSW (ef_construction=128) + GIN verificados.")
+    print("   [OK] Tabela 'produtos_vetores' e índices HNSW (ef_construction=128) + GIN (com texto_busca) verificados.")
 
 
 def buscar_produtos_erp(conn_erp):
@@ -292,14 +402,12 @@ def main():
             dados_lote = []
 
             for (codpro, nompro, grupo, codbar, unidade, preco), h in zip(lote, hashes_lote):
-                texto_busca = f"Produto: {nompro} | Grupo: {grupo} | Unidade: {unidade} | Preço: R$ {preco:.2f}"
-                if codbar:
-                    texto_busca += f" | Cód. Barras: {codbar}"
+                texto_busca = gerar_texto_busca_produto(nompro, grupo, unidade, preco, codbar)
                 textos_lote.append(texto_busca)
                 dados_lote.append((codpro, nompro, grupo, codbar, unidade, preco, texto_busca, h))
 
             vetores = None
-            for tentativa in range(3):
+            for tentativa in range(5):
                 try:
                     res = genai.embed_content(
                         model=DEFAULT_EMBEDDING_MODEL,
@@ -310,8 +418,13 @@ def main():
                     vetores = res["embedding"]
                     break
                 except Exception as e:
-                    print(f"   [Pausa para cota da API] Aguardando 10s... ({e})")
-                    time.sleep(10)
+                    err_msg = str(e)
+                    wait_sec = 15
+                    m_delay = re.search(r'(?:retry in|seconds:\s*)(\d+)', err_msg, re.IGNORECASE)
+                    if m_delay:
+                        wait_sec = int(m_delay.group(1)) + 2
+                    print(f"   [Pausa para cota da API] Aguardando {wait_sec}s... ({err_msg[:120]}...)")
+                    time.sleep(wait_sec)
 
             if vetores:
                 for item_dado, vetor in zip(dados_lote, vetores):
