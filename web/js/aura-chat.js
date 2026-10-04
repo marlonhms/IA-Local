@@ -434,6 +434,8 @@ class AuraChatController {
       'clientes_ranking': 'Ranking de Clientes',
       'dados_filial': 'Dados da Filial',
       'sre_metricas': 'Diagnóstico Operacional',
+      'ajuda_sistema': 'Guia & Auto-Conhecimento',
+      'conhecimento_aura': 'Guia & Auto-Conhecimento',
     };
     return map[toolName] || toolName;
   }
@@ -484,6 +486,9 @@ class AuraChatController {
     if (!data || typeof data !== 'object') return '';
 
     // 1. Roteamento prioritário por toolName canônico
+    if (toolName === 'ajuda_sistema' || toolName === 'conhecimento_aura' || toolName === 'ajuda') {
+      return this.renderAjudaSistemaWidget(data);
+    }
     if (toolName === 'lmc_anp' || toolName === 'gerar_relatorio_lmc_anp') {
       return this.renderLmcAnpWidget(data);
     }
@@ -501,6 +506,12 @@ class AuraChatController {
     }
 
     // 2. Roteamento por assinatura estrutural dos dados (fallback inteligente)
+    if (
+      data.ui_action ||
+      (Array.isArray(data.artigos) && data.artigos.length > 0 && data.artigos[0]?.modulo)
+    ) {
+      return this.renderAjudaSistemaWidget(data);
+    }
     if (
       data.resumo_executivo?.status_geral_anp ||
       Array.isArray(data.demonstrativo_por_combustivel) ||
@@ -539,6 +550,120 @@ class AuraChatController {
 
     // 3. Fallback genérico executivo
     return this.renderGenericToolWidget(toolName, data);
+  }
+
+  /**
+   * Widget de Auto-Conhecimento e Atalho Interativo da UI
+   */
+  renderAjudaSistemaWidget(data) {
+    const action = data.ui_action || (data.artigos && data.artigos[0]?.ui_action) || null;
+    const artigos = data.artigos || [];
+    const topArtigo = artigos.length > 0 ? artigos[0] : null;
+    const modulo = topArtigo?.modulo ? topArtigo.modulo.toUpperCase() : 'SISTEMA';
+    const titulo = topArtigo?.titulo || 'Auto-Conhecimento da AURA';
+    const subtitulo = topArtigo?.subtitulo || 'Guia de operação e atalhos rápidos da plataforma.';
+
+    let actionButtonHtml = '';
+    if (action) {
+      const label = action.label || 'Acessar Funcionalidade';
+      if (action.action === 'switch_tab' && action.target) {
+        actionButtonHtml = `
+          <button 
+            type="button"
+            onclick="if (window.auraAudio) window.auraAudio.playChime(650, 0.05); if (window.auraApp) window.auraApp.switchTab('${this.escapeHtml(action.target)}');" 
+            class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
+            <span class="text-sm">🚀</span>
+            <span>${this.escapeHtml(label)}</span>
+            <svg class="w-3.5 h-3.5 text-cyan-300 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+            </svg>
+          </button>
+        `;
+      } else if (action.action === 'open_sidebar') {
+        actionButtonHtml = `
+          <button 
+            type="button"
+            onclick="if (window.auraApp) window.auraApp.openSidebar();" 
+            class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
+            <span class="text-sm">📂</span>
+            <span>${this.escapeHtml(label)}</span>
+          </button>
+        `;
+      } else if (action.action === 'open_command_palette') {
+        actionButtonHtml = `
+          <button 
+            type="button"
+            onclick="const btn = document.getElementById('btn-open-palette'); if (btn) btn.click();" 
+            class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
+            <span class="text-sm">⌨️</span>
+            <span>${this.escapeHtml(label)}</span>
+          </button>
+        `;
+      } else if (action.action === 'toggle_audio') {
+        actionButtonHtml = `
+          <button 
+            type="button"
+            onclick="const btn = document.getElementById('sidebar-btn-toggle-sfx') || document.getElementById('btn-toggle-sfx'); if (btn) { btn.click(); } else if (window.auraAudio) { const m = window.auraAudio.toggleMute(); if (window.auraApp) window.auraApp.syncSfxButtons(m); }" 
+            class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
+            <span class="text-sm">🔊</span>
+            <span>${this.escapeHtml(label)}</span>
+          </button>
+        `;
+      } else {
+        actionButtonHtml = `
+          <button 
+            type="button"
+            onclick="if (window.auraApp) window.auraApp.switchTab('cockpit');" 
+            class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
+            <span class="text-sm">⚡</span>
+            <span>${this.escapeHtml(label)}</span>
+          </button>
+        `;
+      }
+    }
+
+    let relatedHtml = '';
+    if (artigos.length > 1) {
+      const relBadges = artigos.slice(1, 3).map(art => {
+        const mod = art.modulo ? art.modulo.toUpperCase() : 'GUIA';
+        const tit = art.titulo || art.topico;
+        return `<span class="px-2 py-0.5 rounded-lg bg-slate-800/80 text-cyan-300/90 text-[10px] font-mono border border-slate-700/60 inline-flex items-center gap-1">📌 [${this.escapeHtml(mod)}] ${this.escapeHtml(tit)}</span>`;
+      }).join(' ');
+      relatedHtml = `
+        <div class="pt-2 border-t border-cyan-500/10 flex flex-wrap items-center gap-1.5">
+          <span class="text-[10px] text-slate-400">Tópicos complementares:</span>
+          ${relBadges}
+        </div>
+      `;
+    }
+
+    return `
+      <div class="rounded-2xl border border-cyan-500/30 bg-slate-900/90 backdrop-blur-md p-4 text-slate-100 shadow-lg space-y-3 animate-fade-in">
+        <div class="flex items-center justify-between border-b border-cyan-500/20 pb-2.5">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-300 shadow-inner">
+              <span class="text-sm">💡</span>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase tracking-wider">${this.escapeHtml(modulo)}</span>
+                <span class="text-white font-bold text-xs">${this.escapeHtml(titulo)}</span>
+              </div>
+              <p class="text-[11px] text-slate-400 leading-snug mt-0.5">${this.escapeHtml(subtitulo)}</p>
+            </div>
+          </div>
+        </div>
+
+        ${actionButtonHtml ? `
+        <div class="pt-1 flex items-center justify-between gap-3">
+          <span class="text-[11px] text-slate-400">Atalho de ação rápida no sistema:</span>
+          ${actionButtonHtml}
+        </div>
+        ` : ''}
+
+        ${relatedHtml}
+      </div>
+    `;
   }
 
   /**

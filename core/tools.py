@@ -98,6 +98,10 @@ class PostoTools:
         """Executa busca semântica e lexical híbrida no catálogo de produtos."""
         return self.rag.search_hybrid(termo, top_k=top_k, query_vector=query_vector, grupo_filter=grupo_filter)
 
+    def consultar_conhecimento_aura(self, termo: str, top_k: int = 2, query_vector: list = None) -> dict:
+        """Executa busca híbrida de auto-conhecimento e meta-RAG na base de dados da AURA."""
+        return self.rag.search_hybrid_conhecimento(termo, top_k=top_k, query_vector=query_vector)
+
     def consultar_analise_vendas_erp(self, tipo: str = "mais_vendidos") -> dict:
         """
         Consulta dados analíticos de vendas e abastecimentos no banco ERP (porta 5433).

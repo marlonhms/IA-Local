@@ -736,6 +736,16 @@ class AuraEngine:
                     grupo_filter=p.get("grupo"),
                 )
 
+            elif norm_name in (
+                "ajuda_sistema", "ajuda", "menu", "conhecimento_aura", "conhecimento", "sistema", "guia",
+                "consultar_conhecimento_aura", "auto_conhecimento", "ajuda_telas"
+            ):
+                query_txt = (p.get("query") or p.get("termo") or p.get("pergunta") or "").strip() or "ajuda"
+                return self.tools.consultar_conhecimento_aura(
+                    termo=query_txt,
+                    top_k=int(p.get("top_k", 2)),
+                )
+
             else:
                 raise ValueError(f"Ferramenta desconhecida ou não suportada: '{tool_name}'")
 
@@ -766,8 +776,40 @@ class AuraEngine:
         pergunta_sanitizada: str,
         contexto_sanitizado: str,
         historico_formatado: str,
+        intencao: Optional[str] = None,
     ) -> str:
         dados_filial = self.get_dados_filial()
+
+        if intencao == "ajuda_sistema":
+            return f"""Você é a AURA (Autonomous Unified Retail Assistant), a Assistente de Prontidão e Especialista Guia da Plataforma de Gestão do Posto e Loja de Conveniência.
+Seu papel neste atendimento é fornecer AUTO-CONHECIMENTO e EXPLICAÇÃO EXECUTIVA sobre as telas, módulos operacionais, métricas analíticas e atalhos de navegação da aplicação.
+
+Diretrizes de Tom e Persona para Ajuda do Sistema:
+- DESATIVE COMPLETAMENTE qualquer tom de emergência, crise de pista, cobrança de operadores ou alertas de quebra de caixa.
+- Adote uma postura acolhedora, executiva, clara, didática e estruturada, como a especialista que conhece minuciosamente cada tela e atalho da plataforma.
+- Baseie sua resposta estritamente nas Informações Recuperadas da Base de Conhecimento da AURA apresentadas abaixo.
+
+Estrutura Obrigatória de Resposta:
+Apresente a explicação organizada estritamente nos seguintes 3 blocos estruturados:
+1. 📘 **Visão Geral**: Explique o propósito executivo da tela, módulo ou funcionalidade no dia a dia da revenda.
+2. 🖥️ **O que a tela mostra**: Descreva os componentes visuais, cards, indicadores-chave, métricas apuradas e regras de negócio aplicadas.
+3. ⚡ **Como operar e atalhos**: Indique o passo a passo direto de navegação, atalhos de teclado (ex: Ctrl+K para Command Palette, alternância de abas) e botões de 1-clique disponíveis.
+
+Dados Cadastrais da Unidade:
+- Filial: {dados_filial.get('idempresa')} - {dados_filial.get('nome')}
+- Razão Social: {dados_filial.get('razao_social')}
+- CNPJ: {dados_filial.get('cnpj')}
+
+Histórico Recente da Sessão (Contexto de Continuidade):
+{historico_formatado}
+
+Informações Recuperadas da Base de Conhecimento da AURA (pgvector HNSW + FTS):
+{contexto_sanitizado}
+
+Pergunta do Usuário:
+"{pergunta_sanitizada}"
+"""
+
         return f"""Você é a AURA (Autonomous Unified Retail Assistant), a Assistente de Prontidão e Gerente Supervisora do Posto de Combustíveis e Loja de Conveniência.
 Seu papel fundamental é o suporte à tomada de decisão rápida e cirúrgica do gestor: o usuário tirou o celular do bolso na correria da pista ou da retaguarda, precisou tomar uma decisão imediata, perguntou para você, você ilumina com diagnósticos diretos, cálculos matemáticos exatos e a melhor ação para ele bater o martelo.
 
@@ -848,7 +890,49 @@ Diretrizes Específicas por Assunto:
         cache_hit = False
 
         try:
-            if intencao == "auditoria_turno":
+            if intencao == "ajuda_sistema":
+                busca = self.tools.consultar_conhecimento_aura(
+                    termo=pergunta,
+                    top_k=2,
+                    query_vector=query_vector,
+                )
+                artigos = busca.get("results", [])
+                telemetria_retrieval = busca.get("telemetry", {})
+
+                # Fallback defensivo para garantir artigos se nenhum foi retornado
+                if not artigos:
+                    busca_fb = self.tools.consultar_conhecimento_aura(
+                        termo="panorama operacional",
+                        top_k=2,
+                    )
+                    artigos = busca_fb.get("results", [])
+                    telemetria_retrieval = busca_fb.get("telemetry", {})
+
+                primary_ui_action = None
+                for art in artigos:
+                    if art.get("ui_action"):
+                        primary_ui_action = art.get("ui_action")
+                        break
+
+                resultado_bruto = {
+                    "artigos": artigos,
+                    "ui_action": primary_ui_action,
+                    "total_encontrado": len(artigos),
+                }
+
+                contexto_extra = "Base de Conhecimento e Auto-Explicação da AURA (pgvector HNSW + FTS):\n"
+                for art in artigos:
+                    contexto_extra += (
+                        f"=== MÓDULO: {art.get('modulo', '').upper()} | TÓPICO: {art.get('topico')} ===\n"
+                        f"Título: {art.get('titulo')}\n"
+                        f"Subtítulo: {art.get('subtitulo')}\n"
+                        f"Conteúdo Detalhado: {art.get('conteudo')}\n"
+                        f"Elementos UI: {json.dumps(art.get('elementos_ui', {}), ensure_ascii=False)}\n"
+                        f"Ação UI: {json.dumps(art.get('ui_action', {}), ensure_ascii=False)}\n"
+                        f"Tags: {', '.join(art.get('tags', []) or [])}\n\n"
+                    )
+
+            elif intencao == "auditoria_turno":
                 data_p, turno_p = extrair_data_turno(pergunta)
                 resultado_bruto = self.tools.auditar_fechamento_turno(data=data_p, turno=turno_p)
                 contexto_extra = f"Auditoria de Fechamento de Turno e Conciliação de Pista no ERP:\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
@@ -1142,6 +1226,7 @@ Diretrizes Específicas por Assunto:
             pergunta_sanitizada=pergunta_sanitizada,
             contexto_sanitizado=contexto_sanitizado,
             historico_formatado=historico_formatado,
+            intencao=intencao,
         )
 
         # 7. Streaming com Google Gemini e Fallback Resiliente

@@ -208,7 +208,9 @@ def main():
     router.init_table()
     total_intents = router.count_intents()
     distinct_intents = router.count_distinct_intents()
-    if total_intents < 9 or distinct_intents < 9 or args.seed_intencoes:
+    from core.semantic_router import INTENT_EXEMPLARS
+    total_exemplares_esperados = sum(len(d["exemplos"]) for d in INTENT_EXEMPLARS.values())
+    if total_intents < total_exemplares_esperados or distinct_intents < len(INTENT_EXEMPLARS) or args.seed_intencoes:
         print(f"\n[ROTEADOR] Indexando intenções operacionais ({total_intents} exemplares, {distinct_intents} intenções)...")
         total_seeded = router.seed_intents(force=args.seed_intencoes)
         print(f"   [OK] {total_seeded} intenções semânticas indexadas em 'intencoes_vetores'.")

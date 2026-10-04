@@ -236,6 +236,31 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
             "O que vender junto para aumentar o ticket?",
         ]
     },
+    "ajuda_sistema": {
+        "descricao": "Auto-conhecimento da AURA, funcionamento do sistema, explicações de telas, módulos, atalhos de teclado e interface",
+        "exemplos": [
+            "Como funciona o Panorama Operacional?",
+            "O que significa o cálculo de Ullage de 5.000L?",
+            "Onde eu vejo a vazão dos bicos e filtro lento?",
+            "Como funciona o ranking de frentistas e conversão de aditivada?",
+            "Como a AURA faz a triangulação CBC04 vs PDV?",
+            "Como funciona a conciliação de turno e quebra de caixa?",
+            "Como funciona o relatório do LMC da ANP e a margem de 0.6%?",
+            "O que são os combos da conveniência e Market Basket Apriori?",
+            "Como usar o radar de ações rápidas e gatilhos de 1 clique?",
+            "Para que serve o inspetor duplo com JSON?",
+            "Como funciona a assistente executiva no console chat?",
+            "Como ativo a visão integrada split?",
+            "Onde fica o menu lateral hambúrguer liquid glass?",
+            "Como usar o atalho Ctrl+K e a command palette?",
+            "Como ativar o feedback sensorial e os sons de áudio?",
+            "ajuda",
+            "menu",
+            "O que essa tela mostra e como operar o sistema?",
+            "Como navegar nas abas e atalhos da AURA?",
+            "Quais são as funcionalidades e módulos do sistema AURA?",
+        ]
+    },
 }
 
 
@@ -251,7 +276,7 @@ RETRY_REGEX = re.compile(
 
 CONVERSATIONAL_WORDS = {
     "ola", "olá", "oi", "bom dia", "boa tarde", "boa noite", "ok", "obrigado", "obrigada",
-    "valeu", "show", "beleza", "legal", "certo", "entendido", "ajuda", "menu"
+    "valeu", "show", "beleza", "legal", "certo", "entendido"
 }
 
 
@@ -261,6 +286,38 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     Usado como fallback ultrarrápido (sub-milissegundo) para o roteador semântico.
     """
     p = pergunta.lower().strip()
+
+    # -3. Comandos isolados de ajuda, menu e documentação do sistema
+    if p in ("ajuda", "menu", "help", "socorro", "telas", "comandos", "atalhos", "modulos", "módulos", "sistema"):
+        return "ajuda_sistema"
+
+    # -2.8 Pedidos conversacionais e expressos de ajuda operacional
+    if re.search(r"\b(?:preciso\s+de\s+ajuda|me\s+ajuda|quero\s+ajuda|ajuda\s+aqui|ajuda\s+a[ií]|d[aá]\s+(?:uma\s+)?ajuda|ajuda\s+com\s+o\s+sistema|estou\s+com\s+d[uú]vida|pode\s+me\s+ajudar)\b", p):
+        return "ajuda_sistema"
+
+    # -2.5 Meta-perguntas sobre funcionamento do sistema, UI, telas, módulos e atalhos
+    padrao_meta_pergunta = re.compile(
+        r"\b(?:onde\s+(?:(?:eu|voc[eê]|a\s+gente)\s+)?(?:fica|vejo|encontro|est[aá]|olho)|"
+        r"como\s+(?:(?:eu|voc[eê]|a\s+gente)\s+)?(?:funciona|usar|operar|navegar|abrir|ativo|ativar|faco|faço)|"
+        r"para\s+que\s+serve|o\s+que\s+(?:faz|mostra|significa|[eé]|essa\s+tela)|"
+        r"quais\s+(?:s[aã]o\s+as\s+)?(?:funcionalidades|telas|atalhos|comandos|m[oó]dulos))\b",
+        re.IGNORECASE
+    )
+    alvos_meta_sistema = [
+        "cockpit", "panorama", "tela", "telas", "aba", "abas", "modulo", "modulos", "módulo", "módulos",
+        "sistema", "aura", "painel", "split", "inspetor", "gatilho", "gatilhos", "radar", "ctrl+k", "ctrl k",
+        "command palette", "paleta", "menu", "hamburguer", "liquid glass", "audio", "sfx", "som", "chime",
+        "assistente", "console", "atalho", "atalhos", "ullage", "cbc04", "apriori", "market basket",
+        "feedback sensorial", "lmc", "conciliação", "conciliacao", "bico", "bicos", "filtro", "frentista", "tanque"
+    ]
+    if padrao_meta_pergunta.search(p) and any(alvo in p for alvo in alvos_meta_sistema):
+        return "ajuda_sistema"
+
+    if re.search(r"\b(?:ctrl\s*\+\s*k|command\s+palette|liquid\s+glass|menu\s+hamb[uú]rguer|vis[aã]o\s+split|inspetor\s+duplo|radar\s+de\s+a[cç][oõ]es)\b", p):
+        return "ajuda_sistema"
+
+    if re.search(r"^(?:ajuda|help|menu|manual|guia)\b", p):
+        return "ajuda_sistema"
 
     # -2. Comandos de repetição / saudações neutras não devem disparar ferramentas operacionais
     if RETRY_REGEX.match(p) or p in CONVERSATIONAL_WORDS:
@@ -699,6 +756,27 @@ class SemanticRouter:
             }
             return "catalogo_produtos", 0.0, telemetry
 
+        # 0.05 Comandos diretos de ajuda / menu do sistema
+        if (
+            query_norm in ("ajuda", "menu", "help", "socorro", "telas", "comandos", "atalhos", "modulos", "módulos", "sistema")
+            or re.search(r"^(?:me\s+ajuda|preciso\s+de\s+ajuda|quero\s+ajuda|ajuda\s+aqui|d[aá]\s+(?:uma\s+)?ajuda|ajuda\s+com\s+o\s+sistema)$", query_norm)
+        ):
+            total_ms = (time.perf_counter() - t0) * 1000
+            telemetry = {
+                "intent": "ajuda_sistema",
+                "confidence": 1.0,
+                "method": "direct_help_command",
+                "matched_phrase": f"Comando direto '{query_norm}'",
+                "pgvector_latency_ms": 0.0,
+                "embedding_latency_ms": 0.0,
+                "total_routing_latency_ms": round(total_ms, 3),
+                "confidence_threshold": self.confidence_threshold,
+                "query_vector": None,
+            }
+            if use_cache:
+                self._memory_cache[query_norm] = ("ajuda_sistema", 1.0, telemetry)
+            return "ajuda_sistema", 1.0, telemetry
+
         # 0.1 Comandos de repetição / saudações genéricas - neutralização de falsos positivos operacionais
         if RETRY_REGEX.match(query_norm) or query_norm in CONVERSATIONAL_WORDS:
             total_ms = (time.perf_counter() - t0) * 1000
@@ -767,8 +845,8 @@ class SemanticRouter:
                 last_similarity = similarity
                 intencao_detectada = melhor_match["intencao"]
 
-                # Priorização de termos técnicos determinísticos do LMC ANP
-                if intencao_detectada != "lmc_anp":
+                # Priorização de termos técnicos determinísticos do LMC ANP (exceto se for ajuda do sistema)
+                if intencao_detectada not in ("lmc_anp", "ajuda_sistema"):
                     if any(t in query_norm for t in TERMOS_LMC_EXATOS) or re.search(r"\blmc\b", query_norm):
                         intencao_detectada = "lmc_anp"
                         similarity = max(similarity, 0.88)

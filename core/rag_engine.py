@@ -167,16 +167,22 @@ class HybridRAGEngine:
         ef = ef_search or self.ef_search
         t0 = time.perf_counter()
 
+        clean_query = (query_text or "").strip()
+        if not clean_query:
+            clean_query = "produtos"
+
         t_emb_start = time.perf_counter()
         if not query_vector:
-            query_vector = self.gerar_embedding(query_text, task_type="retrieval_query")
+            try:
+                query_vector = self.gerar_embedding(clean_query, task_type="retrieval_query")
+            except Exception:
+                query_vector = None
         emb_latency_ms = (time.perf_counter() - t_emb_start) * 1000
 
-        tsquery_str = formatar_tsquery_portugues(query_text)
-        like_term = f"%{query_text.strip()}%"
+        tsquery_str = formatar_tsquery_portugues(clean_query)
+        like_term = f"%{clean_query}%"
 
         # Detecção de código de produto ou código de barras
-        clean_query = query_text.strip()
         prefix_match = re.search(r'(?:c[oó]digo|cod|item|produto|ean|barras|ref)\s*[:#]?\s*(\d{1,14})\b', clean_query, re.IGNORECASE)
         if prefix_match:
             exact_code = prefix_match.group(1)
@@ -331,6 +337,216 @@ class HybridRAGEngine:
             "telemetry": telemetry,
         }
 
+    def search_hybrid_conhecimento(
+        self,
+        query_text: str,
+        top_k: int = 2,
+        dense_weight: float = 0.5,
+        sparse_weight: float = 0.5,
+        ef_search: Optional[int] = None,
+        query_vector: Optional[List[float]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Busca híbrida de auto-conhecimento da AURA na tabela `aura_conhecimento_vetores`
+        utilizando pgvector HNSW (halfvec 768d) + GIN Full-Text Search (tsvector em português)
+        + Reciprocal Rank Fusion (RRF) em SQL nativo.
+        Latência de busca em banco sub-5ms (< 5ms).
+        """
+        ef = ef_search or self.ef_search
+        t0 = time.perf_counter()
+
+        q_clean = (query_text or "").strip()
+        if not q_clean:
+            q_clean = "panorama operacional"
+
+        t_emb_start = time.perf_counter()
+        if not query_vector:
+            # Comandos diretos de ajuda evitam latência de rede na API e usam FTS sub-1ms
+            if q_clean.lower() in ("ajuda", "menu", "telas", "atalhos", "help", "socorro", "modulos"):
+                query_vector = None
+            else:
+                try:
+                    query_vector = self.gerar_embedding(q_clean, task_type="retrieval_query")
+                except Exception:
+                    query_vector = None
+        emb_latency_ms = (time.perf_counter() - t_emb_start) * 1000
+
+        tsquery_str = formatar_tsquery_portugues(q_clean)
+        like_term = f"%{q_clean}%"
+        fetch_limit = top_k * 3
+
+        t_db_start = time.perf_counter()
+
+        with self._get_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                if query_vector is not None:
+                    sql_rrf = f"""
+                    SET LOCAL hnsw.ef_search = {ef};
+
+                    WITH dense_search AS (
+                        SELECT 
+                            id, modulo, topico, titulo, subtitulo, conteudo, elementos_ui, ui_action, tags,
+                            1 - (embedding <=> %s::halfvec) AS cosine_similarity,
+                            ROW_NUMBER() OVER (ORDER BY embedding <=> %s::halfvec) AS dense_rank
+                        FROM aura_conhecimento_vetores
+                        WHERE embedding IS NOT NULL
+                        ORDER BY embedding <=> %s::halfvec
+                        LIMIT %s
+                    ),
+                    sparse_search AS (
+                        SELECT 
+                            id, modulo, topico, titulo, subtitulo, conteudo, elementos_ui, ui_action, tags,
+                            CASE 
+                                WHEN %s <> '' AND to_tsquery('portuguese', %s) IS NOT NULL THEN
+                                    ts_rank_cd(tsv, to_tsquery('portuguese', %s))
+                                ELSE 0.0
+                            END AS fts_score,
+                            ROW_NUMBER() OVER (
+                                ORDER BY 
+                                    (CASE WHEN %s <> '' AND to_tsquery('portuguese', %s) IS NOT NULL THEN ts_rank_cd(tsv, to_tsquery('portuguese', %s)) ELSE 0.0 END) DESC,
+                                    (titulo ILIKE %s) DESC,
+                                    (topico ILIKE %s) DESC,
+                                    (modulo ILIKE %s) DESC,
+                                    id ASC
+                            ) AS sparse_rank
+                        FROM aura_conhecimento_vetores
+                        WHERE (%s <> '' AND tsv @@ to_tsquery('portuguese', %s))
+                           OR titulo ILIKE %s
+                           OR subtitulo ILIKE %s
+                           OR topico ILIKE %s
+                           OR modulo ILIKE %s
+                           OR conteudo ILIKE %s
+                        ORDER BY sparse_rank ASC
+                        LIMIT %s
+                    )
+                    SELECT 
+                        COALESCE(d.id, s.id) AS id,
+                        COALESCE(d.modulo, s.modulo) AS modulo,
+                        COALESCE(d.topico, s.topico) AS topico,
+                        COALESCE(d.titulo, s.titulo) AS titulo,
+                        COALESCE(d.subtitulo, s.subtitulo) AS subtitulo,
+                        COALESCE(d.conteudo, s.conteudo) AS conteudo,
+                        COALESCE(d.elementos_ui, s.elementos_ui) AS elementos_ui,
+                        COALESCE(d.ui_action, s.ui_action) AS ui_action,
+                        COALESCE(d.tags, s.tags) AS tags,
+                        COALESCE(d.cosine_similarity, 0.0) AS cosine_similarity,
+                        COALESCE(s.fts_score, 0.0) AS fts_score,
+                        d.dense_rank,
+                        s.sparse_rank,
+                        (
+                            {dense_weight} * COALESCE(1.0 / ({self.rrf_k} + d.dense_rank), 0.0) +
+                            {sparse_weight} * COALESCE(1.0 / ({self.rrf_k} + s.sparse_rank), 0.0)
+                        ) AS rrf_score
+                    FROM dense_search d
+                    FULL OUTER JOIN sparse_search s ON d.id = s.id
+                    ORDER BY rrf_score DESC
+                    LIMIT %s;
+                    """
+                    vec_str = str(query_vector)
+                    params = [
+                        # dense_search
+                        vec_str, vec_str, vec_str, fetch_limit,
+                        # sparse_search CASE
+                        tsquery_str, tsquery_str, tsquery_str,
+                        # sparse_search ORDER BY
+                        tsquery_str, tsquery_str, tsquery_str,
+                        like_term, like_term, like_term,
+                        # sparse_search WHERE
+                        tsquery_str, tsquery_str,
+                        like_term, like_term, like_term, like_term, like_term,
+                        fetch_limit,
+                        # final LIMIT
+                        top_k
+                    ]
+                    cur.execute(sql_rrf, tuple(params))
+                    results = cur.fetchall()
+                else:
+                    # Recuperação esparsa ultra-rápida (sub-1ms) em fallback
+                    sql_sparse = f"""
+                    SELECT 
+                        id, modulo, topico, titulo, subtitulo, conteudo, elementos_ui, ui_action, tags,
+                        0.0 AS cosine_similarity,
+                        CASE 
+                            WHEN %s <> '' AND to_tsquery('portuguese', %s) IS NOT NULL THEN
+                                ts_rank_cd(tsv, to_tsquery('portuguese', %s))
+                            ELSE 0.0
+                        END AS fts_score,
+                        NULL::bigint AS dense_rank,
+                        ROW_NUMBER() OVER (
+                            ORDER BY 
+                                (CASE WHEN %s <> '' AND to_tsquery('portuguese', %s) IS NOT NULL THEN ts_rank_cd(tsv, to_tsquery('portuguese', %s)) ELSE 0.0 END) DESC,
+                                (titulo ILIKE %s) DESC,
+                                (topico ILIKE %s) DESC,
+                                (modulo ILIKE %s) DESC,
+                                id ASC
+                        ) AS sparse_rank,
+                        (1.0 / ({self.rrf_k} + ROW_NUMBER() OVER (
+                            ORDER BY 
+                                (CASE WHEN %s <> '' AND to_tsquery('portuguese', %s) IS NOT NULL THEN ts_rank_cd(tsv, to_tsquery('portuguese', %s)) ELSE 0.0 END) DESC,
+                                (titulo ILIKE %s) DESC,
+                                (topico ILIKE %s) DESC,
+                                (modulo ILIKE %s) DESC,
+                                id ASC
+                        ))) AS rrf_score
+                    FROM aura_conhecimento_vetores
+                    WHERE (%s <> '' AND tsv @@ to_tsquery('portuguese', %s))
+                       OR titulo ILIKE %s
+                       OR subtitulo ILIKE %s
+                       OR topico ILIKE %s
+                       OR modulo ILIKE %s
+                       OR conteudo ILIKE %s
+                    ORDER BY rrf_score DESC
+                    LIMIT %s;
+                    """
+                    params = [
+                        tsquery_str, tsquery_str, tsquery_str,
+                        tsquery_str, tsquery_str, tsquery_str,
+                        like_term, like_term, like_term,
+                        tsquery_str, tsquery_str, tsquery_str,
+                        like_term, like_term, like_term,
+                        tsquery_str, tsquery_str,
+                        like_term, like_term, like_term, like_term, like_term,
+                        top_k
+                    ]
+                    cur.execute(sql_sparse, tuple(params))
+                    results = cur.fetchall()
+
+                # Fallback garantido se nenhuma linha for encontrada
+                if not results:
+                    cur.execute("""
+                        SELECT 
+                            id, modulo, topico, titulo, subtitulo, conteudo, elementos_ui, ui_action, tags,
+                            0.0 AS cosine_similarity, 0.0 AS fts_score, NULL::bigint AS dense_rank, 1::bigint AS sparse_rank,
+                            0.01639 AS rrf_score
+                        FROM aura_conhecimento_vetores
+                        WHERE topico = 'panorama_operacional'
+                        LIMIT 1;
+                    """)
+                    results = cur.fetchall()
+
+        db_latency_ms = (time.perf_counter() - t_db_start) * 1000
+        total_latency_ms = (time.perf_counter() - t0) * 1000
+
+        telemetry = {
+            "query": query_text,
+            "tsquery_used": tsquery_str,
+            "embedding_latency_ms": round(emb_latency_ms, 2),
+            "db_rrf_latency_ms": round(db_latency_ms, 2),
+            "total_retrieval_latency_ms": round(total_latency_ms, 2),
+            "hnsw_ef_search": ef,
+            "rrf_k": self.rrf_k,
+            "dense_weight": dense_weight,
+            "sparse_weight": sparse_weight,
+            "top_k": top_k,
+            "results_count": len(results),
+            "retrieval_mode": "hybrid_hnsw_rrf" if query_vector is not None else "sparse_fts_fallback",
+        }
+
+        return {
+            "results": [dict(r) for r in results],
+            "telemetry": telemetry,
+        }
+
     def search_dense_only(self, query_text: str, top_k: int = 5, ef_search: Optional[int] = None) -> Dict[str, Any]:
         """Busca puramente semântica (HNSW)."""
         ef = ef_search or self.ef_search
@@ -452,7 +668,11 @@ class HybridRAGEngine:
                         'produtos_vetores_pkey',
                         'idx_produtos_vetores_hash_md5',
                         'idx_intencoes_vetores_hnsw',
-                        'intencoes_vetores_pkey'
+                        'intencoes_vetores_pkey',
+                        'idx_aura_conhecimento_hnsw',
+                        'idx_aura_conhecimento_tsv_gin',
+                        'idx_aura_conhecimento_modulo_topico',
+                        'idx_aura_conhecimento_hash_md5'
                     )
                     ORDER BY pg_relation_size(i.oid) DESC;
                 """)
