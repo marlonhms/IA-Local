@@ -33,6 +33,7 @@ def capture():
     artifact_dir = Path(r"C:\Users\Marlon\.gemini\antigravity\brain\94da55fc-9aa9-4fa4-a1ff-8e151407b516")
     artifact_dir.mkdir(parents=True, exist_ok=True)
     
+    desktop_png = artifact_dir / "painel_aura_desktop.png"
     cockpit_png = artifact_dir / "painel_aura_cockpit.png"
     radar_png = artifact_dir / "painel_aura_radar.png"
 
@@ -41,25 +42,36 @@ def capture():
         context = browser.new_context(viewport={"width": 1280, "height": 850}, device_scale_factor=2)
         page = context.new_page()
         page.goto("http://127.0.0.1:8000", wait_until="networkidle")
-        time.sleep(1.5)
+        time.sleep(2.0)
 
-        # 1. Click on Cockpit Operacional Tab
+        # 0. Capture Main Assistente Workspace (painel_aura_desktop.png)
+        try:
+            page.screenshot(path=str(desktop_png))
+            print(f"[OK] Desktop Assistente screenshot saved: {desktop_png}")
+        except Exception as e:
+            print(f"[WARN] Failed desktop screenshot: {e}")
+
+        # 1. Click on Panorama Operacional Tab
         try:
             tab_cockpit = page.locator("button[data-tab='cockpit']")
             if tab_cockpit.is_visible():
                 tab_cockpit.click()
-                time.sleep(2.0)
+                time.sleep(1.0)
+                btn_refresh = page.locator("#btn-refresh-cockpit")
+                if btn_refresh.is_visible():
+                    btn_refresh.click()
+                    time.sleep(2.0)
                 page.screenshot(path=str(cockpit_png))
                 print(f"[OK] Cockpit screenshot saved: {cockpit_png}")
         except Exception as e:
             print(f"[WARN] Failed cockpit: {e}")
 
-        # 2. Click on Radar 1-Clique Tab
+        # 2. Click on Radar Ações Rápidas Tab
         try:
             tab_radar = page.locator("button[data-tab='triggers']")
             if tab_radar.is_visible():
                 tab_radar.click()
-                time.sleep(2.0)
+                time.sleep(1.5)
                 # Click on LMC ANP card
                 card_lmc = page.locator("button:has-text('LMC Oficial ANP')").first
                 if card_lmc.is_visible():

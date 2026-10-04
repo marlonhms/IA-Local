@@ -16,10 +16,44 @@ class AuraCockpitController {
   }
 
   /**
-   * Inicializa o cockpit e vincula listeners
+   * Inicializa o cockpit com estado sob demanda (sem polling ou consultas automáticas)
    */
   async init() {
-    await this.refreshAllData();
+    this.renderInitialPlaceholder();
+  }
+
+  renderInitialPlaceholder() {
+    const container = document.getElementById('cockpit-tanks-grid');
+    if (container && (!this.tanksData || this.tanksData.length === 0)) {
+      container.innerHTML = `
+        <div class="col-span-full py-10 px-6 text-center glass-panel border border-slate-800/80 rounded-2xl bg-gradient-to-b from-slate-900/40 to-slate-950/60 shadow-lg">
+          <div class="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-3">
+            <i data-lucide="fuel" class="w-6 h-6 text-emerald-400"></i>
+          </div>
+          <h4 class="text-white font-bold text-base mb-1">Panorama Operacional Sob Demanda</h4>
+          <p class="text-slate-400 text-xs max-w-md mx-auto mb-4 leading-relaxed font-sans">
+            A AURA opera sem consultas automáticas em segundo plano para economizar recursos e garantir máxima prontidão sob demanda.
+          </p>
+          <div class="flex flex-wrap items-center justify-center gap-3">
+            <button onclick="window.auraCockpit.refreshAllData()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition-all shadow-sm flex items-center gap-2">
+              <i data-lucide="refresh-cw" class="w-4 h-4 text-emerald-400"></i>
+              <span>Consultar Panorama Agora</span>
+            </button>
+            <button onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" class="px-4 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-200 border border-purple-500/30 text-xs font-semibold transition-all shadow-sm flex items-center gap-2">
+              <i data-lucide="sparkles" class="w-4 h-4 text-purple-400"></i>
+              <span>Perguntar no Chat</span>
+            </button>
+          </div>
+        </div>`;
+    }
+
+    const splitContainer = document.getElementById('split-tanks-grid');
+    if (splitContainer && (!this.tanksData || this.tanksData.length === 0)) {
+      splitContainer.innerHTML = `
+        <div class="col-span-full py-6 text-center text-slate-400 font-mono text-xs glass-panel p-4">
+          Consultas 100% sob demanda. Pergunte no chat ao lado ou <button onclick="window.auraCockpit.refreshAllData()" class="text-cyan-400 hover:underline font-bold">clique aqui</button> para apurar.
+        </div>`;
+    }
   }
 
   /**
@@ -139,39 +173,12 @@ class AuraCockpitController {
   }
 
   /**
-   * Atualiza cabeçalho com badges de status de banco e telemetria
+   * Atualiza cabeçalho com identificação da filial
    */
   renderStationHeader(st) {
     const filialEl = document.getElementById('hud-filial-name');
-    if (filialEl) {
+    if (filialEl && st) {
       filialEl.textContent = `${st.filial_nome || 'Posto Piloto'} (Filial ${st.filial_id || '59050'})`;
-    }
-
-    const erpBadge = document.getElementById('hud-erp-badge');
-    if (erpBadge) {
-      if (st.erp_online) {
-        erpBadge.className = 'flex items-center gap-2 px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono';
-        erpBadge.innerHTML = `<span class="pulse-indicator emerald"></span> ERP :${st.erp_port || 5433} (${st.latency_erp_ms ? st.latency_erp_ms + 'ms' : 'ONLINE'})`;
-      } else {
-        erpBadge.className = 'flex items-center gap-2 px-2.5 py-1 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-mono';
-        erpBadge.innerHTML = `<span class="pulse-indicator rose"></span> ERP :${st.erp_port || 5433} (OFFLINE)`;
-      }
-    }
-
-    const vectorBadge = document.getElementById('hud-vector-badge');
-    if (vectorBadge) {
-      if (st.vector_db_online) {
-        vectorBadge.className = 'flex items-center gap-2 px-2.5 py-1 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-mono';
-        vectorBadge.innerHTML = `<span class="pulse-indicator cyan"></span> PGVECTOR :${st.vector_db_port || 5434} (${st.total_products_indexed || 250} SKU)`;
-      } else {
-        vectorBadge.className = 'flex items-center gap-2 px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-mono';
-        vectorBadge.innerHTML = `<span class="pulse-indicator amber"></span> PGVECTOR OFFLINE`;
-      }
-    }
-
-    const cacheBadge = document.getElementById('hud-cache-badge');
-    if (cacheBadge && st.cache_hit_ratio_percent !== null) {
-      cacheBadge.textContent = `Hit: ${st.cache_hit_ratio_percent}%`;
     }
   }
 

@@ -73,31 +73,33 @@ class AuraChatController {
   addWelcomeMessage() {
     const welcomeHtml = `
       <div class="prose-aura">
-        <p>Olá, gestor! Sou a <strong>AURA</strong>, sua <strong>Assistente de Prontidão e Gerente Supervisora do Posto & PDV</strong>.</p>
-        <p>Tirou o celular do bolso e precisa tomar uma decisão rápida na pista ou na loja? Pergunte sobre tanques, fechamento de turno, furo de caixa, conformidade fiscal ANP ou vendas cruzadas na conveniência:</p>
+        <p class="text-base text-white font-medium">Olá! Seja muito bem-vindo à sua central de gestão.</p>
+        <p>Sou a <strong>AURA</strong>, sua <strong>Assistente Executiva e Supervisora do Posto & PDV</strong>. Trabalho 100% sob demanda para apoiar suas decisões de forma rápida, inteligente e acolhedora.</p>
+        <p class="text-slate-300">Precisa consultar os tanques, auditar o turno, conferir o LMC fiscal ou alavancar as vendas da loja? Escolha um atalho abaixo ou digite sua pergunta:</p>
       </div>
-      <div class="mt-3 pt-2 border-t border-purple-900/30">
-        <div class="text-[11px] font-mono text-slate-400 mb-2 font-semibold flex items-center gap-1.5">
-          <span>⚡</span> <span>Decisões Rápidas de 1 Toque:</span>
+      <div class="mt-4 pt-3 border-t border-purple-500/20">
+        <div class="text-[11px] font-mono text-purple-300 mb-2 font-semibold flex items-center gap-1.5">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span>Decisões Rápidas de 1 Toque:</span>
         </div>
         <div class="flex flex-wrap gap-2">
-          <button onclick="window.auraChat.sendUserPrompt('Como fechou o turno da manhã?')" class="quick-prompt-chip">
-            💰 Como fechou o turno da manhã?
+          <button onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" class="quick-prompt-chip">
+            ⛽ Autonomia de Tanques
           </button>
-          <button onclick="window.auraChat.sendUserPrompt('Qual a autonomia da gasolina comum?')" class="quick-prompt-chip">
-            ⛽ Qual a autonomia da gasolina comum?
+          <button onclick="window.auraChat.sendUserPrompt('Como fechou o último turno? Teve furo de caixa?')" class="quick-prompt-chip">
+            💰 Fechamento de Turno & Caixa
           </button>
-          <button onclick="window.auraChat.sendUserPrompt('Teve furo no caixa?')" class="quick-prompt-chip">
-            🚨 Teve furo no caixa?
+          <button onclick="window.auraChat.sendUserPrompt('O LMC de ontem fechou dentro da tolerância oficial da ANP?')" class="quick-prompt-chip">
+            📋 LMC Oficial ANP
           </button>
-          <button onclick="window.auraChat.sendUserPrompt('Combos para vender mais Heineken?')" class="quick-prompt-chip">
-            🛒 Combos para vender mais Heineken?
+          <button onclick="window.auraChat.sendUserPrompt('Quais os combos de vendas cruzadas com maior Lift na conveniência?')" class="quick-prompt-chip">
+            🛒 Combos da Loja & Conveniência
           </button>
-          <button onclick="window.auraChat.sendUserPrompt('Qual o status do LMC da ANP de hoje?')" class="quick-prompt-chip">
-            📋 LMC ANP de hoje
+          <button onclick="window.auraChat.sendUserPrompt('Há algum bico com vazão lenta ou alerta na pista?')" class="quick-prompt-chip">
+            ⚠️ Alerta de Vazão nos Bicos
           </button>
-          <button onclick="window.auraChat.sendUserPrompt('Há algum bico lento na pista?')" class="quick-prompt-chip">
-            ⚠️ Algum bico lento na pista?
+          <button onclick="window.auraChat.sendUserPrompt('Quem são os maiores clientes e frotistas da revenda?')" class="quick-prompt-chip">
+            🏆 Ranking de Clientes VIP
           </button>
         </div>
       </div>
@@ -963,17 +965,16 @@ class AuraChatController {
 
   updateTelemetryBadge(containerId, t) {
     const ids = [containerId + '-telemetry', containerId + '-split-telemetry'];
-    const ttft = t.ttft_ms ? `${t.ttft_ms.toFixed(0)}ms` : null;
     const e2e = t.total_e2e_ms ? `${t.total_e2e_ms.toFixed(0)}ms` : null;
     const model = t.llm_model || 'Gemini 3.1 Flash';
     const lgpd = t.lgpd_sanitized_count || 0;
 
     const html = `
       <div class="flex flex-wrap items-center gap-3">
-        ${ttft ? `<span>TTFT: <strong class="text-cyan-300">${ttft}</strong></span>` : ''}
-        ${e2e ? `<span>E2E: <strong class="text-emerald-300">${e2e}</strong></span>` : ''}
-        <span>Modelo: <strong class="text-purple-300">${model}</strong></span>
-        <span>LGPD Blindagem: <strong class="text-slate-300">${lgpd} ofuscados</strong></span>
+        ${e2e ? `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Resposta em <strong class="text-emerald-300 font-mono">${e2e}</strong></span>` : ''}
+        <span class="text-slate-500">•</span>
+        <span>Motor: <strong class="text-purple-300">${model}</strong></span>
+        ${lgpd > 0 ? `<span class="text-slate-500">•</span><span class="text-emerald-400/90 font-medium">🛡️ LGPD: ${lgpd} dados protegidos</span>` : ''}
       </div>
     `;
 

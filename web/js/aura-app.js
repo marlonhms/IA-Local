@@ -77,6 +77,8 @@ function applyIconsFallback() {
     'sparkles': '<svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12 3l1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5L12 3z"/></svg>',
     'square': '<svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
     'monitor': '<svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" stroke-width="2"/><line x1="8" y1="21" x2="16" y2="21" stroke-width="2"/><line x1="12" y1="17" x2="12" y2="21" stroke-width="2"/></svg>',
+    'clock': '<svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><polyline points="12 6 12 12 16 14"/></svg>',
+    'message-square': '<svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
   };
 
   document.querySelectorAll('i[data-lucide]').forEach(el => {
@@ -90,15 +92,11 @@ function applyIconsFallback() {
 class AuraApp {
   constructor() {
     this.currentTab = 'console';
-    this.autoRefreshInterval = 30; // segundos
-    this.refreshTimer = null;
-    this.countdownSeconds = 30;
   }
 
   init() {
     this.bindNavigationTabs();
     this.startClock();
-    this.setupAutoRefresh();
 
     // Inicializa subsistemas
     window.auraCockpit.init();
@@ -142,7 +140,6 @@ class AuraApp {
       btnRefresh.addEventListener('click', () => {
         window.auraAudio.playChime(700, 0.06);
         window.auraCockpit.refreshAllData();
-        this.resetCountdown();
       });
     }
 
@@ -275,29 +272,6 @@ class AuraApp {
     };
     update();
     setInterval(update, 1000);
-  }
-
-  setupAutoRefresh() {
-    this.countdownSeconds = this.autoRefreshInterval;
-    const countdownEl = document.getElementById('hud-refresh-countdown');
-
-    setInterval(() => {
-      if (this.currentTab === 'cockpit' || this.currentTab === 'split') {
-        this.countdownSeconds--;
-        if (countdownEl) countdownEl.textContent = `${this.countdownSeconds}s`;
-
-        if (this.countdownSeconds <= 0) {
-          window.auraCockpit.refreshAllData();
-          this.resetCountdown();
-        }
-      }
-    }, 1000);
-  }
-
-  resetCountdown() {
-    this.countdownSeconds = this.autoRefreshInterval;
-    const countdownEl = document.getElementById('hud-refresh-countdown');
-    if (countdownEl) countdownEl.textContent = `${this.countdownSeconds}s`;
   }
 }
 

@@ -55,7 +55,7 @@ def run_tests():
     client = TestClient(app)
 
     # ------------------------------------------------------------------
-    # 1. TESTE DE ROTAS SPA HTML
+    # 1. TESTE DE ROTAS SPA HTML & REMOÇÃO DE SRE / POLLING
     # ------------------------------------------------------------------
     print("\n1. Testando Rotas da SPA (GET / e GET /dashboard)...")
     resp_root = client.get("/")
@@ -63,9 +63,16 @@ def run_tests():
     assert "text/html" in resp_root.headers.get("content-type", "")
     html_text = resp_root.text
     assert "AURA" in html_text, "AURA não encontrada no HTML da rota /"
-    assert "Cockpit Operacional" in html_text, "Título do Cockpit não encontrado no HTML"
-    assert "Console Cognitivo" in html_text, "Console Cognitivo não encontrado no HTML"
-    print(" [OK] GET / -> 200 OK (SPA HTML carregada com sucesso).")
+    assert "Panorama Operacional" in html_text, "Panorama Operacional não encontrado no HTML"
+    assert "Assistente AURA" in html_text, "Assistente AURA não encontrada no HTML"
+
+    # Verificações de eliminação de SRE e auto-refresh polling do frontend
+    assert "ERP :5433" not in html_text, "Badge SRE ERP :5433 ainda presente no HTML"
+    assert "PGVECTOR :5434" not in html_text, "Badge SRE PGVECTOR :5434 ainda presente no HTML"
+    assert "WAL SQLite" not in html_text, "Badge SRE WAL SQLite ainda presente no HTML"
+    assert "Sync: 30s" not in html_text, "Contador de auto-refresh ainda presente no HTML"
+    assert "data-filter=\"sre\"" not in html_text, "Filtro SRE ainda presente no HTML"
+    print(" [OK] GET / -> 200 OK (SPA HTML carregada e elementos SRE removidos).")
 
     resp_dash = client.get("/dashboard")
     assert resp_dash.status_code == 200, f"Esperava 200 em /dashboard, obteve {resp_dash.status_code}"
@@ -73,7 +80,7 @@ def run_tests():
     print(" [OK] GET /dashboard -> 200 OK (Alias de rota funcionando).")
 
     # ------------------------------------------------------------------
-    # 2. TESTE DE ARQUIVOS ESTÁTICOS (/static/...)
+    # 2. TESTE DE ARQUIVOS ESTÁTICOS (/static/...) E ARQUITETURA SOB DEMANDA
     # ------------------------------------------------------------------
     print("\n2. Testando Entrega de Assets Estáticos (/static/...)...")
     assets = [
@@ -90,6 +97,14 @@ def run_tests():
         resp = client.get(path)
         assert resp.status_code == 200, f"Falha ao carregar {path}: HTTP {resp.status_code}"
         assert expected_snippet in resp.text, f"Snippet '{expected_snippet}' não encontrado em {path}"
+        
+        # Validação extra de eliminação de polling e SRE nos scripts
+        if path == "/static/js/aura-app.js":
+            assert "setupAutoRefresh" not in resp.text, "setupAutoRefresh ainda existe em aura-app.js"
+            assert "autoRefreshInterval" not in resp.text, "autoRefreshInterval ainda existe em aura-app.js"
+        if path == "/static/js/aura-triggers.js":
+            assert "id: 'sre_metricas'" not in resp.text, "sre_metricas ainda catalogada em aura-triggers.js"
+            
         print(f" [OK] {label}: {path} -> 200 OK ({len(resp.text)} bytes).")
 
     # ------------------------------------------------------------------

@@ -78,63 +78,44 @@
         </div>
       </div>
 
-      <!-- Centro: Badges de Observabilidade dos Bancos (Desktop) -->
-      <div class="hidden md:flex flex-wrap items-center justify-center gap-2 font-mono text-xs">
-        <div id="hud-erp-badge" class="flex items-center gap-2 px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-400">
-          <span class="pulse-indicator emerald"></span> ERP :5433 (CONECTANDO)
-        </div>
-
-        <div id="hud-vector-badge" class="flex items-center gap-2 px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-400">
-          <span class="pulse-indicator cyan"></span> PGVECTOR :5434
-        </div>
-
-        <div class="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded bg-auraPurple/10 border border-auraPurple/20 text-auraPurple-light text-[11px]">
-          <span class="pulse-indicator purple"></span> WAL SQLite
-        </div>
-
-        <div id="hud-cache-badge" class="hidden sm:block px-2 py-1 rounded bg-slate-900 border border-slate-800 text-slate-400 text-[11px]">
-          Hit: 99.9%
-        </div>
+      <!-- Centro: Status de Prontidão e Atendimento Executivo -->
+      <div class="hidden lg:flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-slate-900/60 border border-white/5 text-xs text-slate-300 backdrop-blur-md shadow-inner">
+        <span class="w-2 h-2 rounded-full bg-auraEmerald animate-pulse"></span>
+        <span class="font-medium text-slate-100">Pronta para Atendimento</span>
+        <span class="text-slate-600">•</span>
+        <span class="text-slate-400 text-[11px]">Consultas 100% sob demanda</span>
       </div>
 
-      <!-- Lado Direito: Relógio BRT, Auto-refresh & Navegação -->
+      <!-- Lado Direito: Dispositivo, Fluidez de Hardware, Comandos & Relógio -->
       <div class="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
         
         <!-- Badge de Dispositivo Inteligente (Desktop vs Mobile) -->
-        <div id="hud-device-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-900/90 border border-slate-800 text-[11px] font-mono text-slate-300 cursor-pointer hover:border-auraCyan transition-all shadow-sm" title="Dispositivo Detectado (Clique para alternar)">
+        <div id="hud-device-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800 text-[11px] font-mono text-slate-300 cursor-pointer hover:border-auraCyan transition-all shadow-sm" title="Dispositivo Detectado (Clique para alternar)">
           <span id="hud-device-icon" class="w-2 h-2 rounded-full bg-auraCyan animate-pulse"></span>
           <span id="hud-device-label">DESKTOP</span>
         </div>
 
         <!-- Telemetria de Taxa de Atualização do Monitor (Hz) -->
-        <div id="hud-hz-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-900/90 border border-slate-800 text-[11px] font-mono text-cyan-300 shadow-sm" title="Taxa de Atualização do Monitor Sincronizada">
+        <div id="hud-hz-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800 text-[11px] font-mono text-cyan-300 shadow-sm" title="Taxa de Atualização do Monitor Sincronizada">
           <span id="hud-hz-value">⚡ 60 Hz</span>
         </div>
 
         <!-- Botão Command Palette Executiva (Ctrl+K) -->
-        <button id="btn-open-palette" class="flex items-center gap-2 px-2.5 py-1 rounded bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 font-mono text-xs transition-colors" title="Abrir AURA Command Palette (Ctrl+K)">
+        <button id="btn-open-palette" class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 font-sans text-xs transition-colors shadow-sm" title="Abrir AURA Command Palette (Ctrl+K)">
           <i data-lucide="sparkles" class="w-3.5 h-3.5 text-auraCyan"></i>
-          <span class="text-[11px]">Comandos</span>
-          <kbd class="px-1 py-0.2 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-mono">⌘K</kbd>
+          <span class="text-[11px] font-medium">Comandos</span>
+          <kbd class="px-1.5 py-0.2 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-mono">⌘K</kbd>
         </button>
 
-        <div class="flex items-center gap-2 px-2.5 py-1 rounded bg-slate-900/90 border border-slate-800 font-mono text-xs text-slate-300">
-          <span id="hud-live-clock" class="text-white font-bold">--:--:--</span>
-          <span class="text-slate-600">|</span>
-          <span class="text-[11px] text-slate-400 flex items-center gap-1" title="Próxima sincronização automática">
-            <span>Sync:</span>
-            <span id="hud-refresh-countdown" class="text-auraCyan-light font-semibold">30s</span>
-          </span>
+        <!-- Relógio Limpo e Elegante (Sem polling countdown) -->
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800 font-mono text-xs text-slate-300 shadow-sm">
+          <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400"></i>
+          <span id="hud-live-clock" class="text-white font-semibold">--:--:--</span>
         </div>
 
-        <!-- Botão SFX Audio Tático -->
-        <button id="btn-toggle-sfx" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-colors" title="Alternar Efeitos Sonoros Táticos">
+        <!-- Botão SFX Audio -->
+        <button id="btn-toggle-sfx" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-colors shadow-sm" title="Alternar Efeitos Sonoros">
           <i data-lucide="volume-2" class="w-4 h-4"></i>
-        </button>
-
-        <!-- Botão Refresh Manual -->
-        <button id="btn-refresh-cockpit" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors" title="Atualizar Agora">
-          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
         </button>
       </div>
 
@@ -142,30 +123,31 @@
 
     <!-- Barra de Abas de Navegação -->
     <div class="max-w-7xl mx-auto mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between overflow-x-auto">
-      <div class="flex items-center gap-1">
+      <div class="flex items-center gap-1.5">
         <button class="nav-tab-btn tab-console active" data-tab="console">
           <i data-lucide="terminal" class="w-4 h-4"></i>
-          <span>Console Cognitivo</span>
+          <span>Assistente AURA (Console Cognitivo)</span>
         </button>
 
         <button class="nav-tab-btn tab-cockpit" data-tab="cockpit">
           <i data-lucide="gauge" class="w-4 h-4"></i>
-          <span>Cockpit Operacional</span>
+          <span>Panorama Operacional (Cockpit)</span>
         </button>
 
         <button class="nav-tab-btn tab-triggers" data-tab="triggers">
           <i data-lucide="zap" class="w-4 h-4"></i>
-          <span>Radar 1-Clique (11)</span>
+          <span>Ações Rápidas (10)</span>
         </button>
 
         <button class="nav-tab-btn tab-split" data-tab="split">
           <i data-lucide="layout-grid" class="w-4 h-4"></i>
-          <span>Visão Split</span>
+          <span>Visão Integrada</span>
         </button>
       </div>
 
-      <div id="hud-last-sync" class="hidden md:block font-mono text-[10px] text-slate-500">
-        Sincronizando...
+      <div class="hidden md:flex items-center gap-2 text-xs text-slate-400 font-sans">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        <span>Atendimento Sob Demanda</span>
       </div>
     </div>
   </header>
@@ -220,15 +202,21 @@
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
             <div class="flex items-center gap-2">
-              <span class="text-xs font-mono font-bold uppercase tracking-wider text-auraEmerald">Telemetria ao Vivo</span>
+              <span class="text-xs font-sans font-bold uppercase tracking-wider text-auraEmerald">Supervisão da Pista</span>
               <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-auraEmerald/20 text-auraEmerald-light border border-auraEmerald/30">
-                Posto em Operação
+                Atendimento Sob Demanda
               </span>
             </div>
-            <h2 class="text-lg font-bold text-white mt-0.5">Visão Integrada de Estoques, Pista e Conformidade Fiscal</h2>
+            <h2 class="text-lg font-bold text-white mt-0.5">Panorama Integrado de Estoques, Pista e Conformidade Fiscal</h2>
           </div>
-          <div id="cockpit-runout-summary">
-            <!-- Injetado dinamicamente via JS -->
+          <div class="flex items-center gap-2">
+            <button id="btn-refresh-cockpit" class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30 text-xs font-medium transition-colors flex items-center gap-1.5 shadow-sm" title="Consultar dados da pista agora">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <span>Consultar Operação Agora</span>
+            </button>
+            <div id="cockpit-runout-summary">
+              <!-- Injetado dinamicamente via JS -->
+            </div>
           </div>
         </div>
       </div>
@@ -260,9 +248,9 @@
             <h4 class="font-bold text-sm text-white font-mono">Gêmeo Digital da Estação & Topologia CBC04</h4>
           </div>
           <div class="flex items-center gap-2 font-mono text-[10px]">
-            <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">CBC04 ATIVO</span>
-            <span class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">ERP :5433</span>
-            <span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30">PGVECTOR :5434</span>
+            <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">AUTOMAÇÃO CBC04</span>
+            <span class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">INTEGRAÇÃO ERP</span>
+            <span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30">BUSCA HÍBRIDA RAG</span>
           </div>
         </div>
 
@@ -431,10 +419,10 @@
                 0 Tokens LLM • Sub-100ms
               </span>
             </div>
-            <h2 class="text-lg font-bold text-white mt-0.5">Matriz de 11 Gatilhos Especializados de Posto & PDV</h2>
+            <h2 class="text-lg font-bold text-white mt-0.5">Ações & Diagnósticos Executivos em 1-Clique</h2>
           </div>
-          <p class="text-xs text-slate-400 font-mono max-w-md">
-            Invoque diagnósticos fiscais, operacionais e preditivos com 1 clique direto no banco PostgreSQL.
+          <p class="text-xs text-slate-400 font-sans max-w-md">
+            Invoque diagnósticos operacionais, fiscais e estratégicos diretamente sob demanda, sem latência.
           </p>
         </div>
       </div>
@@ -442,7 +430,7 @@
       <!-- Filtros por Categoria -->
       <div class="flex flex-wrap items-center gap-2 font-mono text-xs">
         <button class="trigger-filter-btn px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-white font-semibold transition-colors" data-filter="todos">
-          Todos (11)
+          Todos (10)
         </button>
         <button class="trigger-filter-btn px-3 py-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-white transition-colors" data-filter="combustiveis">
           Combustíveis & Tanques
@@ -454,14 +442,14 @@
           Pista & Caixa
         </button>
         <button class="trigger-filter-btn px-3 py-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-white transition-colors" data-filter="loja">
-          Conveniência & RAG
+          Conveniência & Loja
         </button>
-        <button class="trigger-filter-btn px-3 py-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-white transition-colors" data-filter="sre">
-          SRE & Sistema
+        <button class="trigger-filter-btn px-3 py-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-white transition-colors" data-filter="gestao">
+          Gestão do Posto
         </button>
       </div>
 
-      <!-- Grid dos 11 Gatilhos -->
+      <!-- Grid das 10 Ações Rápidas -->
       <div id="triggers-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         <!-- Renderizado dinamicamente via aura-triggers.js -->
       </div>
@@ -523,61 +511,61 @@
     <div id="view-console" class="space-y-3 animate-fade-in flex flex-col h-[calc(100vh-215px)]">
       
       <!-- Topo do Console: Status da Sessão e Blindagem LGPD -->
-      <div class="glass-panel px-4 py-2.5 flex items-center justify-between border-auraPurple/30">
+      <div class="glass-panel px-4 py-2.5 flex items-center justify-between border-auraPurple/30 rounded-xl">
         <div class="flex items-center gap-3">
           <div class="w-3 h-3 rounded-full bg-auraEmerald animate-pulse"></div>
-          <span class="font-bold text-sm text-slate-100 font-mono">Terminal Cognitivo AURA // Assistente de Prontidão</span>
-          <span id="chat-session-badge" class="px-2 py-0.5 rounded text-[11px] font-mono bg-slate-800 text-slate-300 border border-slate-700">
+          <span class="font-bold text-sm text-slate-100 font-sans">Assistente Executiva AURA</span>
+          <span class="hidden sm:inline-block text-xs text-slate-400 font-sans">• Supervisão & Prontidão</span>
+          <span id="chat-session-badge" class="px-2 py-0.5 rounded-full text-[11px] font-mono bg-purple-950/40 text-purple-300 border border-purple-500/20">
             Sessão Ativa
           </span>
         </div>
 
-        <div class="flex items-center gap-3 font-mono text-xs">
+        <div class="flex items-center gap-3 font-sans text-xs">
           <div class="hidden sm:flex items-center gap-1.5 text-emerald-400">
             <i data-lucide="shield-check" class="w-4 h-4"></i>
-            <span>LGPD BLINDAGEM ATIVA</span>
+            <span class="font-medium">Privacidade & LGPD Ativas</span>
           </div>
 
-          <button id="btn-chat-clear" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors flex items-center gap-1">
+          <button id="btn-chat-clear" class="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors flex items-center gap-1.5 text-xs shadow-sm">
             <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-            <span>Nova Sessão</span>
+            <span>Nova Conversa</span>
           </button>
         </div>
       </div>
 
       <!-- Feed de Mensagens (Scrollable) -->
-      <div id="chat-feed-container" class="glass-panel flex-1 p-4 overflow-y-auto space-y-4 font-sans border-slate-800">
+      <div id="chat-feed-container" class="glass-panel flex-1 p-5 overflow-y-auto space-y-4 font-sans border-slate-800 rounded-2xl">
         <!-- Mensagens inseridas dinamicamente via aura-chat.js -->
       </div>
 
       <!-- Barra de Sugestões de Perguntas Rápidas (Mobile-First 1-Touch) -->
       <div class="quick-prompts-bar">
-        <span class="text-slate-500 font-mono text-[11px] px-1 flex-shrink-0">⚡ Decisão Rápida:</span>
-        <button onclick="window.auraChat.sendUserPrompt('Como fechou o turno da manhã?')" class="quick-prompt-chip">
-          💰 Como fechou o turno da manhã?
+        <span class="text-purple-300 font-sans text-xs px-1 flex-shrink-0 font-medium flex items-center gap-1">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-cyan-400"></i> Sugestões:
+        </span>
+        <button onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" class="quick-prompt-chip">
+          ⛽ Autonomia de Tanques
         </button>
-        <button onclick="window.auraChat.sendUserPrompt('Qual a autonomia da gasolina comum?')" class="quick-prompt-chip">
-          ⛽ Qual a autonomia da gasolina comum?
+        <button onclick="window.auraChat.sendUserPrompt('Como fechou o último turno? Teve furo de caixa?')" class="quick-prompt-chip">
+          💰 Fechamento de Turno & Caixa
         </button>
-        <button onclick="window.auraChat.sendUserPrompt('Teve furo no caixa?')" class="quick-prompt-chip">
-          🚨 Teve furo no caixa?
+        <button onclick="window.auraChat.sendUserPrompt('O LMC de ontem fechou dentro da tolerância oficial da ANP?')" class="quick-prompt-chip">
+          📋 LMC Fiscal ANP
         </button>
-        <button onclick="window.auraChat.sendUserPrompt('Combos para vender mais Heineken?')" class="quick-prompt-chip">
-          🛒 Combos para vender mais Heineken?
+        <button onclick="window.auraChat.sendUserPrompt('Quais os combos de vendas cruzadas com maior Lift na conveniência?')" class="quick-prompt-chip">
+          🛒 Combos da Conveniência
         </button>
-        <button onclick="window.auraChat.sendUserPrompt('Qual o status do LMC da ANP de hoje?')" class="quick-prompt-chip">
-          📋 LMC ANP Oficial
+        <button onclick="window.auraChat.sendUserPrompt('Há algum bico com vazão lenta ou alerta na pista?')" class="quick-prompt-chip">
+          ⚠️ Vazão dos Bicos
         </button>
-        <button onclick="window.auraChat.sendUserPrompt('Há algum bico com vazão lenta ou alerta?')" class="quick-prompt-chip">
-          ⚠️ Alerta Vazão Bicos
-        </button>
-        <button onclick="window.auraChat.sendUserPrompt('Quem vendeu mais gasolina aditivada?')" class="quick-prompt-chip">
-          🏆 Frentistas Aditivada
+        <button onclick="window.auraChat.sendUserPrompt('Quem são os maiores clientes e frotistas da revenda?')" class="quick-prompt-chip">
+          🏆 Clientes VIP & Frotas
         </button>
       </div>
 
       <!-- Barra de Entrada de Mensagem HUD -->
-      <div class="glass-panel p-2 flex items-center gap-2 border-slate-700/80 bg-slate-950/80">
+      <div class="glass-panel p-2.5 flex items-center gap-2 border-slate-700/60 bg-slate-950/90 rounded-2xl shadow-xl ring-1 ring-white/5 focus-within:ring-cyan-500/30 transition-all">
         <textarea 
           id="chat-input-text" 
           rows="1"
@@ -587,14 +575,14 @@
 
         <button 
           id="btn-chat-send" 
-          class="px-4 py-2 rounded-lg bg-gradient-to-r from-auraEmerald to-auraCyan hover:brightness-110 text-slate-950 font-bold text-sm font-mono transition-all flex items-center gap-1.5 shadow-md">
+          class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-auraEmerald via-cyan-500 to-auraCyan hover:brightness-110 text-slate-950 font-bold text-sm font-sans transition-all flex items-center gap-1.5 shadow-md hover:shadow-cyan-500/20 active:scale-95">
           <span>Enviar</span>
           <i data-lucide="send" class="w-4 h-4"></i>
         </button>
 
         <button 
           id="btn-chat-stop" 
-          class="hidden px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm font-mono transition-all flex items-center gap-1.5 animate-pulse">
+          class="hidden px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm font-sans transition-all flex items-center gap-1.5 animate-pulse">
           <span>Parar</span>
           <i data-lucide="square" class="w-4 h-4"></i>
         </button>
@@ -612,12 +600,12 @@
         <!-- Esquerda: Cockpit Resumido (7 colunas) -->
         <div class="lg:col-span-7 overflow-y-auto space-y-4 pr-1">
           <!-- Banner Rápido -->
-          <div class="glass-panel p-3 border-l-3 border-l-auraEmerald font-mono text-xs text-slate-300 flex items-center justify-between">
+          <div class="glass-panel p-3 border-l-3 border-l-auraEmerald font-sans text-xs text-slate-300 flex items-center justify-between">
             <div class="flex items-center gap-2">
               <span class="w-2.5 h-2.5 rounded-full bg-auraEmerald animate-pulse"></span>
-              <strong>Cockpit em Tempo Real</strong>
+              <strong>Panorama Operacional Integrado</strong>
             </div>
-            <button onclick="window.auraCockpit.refreshAllData()" class="text-auraCyan hover:underline">Atualizar ↺</button>
+            <button onclick="window.auraCockpit.refreshAllData()" class="text-auraCyan hover:underline font-medium">Consultar Sob Demanda ↺</button>
           </div>
 
           <!-- Tanques Compactos -->
