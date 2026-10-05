@@ -196,77 +196,114 @@ class AuraChatController {
 
   addWelcomeMessage() {
     const welcomeHtml = `
-      <div class="space-y-4">
-        <div class="flex items-center gap-3 pb-2 border-b border-purple-500/20">
-          <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500/20 via-cyan-500/20 to-purple-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-300 shadow-inner">
-            <i data-lucide="sparkles" class="w-5 h-5 text-cyan-300"></i>
+      <div class="decision-card !p-5 border-cyan-500/25 bg-gradient-to-b from-slate-900/95 via-slate-900/80 to-slate-950/95 space-y-4 shadow-2xl">
+        <!-- Cabeçalho Executivo Precision Glass -->
+        <div class="flex items-start justify-between gap-3 pb-3 border-b border-white/10">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500/20 via-sky-500/15 to-purple-500/20 border border-cyan-400/30 flex items-center justify-center text-cyan-300 shadow-inner">
+              <i data-lucide="sparkles" class="w-5 h-5 text-cyan-300"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-white font-bold text-base tracking-wide">AURA // Decisão & Supervisão</h3>
+                <span class="px-2 py-0.5 rounded-full text-[9px] font-sans font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  Precision Glass
+                </span>
+              </div>
+              <p class="text-slate-400 text-xs">Assistente Executiva de Prontidão • Posto & PDV</p>
+            </div>
           </div>
-          <div>
-            <h3 class="text-white font-bold text-base">Olá! Seja bem-vindo à AURA</h3>
-            <p class="text-slate-400 text-xs">Sua Assistente Executiva e Supervisora do Posto & PDV</p>
-          </div>
+          <span class="px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 hidden sm:inline-flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span> Sob Demanda
+          </span>
         </div>
 
         <p class="text-slate-200 text-sm leading-relaxed">
-          Estou de prontidão para apoiar sua gestão com foco total em assistência ágil, acolhedora e precisa. 
-          Todas as consultas ao banco de dados ocorrem <strong>100% sob sua demanda</strong>, sem processos em segundo plano.
+          Estou de prontidão para iluminar tomadas de decisão rápidas na pista e no PDV com <strong>diagnósticos estruturados, cálculos contábeis oficiais e evidências verificáveis</strong>.
         </p>
 
-        <div class="pt-2">
-          <div class="text-xs font-medium text-slate-300 mb-3 flex items-center gap-1.5">
-            <i data-lucide="compass" class="w-4 h-4 text-emerald-400"></i>
-            <span>Por onde deseja começar? Escolha uma sugestão ou pergunte diretamente:</span>
+        <!-- Grade de Consultas Executivas em 1-Toque (Acionam os DecisionCards Reais) -->
+        <div class="space-y-2 pt-1">
+          <div class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <i data-lucide="compass" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span>Diagnósticos Especializados (Toque para auditar agora):</span>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full">
-            <button onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" class="group p-3 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-emerald-500/40 text-left transition-all shadow-sm">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="text-base">⛽</span>
-                <span class="text-white font-semibold text-xs group-hover:text-emerald-300 transition-colors">Autonomia de Tanques</span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 w-full">
+            <button onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" class="group p-3 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-white/10 hover:border-emerald-500/50 text-left transition-all shadow-sm active:scale-[0.98]">
+              <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center gap-2">
+                  <span class="text-base">⛽</span>
+                  <span class="text-white font-semibold text-xs group-hover:text-emerald-300 transition-colors">Autonomia de Tanques</span>
+                </div>
+                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Run-Out</span>
               </div>
-              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Previsão de esgotamento e pedido de carreta.</p>
+              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Previsão em horas/dias, reserva de 15% e espaço de carreta (5.000L).</p>
             </button>
 
-            <button onclick="window.auraChat.sendUserPrompt('Como fechou o último turno? Teve furo de caixa?')" class="group p-3 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-purple-500/40 text-left transition-all shadow-sm">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="text-base">💰</span>
-                <span class="text-white font-semibold text-xs group-hover:text-purple-300 transition-colors">Fechamento de Caixa</span>
+            <button onclick="window.auraChat.sendUserPrompt('Como fechou o último turno? Teve furo de caixa?')" class="group p-3 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-white/10 hover:border-cyan-500/50 text-left transition-all shadow-sm active:scale-[0.98]">
+              <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center gap-2">
+                  <span class="text-base">💰</span>
+                  <span class="text-white font-semibold text-xs group-hover:text-cyan-300 transition-colors">Conciliação de Turno</span>
+                </div>
+                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">CBC04 vs PDV</span>
               </div>
-              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Triangulação de encerrantes e turno.</p>
+              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Triangulação de encerrantes físicos, sobras/quebras e faturamento.</p>
             </button>
 
-            <button onclick="window.auraChat.sendUserPrompt('O LMC de ontem fechou dentro da tolerância oficial da ANP?')" class="group p-3 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-cyan-500/40 text-left transition-all shadow-sm">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="text-base">📋</span>
-                <span class="text-white font-semibold text-xs group-hover:text-cyan-300 transition-colors">LMC Fiscal ANP</span>
+            <button onclick="window.auraChat.sendUserPrompt('O LMC de ontem fechou dentro da tolerância oficial da ANP?')" class="group p-3 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-white/10 hover:border-purple-500/50 text-left transition-all shadow-sm active:scale-[0.98]">
+              <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center gap-2">
+                  <span class="text-base">📋</span>
+                  <span class="text-white font-semibold text-xs group-hover:text-purple-300 transition-colors">LMC Oficial ANP</span>
+                </div>
+                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">±0.6%</span>
               </div>
-              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Auditoria Portaria 26 (margem ±0.6%).</p>
+              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Auditoria diária pela Portaria 26 com régua visual de conformidade legal.</p>
             </button>
 
-            <button onclick="window.auraChat.sendUserPrompt('Quais os combos de vendas cruzadas com maior Lift na conveniência?')" class="group p-3 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-amber-500/40 text-left transition-all shadow-sm">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="text-base">🛒</span>
-                <span class="text-white font-semibold text-xs group-hover:text-amber-300 transition-colors">Vendas da Loja</span>
+            <button onclick="window.auraChat.sendUserPrompt('Há algum bico com vazão lenta ou alerta na pista?')" class="group p-3 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-white/10 hover:border-amber-500/50 text-left transition-all shadow-sm active:scale-[0.98]">
+              <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center gap-2">
+                  <span class="text-base">⚡</span>
+                  <span class="text-white font-semibold text-xs group-hover:text-amber-300 transition-colors">Vazão & Frentistas</span>
+                </div>
+                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">&lt;30 L/min</span>
               </div>
-              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Cross-selling e combos no caixa.</p>
+              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Detecção preventiva de filtro sujo, produtividade e conversão de aditivada.</p>
             </button>
 
-            <button onclick="window.auraChat.sendUserPrompt('Há algum bico com vazão lenta ou alerta na pista?')" class="group p-3 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-rose-500/40 text-left transition-all shadow-sm">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="text-base">⚠️</span>
-                <span class="text-white font-semibold text-xs group-hover:text-rose-300 transition-colors">Vazão dos Bicos</span>
+            <button onclick="window.auraChat.sendUserPrompt('Quais os combos de vendas cruzadas com maior Lift na conveniência?')" class="group p-3 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-white/10 hover:border-sky-500/50 text-left transition-all shadow-sm active:scale-[0.98]">
+              <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center gap-2">
+                  <span class="text-base">🛒</span>
+                  <span class="text-white font-semibold text-xs group-hover:text-sky-300 transition-colors">Combos da Loja</span>
+                </div>
+                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">Lift ≥ 2.0x</span>
               </div>
-              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Alerta preventivo (&lt;30 L/min).</p>
+              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Market Basket Analysis da conveniência com scripts práticos para balcão.</p>
             </button>
 
-            <button onclick="window.auraChat.sendUserPrompt('Quem são os maiores clientes e frotistas da revenda?')" class="group p-3 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-sky-500/40 text-left transition-all shadow-sm">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="text-base">🏆</span>
-                <span class="text-white font-semibold text-xs group-hover:text-sky-300 transition-colors">Clientes VIP & Frotas</span>
+            <button onclick="window.auraChat.sendUserPrompt('Quem são os maiores clientes e frotistas da revenda?')" class="group p-3 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-white/10 hover:border-rose-500/50 text-left transition-all shadow-sm active:scale-[0.98]">
+              <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center gap-2">
+                  <span class="text-base">🏆</span>
+                  <span class="text-white font-semibold text-xs group-hover:text-rose-300 transition-colors">Clientes & Frotas</span>
+                </div>
+                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">Ranking</span>
               </div>
-              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Ranking de clientes de maior volume.</p>
+              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Faturamento acumulado por cliente, frotistas e volume de vendas.</p>
             </button>
           </div>
+        </div>
+
+        <div class="p-2.5 rounded-xl bg-cyan-500/5 border border-cyan-500/15 flex items-center justify-between text-xs text-slate-400">
+          <span class="flex items-center gap-1.5 text-cyan-300">
+            <i data-lucide="info" class="w-3.5 h-3.5"></i>
+            <span>Dica: Ao receber qualquer resposta, clique em <strong>"Ver Evidências"</strong> para abrir o painel com as fontes oficiais.</span>
+          </span>
+          <kbd class="hidden sm:inline-block px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-400 font-mono">Esc fecha gaveta</kbd>
         </div>
       </div>
     `;
