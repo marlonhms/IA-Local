@@ -228,6 +228,7 @@ class AuraCockpitController {
       const comp5k = tank.compartimentos_5k || 0;
       const horasAutonomia = Number(tank.autonomia_runout_horas || 0);
       const diasAutonomia = Number(tank.autonomia_runout_dias || 0);
+      const horasCritica = Number(tank.autonomia_critica_horas ?? 0);
       const statusOp = tank.status_operacional || 'NORMAL';
       const isCritical = tank.alerta_critico || pct < 15;
       const isInativo = statusOp === 'INATIVO';
@@ -259,25 +260,29 @@ class AuraCockpitController {
         tagBg = 'bg-sky-500/10 text-sky-300 border-sky-500/30';
       }
 
-      // Alerta crítico sobrepõe cor do card
+      // Alerta crítico ou atenção sobrepõe cor do card e do fluido com gradientes de advertência
       if (isCritical && !isInativo) {
+        fuelClass += ' fuel-critical';
         borderAccent = 'border-rose-500/60 shadow-lg shadow-rose-950/20';
+      } else if (pct < 25 && !isInativo) {
+        fuelClass += ' fuel-warning';
+        borderAccent = 'border-amber-500/50 shadow-md shadow-amber-950/20';
       }
 
       html += `
         <div class="glass-panel p-4 flex flex-col justify-between relative overflow-hidden transition-all hover:scale-[1.01] ${borderAccent}">
           <!-- Topo do Card -->
-          <div class="flex items-start justify-between mb-3">
+          <div class="flex items-start justify-between mb-3 pb-2 border-b border-white/5">
             <div>
               <div class="flex items-center gap-2">
-                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-900 text-slate-200 border border-slate-700/80">
                   TQ-${cod}
                 </span>
                 <span class="text-xs font-semibold px-2 py-0.5 rounded border ${tagBg}">
                   ${comb}
                 </span>
               </div>
-              <div class="mt-1 text-slate-400 text-xs font-mono">
+              <div class="mt-1 text-slate-400 text-[11px] font-mono">
                 Bicos: ${(tank.bicos_conectados && tank.bicos_conectados.length) ? tank.bicos_conectados.join(', ') : 'Nenhum'}
               </div>
             </div>
@@ -306,67 +311,75 @@ class AuraCockpitController {
 
           <!-- Centro: Medidor Cilíndrico de Fluido + Métricas -->
           <div class="flex items-center gap-4 my-2">
-            <!-- Cilindro 3D -->
-            <div class="tank-gauge-container flex-shrink-0">
+            <!-- Cilindro 3D Translúcido -->
+            <div class="tank-gauge-container flex-shrink-0" title="Nível: ${pct.toFixed(1)}%">
               <div class="tank-critical-line"></div>
               <div class="tank-liquid ${fuelClass}" style="height: ${isInativo ? 0 : pct}%;"></div>
             </div>
 
-            <!-- Dados Volumétricos -->
+            <!-- Dados Volumétricos Executivos -->
             <div class="flex-1 space-y-1.5 font-mono text-xs">
-              <div class="flex items-baseline justify-between border-b border-slate-800/80 pb-1">
+              <div class="flex items-baseline justify-between border-b border-white/5 pb-1">
                 <span class="text-slate-400">Saldo Atual:</span>
-                <span class="font-bold text-sm ${isCritical ? 'text-rose-300' : 'text-slate-100'}">
+                <span class="font-bold text-base tabular-nums ${isCritical ? 'text-rose-300' : 'text-slate-100'}">
                   ${saldo.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L
                 </span>
               </div>
 
-              <div class="flex items-baseline justify-between border-b border-slate-800/80 pb-1">
+              <div class="flex items-baseline justify-between border-b border-white/5 pb-1">
                 <span class="text-slate-400">Capacidade:</span>
-                <span class="text-slate-300">${cap.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L</span>
+                <span class="text-slate-300 tabular-nums">${cap.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L</span>
               </div>
 
-              <div class="flex items-baseline justify-between border-b border-slate-800/80 pb-1">
+              <div class="flex items-baseline justify-between border-b border-white/5 pb-1">
                 <span class="text-slate-400">Nível:</span>
-                <span class="font-bold ${pct < 15 ? 'text-rose-400' : pct < 35 ? 'text-amber-400' : 'text-emerald-400'}">
+                <span class="font-bold tabular-nums ${pct < 15 ? 'text-rose-400' : pct < 35 ? 'text-amber-400' : 'text-emerald-400'}">
                   ${pct.toFixed(1)}%
                 </span>
               </div>
 
-              <div class="flex items-baseline justify-between border-b border-slate-800/80 pb-1">
+              <div class="flex items-baseline justify-between border-b border-white/5 pb-1">
                 <span class="text-slate-400">Espaço Livre:</span>
-                <span class="text-cyan-300 font-semibold">${ullage.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L</span>
+                <span class="text-cyan-300 font-semibold tabular-nums">${ullage.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L</span>
               </div>
 
               <div class="flex items-baseline justify-between">
                 <span class="text-slate-400">Comporta Carreta:</span>
-                <span class="text-purple-300 font-bold">${comp5k}x 5.000 L</span>
+                <span class="text-purple-300 font-bold tabular-nums flex items-center gap-1">
+                  <span>🚚</span>
+                  <span>${comp5k}x 5.000 L</span>
+                </span>
               </div>
             </div>
           </div>
 
           <!-- Rodapé do Card: Autonomia & Ação Rápida -->
-          <div class="mt-3 pt-2.5 border-t border-slate-800 flex items-center justify-between">
-            <div class="font-mono text-[11px]">
+          <div class="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between">
+            <div class="font-mono text-[11px] leading-tight">
               ${isInativo ? `
                 <span class="text-slate-500">Sem consumo registrado</span>
               ` : isCritical ? `
-                <span class="text-rose-400 font-semibold">
-                  Autonomia: ~${horasAutonomia.toFixed(0)}h (${diasAutonomia.toFixed(1)}d)
-                </span>
+                <div class="text-rose-400 font-semibold space-y-0.5">
+                  <div class="flex items-center gap-1">
+                    <span>⚠️</span>
+                    <span>Reserva Crítica (&lt;15%): <strong class="tabular-nums">0.0h</strong></span>
+                  </div>
+                  <div class="text-slate-400 text-[10px]">Esgotamento: <strong class="text-rose-300 tabular-nums">~${horasAutonomia.toFixed(0)}h</strong> (~${diasAutonomia.toFixed(1)}d)</div>
+                </div>
               ` : `
-                <span class="text-slate-300">
-                  Autonomia: ~${diasAutonomia.toFixed(1)} dias (${horasAutonomia.toFixed(0)}h)
-                </span>
+                <div class="text-slate-300 space-y-0.5">
+                  <div>Autonomia 15%: <strong class="text-cyan-300 tabular-nums">~${horasCritica.toFixed(0)}h</strong></div>
+                  <div class="text-slate-400 text-[10px]">Esgotamento: <strong class="text-emerald-300 tabular-nums">~${horasAutonomia.toFixed(0)}h</strong> (~${diasAutonomia.toFixed(1)}d)</div>
+                </div>
               `}
             </div>
 
             <button 
               onclick="window.auraApp.askAboutTank('${cod}', '${comb}')"
-              class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-cyan-300 text-[11px] font-mono flex items-center gap-1 transition-colors"
+              class="px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-cyan-300 hover:text-white border border-cyan-500/30 text-[11px] font-mono flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
               title="Perguntar à AURA sobre este tanque">
               <span>Perguntar</span>
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+              <svg class="w-3 h-3 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
             </button>
           </div>
         </div>
@@ -387,13 +400,12 @@ class AuraCockpitController {
       const ocupMedia = capTot > 0 ? (saldoTot / capTot) * 100 : 0;
 
       summaryEl.innerHTML = `
-        <div class="flex flex-wrap items-center gap-4 text-xs font-mono text-slate-300">
-          <div>Tanques Ativos: <strong class="text-emerald-400">${totalAtivos}</strong></div>
-          <div>Em Risco Crítico: <strong class="text-rose-400">${emRisco}</strong></div>
-          <div>Capacidade Total: <strong class="text-slate-200">${capTot.toLocaleString('pt-BR')} L</strong></div>
-          <div>Saldo Geral: <strong class="text-slate-200">${saldoTot.toLocaleString('pt-BR')} L</strong></div>
-          <div>Ocupação Média: <strong class="text-cyan-400">${ocupMedia.toFixed(1)}%</strong></div>
-          <div>Ullage Total: <strong class="text-purple-300">${ullageTot.toLocaleString('pt-BR')} L</strong></div>
+        <div class="flex flex-wrap items-center gap-3 text-xs font-mono text-slate-300">
+          <div class="px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800">Tanques: <strong class="text-emerald-400 tabular-nums">${totalAtivos}</strong></div>
+          <div class="px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800">Críticos: <strong class="${emRisco > 0 ? 'text-rose-400' : 'text-slate-400'} tabular-nums">${emRisco}</strong></div>
+          <div class="px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800">Saldo Geral: <strong class="text-slate-100 tabular-nums">${saldoTot.toLocaleString('pt-BR')} L</strong></div>
+          <div class="px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800">Ocupação: <strong class="text-cyan-400 tabular-nums">${ocupMedia.toFixed(1)}%</strong></div>
+          <div class="px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800">Ullage: <strong class="text-purple-300 tabular-nums">${ullageTot.toLocaleString('pt-BR')} L</strong></div>
         </div>
       `;
     }
@@ -413,23 +425,23 @@ class AuraCockpitController {
         const isInativo = b.status_operacional?.includes('INATIVO');
 
         bicosHtml += `
-          <div class="p-2.5 rounded-lg border ${isLento ? 'bg-amber-950/20 border-amber-500/50' : isInativo ? 'bg-slate-900/40 border-slate-800' : 'bg-slate-900/80 border-slate-800'} flex flex-col justify-between font-mono text-xs">
+          <div class="p-3 rounded-xl glass-subcard border ${isLento ? 'border-amber-500/50 shadow-md shadow-amber-950/25' : isInativo ? 'border-white/5 opacity-70' : 'border-white/10'} flex flex-col justify-between font-mono text-xs transition-all hover:-translate-y-0.5">
             <div class="flex items-center justify-between">
               <span class="font-bold text-slate-200">Bico ${b.bico}</span>
-              <span class="text-[10px] text-slate-400">Bomba ${b.bomba_fisica}</span>
+              <span class="text-[10px] text-slate-400 px-1.5 py-0.5 rounded bg-slate-800/80">Bomba ${b.bomba_fisica}</span>
             </div>
             <div class="text-[11px] text-slate-400 truncate mt-1">${b.combustivel}</div>
             
-            <div class="mt-2 pt-1 border-t border-slate-800 flex items-center justify-between">
-              <span class="text-slate-500 text-[10px]">Vazão:</span>
-              <span class="font-bold ${isLento ? 'text-amber-400' : isInativo ? 'text-slate-500' : 'text-emerald-400'}">
+            <div class="mt-2 pt-1 border-t border-white/5 flex items-center justify-between">
+              <span class="text-slate-400 text-[10px]">Vazão Média:</span>
+              <span class="font-bold tabular-nums ${isLento ? 'text-amber-300 text-sm' : isInativo ? 'text-slate-500' : 'text-emerald-400'}">
                 ${isInativo ? '0.0' : vazao.toFixed(1)} L/min
               </span>
             </div>
             
             ${isLento ? `
-              <div class="mt-1 text-[9px] text-amber-400 font-semibold flex items-center gap-1">
-                <span>⚠️ Filtro Lento</span>
+              <div class="mt-1.5 text-[10px] text-amber-300 font-semibold flex items-center gap-1 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30">
+                <span>⚠️ Filtro Lento (&lt;30 L/min)</span>
               </div>
             ` : ''}
           </div>
@@ -444,7 +456,7 @@ class AuraCockpitController {
       let frentHtml = `
         <table class="w-full text-left font-mono text-xs">
           <thead>
-            <tr class="text-slate-400 border-b border-slate-800 text-[11px]">
+            <tr class="text-slate-400 border-b border-white/10 text-[11px]">
               <th class="pb-2">#</th>
               <th class="pb-2">Frentista</th>
               <th class="pb-2 text-right">Litros</th>
@@ -453,23 +465,23 @@ class AuraCockpitController {
               <th class="pb-2 text-right">Conv. Aditivada</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-800/60">
+          <tbody class="divide-y divide-white/5">
       `;
 
       pista.ranking_frentistas.forEach((f, idx) => {
         const conv = Number(f.conversao_aditivada_pct || 0);
         frentHtml += `
-          <tr class="hover:bg-slate-800/30 transition-colors">
-            <td class="py-2 text-slate-400">${idx + 1}</td>
-            <td class="py-2 font-semibold text-slate-200">
+          <tr class="hover:bg-white/[0.03] transition-colors">
+            <td class="py-2.5 text-slate-400">${idx + 1}</td>
+            <td class="py-2.5 font-semibold text-slate-200">
               ${f.nome}
               ${f.destaque_performance ? `<span class="block text-[10px] text-emerald-400 font-normal">${f.destaque_performance}</span>` : ''}
             </td>
-            <td class="py-2 text-right text-slate-300">${Number(f.total_litros || 0).toFixed(1)} L</td>
-            <td class="py-2 text-right text-emerald-400 font-semibold">R$ ${Number(f.faturamento_reais || 0).toFixed(2)}</td>
-            <td class="py-2 text-right text-slate-300">R$ ${Number(f.ticket_medio_reais || 0).toFixed(2)}</td>
-            <td class="py-2 text-right">
-              <span class="px-1.5 py-0.5 rounded text-[10px] ${conv > 15 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'}">
+            <td class="py-2.5 text-right text-slate-300 tabular-nums">${Number(f.total_litros || 0).toFixed(1)} L</td>
+            <td class="py-2.5 text-right text-emerald-300 font-semibold tabular-nums">R$ ${Number(f.faturamento_reais || 0).toFixed(2)}</td>
+            <td class="py-2.5 text-right text-slate-300 tabular-nums">R$ ${Number(f.ticket_medio_reais || 0).toFixed(2)}</td>
+            <td class="py-2.5 text-right">
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold tabular-nums ${conv > 15 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'}">
                 ${conv.toFixed(1)}%
               </span>
             </td>
@@ -587,7 +599,7 @@ class AuraCockpitController {
           </span>
         </div>
 
-        <div class="grid grid-cols-2 gap-2 p-2 rounded bg-slate-900/80 border border-slate-800">
+        <div class="grid grid-cols-2 gap-2.5 p-3 rounded-xl glass-subcard border border-white/5">
           <div>
             <div class="text-slate-400 text-[10px]">Faturamento Pista CBC04</div>
             <div class="text-sm font-bold text-slate-100 tabular-nums">${autRevText}</div>
@@ -598,7 +610,7 @@ class AuraCockpitController {
           </div>
         </div>
 
-        <div class="flex items-center justify-between text-xs border-t border-slate-800 pt-2">
+        <div class="flex items-center justify-between text-xs border-t border-white/5 pt-2">
           <span class="text-slate-400">${this.escapeHtml(diffLabel)}</span>
           <span class="font-bold tabular-nums ${diffColorClass}">
             ${diffFormatted}
@@ -606,21 +618,21 @@ class AuraCockpitController {
         </div>
 
         ${limitation && !isNoMovement && !isUnavailable ? `
-          <div class="text-[11px] text-amber-300 bg-amber-500/10 p-2 rounded border border-amber-500/20">
+          <div class="text-[11px] text-amber-300 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/25">
             ⚠️ <strong>Limitação:</strong> ${this.escapeHtml(limitation)}
           </div>
         ` : ''}
 
-        <div class="text-[11px] text-slate-400 bg-slate-900/40 p-2 rounded border border-slate-800/80">
+        <div class="text-[11px] text-slate-300 glass-subcard p-2.5 rounded-xl border border-white/5">
           ${this.escapeHtml(diagText)}
         </div>
 
-        <div class="pt-2 border-t border-slate-800 flex items-center justify-between font-sans">
-          <span class="text-[10px] text-slate-500 font-mono">ERP Somente Leitura</span>
+        <div class="pt-2 border-t border-white/5 flex items-center justify-between font-sans">
+          <span class="text-[10px] text-slate-400 font-mono">ERP Somente Leitura</span>
           <button 
             type="button"
             onclick="if (typeof window !== 'undefined') { window.__auraEvidenceStore = window.__auraEvidenceStore || {}; window.__auraEvidenceStore['cockpit_turno'] = window.auraCockpit?.turnoData; if (window.auraChat) window.auraChat.openEvidence('cockpit_turno', 'resumo'); }"
-            class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-white border border-slate-700 transition-colors text-[11px] flex items-center gap-1.5 cursor-pointer">
+            class="px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-cyan-300 hover:text-white border border-cyan-500/30 transition-all text-[11px] flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95">
             <span>Ver Evidências</span>
             <span>↗</span>
           </button>
@@ -648,21 +660,21 @@ class AuraCockpitController {
           </span>
         </div>
 
-        <div class="grid grid-cols-2 gap-2 p-2 rounded bg-slate-900/80 border border-slate-800">
+        <div class="grid grid-cols-2 gap-2.5 p-3 rounded-xl glass-subcard border border-white/5">
           <div>
             <div class="text-slate-400 text-[10px]">Tanques Auditados</div>
-            <div class="text-sm font-bold text-slate-100">${r.total_tanques_analisados || 0} tanques</div>
+            <div class="text-sm font-bold text-slate-100 tabular-nums">${r.total_tanques_analisados || 0} tanques</div>
           </div>
           <div>
             <div class="text-slate-400 text-[10px]">Variação Física vs Livro</div>
-            <div class="text-sm font-bold ${isConforme ? 'text-emerald-400' : 'text-rose-400'}">
+            <div class="text-sm font-bold tabular-nums ${isConforme ? 'text-emerald-400' : 'text-rose-400'}">
               ${(r.variacao_volumetrica_geral_pct || 0).toFixed(2)}%
             </div>
           </div>
         </div>
 
         <div class="text-[11px] text-slate-400">
-          Estoque Físico Total: <strong class="text-slate-200">${(r.total_estoque_fisico_litros || 0).toLocaleString('pt-BR')} L</strong>
+          Estoque Físico Total: <strong class="text-slate-200 tabular-nums">${(r.total_estoque_fisico_litros || 0).toLocaleString('pt-BR')} L</strong>
         </div>
       </div>
     `;
@@ -684,17 +696,17 @@ class AuraCockpitController {
       const incPct = Number(c.impacto_financeiro?.incremento_ticket_pct || 0);
 
       html += `
-        <div class="p-3 rounded-lg bg-purple-950/20 border border-purple-500/30 flex flex-col justify-between font-mono text-xs">
+        <div class="p-3.5 rounded-xl glass-subcard border border-purple-500/30 flex flex-col justify-between font-mono text-xs hover:-translate-y-0.5 transition-all">
           <div>
-            <div class="flex items-center justify-between text-[11px] mb-1">
-              <span class="text-purple-300 font-bold">LIFT: ${lift.toFixed(1)}x</span>
-              <span class="text-slate-400">Confiança: ${conf.toFixed(0)}%</span>
+            <div class="flex items-center justify-between text-[11px] mb-1.5 pb-1 border-b border-white/5">
+              <span class="text-purple-300 font-bold tabular-nums">LIFT: ${lift.toFixed(1)}x</span>
+              <span class="text-slate-400 tabular-nums">Confiança: ${conf.toFixed(0)}%</span>
             </div>
             <div class="text-slate-200 font-semibold">${c.produto_origem?.nompro}</div>
             <div class="text-emerald-400 text-[11px] mt-0.5">↳ + ${c.produto_recomendado?.nompro}</div>
           </div>
 
-          <div class="mt-2 pt-2 border-t border-purple-900/40 text-[11px] text-slate-400">
+          <div class="mt-2.5 pt-2 border-t border-purple-900/30 text-[11px] text-slate-400">
             <span class="text-slate-300">${c.script_sugerido_caixa || ''}</span>
           </div>
         </div>
@@ -736,6 +748,7 @@ class AuraCockpitController {
       const ullage = Number(t.espaco_livre_ullage_litros || 0);
       const comp5k = t.compartimentos_5k || 0;
       const horasAutonomia = Number(t.autonomia_runout_horas || 0);
+      const horasCritica = Number(t.autonomia_critica_horas ?? 0);
 
       let statusColor = 'text-emerald-400';
       let statusText = `Normal (~${horasAutonomia.toFixed(0)}h)`;
@@ -743,22 +756,22 @@ class AuraCockpitController {
 
       if (isCritical) {
         statusColor = 'text-rose-400';
-        statusText = `Crítico <15% (~${horasAutonomia.toFixed(0)}h)`;
-        borderAccent = 'border-rose-500/40 hover:border-rose-400';
+        statusText = `Crítico <15% (Esgota ~${horasAutonomia.toFixed(0)}h)`;
+        borderAccent = 'border-rose-500/40 hover:border-rose-400 shadow-md shadow-rose-950/20';
       } else if (pct < 35) {
         statusColor = 'text-amber-400';
         statusText = `Atenção (~${horasAutonomia.toFixed(0)}h)`;
-        borderAccent = 'border-amber-500/30 hover:border-amber-400';
+        borderAccent = 'border-amber-500/30 hover:border-amber-400 shadow-md shadow-amber-950/20';
       }
 
       html += `
-        <button onclick="window.auraApp.askAboutTank('${cod}', '${comb}')" class="p-3 rounded-lg bg-slate-900 border ${borderAccent} text-left font-mono text-xs transition-all group">
+        <button onclick="window.auraApp.askAboutTank('${cod}', '${comb}')" class="p-3 rounded-xl glass-subcard border ${borderAccent} text-left font-mono text-xs transition-all hover:-translate-y-0.5 group">
           <div class="flex items-center justify-between">
             <span class="font-bold text-slate-200 group-hover:text-white">TQ-${cod} ${comb}</span>
-            <span class="text-[10px] font-bold ${statusColor}">${pct.toFixed(0)}%</span>
+            <span class="text-[10px] font-bold ${statusColor} tabular-nums">${pct.toFixed(0)}%</span>
           </div>
-          <div class="${statusColor} font-semibold mt-1">${statusText}</div>
-          <div class="text-slate-400 text-[10px] mt-0.5">Ullage: ${ullage.toLocaleString('pt-BR')} L (${comp5k}x 5k)</div>
+          <div class="${statusColor} font-semibold mt-1 tabular-nums">${statusText}</div>
+          <div class="text-slate-400 text-[10px] mt-0.5">Ullage: <strong class="text-cyan-300 tabular-nums">${ullage.toLocaleString('pt-BR')} L</strong> (${comp5k}x 5k)</div>
         </button>
       `;
     });

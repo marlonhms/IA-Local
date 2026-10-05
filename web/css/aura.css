@@ -70,14 +70,15 @@
 }
 
 body {
-  background-color: var(--bg-deep);
-  color: #e2e8f0;
+  background-color: #07090e;
+  color: #f1f5fa;
   font-family: var(--font-sans);
   overflow-x: hidden;
   background-image: 
-    radial-gradient(circle at 18% 12%, rgba(6, 182, 212, 0.06) 0%, transparent 48%),
-    radial-gradient(circle at 82% 18%, rgba(124, 58, 237, 0.07) 0%, transparent 52%),
-    radial-gradient(circle at 50% 85%, rgba(16, 185, 129, 0.05) 0%, transparent 55%);
+    radial-gradient(circle at 12% 8%, rgba(6, 182, 212, 0.08) 0%, transparent 44%),
+    radial-gradient(circle at 88% 14%, rgba(124, 58, 237, 0.09) 0%, transparent 48%),
+    radial-gradient(circle at 50% 90%, rgba(16, 185, 129, 0.06) 0%, transparent 55%),
+    radial-gradient(circle at 75% 60%, rgba(6, 182, 212, 0.04) 0%, transparent 42%);
   background-attachment: fixed;
 }
 
@@ -87,14 +88,14 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(10, 14, 23, 0.8);
+  background: rgba(7, 10, 18, 0.9);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(6, 182, 212, 0.4);
+  background: rgba(6, 182, 212, 0.5);
 }
 
 /* Utilitários Tipográficos */
@@ -106,40 +107,47 @@ body {
   font-family: var(--font-display);
 }
 
-/* Glassmorphism Refinado */
+/* Glassmorphism Precision Glass Deluxe Refinado (20px blur, bordas com gradiente de luz) */
 .glass-panel {
-  background: var(--bg-card);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  background: linear-gradient(145deg, rgba(16, 23, 38, 0.72) 0%, rgba(10, 16, 28, 0.85) 100%);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
 }
 
 .glass-panel:hover {
   border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 12px 38px 0 rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .glass-panel-interactive:hover {
   border-color: var(--border-cyan);
-  box-shadow: 0 4px 20px rgba(6, 182, 212, 0.08);
-  transform: translateY(-1px);
+  box-shadow: 0 8px 28px rgba(6, 182, 212, 0.14);
+  transform: translateY(-2px);
 }
 
 .glass-card-emerald {
   border-left: 3px solid var(--emerald-main);
+  box-shadow: inset 1px 0 0 0 rgba(16, 185, 129, 0.2);
 }
 .glass-card-cyan {
   border-left: 3px solid var(--cyan-main);
+  box-shadow: inset 1px 0 0 0 rgba(6, 182, 212, 0.2);
 }
 .glass-card-purple {
   border-left: 3px solid var(--purple-main);
+  box-shadow: inset 1px 0 0 0 rgba(124, 58, 237, 0.2);
 }
 .glass-card-amber {
   border-left: 3px solid #f59e0b;
+  box-shadow: inset 1px 0 0 0 rgba(245, 158, 11, 0.2);
 }
 .glass-card-rose {
   border-left: 3px solid #f43f5e;
+  box-shadow: inset 1px 0 0 0 rgba(244, 63, 94, 0.2);
 }
 
 /* Núcleo Cognitivo Holográfico AURA (Sem neon brega) */
@@ -218,16 +226,31 @@ body {
   }
 }
 
-/* Tanque Volumétrico Cilíndrico com Simulação de Fluido */
+/* Tanque Volumétrico Cilíndrico com Simulação de Fluido Precision Glass Deluxe */
 .tank-gauge-container {
   position: relative;
-  width: 72px;
-  height: 140px;
-  background: rgba(10, 15, 26, 0.9);
-  border: 1.5px solid rgba(255, 255, 255, 0.12);
-  border-radius: 36px / 18px;
+  width: 76px;
+  height: 148px;
+  background: linear-gradient(180deg, rgba(12, 18, 30, 0.95) 0%, rgba(7, 10, 18, 0.98) 100%);
+  border: 1.5px solid rgba(255, 255, 255, 0.14);
+  border-radius: 38px / 20px;
   overflow: hidden;
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8), 0 4px 14px rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.85), 0 8px 24px rgba(0, 0, 0, 0.5), inset 0 0 12px rgba(255, 255, 255, 0.03);
+}
+
+/* Reflexo de vidro vertical especular na lateral direita do cilindro */
+.tank-gauge-container::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  right: 8px;
+  bottom: 10px;
+  width: 4px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(255, 255, 255, 0.18) 100%);
+  border-radius: 2px;
+  z-index: 12;
+  pointer-events: none;
+  filter: blur(0.5px);
 }
 
 .tank-gauge-container::before {
@@ -236,11 +259,11 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  height: 18px;
-  background: rgba(255, 255, 255, 0.07);
+  height: 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.02) 100%);
   border-radius: 50%;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-  z-index: 10;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  z-index: 15;
   pointer-events: none;
 }
 
@@ -249,41 +272,77 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  transition: height 1s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: height 1s cubic-bezier(0.34, 1.56, 0.64, 1);
   overflow: hidden;
+  box-shadow: inset 0 2px 6px rgba(255, 255, 255, 0.3);
 }
 
 .tank-liquid::before {
   content: '';
   position: absolute;
-  top: -6px;
+  top: -7px;
   left: 0;
   right: 0;
-  height: 12px;
+  height: 14px;
   border-radius: 50%;
   background: inherit;
-  filter: brightness(1.25);
-  border-top: 1px solid rgba(255, 255, 255, 0.4);
+  filter: brightness(1.3) contrast(1.1);
+  border-top: 1.5px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 1px 4px rgba(255, 255, 255, 0.2);
 }
 
-/* Cores de Fluidos por Combustível */
+/* Cores de Fluidos por Combustível com Gradientes Profundos */
 .fuel-gasolina-comum {
-  background: linear-gradient(180deg, #10b981 0%, #047857 100%);
+  background: linear-gradient(180deg, #10b981 0%, #059669 45%, #047857 100%);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.3);
 }
 .fuel-gasolina-aditivada {
-  background: linear-gradient(180deg, #34d399 0%, #059669 100%);
+  background: linear-gradient(180deg, #34d399 0%, #10b981 45%, #065f46 100%);
+  box-shadow: 0 0 16px rgba(52, 211, 153, 0.3);
 }
 .fuel-etanol {
-  background: linear-gradient(180deg, #22d3ee 0%, #0891b2 100%);
+  background: linear-gradient(180deg, #22d3ee 0%, #06b6d4 45%, #0e7490 100%);
+  box-shadow: 0 0 16px rgba(6, 182, 212, 0.3);
 }
 .fuel-diesel-s10 {
-  background: linear-gradient(180deg, #818cf8 0%, #4338ca 100%);
+  background: linear-gradient(180deg, #818cf8 0%, #6366f1 45%, #3730a3 100%);
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.3);
 }
 .fuel-diesel-s500 {
-  background: linear-gradient(180deg, #a855f7 0%, #6d28d9 100%);
+  background: linear-gradient(180deg, #a855f7 0%, #7c3aed 45%, #581c87 100%);
+  box-shadow: 0 0 16px rgba(124, 58, 237, 0.3);
 }
 .fuel-arla {
-  background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
+  background: linear-gradient(180deg, #38bdf8 0%, #0284c7 45%, #0369a1 100%);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.3);
+}
+.fuel-critical {
+  background: linear-gradient(180deg, #f43f5e 0%, #e11d48 45%, #9f1239 100%) !important;
+  box-shadow: 0 0 18px rgba(244, 63, 94, 0.45) !important;
+  animation: tank-critical-pulse 2s ease-in-out infinite alternate;
+}
+.fuel-warning {
+  background: linear-gradient(180deg, #f59e0b 0%, #d97706 45%, #b45309 100%) !important;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.35) !important;
+}
+
+@keyframes tank-critical-pulse {
+  0% { filter: brightness(1); }
+  100% { filter: brightness(1.22); }
+}
+
+.glass-subcard {
+  background: linear-gradient(145deg, rgba(14, 21, 35, 0.72) 0%, rgba(9, 14, 24, 0.88) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: all 0.2s ease;
+}
+.glass-subcard:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 /* Linha de Referência de Reserva Crítica 15% */
@@ -293,10 +352,11 @@ body {
   left: 4px;
   right: 4px;
   height: 1px;
-  background: rgba(239, 68, 68, 0.7);
-  border-top: 1px dashed rgba(239, 68, 68, 0.9);
-  z-index: 8;
+  background: rgba(239, 68, 68, 0.8);
+  border-top: 1px dashed rgba(239, 68, 68, 1);
+  z-index: 14;
   pointer-events: none;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
 }
 .tank-critical-line::after {
   content: '15%';
@@ -306,7 +366,8 @@ body {
   font-family: var(--font-mono);
   font-size: 8px;
   color: #ef4444;
-  font-weight: 700;
+  font-weight: 800;
+  text-shadow: 0 0 4px rgba(239, 68, 68, 0.8);
 }
 
 /* Tabs Técnicas de Navegação */
@@ -351,26 +412,34 @@ body {
   color: #38bdf8;
 }
 
-/* Balões de Chat e Terminal Neural */
+/* Balões de Chat e Terminal Neural Executivo */
 .chat-bubble-user {
-  background: rgba(22, 33, 54, 0.9);
+  background: linear-gradient(135deg, rgba(18, 30, 52, 0.88) 0%, rgba(12, 20, 36, 0.95) 100%);
   border: 1px solid rgba(6, 182, 212, 0.25);
-  border-radius: 14px 14px 2px 14px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+  border-radius: 16px 16px 4px 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   word-break: break-word;
+  transition: all 0.2s ease;
 }
+.chat-bubble-user:hover {
+  border-color: rgba(6, 182, 212, 0.38);
+  box-shadow: 0 6px 24px rgba(6, 182, 212, 0.12);
+}
+
 .chat-bubble-aura {
   width: 100%;
   max-width: 100%;
-  background: rgba(12, 17, 30, 0.88);
-  border: 1px solid rgba(124, 58, 237, 0.22);
-  border-radius: 14px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: linear-gradient(180deg, rgba(14, 21, 37, 0.88) 0%, rgba(9, 14, 26, 0.96) 100%);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(168, 180, 197, 0.14);
+  border-radius: 18px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
   word-break: break-word;
 }
 .chat-bubble-aura:hover {
-  border-color: rgba(124, 58, 237, 0.38);
+  border-color: rgba(168, 180, 197, 0.22);
 }
 
 /* Cursor de Streaming */
@@ -1036,38 +1105,42 @@ body {
   min-height: 40px;
   padding: 8px 14px;
   border-radius: 9999px;
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #e2e8f0;
+  background: linear-gradient(145deg, rgba(18, 26, 44, 0.85) 0%, rgba(11, 17, 30, 0.95) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: #cbd5e1;
   font-family: var(--font-sans);
   font-size: 0.78rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  gap: 7px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   touch-action: manipulation;
 }
 
 .quick-prompt-chip:hover {
-  background: rgba(30, 41, 59, 0.95);
+  background: linear-gradient(145deg, rgba(28, 40, 68, 0.95) 0%, rgba(16, 25, 44, 0.98) 100%);
   border-color: rgba(6, 182, 212, 0.4);
   color: #ffffff;
-  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.15);
+  box-shadow: 0 4px 16px rgba(6, 182, 212, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   transform: translateY(-1.5px);
 }
 
 .quick-prompt-chip:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.98);
 }
 
 /* Botão Flutuante de Retorno às Mensagens Recentes (F4-13) */
 .scroll-to-bottom-btn {
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45), 0 0 12px rgba(6, 182, 212, 0.2);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: rgba(9, 14, 24, 0.92);
+  border: 1px solid rgba(6, 182, 212, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 16px rgba(6, 182, 212, 0.25);
   cursor: pointer;
   touch-action: manipulation;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1075,18 +1148,40 @@ body {
 
 .scroll-to-bottom-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 16px rgba(6, 182, 212, 0.3);
+  border-color: rgba(6, 182, 212, 0.6);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65), 0 0 20px rgba(6, 182, 212, 0.35);
 }
 
 /* MessageComposer Moderno com Estados Claros de Foco & Auto-Resize (F4-06 & F4-09) */
 .message-composer-container {
+  background: linear-gradient(180deg, rgba(12, 18, 32, 0.92) 0%, rgba(7, 10, 18, 0.97) 100%);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transition: border-color var(--aura-motion-fast) ease, box-shadow var(--aura-motion-fast) ease;
   padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
 }
 
 .message-composer-container:focus-within {
-  border-color: rgba(6, 182, 212, 0.45) !important;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 0 16px rgba(6, 182, 212, 0.12) !important;
+  border-color: rgba(6, 182, 212, 0.5) !important;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(6, 182, 212, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
+}
+
+#btn-chat-send {
+  background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.32), 0 0 10px rgba(6, 182, 212, 0.2);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#btn-chat-send:hover {
+  filter: brightness(1.12);
+  box-shadow: 0 6px 22px rgba(16, 185, 129, 0.45), 0 0 16px rgba(6, 182, 212, 0.3);
+  transform: translateY(-1px);
+}
+
+#btn-chat-send:active {
+  transform: scale(0.96);
 }
 
 #chat-input-text {

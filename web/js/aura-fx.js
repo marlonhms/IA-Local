@@ -520,6 +520,13 @@
       }
     }
 
+    openCommandPalette() {
+      const modal = document.getElementById('aura-command-palette-modal');
+      if (modal && modal.classList.contains('hidden')) {
+        this.toggleCommandPalette();
+      }
+    }
+
     toggleCommandPalette() {
       const modal = document.getElementById('aura-command-palette-modal');
       if (!modal) return;

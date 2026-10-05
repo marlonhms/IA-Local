@@ -133,28 +133,28 @@ class AuraTriggersController {
     let html = '';
 
     filtered.forEach(tool => {
-      let borderAccent = 'border-slate-800 hover:border-emerald-500/50';
+      let borderAccent = 'hover:border-emerald-500/50 hover:shadow-emerald-950/20';
       let tagBg = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
 
       if (tool.color === 'cyan') {
-        borderAccent = 'border-slate-800 hover:border-cyan-500/50';
+        borderAccent = 'hover:border-cyan-500/50 hover:shadow-cyan-950/20';
         tagBg = 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30';
       } else if (tool.color === 'purple') {
-        borderAccent = 'border-slate-800 hover:border-purple-500/50';
+        borderAccent = 'hover:border-purple-500/50 hover:shadow-purple-950/20';
         tagBg = 'bg-purple-500/10 text-purple-400 border-purple-500/30';
       }
 
       html += `
-        <div class="glass-panel p-4 flex flex-col justify-between transition-all duration-200 cursor-pointer ${borderAccent} group"
+        <div class="glass-panel p-4 flex flex-col justify-between transition-all duration-200 cursor-pointer ${borderAccent} hover:-translate-y-1 hover:shadow-xl group"
              onclick="window.auraTriggers.executeTrigger('${tool.id}')">
           <div>
-            <div class="flex items-center justify-between mb-2">
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold border ${tagBg}">
+            <div class="flex items-center justify-between mb-3">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold border ${tagBg}">
                 ${tool.badge}
               </span>
-              <span class="text-xs text-slate-500 font-mono group-hover:text-cyan-400 transition-colors flex items-center gap-1">
+              <span class="text-[11px] text-slate-400 font-mono group-hover:text-cyan-300 transition-colors flex items-center gap-1">
                 <span>1-Clique</span>
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                <svg class="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
               </span>
             </div>
 
@@ -162,14 +162,17 @@ class AuraTriggersController {
               ${tool.name}
             </h3>
 
-            <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">
+            <p class="text-xs text-slate-400 mt-1.5 leading-relaxed font-sans">
               ${tool.desc}
             </p>
           </div>
 
-          <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between font-mono text-[11px] text-slate-500">
-            <span>alias: ${tool.id}</span>
-            <span class="text-cyan-400/80 font-semibold group-hover:translate-x-0.5 transition-transform">Disparar ⚡</span>
+          <div class="mt-4 pt-3 border-t border-white/5 flex items-center justify-between font-mono text-[11px] text-slate-500">
+            <span class="text-slate-400">alias: ${tool.id}</span>
+            <span class="text-cyan-400 font-semibold group-hover:text-cyan-300 flex items-center gap-1">
+              <span>Disparar</span>
+              <span>⚡</span>
+            </span>
           </div>
         </div>
       `;
@@ -268,15 +271,15 @@ class AuraTriggersController {
       let rows = '';
       data.detalhamento_tanques.forEach(t => {
         rows += `
-          <tr class="border-b border-slate-800 text-xs font-mono">
-            <td class="py-2 text-slate-300">TQ-${t.codtan}</td>
-            <td class="py-2 font-semibold text-slate-100">${t.combustivel}</td>
-            <td class="py-2 text-right">${(t.saldo_atual_litros || 0).toLocaleString('pt-BR')} L</td>
-            <td class="py-2 text-right">${(t.capacidade_litros || 0).toLocaleString('pt-BR')} L</td>
-            <td class="py-2 text-right text-emerald-400 font-bold">${(t.ocupacao_pct || 0).toFixed(1)}%</td>
-            <td class="py-2 text-right text-cyan-300">${(t.espaco_livre_ullage_litros || 0).toLocaleString('pt-BR')} L</td>
-            <td class="py-2 text-right text-purple-300">${t.compartimentos_5k || 0}x 5k</td>
-            <td class="py-2 text-right font-bold ${t.alerta_critico ? 'text-rose-400' : 'text-slate-300'}">
+          <tr class="border-b border-white/5 text-xs font-mono hover:bg-white/[0.02] transition-colors">
+            <td class="py-2.5 text-slate-300 font-bold">TQ-${t.codtan}</td>
+            <td class="py-2.5 font-semibold text-slate-100">${t.combustivel}</td>
+            <td class="py-2.5 text-right tabular-nums">${(t.saldo_atual_litros || 0).toLocaleString('pt-BR')} L</td>
+            <td class="py-2.5 text-right tabular-nums">${(t.capacidade_litros || 0).toLocaleString('pt-BR')} L</td>
+            <td class="py-2.5 text-right text-emerald-400 font-bold tabular-nums">${(t.ocupacao_pct || 0).toFixed(1)}%</td>
+            <td class="py-2.5 text-right text-cyan-300 tabular-nums">${(t.espaco_livre_ullage_litros || 0).toLocaleString('pt-BR')} L</td>
+            <td class="py-2.5 text-right text-purple-300 tabular-nums">${t.compartimentos_5k || 0}x 5k</td>
+            <td class="py-2.5 text-right font-bold tabular-nums ${t.alerta_critico ? 'text-rose-400' : 'text-slate-300'}">
               ~${(t.autonomia_runout_dias || 0).toFixed(1)}d
             </td>
           </tr>
@@ -291,27 +294,27 @@ class AuraTriggersController {
 
       return `
         <div class="space-y-4">
-          <div class="p-3 rounded bg-slate-900/80 border border-slate-800 font-mono text-xs text-slate-300">
+          <div class="p-3.5 rounded-xl glass-subcard border border-white/5 font-mono text-xs text-slate-300">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div>Tanques Ativos: <strong class="text-emerald-400">${totalAtivos}</strong></div>
-              <div>Nível Crítico (&lt;15%): <strong class="text-rose-400">${emRisco}</strong></div>
-              <div>Saldo Total: <strong class="text-slate-100">${saldoTot.toLocaleString('pt-BR')} L</strong></div>
-              <div>Ullage Total: <strong class="text-cyan-300">${ullageTot.toLocaleString('pt-BR')} L</strong></div>
+              <div>Tanques Ativos: <strong class="text-emerald-400 tabular-nums">${totalAtivos}</strong></div>
+              <div>Nível Crítico (&lt;15%): <strong class="${emRisco > 0 ? 'text-rose-400' : 'text-slate-400'} tabular-nums">${emRisco}</strong></div>
+              <div>Saldo Total: <strong class="text-slate-100 tabular-nums">${saldoTot.toLocaleString('pt-BR')} L</strong></div>
+              <div>Ullage Total: <strong class="text-cyan-300 tabular-nums">${ullageTot.toLocaleString('pt-BR')} L</strong></div>
             </div>
           </div>
 
           <div class="overflow-x-auto">
             <table class="w-full text-left font-mono text-xs">
               <thead>
-                <tr class="text-slate-400 border-b border-slate-800">
-                  <th class="pb-2">Tanque</th>
-                  <th class="pb-2">Combustível</th>
-                  <th class="pb-2 text-right">Saldo</th>
-                  <th class="pb-2 text-right">Capacidade</th>
-                  <th class="pb-2 text-right">Ocupação</th>
-                  <th class="pb-2 text-right">Ullage</th>
-                  <th class="pb-2 text-right">Carreta</th>
-                  <th class="pb-2 text-right">Autonomia</th>
+                <tr class="text-slate-400 border-b border-white/10">
+                  <th class="pb-2.5">Tanque</th>
+                  <th class="pb-2.5">Combustível</th>
+                  <th class="pb-2.5 text-right">Saldo</th>
+                  <th class="pb-2.5 text-right">Capacidade</th>
+                  <th class="pb-2.5 text-right">Ocupação</th>
+                  <th class="pb-2.5 text-right">Ullage</th>
+                  <th class="pb-2.5 text-right">Carreta</th>
+                  <th class="pb-2.5 text-right">Autonomia</th>
                 </tr>
               </thead>
               <tbody>${rows}</tbody>
@@ -326,7 +329,7 @@ class AuraTriggersController {
       const r = data.resumo_executivo;
       return `
         <div class="space-y-4 font-mono text-xs">
-          <div class="p-4 rounded-lg bg-emerald-950/20 border border-emerald-500/30 flex items-center justify-between">
+          <div class="p-4 rounded-xl glass-subcard border border-emerald-500/40 flex items-center justify-between shadow-lg">
             <div>
               <div class="text-xs text-slate-400">Status Geral ANP</div>
               <div class="text-lg font-bold text-emerald-400">${r.status_geral_anp}</div>
@@ -337,11 +340,11 @@ class AuraTriggersController {
             </div>
           </div>
 
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded bg-slate-900 border border-slate-800">
-            <div>Tanques Conformes: <strong class="text-emerald-400">${r.total_tanques_conformes} / ${r.total_tanques_analisados}</strong></div>
-            <div>Vendas do Período: <strong class="text-slate-100">${(r.total_vendas_litros || 0).toLocaleString('pt-BR')} L</strong></div>
-            <div>Estoque Escriturado: <strong class="text-slate-100">${(r.total_estoque_escriturado_litros || 0).toLocaleString('pt-BR')} L</strong></div>
-            <div>Estoque Físico Medido: <strong class="text-slate-100">${(r.total_estoque_fisico_litros || 0).toLocaleString('pt-BR')} L</strong></div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-3.5 rounded-xl glass-subcard border border-white/5">
+            <div>Tanques Conformes: <strong class="text-emerald-400 tabular-nums">${r.total_tanques_conformes} / ${r.total_tanques_analisados}</strong></div>
+            <div>Vendas do Período: <strong class="text-slate-100 tabular-nums">${(r.total_vendas_litros || 0).toLocaleString('pt-BR')} L</strong></div>
+            <div>Estoque Escriturado: <strong class="text-slate-100 tabular-nums">${(r.total_estoque_escriturado_litros || 0).toLocaleString('pt-BR')} L</strong></div>
+            <div>Estoque Físico Medido: <strong class="text-slate-100 tabular-nums">${(r.total_estoque_fisico_litros || 0).toLocaleString('pt-BR')} L</strong></div>
           </div>
         </div>
       `;
@@ -416,9 +419,9 @@ class AuraTriggersController {
           const vazao = Number(b.vazao_media_l_min || 0);
           const isLento = b.alerta_filtro_lento || (b.status_operacional === 'ATIVO' && vazao > 0 && vazao < 30);
           bicosList += `
-            <div class="p-2 rounded bg-slate-900 border ${isLento ? 'border-amber-500/40 text-amber-300' : 'border-slate-800 text-slate-300'} font-mono text-xs">
+            <div class="p-3 rounded-xl glass-subcard border ${isLento ? 'border-amber-500/50 shadow-md shadow-amber-950/20 text-amber-300' : 'border-white/10 text-slate-300'} font-mono text-xs transition-all hover:-translate-y-0.5">
               <div class="font-bold">Bico ${b.bico} (${b.combustivel})</div>
-              <div class="text-[11px] text-slate-400">Vazão: <strong>${vazao.toFixed(1)} L/min</strong> ${isLento ? '⚠️ LENTO' : '✓'}</div>
+              <div class="text-[11px] text-slate-400 mt-1">Vazão: <strong class="tabular-nums">${vazao.toFixed(1)} L/min</strong> ${isLento ? '⚠️ LENTO' : '✓'}</div>
             </div>
           `;
         });
@@ -428,12 +431,12 @@ class AuraTriggersController {
       if (data.ranking_frentistas) {
         data.ranking_frentistas.forEach((f, idx) => {
           frentRows += `
-            <tr class="border-b border-slate-800 text-xs font-mono">
-              <td class="py-2 text-slate-400">${idx + 1}</td>
-              <td class="py-2 font-semibold text-slate-200">${f.nome}</td>
-              <td class="py-2 text-right">${Number(f.total_litros || 0).toFixed(1)} L</td>
-              <td class="py-2 text-right text-emerald-400 font-bold">R$ ${Number(f.faturamento_reais || 0).toFixed(2)}</td>
-              <td class="py-2 text-right text-cyan-300">${Number(f.conversao_aditivada_pct || 0).toFixed(1)}%</td>
+            <tr class="border-b border-white/5 text-xs font-mono hover:bg-white/[0.02] transition-colors">
+              <td class="py-2.5 text-slate-400">${idx + 1}</td>
+              <td class="py-2.5 font-semibold text-slate-200">${f.nome}</td>
+              <td class="py-2.5 text-right tabular-nums">${Number(f.total_litros || 0).toFixed(1)} L</td>
+              <td class="py-2.5 text-right text-emerald-400 font-bold tabular-nums">R$ ${Number(f.faturamento_reais || 0).toFixed(2)}</td>
+              <td class="py-2.5 text-right text-cyan-300 tabular-nums">${Number(f.conversao_aditivada_pct || 0).toFixed(1)}%</td>
             </tr>
           `;
         });
@@ -443,19 +446,19 @@ class AuraTriggersController {
         <div class="space-y-4 font-mono text-xs">
           <div>
             <h4 class="font-bold text-slate-200 mb-2">Auditoria de Vazão dos Bicos:</h4>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">${bicosList || '<div class="text-slate-500">Sem dados de bicos</div>'}</div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">${bicosList || '<div class="text-slate-500">Sem dados de bicos</div>'}</div>
           </div>
           <div>
             <h4 class="font-bold text-slate-200 mb-2">Ranking de Frentistas:</h4>
             <div class="overflow-x-auto">
               <table class="w-full text-left font-mono text-xs">
                 <thead>
-                  <tr class="text-slate-400 border-b border-slate-800">
-                    <th class="pb-2">#</th>
-                    <th class="pb-2">Frentista</th>
-                    <th class="pb-2 text-right">Volume</th>
-                    <th class="pb-2 text-right">Faturamento</th>
-                    <th class="pb-2 text-right">Conv. Aditivada</th>
+                  <tr class="text-slate-400 border-b border-white/10">
+                    <th class="pb-2.5">#</th>
+                    <th class="pb-2.5">Frentista</th>
+                    <th class="pb-2.5 text-right">Volume</th>
+                    <th class="pb-2.5 text-right">Faturamento</th>
+                    <th class="pb-2.5 text-right">Conv. Aditivada</th>
                   </tr>
                 </thead>
                 <tbody>${frentRows}</tbody>
@@ -472,33 +475,35 @@ class AuraTriggersController {
       if (data.produtos_mais_vendidos) {
         data.produtos_mais_vendidos.slice(0, 8).forEach(p => {
           topProds += `
-            <tr class="border-b border-slate-800 text-xs font-mono">
-              <td class="py-1.5 text-slate-200">${p.nompro || p.descricao || p.codpro}</td>
-              <td class="py-1.5 text-right text-slate-300">${Number(p.quantidade || p.quant || 0).toFixed(1)}</td>
-              <td class="py-1.5 text-right text-emerald-400 font-semibold">R$ ${Number(p.valor_total || p.total || 0).toFixed(2)}</td>
+            <tr class="border-b border-white/5 text-xs font-mono hover:bg-white/[0.02] transition-colors">
+              <td class="py-2 text-slate-200">${p.nompro || p.descricao || p.codpro}</td>
+              <td class="py-2 text-right text-slate-300 tabular-nums">${Number(p.quantidade || p.quant || 0).toFixed(1)}</td>
+              <td class="py-2 text-right text-emerald-400 font-semibold tabular-nums">R$ ${Number(p.valor_total || p.total || 0).toFixed(2)}</td>
             </tr>
           `;
         });
       }
       return `
         <div class="space-y-4 font-mono text-xs">
-          <div class="grid grid-cols-2 md:grid-cols-3 gap-3 p-3 rounded bg-slate-900 border border-slate-800">
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3 p-3.5 rounded-xl glass-subcard border border-white/5">
             <div>Status: <strong class="text-emerald-400">${data.status || 'OK'}</strong></div>
             <div>Destaque Hoje: <strong class="text-cyan-300">${data.ultimo_produto_vendido_destaque?.nompro || 'Registrado'}</strong></div>
-            <div>Total Geral: <strong class="text-purple-300">R$ ${Number(data.resumo_geral?.faturamento_total || 0).toFixed(2)}</strong></div>
+            <div>Total Geral: <strong class="text-purple-300 tabular-nums">R$ ${Number(data.resumo_geral?.faturamento_total || 0).toFixed(2)}</strong></div>
           </div>
           <div>
             <h4 class="font-bold text-slate-200 mb-2">Top Produtos Mais Vendidos:</h4>
-            <table class="w-full text-left font-mono text-xs">
-              <thead>
-                <tr class="text-slate-400 border-b border-slate-800">
-                  <th class="pb-1.5">Produto</th>
-                  <th class="pb-1.5 text-right">Qtd</th>
-                  <th class="pb-1.5 text-right">Faturamento</th>
-                </tr>
-              </thead>
-              <tbody>${topProds || '<tr><td colspan="3" class="py-2 text-slate-500">Sem itens</td></tr>'}</tbody>
-            </table>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left font-mono text-xs">
+                <thead>
+                  <tr class="text-slate-400 border-b border-white/10">
+                    <th class="pb-2">Produto</th>
+                    <th class="pb-2 text-right">Qtd</th>
+                    <th class="pb-2 text-right">Faturamento</th>
+                  </tr>
+                </thead>
+                <tbody>${topProds || '<tr><td colspan="3" class="py-2 text-slate-500">Sem itens</td></tr>'}</tbody>
+              </table>
+            </div>
           </div>
         </div>
       `;
@@ -509,14 +514,14 @@ class AuraTriggersController {
       let cards = '';
       data.top_combos_cross_selling.forEach(c => {
         cards += `
-          <div class="p-3 rounded bg-slate-900 border border-purple-500/30 flex flex-col justify-between font-mono text-xs">
-            <div class="flex items-center justify-between text-[11px] mb-1">
-              <span class="text-purple-300 font-bold">LIFT: ${c.metricas?.lift?.toFixed(1)}x</span>
-              <span class="text-slate-400">Confiança: ${(c.metricas?.confianca * 100).toFixed(0)}%</span>
+          <div class="p-3.5 rounded-xl glass-subcard border border-purple-500/30 flex flex-col justify-between font-mono text-xs hover:-translate-y-0.5 transition-all">
+            <div class="flex items-center justify-between text-[11px] mb-1.5 pb-1 border-b border-white/5">
+              <span class="text-purple-300 font-bold tabular-nums">LIFT: ${c.metricas?.lift?.toFixed(1)}x</span>
+              <span class="text-slate-400 tabular-nums">Confiança: ${(c.metricas?.confianca * 100).toFixed(0)}%</span>
             </div>
             <div class="text-slate-100 font-semibold">${c.produto_origem?.nompro}</div>
             <div class="text-emerald-400 text-xs mt-1">↳ + ${c.produto_recomendado?.nompro}</div>
-            <div class="text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-800">
+            <div class="text-[11px] text-slate-300 mt-2.5 pt-2 border-t border-purple-900/30">
               "${c.script_sugerido_caixa}"
             </div>
           </div>
@@ -531,18 +536,18 @@ class AuraTriggersController {
       if (data.maiores_estoques) {
         data.maiores_estoques.slice(0, 10).forEach(e => {
           estRows += `
-            <tr class="border-b border-slate-800 text-xs font-mono">
-              <td class="py-1.5 text-slate-400">${e.codpro}</td>
-              <td class="py-1.5 text-slate-200 font-semibold">${e.nompro}</td>
-              <td class="py-1.5 text-right text-cyan-300">${Number(e.estoque || 0).toFixed(1)} ${e.unidade || 'UN'}</td>
-              <td class="py-1.5 text-right text-emerald-400">R$ ${Number(e.precovenda || 0).toFixed(2)}</td>
+            <tr class="border-b border-white/5 text-xs font-mono hover:bg-white/[0.02] transition-colors">
+              <td class="py-2 text-slate-400">${e.codpro}</td>
+              <td class="py-2 text-slate-200 font-semibold">${e.nompro}</td>
+              <td class="py-2 text-right text-cyan-300 tabular-nums">${Number(e.estoque || 0).toFixed(1)} ${e.unidade || 'UN'}</td>
+              <td class="py-2 text-right text-emerald-400 tabular-nums">R$ ${Number(e.precovenda || 0).toFixed(2)}</td>
             </tr>
           `;
         });
       }
       return `
         <div class="space-y-4 font-mono text-xs">
-          <div class="p-3 rounded bg-slate-900 border border-slate-800">
+          <div class="p-3.5 rounded-xl glass-subcard border border-white/5 flex items-center justify-between">
             <span class="text-slate-400">Status do Estoque ERP:</span> <strong class="text-emerald-400">${data.status || 'ONLINE'}</strong>
           </div>
           <div>
@@ -550,11 +555,11 @@ class AuraTriggersController {
             <div class="overflow-x-auto">
               <table class="w-full text-left font-mono text-xs">
                 <thead>
-                  <tr class="text-slate-400 border-b border-slate-800">
-                    <th class="pb-1.5">SKU</th>
-                    <th class="pb-1.5">Produto</th>
-                    <th class="pb-1.5 text-right">Saldo</th>
-                    <th class="pb-1.5 text-right">Preço Venda</th>
+                  <tr class="text-slate-400 border-b border-white/10">
+                    <th class="pb-2">SKU</th>
+                    <th class="pb-2">Produto</th>
+                    <th class="pb-2 text-right">Saldo</th>
+                    <th class="pb-2 text-right">Preço Venda</th>
                   </tr>
                 </thead>
                 <tbody>${estRows || '<tr><td colspan="4" class="py-2 text-slate-500">Nenhum estoque</td></tr>'}</tbody>
@@ -571,19 +576,19 @@ class AuraTriggersController {
       if (data.ranking_compras_pedidos) {
         data.ranking_compras_pedidos.slice(0, 8).forEach((c, idx) => {
           cliRows += `
-            <tr class="border-b border-slate-800 text-xs font-mono">
-              <td class="py-1.5 text-slate-400">${idx + 1}</td>
-              <td class="py-1.5 text-slate-200 font-semibold">${c.nome || c.cliente || 'Consumidor'}</td>
-              <td class="py-1.5 text-right text-cyan-300">${c.total_pedidos || 1} compras</td>
-              <td class="py-1.5 text-right text-emerald-400 font-bold">R$ ${Number(c.total_gasto || c.faturamento || 0).toFixed(2)}</td>
+            <tr class="border-b border-white/5 text-xs font-mono hover:bg-white/[0.02] transition-colors">
+              <td class="py-2.5 text-slate-400">${idx + 1}</td>
+              <td class="py-2.5 text-slate-200 font-semibold">${c.nome || c.cliente || 'Consumidor'}</td>
+              <td class="py-2.5 text-right text-cyan-300 tabular-nums">${c.total_pedidos || 1} compras</td>
+              <td class="py-2.5 text-right text-emerald-400 font-bold tabular-nums">R$ ${Number(c.total_gasto || c.faturamento || 0).toFixed(2)}</td>
             </tr>
           `;
         });
       }
       return `
         <div class="space-y-4 font-mono text-xs">
-          <div class="grid grid-cols-2 gap-3 p-3 rounded bg-slate-900 border border-slate-800">
-            <div>Clientes Cadastrados: <strong class="text-cyan-300">${data.total_clientes_cadastrados || 'N/A'}</strong></div>
+          <div class="grid grid-cols-2 gap-3 p-3.5 rounded-xl glass-subcard border border-white/5">
+            <div>Clientes Cadastrados: <strong class="text-cyan-300 tabular-nums">${data.total_clientes_cadastrados || 'N/A'}</strong></div>
             <div>Observação PDV: <span class="text-slate-300">${data.observacao_pdv || 'Normal'}</span></div>
           </div>
           <div>
@@ -591,11 +596,11 @@ class AuraTriggersController {
             <div class="overflow-x-auto">
               <table class="w-full text-left font-mono text-xs">
                 <thead>
-                  <tr class="text-slate-400 border-b border-slate-800">
-                    <th class="pb-1.5">#</th>
-                    <th class="pb-1.5">Cliente</th>
-                    <th class="pb-1.5 text-right">Frequência</th>
-                    <th class="pb-1.5 text-right">Faturamento</th>
+                  <tr class="text-slate-400 border-b border-white/10">
+                    <th class="pb-2.5">#</th>
+                    <th class="pb-2.5">Cliente</th>
+                    <th class="pb-2.5 text-right">Frequência</th>
+                    <th class="pb-2.5 text-right">Faturamento</th>
                   </tr>
                 </thead>
                 <tbody>${cliRows || '<tr><td colspan="4" class="py-2 text-slate-500">Sem clientes</td></tr>'}</tbody>
@@ -609,13 +614,13 @@ class AuraTriggersController {
     // 9. Dados Cadastrais da Filial
     if (toolId === 'dados_filial') {
       return `
-        <div class="space-y-3 font-mono text-xs p-4 rounded-lg bg-slate-900/80 border border-slate-800">
-          <div class="text-sm font-bold text-white border-b border-slate-800 pb-2">${data.nome || data.razao_social || 'Posto'}</div>
+        <div class="space-y-3 font-mono text-xs p-4 rounded-xl glass-subcard border border-white/5">
+          <div class="text-sm font-bold text-white border-b border-white/10 pb-2">${data.nome || data.razao_social || 'Posto'}</div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
             <div><span class="text-slate-400">Razão Social:</span> <strong class="text-slate-200">${data.razao_social || 'N/A'}</strong></div>
-            <div><span class="text-slate-400">CNPJ:</span> <strong class="text-cyan-300">${data.cnpj || 'N/A'}</strong></div>
-            <div><span class="text-slate-400">Filial ID:</span> <strong class="text-emerald-400">${data.idempresa || '59050'}</strong></div>
-            <div><span class="text-slate-400">PDV Vinculado:</span> <strong class="text-purple-300">PDV ${data.pdv || '01'}</strong></div>
+            <div><span class="text-slate-400">CNPJ:</span> <strong class="text-cyan-300 tabular-nums">${data.cnpj || 'N/A'}</strong></div>
+            <div><span class="text-slate-400">Filial ID:</span> <strong class="text-emerald-400 tabular-nums">${data.idempresa || '59050'}</strong></div>
+            <div><span class="text-slate-400">PDV Vinculado:</span> <strong class="text-purple-300 tabular-nums">PDV ${data.pdv || '01'}</strong></div>
             <div class="md:col-span-2"><span class="text-slate-400">Endereço:</span> <span class="text-slate-300">${data.endereco || 'Unidade Operacional'}</span></div>
           </div>
         </div>
@@ -628,14 +633,14 @@ class AuraTriggersController {
       let prodCards = '';
       results.forEach(p => {
         prodCards += `
-          <div class="p-2.5 rounded bg-slate-900 border border-purple-500/30 font-mono text-xs">
+          <div class="p-3 rounded-xl glass-subcard border border-purple-500/30 font-mono text-xs hover:-translate-y-0.5 transition-all">
             <div class="flex items-center justify-between text-[11px] text-slate-400">
-              <span>SKU: ${p.codpro || p.codigo}</span>
-              ${p.score ? `<span class="text-purple-300 font-bold">Score: ${(p.score * 100).toFixed(0)}%</span>` : ''}
+              <span class="tabular-nums">SKU: ${p.codpro || p.codigo}</span>
+              ${p.score ? `<span class="text-purple-300 font-bold tabular-nums">Score: ${(p.score * 100).toFixed(0)}%</span>` : ''}
             </div>
             <div class="font-bold text-slate-100 mt-1">${p.nompro || p.nome}</div>
-            <div class="flex items-center justify-between mt-2 pt-1 border-t border-slate-800 text-emerald-400 font-semibold">
-              <span>Preço: R$ ${Number(p.precovenda || p.preco || 0).toFixed(2)}</span>
+            <div class="flex items-center justify-between mt-2.5 pt-1.5 border-t border-white/5 text-emerald-400 font-semibold">
+              <span>Preço: <strong class="tabular-nums">R$ ${Number(p.precovenda || p.preco || 0).toFixed(2)}</strong></span>
               <span class="text-slate-400 text-[10px]">${p.grupo || 'GERAL'}</span>
             </div>
           </div>
@@ -643,9 +648,9 @@ class AuraTriggersController {
       });
       return `
         <div class="space-y-3 font-mono text-xs">
-          <div class="flex items-center justify-between p-2 rounded bg-slate-900 border border-slate-800">
+          <div class="flex items-center justify-between p-3 rounded-xl glass-subcard border border-white/5">
             <span>Método de Busca: <strong class="text-purple-300">${data.metodo || 'Híbrido (HNSW + FTS)'}</strong></span>
-            <span>Resultados: <strong class="text-cyan-300">${results.length}</strong></span>
+            <span>Resultados: <strong class="text-cyan-300 tabular-nums">${results.length}</strong></span>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">${prodCards || '<div class="text-slate-500">Nenhum produto encontrado.</div>'}</div>
         </div>
