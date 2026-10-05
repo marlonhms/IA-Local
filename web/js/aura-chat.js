@@ -1109,11 +1109,470 @@ class AuraChatController {
     `;
   }
 
+  /**
+   * Extrai e protege blocos de código (``` e `) com tokens neutros
+   * para evitar corrupção durante transformações de BBCode, sublinhado e sanitização.
+   */
+  extractCodeBlocks(text) {
+    const codeSnippets = [];
+    const protectedText = text.replace(/(```[\s\S]*?```|`[^`\r\n]+`)/g, (match) => {
+      const placeholder = `XAURACODE${codeSnippets.length}END`;
+      codeSnippets.push(match);
+      return placeholder;
+    });
+    return { protectedText, codeSnippets };
+  }
+
+  /**
+   * Restaura os blocos de código originais após processamento de Markdown e estilos.
+   */
+  restoreCodeBlocks(text, codeSnippets) {
+    if (!codeSnippets || codeSnippets.length === 0) return text;
+    return text.replace(/XAURACODE(\d+)END/g, (match, idx) => {
+      const code = codeSnippets[Number(idx)];
+      return code !== undefined ? code : match;
+    });
+  }
+
+  /**
+   * Balanceia tags abertas e marcadores em streaming para evitar quebras de layout
+   * ou vazamento de estilos durante a digitação token-a-token.
+   * Utiliza pilha unificada LIFO para garantir aninhamento sem cruzamento de tags.
+   */
+  balanceStreamingText(text) {
+    if (!text) return '';
+    let balanced = text;
+
+    // Remove tags incompletas que estejam sendo ativamente digitadas no final da string.
+    // Preserva operadores matemáticos como "< 15" e citações numéricas como "[1]".
+    balanced = balanced.replace(/\[(\/?(?:badge-)?[a-zA-Z][a-zA-Z0-9_\-]*)$/, '');
+    balanced = balanced.replace(/<(\/?[a-zA-Z]{1,6}(?:\s+[^>]*)?)$/, '');
+
+    // Se houver bloco de código (```) não fechado, fecha temporariamente
+    const codeBlockCount = (balanced.match(/```/g) || []).length;
+    if (codeBlockCount % 2 !== 0) {
+      balanced += '\n```';
+    }
+
+    // Se houver inline code (`) não fechado, fecha temporariamente
+    const inlineTickMatches = (balanced.replace(/```[\s\S]*?```/g, '').match(/`/g) || []).length;
+    if (inlineTickMatches % 2 !== 0) {
+      balanced += '`';
+    }
+
+    // Pilha unificada LIFO para garantir aninhamento perfeito
+    const stack = [];
+    const tokenRegex = /(\*\*|__(?!\w)|(?<!\*)\*(?!\*)|\[(\/?)([a-zA-Z0-9_\-]+)\]|<(\/?)([a-zA-Z0-9]+)(?:\s+[^>]*)?>)/g;
+    const bbTags = new Set([
+      'verde', 'emerald', 'green', 'amarelo', 'amber', 'yellow', 'vermelho', 'rose', 'red', 'ciano', 'cyan', 'roxo', 'purple',
+      'badge-verde', 'badge-emerald', 'badge-green', 'badge-amarelo', 'badge-amber', 'badge-yellow',
+      'badge-vermelho', 'badge-rose', 'badge-red', 'badge-ciano', 'badge-cyan', 'badge-roxo', 'badge-purple', 'u'
+    ]);
+    const htmlTags = new Set(['span', 'u', 'strong', 'em', 'b', 'i', 'mark']);
+
+    let match;
+    while ((match = tokenRegex.exec(balanced)) !== null) {
+      const full = match[0];
+
+      if (full === '**') {
+        const idx = stack.map(s => s.close).lastIndexOf('**');
+        if (idx !== -1) stack.splice(idx, 1);
+        else stack.push({ type: 'bold', close: '**' });
+      } else if (full.startsWith('__')) {
+        const idx = stack.map(s => s.close).lastIndexOf('__');
+        if (idx !== -1) stack.splice(idx, 1);
+        else stack.push({ type: 'underline', close: '__' });
+      } else if (full === '*') {
+        const idx = stack.map(s => s.close).lastIndexOf('*');
+        if (idx !== -1) stack.splice(idx, 1);
+        else stack.push({ type: 'italic', close: '*' });
+      } else if (match[3]) {
+        // BBCode
+        const isClosing = match[2] === '/';
+        const tag = match[3].toLowerCase();
+        if (bbTags.has(tag)) {
+          if (!isClosing) {
+            stack.push({ type: 'bb', tag, close: `[/${tag}]` });
+          } else {
+            const idx = stack.map(s => s.tag).lastIndexOf(tag);
+            if (idx !== -1) stack.splice(idx, 1);
+          }
+        }
+      } else if (match[5]) {
+        // HTML
+        const isClosing = match[4] === '/';
+        const tag = match[5].toLowerCase();
+        if (htmlTags.has(tag)) {
+          if (!isClosing) {
+            stack.push({ type: 'html', tag, close: `</${tag}>` });
+          } else {
+            const idx = stack.map(s => s.tag).lastIndexOf(tag);
+            if (idx !== -1) stack.splice(idx, 1);
+          }
+        }
+      }
+    }
+
+    // Fecha tags na ordem inversa de abertura
+    while (stack.length > 0) {
+      balanced += stack.pop().close;
+    }
+
+    return balanced;
+  }
+
+  /**
+   * Sanitiza HTML perigoso contra XSS e converte BBCode e marcadores semânticos
+   * em tags HTML estilizadas com as classes do Design System AURA.
+   */
+  sanitizeAndTransformTags(input) {
+    if (!input) return '';
+
+    const allowedClasses = /^(?:text-(?:emerald|amber|rose|cyan|purple|red|yellow|green)|badge-(?:emerald|amber|rose|cyan|purple|red|yellow|green)|aura-(?:hl|badge|text)-(?:emerald|amber|rose|cyan|purple|red)|aura-underline|\s)+$/i;
+
+    // 1. Escapa comentários HTML e declarações <! ... >
+    let text = input.replace(/<![\s\S]*?>/g, (match) => {
+      return '&lt;' + match.slice(1, -1) + '&gt;';
+    });
+
+    // 2. Escapa operadores matemáticos '<' seguidos de espaço, dígito ou símbolo (ex: < 15%, <15, <= 10)
+    text = text.replace(/<(?![a-zA-Z\/])/g, '&lt;');
+
+    // 3. Sanitiza e filtra TODAS as tags HTML
+    text = text.replace(/<(\/?[a-zA-Z][a-zA-Z0-9]*)([^>]*)>/g, (fullMatch, rawTagName, rawAttrs) => {
+      const isClosing = rawTagName.startsWith('/');
+      const tagName = (isClosing ? rawTagName.slice(1) : rawTagName).toLowerCase();
+      const attrs = (rawAttrs || '').trim();
+
+      // Expurgar handlers de eventos perigosos (on*) e schemes de script
+      const cleanedAttrs = attrs
+        .replace(/\bon\w+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '')
+        .replace(/javascript:[^\s"'>]*/gi, '')
+        .trim();
+
+      const escapeTag = (name, a) => {
+        const inside = (name + (a ? ' ' + a : '')).trim();
+        return '&lt;' + inside.replace(/"/g, '&quot;').replace(/'/g, '&#039;') + '&gt;';
+      };
+
+      const safeVoidOrSimpleTags = new Set(['b', 'i', 'strong', 'em', 'p', 'br', 'hr', 'code', 'pre', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'ul', 'ol', 'li']);
+
+      if (isClosing) {
+        if (['span', 'mark', 'u', ...safeVoidOrSimpleTags].includes(tagName)) {
+          return `</${tagName}>`;
+        }
+        return '&lt;/' + tagName + '&gt;';
+      }
+
+      // Abertura de span ou mark: EXCLUSIVAMENTE atributo class com classes permitidas
+      if (tagName === 'span' || tagName === 'mark') {
+        const classMatch = attrs.match(/^class\s*=\s*(["'])([^"']*)\1$/i);
+        if (classMatch) {
+          const cls = classMatch[2].trim();
+          if (allowedClasses.test(cls)) {
+            return `<span class="${cls}">`;
+          }
+        }
+        return escapeTag(rawTagName, cleanedAttrs);
+      }
+
+      // Abertura de u: sem atributos ou com class="aura-underline"
+      if (tagName === 'u') {
+        if (!attrs || /^class\s*=\s*(["'])aura-underline\1$/i.test(attrs)) {
+          return '<u class="aura-underline">';
+        }
+        return escapeTag(rawTagName, cleanedAttrs);
+      }
+
+      // Tags simples sem atributos
+      if (safeVoidOrSimpleTags.has(tagName)) {
+        if (!attrs || attrs === '/') {
+          return `<${tagName}>`;
+        }
+        return escapeTag(rawTagName, cleanedAttrs);
+      }
+
+      // Qualquer outra tag não autorizada é escapada
+      return escapeTag(rawTagName, cleanedAttrs);
+    });
+
+    // 4. Dicionário de cores e badges semânticos AURA
+    const colorMap = {
+      'verde': { hl: 'text-emerald aura-hl-emerald', badge: 'badge-emerald aura-badge-emerald' },
+      'emerald': { hl: 'text-emerald aura-hl-emerald', badge: 'badge-emerald aura-badge-emerald' },
+      'green': { hl: 'text-emerald aura-hl-emerald', badge: 'badge-emerald aura-badge-emerald' },
+
+      'amarelo': { hl: 'text-amber aura-hl-amber', badge: 'badge-amber aura-badge-amber' },
+      'amber': { hl: 'text-amber aura-hl-amber', badge: 'badge-amber aura-badge-amber' },
+      'yellow': { hl: 'text-amber aura-hl-amber', badge: 'badge-amber aura-badge-amber' },
+
+      'vermelho': { hl: 'text-rose aura-hl-rose', badge: 'badge-rose aura-badge-rose' },
+      'rose': { hl: 'text-rose aura-hl-rose', badge: 'badge-rose aura-badge-rose' },
+      'red': { hl: 'text-rose aura-hl-rose', badge: 'badge-rose aura-badge-rose' },
+
+      'ciano': { hl: 'text-cyan aura-hl-cyan', badge: 'badge-cyan aura-badge-cyan' },
+      'cyan': { hl: 'text-cyan aura-hl-cyan', badge: 'badge-cyan aura-badge-cyan' },
+
+      'roxo': { hl: 'text-purple aura-hl-purple', badge: 'badge-purple aura-badge-purple' },
+      'purple': { hl: 'text-purple aura-hl-purple', badge: 'badge-purple aura-badge-purple' },
+    };
+
+    // Transforma BBCode de badges: [badge-cor]...[/badge-cor]
+    Object.keys(colorMap).forEach(key => {
+      const badgeRegex = new RegExp('\\[badge-' + key + '\\]([\\s\\S]*?)\\[\\/badge-' + key + '\\]', 'gi');
+      text = text.replace(badgeRegex, `<span class="${colorMap[key].badge}">$1</span>`);
+    });
+
+    // Transforma BBCode de realces coloridos: [cor]...[/cor]
+    Object.keys(colorMap).forEach(key => {
+      const hlRegex = new RegExp('\\[' + key + '\\]([\\s\\S]*?)\\[\\/' + key + '\\]', 'gi');
+      text = text.replace(hlRegex, `<span class="${colorMap[key].hl}">$1</span>`);
+    });
+
+    // Transforma BBCode de sublinhado: [u]...[/u]
+    text = text.replace(/\[u\]([\s\S]*?)\[\/u\]/gi, '<u class="aura-underline">$1</u>');
+
+    // Transforma Markdown de sublinhado: __texto__ (permite underlines no meio de palavras compostas)
+    text = text.replace(/(^|[^\w])__(?!_)([^\r\n]+?)(?<!_)__([^\w]|$)/g, '$1<u class="aura-underline">$2</u>$3');
+
+    return text;
+  }
+
+  /**
+   * Renderizador autônomo e rico de Markdown para funcionamento 100% offline
+   * sem dependência externa do Marked.js.
+   * Suporta cabeçalhos, listas (ordenadas e não ordenadas), blockquotes,
+   * tabelas, blocos de código com linguagem, inline code, negrito, itálico e links.
+   */
+  renderFallbackMarkdown(text) {
+    if (!text) return '';
+
+    const lines = text.split('\n');
+    const output = [];
+    let inCodeBlock = false;
+    let codeBlockLang = '';
+    let codeBlockLines = [];
+    let listType = null;
+    let inBlockquote = false;
+    let blockquoteLines = [];
+    let inTable = false;
+    let tableLines = [];
+
+    function flushList() {
+      if (listType) {
+        output.push(`</${listType}>`);
+        listType = null;
+      }
+    }
+
+    function flushBlockquote() {
+      if (inBlockquote) {
+        output.push(`<blockquote><p>${blockquoteLines.join('<br>')}</p></blockquote>`);
+        inBlockquote = false;
+        blockquoteLines = [];
+      }
+    }
+
+    function flushTable() {
+      if (inTable && tableLines.length > 0) {
+        let tableHtml = '<div class="overflow-x-auto my-3"><table class="w-full text-xs text-left border-collapse border border-slate-800">';
+        let isHeader = true;
+        for (let r = 0; r < tableLines.length; r++) {
+          const row = tableLines[r].trim();
+          if (/^\|?[\s\-:|]+\|?$/.test(row)) {
+            isHeader = false;
+            continue;
+          }
+          const cells = row.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+          tableHtml += '<tr>';
+          cells.forEach(c => {
+            if (isHeader) {
+              tableHtml += `<th class="px-2.5 py-1.5 font-bold bg-slate-900 border border-slate-800 text-slate-200">${c}</th>`;
+            } else {
+              tableHtml += `<td class="px-2.5 py-1.5 border border-slate-800 text-slate-300">${c}</td>`;
+            }
+          });
+          tableHtml += '</tr>';
+        }
+        tableHtml += '</table></div>';
+        output.push(tableHtml);
+        inTable = false;
+        tableLines = [];
+      }
+    }
+
+    for (let i = 0; i < lines.length; i++) {
+      const rawLine = lines[i];
+
+      // 1. Fenced Code Blocks (```)
+      const codeMatch = rawLine.match(/^```([a-zA-Z0-9_\-]*)/);
+      if (codeMatch) {
+        if (!inCodeBlock) {
+          flushList();
+          flushBlockquote();
+          flushTable();
+          inCodeBlock = true;
+          codeBlockLang = codeMatch[1] || '';
+          codeBlockLines = [];
+        } else {
+          inCodeBlock = false;
+          const codeContent = codeBlockLines.join('\n')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+          const langAttr = codeBlockLang ? ` class="language-${codeBlockLang}"` : '';
+          output.push(`<pre class="bg-slate-900 border border-slate-800 p-3 rounded-lg overflow-x-auto text-xs font-mono text-cyan-300"><code${langAttr}>${codeContent}</code></pre>`);
+          codeBlockLang = '';
+          codeBlockLines = [];
+        }
+        continue;
+      }
+
+      if (inCodeBlock) {
+        codeBlockLines.push(rawLine);
+        continue;
+      }
+
+      // 2. Tabelas Markdown (| col1 | col2 |)
+      if (rawLine.trim().startsWith('|') && rawLine.trim().endsWith('|')) {
+        flushList();
+        flushBlockquote();
+        inTable = true;
+        tableLines.push(rawLine);
+        continue;
+      } else if (inTable) {
+        flushTable();
+      }
+
+      // 3. Blockquotes (> texto)
+      const bqMatch = rawLine.match(/^>\s*(.+)$/);
+      if (bqMatch) {
+        flushList();
+        flushTable();
+        inBlockquote = true;
+        blockquoteLines.push(bqMatch[1]);
+        continue;
+      } else if (inBlockquote) {
+        flushBlockquote();
+      }
+
+      // 4. Cabeçalhos Markdown
+      const h4 = rawLine.match(/^####\s+(.+)$/);
+      if (h4) { flushList(); output.push(`<h4>${h4[1]}</h4>`); continue; }
+      const h3 = rawLine.match(/^###\s+(.+)$/);
+      if (h3) { flushList(); output.push(`<h3>${h3[1]}</h3>`); continue; }
+      const h2 = rawLine.match(/^##\s+(.+)$/);
+      if (h2) { flushList(); output.push(`<h2>${h2[1]}</h2>`); continue; }
+      const h1 = rawLine.match(/^#\s+(.+)$/);
+      if (h1) { flushList(); output.push(`<h1>${h1[1]}</h1>`); continue; }
+
+      // 5. Linhas horizontais (--- ou ***)
+      if (/^(?:---|\*\*\*|___)\s*$/.test(rawLine.trim())) {
+        flushList();
+        output.push('<hr class="my-3 border-slate-800">');
+        continue;
+      }
+
+      // 6. Listas ordenadas (1. item)
+      const olMatch = rawLine.match(/^\s*(\d+)\.\s+(.+)$/);
+      if (olMatch) {
+        if (listType !== 'ol') {
+          flushList();
+          listType = 'ol';
+          output.push('<ol class="list-decimal pl-5 space-y-1">');
+        }
+        output.push(`<li>${olMatch[2]}</li>`);
+        continue;
+      }
+
+      // 7. Listas não ordenadas (- item ou * item)
+      const ulMatch = rawLine.match(/^\s*[-*]\s+(.+)$/);
+      if (ulMatch) {
+        if (listType !== 'ul') {
+          flushList();
+          listType = 'ul';
+          output.push('<ul class="list-disc pl-5 space-y-1">');
+        }
+        output.push(`<li>${ulMatch[1]}</li>`);
+        continue;
+      }
+
+      flushList();
+
+      // 8. Linhas vazias
+      if (rawLine.trim() === '') {
+        continue;
+      }
+
+      // 9. Parágrafos comuns
+      output.push(`<p>${rawLine}</p>`);
+    }
+
+    if (inCodeBlock) {
+      const codeContent = codeBlockLines.join('\n')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      output.push(`<pre class="bg-slate-900 border border-slate-800 p-3 rounded-lg overflow-x-auto text-xs font-mono text-cyan-300"><code>${codeContent}</code></pre>`);
+    }
+    flushList();
+    flushBlockquote();
+    flushTable();
+
+    let html = output.join('\n');
+
+    // Negrito (**texto**)
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // Itálico (*texto*)
+    html = html.replace(/(?<!\*)\*([^*\n]+?)\*(?!\*)/g, '<em>$1</em>');
+    // Inline code (`código`)
+    html = html.replace(/`([^`\n]+)`/g, '<code class="px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300 font-mono text-xs">$1</code>');
+
+    return html;
+  }
+
+  /**
+   * Formata texto em Markdown rico, seguro e semântico para a AURA.
+   * Suporta negrito (**texto**), itálico (*texto*), sublinhado (<u>texto</u>, [u]texto[/u] ou __texto__),
+   * destaques coloridos ([verde], [amarelo], [vermelho], [ciano], [roxo]), badges e tags seguras.
+   * Garante renderização suave no streaming token-a-token e sanitização estrita contra XSS.
+   */
+  formatMarkdown(rawMarkdown, isStillStreaming = false) {
+    if (!rawMarkdown || typeof rawMarkdown !== 'string') return '';
+
+    // 1. Em streaming ativo, balanceia tags abertas temporariamente
+    let preparedText = isStillStreaming
+      ? this.balanceStreamingText(rawMarkdown)
+      : rawMarkdown;
+
+    // 2. Protege blocos de código e inline code antes de transformar BBCode e tags
+    const { protectedText, codeSnippets } = this.extractCodeBlocks(preparedText);
+
+    // 3. Sanitiza HTML malicioso e transforma BBCode e sublinhado em tags seguras
+    let transformedText = this.sanitizeAndTransformTags(protectedText);
+
+    // 4. Restaura blocos de código intactos
+    let finalText = this.restoreCodeBlocks(transformedText, codeSnippets);
+
+    // 5. Renderização via Marked.js com breaks e GFM ou fallback offline
+    let html = '';
+    if (typeof window !== 'undefined' && window.marked && typeof window.marked.parse === 'function') {
+      try {
+        html = window.marked.parse(finalText);
+      } catch (err) {
+        console.warn('[AuraChat] Falha no marked.parse, acionando fallback nativo:', err);
+        html = this.renderFallbackMarkdown(finalText);
+      }
+    } else {
+      html = this.renderFallbackMarkdown(finalText);
+    }
+
+    return html;
+  }
+
   updateAuraText(containerId, fullMarkdown, isStillStreaming) {
     const textIds = [containerId + '-text', containerId + '-split-text'];
-    const html = window.marked 
-      ? window.marked.parse(fullMarkdown) 
-      : `<p>${this.escapeHtml(fullMarkdown).replace(/\n/g, '<br>')}</p>`;
+    const html = this.formatMarkdown(fullMarkdown, isStillStreaming);
 
     textIds.forEach(id => {
       const textEl = document.getElementById(id);
@@ -1197,5 +1656,10 @@ class AuraChatController {
   }
 }
 
-// Instância singleton global
-window.auraChat = new AuraChatController();
+// Instância singleton global e export para ambientes Node/Testes
+if (typeof window !== 'undefined') {
+  window.auraChat = new AuraChatController();
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { AuraChatController };
+}
