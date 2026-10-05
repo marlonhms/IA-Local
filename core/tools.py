@@ -14,6 +14,16 @@ from datetime import datetime, date, time, timedelta
 from config.settings import DB_ERP_CONFIG
 from core.rag_engine import HybridRAGEngine
 from core.sanitizer import sanitize_dict
+from core.schemas.reconciliation import (
+    ReconciliationAssessment,
+    ReconciliationMetrics,
+    ReconciliationContext,
+    ReconciliationExplanation,
+    PendingItem,
+    DataSource,
+    RecommendedAction,
+    ShiftReconciliationContract,
+)
 
 _last_working_erp_port: Optional[int] = None
 
@@ -39,7 +49,7 @@ def get_erp_connection(timeout: Optional[int] = None) -> psycopg2.extensions.con
         if alt not in ports_to_try:
             ports_to_try.append(alt)
 
-    last_err = None
+    errors_by_port = {}
     for port in ports_to_try:
         try_config = dict(config)
         try_config["port"] = port
@@ -49,11 +59,12 @@ def get_erp_connection(timeout: Optional[int] = None) -> psycopg2.extensions.con
             _last_working_erp_port = port
             return conn
         except Exception as e:
-            last_err = e
+            errors_by_port[port] = e
             continue
 
-    raise last_err or psycopg2.OperationalError(
-        f"Não foi possível conectar ao banco ERP ({config.get('host')}) nas portas testadas ({ports_to_try})."
+    primary_err = errors_by_port.get(configured_port) or list(errors_by_port.values())[0]
+    raise psycopg2.OperationalError(
+        f"Falha de conexão com o banco ERP na porta {configured_port} ({config.get('host')}): {primary_err}"
     )
 
 
@@ -642,13 +653,74 @@ class PostoTools:
                     msg = f"Nenhum registro de fechamento de bomba, caixa ou abastecimento encontrado para a data {data_alvo}."
                     if max_disp:
                         msg += f" Última data com movimentação registrada: {max_disp}."
+                    queried_at_iso = datetime.now().astimezone().isoformat()
+                    contrato_sem_mov = ShiftReconciliationContract(
+                        schema_version="1.0",
+                        response_id=f"reconcil-{data_alvo}-sem_movimento",
+                        intent="shift_reconciliation",
+                        context=ReconciliationContext(
+                            unit_id="posto_01",
+                            shift_id=str(turno or "todos"),
+                            queried_at=queried_at_iso,
+                            data_auditada=str(data_alvo),
+                            data_solicitada=str(data or "hoje"),
+                            turno_solicitado=str(turno or "TODOS"),
+                            period_start=None,
+                            period_end=None,
+                        ),
+                        assessment=ReconciliationAssessment(
+                            finality="no_movement",
+                            severity="normal",
+                            status_code="SEM_MOVIMENTO",
+                            title="Sem movimentação registrada",
+                            limitation="Nenhum registro de fechamento de bomba, caixa ou abastecimento na data consultada.",
+                            badge_label="Sem movimentação",
+                        ),
+                        metrics=ReconciliationMetrics(
+                            automation_revenue=0.0,
+                            automation_revenue_cents=0,
+                            pos_revenue=0.0,
+                            pos_revenue_cents=0,
+                            difference=0.0,
+                            difference_cents=0,
+                            difference_definition="pos_minus_automation",
+                            physical_volume_liters=None,
+                            physical_volume_state="not_reported",
+                            automation_volume_liters=0.0,
+                            is_provisional=False,
+                        ),
+                        pending_items=[],
+                        sources=[
+                            DataSource(id="automation", label="Automação Companytec CBC04", availability="missing"),
+                            DataSource(id="pos", label="PDV / Caixas", availability="missing"),
+                            DataSource(id="physical_readings", label="Encerrantes Físicos", availability="missing"),
+                            DataSource(id="tanks", label="Medição de Tanques", availability="missing"),
+                        ],
+                        recommended_action=RecommendedAction(
+                            label=f"Consultar data recente ({max_disp})" if max_disp else "Consultar outra data",
+                            execution="external_manual",
+                            detail=f"Última data disponível no ERP: {max_disp}" if max_disp else "Sem datas com movimentação"
+                        ),
+                        explanation=ReconciliationExplanation(text=msg),
+                    )
                     return {
                         "status": "sem_movimento",
                         "data_auditada": str(data_alvo),
                         "data_solicitada": data or "hoje",
                         "turno_solicitado": turno or "TODOS",
                         "ultima_data_disponivel": str(max_disp) if max_disp else None,
-                        "mensagem": msg
+                        "mensagem": msg,
+                        "schema_version": "1.0",
+                        "response_id": f"reconcil-{data_alvo}-sem_movimento",
+                        "intent": "shift_reconciliation",
+                        "context": contrato_sem_mov.context.model_dump(),
+                        "assessment": contrato_sem_mov.assessment.model_dump(),
+                        "metrics": contrato_sem_mov.metrics.model_dump(),
+                        "pending_items": [p.model_dump() for p in contrato_sem_mov.pending_items],
+                        "sources": [s.model_dump() for s in contrato_sem_mov.sources],
+                        "recommended_action": contrato_sem_mov.recommended_action.model_dump(),
+                        "explanation": contrato_sem_mov.explanation.model_dump(),
+                        "contrato": contrato_sem_mov.model_dump(),
                     }
 
                 # 6. Consulta de Cupons / Pedidos do PDV (para caixas abertos ou faturamento PDV)
@@ -782,7 +854,11 @@ class PostoTools:
                 c_id = fc['caixa_id']
                 pdv = fc['pdv']
                 matricula = fc['matricula']
-                operador = fc['operador_nome']
+                raw_operador = str(fc['operador_nome'] or '').strip()
+                if not raw_operador or 'NO' in raw_operador or 'NAO INFORMADO' in raw_operador.upper() or 'NÃO INFORMADO' in raw_operador.upper():
+                    operador = 'Operador não informado'
+                else:
+                    operador = raw_operador
                 fechado = (fc['fechado'] == 'S')
 
                 dinh = Decimal(str(fc['dinheiro'] or 0))
@@ -984,12 +1060,187 @@ class PostoTools:
             if tanques_fora_tolerancia > 0:
                 recomendacoes.append("Verificar calibração dos bicos e medição de régua/telemetria eletrônica nos tanques com alerta.")
 
+            # Geração do Contrato Oficial Versionado (AURA Precision Glass v1.0)
+            is_partial = bool(caixa_em_aberto or encerrantes_pendentes)
+
+            if is_partial:
+                assessment_finality = "partial"
+                assessment_severity = "attention"
+                assessment_title = "Conciliação parcial do turno"
+                assessment_badge = "Análise parcial (provisória)"
+                if caixa_em_aberto and encerrantes_pendentes:
+                    assessment_limitation = "Caixas abertos no PDV e encerrantes pendentes no ERP"
+                elif caixa_em_aberto:
+                    assessment_limitation = "Operador com caixa aberto no PDV; fechamento provisório"
+                else:
+                    assessment_limitation = "Encerrantes mecânicos finais pendentes de digitação no ERP"
+            elif tem_furo_caixa or tem_divergencia_pista:
+                assessment_finality = "final"
+                assessment_severity = "critical"
+                assessment_title = "Divergência confirmada no turno"
+                assessment_badge = "Divergência confirmada"
+                assessment_limitation = None
+            else:
+                assessment_finality = "final"
+                assessment_severity = "normal"
+                assessment_title = "Conciliação validada do turno"
+                assessment_badge = "Conciliação validada"
+                assessment_limitation = None
+
+            # Metrificação semântica: distinguir null de zero
+            if encerrantes_pendentes:
+                phys_volume = None
+                phys_state = "not_reported"
+            elif tot_litros_faturados_encerrante > Decimal("0.0"):
+                phys_volume = float(tot_litros_faturados_encerrante)
+                phys_state = "measured"
+            else:
+                phys_volume = 0.0
+                phys_state = "zero_registered"
+
+            # Itens de pendência explícitos
+            pending_items = []
+            if encerrantes_pendentes:
+                pending_items.append(PendingItem(
+                    code="physical_readings_missing",
+                    label="Encerrantes não informados",
+                    detail=f"Automação CBC04 registrou {float(tot_litros_automacao):.3f} L ({total_abast_count} abastecimentos), mas os encerrantes de fechamento ainda não foram lançados no módulo fechabomba.",
+                    severity="attention"
+                ))
+            if caixa_em_aberto:
+                pending_items.append(PendingItem(
+                    code="registers_open",
+                    label="Caixas ainda abertos no PDV",
+                    detail="Operador com caixa aberto no PDV. Fechamento contábil definitivo será apurado após o encerramento formal do caixa.",
+                    severity="attention"
+                ))
+            if tanques_fora_tolerancia > 0:
+                pending_items.append(PendingItem(
+                    code="tanks_anp_alert",
+                    label=f"{tanques_fora_tolerancia} tanque(s) fora da tolerância ANP",
+                    detail="Variação física vs livro excede o limite legal de ±0.6% da Portaria ANP 26/1992.",
+                    severity="attention"
+                ))
+
+            # Fontes de dados
+            sources = [
+                DataSource(
+                    id="automation",
+                    label="Automação Companytec CBC04",
+                    availability="available" if linhas_automacao else "missing",
+                    data_as_of=str(data_alvo) if linhas_automacao else None
+                ),
+                DataSource(
+                    id="pos",
+                    label="PDV / Cupons Fiscais",
+                    availability="available" if (linhas_fechacaixa or pedidos_pdv_rows) else "missing",
+                    data_as_of=str(data_alvo) if (linhas_fechacaixa or pedidos_pdv_rows) else None
+                ),
+                DataSource(
+                    id="physical_readings",
+                    label="Encerrantes Físicos (fechabomba)",
+                    availability="missing" if encerrantes_pendentes else ("available" if linhas_fechabomba else "missing"),
+                    data_as_of=str(data_alvo) if (linhas_fechabomba and not encerrantes_pendentes) else None
+                ),
+                DataSource(
+                    id="tanks",
+                    label="Medição de Tanques",
+                    availability="available" if linhas_tanques else "missing",
+                    data_as_of=str(data_alvo) if linhas_tanques else None
+                ),
+            ]
+
+            # Ação recomendada (segura, manual no ERP)
+            if is_partial:
+                rec_action = RecommendedAction(
+                    label="Conferir encerrantes e fechamento no ERP",
+                    execution="external_manual",
+                    detail="Solicitar a digitação dos encerrantes no módulo fechabomba e o fechamento de caixa no PDV."
+                )
+            elif tem_furo_caixa:
+                rec_action = RecommendedAction(
+                    label="Conferir comprovantes de cartão e cédulas com operador",
+                    execution="external_manual",
+                    detail="Apurar motivo da falta entre cupons fiscais e valores declarados."
+                )
+            elif tem_sobra_caixa:
+                rec_action = RecommendedAction(
+                    label="Verificar recebimentos pendentes no PDV",
+                    execution="external_manual",
+                    detail="Conferir se houve recebimento de cliente não baixado corretamente."
+                )
+            else:
+                rec_action = RecommendedAction(
+                    label="Nenhuma pendência operacional",
+                    execution="external_manual",
+                    detail="Fechamento do turno 100% validado."
+                )
+
+            dif_val = float(diferenca_financeira)
+            explanation_text = (
+                f"A diferença contábil apurada é de R$ {dif_val:.2f}. "
+                f"{'Como existem caixas abertos e encerrantes pendentes, esta diferença é provisória e não representa quebra definitiva.' if is_partial else 'Conciliação validada com as fontes do ERP.'}"
+            )
+
+            queried_at_iso = datetime.now().astimezone().isoformat()
+            contrato_oficial = ShiftReconciliationContract(
+                schema_version="1.0",
+                response_id=f"reconcil-{data_alvo}-{filtro_turno_pattern or 'all'}",
+                intent="shift_reconciliation",
+                context=ReconciliationContext(
+                    unit_id="posto_01",
+                    shift_id=str(turno or "todos"),
+                    queried_at=queried_at_iso,
+                    data_auditada=str(data_alvo),
+                    data_solicitada=str(data or "hoje"),
+                    turno_solicitado=str(turno or "TODOS"),
+                    period_start=None,
+                    period_end=None,
+                ),
+                assessment=ReconciliationAssessment(
+                    finality=assessment_finality,
+                    severity=assessment_severity,
+                    status_code=status_conciliacao,
+                    title=assessment_title,
+                    limitation=assessment_limitation,
+                    badge_label=assessment_badge,
+                ),
+                metrics=ReconciliationMetrics(
+                    automation_revenue=float(faturamento_pista_esperado),
+                    automation_revenue_cents=int(round(float(faturamento_pista_esperado) * 100)),
+                    pos_revenue=float(faturamento_caixa_apurado),
+                    pos_revenue_cents=int(round(float(faturamento_caixa_apurado) * 100)),
+                    difference=dif_val,
+                    difference_cents=int(round(dif_val * 100)),
+                    difference_definition="pos_minus_automation",
+                    physical_volume_liters=phys_volume,
+                    physical_volume_state=phys_state,
+                    automation_volume_liters=float(tot_litros_automacao),
+                    is_provisional=is_partial,
+                ),
+                pending_items=pending_items,
+                sources=sources,
+                recommended_action=rec_action,
+                explanation=ReconciliationExplanation(text=explanation_text),
+            )
+
             resultado = {
                 "status": "ok",
                 "data_auditada": str(data_alvo),
                 "data_solicitada": data or "hoje",
                 "turno_auditado": turno or "TODOS OS TURNOS",
                 "aviso_data": aviso_data,
+                "schema_version": "1.0",
+                "response_id": f"reconcil-{data_alvo}-{filtro_turno_pattern or 'all'}",
+                "intent": "shift_reconciliation",
+                "context": contrato_oficial.context.model_dump(),
+                "assessment": contrato_oficial.assessment.model_dump(),
+                "metrics": contrato_oficial.metrics.model_dump(),
+                "pending_items": [p.model_dump() for p in contrato_oficial.pending_items],
+                "sources": [s.model_dump() for s in contrato_oficial.sources],
+                "recommended_action": contrato_oficial.recommended_action.model_dump(),
+                "explanation": contrato_oficial.explanation.model_dump(),
+                "contrato": contrato_oficial.model_dump(),
                 "resumo_executivo": {
                     "status_conciliacao": status_conciliacao,
                     "score_conformidade_pct": score_conformidade,
@@ -1039,9 +1290,66 @@ class PostoTools:
             return resultado_limpo
 
         except Exception as e:
+            err_queried_at_iso = datetime.now().astimezone().isoformat()
+            contrato_erro = ShiftReconciliationContract(
+                schema_version="1.0",
+                response_id="reconcil-indisponivel",
+                intent="shift_reconciliation",
+                context=ReconciliationContext(
+                    unit_id="posto_01",
+                    shift_id=str(turno or "todos"),
+                    queried_at=err_queried_at_iso,
+                    data_auditada=str(data or "desconhecida"),
+                    data_solicitada=str(data or "hoje"),
+                    turno_solicitado=str(turno or "TODOS"),
+                    period_start=None,
+                    period_end=None,
+                    error=str(e),
+                ),
+                assessment=ReconciliationAssessment(
+                    finality="unavailable",
+                    severity="critical",
+                    status_code="INDISPONIVEL",
+                    title="Fonte de dados indisponível",
+                    limitation=f"Falha na consulta ao ERP: {e}",
+                    badge_label="Fonte indisponível",
+                ),
+                metrics=ReconciliationMetrics(
+                    automation_revenue=0.0,
+                    automation_revenue_cents=0,
+                    pos_revenue=0.0,
+                    pos_revenue_cents=0,
+                    difference=0.0,
+                    difference_cents=0,
+                    difference_definition="pos_minus_automation",
+                    physical_volume_liters=None,
+                    physical_volume_state="not_reported",
+                    automation_volume_liters=0.0,
+                    is_provisional=False,
+                ),
+                pending_items=[PendingItem(code="erp_unavailable", label="Falha de conexão ERP", detail=str(e), severity="critical")],
+                sources=[DataSource(id="erp", label="Banco de Dados ERP", availability="unavailable")],
+                recommended_action=RecommendedAction(
+                    label="Verificar conexão com ERP",
+                    execution="external_manual",
+                    detail="Verificar se o serviço PostgreSQL local (porta 5433) está ativo."
+                ),
+                explanation=ReconciliationExplanation(text=f"Não foi possível consultar os dados da auditoria: {e}"),
+            )
             return {
                 "status": "indisponivel",
                 "motivo": f"Falha na execução da auditoria de turno no ERP (porta 5433): {e}",
+                "schema_version": "1.0",
+                "response_id": "reconcil-indisponivel",
+                "intent": "shift_reconciliation",
+                "context": contrato_erro.context.model_dump(),
+                "assessment": contrato_erro.assessment.model_dump(),
+                "metrics": contrato_erro.metrics.model_dump(),
+                "pending_items": [p.model_dump() for p in contrato_erro.pending_items],
+                "sources": [s.model_dump() for s in contrato_erro.sources],
+                "recommended_action": contrato_erro.recommended_action.model_dump(),
+                "explanation": contrato_erro.explanation.model_dump(),
+                "contrato": contrato_erro.model_dump(),
             }
 
     @staticmethod

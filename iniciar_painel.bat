@@ -25,6 +25,11 @@ if %errorlevel% equ 0 (
 ) else (
     echo [!] Tentando iniciar servico postgresql-x64-16...
     net start postgresql-x64-16 > nul 2>&1
+    sc query postgresql-x64-16 | find "RUNNING" > nul 2>&1
+    if %errorlevel% neq 0 (
+        echo [*] Iniciando PostgreSQL 16 via pg_ctl...
+        "C:\Program Files\PostgreSQL\16\bin\pg_ctl.exe" start -D "C:\Program Files\PostgreSQL\16\data" > nul 2>&1
+    )
 )
 
 echo.

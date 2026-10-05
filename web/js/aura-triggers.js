@@ -347,27 +347,62 @@ class AuraTriggersController {
       `;
     }
 
-    // 3. Conciliação de Turno & Caixa
+    // 3. Conciliação de Turno & Caixa (AURA Precision Glass v1.0)
     if (toolId === 'conciliacao_turno') {
+      if (typeof window !== 'undefined' && window.auraChat && typeof window.auraChat.renderTurnoWidget === 'function') {
+        return window.auraChat.renderTurnoWidget(data);
+      }
+
+      // Fallback com contrato semântico caso auraChat não esteja instanciado
+      const c = data.contrato || data;
       const r = data.resumo_executivo || {};
-      const score = Number(r.score_conformidade_pct || 0);
+      const assessment = c.assessment || {};
+      const metrics = c.metrics || {};
+      const finality = assessment.finality || (r.status_conciliacao?.includes('ANDAMENTO') ? 'partial' : 'final');
+      const isPartial = finality === 'partial';
+      const isNoMovement = finality === 'no_movement' || data.status === 'sem_movimento';
+      const isUnavailable = finality === 'unavailable' || data.status === 'indisponivel';
+
+      const diffVal = Number(metrics.difference ?? r.diferenca_financeira_caixa ?? 0);
+      const autRev = Number(metrics.automation_revenue ?? r.faturamento_pista_total ?? 0);
+      const posRev = Number(metrics.pos_revenue ?? r.faturamento_caixa_total ?? 0);
+
+      const diffFormatted = (isNoMovement || isUnavailable)
+        ? '—'
+        : `${diffVal < 0 ? '-' : diffVal > 0 ? '+' : ''}R$ ${Math.abs(diffVal).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+      const autRevText = (isNoMovement || isUnavailable)
+        ? '—'
+        : `R$ ${autRev.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+      const posRevText = (isNoMovement || isUnavailable)
+        ? '—'
+        : `R$ ${posRev.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+      const badgeLabel = assessment.badge_label || r.status_conciliacao || (isPartial ? 'Análise parcial (provisória)' : (isNoMovement ? 'Sem movimentação' : 'Turno em Andamento'));
+      const diagText = r.diagnostico_caixa || c.explanation?.text || 'Conferência de turno executada.';
+
       return `
         <div class="space-y-4 font-mono text-xs">
-          <div class="p-4 rounded-lg bg-cyan-950/20 border border-cyan-500/30 flex items-center justify-between">
+          <div class="p-4 rounded-lg ${isPartial ? 'bg-amber-950/20 border border-amber-500/30' : (isUnavailable ? 'bg-rose-950/20 border border-rose-500/30' : 'bg-cyan-950/20 border border-cyan-500/30')} flex items-center justify-between">
             <div>
               <div class="text-xs text-slate-400">Status da Conciliação</div>
-              <div class="text-lg font-bold text-cyan-300">${r.status_conciliacao || 'Turno em Andamento'}</div>
+              <div class="text-lg font-bold ${isPartial ? 'text-amber-300' : (isUnavailable ? 'text-rose-300' : 'text-cyan-300')}">
+                ${this.escapeHtml(badgeLabel)}
+              </div>
             </div>
             <div class="text-right">
-              <div class="text-xs text-slate-400">Score de Triangulação</div>
-              <div class="text-base font-bold ${score >= 90 ? 'text-emerald-400' : 'text-amber-400'}">${score}%</div>
+              <div class="text-xs text-slate-400">${isPartial ? 'Análise Provisória' : 'Score de Triangulação'}</div>
+              <div class="text-base font-bold ${isPartial ? 'text-amber-400' : 'text-emerald-400'}">
+                ${isPartial ? 'Caixa Aberto' : (isNoMovement || isUnavailable ? '—' : `${Number(r.score_conformidade_pct || 100)}%`)}
+              </div>
             </div>
           </div>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded bg-slate-900 border border-slate-800">
-            <div>Faturamento Pista CBC04: <strong class="text-slate-100 block mt-0.5">R$ ${Number(r.faturamento_pista_total || 0).toFixed(2)}</strong></div>
-            <div>Faturamento Caixa PDV: <strong class="text-cyan-300 block mt-0.5">R$ ${Number(r.faturamento_caixa_total || 0).toFixed(2)}</strong></div>
-            <div>Diferença Caixa: <strong class="text-amber-400 block mt-0.5">R$ ${Number(r.diferenca_financeira_caixa || 0).toFixed(2)}</strong></div>
-            <div>Diagnóstico: <span class="text-slate-400 block mt-0.5">${r.diagnostico_caixa || 'OK'}</span></div>
+            <div>Faturamento Pista CBC04: <strong class="text-slate-100 block mt-0.5 tabular-nums">${autRevText}</strong></div>
+            <div>Faturamento Caixa PDV: <strong class="text-cyan-300 block mt-0.5 tabular-nums">${posRevText}</strong></div>
+            <div>${isPartial ? 'Diferença Provisória:' : 'Diferença Caixa:'} <strong class="${isPartial ? 'text-amber-400' : 'text-emerald-400'} block mt-0.5 tabular-nums">${diffFormatted}</strong></div>
+            <div>Diagnóstico: <span class="text-slate-400 block mt-0.5">${this.escapeHtml(diagText)}</span></div>
           </div>
         </div>
       `;
@@ -684,6 +719,16 @@ class AuraTriggersController {
         setTimeout(() => btn.textContent = orig, 1800);
       }
     });
+  }
+
+  escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 }
 

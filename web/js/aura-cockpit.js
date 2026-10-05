@@ -509,43 +509,121 @@ class AuraCockpitController {
 
   /**
    * Renderiza card de Fechamento de Turno
+   * AURA Precision Glass v1.0: Contrato Semântico & Diferença Provisória
    */
   renderTurnoCard(turno) {
     const el = document.getElementById('cockpit-turno-content');
-    if (!el || !turno.resumo_executivo) return;
+    if (!el || (!turno.resumo_executivo && !turno.contrato)) return;
 
-    const r = turno.resumo_executivo;
+    const c = turno.contrato || turno;
+    const assessment = c.assessment || {};
+    const metrics = c.metrics || {};
+    const r = turno.resumo_executivo || {};
     const score = Number(r.score_conformidade_pct || 0);
+
+    const finality = assessment.finality || (r.status_conciliacao?.includes('ANDAMENTO') ? 'partial' : 'final');
+    const isPartial = finality === 'partial';
+    const isNoMovement = finality === 'no_movement' || turno.status === 'sem_movimento';
+    const isUnavailable = finality === 'unavailable' || turno.status === 'indisponivel';
+
+    let badgeClass = 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30';
+    let badgeText = assessment.badge_label || r.status_conciliacao || 'Turno';
+
+    if (isPartial) {
+      badgeClass = 'bg-amber-500/20 text-amber-300 border border-amber-500/30';
+      badgeText = assessment.badge_label || 'Análise parcial (provisória)';
+    } else if (isNoMovement) {
+      badgeClass = 'bg-slate-800 text-slate-400 border border-slate-700';
+      badgeText = 'Sem movimentação';
+    } else if (isUnavailable) {
+      badgeClass = 'bg-rose-500/20 text-rose-300 border border-rose-500/30';
+      badgeText = 'Fonte indisponível';
+    } else if (assessment.severity === 'critical' || r.status_conciliacao?.includes('FURO') || r.status_conciliacao?.includes('DIVERGENCIA')) {
+      badgeClass = 'bg-rose-500/20 text-rose-300 border border-rose-500/30';
+      badgeText = assessment.badge_label || 'Divergência confirmada';
+    } else if (score >= 95 || assessment.finality === 'final') {
+      badgeClass = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+      badgeText = assessment.badge_label || 'Conciliação validada';
+    }
+
+    const diffVal = Number(metrics.difference ?? r.diferenca_financeira_caixa ?? 0);
+    const autRev = Number(metrics.automation_revenue ?? r.faturamento_pista_total ?? 0);
+    const posRev = Number(metrics.pos_revenue ?? r.faturamento_caixa_total ?? 0);
+
+    let diffLabel = 'Divergência Pista vs PDV:';
+    let diffColorClass = 'text-emerald-400';
+    if (isPartial) {
+      diffLabel = 'Diferença Provisória (Caixa Aberto):';
+      diffColorClass = diffVal < 0 ? 'text-amber-400' : 'text-emerald-400';
+    } else if (isNoMovement || isUnavailable) {
+      diffLabel = 'Situação:';
+      diffColorClass = 'text-slate-400';
+    } else if (diffVal < 0) {
+      diffLabel = 'Falta Apurada no Caixa:';
+      diffColorClass = 'text-rose-400';
+    }
+
+    const diffFormatted = (isNoMovement || isUnavailable)
+      ? '—'
+      : `${diffVal < 0 ? '-' : diffVal > 0 ? '+' : ''}R$ ${Math.abs(diffVal).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    const autRevText = (isNoMovement || isUnavailable)
+      ? '—'
+      : `R$ ${autRev.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    const posRevText = (isNoMovement || isUnavailable)
+      ? '—'
+      : `R$ ${posRev.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    const limitation = assessment.limitation;
+    const diagText = r.diagnostico_caixa || c.explanation?.text || 'Conferência de turno executada com sucesso.';
 
     el.innerHTML = `
       <div class="space-y-3 font-mono text-xs">
         <div class="flex items-center justify-between">
           <span class="text-slate-400">Status da Conciliação:</span>
-          <span class="font-bold px-2 py-0.5 rounded text-[11px] ${score >= 95 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-cyan-500/20 text-cyan-300'}">
-            ${r.status_conciliacao || 'Turno em Andamento'}
+          <span class="font-bold px-2 py-0.5 rounded text-[11px] ${badgeClass}">
+            ${this.escapeHtml(badgeText)}
           </span>
         </div>
 
         <div class="grid grid-cols-2 gap-2 p-2 rounded bg-slate-900/80 border border-slate-800">
           <div>
             <div class="text-slate-400 text-[10px]">Faturamento Pista CBC04</div>
-            <div class="text-sm font-bold text-slate-100">R$ ${Number(r.faturamento_pista_total || 0).toFixed(2)}</div>
+            <div class="text-sm font-bold text-slate-100 tabular-nums">${autRevText}</div>
           </div>
           <div>
             <div class="text-slate-400 text-[10px]">Faturamento Caixa PDV</div>
-            <div class="text-sm font-bold text-cyan-300">R$ ${Number(r.faturamento_caixa_total || 0).toFixed(2)}</div>
+            <div class="text-sm font-bold text-cyan-300 tabular-nums">${posRevText}</div>
           </div>
         </div>
 
         <div class="flex items-center justify-between text-xs border-t border-slate-800 pt-2">
-          <span class="text-slate-400">Divergência Pista vs PDV:</span>
-          <span class="font-bold ${Number(r.diferenca_financeira_caixa || 0) < 0 ? 'text-amber-400' : 'text-emerald-400'}">
-            R$ ${Number(r.diferenca_financeira_caixa || 0).toFixed(2)}
+          <span class="text-slate-400">${this.escapeHtml(diffLabel)}</span>
+          <span class="font-bold tabular-nums ${diffColorClass}">
+            ${diffFormatted}
           </span>
         </div>
 
+        ${limitation && !isNoMovement && !isUnavailable ? `
+          <div class="text-[11px] text-amber-300 bg-amber-500/10 p-2 rounded border border-amber-500/20">
+            ⚠️ <strong>Limitação:</strong> ${this.escapeHtml(limitation)}
+          </div>
+        ` : ''}
+
         <div class="text-[11px] text-slate-400 bg-slate-900/40 p-2 rounded border border-slate-800/80">
-          ${r.diagnostico_caixa || 'Conferência de turno em andamento.'}
+          ${this.escapeHtml(diagText)}
+        </div>
+
+        <div class="pt-2 border-t border-slate-800 flex items-center justify-between font-sans">
+          <span class="text-[10px] text-slate-500 font-mono">ERP Somente Leitura</span>
+          <button 
+            type="button"
+            onclick="if (typeof window !== 'undefined') { window.__auraEvidenceStore = window.__auraEvidenceStore || {}; window.__auraEvidenceStore['cockpit_turno'] = window.auraCockpit?.turnoData; if (window.auraChat) window.auraChat.openEvidence('cockpit_turno', 'resumo'); }"
+            class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-white border border-slate-700 transition-colors text-[11px] flex items-center gap-1.5 cursor-pointer">
+            <span>Ver Evidências</span>
+            <span>↗</span>
+          </button>
         </div>
       </div>
     `;
@@ -686,6 +764,16 @@ class AuraCockpitController {
     });
 
     container.innerHTML = html;
+  }
+
+  escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 }
 

@@ -119,10 +119,18 @@ class AuraApp {
     const btnToggle = document.getElementById('btn-toggle-sidebar');
     const btnClose = document.getElementById('btn-close-sidebar');
     const overlay = document.getElementById('aura-sidebar-overlay');
+    const btnNewChat = document.getElementById('btn-new-chat');
 
     if (btnToggle) {
       btnToggle.addEventListener('click', () => {
         this.toggleSidebar();
+      });
+    }
+
+    if (btnNewChat) {
+      btnNewChat.addEventListener('click', () => {
+        window.auraAudio.playChime(500, 0.05);
+        if (window.auraChat) window.auraChat.clearSession();
       });
     }
 
@@ -138,10 +146,30 @@ class AuraApp {
       });
     }
 
-    // Atalho ESC para fechar gaveta
+    // Atalho ESC e Focus Trap para a gaveta lateral (F4-08)
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.sidebarOpen) {
+      if (!this.sidebarOpen) return;
+
+      if (e.key === 'Escape') {
         this.closeSidebar();
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        const drawer = document.getElementById('aura-sidebar-drawer');
+        if (!drawer) return;
+        const focusables = drawer.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex="-1"]), a[href]');
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     });
 
@@ -150,7 +178,7 @@ class AuraApp {
     if (btnSidebarClear) {
       btnSidebarClear.addEventListener('click', () => {
         window.auraAudio.playChime(500, 0.05);
-        if (window.auraChat) window.auraChat.clearChat();
+        if (window.auraChat) window.auraChat.clearSession();
         this.closeSidebar();
       });
     }
@@ -180,12 +208,19 @@ class AuraApp {
   }
 
   openSidebar() {
+    this.previousActiveElement = document.activeElement;
     this.sidebarOpen = true;
     const drawer = document.getElementById('aura-sidebar-drawer');
     const overlay = document.getElementById('aura-sidebar-overlay');
     if (drawer) drawer.classList.add('open');
     if (overlay) overlay.classList.add('open');
     window.auraAudio.playChime(660, 0.05);
+
+    // Foco inicial no botão fechar para acessibilidade
+    const btnClose = document.getElementById('btn-close-sidebar');
+    if (btnClose) {
+      setTimeout(() => btnClose.focus(), 50);
+    }
   }
 
   closeSidebar() {
@@ -194,6 +229,14 @@ class AuraApp {
     const overlay = document.getElementById('aura-sidebar-overlay');
     if (drawer) drawer.classList.remove('open');
     if (overlay) overlay.classList.remove('open');
+
+    // Devolve o foco ao acionador
+    if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
+      this.previousActiveElement.focus();
+    } else {
+      const btnToggle = document.getElementById('btn-toggle-sidebar');
+      if (btnToggle) btnToggle.focus();
+    }
   }
 
   toggleSidebar() {
@@ -390,6 +433,7 @@ class AuraApp {
   startClock() {
     const clockEl = document.getElementById('hud-live-clock');
     const clockMobile = document.getElementById('hud-live-clock-mobile');
+    if (!clockEl && !clockMobile) return;
 
     const update = () => {
       const now = new Date();

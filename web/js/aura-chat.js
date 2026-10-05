@@ -12,10 +12,18 @@ class AuraChatController {
     this.isStreaming = false;
     this.abortController = null;
     this.messages = [];
+    this.userScrolledUp = false;
   }
 
   generateSessionId() {
     return 'aura_ui_' + Math.random().toString(36).substring(2, 10);
+  }
+
+  autoResizeInput(textarea) {
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    const newHeight = Math.min(Math.max(textarea.scrollHeight, 44), 160);
+    textarea.style.height = `${newHeight}px`;
   }
 
   init() {
@@ -37,15 +45,22 @@ class AuraChatController {
     const sendBtn = document.getElementById('btn-chat-send');
     const stopBtn = document.getElementById('btn-chat-stop');
     const clearBtn = document.getElementById('btn-chat-clear');
+    const newChatBtn = document.getElementById('btn-new-chat');
 
     const splitInput = document.getElementById('split-chat-input-text');
     const splitSendBtn = document.getElementById('btn-split-chat-send');
 
     if (input) {
+      input.addEventListener('input', () => {
+        this.autoResizeInput(input);
+      });
+
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           this.handleSendMessage();
+        } else if (e.key === 'Enter' && e.shiftKey) {
+          setTimeout(() => this.autoResizeInput(input), 0);
         }
       });
     }
@@ -63,6 +78,86 @@ class AuraChatController {
     if (splitSendBtn) splitSendBtn.addEventListener('click', () => this.handleSendMessage());
     if (stopBtn) stopBtn.addEventListener('click', () => this.abortStreaming());
     if (clearBtn) clearBtn.addEventListener('click', () => this.clearSession());
+
+    // F4-12 & F4-13: Detecção de rolagem e botão flutuante de mensagens recentes
+    const chatFeed = document.getElementById('chat-feed-container');
+    const splitFeed = document.getElementById('split-chat-feed-container');
+    const scrollBtn = document.getElementById('btn-scroll-bottom');
+
+    if (chatFeed) {
+      chatFeed.addEventListener('scroll', () => {
+        const threshold = 80;
+        const isAtBottom = (chatFeed.scrollHeight - chatFeed.scrollTop - chatFeed.clientHeight) <= threshold;
+        this.userScrolledUp = !isAtBottom;
+        if (scrollBtn) {
+          if (this.userScrolledUp) {
+            scrollBtn.classList.remove('hidden');
+          } else {
+            scrollBtn.classList.add('hidden');
+          }
+        }
+      }, { passive: true });
+    }
+
+    if (splitFeed) {
+      splitFeed.addEventListener('scroll', () => {
+        const threshold = 80;
+        const isAtBottom = (splitFeed.scrollHeight - splitFeed.scrollTop - splitFeed.clientHeight) <= threshold;
+        this.userScrolledUp = !isAtBottom;
+      }, { passive: true });
+    }
+
+    if (scrollBtn) {
+      scrollBtn.addEventListener('click', () => {
+        this.userScrolledUp = false;
+        if (chatFeed) {
+          chatFeed.scrollTo({ top: chatFeed.scrollHeight, behavior: 'smooth' });
+        }
+        scrollBtn.classList.add('hidden');
+      });
+    }
+
+    // Eventos do Drawer de Evidências (Marco 1)
+    const closeEvBtn = document.getElementById('btn-close-evidence-drawer');
+    const evOverlay = document.getElementById('aura-evidence-drawer-overlay');
+    if (closeEvBtn) closeEvBtn.addEventListener('click', () => this.closeEvidence());
+    if (evOverlay) evOverlay.addEventListener('click', () => this.closeEvidence());
+
+    document.addEventListener('keydown', (e) => {
+      const evDrawer = document.getElementById('aura-evidence-drawer');
+      const isDrawerOpen = evDrawer && evDrawer.classList.contains('open');
+
+      if (e.key === 'Escape' && isDrawerOpen) {
+        this.closeEvidence();
+      }
+
+      // Acessibilidade: Focus Trap dentro do Drawer aberto
+      if (e.key === 'Tab' && isDrawerOpen) {
+        const focusableEls = evDrawer.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex="-1"]), [href], input, select, textarea');
+        if (focusableEls.length > 0) {
+          const firstEl = focusableEls[0];
+          const lastEl = focusableEls[focusableEls.length - 1];
+          if (e.shiftKey) {
+            if (document.activeElement === firstEl) {
+              e.preventDefault();
+              lastEl.focus();
+            }
+          } else {
+            if (document.activeElement === lastEl) {
+              e.preventDefault();
+              firstEl.focus();
+            }
+          }
+        }
+      }
+    });
+
+    document.querySelectorAll('.evidence-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.getAttribute('data-ev-tab');
+        this.switchEvidenceTab(tab);
+      });
+    });
   }
 
   renderSessionId() {
@@ -165,24 +260,30 @@ class AuraChatController {
    */
   async handleSendMessage(promptText = null) {
     let query = promptText;
+    const input = document.getElementById('chat-input-text');
+    const splitInput = document.getElementById('split-chat-input-text');
+
     if (!query) {
-      const input = document.getElementById('chat-input-text');
-      const splitInput = document.getElementById('split-chat-input-text');
       if (input && input.value.trim()) {
         query = input.value.trim();
-        input.value = '';
       } else if (splitInput && splitInput.value.trim()) {
         query = splitInput.value.trim();
-        splitInput.value = '';
       }
-    } else {
-      const input = document.getElementById('chat-input-text');
-      if (input) input.value = '';
-      const splitInput = document.getElementById('split-chat-input-text');
-      if (splitInput) splitInput.value = '';
     }
 
     if (!query || this.isStreaming) return;
+
+    if (input) {
+      input.value = '';
+      input.style.height = 'auto';
+    }
+    if (splitInput) {
+      splitInput.value = '';
+    }
+
+    this.userScrolledUp = false;
+    const scrollBtn = document.getElementById('btn-scroll-bottom');
+    if (scrollBtn) scrollBtn.classList.add('hidden');
 
     this.setStreamingState(true);
 
@@ -192,6 +293,9 @@ class AuraChatController {
     // 2. Prepara contêiner para a resposta da AURA
     const messageContainerId = 'aura-msg-' + Date.now();
     this.createAuraMessageBubble(messageContainerId);
+
+    // Força rolagem para o início da nova resposta
+    this.scrollToBottom(true);
 
     // Contexto de streaming
     let fullResponseText = '';
@@ -231,6 +335,11 @@ class AuraChatController {
             telemetryData = chunk.data || {};
             this.updateTelemetryBadge(messageContainerId, telemetryData);
           }
+          else if (type === 'error') {
+            const errorMsg = chunk.data?.error || chunk.text || 'Erro no processamento da solicitação';
+            this.renderStreamError(messageContainerId, errorMsg);
+            this.setStreamingState(false);
+          }
           else if (type === 'done') {
             this.updateAuraText(messageContainerId, fullResponseText, false);
             this.setStreamingState(false);
@@ -239,7 +348,7 @@ class AuraChatController {
         onDone: () => {
           this.updateAuraText(messageContainerId, fullResponseText, false);
           this.setStreamingState(false);
-          this.scrollToBottom();
+          this.scrollToBottom(false);
         },
         onError: (err) => {
           console.error('[AuraChat] Erro no stream:', err);
@@ -264,6 +373,14 @@ class AuraChatController {
 
   clearSession() {
     this.abortStreaming();
+    this.userScrolledUp = false;
+    const scrollBtn = document.getElementById('btn-scroll-bottom');
+    if (scrollBtn) scrollBtn.classList.add('hidden');
+    const input = document.getElementById('chat-input-text');
+    if (input) {
+      input.value = '';
+      input.style.height = 'auto';
+    }
     this.sessionId = this.generateSessionId();
     this.renderSessionId();
     const feed = document.getElementById('chat-feed-container');
@@ -299,7 +416,9 @@ class AuraChatController {
 
     if (input) {
       input.disabled = isStreaming;
-      if (!isStreaming) input.focus();
+      if (!isStreaming && typeof window !== 'undefined' && window.innerWidth >= 768 && typeof input.focus === 'function') {
+        input.focus({ preventScroll: true });
+      }
     }
 
     if (splitInput) {
@@ -520,6 +639,8 @@ class AuraChatController {
       return this.renderLmcAnpWidget(data);
     }
     if (
+      data.contrato?.intent === 'shift_reconciliation' ||
+      data.intent === 'shift_reconciliation' ||
       data.triangulacao_pista ||
       data.triangulacao_caixa ||
       data.triangulacao_volumes ||
@@ -859,104 +980,674 @@ class AuraChatController {
   }
 
   /**
-   * Widget 3: Mini-Tabela de Furos/Quebras de Caixa e Conciliação de Pista
+   * Widget 3: Card de Decisão Executiva para Conciliação de Turno & Caixa
+   * Implementação AURA Precision Glass v1.0 (Marco 1 / Fases 1 a 3).
+   * Garante:
+   * 1. Superfície única estável, sem cards aninhados.
+   * 2. Semântica estrita: Análise parcial nunca é exibida como quebra definitiva.
+   * 3. Métrica hero em destaque com números tabulares e formatação pt-BR.
+   * 4. Comparativo compacto entre Automação CBC04, Caixas PDV e Encerrantes Físicos.
+   * 5. Limitações e pendências verificáveis transparentes.
+   * 6. Acesso em 1 clique ao Drawer Lateral de Evidências e Fórmulas.
    */
   renderTurnoWidget(data) {
-    const resumo = data.resumo_executivo || {};
-    const tri = data.triangulacao_pista || data.triangulacao_volumes || {};
-    const caixa = data.triangulacao_caixa || data.fechamento_caixa || {};
-    const status = resumo.status_conciliacao || 'CONCILIADO';
-    const score = resumo.score_conformidade_pct ?? resumo.score_conformidade_percentual ?? 100;
-
-    const diffReais = parseFloat(resumo.diferenca_financeira_caixa ?? caixa.diferenca_reais ?? 0);
-    let diffBadge = '<span class="text-emerald-300 font-bold">✓ Caixa Zerado</span>';
-    if (diffReais < -0.01) {
-      diffBadge = `<span class="text-rose-400 font-bold">🚨 Furo de R$ ${Math.abs(diffReais).toFixed(2)}</span>`;
-    } else if (diffReais > 0.01) {
-      diffBadge = `<span class="text-emerald-400 font-bold">🟢 Sobra de R$ ${diffReais.toFixed(2)}</span>`;
+    if (!data || typeof data !== 'object') {
+      return `<div class="decision-card"><p class="text-xs text-slate-400">Dados de conciliação indisponíveis ou payload inválido.</p></div>`;
     }
 
-    const modal = caixa.totais_caixa || caixa.modalidades || {};
-    const din = parseFloat(modal.dinheiro || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    const carCred = parseFloat(modal.cartao_credito || modal.cartao || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    const carDeb = parseFloat(modal.cartao_debito || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    const pix = parseFloat(modal.pix || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const c = data.contrato || data;
 
-    const faturadoVal = resumo.faturamento_pista_total ?? caixa.total_combustivel_faturado_reais ?? 0;
-    const faturado = parseFloat(faturadoVal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    const declaradoVal = modal.total_declarado ?? caixa.total_declarado_operador_reais ?? 0;
-    const declarado = parseFloat(declaradoVal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-    const encLitros = parseFloat(tri.total_litros_encerrante ?? tri.encerrantes_litros ?? 0).toLocaleString('pt-BR');
-    const cbcLitros = parseFloat(tri.total_litros_automacao ?? tri.abastecimentos_cbc04_litros ?? 0).toLocaleString('pt-BR');
-    const divPista = parseFloat(tri.diferenca_litros_pista ?? tri.divergencia_litros ?? 0);
-
-    return `
-      <div class="widget-inline-container border-l-4 border-l-auraCyan">
-        <div class="widget-inline-header">
-          <div class="flex items-center gap-2">
-            <span class="text-sm">💰</span>
-            <strong class="text-xs font-mono text-white uppercase tracking-wider">Conciliação de Turno & Caixa</strong>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="text-[11px] font-mono text-cyan-300 font-bold">Score: ${score}%</span>
-            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-200 border border-slate-700">
-              ${this.escapeHtml(status)}
+    // F1-08: Tratar versões de contrato desconhecidas com fallback seguro (sem aparentar validação financeira)
+    if (c.schema_version && c.schema_version !== '1.0') {
+      return `
+        <div class="decision-card">
+          <div class="decision-header">
+            <div class="decision-context">
+              <span class="decision-context-title">Versão de Contrato Não Suportada (v${this.escapeHtml(c.schema_version)})</span>
+              <span class="decision-context-sub">Contrato AURA Precision Glass v1.0 esperado</span>
+            </div>
+            <span class="decision-status-badge status-neutral">
+              <span>⚠️</span>
+              <span>Schema Desconhecido</span>
             </span>
           </div>
-        </div>
-
-        <!-- Grid de Triangulação -->
-        <div class="widget-turno-grid">
-          <!-- Coluna 1: Pista -->
-          <div class="widget-turno-cell space-y-1">
-            <div class="text-[10px] font-mono text-slate-400 font-bold uppercase">⛽ Pista (Encerrantes vs CBC04)</div>
-            <div class="text-xs font-mono flex justify-between">
-              <span class="text-slate-400">Encerrantes:</span>
-              <strong class="text-white">${encLitros} L</strong>
-            </div>
-            <div class="text-xs font-mono flex justify-between">
-              <span class="text-slate-400">CBC04:</span>
-              <strong class="text-cyan-300">${cbcLitros} L</strong>
-            </div>
-            <div class="text-xs font-mono flex justify-between pt-1 border-t border-slate-800">
-              <span class="text-slate-400">Divergência Pista:</span>
-              <strong class="${Math.abs(divPista) < 0.01 ? 'text-emerald-300' : 'text-rose-400'}">${divPista > 0 ? '+' : ''}${divPista.toFixed(1)} L</strong>
-            </div>
-          </div>
-
-          <!-- Coluna 2: Caixa -->
-          <div class="widget-turno-cell space-y-1">
-            <div class="text-[10px] font-mono text-slate-400 font-bold uppercase">💵 Fechamento de Caixa</div>
-            <div class="text-xs font-mono flex justify-between">
-              <span class="text-slate-400">Faturado ERP:</span>
-              <strong class="text-white">${faturado}</strong>
-            </div>
-            <div class="text-xs font-mono flex justify-between">
-              <span class="text-slate-400">Declarado Operador:</span>
-              <strong class="text-slate-200">${declarado}</strong>
-            </div>
-            <div class="text-xs font-mono flex justify-between pt-1 border-t border-slate-800">
-              <span class="text-slate-400">Diferença Caixa:</span>
-              ${diffBadge}
-            </div>
+          <div class="p-3.5 rounded-xl bg-slate-900/80 border border-amber-500/30 text-amber-200/90 font-mono text-xs space-y-1.5">
+            <div>⚠️ <strong>Aviso de Conformidade Contábil:</strong></div>
+            <p class="text-[11px] text-slate-300">
+              O payload analítico recebido utiliza a versão <code>${this.escapeHtml(c.schema_version)}</code>, incompatível com o renderizador atual. Por governança e segurança financeira, a exibição de decisão foi suspensa.
+            </p>
           </div>
         </div>
+      `;
+    }
 
-        <!-- Breakdown Modalidades -->
-        <div class="mt-2 p-2 rounded bg-slate-900/50 border border-slate-800 text-[11px] font-mono flex flex-wrap items-center justify-between gap-2">
-          <span>Dinheiro: <strong class="text-slate-200">${din}</strong></span>
-          <span>Cartões: <strong class="text-slate-200">${carCred} / ${carDeb}</strong></span>
-          <span>PIX: <strong class="text-slate-200">${pix}</strong></span>
+    // Validação mínima de payload válido
+    if (!data.contrato && !data.assessment && !data.metrics && !data.resumo_executivo) {
+      return `
+        <div class="decision-card">
+          <div class="decision-header">
+            <span class="decision-context-title">Auditoria Indisponível</span>
+            <span class="decision-status-badge status-neutral">Sem Dados</span>
+          </div>
+          <p class="text-xs text-slate-400 font-mono">Payload de conciliação vazio ou estrutura não reconhecida.</p>
+        </div>
+      `;
+    }
+
+    const assessment = c.assessment || {};
+    const metrics = c.metrics || {};
+    const pendingItems = c.pending_items || [];
+    const action = c.recommended_action || {};
+    const resumo = data.resumo_executivo || {};
+    const tri = data.triangulacao_pista || {};
+
+    const finality = assessment.finality || (resumo.status_conciliacao?.includes('ANDAMENTO') ? 'partial' : 'final');
+    const isPartial = finality === 'partial';
+    const isNoMovement = finality === 'no_movement' || data.status === 'sem_movimento';
+    const isUnavailable = finality === 'unavailable' || data.status === 'indisponivel';
+
+    // Armazena payload na memória global de evidências
+    const evId = 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    if (typeof window !== 'undefined') {
+      if (!window.__auraEvidenceStore) window.__auraEvidenceStore = {};
+      window.__auraEvidenceStore[evId] = data;
+    }
+
+    // Badges de Status Semânticos
+    let badgeClass = 'status-neutral';
+    let badgeIcon = '📋';
+    let badgeText = assessment.badge_label || resumo.status_conciliacao || 'Turno';
+
+    if (isPartial) {
+      badgeClass = 'status-partial';
+      badgeIcon = '⏳';
+      badgeText = assessment.badge_label || 'Análise parcial (provisória)';
+    } else if (isNoMovement) {
+      badgeClass = 'status-neutral';
+      badgeIcon = '⏸️';
+      badgeText = 'Sem movimentação';
+    } else if (isUnavailable) {
+      badgeClass = 'status-divergent';
+      badgeIcon = '⚠️';
+      badgeText = 'Fonte indisponível';
+    } else if (assessment.severity === 'critical' || resumo.status_conciliacao?.includes('FURO') || resumo.status_conciliacao?.includes('DIVERGENCIA')) {
+      badgeClass = 'status-divergent';
+      badgeIcon = '🚨';
+      badgeText = assessment.badge_label || 'Divergência confirmada';
+    } else {
+      badgeClass = 'status-validated';
+      badgeIcon = '✓';
+      badgeText = assessment.badge_label || 'Conciliação validada';
+    }
+
+    // Contexto
+    const dataAuditada = data.data_auditada || c.context?.data_auditada || 'Data Recente';
+    const rawTurno = data.turno_auditado ?? c.context?.shift_id ?? 'Todos os Turnos';
+    let turnoAuditado = rawTurno;
+    if (rawTurno === 1 || rawTurno === '1') turnoAuditado = '1º Turno';
+    else if (rawTurno === 2 || rawTurno === '2') turnoAuditado = '2º Turno';
+    else if (rawTurno === 3 || rawTurno === '3') turnoAuditado = '3º Turno';
+    const title = assessment.title || (isPartial ? 'Conciliação parcial do turno' : 'Conciliação do Turno & Caixa');
+
+    // Métrica Hero: Diferença Financeira
+    const diffVal = Number(metrics.difference ?? resumo.diferenca_financeira_caixa ?? 0);
+    let diffColorClass = 'text-emerald';
+    let heroLabel = 'Diferença Contábil';
+    let heroBadge = '';
+
+    if (isPartial) {
+      diffColorClass = diffVal < 0 ? 'text-amber' : 'text-emerald';
+      heroLabel = 'Diferença Provisória';
+      heroBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">Caixas em Aberto</span>`;
+    } else if (isNoMovement || isUnavailable) {
+      diffColorClass = 'text-slate-400';
+      heroLabel = 'Situação';
+    } else if (Math.abs(diffVal) < 0.01) {
+      diffColorClass = 'text-emerald';
+      heroLabel = 'Caixa Conciliado';
+      heroBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">100% Batido</span>`;
+    } else if (diffVal < 0) {
+      diffColorClass = 'text-rose';
+      heroLabel = 'Falta Apurada';
+      heroBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">Furo de Caixa</span>`;
+    } else {
+      diffColorClass = 'text-emerald';
+      heroLabel = 'Sobra Apurada';
+      heroBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Sobra de Caixa</span>`;
+    }
+
+    const diffFormatted = (isNoMovement || isUnavailable)
+      ? '—'
+      : this.formatSignedBRL(diffVal);
+
+    // Valores do Comparativo
+    const autRev = Number(metrics.automation_revenue ?? resumo.faturamento_pista_total ?? 0);
+    const autVol = Number(metrics.automation_volume_liters ?? tri.total_litros_automacao ?? 0);
+    const posRev = Number(metrics.pos_revenue ?? resumo.faturamento_caixa_total ?? 0);
+
+    const encState = metrics.physical_volume_state || (tri.total_litros_faturados_encerrante === 0 && autVol > 0 ? 'not_reported' : 'measured');
+    const encVol = metrics.physical_volume_liters ?? (encState === 'not_reported' ? null : Number(tri.total_litros_faturados_encerrante || 0));
+
+    // Bloco de Limitação
+    let limitationHtml = '';
+    const limText = assessment.limitation || (isPartial ? 'Caixas abertos no PDV e encerrantes pendentes no ERP' : null);
+    if (limText && !isNoMovement && !isUnavailable) {
+      limitationHtml = `
+        <div class="decision-limitation-callout">
+          <span class="text-sm">⚠️</span>
+          <div>
+            <strong class="font-semibold">Limitação da Análise:</strong>
+            <span class="text-amber-200/90">${this.escapeHtml(limText)}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // Bloco de Pendências com atalhos para abas
+    let pendingHtml = '';
+    if (pendingItems.length > 0) {
+      const itemsList = pendingItems.map(p => {
+        const targetTab = p.code === 'physical_readings_missing' ? 'bicos' : (p.code === 'tanks_anp_alert' ? 'tanques' : 'caixas');
+        const badgeTag = p.code === 'physical_readings_missing' ? 'Encerrante' : (p.code === 'tanks_anp_alert' ? 'Tanque' : 'PDV');
+        return `
+          <div class="decision-pending-item cursor-pointer hover:bg-amber-500/10 transition-colors" onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', '${targetTab}');" title="Ver detalhes desta pendência nas evidências">
+            <div class="flex items-center gap-2">
+              <span class="text-amber-400 font-bold">⏳</span>
+              <span class="font-semibold text-slate-200">${this.escapeHtml(p.label)}</span>
+            </div>
+            <span class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+              <span>${badgeTag}</span>
+              <span>↗</span>
+            </span>
+          </div>
+        `;
+      }).join('');
+
+      pendingHtml = `
+        <div class="space-y-1.5">
+          <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">Pendências Operacionais:</span>
+          <div class="decision-pending-list">${itemsList}</div>
+        </div>
+      `;
+    }
+
+    // Ação recomendada (Somente leitura segura)
+    const recLabel = action.label || (isPartial ? 'Conferir encerrantes e fechamento no ERP' : 'Conferir no ERP');
+
+    return `
+      <div class="decision-card" data-evidence-id="${evId}">
+        <!-- Topo: Contexto da Consulta & Status Badge -->
+        <div class="decision-header">
+          <div class="decision-context">
+            <span class="decision-context-title">${this.escapeHtml(title)}</span>
+            <span class="decision-context-sub">
+              <span>📅 ${this.escapeHtml(dataAuditada)}</span>
+              <span>•</span>
+              <span>⏰ ${this.escapeHtml(turnoAuditado)}</span>
+              <span>•</span>
+              <span>⛽ CBC04 + PDV</span>
+            </span>
+          </div>
+          <span class="decision-status-badge ${badgeClass}">
+            <span>${badgeIcon}</span>
+            <span>${this.escapeHtml(badgeText)}</span>
+          </span>
         </div>
 
-        <div class="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between">
-          <button class="widget-action-btn emerald" onclick="window.auraChat.sendUserPrompt('Teve furo no caixa por operador?')">
-            👥 Identificar Operador
+        <!-- Métrica Hero Executiva -->
+        <div class="decision-hero">
+          <div class="decision-hero-header">
+            <span class="decision-hero-label">${this.escapeHtml(heroLabel)}</span>
+            ${heroBadge}
+          </div>
+          <div class="decision-hero-value ${diffColorClass}">
+            ${diffFormatted}
+          </div>
+          <div class="decision-hero-sub">
+            ${isPartial ? 'A diferença definitiva será apurada após o encerramento formal dos caixas e lançamento de encerrantes.' : (isNoMovement ? 'Nenhum lançamento encontrado para a data informada.' : (isUnavailable ? 'Não foi possível consultar os dados da auditoria.' : 'Comparativo entre vendas faturadas no PDV e saídas registradas na pista.'))}
+          </div>
+        </div>
+
+        ${limitationHtml}
+
+        <!-- Comparativo Compacto (Automação vs PDV vs Encerrante) -->
+        ${(!isNoMovement && !isUnavailable) ? `
+          <div class="decision-comparison-grid">
+            <div class="decision-comp-item">
+              <span class="decision-comp-label">Automação CBC04</span>
+              <strong class="decision-comp-val text-cyan-300">${this.formatBRL(autRev)}</strong>
+              <span class="decision-comp-sub">${this.formatLiters(autVol, 1)} medidos</span>
+            </div>
+            <div class="decision-comp-item">
+              <span class="decision-comp-label">Cupons / PDV</span>
+              <strong class="decision-comp-val text-slate-100">${this.formatBRL(posRev)}</strong>
+              <span class="decision-comp-sub">${isPartial ? 'Caixa em andamento' : 'Caixa fechado'}</span>
+            </div>
+            <div class="decision-comp-item">
+              <span class="decision-comp-label">Encerrantes Físicos</span>
+              <strong class="decision-comp-val ${encState === 'not_reported' ? 'text-amber-400' : 'text-slate-100'}">
+                ${encState === 'not_reported' ? 'Pendente' : (encVol !== null ? this.formatLiters(encVol, 1) : '—')}
+              </strong>
+              <span class="decision-comp-sub">${encState === 'not_reported' ? 'Não digitado no ERP' : 'Lançado no fechabomba'}</span>
+            </div>
+          </div>
+        ` : ''}
+
+        ${pendingHtml}
+
+        <!-- Ações Permitidas (Uma primária + botões de evidência) -->
+        <div class="decision-actions">
+          <button 
+            type="button" 
+            class="decision-btn-primary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
+            title="Abrir painel lateral com proveniência e detalhamento">
+            <span class="text-xs">📋</span>
+            <span>${this.escapeHtml(recLabel)} ↗</span>
           </button>
-          <button class="widget-action-btn purple" onclick="window.auraChat.sendUserPrompt('Como fechou o turno da manhã?')">
-            🔄 Fechamento Detalhado
+
+          <button 
+            type="button" 
+            class="decision-btn-secondary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
+            title="Ver fórmula matemática e definição do cálculo">
+            <span class="text-xs">📐</span>
+            <span>Como foi calculado</span>
           </button>
+
+          ${pendingItems.length > 0 ? `
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
+              title="Ver lista de pendências impeditivas">
+              <span class="text-xs">⏳</span>
+              <span>Ver pendências (${pendingItems.length})</span>
+            </button>
+          ` : ''}
+
+          <button 
+            type="button" 
+            class="decision-btn-secondary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'bicos');"
+            title="Ver todos os bicos da pista e encerrantes">
+            <span class="text-xs">⛽</span>
+            <span>Ver Bicos & Caixas</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Abre o Drawer Lateral de Evidências com foco acessível
+   */
+  openEvidence(evId, activeTab = 'resumo') {
+    if (typeof document === 'undefined') return;
+    this.lastFocusedElement = document.activeElement;
+    this.currentEvidenceId = evId;
+
+    const store = (typeof window !== 'undefined' && window.__auraEvidenceStore) || {};
+    const data = store[evId] || {};
+
+    const drawer = document.getElementById('aura-evidence-drawer');
+    const overlay = document.getElementById('aura-evidence-drawer-overlay');
+    const titleEl = document.getElementById('evidence-drawer-title');
+    const chipEl = document.getElementById('evidence-drawer-status-chip');
+    const subEl = document.getElementById('evidence-drawer-subtitle');
+
+    if (!drawer || !overlay) return;
+
+    const c = data.contrato || data;
+    const assessment = c.assessment || {};
+    const dataAuditada = data.data_auditada || c.context?.data_auditada || 'Data Recente';
+    const turnoAuditado = data.turno_auditado || c.context?.shift_id || 'Turno';
+
+    if (titleEl) titleEl.textContent = `Evidências: ${dataAuditada} (${turnoAuditado})`;
+    if (chipEl) {
+      chipEl.textContent = assessment.badge_label || (assessment.finality === 'partial' ? 'Provisório' : 'Validado');
+      chipEl.className = `px-2 py-0.5 rounded-full text-[10px] font-sans font-semibold ${assessment.finality === 'partial' ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'}`;
+    }
+    if (subEl) subEl.textContent = `Unidade: ${c.context?.unit_id || 'Posto'} • Data: ${dataAuditada} • Turno: ${turnoAuditado}`;
+
+    this.switchEvidenceTab(activeTab);
+
+    overlay.classList.add('open');
+    drawer.classList.add('open');
+
+    const closeBtn = document.getElementById('btn-close-evidence-drawer');
+    if (closeBtn) closeBtn.focus();
+    if (typeof window !== 'undefined' && window.lucide) window.lucide.createIcons();
+  }
+
+  /**
+   * Fecha o Drawer Lateral de Evidências e devolve o foco ao botão chamador
+   */
+  closeEvidence() {
+    if (typeof document === 'undefined') return;
+    const drawer = document.getElementById('aura-evidence-drawer');
+    const overlay = document.getElementById('aura-evidence-drawer-overlay');
+    if (drawer) drawer.classList.remove('open');
+    if (overlay) overlay.classList.remove('open');
+
+    if (this.lastFocusedElement && typeof this.lastFocusedElement.focus === 'function') {
+      try {
+        this.lastFocusedElement.focus();
+      } catch (_) {}
+    }
+  }
+
+  /**
+   * Alterna a aba ativa no Drawer de Evidências
+   */
+  switchEvidenceTab(tabName) {
+    if (typeof document === 'undefined') return;
+    this.currentEvidenceTab = tabName;
+
+    document.querySelectorAll('.evidence-tab-btn').forEach(btn => {
+      const t = btn.getAttribute('data-ev-tab');
+      const isSelected = (t === tabName);
+      btn.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+      btn.setAttribute('tabindex', isSelected ? '0' : '-1');
+      if (isSelected) {
+        btn.className = 'evidence-tab-btn active px-3 py-1.5 rounded-lg bg-slate-800 text-white font-semibold border border-slate-700';
+      } else {
+        btn.className = 'evidence-tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white border border-transparent';
+      }
+    });
+
+    const store = (typeof window !== 'undefined' && window.__auraEvidenceStore) || {};
+    const data = store[this.currentEvidenceId] || {};
+    const contentEl = document.getElementById('evidence-drawer-content');
+    if (contentEl) {
+      contentEl.setAttribute('aria-labelledby', `evidence-tab-${tabName}`);
+      contentEl.innerHTML = this.renderEvidenceTabContent(data, tabName);
+      if (typeof window !== 'undefined' && window.lucide) window.lucide.createIcons();
+    }
+  }
+
+  /**
+   * Renderiza o conteúdo da aba selecionada no Drawer de Evidências
+   */
+  renderEvidenceTabContent(data, tab) {
+    if (!data || (typeof data !== 'object') || (!data.contrato && !data.resumo_executivo && !data.assessment && !data.metrics)) {
+      return `<div class="p-6 text-center text-slate-400 font-mono text-xs">Dados de evidência indisponíveis para este item.</div>`;
+    }
+
+    const c = data.contrato || data;
+    const assessment = c.assessment || {};
+    const metrics = c.metrics || {};
+    const sources = c.sources || [];
+    const tri = data.triangulacao_pista || {};
+    const caixa = data.triangulacao_caixa || {};
+    const tanques = data.balanco_tanques || {};
+    const bicosList = tri.detalhamento_bicos || [];
+    const caixasList = caixa.caixas || [];
+    const tanquesList = tanques.detalhamento_tanques || [];
+    const dataAuditada = data.data_auditada || c.context?.data_auditada || 'Data Recente';
+
+    if (tab === 'formula') {
+      if (assessment.finality === 'no_movement' || data.status === 'sem_movimento') {
+        return `
+          <div class="evidence-section-card">
+            <h4 class="font-bold text-slate-100 flex items-center gap-2">
+              <span>⏸️</span><span>Sem Movimentação Registrada</span>
+            </h4>
+            <p class="text-slate-300 text-xs leading-relaxed p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono">
+              Não foram encontrados lançamentos de bicos, cupons fiscais ou movimentação de caixas para a data consultada (${this.escapeHtml(dataAuditada)}). Por isso, nenhuma diferença contábil ou volumétrica foi apurada.
+            </p>
+          </div>
+        `;
+      }
+
+      if (assessment.finality === 'unavailable' || data.status === 'indisponivel') {
+        return `
+          <div class="evidence-section-card">
+            <h4 class="font-bold text-slate-100 flex items-center gap-2">
+              <span>⚠️</span><span>Fonte Indisponível</span>
+            </h4>
+            <p class="text-slate-300 text-xs leading-relaxed p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono">
+              A conexão com o banco de dados ERP não pôde ser estabelecida no momento da consulta. Não foi possível apurar fórmulas contábeis ou volumétricas.
+            </p>
+          </div>
+        `;
+      }
+
+      const autRev = Number(metrics.automation_revenue ?? data.resumo_executivo?.faturamento_pista_total ?? 0);
+      const posRev = Number(metrics.pos_revenue ?? data.resumo_executivo?.faturamento_caixa_total ?? 0);
+      const diff = Number(metrics.difference ?? data.resumo_executivo?.diferenca_financeira_caixa ?? 0);
+      const autVol = Number(metrics.automation_volume_liters ?? tri.total_litros_automacao ?? 0);
+
+      const encState = metrics.physical_volume_state || (tri.total_litros_faturados_encerrante === 0 && autVol > 0 ? 'not_reported' : 'measured');
+      const encVol = metrics.physical_volume_liters ?? (encState === 'not_reported' ? null : Number(tri.total_litros_faturados_encerrante || 0));
+
+      let volumetricContent = '';
+      if (encState === 'not_reported') {
+        volumetricContent = `
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
+            <div class="text-cyan-400 font-bold">Triangulação Volumétrica: Pendência de Leitura Física</div>
+            <div class="text-slate-300 space-y-1">
+              <div>Automação CBC04: <strong class="text-cyan-300">${this.formatLiters(autVol, 3)}</strong></div>
+              <div>Encerrantes Físicos: <strong class="text-amber-400">Pendente / Não digitado no módulo fechabomba</strong></div>
+              <div class="pt-1 border-t border-slate-800 text-slate-400">Divergência Pista: <strong class="text-amber-300">Diferença provisória (aguardando leitura dos bicos)</strong></div>
+            </div>
+          </div>
+          <p class="text-slate-400 text-xs leading-relaxed">
+            ⚠️ <strong>Dado ausente:</strong> A ausência de digitação de encerrantes mecânicos <em>não representa 0 L medidos</em>. O fechamento físico permanece provisório até a conferência pelo chefe de pista.
+          </p>
+        `;
+      } else if (encState === 'zero_registered') {
+        volumetricContent = `
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
+            <div class="text-cyan-400 font-bold">Divergência Pista = Volume Automação - Encerrantes Faturados</div>
+            <div class="text-slate-300">
+              ${this.formatLiters(autVol, 3)} (CBC04) - ${this.formatLiters(0, 3)} (fechabomba) = 
+              <strong class="text-emerald-400">${this.formatLiters(0, 3)}</strong>
+            </div>
+          </div>
+          <p class="text-slate-400 text-xs leading-relaxed">
+            ✓ Zero efetivamente registrado: Turno confirmado sem saídas nos bicos.
+          </p>
+        `;
+      } else {
+        const diffVol = autVol - (encVol || 0);
+        volumetricContent = `
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
+            <div class="text-cyan-400 font-bold">Divergência Pista = Volume Automação - Encerrantes Faturados</div>
+            <div class="text-slate-300">
+              ${this.formatLiters(autVol, 3)} (CBC04) - ${this.formatLiters(encVol, 3)} (fechabomba) = 
+              <strong class="${Math.abs(diffVol) < 0.01 ? 'text-emerald-400' : 'text-amber-400'}">${diffVol > 0 ? '+' : ''}${this.formatLiters(diffVol, 3)}</strong>
+            </div>
+          </div>
+          <p class="text-slate-400 text-xs leading-relaxed">
+            ${Math.abs(diffVol) < 0.01 ? '✓ Encerrantes físicos 100% batidos com a telemetria CBC04.' : '⚠️ Diferença apurada entre medição mecânica e telemetria CBC04.'}
+          </p>
+        `;
+      }
+
+      return `
+        <div class="space-y-4">
+          <div class="evidence-section-card">
+            <h4 class="font-bold text-slate-100 flex items-center gap-2">
+              <span>📐</span><span>Fórmula da Conciliação Financeira</span>
+            </h4>
+            <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
+              <div class="text-cyan-400 font-bold">Diferença = Faturamento PDV - Automação CBC04</div>
+              <div class="text-slate-300">
+                ${this.formatBRL(posRev)} (PDV) - ${this.formatBRL(autRev)} (CBC04) = 
+                <strong class="${diff < 0 ? 'text-amber-400' : 'text-emerald-400'}">${this.formatSignedBRL(diff)}</strong>
+              </div>
+            </div>
+            <p class="text-slate-400 text-xs leading-relaxed">
+              ${assessment.finality === 'partial' ? '⚠️ <strong>Diferença Provisória:</strong> Como os operadores ainda possuem caixa aberto no PDV e/ou encerrantes mecânicos pendentes, esta diferença não representa uma quebra confirmada.' : '✓ <strong>Diferença Definitiva:</strong> Fechamento apurado após o encerramento formal de todos os caixas.'}
+            </p>
+          </div>
+
+          <div class="evidence-section-card">
+            <h4 class="font-bold text-slate-100 flex items-center gap-2">
+              <span>⛽</span><span>Triangulação Volumétrica da Pista</span>
+            </h4>
+            ${volumetricContent}
+          </div>
+        </div>
+      `;
+    }
+
+    if (tab === 'bicos') {
+      if (bicosList.length === 0) {
+        return `<div class="p-4 text-center text-slate-500 font-mono text-xs">Sem dados detalhados de bicos para este turno.</div>`;
+      }
+
+      const rows = bicosList.map(b => {
+        const isPend = b.status_bico?.includes('PENDENTE_ENCERRANTE');
+        const encText = isPend ? 'Pendente' : this.formatLiters(Number(b.volume_faturado_encerrante || 0), 1);
+        return `
+          <tr class="border-b border-slate-800/80 text-[11px] font-mono">
+            <td class="py-2.5 font-bold text-slate-200">${this.escapeHtml(b.bico)}</td>
+            <td class="py-2.5 text-slate-300">${this.escapeHtml(b.combustivel)}</td>
+            <td class="py-2.5 text-right text-cyan-300">${this.formatLiters(Number(b.volume_automacao_litros || 0), 1)}</td>
+            <td class="py-2.5 text-right ${isPend ? 'text-amber-400 font-semibold' : 'text-slate-200'}">
+              ${encText}
+            </td>
+            <td class="py-2.5 text-right text-slate-100">${this.formatBRL(Number(b.total_reais_automacao || 0))}</td>
+            <td class="py-2.5 text-right">
+              <span class="px-1.5 py-0.5 rounded text-[10px] ${b.status_bico?.includes('CONCILIADO') ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}">
+                ${isPend ? 'Encerrante Pendente' : (b.status_bico?.includes('CONCILIADO') ? 'OK' : 'Divergência')}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      return `
+        <div class="space-y-3">
+          <div class="flex items-center justify-between text-xs font-mono text-slate-400">
+            <span>Total de Bicos Auditados: <strong>${bicosList.length}</strong></span>
+            <span>Automação: CBC04 Companytec</span>
+          </div>
+          <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60 p-1">
+            <table class="w-full text-left font-mono">
+              <thead>
+                <tr class="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
+                  <th class="p-2">Bico</th>
+                  <th class="p-2">Combustível</th>
+                  <th class="p-2 text-right">CBC04</th>
+                  <th class="p-2 text-right">Encerrante</th>
+                  <th class="p-2 text-right">Total R$</th>
+                  <th class="p-2 text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    if (tab === 'caixas') {
+      if (caixasList.length === 0) {
+        return `<div class="p-4 text-center text-slate-500 font-mono text-xs">Sem caixas registrados na data auditada.</div>`;
+      }
+
+      const rows = caixasList.map(cItem => {
+        let opName = String(cItem.operador || 'Operador não informado').trim();
+        if (opName.includes('NO') || opName.toUpperCase().includes('NAO INFORMADO') || opName.toUpperCase().includes('NÃO INFORMADO')) {
+          opName = 'Operador não informado';
+        }
+
+        return `
+        <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2 font-mono text-xs">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-100">Sessão #${this.escapeHtml(cItem.caixa_id ?? 'N/D')} • Terminal PDV ${this.escapeHtml(cItem.pdv ?? 'N/D')}</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${cItem.status === 'FECHADO' ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'}">
+                ${this.escapeHtml(cItem.status ?? 'EM ABERTO')}
+              </span>
+            </div>
+            <span class="text-slate-400 text-[11px]">${this.escapeHtml(opName)}</span>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-slate-800 text-[11px]">
+            <div><span class="text-slate-400">Dinheiro:</span> <strong class="text-slate-200">${this.formatBRL(cItem.dinheiro)}</strong></div>
+            <div><span class="text-slate-400">Cartões:</span> <strong class="text-slate-200">${this.formatBRL(cItem.cartao)}</strong></div>
+            <div><span class="text-slate-400">Prazo:</span> <strong class="text-slate-200">${this.formatBRL(cItem.prazo)}</strong></div>
+            <div><span class="text-slate-400">Convênio:</span> <strong class="text-slate-200">${this.formatBRL(cItem.convenio_cheque)}</strong></div>
+          </div>
+
+          <div class="flex items-center justify-between pt-1 border-t border-slate-800/60 text-xs">
+            <span class="text-slate-400">Total Declarado:</span>
+            <strong class="text-cyan-300">${this.formatBRL(cItem.total_declarado)}</strong>
+          </div>
+        </div>
+      `;
+      }).join('');
+
+      return `<div class="space-y-3">${rows}</div>`;
+    }
+
+    if (tab === 'tanques') {
+      if (tanquesList.length === 0) {
+        return `<div class="p-4 text-center text-slate-500 font-mono text-xs">Sem tanques auditados neste fechamento.</div>`;
+      }
+
+      const rows = tanquesList.map(t => {
+        const isConf = t.status_anp?.includes('CONFORME');
+        return `
+          <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2 font-mono text-xs">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-slate-100">TQ-${this.escapeHtml(t.codtan ?? 'N/D')} • ${this.escapeHtml(t.combustivel ?? 'N/D')}</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${isConf ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}">
+                ${isConf ? '✓ Conforme ANP (±0.6%)' : '⚠️ Alerta ANP'}
+              </span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-300">
+              <div><span class="text-slate-400">Capacidade:</span> ${this.formatLiters(t.capacidade_litros, 0)}</div>
+              <div><span class="text-slate-400">Saldo Inicial:</span> ${this.formatLiters(t.saldo_inicial, 0)}</div>
+              <div><span class="text-slate-400">Saldo Final:</span> ${this.formatLiters(t.saldo_final, 0)}</div>
+              <div><span class="text-slate-400">Saída Bicos:</span> ${this.formatLiters(t.saida_bicos_litros, 1)}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      return `<div class="space-y-3">${rows}</div>`;
+    }
+
+    // Default: 'resumo'
+    const sourcesList = sources.map(s => {
+      let stBadge = '<span class="text-emerald-400 font-semibold">✓ Disponível</span>';
+      if (s.availability === 'missing') stBadge = '<span class="text-amber-400 font-semibold">⏳ Pendente / Não lançado</span>';
+      if (s.availability === 'unavailable') stBadge = '<span class="text-rose-400 font-semibold">⚠️ Indisponível</span>';
+
+      return `
+        <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 flex items-center justify-between font-mono text-xs">
+          <div>
+            <div class="font-bold text-slate-200">${this.escapeHtml(s.label)}</div>
+            <div class="text-[10px] text-slate-400">Data de atualização: ${s.data_as_of ? this.escapeHtml(s.data_as_of) : 'Não informada'}</div>
+          </div>
+          <div>${stBadge}</div>
+        </div>
+      `;
+    }).join('');
+
+    const explanationText = c.explanation?.text || data.resumo_executivo?.diagnostico_caixa || 'Auditoria executada conforme regras vigentes.';
+
+    return `
+      <div class="space-y-4">
+        <div class="evidence-section-card">
+          <h4 class="font-bold text-slate-100 flex items-center gap-2">
+            <span>📡</span><span>Proveniência e Disponibilidade das Fontes</span>
+          </h4>
+          <div class="space-y-2">${sourcesList || '<div class="text-slate-500">Fontes padrão do ERP</div>'}</div>
+        </div>
+
+        <div class="evidence-section-card">
+          <h4 class="font-bold text-slate-100 flex items-center gap-2">
+            <span>📝</span><span>Diagnóstico Operacional</span>
+          </h4>
+          <p class="text-slate-300 leading-relaxed text-xs p-3 rounded-lg bg-slate-900 border border-slate-800">
+            ${this.escapeHtml(explanationText)}
+          </p>
         </div>
       </div>
     `;
@@ -1634,20 +2325,44 @@ class AuraChatController {
     this.scrollToBottom();
   }
 
-  scrollToBottom() {
+  scrollToBottom(force = false) {
     const feeds = [
       document.getElementById('chat-feed-container'),
       document.getElementById('split-chat-feed-container')
     ];
 
     feeds.forEach(feed => {
-      if (feed) feed.scrollTop = feed.scrollHeight;
+      if (feed && (force || !this.userScrolledUp)) {
+        feed.scrollTop = feed.scrollHeight;
+      }
     });
   }
 
+  formatBRL(val) {
+    if (val === null || val === undefined || isNaN(Number(val))) return '—';
+    const num = Number(val);
+    return 'R$ ' + num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  formatSignedBRL(val) {
+    if (val === null || val === undefined || isNaN(Number(val))) return '—';
+    const num = Number(val);
+    if (Math.abs(num) < 0.005) {
+      return 'R$ 0,00';
+    }
+    const prefix = num < 0 ? '-' : '+';
+    return `${prefix}R$ ${Math.abs(num).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  formatLiters(val, decimals = 1) {
+    if (val === null || val === undefined || isNaN(Number(val))) return '—';
+    const num = Number(val);
+    return `${num.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })} L`;
+  }
+
   escapeHtml(str) {
-    if (!str) return '';
-    return str
+    if (str === null || str === undefined) return '';
+    return String(str)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')

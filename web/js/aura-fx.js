@@ -526,6 +526,7 @@
 
       const isHidden = modal.classList.contains('hidden');
       if (isHidden) {
+        this.previousActiveElement = document.activeElement;
         modal.classList.remove('hidden');
         if (window.auraAudio) window.auraAudio.playChime(720, 0.05);
         const input = document.getElementById('palette-search-input');
@@ -542,6 +543,11 @@
     closeCommandPalette() {
       const modal = document.getElementById('aura-command-palette-modal');
       if (modal) modal.classList.add('hidden');
+      if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
+        try {
+          this.previousActiveElement.focus();
+        } catch (_) {}
+      }
     }
 
     filterPalette(query) {
