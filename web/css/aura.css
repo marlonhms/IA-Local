@@ -1558,6 +1558,12 @@ body {
   }
 }
 
+@media (max-width: 420px) {
+  .decision-comparison-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .decision-comp-item {
   padding: 10px 12px;
   border-radius: 10px;
@@ -1726,7 +1732,9 @@ body {
   }
 }
 
-
-
-
-
+/* F5-09: Utilitário de Acessibilidade e Alinhamento Numérico Tabular */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  -webkit-font-feature-settings: "tnum";
+  font-feature-settings: "tnum";
+}

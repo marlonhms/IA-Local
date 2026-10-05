@@ -24,6 +24,44 @@ from core.schemas.reconciliation import (
     RecommendedAction,
     ShiftReconciliationContract,
 )
+from core.schemas.tank_forecast import (
+    TankForecastAssessment,
+    TankForecastMetrics,
+    TankDetailItem,
+    FuelForecastItem,
+    OrderSuggestionItem,
+    TankForecastContext,
+    TankForecastExplanation,
+    TankForecastContract,
+)
+from core.schemas.pump_performance import (
+    PumpPerformanceAssessment,
+    PumpPerformanceMetrics,
+    AttendantPerformanceItem,
+    NozzleAuditedItem,
+    PisteAnomalyItem,
+    PumpPerformanceContext,
+    PumpPerformanceExplanation,
+    PumpPerformanceContract,
+)
+from core.schemas.lmc_report import (
+    LMCReportAssessment,
+    LMCReportMetrics,
+    LMCTankAuditedItem,
+    LMCTankAlertItem,
+    LMCReportContext,
+    LMCReportExplanation,
+    LMCReportContract,
+)
+from core.schemas.market_basket import (
+    MarketBasketAssessment,
+    MarketBasketMetrics,
+    MarketBasketComboItem,
+    MarketBasketRuleItem,
+    MarketBasketContext,
+    MarketBasketExplanation,
+    MarketBasketContract,
+)
 
 _last_working_erp_port: Optional[int] = None
 
@@ -1963,11 +2001,202 @@ class PostoTools:
             else:
                 diag_fds = "Estoque suficiente para atravessar o fim de semana com margem de segurança confortável nos combustíveis analisados."
 
-            # Montagem do Resultado Estruturado
+            # Construção do Contrato Estruturado AURA Precision Glass v1.0 (F5-03 & F5-04)
+            queried_at_iso = agora.astimezone().isoformat()
+            has_crit_hours = any(t.get('autonomia_runout_horas', 999) < 24 for t in tanques_retorno)
+            has_crit_alert = any(t.get('alerta_critico') for t in tanques_retorno)
+
+            if not tanques_retorno:
+                status_geral_tanks = "SEM_REGISTROS"
+                severity_tanks = "normal"
+                title_tanks = f"Nenhum Tanque Localizado ({filtro_combustivel})" if filtro_combustivel else "Nenhum Tanque Cadastrado"
+                badge_tanks = "Filtro Sem Resultados" if filtro_combustivel else "Sem Registros"
+            else:
+                status_geral_tanks = "ALERTA_ESTOQUE_CRITICO" if any(t.get('alerta_critico') for t in tanques_retorno) else "ESTOQUE_ESTAVEL"
+                severity_tanks = "critical" if (tanques_zerados_secos or has_crit_hours) else ("attention" if (alerta_fim_de_semana or has_crit_alert) else "normal")
+                title_tanks = "Alerta Crítico: Risco de Esgotamento de Tanques" if severity_tanks == "critical" else ("Atenção: Tanques em Nível de Reserva" if severity_tanks == "attention" else "Autonomia dos Tanques Estável")
+                badge_tanks = "🚨 Crítico / Risco de Falta" if severity_tanks == "critical" else ("⚠️ Risco Fim de Semana" if alerta_fim_de_semana else ("⚠️ Nível de Reserva" if severity_tanks == "attention" else "✓ Confortável / Estável"))
+
+            limitation_tanks = "Projeção baseada em consumo histórico e medição física de estoque; não prevê picos abruptos decorrentes de feriados atípicos."
+
+            tot_saldo = sum(t['saldo_atual_litros'] for t in tanques_retorno)
+            tot_cap = sum(t['capacidade_litros'] for t in tanques_retorno)
+            ocup_geral = round((tot_saldo / tot_cap * 100.0), 2) if tot_cap > 0 else 0.0
+
+            min_auto_crit_h = min([t['autonomia_critica_horas'] for t in tanques_retorno], default=0.0) if tanques_retorno else 0.0
+            min_auto_crit_d = min([t['autonomia_critica_dias'] for t in tanques_retorno], default=0.0) if tanques_retorno else 0.0
+            min_auto_ro_h = min([t['autonomia_runout_horas'] for t in tanques_retorno], default=0.0) if tanques_retorno else 0.0
+            min_auto_ro_d = min([t['autonomia_runout_dias'] for t in tanques_retorno], default=0.0) if tanques_retorno else 0.0
+            tot_ullage = sum(t['espaco_livre_ullage_litros'] for t in tanques_retorno)
+
+            assessment_tanks = TankForecastAssessment(
+                status_code=status_geral_tanks,
+                severity=severity_tanks,
+                title=title_tanks,
+                limitation=limitation_tanks,
+                badge_label=badge_tanks,
+                alerta_fim_de_semana=alerta_fim_de_semana,
+                horizonte_critico_horas=tanque_mais_critico['autonomia_critica_horas'] if tanque_mais_critico else None,
+                horizonte_runout_horas=tanque_mais_critico['autonomia_runout_horas'] if tanque_mais_critico else None,
+                tanque_mais_critico_cod=tanque_mais_critico['codtan'] if tanque_mais_critico else None,
+            )
+
+            metrics_tanks = TankForecastMetrics(
+                saldo_total_litros=round(tot_saldo, 2),
+                capacidade_total_litros=round(tot_cap, 2),
+                ocupacao_geral_pct=ocup_geral,
+                autonomia_critica_horas=round(min_auto_crit_h, 1),
+                autonomia_critica_dias=round(min_auto_crit_d, 1),
+                autonomia_runout_horas=round(min_auto_ro_h, 1),
+                autonomia_runout_dias=round(min_auto_ro_d, 1),
+                espaco_livre_ullage_total_litros=round(tot_ullage, 2),
+                compartimentos_5k_total=tot_bocas_5k,
+                volume_sugerido_total_litros=float(tot_vol_sugerido),
+                tanques_criticos_count=sum(1 for t in tanques_retorno if t.get('alerta_critico')),
+                tanques_zerados_count=len(tanques_zerados_secos),
+            )
+
+            tanks_items = [
+                TankDetailItem(
+                    codtan=t['codtan'],
+                    combustivel=t['combustivel'],
+                    categoria=t['categoria'],
+                    capacidade_litros=float(t['capacidade_litros']),
+                    saldo_atual_litros=float(t['saldo_atual_litros']),
+                    ocupacao_pct=float(t['ocupacao_pct']),
+                    estoque_critico_15pct_litros=float(t['estoque_critico_15pct_litros']),
+                    saldo_util_critico_litros=float(t['saldo_util_critico_litros']),
+                    consumo_diario_litros=float(t['consumo_diario_litros']),
+                    consumo_horario_litros=float(t['consumo_horario_litros']),
+                    autonomia_critica_horas=float(t['autonomia_critica_horas']),
+                    autonomia_critica_dias=float(t['autonomia_critica_dias']),
+                    autonomia_runout_horas=float(t['autonomia_runout_horas']),
+                    autonomia_runout_dias=float(t['autonomia_runout_dias']),
+                    espaco_livre_ullage_litros=float(t['espaco_livre_ullage_litros']),
+                    compartimentos_5k=int(t['compartimentos_5k']),
+                    volume_sugerido_litros=float(t['volume_sugerido_litros']),
+                    alerta_critico=bool(t['alerta_critico']),
+                    status_operacional=t['status_operacional'],
+                    urgencia_pedido=t['urgencia_pedido'],
+                    prazo_ideal_compra=t['prazo_ideal_compra'],
+                    data_hora_critico=t['data_hora_critico'],
+                    data_hora_runout=t['data_hora_runout'],
+                    bicos_conectados=t.get('bicos_conectados', []),
+                ) for t in tanques_retorno
+            ]
+
+            fuel_items = [
+                FuelForecastItem(
+                    combustivel=c['combustivel'],
+                    capacidade_total_litros=float(c['capacidade_total_litros']),
+                    saldo_total_litros=float(c['saldo_total_litros']),
+                    ocupacao_pct=float(c.get('ocupacao_pct', c.get('ocupacao_media_pct', 0.0))),
+                    autonomia_critica_dias=float(c['autonomia_critica_dias']),
+                    autonomia_runout_dias=float(c['autonomia_runout_dias']),
+                    autonomia_runout_horas=float(c['autonomia_runout_horas']),
+                    volume_sugerido_compra_litros=float(c['volume_sugerido_compra_litros']),
+                    compartimentos_5k_sugeridos=int(c['compartimentos_5k_sugeridos']),
+                    alerta_fim_de_semana=bool(c.get('alerta_fim_de_semana', False)),
+                    tanques_vinculados=c.get('tanques_vinculados', []),
+                ) for c in combustiveis_retorno
+            ]
+
+            order_items = [
+                OrderSuggestionItem(
+                    tanque=s['tanque'],
+                    combustivel=s['combustivel'],
+                    categoria=s['categoria'],
+                    volume_sugerido_litros=float(s['volume_sugerido_litros']),
+                    compartimentos_5k=int(s['compartimentos_5k']),
+                    espaco_livre_ullage_litros=float(s['espaco_livre_ullage_litros']),
+                    autonomia_critica_dias=float(s['autonomia_critica_dias']),
+                    autonomia_runout_horas=float(s['autonomia_runout_horas']),
+                    urgencia=s['urgencia'],
+                    prazo_ideal=s['prazo_ideal'],
+                    justificativa=s['justificativa'],
+                ) for s in sugestoes_retorno
+            ]
+
+            pending_items_tanks = []
+            if tanques_zerados_secos:
+                pending_items_tanks.append(PendingItem(
+                    code="tanks_empty",
+                    label=f"Tanque(s) secos: {', '.join(tanques_zerados_secos)}",
+                    detail="Combustível zerado na base de dados (0 L)",
+                    severity="critical"
+                ))
+            if alerta_fim_de_semana:
+                pending_items_tanks.append(PendingItem(
+                    code="weekend_risk",
+                    label="Risco de esgotamento no fim de semana",
+                    detail=f"Combustíveis em risco: {', '.join(combustiveis_em_risco_fds)}",
+                    severity="attention"
+                ))
+
+            sources_tanks = [
+                DataSource(id="tanques", label="Medição de Tanques (ERP)", availability="available", data_as_of=agora.strftime("%Y-%m-%d %H:%M")),
+                DataSource(id="abastecimentos", label="Telemetria de Consumo (CBC04)", availability="available" if telemetria_geral.get('total_abast_geral', 0) > 0 else "missing", data_as_of=agora.strftime("%Y-%m-%d %H:%M")),
+            ]
+
+            if tot_vol_sugerido > 0:
+                prazo_txt = tanque_mais_critico.get('prazo_ideal', tanque_mais_critico.get('prazo_ideal_compra', 'Imediato')) if tanque_mais_critico else 'Imediato'
+                rec_action_tanks = RecommendedAction(
+                    label=f"Sugerir Pedido ({tot_vol_sugerido:,.0f} L / {tot_bocas_5k} bocas)".replace(",", "."),
+                    execution="external_manual",
+                    detail=f"Emitir pedido de compra junto à distribuidora. Prazo recomendado: {prazo_txt}."
+                )
+            else:
+                rec_action_tanks = RecommendedAction(
+                    label="Nenhum Pedido Necessário",
+                    execution="external_manual",
+                    detail="Tanques com autonomia operacional suficiente."
+                )
+
+            crit_desc = f"Tanque mais crítico: TQ {tanque_mais_critico['codtan']} ({tanque_mais_critico['combustivel']}) com autonomia de {tanque_mais_critico['autonomia_runout_horas']:.1f}h. " if tanque_mais_critico else ""
+            carreta_desc = f"Sugestão total de carreta: {tot_vol_sugerido:,.0f} L ({tot_bocas_5k} compartimentos de 5.000 L)." if tot_vol_sugerido > 0 else "Nenhum pedido urgente necessário."
+            explanation_tanks_text = f"Projeção de esgotamento para {len(tanques_retorno)} tanque(s). {crit_desc}{carreta_desc}"
+
+            resp_id_tank = f"tank-forecast-{(filtro_combustivel or 'all').replace(' ', '_')}-{int(agora.timestamp())}"
+            contrato_tanques = TankForecastContract(
+                schema_version="1.0",
+                response_id=resp_id_tank,
+                intent="tank_forecast",
+                context=TankForecastContext(
+                    unit_id="posto_01",
+                    queried_at=queried_at_iso,
+                    filtro_combustivel=filtro_combustivel,
+                    data_referencia=str(data_referencia) if data_referencia else None,
+                ),
+                assessment=assessment_tanks,
+                metrics=metrics_tanks,
+                tanks=tanks_items,
+                fuel_summary=fuel_items,
+                order_suggestions=order_items,
+                pending_items=pending_items_tanks,
+                sources=sources_tanks,
+                recommended_action=rec_action_tanks,
+                explanation=TankForecastExplanation(text=explanation_tanks_text),
+            )
+
+            # Montagem do Resultado Estruturado (AURA Precision Glass v1.0)
             resultado = {
                 "status": "ok",
                 "timestamp_previsao": agora.strftime("%Y-%m-%d %H:%M"),
                 "filtro_aplicado": filtro_combustivel,
+                "schema_version": "1.0",
+                "response_id": resp_id_tank,
+                "intent": "tank_forecast",
+                "context": contrato_tanques.context.model_dump(),
+                "assessment": contrato_tanques.assessment.model_dump(),
+                "metrics": contrato_tanques.metrics.model_dump(),
+                "tanks": [t.model_dump() for t in contrato_tanques.tanks],
+                "fuel_summary": [f.model_dump() for f in contrato_tanques.fuel_summary],
+                "order_suggestions": [o.model_dump() for o in contrato_tanques.order_suggestions],
+                "pending_items": [p.model_dump() for p in contrato_tanques.pending_items],
+                "sources": [s.model_dump() for s in contrato_tanques.sources],
+                "recommended_action": contrato_tanques.recommended_action.model_dump(),
+                "explanation": contrato_tanques.explanation.model_dump(),
+                "contrato": contrato_tanques.model_dump(),
                 "resumo_executivo": {
                     "status_geral": "ALERTA_ESTOQUE_CRITICO" if any(t.get('alerta_critico') for t in tanques_retorno) else ("ESTOQUE_ESTAVEL" if tanques_retorno else "SEM_REGISTROS"),
                     "tanque_mais_critico": {
@@ -2674,6 +2903,8 @@ class PostoTools:
                 status_geral = "CRÍTICO_MANUTENÇÃO"
             elif bicos_com_alerta or any(an['gravidade'] == "ALTA" for an in anomalias):
                 status_geral = "ALERTA_PISTA"
+            elif tot_abast_count == 0:
+                status_geral = "SEM_MOVIMENTACAO"
             else:
                 status_geral = "OPERACIONAL_NORMAL"
 
@@ -2718,9 +2949,189 @@ class PostoTools:
                 b_pad = f"{int(bico_alvo):03d}" if str(bico_alvo).isdigit() else str(bico_alvo)
                 bico_destaque = next((b for b in bicos_auditoria if b['bico'] == b_pad or b['bico'].lstrip('0') == b_pad.lstrip('0')), None)
 
+            # Construção do Contrato Estruturado AURA Precision Glass v1.0 (F5-05)
+            queried_at_iso = datetime.now().astimezone().isoformat()
+            if status_geral == "CRÍTICO_MANUTENÇÃO":
+                severity_piste = "critical"
+                title_piste = "Manutenção Urgente: Filtros de Bicos Obstruídos"
+                badge_piste = "🚨 Filtro Obstruído (< 30 L/min)"
+            elif status_geral == "ALERTA_PISTA":
+                severity_piste = "attention"
+                title_piste = "Auditoria de Pista: Alertas Preventivos"
+                badge_piste = "⚠️ Alerta de Pista"
+            elif status_geral == "SEM_MOVIMENTACAO":
+                severity_piste = "normal"
+                title_piste = "Pista sem Movimentação Registrada"
+                badge_piste = "⏸️ Sem Movimentação"
+            else:
+                severity_piste = "normal"
+                title_piste = "Desempenho de Pista & Frentistas em Conformidade"
+                badge_piste = "✓ Pista Operacional"
+
+            limitation_piste = "Vazão calculada a partir do tempo medido pelo concentrador CBC04; bicos sem registro de tempo utilizam baseline de referência nominal da bomba."
+            vazao_media_geral = round(sum(b['vazao_media_l_min'] for b in bicos_auditoria) / len(bicos_auditoria), 2) if bicos_auditoria else 35.0
+
+            assessment_piste = PumpPerformanceAssessment(
+                status_code=status_geral,
+                severity=severity_piste,
+                title=title_piste,
+                limitation=limitation_piste,
+                badge_label=badge_piste,
+                total_bicos_lentos=len(bicos_com_alerta),
+                total_anomalias=len(anomalias),
+                melhor_frentista_nome=campeao_faturamento['nome'] if campeao_faturamento else None,
+            )
+
+            metrics_piste = PumpPerformanceMetrics(
+                total_abastecimentos=tot_abast_count,
+                total_litros=round(tot_litros_pista, 3),
+                faturamento_total=round(tot_fat_pista, 2),
+                faturamento_total_cents=int(round(tot_fat_pista * 100)),
+                ticket_medio=ticket_medio_pista,
+                volume_medio=vol_medio_pista,
+                taxa_conversao_aditivada_geral_pct=float(res_conv_geral["conversao_aditivada_pct"]),
+                classificacao_conversao_aditivada=str(res_conv_geral["classificacao_conversao"]),
+                vazao_media_l_min=vazao_media_geral,
+                total_gasolina_comum_litros=round(gas_comum_pista, 3),
+                total_gasolina_aditivada_litros=round(gas_adit_pista, 3),
+                total_diesel_litros=round(tot_die_pista, 3),
+                taxa_conversao_diesel_s10_pct=float(taxa_die_s10_pista),
+                bicos_com_alerta_filtro=len(bicos_com_alerta),
+                total_anomalias_detectadas=len(anomalias),
+            )
+
+            ranking_items = [
+                AttendantPerformanceItem(
+                    matricula=f['matricula'],
+                    nome=f['nome'],
+                    total_abastecimentos=int(f['total_abastecimentos']),
+                    total_litros=float(f['total_litros']),
+                    faturamento_reais=float(f['faturamento_reais']),
+                    ticket_medio_reais=float(f['ticket_medio_reais']),
+                    volume_medio_litros=float(f['volume_medio_litros']),
+                    conversao_aditivada_pct=float(f['conversao_aditivada_pct']),
+                    classificacao_conversao=str(f.get('classificacao_conversao', 'Sem Classificação')),
+                    taxa_diesel_s10_pct=float(f.get('taxa_diesel_s10_pct', 0.0)),
+                    identificado=bool(f.get('identificado', True)),
+                ) for f in ranking_frentistas
+            ]
+
+            nozzle_items = [
+                NozzleAuditedItem(
+                    bico=b['bico'],
+                    bomba_fisica=b['bomba_fisica'],
+                    tanque=b['tanque'],
+                    combustivel=b['combustivel'],
+                    categoria=b['categoria'],
+                    total_abastecimentos=int(b['total_abastecimentos']),
+                    volume_total_litros=float(b['volume_total_litros']),
+                    vazao_media_l_min=float(b['vazao_media_l_min']),
+                    status_vazao=b['status_vazao'],
+                    alerta_filtro_lento=bool(b['alerta_filtro_lento']),
+                    recomendacao=b['recomendacao'],
+                    origem_vazao=b['origem_vazao'],
+                ) for b in bicos_auditoria
+            ]
+
+            anomaly_items = [
+                PisteAnomalyItem(
+                    controle=str(an['controle']),
+                    tipo=an['tipo'],
+                    gravidade=an['gravidade'],
+                    bico=str(an['bico']),
+                    data_hora=an['data_hora'],
+                    litros=float(an['litros']),
+                    total_reais=float(an['total_reais']),
+                    frentista=an['frentista'],
+                    motivo=an['motivo'],
+                ) for an in anomalias
+            ]
+
+            pending_items_piste = []
+            if bicos_com_alerta:
+                pending_items_piste.append(PendingItem(
+                    code="slow_nozzle_filter",
+                    label=f"{len(bicos_com_alerta)} bico(s) com vazão lenta (< 30 L/min)",
+                    detail=", ".join(f"Bico {b['bico']} ({b['vazao_media_l_min']:.1f} L/min)" for b in bicos_com_alerta),
+                    severity="critical" if any(b.get('status_vazao') == "CRÍTICO_FILTRO_OBSTRUÍDO" for b in bicos_com_alerta) else "attention"
+                ))
+            if anomalias_altas:
+                pending_items_piste.append(PendingItem(
+                    code="high_piste_anomalies",
+                    label=f"{len(anomalias_altas)} anomalia(s) de alta gravidade",
+                    detail="Abastecimentos manuais ou cancelados na pista",
+                    severity="attention"
+                ))
+
+            sources_piste = [
+                DataSource(id="abastecimentos", label="Abastecimentos CBC04", availability="available", data_as_of=str(data_filtro_db or datetime.now().date())),
+                DataSource(id="frentistas", label="Controle de Frentistas / RFID", availability="available", data_as_of=str(data_filtro_db or datetime.now().date())),
+            ]
+
+            if bicos_com_alerta:
+                rec_action_piste = RecommendedAction(
+                    label=f"Trocar Filtro do Bico {bicos_com_alerta[0]['bico']}",
+                    execution="external_manual",
+                    detail="Providenciar a substituição imediata do elemento filtrante para restaurar a vazão normal."
+                )
+            elif float(res_conv_geral["conversao_aditivada_pct"]) < 20.0 and float(res_conv_geral["total_gasolina_litros"]) > 0:
+                rec_action_piste = RecommendedAction(
+                    label="Treinar Equipe em Aditivada",
+                    execution="external_manual",
+                    detail="Capacitar frentistas para oferta ativa no primeiro contato com o motorista."
+                )
+            else:
+                rec_action_piste = RecommendedAction(
+                    label="Operação Conforme",
+                    execution="external_manual",
+                    detail="Pista com fluxo normal e produtividade adequada."
+                )
+
+            exp_bico_alert = f"Alerta de filtro obstruído em {len(bicos_com_alerta)} bico(s). " if bicos_com_alerta else "Vazão hidráulica em níveis adequados. "
+            exp_lider = f"Líder em faturamento: {campeao_faturamento['nome']} (R$ {campeao_faturamento['faturamento_reais']:.2f})." if campeao_faturamento else ""
+            explanation_piste_text = f"Pista com {tot_abast_count} abastecimento(s) auditado(s) totalizando R$ {tot_fat_pista:.2f}. {exp_bico_alert}{exp_lider}"
+
+            resp_id_piste = f"pump-perf-{str(data_filtro_db or 'all').replace('-', '')}"
+            contrato_pista = PumpPerformanceContract(
+                schema_version="1.0",
+                response_id=resp_id_piste,
+                intent="pump_performance",
+                context=PumpPerformanceContext(
+                    unit_id="posto_01",
+                    queried_at=queried_at_iso,
+                    data_filtro=str(data_filtro_db) if data_filtro_db else None,
+                    turno_filtro=turno_alvo,
+                    frentista_filtro=frentista_alvo,
+                    bico_filtro=bico_alvo,
+                ),
+                assessment=assessment_piste,
+                metrics=metrics_piste,
+                ranking=ranking_items,
+                nozzles=nozzle_items,
+                anomalies=anomaly_items,
+                pending_items=pending_items_piste,
+                sources=sources_piste,
+                recommended_action=rec_action_piste,
+                explanation=PumpPerformanceExplanation(text=explanation_piste_text),
+            )
+
             resultado = {
                 "status": "ok",
                 "timestamp_auditoria": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "schema_version": "1.0",
+                "response_id": resp_id_piste,
+                "intent": "pump_performance",
+                "context": contrato_pista.context.model_dump(),
+                "assessment": contrato_pista.assessment.model_dump(),
+                "metrics": contrato_pista.metrics.model_dump(),
+                "ranking": [r.model_dump() for r in contrato_pista.ranking],
+                "nozzles": [n.model_dump() for n in contrato_pista.nozzles],
+                "anomalies": [a.model_dump() for a in contrato_pista.anomalies],
+                "pending_items": [p.model_dump() for p in contrato_pista.pending_items],
+                "sources": [s.model_dump() for s in contrato_pista.sources],
+                "recommended_action": contrato_pista.recommended_action.model_dump(),
+                "explanation": contrato_pista.explanation.model_dump(),
+                "contrato": contrato_pista.model_dump(),
                 "periodo_analisado": {
                     "data_filtro": data_filtro_db,
                     "turno_filtro": turno_alvo,
@@ -3310,9 +3721,145 @@ class PostoTools:
                 "Guarda de Documentos: Manter os registros diários do LMC arquivados e à disposição da fiscalização da ANP e órgãos fazendários pelo prazo regulamentar de 5 anos."
             )
 
+            # Construção do Contrato Estruturado AURA Precision Glass v1.0 (F5-06 & F5-07)
+            queried_at_iso = datetime.now().astimezone().isoformat()
+            is_lmc_conforme = len(tanques_alerta) == 0
+            severity_lmc = "normal" if is_lmc_conforme else ("critical" if any(a['variacao_litros'] < 0 for a in tanques_alerta) else "attention")
+            title_lmc = "LMC Oficial ANP: Conformidade Regulamentar Aprovada" if is_lmc_conforme else "Alerta Fiscal: Tanque Fora da Tolerância ANP (±0,6%)"
+            badge_lmc = "✓ Conforme ANP (±0,6%)" if is_lmc_conforme else "🚨 Fora da Tolerância (±0,6%)"
+            limitation_lmc = "Cálculo estrito conforme Portaria ANP nº 26/1992. Variação percentual calculada sobre o total de saídas dos bicos."
+
+            assessment_lmc = LMCReportAssessment(
+                status_geral_anp=status_geral,
+                severity=severity_lmc,
+                title=title_lmc,
+                limitation=limitation_lmc,
+                badge_label=badge_lmc,
+                dentro_tolerancia_geral=is_lmc_conforme,
+                variacao_geral_pct=var_geral_pct,
+                total_tanques_alerta=len(tanques_alerta),
+            )
+
+            metrics_lmc = LMCReportMetrics(
+                total_tanques_analisados=len(tanques_relatorio),
+                total_tanques_conformes=len(tanques_relatorio) - len(tanques_alerta),
+                total_tanques_alerta=len(tanques_alerta),
+                total_vendas_litros=round(tot_vendas, 3),
+                total_recebimentos_litros=round(tot_rec, 3),
+                total_estoque_escriturado_litros=round(tot_escriturado, 3),
+                total_estoque_fisico_litros=round(tot_fisico, 3),
+                variacao_volumetrica_total_litros=round(tot_var_litros, 3),
+                variacao_volumetrica_geral_pct=var_geral_pct,
+                tolerancia_oficial_pct=0.6,
+            )
+
+            tanks_lmc_items = [
+                LMCTankAuditedItem(
+                    tanque=t['tanque'],
+                    combustivel=t['combustivel'],
+                    categoria_combustivel=t['categoria_combustivel'],
+                    codlmc_anp=t['codlmc_anp'],
+                    capacidade_litros=float(t['capacidade_litros']),
+                    bicos_vinculados=t.get('bicos_vinculados', []),
+                    total_abastecimentos=int(t.get('total_abastecimentos', 0)),
+                    faturamento_vendas_reais=float(t.get('faturamento_vendas_reais', 0.0)),
+                    estoque_abertura_litros=float(t['movimentacao']['estoque_abertura_litros']),
+                    recebimentos_descargas_litros=float(t['movimentacao']['recebimentos_descargas_litros']),
+                    vendas_bicos_litros=float(t['movimentacao']['vendas_bicos_litros']),
+                    estoque_escriturado_litros=float(t['movimentacao']['estoque_escriturado_litros']),
+                    estoque_fisico_medido_litros=float(t['movimentacao']['estoque_fisico_medido_litros']),
+                    variacao_litros=float(t['auditoria_anp']['variacao_litros']),
+                    variacao_pct=float(t['auditoria_anp']['variacao_pct']),
+                    tolerancia_pct=float(t['auditoria_anp']['tolerancia_pct']),
+                    tolerancia_max_litros=float(t['auditoria_anp']['tolerancia_max_litros']),
+                    dentro_tolerancia=bool(t['auditoria_anp']['dentro_tolerancia']),
+                    status_anp=t['auditoria_anp']['status_anp'],
+                    tipo_variacao=t['auditoria_anp']['tipo_variacao'],
+                    nome_variacao=t['auditoria_anp']['nome_variacao'],
+                    descricao_status=t['auditoria_anp']['descricao_status'],
+                    diagnostico=t['auditoria_anp']['diagnostico'],
+                ) for t in tanques_relatorio
+            ]
+
+            alert_lmc_items = [
+                LMCTankAlertItem(
+                    tanque=a['tanque'],
+                    combustivel=a['combustivel'],
+                    variacao_litros=float(a['variacao_litros']),
+                    variacao_pct=float(a['variacao_pct']),
+                    tolerancia_max_litros=float(a['tolerancia_max_litros']),
+                    diagnostico=a['diagnostico'],
+                ) for a in tanques_alerta
+            ]
+
+            pending_items_lmc = []
+            if tanques_alerta:
+                pending_items_lmc.append(PendingItem(
+                    code="anp_tolerance_breach",
+                    label=f"{len(tanques_alerta)} tanque(s) fora da tolerância de ±0.6%",
+                    detail=", ".join(f"Tanque {a['tanque']} ({a['variacao_pct']:+.2f}%)" for a in tanques_alerta),
+                    severity="critical" if any(a['variacao_litros'] < 0 for a in tanques_alerta) else "attention"
+                ))
+
+            sources_lmc = [
+                DataSource(id="fechabomba", label="Encerrantes Fiscais (ERP)", availability="available", data_as_of=str(data_alvo)),
+                DataSource(id="medicao_tanques", label="Régua / Sonda Física", availability="available", data_as_of=str(data_alvo)),
+                DataSource(id="notas_fiscais", label="Notas Fiscais de Entrada", availability="available", data_as_of=str(data_alvo)),
+            ]
+
+            if tanques_alerta:
+                rec_action_lmc = RecommendedAction(
+                    label=f"Investigar Tanque {tanques_alerta[0]['tanque']} (Aferição / Estanqueidade)",
+                    execution="external_manual",
+                    detail="Realizar aferição com medida-padrão de 20L e teste de estanqueidade para descartar vazamentos."
+                )
+            else:
+                rec_action_lmc = RecommendedAction(
+                    label="Arquivar Folha Diária do LMC",
+                    execution="external_manual",
+                    detail="Fechamento conforme. Manter os registros impressos à disposição da fiscalização por 5 anos."
+                )
+
+            exp_anp_alert = f"ATENÇÃO: {len(tanques_alerta)} tanque(s) fora da margem regulamentar de ±0,6%." if tanques_alerta else "Todos os tanques operaram estritamente dentro da margem legal de ±0,6%."
+            explanation_lmc_text = f"Relatório Oficial LMC ({data_alvo}): Vendas totais de {tot_vendas:,.1f} L com variação volumétrica de {tot_var_litros:+.1f} L ({var_geral_pct:+.2f}%). {exp_anp_alert}"
+
+            resp_id_lmc = f"lmc-report-{str(data_alvo).replace('-', '')}"
+            contrato_lmc = LMCReportContract(
+                schema_version="1.0",
+                response_id=resp_id_lmc,
+                intent="lmc_report",
+                context=LMCReportContext(
+                    unit_id="posto_01",
+                    queried_at=queried_at_iso,
+                    data_lmc=str(data_alvo),
+                    filtro_combustivel=combustivel,
+                    filtro_tanque=tanque,
+                ),
+                assessment=assessment_lmc,
+                metrics=metrics_lmc,
+                tanks=tanks_lmc_items,
+                tanques_em_alerta=alert_lmc_items,
+                pending_items=pending_items_lmc,
+                sources=sources_lmc,
+                recommended_action=rec_action_lmc,
+                explanation=LMCReportExplanation(text=explanation_lmc_text),
+            )
+
             resultado = {
                 "status": "ok",
                 "timestamp_geracao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "schema_version": "1.0",
+                "response_id": resp_id_lmc,
+                "intent": "lmc_report",
+                "context": contrato_lmc.context.model_dump(),
+                "assessment": contrato_lmc.assessment.model_dump(),
+                "metrics": contrato_lmc.metrics.model_dump(),
+                "tanques_em_alerta": [a.model_dump() for a in contrato_lmc.tanques_em_alerta],
+                "pending_items": [p.model_dump() for p in contrato_lmc.pending_items],
+                "sources": [s.model_dump() for s in contrato_lmc.sources],
+                "recommended_action": contrato_lmc.recommended_action.model_dump(),
+                "explanation": contrato_lmc.explanation.model_dump(),
+                "contrato": contrato_lmc.model_dump(),
                 "periodo_analisado": {
                     "data_lmc": data_alvo,
                     "aviso_data": aviso_data,
@@ -3781,9 +4328,138 @@ class PostoTools:
                     "para estimular o hábito de compra de múltiplos itens."
                 )
 
+            # Construção do Contrato Estruturado AURA Precision Glass v1.0 (F5-08)
+            queried_at_iso = datetime.now().astimezone().isoformat()
+            severity_mb = "normal" if count_forte_sinergia > 0 else ("attention" if total_multiplas == 0 else "normal")
+            title_mb = "Combos & Vendas Cruzadas na Loja de Conveniência"
+            badge_mb = f"⚡ Max Lift: {maior_lift:.2f}x" if count_forte_sinergia > 0 else ("⚠️ Poucas Sinergias" if total_multiplas == 0 else "✓ Regras Mineradas")
+            limitation_mb = f"Análise estatística baseada em {total_transacoes} cupons/pedidos. Aumentos de ticket médio dependem da adesão ativa da equipe aos scripts de abordagem no caixa."
+
+            assessment_mb = MarketBasketAssessment(
+                status_code="SINERGIA_IDENTIFICADA" if count_forte_sinergia > 0 else ("SEM_REGISTROS" if total_transacoes == 0 else "POUCAS_SINERGIAS"),
+                severity=severity_mb,
+                title=title_mb,
+                limitation=limitation_mb,
+                badge_label=badge_mb,
+                maior_lift=round(float(maior_lift), 4),
+                regras_com_forte_sinergia_lift_2=count_forte_sinergia,
+            )
+
+            metrics_mb = MarketBasketMetrics(
+                total_transacoes_analisadas=total_transacoes,
+                total_transacoes_multiplos_itens=total_multiplas,
+                pct_cestas_multiplos_itens=pct_multiplas,
+                total_itens_distintos=len(todos_skus),
+                total_regras_geradas=len(todas_regras),
+                regras_forte_sinergia_count=count_forte_sinergia,
+                maior_lift=round(float(maior_lift), 4),
+                ticket_medio_reais=ticket_medio_geral,
+            )
+
+            top_combos_items = [
+                MarketBasketComboItem(
+                    produto_origem=c['produto_origem']['nompro'] if isinstance(c['produto_origem'], dict) else str(c['produto_origem']),
+                    produto_recomendado=c['produto_recomendado']['nompro'] if isinstance(c['produto_recomendado'], dict) else str(c['produto_recomendado']),
+                    suporte_conjunto_pct=round(float(c['metricas']['suporte']) * 100.0, 2),
+                    confianca_pct=round(float(c['metricas']['confianca']) * 100.0, 2),
+                    lift=round(float(c['metricas']['lift']), 2),
+                    cupons_conjuntos=int(c['metricas']['frequencia_conjunta']),
+                    ticket_origem_reais=float(c.get('impacto_financeiro', {}).get('preco_origem', 0.0)),
+                    ticket_recomendado_reais=float(c.get('impacto_financeiro', {}).get('preco_recomendado', 0.0)),
+                    script_sugerido_caixa=c.get('script_sugerido_caixa', ''),
+                    forte_sinergia=bool(c['metricas']['lift'] >= 2.0),
+                ) for c in top_combos
+            ]
+
+            detailed_rules_items = []
+            for r in todas_regras:
+                orig_label = r['produto_origem']['nompro'] if isinstance(r.get('produto_origem'), dict) else str(r.get('produto_origem', ''))
+                rec_label = r['produto_recomendado']['nompro'] if isinstance(r.get('produto_recomendado'), dict) else str(r.get('produto_recomendado', ''))
+                regra_str = r.get('regra') or f"{orig_label} -> {rec_label}"
+                detailed_rules_items.append(
+                    MarketBasketRuleItem(
+                        regra=regra_str,
+                        suporte=float(r['metricas']['suporte']),
+                        confianca=float(r['metricas']['confianca']),
+                        lift=float(r['metricas']['lift']),
+                        frequencia_conjunta=int(r['metricas']['frequencia_conjunta']),
+                        forte_sinergia=bool(r['metricas']['lift'] >= 2.0),
+                    )
+                )
+
+            pending_items_mb = []
+            if count_forte_sinergia == 0 and total_transacoes > 0:
+                pending_items_mb.append(PendingItem(
+                    code="low_synergy",
+                    label="Nenhum combo com Lift ≥ 2.0x identificado",
+                    detail="Ampliar o recorte temporal para analisar maior base de cupons",
+                    severity="attention"
+                ))
+
+            sources_mb = [
+                DataSource(id="pedidos_pdv", label="Pedidos e Cupons do PDV (pedido + itemped)", availability="available", data_as_of=datetime.now().isoformat()),
+            ]
+
+            if top_combos:
+                c_lead = top_combos[0]
+                p_orig_nome = c_lead['produto_origem']['nompro'] if isinstance(c_lead['produto_origem'], dict) else str(c_lead['produto_origem'])
+                p_rec_nome = c_lead['produto_recomendado']['nompro'] if isinstance(c_lead['produto_recomendado'], dict) else str(c_lead['produto_recomendado'])
+                rec_action_mb = RecommendedAction(
+                    label=f"Ativar Combo: {p_orig_nome[:18]} + {p_rec_nome[:18]}",
+                    execution="external_manual",
+                    detail=f"Orientar caixas com o script persuasivo sugerido (Lift {c_lead['metricas']['lift']:.1f}x)."
+                )
+            else:
+                rec_action_mb = RecommendedAction(
+                    label="Ampliar Período de Análise",
+                    execution="external_manual",
+                    detail="Consultar período mais longo no ERP para minerar regras com significância estatística."
+                )
+
+            exp_lift_lead = f"Maior Lift apurado: {maior_lift:.2f}x com {count_forte_sinergia} combo(s) de forte sinergia (Lift ≥ 2.0). " if count_forte_sinergia > 0 else "Pouca associação detectada na amostra avaliada. "
+            explanation_mb_text = f"Análise de {total_transacoes} cupons ({pct_multiplas:.1f}% com múltiplos itens). {exp_lift_lead}Aplique os scripts de balcão para elevar o ticket médio."
+
+            resp_id_mb = f"market-basket-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            contrato_mb = MarketBasketContract(
+                schema_version="1.0",
+                response_id=resp_id_mb,
+                intent="market_basket",
+                context=MarketBasketContext(
+                    unit_id="posto_01",
+                    queried_at=queried_at_iso,
+                    filtro_produto=filtro_produto,
+                    min_lift=min_lift,
+                    min_suporte=min_suporte,
+                    min_confianca=min_confianca,
+                    data_inicio=data_inicio,
+                    data_fim=data_fim,
+                ),
+                assessment=assessment_mb,
+                metrics=metrics_mb,
+                top_combos=top_combos_items,
+                detailed_rules=detailed_rules_items,
+                pending_items=pending_items_mb,
+                sources=sources_mb,
+                recommended_action=rec_action_mb,
+                explanation=MarketBasketExplanation(text=explanation_mb_text),
+            )
+
             resultado = {
                 "status": "ok",
                 "timestamp_geracao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "schema_version": "1.0",
+                "response_id": resp_id_mb,
+                "intent": "market_basket",
+                "context": contrato_mb.context.model_dump(),
+                "assessment": contrato_mb.assessment.model_dump(),
+                "metrics": contrato_mb.metrics.model_dump(),
+                "top_combos": [c.model_dump() for c in contrato_mb.top_combos],
+                "detailed_rules": [r.model_dump() for r in contrato_mb.detailed_rules],
+                "pending_items": [p.model_dump() for p in contrato_mb.pending_items],
+                "sources": [s.model_dump() for s in contrato_mb.sources],
+                "recommended_action": contrato_mb.recommended_action.model_dump(),
+                "explanation": contrato_mb.explanation.model_dump(),
+                "contrato": contrato_mb.model_dump(),
                 "parametros_consulta": {
                     "filtro_produto": filtro_produto,
                     "min_lift": min_lift,

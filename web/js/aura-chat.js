@@ -13,6 +13,35 @@ class AuraChatController {
     this.abortController = null;
     this.messages = [];
     this.userScrolledUp = false;
+
+    // F5-01: Registro Modular Centralizado de Renderizadores Especializados por Intent / Ferramenta
+    this.responseRenderers = {
+      'shift_reconciliation': this.renderTurnoWidget.bind(this),
+      'conciliacao_turno': this.renderTurnoWidget.bind(this),
+      'auditoria_turno': this.renderTurnoWidget.bind(this),
+      'auditar_fechamento_turno': this.renderTurnoWidget.bind(this),
+
+      'tank_forecast': this.renderTankAutonomyWidget.bind(this),
+      'previsao_tanques': this.renderTankAutonomyWidget.bind(this),
+      'run_out': this.renderTankAutonomyWidget.bind(this),
+      'prever_esgotamento_tanques': this.renderTankAutonomyWidget.bind(this),
+
+      'pump_performance': this.renderDesempenhoPistaWidget.bind(this),
+      'desempenho_pista_frentistas': this.renderDesempenhoPistaWidget.bind(this),
+      'auditar_desempenho_pista_frentistas': this.renderDesempenhoPistaWidget.bind(this),
+
+      'lmc_report': this.renderLmcAnpWidget.bind(this),
+      'lmc_anp': this.renderLmcAnpWidget.bind(this),
+      'gerar_relatorio_lmc_anp': this.renderLmcAnpWidget.bind(this),
+
+      'market_basket': this.renderCombosWidget.bind(this),
+      'conveniencia_vendas_cruzadas': this.renderCombosWidget.bind(this),
+      'auditar_cesta_conveniencia_vendas_cruzadas': this.renderCombosWidget.bind(this),
+
+      'ajuda_sistema': this.renderAjudaSistemaWidget.bind(this),
+      'conhecimento_aura': this.renderAjudaSistemaWidget.bind(this),
+      'ajuda': this.renderAjudaSistemaWidget.bind(this),
+    };
   }
 
   generateSessionId() {
@@ -599,32 +628,24 @@ class AuraChatController {
   }
 
   /**
-   * Roteador de Renderização de Widgets Inline Interativos no Chat
+   * F5-01: Roteador Centralizado de Renderização de Respostas Especializadas
+   * Despacha para renderizadores canônicos registrados por intent ou toolName.
    */
   renderToolInlineWidget(toolName, data) {
     if (!data || typeof data !== 'object') return '';
 
-    // 1. Roteamento prioritário por toolName canônico
-    if (toolName === 'ajuda_sistema' || toolName === 'conhecimento_aura' || toolName === 'ajuda') {
-      return this.renderAjudaSistemaWidget(data);
-    }
-    if (toolName === 'lmc_anp' || toolName === 'gerar_relatorio_lmc_anp') {
-      return this.renderLmcAnpWidget(data);
-    }
-    if (toolName === 'previsao_tanques' || toolName === 'run_out' || toolName === 'prever_esgotamento_tanques') {
-      return this.renderTankAutonomyWidget(data);
-    }
-    if (toolName === 'auditoria_turno' || toolName === 'conciliacao_turno' || toolName === 'auditar_fechamento_turno') {
-      return this.renderTurnoWidget(data);
-    }
-    if (toolName === 'conveniencia_vendas_cruzadas' || toolName === 'auditar_cesta_conveniencia_vendas_cruzadas') {
-      return this.renderCombosWidget(data);
-    }
-    if (toolName === 'desempenho_pista_frentistas' || toolName === 'auditar_desempenho_pista_frentistas') {
-      return this.renderDesempenhoPistaWidget(data);
+    // 1. Despacho Canônico por Intent Estruturado do Contrato (F5-01)
+    const intent = data.contrato?.intent || data.intent;
+    if (intent && this.responseRenderers && typeof this.responseRenderers[intent] === 'function') {
+      return this.responseRenderers[intent](data);
     }
 
-    // 2. Roteamento por assinatura estrutural dos dados (fallback inteligente)
+    // 2. Despacho por toolName registrado
+    if (toolName && this.responseRenderers && typeof this.responseRenderers[toolName] === 'function') {
+      return this.responseRenderers[toolName](data);
+    }
+
+    // 3. Roteamento por Assinatura Estrutural dos Dados (Fallback Seguro)
     if (
       data.ui_action ||
       (Array.isArray(data.artigos) && data.artigos.length > 0 && data.artigos[0]?.modulo)
@@ -633,14 +654,15 @@ class AuraChatController {
     }
     if (
       data.resumo_executivo?.status_geral_anp ||
+      data.assessment?.status_code === 'CONFORME_ANP' ||
+      data.assessment?.status_code === 'ALERTA_VARIACAO_EXCESSIVA' ||
       Array.isArray(data.demonstrativo_por_combustivel) ||
-      (Array.isArray(data.tanques) && data.tanques[0]?.auditoria_anp)
+      (Array.isArray(data.tanques) && data.tanques[0]?.auditoria_anp) ||
+      (Array.isArray(data.tanques) && data.tanques[0]?.status_anp)
     ) {
       return this.renderLmcAnpWidget(data);
     }
     if (
-      data.contrato?.intent === 'shift_reconciliation' ||
-      data.intent === 'shift_reconciliation' ||
       data.triangulacao_pista ||
       data.triangulacao_caixa ||
       data.triangulacao_volumes ||
@@ -651,26 +673,57 @@ class AuraChatController {
     if (
       Array.isArray(data.top_combos_cross_selling) ||
       Array.isArray(data.top_combos_oportunidades) ||
-      Array.isArray(data.regras_associacao_detalhadas)
+      Array.isArray(data.regras_associacao_detalhadas) ||
+      Array.isArray(data.top_combos)
     ) {
       return this.renderCombosWidget(data);
     }
     if (
       Array.isArray(data.ranking_frentistas) ||
-      Array.isArray(data.auditoria_vazao_bicos)
+      Array.isArray(data.auditoria_vazao_bicos) ||
+      Array.isArray(data.ranking) ||
+      Array.isArray(data.nozzles)
     ) {
       return this.renderDesempenhoPistaWidget(data);
     }
     if (
       Array.isArray(data.detalhamento_tanques) ||
       data.previsao_por_combustivel ||
+      Array.isArray(data.tanks) ||
       Array.isArray(data.tanques)
     ) {
       return this.renderTankAutonomyWidget(data);
     }
 
-    // 3. Fallback genérico executivo
+    // 4. Fallback genérico executivo
     return this.renderGenericToolWidget(toolName, data);
+  }
+
+  /**
+   * F1-08 / F5-01: Card de Fallback Seguro para Versão Desconhecida de Schema
+   * Não inventa interpretação financeira ou operacional quando o schema não for suportado.
+   */
+  renderUnsupportedSchemaCard(version, moduleName) {
+    return `
+      <div class="decision-card">
+        <div class="decision-header">
+          <div class="decision-context">
+            <span class="decision-context-title">Versão de Contrato Não Suportada (v${this.escapeHtml(version)})</span>
+            <span class="decision-context-sub">Contrato AURA Precision Glass v1.0 esperado • ${this.escapeHtml(moduleName)}</span>
+          </div>
+          <span class="decision-status-badge status-neutral">
+            <span>⚠️</span>
+            <span>Schema Desconhecido</span>
+          </span>
+        </div>
+        <div class="p-3.5 rounded-xl bg-slate-900/80 border border-amber-500/30 text-amber-200/90 font-mono text-xs space-y-1.5">
+          <div>⚠️ <strong>Aviso de Conformidade e Governança:</strong></div>
+          <p class="text-[11px] text-slate-300">
+            O payload analítico recebido para <strong>${this.escapeHtml(moduleName)}</strong> utiliza a versão <code>${this.escapeHtml(version)}</code>, incompatível com o renderizador atual. A exibição executiva foi suspensa para evitar inferências incorretas.
+          </p>
+        </div>
+      </div>
+    `;
   }
 
   /**
@@ -788,65 +841,168 @@ class AuraChatController {
   }
 
   /**
-   * Widget 1: Mini-Barras Visuais de Nível de Tanques e Autonomia Restante
+   * Widget 1: Card de Decisão Executiva para Autonomia de Tanques & Previsão de Run-Out
+   * Implementação AURA Precision Glass v1.0 (F5-03 & F5-04).
+   * Garante:
+   * 1. Superfície única DecisionCard sem aninhamentos desnecessários.
+   * 2. Distinção explícita entre autonomia até reserva crítica (15%) e esgotamento total (0%) (F5-04).
+   * 3. Barras volumétricas com código de cores semântico e espaço livre (Ullage em carretas de 5k).
+   * 4. Limitações de histórico e consumo médio explícitas (F5-02).
+   * 5. Ação recomendada em 1 clique e gatilho de evidências detalhadas.
    */
   renderTankAutonomyWidget(data) {
-    const resumo = data.resumo_executivo || {};
-    const tanques = data.detalhamento_tanques || data.tanques || [];
-    const statusGeral = resumo.status_geral || 'ESTÁVEL';
-    const menorAutonomia = resumo.tanque_mais_critico?.autonomia_runout_horas ?? resumo.menor_autonomia_horas;
-
-    let badgeStatus = '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓ ESTÁVEL</span>';
-    if (statusGeral === 'ALERTA_ESTOQUE_CRITICO' || statusGeral === 'CRÍTICO') {
-      badgeStatus = '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">🚨 CRÍTICO</span>';
-    } else if (String(statusGeral).includes('ATENÇÃO')) {
-      badgeStatus = '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">⚠️ ATENÇÃO</span>';
+    if (!data || typeof data !== 'object') {
+      return `<div class="decision-card"><p class="text-xs text-slate-400">Dados de autonomia de tanques indisponíveis.</p></div>`;
     }
 
-    let tanksHtml = '';
-    tanques.forEach(t => {
-      const cod = t.codtan || t.tanque || '000';
+    const c = data.contrato || data;
+
+    // F1-08 / F5-01: Versão desconhecida de contrato tratada com segurança
+    if (c.schema_version && c.schema_version !== '1.0') {
+      return this.renderUnsupportedSchemaCard(c.schema_version, 'Autonomia de Tanques');
+    }
+
+    const assessment = c.assessment || {};
+    const metrics = c.metrics || {};
+    const pendingItems = c.pending_items || [];
+    const action = c.recommended_action || {};
+    const resumo = data.resumo_executivo || {};
+    const tanksList = c.tanks || data.detalhamento_tanques || data.tanques || [];
+
+    const isNoMovement = assessment.status_code === 'SEM_MOVIMENTACAO' || assessment.status_code === 'SEM_REGISTROS' || data.status === 'sem_movimento' || tanksList.length === 0;
+    const isUnavailable = assessment.status_code === 'INDISPONIVEL' || data.status === 'indisponivel';
+
+    const evId = 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    if (typeof window !== 'undefined') {
+      if (!window.__auraEvidenceStore) window.__auraEvidenceStore = {};
+      window.__auraEvidenceStore[evId] = data;
+    }
+
+    // Status Badges Semânticos com Ícone (F5-09)
+    let badgeClass = 'status-validated';
+    let badgeIcon = '✓';
+    let badgeText = assessment.badge_label || 'Estoque Estável';
+    const severity = assessment.severity || (resumo.status_geral?.includes('CRITICO') ? 'critical' : (resumo.status_geral?.includes('ATENCAO') ? 'attention' : 'normal'));
+
+    if (isNoMovement) {
+      badgeClass = 'status-neutral';
+      badgeIcon = '⏸️';
+      badgeText = assessment.badge_label || 'Sem Registros';
+    } else if (isUnavailable) {
+      badgeClass = 'status-divergent';
+      badgeIcon = '⚠️';
+      badgeText = 'Fonte Indisponível';
+    } else if (severity === 'critical') {
+      badgeClass = 'status-divergent';
+      badgeIcon = '🚨';
+      badgeText = assessment.badge_label || 'Estoque Crítico (< 12h)';
+    } else if (severity === 'attention') {
+      badgeClass = 'status-partial';
+      badgeIcon = '⚠️';
+      badgeText = assessment.badge_label || 'Atenção Estoque';
+    } else {
+      badgeClass = 'status-validated';
+      badgeIcon = '✓';
+      badgeText = assessment.badge_label || 'Estoque Confortável';
+    }
+
+    // Métrica Hero: Menor Autonomia até Reserva 15% (distinguindo esgotamento 0% - F5-04)
+    const menorAutonomiaReserva = assessment.horizonte_critico_horas ?? metrics.autonomia_critica_horas ?? metrics.menor_autonomia_runout_horas ?? assessment.menor_autonomia_horas ?? resumo.tanque_mais_critico?.autonomia_critica_horas;
+    const menorAutonomiaEsgot = assessment.horizonte_runout_horas ?? metrics.autonomia_runout_horas ?? metrics.menor_autonomia_esgotamento_horas ?? assessment.menor_autonomia_esgotamento_horas ?? resumo.tanque_mais_critico?.autonomia_runout_horas;
+    const codCritico = assessment.tanque_mais_critico_cod ?? resumo.tanque_mais_critico?.codtan ?? resumo.tanque_mais_critico?.tanque ?? (tanksList.length > 0 ? (tanksList[0]?.codtan || tanksList[0]?.tanque) : 'N/D');
+
+    let heroValFormatted = '—';
+    let heroColorClass = 'text-emerald';
+    if (tanksList.length === 0 || isNoMovement) {
+      heroValFormatted = '—';
+      heroColorClass = 'text-slate-400';
+    } else if (menorAutonomiaReserva !== null && menorAutonomiaReserva !== undefined && !isNaN(Number(menorAutonomiaReserva))) {
+      const hVal = Number(menorAutonomiaReserva);
+      heroValFormatted = `${hVal.toFixed(1)}h`;
+      if (hVal < 12) heroColorClass = 'text-rose';
+      else if (hVal < 24) heroColorClass = 'text-amber';
+      else heroColorClass = 'text-emerald';
+    }
+
+    const heroLabel = 'Menor Autonomia de Pista';
+    let heroSub = 'Tempo estimado até atingir a reserva crítica de segurança (15%).';
+    if (tanksList.length === 0 || isNoMovement) {
+      heroSub = 'Nenhum tanque localizado para os critérios informados.';
+    } else if (menorAutonomiaEsgot !== null && menorAutonomiaEsgot !== undefined && !isNaN(Number(menorAutonomiaEsgot))) {
+      heroSub = `Tanque ${codCritico} • Reserva técnica (15%) em ${heroValFormatted} • Esgotamento total (0%) em ${Number(menorAutonomiaEsgot).toFixed(1)}h.`;
+    }
+
+    // Comparativo Compacto (Volume Total, Capacidade Total, Ullage Total)
+    const volTotal = Number(metrics.saldo_total_litros ?? metrics.volume_total_estoque_litros ?? resumo.volume_total_estoque_litros ?? 0);
+    const capTotal = Number(metrics.capacidade_total_litros ?? resumo.capacidade_total_litros ?? 0);
+    const ullageTotal = Number(metrics.espaco_livre_ullage_total_litros ?? metrics.espaco_livre_total_ullage_litros ?? resumo.espaco_livre_total_ullage_litros ?? 0);
+    const carretas5k = metrics.compartimentos_5k_total ?? metrics.carretas_capacidade_5k_sugeridas ?? resumo.carretas_capacidade_5k_sugeridas ?? Math.floor(ullageTotal / 5000);
+    const pctGlobal = metrics.ocupacao_geral_pct !== undefined ? Number(metrics.ocupacao_geral_pct).toFixed(1) : (capTotal > 0 ? ((volTotal / capTotal) * 100).toFixed(1) : '0.0');
+
+    // Bloco de Limitação (F5-02)
+    let limitationHtml = '';
+    const limText = assessment.limitation || resumo.limitation;
+    if (limText && !isNoMovement && !isUnavailable) {
+      limitationHtml = `
+        <div class="decision-limitation-callout">
+          <span class="text-sm">⚠️</span>
+          <div>
+            <strong class="font-semibold">Premissa e Limitação:</strong>
+            <span class="text-amber-200/90">${this.escapeHtml(limText)}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // Barras Volumétricas por Tanque com Ullage e Ação Rápida
+    let tanksBarsHtml = '';
+    tanksList.forEach(t => {
+      const cod = t.codtan || t.tanque || '00';
       const comb = t.combustivel || 'Combustível';
       const pct = Math.min(100, Math.max(0, parseFloat(t.ocupacao_pct ?? t.ocupacao_percentual ?? 0)));
       const vol = parseFloat(t.saldo_atual_litros ?? t.volume_atual_litros ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
       const cap = parseFloat(t.capacidade_litros ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
-      const horasVal = t.autonomia_runout_horas ?? t.autonomia_horas;
-      const horas = (horasVal !== undefined && horasVal !== null && !isNaN(horasVal)) ? `${parseFloat(horasVal).toFixed(1)}h restantes` : 'N/A';
-      const ullageVal = t.espaco_livre_ullage_litros ?? t.espaco_livre_descarga_litros;
-      const ullage = (ullageVal !== undefined && ullageVal !== null) ? parseFloat(ullageVal).toLocaleString('pt-BR', { maximumFractionDigits: 0 }) : 'N/A';
+
+      const hReserva = t.autonomia_critica_horas ?? t.autonomia_reserva_horas ?? t.autonomia_horas;
+      const hEsgot = t.autonomia_runout_horas ?? t.autonomia_esgotamento_horas;
+      const hReservaStr = (hReserva !== null && hReserva !== undefined && !isNaN(hReserva)) ? `${parseFloat(hReserva).toFixed(1)}h até 15%` : 'N/A';
+      const hEsgotStr = (hEsgot !== null && hEsgot !== undefined && !isNaN(hEsgot)) ? ` | ${parseFloat(hEsgot).toFixed(1)}h até 0%` : '';
+
+      const ullageL = parseFloat(t.espaco_livre_ullage_litros ?? t.espaco_livre_descarga_litros ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+      const carretasTq = t.compartimentos_5k ?? t.sugestao_carreta_5k ?? Math.floor((t.espaco_livre_ullage_litros || 0) / 5000);
 
       let fillClass = 'normal';
       let statusIcon = '🟢';
-      const statusOp = String(t.status_operacional || t.status_nivel || '').toUpperCase();
-      if (pct < 15 || statusOp.includes('CRÍTICO')) {
+      const statusOp = String(t.status_operacional || '').toUpperCase();
+      if (pct < 15 || statusOp.includes('CRÍTICO') || (hReserva !== null && hReserva < 12)) {
         fillClass = 'critical';
         statusIcon = '🚨';
-      } else if (pct < 30 || statusOp.includes('ATENÇÃO')) {
+      } else if (pct < 30 || statusOp.includes('ATENÇÃO') || (hReserva !== null && hReserva < 24)) {
         fillClass = 'warning';
         statusIcon = '🟡';
       }
 
-      tanksHtml += `
-        <div class="widget-tank-card">
-          <div class="flex items-center justify-between text-xs font-mono">
-            <span class="font-bold text-white flex items-center gap-1.5">
+      tanksBarsHtml += `
+        <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5 font-mono text-xs">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-100 flex items-center gap-1.5">
               <span>${statusIcon}</span>
-              <span>TQ ${cod} • ${this.escapeHtml(comb)}</span>
+              <span>TQ ${this.escapeHtml(cod)} • ${this.escapeHtml(comb)}</span>
             </span>
-            <span class="text-slate-300 font-semibold">${pct.toFixed(1)}% <span class="text-slate-500 font-normal">(${vol} / ${cap} L)</span></span>
+            <span class="text-slate-300 font-semibold tabular-nums">${pct.toFixed(1)}% <span class="text-slate-500 font-normal">(${vol} / ${cap} L)</span></span>
           </div>
 
-          <div class="widget-tank-track">
+          <div class="widget-tank-track" style="margin: 4px 0;">
             <div class="widget-tank-fill ${fillClass}" style="width: ${pct}%"></div>
           </div>
 
-          <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-slate-400 mt-1">
-            <div class="flex items-center gap-2">
-              <span class="text-cyan-300 font-semibold">⏱ ${horas}</span>
+          <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="text-cyan-300 font-semibold tabular-nums">⏱ ${hReservaStr}${hEsgotStr}</span>
               <span class="text-slate-600">|</span>
-              <span class="text-slate-300">📦 Ullage livre: ${ullage} L</span>
+              <span class="text-slate-300 tabular-nums">📦 Ullage: ${ullageL} L (${carretasTq}x 5k)</span>
             </div>
-            <button class="widget-action-btn emerald" onclick="window.auraChat.sendUserPrompt('Qual a melhor sugestão de pedido de carreta para o Tanque ${cod}?')">
+            <button type="button" class="widget-action-btn emerald" onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual a melhor sugestão de pedido de carreta para o Tanque ${cod}?');">
               🚚 Pedir Carreta
             </button>
           </div>
@@ -854,78 +1010,267 @@ class AuraChatController {
       `;
     });
 
-    return `
-      <div class="widget-inline-container border-l-4 border-l-auraEmerald">
-        <div class="widget-inline-header">
+    // Bloco de Pendências (F5-02)
+    let pendingHtml = '';
+    if (pendingItems.length > 0) {
+      const itemsList = pendingItems.map(p => `
+        <div class="decision-pending-item cursor-pointer hover:bg-amber-500/10 transition-colors" onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'tanques');" title="Ver detalhes nas evidências">
           <div class="flex items-center gap-2">
-            <span class="text-sm">⛽</span>
-            <strong class="text-xs font-mono text-white uppercase tracking-wider">Tanques Volumétricos & Previsão de Run-Out</strong>
+            <span class="text-amber-400 font-bold">⏳</span>
+            <span class="font-semibold text-slate-200">${this.escapeHtml(p.label)}</span>
           </div>
-          <div class="flex items-center gap-2">
-            ${menorAutonomia !== undefined && menorAutonomia !== null ? `<span class="text-[11px] font-mono text-cyan-300 font-bold">Mín: ${parseFloat(menorAutonomia).toFixed(1)}h</span>` : ''}
-            ${badgeStatus}
+          <span class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+            <span>Tanque</span>
+            <span>↗</span>
+          </span>
+        </div>
+      `).join('');
+
+      pendingHtml = `
+        <div class="space-y-1.5">
+          <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">Alertas de Reposição:</span>
+          <div class="decision-pending-list">${itemsList}</div>
+        </div>
+      `;
+    }
+
+    const recLabel = action.label || `Pedir Carreta para TQ ${codCritico}`;
+    const dataConsulta = c.context?.queried_at ? new Date(c.context.queried_at).toLocaleDateString('pt-BR') : 'Data Recente';
+
+    return `
+      <div class="decision-card" data-evidence-id="${evId}">
+        <!-- Context Header -->
+        <div class="decision-header">
+          <div class="decision-context">
+            <span class="decision-context-title">${this.escapeHtml(assessment.title || 'Autonomia de Tanques & Previsão de Run-Out')}</span>
+            <span class="decision-context-sub">
+              <span>📅 ${this.escapeHtml(dataConsulta)}</span>
+              <span>•</span>
+              <span>⛽ ${tanksList.length} Tanques Monitorados</span>
+              <span>•</span>
+              <span>🏢 ${this.escapeHtml(c.context?.unit_id || 'Posto')}</span>
+            </span>
+          </div>
+          <span class="decision-status-badge ${badgeClass}">
+            <span>${badgeIcon}</span>
+            <span>${this.escapeHtml(badgeText)}</span>
+          </span>
+        </div>
+
+        <!-- Hero Metric -->
+        <div class="decision-hero">
+          <div class="decision-hero-header">
+            <span class="decision-hero-label">${this.escapeHtml(heroLabel)}</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">Tanque ${codCritico}</span>
+          </div>
+          <div class="decision-hero-value ${heroColorClass}">
+            ${heroValFormatted}
+          </div>
+          <div class="decision-hero-sub">
+            ${this.escapeHtml(heroSub)}
           </div>
         </div>
-        <div class="space-y-1">${tanksHtml || '<div class="text-xs font-mono text-slate-400">Nenhum tanque retornado.</div>'}</div>
+
+        ${limitationHtml}
+
+        <!-- Comparativo Compacto -->
+        ${(!isNoMovement && !isUnavailable) ? `
+          <div class="decision-comparison-grid">
+            <div class="decision-comp-item">
+              <span class="decision-comp-label">Volume Total</span>
+              <strong class="decision-comp-val text-cyan-300 tabular-nums">${this.formatLiters(volTotal, 0)}</strong>
+              <span class="decision-comp-sub tabular-nums">${pctGlobal}% ocupação global</span>
+            </div>
+            <div class="decision-comp-item">
+              <span class="decision-comp-label">Capacidade Nominal</span>
+              <strong class="decision-comp-val text-slate-100 tabular-nums">${this.formatLiters(capTotal, 0)}</strong>
+              <span class="decision-comp-sub">${tanksList.length} tanques físicos</span>
+            </div>
+            <div class="decision-comp-item">
+              <span class="decision-comp-label">Ullage Livre</span>
+              <strong class="decision-comp-val text-amber-300 tabular-nums">${this.formatLiters(ullageTotal, 0)}</strong>
+              <span class="decision-comp-sub tabular-nums">Até ${carretas5k} carretas de 5k L</span>
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Barras de Tanques -->
+        <div class="space-y-2 mt-1">
+          ${tanksBarsHtml || '<div class="text-xs font-mono text-slate-400">Nenhum tanque retornado.</div>'}
+        </div>
+
+        ${pendingHtml}
+
+        <!-- Ações Permitidas -->
+        <div class="decision-actions">
+          <button 
+            type="button" 
+            class="decision-btn-primary" 
+            onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual a melhor sugestão de pedido de carreta para o Tanque ${codCritico}?');"
+            title="Sugerir compra imediata com base no Ullage">
+            <span class="text-xs">🚚</span>
+            <span>${this.escapeHtml(recLabel)}</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="decision-btn-secondary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
+            title="Ver fórmulas matemáticas de consumo médio e run-out">
+            <span class="text-xs">📐</span>
+            <span>Como foi calculado</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="decision-btn-secondary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'tanques');"
+            title="Ver detalhamento completo dos tanques">
+            <span class="text-xs">⛽</span>
+            <span>Ver Tanques & Detalhes</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="decision-btn-secondary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
+            title="Ver fontes de telemetria e diagnóstico">
+            <span class="text-xs">📋</span>
+            <span>Resumo & Fontes</span>
+          </button>
+        </div>
       </div>
     `;
   }
 
   /**
-   * Widget 2: Régua Visual da ANP [-0.6% a +0.6%] e Balanço Volumétrico
+   * Widget 2: Card de Decisão Executiva para Conciliação Físico-Contábil do LMC ANP
+   * Implementação AURA Precision Glass v1.0 (F5-06 & F5-07).
+   * Garante:
+   * 1. Superfície única DecisionCard sem aninhamentos desnecessários.
+   * 2. Régua visual regulatória [-0.6% a +0.6%] com marcação de safezone e agulha precisa.
+   * 3. Alternativa textual acessível para leitores de tela e reflow (F5-09).
+   * 4. Comparativo entre Escriturado e Físico Medido com desvios em Litros e %.
+   * 5. Limitações legais e de calibragem transparentes.
    */
   renderLmcAnpWidget(data) {
+    if (!data || typeof data !== 'object') {
+      return `<div class="decision-card"><p class="text-xs text-slate-400">Dados do LMC ANP indisponíveis.</p></div>`;
+    }
+
+    const c = data.contrato || data;
+
+    // F1-08 / F5-01: Versão desconhecida de contrato tratada com segurança
+    if (c.schema_version && c.schema_version !== '1.0') {
+      return this.renderUnsupportedSchemaCard(c.schema_version, 'LMC ANP Oficial');
+    }
+
+    const assessment = c.assessment || {};
+    const metrics = c.metrics || {};
+    const pendingItems = c.pending_items || [];
+    const action = c.recommended_action || {};
     const resumo = data.resumo_executivo || {};
-    const items = data.demonstrativo_por_combustivel || data.tanques || [];
-    const statusGeral = resumo.status_geral_anp || 'CONFORME_ANP';
+    const items = c.tanks || data.demonstrativo_por_combustivel || data.tanques || [];
+
+    const isNoMovement = assessment.status_code === 'SEM_MOVIMENTACAO' || data.status === 'sem_movimento';
+    const isUnavailable = assessment.status_code === 'INDISPONIVEL' || data.status === 'indisponivel';
+
+    const evId = 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    if (typeof window !== 'undefined') {
+      if (!window.__auraEvidenceStore) window.__auraEvidenceStore = {};
+      window.__auraEvidenceStore[evId] = data;
+    }
+
+    // Status Geral ANP
+    const statusGeral = assessment.status_code || resumo.status_geral_anp || 'CONFORME_ANP';
     const isConforme = statusGeral === 'CONFORME_ANP' || statusGeral === 'CONFORME';
 
-    const statusBadge = isConforme
-      ? '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓ CONFORME ANP</span>'
-      : '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">🚨 FORA DA TOLERÂNCIA</span>';
+    let badgeClass = isConforme ? 'status-validated' : 'status-divergent';
+    let badgeIcon = isConforme ? '✓' : '🚨';
+    let badgeText = assessment.badge_label || (isConforme ? '✓ CONFORME ANP (±0.6%)' : '🚨 FORA DA TOLERÂNCIA ANP');
 
-    // Determina o desvio de maior magnitude para a régua
-    let maxVarPct = resumo.variacao_volumetrica_geral_pct !== undefined ? parseFloat(resumo.variacao_volumetrica_geral_pct) : 0;
+    if (isNoMovement) {
+      badgeClass = 'status-neutral';
+      badgeIcon = '⏸️';
+      badgeText = 'Sem Movimentação';
+    } else if (isUnavailable) {
+      badgeClass = 'status-divergent';
+      badgeIcon = '⚠️';
+      badgeText = 'Fonte Indisponível';
+    }
+
+    // Determina o desvio de maior magnitude para a régua regulatória [-1.2% a +1.2%]
+    let maxVarPct = metrics.variacao_volumetrica_geral_pct !== undefined ? Number(metrics.variacao_volumetrica_geral_pct) : (metrics.maior_desvio_pct !== undefined ? Number(metrics.maior_desvio_pct) : (resumo.variacao_volumetrica_geral_pct !== undefined ? parseFloat(resumo.variacao_volumetrica_geral_pct) : 0));
     if (items.length > 0) {
-      items.forEach(c => {
-        const vPct = parseFloat(c.auditoria_anp?.variacao_pct ?? c.variacao_percentual ?? c.variacao_pct ?? 0);
+      items.forEach(item => {
+        const vPct = parseFloat(item.variacao_pct ?? item.auditoria_anp?.variacao_pct ?? item.variacao_percentual ?? 0);
         if (Math.abs(vPct) > Math.abs(maxVarPct)) {
           maxVarPct = vPct;
         }
       });
     }
 
-    // Escala [-1.2% a +1.2%] na régua para alinhar com a safezone CSS (25% a 75% = ±0.6%)
+    // Escala [-1.2% a +1.2%] na régua (25% a 75% = ±0.6% tolerância da Portaria ANP 26)
     const minScale = -1.2;
     const maxScale = 1.2;
     const clampedPct = Math.max(minScale, Math.min(maxScale, maxVarPct));
     let needleLeft = ((clampedPct - minScale) / (maxScale - minScale)) * 100;
     needleLeft = Math.max(4, Math.min(96, needleLeft));
 
-    const needleColor = Math.abs(maxVarPct) <= 0.6 ? '#10b981' : '#f43f5e';
+    const dentroTolerancia = Math.abs(maxVarPct) <= 0.60;
+    const needleColor = dentroTolerancia ? '#10b981' : '#f43f5e';
     const needleText = `${maxVarPct > 0 ? '+' : ''}${maxVarPct.toFixed(2)}%`;
 
-    let rowsHtml = '';
-    items.forEach(c => {
-      const vL = parseFloat(c.auditoria_anp?.variacao_litros ?? c.variacao_litros ?? 0);
-      const vP = parseFloat(c.auditoria_anp?.variacao_pct ?? c.variacao_percentual ?? c.variacao_pct ?? 0);
-      const cConf = Math.abs(vP) <= 0.6;
-      const tagConf = cConf
-        ? '<span class="text-emerald-400 font-bold">Conforme</span>'
-        : '<span class="text-rose-400 font-bold">Alerta ANP</span>';
+    // Métrica Hero: Maior Desvio Volumétrico ANP
+    const heroLabel = 'Maior Desvio Volumétrico ANP';
+    const heroVal = isNoMovement || isUnavailable ? '—' : needleText;
+    const heroColorClass = isNoMovement || isUnavailable ? 'text-slate-400' : (dentroTolerancia ? 'text-emerald' : 'text-rose');
+    const tanquesConformes = metrics.total_tanques_conformes ?? metrics.tanques_conformes_count ?? items.filter(it => Math.abs(parseFloat(it.variacao_pct ?? it.auditoria_anp?.variacao_pct ?? 0)) <= 0.6).length;
+    const heroSub = `Portaria ANP 26/1992 • Tolerância legal: ±0.60% • ${tanquesConformes} de ${items.length} tanques em conformidade estrita.`;
 
-      const escLitros = parseFloat(c.movimentacao?.estoque_escriturado_litros ?? c.estoque_escriturado_litros ?? 0).toLocaleString('pt-BR');
-      const fisLitros = parseFloat(c.movimentacao?.estoque_fisico_medido_litros ?? c.estoque_fisico_litros ?? 0).toLocaleString('pt-BR');
-      const nome = c.combustivel || (c.tanque ? `Tanque ${c.tanque}` : 'Combustível');
+    // Valores do Comparativo
+    const escTotal = Number(metrics.total_estoque_escriturado_litros ?? metrics.estoque_escriturado_total_litros ?? resumo.estoque_escriturado_total_litros ?? 0);
+    const fisTotal = Number(metrics.total_estoque_fisico_litros ?? metrics.estoque_fisico_total_litros ?? resumo.estoque_fisico_total_litros ?? 0);
+    const varTotalL = Number(metrics.variacao_volumetrica_total_litros ?? resumo.variacao_volumetrica_total_litros ?? (fisTotal - escTotal));
+
+    // Bloco de Limitação (F5-02)
+    let limitationHtml = '';
+    const limText = assessment.limitation || resumo.limitation;
+    if (limText && !isNoMovement && !isUnavailable) {
+      limitationHtml = `
+        <div class="decision-limitation-callout">
+          <span class="text-sm">⚠️</span>
+          <div>
+            <strong class="font-semibold">Marco Regulatório & Premissa:</strong>
+            <span class="text-amber-200/90">${this.escapeHtml(limText)}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // Lista de Tanques Auditados no LMC
+    let rowsHtml = '';
+    items.forEach(cItem => {
+      const vL = parseFloat(cItem.variacao_litros ?? cItem.auditoria_anp?.variacao_litros ?? 0);
+      const vP = parseFloat(cItem.variacao_pct ?? cItem.auditoria_anp?.variacao_pct ?? cItem.variacao_percentual ?? 0);
+      const cConf = Math.abs(vP) <= 0.60;
+      const tagConf = cConf
+        ? '<span class="text-emerald-400 font-bold">✓ Conforme</span>'
+        : '<span class="text-rose-400 font-bold">🚨 Alerta ANP</span>';
+
+      const escLitros = parseFloat(cItem.estoque_escriturado_litros ?? cItem.movimentacao?.estoque_escriturado_litros ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+      const fisLitros = parseFloat(cItem.estoque_fisico_medido_litros ?? cItem.estoque_fisico_litros ?? cItem.movimentacao?.estoque_fisico_medido_litros ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+      const nome = cItem.combustivel || (cItem.tanque ? `Tanque ${cItem.tanque}` : 'Combustível');
+      const codTan = cItem.tanque || '00';
 
       rowsHtml += `
-        <div class="p-2 rounded bg-slate-900/60 border border-slate-800 text-xs font-mono flex items-center justify-between gap-2">
+        <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs font-mono flex items-center justify-between gap-2">
           <div>
-            <div class="font-bold text-slate-200">${this.escapeHtml(nome)}</div>
-            <div class="text-[10px] text-slate-400">Escriturado: ${escLitros} L | Físico: ${fisLitros} L</div>
+            <div class="font-bold text-slate-200">TQ ${this.escapeHtml(codTan)} • ${this.escapeHtml(nome)}</div>
+            <div class="text-[10px] text-slate-400 tabular-nums">Escriturado: ${escLitros} L | Físico: ${fisLitros} L</div>
           </div>
           <div class="text-right">
-            <div class="${cConf ? 'text-emerald-300' : 'text-rose-400'} font-bold">
+            <div class="${cConf ? 'text-emerald-300' : 'text-rose-400'} font-bold tabular-nums">
               Δ ${vL > 0 ? '+' : ''}${vL.toFixed(1)} L (${vP > 0 ? '+' : ''}${vP.toFixed(2)}%)
             </div>
             <div class="text-[10px]">${tagConf}</div>
@@ -934,25 +1279,78 @@ class AuraChatController {
       `;
     });
 
-    return `
-      <div class="widget-inline-container border-l-4 border-l-auraCyan">
-        <div class="widget-inline-header">
+    // Bloco de Pendências
+    let pendingHtml = '';
+    if (pendingItems.length > 0) {
+      const itemsList = pendingItems.map(p => `
+        <div class="decision-pending-item cursor-pointer hover:bg-rose-500/10 transition-colors" onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'tanques');" title="Ver detalhes nas evidências">
           <div class="flex items-center gap-2">
-            <span class="text-sm">📋</span>
-            <strong class="text-xs font-mono text-white uppercase tracking-wider">LMC Oficial ANP (Portaria 26/1992)</strong>
+            <span class="text-rose-400 font-bold">🚨</span>
+            <span class="font-semibold text-slate-200">${this.escapeHtml(p.label)}</span>
           </div>
-          <div>${statusBadge}</div>
+          <span class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+            <span>LMC</span>
+            <span>↗</span>
+          </span>
+        </div>
+      `).join('');
+
+      pendingHtml = `
+        <div class="space-y-1.5">
+          <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">Pendências Regulatórias:</span>
+          <div class="decision-pending-list">${itemsList}</div>
+        </div>
+      `;
+    }
+
+    const recLabel = action.label || 'Auditar Medição Física nos Tanques';
+    const dataConsulta = c.context?.data_auditada || (c.context?.queried_at ? new Date(c.context.queried_at).toLocaleDateString('pt-BR') : 'Data Recente');
+
+    return `
+      <div class="decision-card" data-evidence-id="${evId}">
+        <!-- Context Header -->
+        <div class="decision-header">
+          <div class="decision-context">
+            <span class="decision-context-title">${this.escapeHtml(assessment.title || 'Conciliação Físico-Contábil do LMC ANP')}</span>
+            <span class="decision-context-sub">
+              <span>📅 ${this.escapeHtml(dataConsulta)}</span>
+              <span>•</span>
+              <span>📋 Portaria ANP 26/1992</span>
+              <span>•</span>
+              <span>🏢 ${this.escapeHtml(c.context?.unit_id || 'Posto')}</span>
+            </span>
+          </div>
+          <span class="decision-status-badge ${badgeClass}">
+            <span>${badgeIcon}</span>
+            <span>${this.escapeHtml(badgeText)}</span>
+          </span>
         </div>
 
-        <!-- Régua Visual da ANP [-0.6% a +0.6%] -->
-        <div class="widget-anp-ruler-container">
+        <!-- Hero Metric -->
+        <div class="decision-hero">
+          <div class="decision-hero-header">
+            <span class="decision-hero-label">${this.escapeHtml(heroLabel)}</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold ${dentroTolerancia ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}">
+              ${dentroTolerancia ? 'Dentro da Tolerância' : 'Fora do Limite Legal'}
+            </span>
+          </div>
+          <div class="decision-hero-value ${heroColorClass}">
+            ${heroVal}
+          </div>
+          <div class="decision-hero-sub">
+            ${this.escapeHtml(heroSub)}
+          </div>
+        </div>
+
+        <!-- Régua Visual da ANP [-0.6% a +0.6%] com Alternativa Textual Acessível (F5-09) -->
+        <div class="widget-anp-ruler-container" role="figure" aria-label="Régua de Variação Volumétrica ANP: ${needleText} (tolerância permitida entre -0.6% e +0.6%)">
           <div class="flex justify-between text-[10px] font-mono text-slate-400 px-1">
             <span class="text-rose-400 font-bold">-0.6% (Limite)</span>
             <span class="text-emerald-400 font-bold">0.0% (Equilíbrio)</span>
             <span class="text-rose-400 font-bold">+0.6% (Limite)</span>
           </div>
 
-          <div class="widget-anp-track">
+          <div class="widget-anp-track" aria-hidden="true">
             <div class="widget-anp-safezone-mark"></div>
             <div class="widget-anp-needle" style="left: ${needleLeft}%; color: ${needleColor};">
               <div class="widget-anp-needle-pin"></div>
@@ -962,17 +1360,79 @@ class AuraChatController {
 
           <div class="text-center font-mono text-xs mt-1">
             <span class="text-slate-400">Desvio Regulatório: </span>
-            <strong style="color: ${needleColor};">${needleText}</strong>
-            <span class="text-[10px] text-slate-500 ml-1">(${Math.abs(maxVarPct) <= 0.6 ? 'Dentro da tolerância regulamentar' : 'Fora da tolerância legal'})</span>
+            <strong style="color: ${needleColor};" class="tabular-nums">${needleText}</strong>
+            <span class="text-[10px] text-slate-500 ml-1">(${dentroTolerancia ? 'Dentro da tolerância legal de ±0.60%' : 'Inconformidade: requer verificação física'})</span>
           </div>
         </div>
 
-        <div class="space-y-1 mt-2">${rowsHtml || '<div class="text-xs font-mono text-slate-400">Nenhum tanque auditado no LMC.</div>'}</div>
+        ${limitationHtml}
 
-        <div class="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between">
-          <span class="text-[10px] font-mono text-slate-400">Tolerância Portaria 26: ±0.6%</span>
-          <button class="widget-action-btn purple" onclick="window.auraChat.sendUserPrompt('Como auditar a divergência física no tanque de combustíveis?')">
-            🔍 Auditar Medição Física
+        <!-- Comparativo Compacto -->
+        ${(!isNoMovement && !isUnavailable) ? `
+          <div class="decision-comparison-grid">
+            <div class="decision-comp-item">
+              <span class="decision-comp-label">Estoque Escriturado</span>
+              <strong class="decision-comp-val text-cyan-300 tabular-nums">${this.formatLiters(escTotal, 1)}</strong>
+              <span class="decision-comp-sub">Saldo contábil ERP</span>
+            </div>
+            <div class="decision-comp-item">
+              <span class="decision-comp-label">Estoque Físico Medido</span>
+              <strong class="decision-comp-val text-slate-100 tabular-nums">${this.formatLiters(fisTotal, 1)}</strong>
+              <span class="decision-comp-sub">Medição na régua/sonda</span>
+            </div>
+            <div class="decision-comp-item">
+              <span class="decision-comp-label">Variação Total</span>
+              <strong class="decision-comp-val ${dentroTolerancia ? 'text-emerald-300' : 'text-rose-400'} tabular-nums">
+                ${varTotalL > 0 ? '+' : ''}${this.formatLiters(varTotalL, 1)}
+              </strong>
+              <span class="decision-comp-sub tabular-nums">${needleText} global</span>
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Lista de Tanques -->
+        <div class="space-y-1.5 mt-1">
+          ${rowsHtml || '<div class="text-xs font-mono text-slate-400">Nenhum tanque retornado no relatório.</div>'}
+        </div>
+
+        ${pendingHtml}
+
+        <!-- Ações Permitidas -->
+        <div class="decision-actions">
+          <button 
+            type="button" 
+            class="decision-btn-primary" 
+            onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar a divergência física no tanque de combustíveis?');"
+            title="Abrir procedimento de conferência de sonda e régua">
+            <span class="text-xs">🔍</span>
+            <span>${this.escapeHtml(recLabel)}</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="decision-btn-secondary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
+            title="Ver definição regulatória da Portaria 26 da ANP">
+            <span class="text-xs">📐</span>
+            <span>Como foi calculado</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="decision-btn-secondary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'tanques');"
+            title="Ver balanço físico-contábil completo dos tanques">
+            <span class="text-xs">⛽</span>
+            <span>Ver Tanques & ANP</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="decision-btn-secondary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
+            title="Ver fontes fiscais e telemetria">
+            <span class="text-xs">📋</span>
+            <span>Resumo & Fontes</span>
           </button>
         </div>
       </div>
@@ -1300,15 +1760,35 @@ class AuraChatController {
 
     const c = data.contrato || data;
     const assessment = c.assessment || {};
-    const dataAuditada = data.data_auditada || c.context?.data_auditada || 'Data Recente';
+    const intent = c.intent || data.intent || 'shift_reconciliation';
+    const dataAuditada = data.data_auditada || c.context?.data_auditada || (c.context?.queried_at ? new Date(c.context.queried_at).toLocaleDateString('pt-BR') : 'Data Recente');
     const turnoAuditado = data.turno_auditado || c.context?.shift_id || 'Turno';
 
-    if (titleEl) titleEl.textContent = `Evidências: ${dataAuditada} (${turnoAuditado})`;
+    const titleMap = {
+      'tank_forecast': `Evidências: Autonomia de Tanques (${dataAuditada})`,
+      'pump_performance': `Evidências: Performance da Pista (${dataAuditada})`,
+      'lmc_report': `Evidências: Conciliação LMC ANP (${dataAuditada})`,
+      'market_basket': `Evidências: Combos & Conveniência (${dataAuditada})`,
+      'shift_reconciliation': `Evidências: ${dataAuditada} (${turnoAuditado})`
+    };
+
+    if (titleEl) titleEl.textContent = titleMap[intent] || `Evidências: ${dataAuditada}`;
     if (chipEl) {
       chipEl.textContent = assessment.badge_label || (assessment.finality === 'partial' ? 'Provisório' : 'Validado');
-      chipEl.className = `px-2 py-0.5 rounded-full text-[10px] font-sans font-semibold ${assessment.finality === 'partial' ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'}`;
+      const isCrit = assessment.severity === 'critical';
+      const isAttn = assessment.severity === 'attention' || assessment.finality === 'partial';
+      chipEl.className = `px-2 py-0.5 rounded-full text-[10px] font-sans font-semibold ${isCrit ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30' : (isAttn ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30')}`;
     }
-    if (subEl) subEl.textContent = `Unidade: ${c.context?.unit_id || 'Posto'} • Data: ${dataAuditada} • Turno: ${turnoAuditado}`;
+    if (subEl) {
+      const subMap = {
+        'tank_forecast': `Unidade: ${c.context?.unit_id || 'Posto'} • Tanques & Previsão de Run-Out • ERP Leitura`,
+        'pump_performance': `Unidade: ${c.context?.unit_id || 'Posto'} • Telemetria CBC04 Companytec & PDV`,
+        'lmc_report': `Unidade: ${c.context?.unit_id || 'Posto'} • Portaria ANP 26/1992 • Tolerância ±0.60%`,
+        'market_basket': `Unidade: ${c.context?.unit_id || 'Loja'} • Market Basket PDV (pedido + itemped)`,
+        'shift_reconciliation': `Unidade: ${c.context?.unit_id || 'Posto'} • Data: ${dataAuditada} • Turno: ${turnoAuditado}`
+      };
+      subEl.textContent = subMap[intent] || `Unidade: ${c.context?.unit_id || 'Posto'}`;
+    }
 
     this.switchEvidenceTab(activeTab);
 
@@ -1368,6 +1848,12 @@ class AuraChatController {
 
   /**
    * Renderiza o conteúdo da aba selecionada no Drawer de Evidências
+   * Adaptado modularmente para suportar os 5 contratos canônicos da Fase 5:
+   * 1. shift_reconciliation
+   * 2. tank_forecast
+   * 3. pump_performance
+   * 4. lmc_report
+   * 5. market_basket
    */
   renderEvidenceTabContent(data, tab) {
     if (!data || (typeof data !== 'object') || (!data.contrato && !data.resumo_executivo && !data.assessment && !data.metrics)) {
@@ -1378,15 +1864,140 @@ class AuraChatController {
     const assessment = c.assessment || {};
     const metrics = c.metrics || {};
     const sources = c.sources || [];
-    const tri = data.triangulacao_pista || {};
-    const caixa = data.triangulacao_caixa || {};
-    const tanques = data.balanco_tanques || {};
-    const bicosList = tri.detalhamento_bicos || [];
-    const caixasList = caixa.caixas || [];
-    const tanquesList = tanques.detalhamento_tanques || [];
-    const dataAuditada = data.data_auditada || c.context?.data_auditada || 'Data Recente';
+    const intent = c.intent || data.intent || 'shift_reconciliation';
+    const dataAuditada = data.data_auditada || c.context?.data_auditada || (c.context?.queried_at ? new Date(c.context.queried_at).toLocaleDateString('pt-BR') : 'Data Recente');
 
+    // =========================================================================
+    // ABA: COMO FOI CALCULADO (FÓRMULAS & DEFINIÇÕES CANÔNICAS)
+    // =========================================================================
     if (tab === 'formula') {
+      if (intent === 'tank_forecast') {
+        const menorRes = assessment.horizonte_critico_horas ?? metrics.autonomia_critica_horas ?? metrics.menor_autonomia_runout_horas ?? assessment.menor_autonomia_horas ?? 'N/A';
+        const menorEsg = assessment.horizonte_runout_horas ?? metrics.autonomia_runout_horas ?? metrics.menor_autonomia_esgotamento_horas ?? assessment.menor_autonomia_esgotamento_horas ?? 'N/A';
+        return `
+          <div class="space-y-4">
+            <div class="evidence-section-card">
+              <h4 class="font-bold text-slate-100 flex items-center gap-2">
+                <span>📐</span><span>Fórmula de Autonomia até Reserva de Segurança (15%)</span>
+              </h4>
+              <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
+                <div class="text-cyan-400 font-bold">Autonomia_15h = (Volume_Atual - Reserva_Tecnica_15%) / Consumo_Medio_Horario</div>
+                <div class="text-slate-300">
+                  Reserva Crítica = Capacidade Nominal × 15% (Proteção contra sucção de sedimentos e cavitação da bomba).
+                </div>
+                <div class="text-emerald-400 font-bold pt-1 border-t border-slate-800">
+                  Menor Autonomia até Reserva: ${menorRes !== 'N/A' ? `${Number(menorRes).toFixed(1)}h` : 'N/A'}
+                </div>
+              </div>
+              <p class="text-slate-400 text-xs leading-relaxed">
+                A autonomia de run-out técnico aponta o momento limite para descarga da carreta sem interrupção nas bombas de abastecimento.
+              </p>
+            </div>
+
+            <div class="evidence-section-card">
+              <h4 class="font-bold text-slate-100 flex items-center gap-2">
+                <span>⏱</span><span>Fórmula de Esgotamento Total (0 L) vs Espaço Livre (Ullage)</span>
+              </h4>
+              <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
+                <div class="text-cyan-400 font-bold">Autonomia_0h = Volume_Atual / Consumo_Medio_Horario</div>
+                <div class="text-amber-300">
+                  Esgotamento Zero: ${menorEsg !== 'N/A' ? `${Number(menorEsg).toFixed(1)}h` : 'N/A'} (Zerar o tanque acarreta contaminação e perda de escorva).
+                </div>
+                <div class="pt-1 border-t border-slate-800 text-slate-300">
+                  Ullage Livre (L) = Capacidade Nominal - Volume Atual
+                </div>
+                <div class="text-slate-400">
+                  Sugestão Carretas 5k = floor(Ullage Livre / 5.000 L) (compartimentos padrão das distribuidoras).
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      if (intent === 'pump_performance') {
+        return `
+          <div class="space-y-4">
+            <div class="evidence-section-card">
+              <h4 class="font-bold text-slate-100 flex items-center gap-2">
+                <span>📐</span><span>Fórmula de Vazão Operacional de Bicos (L/min)</span>
+              </h4>
+              <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
+                <div class="text-cyan-400 font-bold">Vazão (L/min) = Volume Abastecido (L) / Duração do Abastecimento (min)</div>
+                <div class="text-slate-300">
+                  Telemetria automatizada recebida via concentrador CBC04 Companytec.
+                </div>
+                <div class="text-amber-400 font-bold pt-1 border-t border-slate-800">
+                  Threshold Operacional: Vazão &lt; 30.0 L/min indica saturação precoce de elemento filtrante ou perda de sucção da bomba mecânica.
+                </div>
+              </div>
+            </div>
+
+            <div class="evidence-section-card">
+              <h4 class="font-bold text-slate-100 flex items-center gap-2">
+                <span>⛽</span><span>Fórmula de Conversão em Gasolina Aditivada (%)</span>
+              </h4>
+              <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
+                <div class="text-cyan-400 font-bold">Conversão Aditivada (%) = (Volume Aditivada / Volume Total do Colaborador) × 100</div>
+                <div class="text-emerald-400">
+                  Meta da Pista: ≥ 25.0% de conversão sobre o volume total abastecido pelo frentista.
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      if (intent === 'lmc_report') {
+        const limTol = metrics.tolerancia_oficial_pct ?? metrics.limite_tolerancia_anp_pct ?? 0.60;
+        return `
+          <div class="space-y-4">
+            <div class="evidence-section-card">
+              <h4 class="font-bold text-slate-100 flex items-center gap-2">
+                <span>📐</span><span>Fórmula Legal da Portaria ANP nº 26/1992</span>
+              </h4>
+              <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
+                <div class="text-cyan-400 font-bold">Estoque Escriturado = Estoque Inicial + Entradas Fiscais (NFe) - Saídas dos Bicos</div>
+                <div class="text-slate-300">
+                  Variação Volumétrica (L) = Estoque Físico Medido (Régua/Sonda) - Estoque Escriturado (L)
+                </div>
+                <div class="text-emerald-400 font-bold pt-1 border-t border-slate-800">
+                  Variação Percentual (Δ%) = (Variação L / Estoque Escriturado L) × 100
+                </div>
+              </div>
+              <p class="text-slate-400 text-xs leading-relaxed">
+                Tolerância regulamentar legal: <strong>±${limTol}%</strong>. Variações absolutas superiores a 0.60% devem ser investigadas e justificadas tecnicamente no LMC oficial.
+              </p>
+            </div>
+          </div>
+        `;
+      }
+
+      if (intent === 'market_basket') {
+        return `
+          <div class="space-y-4">
+            <div class="evidence-section-card">
+              <h4 class="font-bold text-slate-100 flex items-center gap-2">
+                <span>📐</span><span>Fórmulas de Mineração de Regras de Associação</span>
+              </h4>
+              <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
+                <div class="text-cyan-400 font-bold">Suporte(A ∪ B) = Cupons(A e B) / Total de Cupons (N)</div>
+                <div class="text-slate-300">
+                  Confiança(A → B) = P(B | A) = Cupons(A e B) / Cupons(A)
+                </div>
+                <div class="text-purple-300 font-bold pt-1 border-t border-slate-800">
+                  Lift(A → B) = Confiança(A → B) / Suporte(B) = P(A ∩ B) / (P(A) × P(B))
+                </div>
+              </div>
+              <p class="text-slate-400 text-xs leading-relaxed">
+                <strong>Interpretação do Lift:</strong> Lift = 1.0 indica independência estatística; Lift &gt; 1.0 indica associação positiva; Lift ≥ 2.0x representa forte afinidade comprovada no comportamento de compra.
+              </p>
+            </div>
+          </div>
+        `;
+      }
+
+      // Default: shift_reconciliation
       if (assessment.finality === 'no_movement' || data.status === 'sem_movimento') {
         return `
           <div class="evidence-section-card">
@@ -1413,11 +2024,11 @@ class AuraChatController {
         `;
       }
 
+      const tri = data.triangulacao_pista || {};
       const autRev = Number(metrics.automation_revenue ?? data.resumo_executivo?.faturamento_pista_total ?? 0);
       const posRev = Number(metrics.pos_revenue ?? data.resumo_executivo?.faturamento_caixa_total ?? 0);
       const diff = Number(metrics.difference ?? data.resumo_executivo?.diferenca_financeira_caixa ?? 0);
       const autVol = Number(metrics.automation_volume_liters ?? tri.total_litros_automacao ?? 0);
-
       const encState = metrics.physical_volume_state || (tri.total_litros_faturados_encerrante === 0 && autVol > 0 ? 'not_reported' : 'measured');
       const encVol = metrics.physical_volume_liters ?? (encState === 'not_reported' ? null : Number(tri.total_litros_faturados_encerrante || 0));
 
@@ -1493,26 +2104,31 @@ class AuraChatController {
       `;
     }
 
+    // =========================================================================
+    // ABA: BICOS & PISTA
+    // =========================================================================
     if (tab === 'bicos') {
-      if (bicosList.length === 0) {
-        return `<div class="p-4 text-center text-slate-500 font-mono text-xs">Sem dados detalhados de bicos para este turno.</div>`;
+      const nozzlesList = c.nozzles || data.auditoria_vazao_bicos || data.vazao_bicos || data.triangulacao_pista?.detalhamento_bicos || [];
+      if (nozzlesList.length === 0) {
+        return `<div class="p-4 text-center text-slate-500 font-mono text-xs">Sem dados detalhados de bicos para esta consulta.</div>`;
       }
 
-      const rows = bicosList.map(b => {
-        const isPend = b.status_bico?.includes('PENDENTE_ENCERRANTE');
-        const encText = isPend ? 'Pendente' : this.formatLiters(Number(b.volume_faturado_encerrante || 0), 1);
+      const rows = nozzlesList.map(b => {
+        const vazao = b.vazao_media_l_min ?? b.vazao_litros_minuto ?? b.vazao_media_litros_minuto;
+        const isLenta = b.alerta_filtro_lento || b.alerta_vazao_lenta || b.alerta_filtro || (vazao !== undefined && parseFloat(vazao) < 30.0);
+        const vazaoText = vazao !== undefined ? `${parseFloat(vazao).toFixed(1)} L/min` : 'N/A';
+        const volText = this.formatLiters(Number(b.volume_total_litros ?? b.volume_automacao_litros ?? 0), 1);
+        const prod = b.combustivel || b.produto_nome || 'Combustível';
+
         return `
           <tr class="border-b border-slate-800/80 text-[11px] font-mono">
-            <td class="py-2.5 font-bold text-slate-200">${this.escapeHtml(b.bico)}</td>
-            <td class="py-2.5 text-slate-300">${this.escapeHtml(b.combustivel)}</td>
-            <td class="py-2.5 text-right text-cyan-300">${this.formatLiters(Number(b.volume_automacao_litros || 0), 1)}</td>
-            <td class="py-2.5 text-right ${isPend ? 'text-amber-400 font-semibold' : 'text-slate-200'}">
-              ${encText}
-            </td>
-            <td class="py-2.5 text-right text-slate-100">${this.formatBRL(Number(b.total_reais_automacao || 0))}</td>
+            <td class="py-2.5 font-bold text-slate-200">Bico ${this.escapeHtml(b.bico)}</td>
+            <td class="py-2.5 text-slate-300">${this.escapeHtml(prod)}</td>
+            <td class="py-2.5 text-right ${isLenta ? 'text-rose-400 font-bold' : 'text-emerald-300'} tabular-nums">${vazaoText}</td>
+            <td class="py-2.5 text-right text-cyan-300 tabular-nums">${volText}</td>
             <td class="py-2.5 text-right">
-              <span class="px-1.5 py-0.5 rounded text-[10px] ${b.status_bico?.includes('CONCILIADO') ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}">
-                ${isPend ? 'Encerrante Pendente' : (b.status_bico?.includes('CONCILIADO') ? 'OK' : 'Divergência')}
+              <span class="px-1.5 py-0.5 rounded text-[10px] ${isLenta ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'}">
+                ${isLenta ? '⚠️ Filtro Lento' : '✓ Normal'}
               </span>
             </td>
           </tr>
@@ -1522,7 +2138,7 @@ class AuraChatController {
       return `
         <div class="space-y-3">
           <div class="flex items-center justify-between text-xs font-mono text-slate-400">
-            <span>Total de Bicos Auditados: <strong>${bicosList.length}</strong></span>
+            <span>Total de Bicos Monitorados: <strong>${nozzlesList.length}</strong></span>
             <span>Automação: CBC04 Companytec</span>
           </div>
           <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60 p-1">
@@ -1531,10 +2147,9 @@ class AuraChatController {
                 <tr class="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
                   <th class="p-2">Bico</th>
                   <th class="p-2">Combustível</th>
-                  <th class="p-2 text-right">CBC04</th>
-                  <th class="p-2 text-right">Encerrante</th>
-                  <th class="p-2 text-right">Total R$</th>
-                  <th class="p-2 text-right">Status</th>
+                  <th class="p-2 text-right">Vazão</th>
+                  <th class="p-2 text-right">Volume</th>
+                  <th class="p-2 text-right">Diagnóstico</th>
                 </tr>
               </thead>
               <tbody>${rows}</tbody>
@@ -1544,48 +2159,171 @@ class AuraChatController {
       `;
     }
 
+    // =========================================================================
+    // ABA: CAIXAS & PDV (OU REGRAS DE CONVENIÊNCIA)
+    // =========================================================================
     if (tab === 'caixas') {
+      if (intent === 'market_basket') {
+        const rulesList = c.detailed_rules || c.top_combos || data.regras_associacao_detalhadas || [];
+        if (rulesList.length === 0) {
+          return `<div class="p-4 text-center text-slate-500 font-mono text-xs">Nenhuma regra minerada para esta consulta.</div>`;
+        }
+
+        const rows = rulesList.map(r => {
+          const regraStr = r.regra || (r.produto_origem ? `${typeof r.produto_origem === 'object' ? r.produto_origem.nompro : r.produto_origem} ➔ ${typeof r.produto_recomendado === 'object' ? r.produto_recomendado.nompro : r.produto_recomendado}` : 'Regra');
+          const liftVal = parseFloat(r.lift ?? r.metricas?.lift ?? 0).toFixed(2);
+          let confRaw = r.confianca_pct ?? r.confianca ?? (r.metricas?.confianca ? r.metricas.confianca * 100 : 0);
+          if (confRaw <= 1.0 && confRaw > 0) confRaw = confRaw * 100;
+          const confVal = parseFloat(confRaw).toFixed(1);
+
+          let supRaw = r.suporte_conjunto_pct ?? r.suporte ?? (r.metricas?.suporte ? r.metricas.suporte * 100 : 0);
+          if (supRaw <= 1.0 && supRaw > 0) supRaw = supRaw * 100;
+          const supVal = parseFloat(supRaw).toFixed(1);
+          const isForte = Boolean(r.forte_sinergia ?? (parseFloat(liftVal) >= 2.0));
+
+          return `
+            <tr class="border-b border-slate-800/80 text-[11px] font-mono">
+              <td class="py-2.5 font-bold text-slate-200">${this.escapeHtml(regraStr)}</td>
+              <td class="py-2.5 text-right text-slate-300 tabular-nums">${supVal}%</td>
+              <td class="py-2.5 text-right text-cyan-300 tabular-nums">${confVal}%</td>
+              <td class="py-2.5 text-right ${isForte ? 'text-purple-300 font-bold' : 'text-slate-200'} tabular-nums">${liftVal}x</td>
+              <td class="py-2.5 text-right">
+                <span class="px-1.5 py-0.5 rounded text-[10px] ${isForte ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-slate-800 text-slate-400'}">
+                  ${isForte ? '⚡ Forte Sinergia' : '✓ Positiva'}
+                </span>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        return `
+          <div class="space-y-3">
+            <div class="flex items-center justify-between text-xs font-mono text-slate-400">
+              <span>Total de Regras Mineradas: <strong>${rulesList.length}</strong></span>
+              <span>Algoritmo: Market Basket PDV</span>
+            </div>
+            <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60 p-1">
+              <table class="w-full text-left font-mono">
+                <thead>
+                  <tr class="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
+                    <th class="p-2">Regra de Associação</th>
+                    <th class="p-2 text-right">Suporte</th>
+                    <th class="p-2 text-right">Confiança</th>
+                    <th class="p-2 text-right">Lift</th>
+                    <th class="p-2 text-right">Classificação</th>
+                  </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }
+
+      // Default: Conciliação de turno caixas
+      const caixasList = data.triangulacao_caixa?.caixas || [];
       if (caixasList.length === 0) {
         return `<div class="p-4 text-center text-slate-500 font-mono text-xs">Sem caixas registrados na data auditada.</div>`;
       }
 
       const rows = caixasList.map(cItem => {
         let opName = String(cItem.operador || 'Operador não informado').trim();
-        if (opName.includes('NO') || opName.toUpperCase().includes('NAO INFORMADO') || opName.toUpperCase().includes('NÃO INFORMADO')) {
-          opName = 'Operador não informado';
-        }
-
         return `
-        <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2 font-mono text-xs">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
+          <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2 font-mono text-xs">
+            <div class="flex items-center justify-between">
               <span class="font-bold text-slate-100">Sessão #${this.escapeHtml(cItem.caixa_id ?? 'N/D')} • Terminal PDV ${this.escapeHtml(cItem.pdv ?? 'N/D')}</span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${cItem.status === 'FECHADO' ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'}">
-                ${this.escapeHtml(cItem.status ?? 'EM ABERTO')}
-              </span>
+              <span class="text-slate-400 text-[11px]">${this.escapeHtml(opName)}</span>
             </div>
-            <span class="text-slate-400 text-[11px]">${this.escapeHtml(opName)}</span>
+            <div class="flex items-center justify-between pt-1 border-t border-slate-800/60 text-xs">
+              <span class="text-slate-400">Total Declarado:</span>
+              <strong class="text-cyan-300 tabular-nums">${this.formatBRL(cItem.total_declarado)}</strong>
+            </div>
           </div>
-
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-slate-800 text-[11px]">
-            <div><span class="text-slate-400">Dinheiro:</span> <strong class="text-slate-200">${this.formatBRL(cItem.dinheiro)}</strong></div>
-            <div><span class="text-slate-400">Cartões:</span> <strong class="text-slate-200">${this.formatBRL(cItem.cartao)}</strong></div>
-            <div><span class="text-slate-400">Prazo:</span> <strong class="text-slate-200">${this.formatBRL(cItem.prazo)}</strong></div>
-            <div><span class="text-slate-400">Convênio:</span> <strong class="text-slate-200">${this.formatBRL(cItem.convenio_cheque)}</strong></div>
-          </div>
-
-          <div class="flex items-center justify-between pt-1 border-t border-slate-800/60 text-xs">
-            <span class="text-slate-400">Total Declarado:</span>
-            <strong class="text-cyan-300">${this.formatBRL(cItem.total_declarado)}</strong>
-          </div>
-        </div>
-      `;
+        `;
       }).join('');
 
       return `<div class="space-y-3">${rows}</div>`;
     }
 
+    // =========================================================================
+    // ABA: TANQUES & ANP
+    // =========================================================================
     if (tab === 'tanques') {
+      if (intent === 'tank_forecast') {
+        const tanksList = c.tanks || data.detalhamento_tanques || data.tanques || [];
+        if (tanksList.length === 0) {
+          return `<div class="p-4 text-center text-slate-500 font-mono text-xs">Sem tanques auditados neste relatório.</div>`;
+        }
+
+        const rows = tanksList.map(t => {
+          const cod = t.codtan || t.tanque || '00';
+          const comb = t.combustivel || 'Combustível';
+          const saldo = this.formatLiters(t.saldo_atual_litros ?? t.volume_atual_litros ?? 0, 0);
+          const cap = this.formatLiters(t.capacidade_litros ?? 0, 0);
+          const pct = parseFloat(t.ocupacao_pct ?? t.ocupacao_percentual ?? 0).toFixed(1);
+          const hResVal = t.autonomia_critica_horas ?? t.autonomia_reserva_horas;
+          const hRes = (hResVal !== undefined && hResVal !== null) ? `${parseFloat(hResVal).toFixed(1)}h` : 'N/A';
+          const hEsgVal = t.autonomia_runout_horas ?? t.autonomia_esgotamento_horas;
+          const hEsg = (hEsgVal !== undefined && hEsgVal !== null) ? `${parseFloat(hEsgVal).toFixed(1)}h` : 'N/A';
+          const ullage = this.formatLiters(t.espaco_livre_ullage_litros ?? t.espaco_livre_descarga_litros ?? 0, 0);
+
+          return `
+            <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2 font-mono text-xs">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-slate-100">TQ-${this.escapeHtml(cod)} • ${this.escapeHtml(comb)}</span>
+                <span class="text-slate-300 font-semibold tabular-nums">${pct}% (${saldo} / ${cap})</span>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-300 pt-1 border-t border-slate-800">
+                <div><span class="text-slate-400">Autonomia 15%:</span> <strong class="text-cyan-300 tabular-nums">${hRes}</strong></div>
+                <div><span class="text-slate-400">Esgotamento:</span> <strong class="text-amber-300 tabular-nums">${hEsg}</strong></div>
+                <div><span class="text-slate-400">Ullage Livre:</span> <strong class="text-slate-200 tabular-nums">${ullage}</strong></div>
+                <div><span class="text-slate-400">Prazo Compra:</span> <strong class="text-slate-200">${this.escapeHtml(t.prazo_ideal_compra || 'Normal')}</strong></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        return `<div class="space-y-3">${rows}</div>`;
+      }
+
+      if (intent === 'lmc_report') {
+        const tanksList = c.tanks || data.demonstrativo_por_combustivel || data.tanques || [];
+        if (tanksList.length === 0) {
+          return `<div class="p-4 text-center text-slate-500 font-mono text-xs">Sem tanques auditados no LMC.</div>`;
+        }
+
+        const rows = tanksList.map(t => {
+          const cod = t.tanque || t.codtan || '00';
+          const comb = t.combustivel || 'Combustível';
+          const vP = parseFloat(t.variacao_pct ?? t.auditoria_anp?.variacao_pct ?? 0);
+          const vL = parseFloat(t.variacao_litros ?? t.auditoria_anp?.variacao_litros ?? 0);
+          const isConf = Math.abs(vP) <= 0.60;
+          const escLitros = this.formatLiters(t.estoque_escriturado_litros ?? t.movimentacao?.estoque_escriturado_litros ?? 0, 1);
+          const fisLitros = this.formatLiters(t.estoque_fisico_medido_litros ?? t.estoque_fisico_litros ?? t.movimentacao?.estoque_fisico_medido_litros ?? 0, 1);
+
+          return `
+            <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2 font-mono text-xs">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-slate-100">TQ-${this.escapeHtml(cod)} • ${this.escapeHtml(comb)}</span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${isConf ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}">
+                  ${isConf ? '✓ Conforme ANP (±0.6%)' : '🚨 Alerta ANP'}
+                </span>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-300 pt-1 border-t border-slate-800">
+                <div><span class="text-slate-400">Escriturado:</span> <span class="tabular-nums">${escLitros}</span></div>
+                <div><span class="text-slate-400">Físico:</span> <span class="tabular-nums">${fisLitros}</span></div>
+                <div><span class="text-slate-400">Variação L:</span> <strong class="${isConf ? 'text-emerald-300' : 'text-rose-400'} tabular-nums">${vL > 0 ? '+' : ''}${vL.toFixed(1)} L</strong></div>
+                <div><span class="text-slate-400">Desvio %:</span> <strong class="${isConf ? 'text-emerald-300' : 'text-rose-400'} tabular-nums">${vP > 0 ? '+' : ''}${vP.toFixed(2)}%</strong></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        return `<div class="space-y-3">${rows}</div>`;
+      }
+
+      // Default: Balanço de tanques turno
+      const tanquesList = data.balanco_tanques?.detalhamento_tanques || [];
       if (tanquesList.length === 0) {
         return `<div class="p-4 text-center text-slate-500 font-mono text-xs">Sem tanques auditados neste fechamento.</div>`;
       }
@@ -1597,10 +2335,10 @@ class AuraChatController {
             <div class="flex items-center justify-between">
               <span class="font-bold text-slate-100">TQ-${this.escapeHtml(t.codtan ?? 'N/D')} • ${this.escapeHtml(t.combustivel ?? 'N/D')}</span>
               <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${isConf ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}">
-                ${isConf ? '✓ Conforme ANP (±0.6%)' : '⚠️ Alerta ANP'}
+                ${isConf ? '✓ Conforme ANP' : '⚠️ Alerta ANP'}
               </span>
             </div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-300">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-300 pt-1 border-t border-slate-800">
               <div><span class="text-slate-400">Capacidade:</span> ${this.formatLiters(t.capacidade_litros, 0)}</div>
               <div><span class="text-slate-400">Saldo Inicial:</span> ${this.formatLiters(t.saldo_inicial, 0)}</div>
               <div><span class="text-slate-400">Saldo Final:</span> ${this.formatLiters(t.saldo_final, 0)}</div>
@@ -1613,7 +2351,9 @@ class AuraChatController {
       return `<div class="space-y-3">${rows}</div>`;
     }
 
-    // Default: 'resumo'
+    // =========================================================================
+    // ABA PADRÃO: RESUMO & FONTES DE DADOS
+    // =========================================================================
     const sourcesList = sources.map(s => {
       let stBadge = '<span class="text-emerald-400 font-semibold">✓ Disponível</span>';
       if (s.availability === 'missing') stBadge = '<span class="text-amber-400 font-semibold">⏳ Pendente / Não lançado</span>';
@@ -1623,14 +2363,15 @@ class AuraChatController {
         <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 flex items-center justify-between font-mono text-xs">
           <div>
             <div class="font-bold text-slate-200">${this.escapeHtml(s.label)}</div>
-            <div class="text-[10px] text-slate-400">Data de atualização: ${s.data_as_of ? this.escapeHtml(s.data_as_of) : 'Não informada'}</div>
+            <div class="text-[10px] text-slate-400">Atualização: ${s.data_as_of ? this.escapeHtml(s.data_as_of) : 'Tempo real'}</div>
           </div>
           <div>${stBadge}</div>
         </div>
       `;
     }).join('');
 
-    const explanationText = c.explanation?.text || data.resumo_executivo?.diagnostico_caixa || 'Auditoria executada conforme regras vigentes.';
+    const explanationText = c.explanation?.text || data.resumo_executivo?.diagnostico || data.resumo_executivo?.diagnostico_caixa || 'Auditoria executada conforme regras vigentes.';
+    const limText = assessment.limitation || data.resumo_executivo?.limitation || null;
 
     return `
       <div class="space-y-4">
@@ -1638,53 +2379,170 @@ class AuraChatController {
           <h4 class="font-bold text-slate-100 flex items-center gap-2">
             <span>📡</span><span>Proveniência e Disponibilidade das Fontes</span>
           </h4>
-          <div class="space-y-2">${sourcesList || '<div class="text-slate-500">Fontes padrão do ERP</div>'}</div>
+          <div class="space-y-2">${sourcesList || '<div class="text-slate-500">Fontes padrão do ERP (Somente Leitura)</div>'}</div>
         </div>
 
         <div class="evidence-section-card">
           <h4 class="font-bold text-slate-100 flex items-center gap-2">
-            <span>📝</span><span>Diagnóstico Operacional</span>
+            <span>📝</span><span>Diagnóstico Executivo</span>
           </h4>
           <p class="text-slate-300 leading-relaxed text-xs p-3 rounded-lg bg-slate-900 border border-slate-800">
             ${this.escapeHtml(explanationText)}
           </p>
+        </div>
+
+        ${limText ? `
+          <div class="evidence-section-card">
+            <h4 class="font-bold text-slate-100 flex items-center gap-2">
+              <span>⚠️</span><span>Limitações e Premissas da Consulta</span>
+            </h4>
+            <p class="text-amber-200/90 leading-relaxed text-xs p-3 rounded-lg bg-amber-950/20 border border-amber-500/20 font-mono">
+              ${this.escapeHtml(limText)}
+            </p>
+          </div>
+        ` : ''}
+
+        <div class="p-3 rounded-xl bg-slate-900/40 border border-slate-800/60 text-[10px] font-mono text-slate-500 flex items-center justify-between">
+          <span>Contrato: ${this.escapeHtml(c.schema_version || '1.0')} (${this.escapeHtml(intent)})</span>
+          <span>ID: ${this.escapeHtml(c.response_id || 'N/A')}</span>
         </div>
       </div>
     `;
   }
 
   /**
-   * Widget 4: Cards de Combos de Conveniência com Scripts de Balcão e Ações
+   * Widget 4: Card de Decisão Executiva para Combos & Vendas Cruzadas (Market Basket)
+   * Implementação AURA Precision Glass v1.0 (F5-08).
+   * Garante:
+   * 1. Superfície única DecisionCard sem aninhamentos desnecessários.
+   * 2. Destaque para regras com forte sinergia (Lift >= 2.0x) e confiança comprovada.
+   * 3. Scripts práticos de balcão para o operador de caixa sem falsas promessas de ganho garantido (F5-08).
+   * 4. Limitações de cupons analisados e premissas estatísticas transparentes.
+   * 5. Ação de ativação do combo em 1 clique e drawer de regras completas.
    */
   renderCombosWidget(data) {
+    if (!data || typeof data !== 'object') {
+      return `<div class="decision-card"><p class="text-xs text-slate-400">Dados de Market Basket indisponíveis.</p></div>`;
+    }
+
+    const c = data.contrato || data;
+
+    // F1-08 / F5-01: Versão desconhecida de contrato tratada com segurança
+    if (c.schema_version && c.schema_version !== '1.0') {
+      return this.renderUnsupportedSchemaCard(c.schema_version, 'Combos & Conveniência');
+    }
+
+    const assessment = c.assessment || {};
+    const metrics = c.metrics || {};
+    const pendingItems = c.pending_items || [];
+    const action = c.recommended_action || {};
     const resumo = data.resumo_executivo || {};
-    const combos = data.top_combos_cross_selling || data.top_combos_oportunidades || data.regras_associacao_detalhadas || [];
-    const maxLiftVal = resumo.maior_lift_encontrado ?? resumo.max_lift ?? (combos[0]?.metricas?.lift ?? combos[0]?.lift ?? 2.85);
-    const maxLift = `${parseFloat(maxLiftVal).toFixed(2)}x`;
+    const combos = c.top_combos || data.top_combos_cross_selling || data.top_combos_oportunidades || data.regras_associacao_detalhadas || [];
 
+    const isNoMovement = assessment.status_code === 'SEM_REGISTROS' || data.status === 'sem_movimento';
+    const isUnavailable = assessment.status_code === 'INDISPONIVEL' || data.status === 'indisponivel';
+
+    const evId = 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    if (typeof window !== 'undefined') {
+      if (!window.__auraEvidenceStore) window.__auraEvidenceStore = {};
+      window.__auraEvidenceStore[evId] = data;
+    }
+
+    // Métricas Canônicas
+    const maxLiftVal = assessment.maior_lift ?? metrics.maior_lift ?? resumo.maior_lift_encontrado ?? (combos[0]?.lift ?? combos[0]?.metricas?.lift ?? 0.0);
+    const countForteSinergia = assessment.regras_com_forte_sinergia_lift_2 ?? metrics.regras_forte_sinergia_count ?? resumo.regras_com_forte_sinergia_lift_2 ?? 0;
+    const totalTransacoes = metrics.total_transacoes_analisadas ?? resumo.total_transacoes_analisadas ?? 0;
+    const totalMultiplas = metrics.total_transacoes_multiplos_itens ?? resumo.total_transacoes_multiplos_itens ?? 0;
+    const pctMultiplas = metrics.pct_cestas_multiplos_itens ?? resumo.pct_cestas_multiplos_itens ?? 0.0;
+    const ticketMedioLoja = metrics.ticket_medio_reais ?? resumo.ticket_medio_conveniencia ?? 0.0;
+    const totalSkus = metrics.total_itens_distintos ?? resumo.total_itens_distintos_conveniencia ?? 0;
+    const totalRegras = metrics.total_regras_geradas ?? resumo.total_regras_geradas ?? combos.length;
+
+    // Badges Semânticos
+    let badgeClass = 'status-validated';
+    let badgeIcon = '⚡';
+    let badgeText = assessment.badge_label || `⚡ Max Lift: ${parseFloat(maxLiftVal).toFixed(2)}x`;
+
+    if (isNoMovement) {
+      badgeClass = 'status-neutral';
+      badgeIcon = '⏸️';
+      badgeText = 'Sem Cupons';
+    } else if (isUnavailable) {
+      badgeClass = 'status-divergent';
+      badgeIcon = '⚠️';
+      badgeText = 'Fonte Indisponível';
+    } else if (countForteSinergia > 0) {
+      badgeClass = 'status-validated';
+      badgeIcon = '⚡';
+      badgeText = assessment.badge_label || `⚡ Max Lift: ${parseFloat(maxLiftVal).toFixed(2)}x`;
+    } else if (totalMultiplas === 0) {
+      badgeClass = 'status-partial';
+      badgeIcon = '⚠️';
+      badgeText = 'Cestas sem Multiplicidade';
+    } else {
+      badgeClass = 'status-neutral';
+      badgeIcon = '✓';
+      badgeText = 'Regras Mineradas';
+    }
+
+    // Hero Metric: Maior Lift
+    const heroLabel = 'Maior Multiplicador de Sinergia (Lift)';
+    const heroVal = isNoMovement || isUnavailable ? '—' : `${parseFloat(maxLiftVal).toFixed(2)}x`;
+    const heroColorClass = isNoMovement || isUnavailable ? 'text-slate-400' : (parseFloat(maxLiftVal) >= 2.0 ? 'text-purple-300' : 'text-emerald');
+    const heroSub = `${countForteSinergia} combo(s) com forte sinergia (Lift ≥ 2.0x) • ${totalTransacoes} cupons analisados (${parseFloat(pctMultiplas).toFixed(1)}% cestas múltiplas).`;
+
+    // Bloco de Limitação (F5-02 & F5-08)
+    let limitationHtml = '';
+    const limText = assessment.limitation || resumo.limitation;
+    if (limText && !isNoMovement && !isUnavailable) {
+      limitationHtml = `
+        <div class="decision-limitation-callout">
+          <span class="text-sm">⚠️</span>
+          <div>
+            <strong class="font-semibold">Premissa Estatística & Limitação:</strong>
+            <span class="text-amber-200/90">${this.escapeHtml(limText)}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // Top Combos Acionáveis
     let cardsHtml = '';
-    combos.slice(0, 3).forEach(c => {
-      const lift = parseFloat(c.metricas?.lift ?? c.lift ?? 1.5).toFixed(2);
-      const conf = parseFloat((c.metricas?.confianca ? c.metricas.confianca * 100 : c.confianca_percentual) ?? 50).toFixed(0);
-      const cupons = c.metricas?.frequencia_conjunta ?? c.frequencia_conjunta_cupons ?? 10;
+    combos.slice(0, 3).forEach(cItem => {
+      const lift = parseFloat(cItem.lift ?? cItem.metricas?.lift ?? 1.5).toFixed(2);
+      const conf = parseFloat(cItem.confianca_pct ?? (cItem.metricas?.confianca ? cItem.metricas.confianca * 100 : cItem.confianca_percentual) ?? 50).toFixed(0);
+      const cupons = cItem.cupons_conjuntos ?? cItem.metricas?.frequencia_conjunta ?? cItem.frequencia_conjunta_cupons ?? 0;
+      const isForte = Boolean(cItem.forte_sinergia ?? (parseFloat(lift) >= 2.0));
 
-      const prodOrig = typeof c.produto_origem === 'object' ? (c.produto_origem?.nompro || 'Item Origem') : (c.produto_origem || 'Item Origem');
-      const prodDest = typeof c.produto_recomendado === 'object' ? (c.produto_recomendado?.nompro || 'Item Recomendado') : (c.produto_recomendado || 'Item Recomendado');
+      const prodOrig = typeof cItem.produto_origem === 'object' ? (cItem.produto_origem?.nompro || 'Item Origem') : (cItem.produto_origem || 'Item Origem');
+      const prodDest = typeof cItem.produto_recomendado === 'object' ? (cItem.produto_recomendado?.nompro || 'Item Recomendado') : (cItem.produto_recomendado || 'Item Recomendado');
       const prodDestShort = String(prodDest).split(' ').slice(0, 2).join(' ');
-      const script = c.script_sugerido_caixa || c.script_sugestao_pdv || 'Ofereça o combo ao registrar o item.';
+      const script = cItem.script_sugerido_caixa || cItem.script_sugestao_pdv || 'Ofereça o combo ao registrar o item no caixa.';
+
+      const pOrigVal = Number(cItem.ticket_origem_reais ?? cItem.impacto_financeiro?.preco_origem ?? 0);
+      const pRecVal = Number(cItem.ticket_recomendado_reais ?? cItem.impacto_financeiro?.preco_recomendado ?? 0);
+      const incrPct = pOrigVal > 0 ? ((pRecVal / pOrigVal) * 100).toFixed(1) : null;
 
       cardsHtml += `
         <div class="widget-combo-card">
           <div class="flex items-center justify-between text-xs font-mono mb-1">
-            <span class="font-bold text-white">${this.escapeHtml(prodOrig)}</span>
-            <span class="text-purple-400">➔</span>
+            <span class="font-bold text-white flex items-center gap-1.5">
+              <span>${isForte ? '⚡' : '🛒'}</span>
+              <span>${this.escapeHtml(prodOrig)}</span>
+            </span>
+            <span class="text-purple-400 font-bold">➔</span>
             <span class="font-bold text-auraCyan-light">${this.escapeHtml(prodDest)}</span>
           </div>
 
-          <div class="flex items-center gap-2 font-mono text-[10px] text-slate-400 my-1">
-            <span class="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">⚡ Lift ${lift}x</span>
-            <span class="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">🎯 Confiança ${conf}%</span>
-            <span>📦 ${cupons} cupons</span>
+          <div class="flex flex-wrap items-center gap-2 font-mono text-[10px] text-slate-400 my-1">
+            <span class="px-1.5 py-0.5 rounded ${isForte ? 'bg-purple-500/25 text-purple-200 border-purple-500/40' : 'bg-slate-800 text-slate-300 border-slate-700'} font-bold border tabular-nums">
+              ⚡ Lift ${lift}x
+            </span>
+            <span class="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 tabular-nums">
+              🎯 Confiança ${conf}%
+            </span>
+            <span class="tabular-nums">📦 ${cupons} cupons</span>
+            ${pRecVal > 0 ? `<span class="text-emerald-400 font-semibold tabular-nums">+${this.formatBRL(pRecVal)}${incrPct ? ` (+${incrPct}%)` : ''}</span>` : ''}
           </div>
 
           <div class="widget-combo-script-box">
@@ -1692,7 +2550,7 @@ class AuraChatController {
           </div>
 
           <div class="flex justify-end mt-2">
-            <button class="widget-action-btn purple" onclick="window.auraChat.sendUserPrompt('Qual o estoque atual de ${this.escapeHtml(prodDest)}?')">
+            <button type="button" class="widget-action-btn purple" onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual o estoque atual de ${this.escapeHtml(prodDest)}?');">
               📦 Checar Estoque (${this.escapeHtml(prodDestShort)})
             </button>
           </div>
@@ -1700,79 +2558,432 @@ class AuraChatController {
       `;
     });
 
-    return `
-      <div class="widget-inline-container border-l-4 border-l-auraPurple">
-        <div class="widget-inline-header">
+    // Bloco de Pendências
+    let pendingHtml = '';
+    if (pendingItems.length > 0) {
+      const itemsList = pendingItems.map(p => `
+        <div class="decision-pending-item cursor-pointer hover:bg-purple-500/10 transition-colors" onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'caixas');" title="Ver detalhes nas evidências">
           <div class="flex items-center gap-2">
-            <span class="text-sm">🛒</span>
-            <strong class="text-xs font-mono text-white uppercase tracking-wider">Combos & Vendas Cruzadas (Conveniência)</strong>
+            <span class="text-purple-400 font-bold">💡</span>
+            <span class="font-semibold text-slate-200">${this.escapeHtml(p.label)}</span>
           </div>
-          <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
-            ⚡ Max Lift: ${maxLift}
+          <span class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+            <span>Combos</span>
+            <span>↗</span>
           </span>
         </div>
-        <div class="space-y-2">${cardsHtml || '<div class="text-xs font-mono text-slate-400">Nenhum combo com lift mínimo identificado.</div>'}</div>
+      `).join('');
+
+      pendingHtml = `
+        <div class="space-y-1.5">
+          <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">Oportunidades de Venda Cruzada:</span>
+          <div class="decision-pending-list">${itemsList}</div>
+        </div>
+      `;
+    }
+
+    const recLabel = action.label || 'Ativar Combos Recomendados no Balcão';
+    const dataConsulta = c.context?.queried_at ? new Date(c.context.queried_at).toLocaleDateString('pt-BR') : 'Data Recente';
+
+    return `
+      <div class="decision-card" data-evidence-id="${evId}">
+        <!-- Context Header -->
+        <div class="decision-header">
+          <div class="decision-context">
+            <span class="decision-context-title">${this.escapeHtml(assessment.title || 'Combos & Vendas Cruzadas (Conveniência)')}</span>
+            <span class="decision-context-sub">
+              <span>📅 ${this.escapeHtml(dataConsulta)}</span>
+              <span>•</span>
+              <span>🛒 PDV / Cestas de Compras</span>
+              <span>•</span>
+              <span>🏢 ${this.escapeHtml(c.context?.unit_id || 'Loja')}</span>
+            </span>
+          </div>
+          <span class="decision-status-badge ${badgeClass}">
+            <span>${badgeIcon}</span>
+            <span>${this.escapeHtml(badgeText)}</span>
+          </span>
+        </div>
+
+        <!-- Hero Metric -->
+        <div class="decision-hero">
+          <div class="decision-hero-header">
+            <span class="decision-hero-label">${this.escapeHtml(heroLabel)}</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+              ${countForteSinergia} Combos Fortes
+            </span>
+          </div>
+          <div class="decision-hero-value ${heroColorClass} tabular-nums">
+            ${heroVal}
+          </div>
+          <div class="decision-hero-sub">
+            ${this.escapeHtml(heroSub)}
+          </div>
+        </div>
+
+        ${limitationHtml}
+
+        <!-- Comparativo Compacto -->
+        ${(!isNoMovement && !isUnavailable) ? `
+          <div class="decision-comparison-grid">
+            <div class="decision-comp-item">
+              <span class="decision-comp-label">Cestas Múltiplas</span>
+              <strong class="decision-comp-val text-cyan-300 tabular-nums">${totalMultiplas} cupons</strong>
+              <span class="decision-comp-sub tabular-nums">${parseFloat(pctMultiplas).toFixed(1)}% do total</span>
+            </div>
+            <div class="decision-comp-item">
+              <span class="decision-comp-label">Ticket Médio Loja</span>
+              <strong class="decision-comp-val text-slate-100 tabular-nums">${this.formatBRL(ticketMedioLoja)}</strong>
+              <span class="decision-comp-sub tabular-nums">${totalSkus} SKUs minerados</span>
+            </div>
+            <div class="decision-comp-item">
+              <span class="decision-comp-label">Regras Geradas</span>
+              <strong class="decision-comp-val text-purple-300 tabular-nums">${totalRegras} regras</strong>
+              <span class="decision-comp-sub tabular-nums">${countForteSinergia} com Lift ≥ 2.0x</span>
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Lista de Combos Destaque -->
+        <div class="space-y-2 mt-1">
+          ${cardsHtml || '<div class="text-xs font-mono text-slate-400">Nenhum combo com o filtro solicitado retornado.</div>'}
+        </div>
+
+        ${pendingHtml}
+
+        <!-- Ações Permitidas -->
+        <div class="decision-actions">
+          <button 
+            type="button" 
+            class="decision-btn-primary" 
+            onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Quais os scripts de balcão recomendados para a equipe do caixa?');"
+            title="Capacitar operadores com roteiro persuasivo no PDV">
+            <span class="text-xs">🛒</span>
+            <span>${this.escapeHtml(recLabel)}</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="decision-btn-secondary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
+            title="Ver definições matemáticas de Suporte, Confiança e Lift">
+            <span class="text-xs">📐</span>
+            <span>Como foi calculado</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="decision-btn-secondary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'caixas');"
+            title="Ver tabela detalhada de todas as regras mineradas">
+            <span class="text-xs">📊</span>
+            <span>Ver Regras Detalhadas</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="decision-btn-secondary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
+            title="Ver fontes de dados e diagnósticos">
+            <span class="text-xs">📋</span>
+            <span>Resumo & Fontes</span>
+          </button>
+        </div>
       </div>
     `;
   }
 
   /**
-   * Widget 5: Performance de Pista, Ranking e Alertas de Vazão de Bicos
+   * Widget 5: Card de Decisão Executiva para Performance da Pista, Vazão de Bicos & Frentistas
+   * Implementação AURA Precision Glass v1.0 (F5-05).
+   * Garante:
+   * 1. Superfície única DecisionCard sem aninhamentos desnecessários.
+   * 2. Destaque para bicos com vazão lenta (< 30 L/min indicando manutenção preventiva).
+   * 3. Ranking de frentistas com meta de conversão em aditivada (≥ 25%) e faturamento.
+   * 4. Limitações operacionais de telemetria transparentes.
+   * 5. Ação de agendamento de manutenção em 1 clique e drawer de evidências.
    */
   renderDesempenhoPistaWidget(data) {
-    const frents = data.ranking_frentistas || [];
-    const bicos = data.auditoria_vazao_bicos || data.vazao_bicos || [];
-    const lider = data.resumo_executivo?.campeao_faturamento?.nome || data.resumo_executivo?.lider_faturamento || (frents[0]?.nome || frents[0]?.frentista || 'N/A');
+    if (!data || typeof data !== 'object') {
+      return `<div class="decision-card"><p class="text-xs text-slate-400">Dados de performance da pista indisponíveis.</p></div>`;
+    }
 
+    const c = data.contrato || data;
+
+    // F1-08 / F5-01: Versão desconhecida de contrato tratada com segurança
+    if (c.schema_version && c.schema_version !== '1.0') {
+      return this.renderUnsupportedSchemaCard(c.schema_version, 'Performance da Pista');
+    }
+
+    const assessment = c.assessment || {};
+    const metrics = c.metrics || {};
+    const pendingItems = c.pending_items || [];
+    const action = c.recommended_action || {};
+    const resumo = data.resumo_executivo || {};
+    const ranking = c.ranking || data.ranking_frentistas || [];
+    const nozzles = c.nozzles || data.auditoria_vazao_bicos || data.vazao_bicos || [];
+
+    const isNoMovement = assessment.status_code === 'SEM_MOVIMENTACAO' || data.status === 'sem_movimento';
+    const isUnavailable = assessment.status_code === 'INDISPONIVEL' || data.status === 'indisponivel';
+
+    const evId = 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    if (typeof window !== 'undefined') {
+      if (!window.__auraEvidenceStore) window.__auraEvidenceStore = {};
+      window.__auraEvidenceStore[evId] = data;
+    }
+
+    // Identificação de Bicos Lentos (< 30 L/min)
+    const bicosAlerta = nozzles.filter(b => b.alerta_filtro_lento || b.alerta_vazao_lenta || b.alerta_filtro || b.alerta_vazao || parseFloat(b.vazao_media_l_min ?? b.vazao_litros_minuto ?? b.vazao_media_litros_minuto ?? 35) < 30.0);
+    const bicosLentosCount = assessment.total_bicos_lentos ?? assessment.bicos_lentos_count ?? metrics.bicos_com_alerta_filtro ?? metrics.bicos_com_alerta_vazao_count ?? bicosAlerta.length;
+
+    // Badges Semânticos com Ícone (F5-09)
+    let badgeClass = 'status-validated';
+    let badgeIcon = '✓';
+    let badgeText = assessment.badge_label || (bicosLentosCount > 0 ? `⚠️ ${bicosLentosCount} Bicos Lentos (<30 L/min)` : '✓ Pista Operando Conforme');
+
+    if (isNoMovement) {
+      badgeClass = 'status-neutral';
+      badgeIcon = '⏸️';
+      badgeText = assessment.badge_label || 'Sem Movimentação';
+    } else if (isUnavailable) {
+      badgeClass = 'status-divergent';
+      badgeIcon = '⚠️';
+      badgeText = 'Fonte Indisponível';
+    } else if (bicosLentosCount > 0) {
+      badgeClass = 'status-partial';
+      badgeIcon = '⚠️';
+      badgeText = assessment.badge_label || `⚠️ ${bicosLentosCount} Bicos Lentos (<30 L/min)`;
+    } else {
+      badgeClass = 'status-validated';
+      badgeIcon = '✓';
+      badgeText = assessment.badge_label || '✓ Pista Operando Conforme';
+    }
+
+    // Hero Metric: Faturamento da Pista
+    const fatPista = Number(metrics.faturamento_total ?? metrics.faturamento_total_pista ?? resumo.faturamento_pista_total ?? 0);
+    const liderNome = assessment.melhor_frentista_nome ?? resumo.campeao_faturamento?.nome ?? resumo.lider_faturamento ?? (ranking[0]?.nome || ranking[0]?.frentista || 'Colaborador');
+    const liderObj = ranking[0] || {};
+    const liderFat = Number(liderObj.faturamento_reais ?? 0);
+    const liderAdit = parseFloat(liderObj.conversao_aditivada_pct ?? liderObj.percentual_aditivada ?? 0).toFixed(1);
+
+    const heroLabel = 'Faturamento Total da Pista';
+    const heroVal = isNoMovement || isUnavailable ? '—' : this.formatBRL(fatPista);
+    const heroColorClass = isNoMovement || isUnavailable ? 'text-slate-400' : 'text-emerald';
+    const heroSub = ranking.length > 0
+      ? `Líder: ${liderNome} (${this.formatBRL(liderFat)}, Aditivada: ${liderAdit}%) • Ticket Médio da Pista: ${this.formatBRL(metrics.ticket_medio ?? metrics.ticket_medio_pista ?? resumo.ticket_medio_pista ?? 0)}.`
+      : 'Sem abastecimentos registrados no período.';
+
+    // Comparativo Compacto
+    const volPista = Number(metrics.total_litros ?? metrics.volume_total_litros ?? resumo.volume_total_litros ?? 0);
+    const txAditGlobal = parseFloat(metrics.taxa_conversao_aditivada_geral_pct ?? metrics.taxa_conversao_aditivada_global_pct ?? resumo.conversao_aditivada_geral_pct ?? 0).toFixed(1);
+    const vazaoMedia = parseFloat(metrics.vazao_media_l_min ?? metrics.vazao_media_geral_litros_minuto ?? resumo.vazao_media_pista_litros_minuto ?? 34.5).toFixed(1);
+
+    // Bloco de Limitação (F5-02 & F5-05)
+    let limitationHtml = '';
+    const limText = assessment.limitation || resumo.limitation;
+    if (limText && !isNoMovement && !isUnavailable) {
+      limitationHtml = `
+        <div class="decision-limitation-callout">
+          <span class="text-sm">⚠️</span>
+          <div>
+            <strong class="font-semibold">Premissa Operacional & Telemetria:</strong>
+            <span class="text-amber-200/90">${this.escapeHtml(limText)}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // Ranking de Frentistas (Top 3)
     let frentsHtml = '';
-    frents.slice(0, 3).forEach((f, idx) => {
+    ranking.slice(0, 3).forEach((f, idx) => {
       const medals = ['🥇', '🥈', '🥉'];
       const med = medals[idx] || '👤';
       const nomeFrent = f.nome || f.frentista || 'Colaborador';
-      const fat = parseFloat(f.faturamento_reais || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-      const adit = parseFloat(f.conversao_aditivada_pct ?? f.percentual_aditivada ?? 0).toFixed(1);
-      const isMeta = parseFloat(adit) >= 25.0;
+      const fat = this.formatBRL(f.faturamento_reais || 0);
+      const aditVal = parseFloat(f.conversao_aditivada_pct ?? f.percentual_aditivada ?? 0);
+      const isMeta = aditVal >= 25.0;
+      const atends = f.total_abastecimentos ?? f.atendimentos_count ?? 0;
 
       frentsHtml += `
-        <div class="flex items-center justify-between p-1.5 rounded bg-slate-900/50 border border-slate-800 text-xs font-mono">
-          <div class="flex items-center gap-1.5 font-bold text-white">
-            <span>${med}</span>
+        <div class="flex items-center justify-between p-2 rounded-xl bg-slate-900/60 border border-slate-800 text-xs font-mono">
+          <div class="flex items-center gap-2 font-bold text-white">
+            <span class="text-sm">${med}</span>
             <span>${this.escapeHtml(nomeFrent)}</span>
+            ${atends > 0 ? `<span class="text-[10px] text-slate-500 font-normal">(${atends} atends)</span>` : ''}
           </div>
-          <div class="flex items-center gap-2">
-            <span class="text-slate-300">${fat}</span>
-            <span class="${isMeta ? 'text-emerald-400' : 'text-amber-400'} font-semibold">Adit: ${adit}%</span>
+          <div class="flex items-center gap-3">
+            <span class="text-slate-200 font-semibold tabular-nums">${fat}</span>
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums ${isMeta ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'}">
+              Adit: ${aditVal.toFixed(1)}%
+            </span>
           </div>
         </div>
       `;
     });
 
+    // Alerta de Vazão Lenta nos Bicos (< 30 L/min)
     let bicosAlertHtml = '';
-    const bicosAlerta = bicos.filter(b => b.alerta_filtro || b.alerta_vazao || parseFloat(b.vazao_litros_minuto ?? b.vazao_media_litros_minuto ?? 35) < 25.0);
     if (bicosAlerta.length > 0) {
       bicosAlertHtml = `
-        <div class="mt-2 p-2 rounded bg-amber-950/30 border border-amber-500/30 text-amber-300 text-xs font-mono space-y-1">
-          <strong class="text-[10px] uppercase tracking-wider text-amber-400">⚠️ Alerta de Vazão Lenta nos Bicos:</strong>
-          ${bicosAlerta.map(b => {
-            const vazao = parseFloat(b.vazao_litros_minuto ?? b.vazao_media_litros_minuto ?? 0).toFixed(1);
-            const prod = b.produto_nome || b.combustivel || 'Combustível';
-            return `<div>Bico ${b.bico} (${this.escapeHtml(prod)}): <strong>${vazao} L/min</strong> (Filtro/Bomba requer checagem)</div>`;
-          }).join('')}
+        <div class="p-3 rounded-xl bg-amber-950/25 border border-amber-500/30 text-amber-300 text-xs font-mono space-y-1.5">
+          <div class="flex items-center gap-2 font-bold text-amber-400">
+            <span>⚠️</span>
+            <span class="uppercase tracking-wider text-[11px]">Bicos com Alerta de Vazão Lenta (&lt; 30 L/min):</span>
+          </div>
+          <p class="text-[10px] text-slate-300">
+            Vazão reduzida prejudica a produtividade da pista e aponta necessidade de troca de elemento filtrante ou ajuste na unidade de sucção:
+          </p>
+          <div class="space-y-1 pt-1">
+            ${bicosAlerta.map(b => {
+              const vazao = parseFloat(b.vazao_media_l_min ?? b.vazao_litros_minuto ?? b.vazao_media_litros_minuto ?? 0).toFixed(1);
+              const prod = b.combustivel || b.produto_nome || 'Combustível';
+              return `<div class="flex items-center justify-between text-[11px] p-1 rounded bg-slate-900/60 border border-amber-500/20">
+                <span>Bico <strong>${b.bico}</strong> (${this.escapeHtml(prod)})</span>
+                <strong class="text-rose-400 tabular-nums">${vazao} L/min</strong>
+              </div>`;
+            }).join('')}
+          </div>
         </div>
       `;
     }
 
-    return `
-      <div class="widget-inline-container border-l-4 border-l-auraPurple">
-        <div class="widget-inline-header">
+    // Bloco de Pendências
+    let pendingHtml = '';
+    if (pendingItems.length > 0) {
+      const itemsList = pendingItems.map(p => `
+        <div class="decision-pending-item cursor-pointer hover:bg-amber-500/10 transition-colors" onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'bicos');" title="Ver detalhes nas evidências">
           <div class="flex items-center gap-2">
-            <span class="text-sm">🏆</span>
-            <strong class="text-xs font-mono text-white uppercase tracking-wider">Performance da Pista & Frentistas</strong>
+            <span class="text-amber-400 font-bold">🔧</span>
+            <span class="font-semibold text-slate-200">${this.escapeHtml(p.label)}</span>
           </div>
-          <span class="text-[10px] font-mono text-cyan-300 font-bold">Líder: ${this.escapeHtml(lider)}</span>
+          <span class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+            <span>Bicos</span>
+            <span>↗</span>
+          </span>
         </div>
-        <div class="space-y-1">${frentsHtml}</div>
+      `).join('');
+
+      pendingHtml = `
+        <div class="space-y-1.5">
+          <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">Pendências Operacionais:</span>
+          <div class="decision-pending-list">${itemsList}</div>
+        </div>
+      `;
+    }
+
+    const recLabel = action.label || (bicosLentosCount > 0 ? 'Agendar Manutenção de Filtro nos Bicos Lentos' : 'Incentivar Conversão em Aditivada');
+    const dataConsulta = c.context?.data_auditada || (c.context?.queried_at ? new Date(c.context.queried_at).toLocaleDateString('pt-BR') : 'Data Recente');
+
+    return `
+      <div class="decision-card" data-evidence-id="${evId}">
+        <!-- Context Header -->
+        <div class="decision-header">
+          <div class="decision-context">
+            <span class="decision-context-title">${this.escapeHtml(assessment.title || 'Performance da Pista & Frentistas')}</span>
+            <span class="decision-context-sub">
+              <span>📅 ${this.escapeHtml(dataConsulta)}</span>
+              <span>•</span>
+              <span>⛽ ${nozzles.length} Bicos Monitorados</span>
+              <span>•</span>
+              <span>🏢 ${this.escapeHtml(c.context?.unit_id || 'Posto')}</span>
+            </span>
+          </div>
+          <span class="decision-status-badge ${badgeClass}">
+            <span>${badgeIcon}</span>
+            <span>${this.escapeHtml(badgeText)}</span>
+          </span>
+        </div>
+
+        <!-- Hero Metric -->
+        <div class="decision-hero">
+          <div class="decision-hero-header">
+            <span class="decision-hero-label">${this.escapeHtml(heroLabel)}</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+              Líder: ${this.escapeHtml(liderNome)}
+            </span>
+          </div>
+          <div class="decision-hero-value ${heroColorClass} tabular-nums">
+            ${heroVal}
+          </div>
+          <div class="decision-hero-sub">
+            ${this.escapeHtml(heroSub)}
+          </div>
+        </div>
+
+        ${limitationHtml}
+
+        <!-- Comparativo Compacto -->
+        ${(!isNoMovement && !isUnavailable) ? `
+          <div class="decision-comparison-grid">
+            <div class="decision-comp-item">
+              <span class="decision-comp-label">Volume Total</span>
+              <strong class="decision-comp-val text-cyan-300 tabular-nums">${this.formatLiters(volPista, 1)}</strong>
+              <span class="decision-comp-sub tabular-nums">${ranking.length} frentistas ativos</span>
+            </div>
+            <div class="decision-comp-item">
+              <span class="decision-comp-label">Conversão Aditivada</span>
+              <strong class="decision-comp-val ${parseFloat(txAditGlobal) >= 25.0 ? 'text-emerald-400' : 'text-amber-300'} tabular-nums">
+                ${txAditGlobal}%
+              </strong>
+              <span class="decision-comp-sub">Meta da pista: ≥ 25.0%</span>
+            </div>
+            <div class="decision-comp-item">
+              <span class="decision-comp-label">Vazão Média Geral</span>
+              <strong class="decision-comp-val ${parseFloat(vazaoMedia) >= 30.0 ? 'text-slate-100' : 'text-rose-400'} tabular-nums">
+                ${vazaoMedia} L/min
+              </strong>
+              <span class="decision-comp-sub tabular-nums">${bicosLentosCount > 0 ? `${bicosLentosCount} em alerta` : 'Todos conforme'}</span>
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Ranking de Frentistas -->
+        <div class="space-y-1.5 mt-1">
+          <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">Podium de Performance da Pista:</span>
+          ${frentsHtml || '<div class="text-xs font-mono text-slate-400">Nenhum frentista retornado.</div>'}
+        </div>
+
         ${bicosAlertHtml}
+        ${pendingHtml}
+
+        <!-- Ações Permitidas -->
+        <div class="decision-actions">
+          <button 
+            type="button" 
+            class="decision-btn-primary" 
+            onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como programar a manutenção preventiva dos filtros de bicos de combustíveis?');"
+            title="Abrir diretrizes de manutenção de bicos e bombas">
+            <span class="text-xs">🔧</span>
+            <span>${this.escapeHtml(recLabel)}</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="decision-btn-secondary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
+            title="Ver fórmulas de vazão e conversão de aditivada">
+            <span class="text-xs">📐</span>
+            <span>Como foi calculado</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="decision-btn-secondary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'bicos');"
+            title="Ver detalhamento de todos os bicos da pista">
+            <span class="text-xs">⛽</span>
+            <span>Ver Bicos & Pista</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="decision-btn-secondary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
+            title="Ver fontes de dados e diagnósticos">
+            <span class="text-xs">📋</span>
+            <span>Resumo & Fontes</span>
+          </button>
+        </div>
       </div>
     `;
   }
@@ -2358,6 +3569,18 @@ class AuraChatController {
     if (val === null || val === undefined || isNaN(Number(val))) return '—';
     const num = Number(val);
     return `${num.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })} L`;
+  }
+
+  formatNumber(val, decimals = 0) {
+    if (val === null || val === undefined || isNaN(Number(val))) return '—';
+    const num = Number(val);
+    return num.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  }
+
+  formatPercent(val, decimals = 1) {
+    if (val === null || val === undefined || isNaN(Number(val))) return '—';
+    const num = Number(val);
+    return `${num.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}%`;
   }
 
   escapeHtml(str) {
