@@ -464,8 +464,8 @@ class AuraApp {
     if (sfxBadge) {
       sfxBadge.textContent = isMuted ? 'Mudo' : 'Ativo';
       sfxBadge.className = isMuted 
-        ? 'px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400' 
-        : 'px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+        ? 'px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-slate-800 text-slate-400' 
+        : 'px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
     }
 
     if (sfxIcon) {
@@ -611,8 +611,8 @@ class AuraApp {
     if (badge) {
       badge.textContent = enabled ? 'Ativo (60 FPS)' : 'Desativado';
       badge.className = enabled
-        ? 'px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-        : 'px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400';
+        ? 'px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+        : 'px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-slate-800 text-slate-400';
     }
     if (icon) {
       icon.setAttribute('class', enabled ? 'w-4 h-4 text-emerald-400' : 'w-4 h-4 text-slate-400');

@@ -145,11 +145,27 @@ class PostoTools:
 
     def buscar_produtos_catalogo(self, termo: str, top_k: int = 5, query_vector: list = None, grupo_filter: str = None) -> dict:
         """Executa busca semântica e lexical híbrida no catálogo de produtos."""
-        return self.rag.search_hybrid(termo, top_k=top_k, query_vector=query_vector, grupo_filter=grupo_filter)
+        try:
+            return self.rag.search_hybrid(termo, top_k=top_k, query_vector=query_vector, grupo_filter=grupo_filter)
+        except Exception as e:
+            return {
+                "termo": termo,
+                "produtos": [],
+                "status": "offline",
+                "motivo": f"Busca no catálogo vetorial indisponível: {e}",
+            }
 
     def consultar_conhecimento_aura(self, termo: str, top_k: int = 2, query_vector: list = None) -> dict:
         """Executa busca híbrida de auto-conhecimento e meta-RAG na base de dados da AURA."""
-        return self.rag.search_hybrid_conhecimento(termo, top_k=top_k, query_vector=query_vector)
+        try:
+            return self.rag.search_hybrid_conhecimento(termo, top_k=top_k, query_vector=query_vector)
+        except Exception as e:
+            return {
+                "termo": termo,
+                "conhecimento": [],
+                "status": "offline",
+                "motivo": f"Base de conhecimento AURA indisponível: {e}",
+            }
 
     def consultar_analise_vendas_erp(self, tipo: str = "mais_vendidos") -> dict:
         """
@@ -316,7 +332,7 @@ class PostoTools:
         except Exception as e:
             return {
                 "status": "indisponivel",
-                "motivo": f"Falha na consulta ao ERP (porta 5433): {e}",
+                "motivo": f"Falha na consulta ao sistema ERP: {e}",
             }
 
     def consultar_estoque_erp(self, termo: str = "") -> dict:
@@ -366,7 +382,7 @@ class PostoTools:
         except Exception as e:
             return {
                 "status": "indisponivel",
-                "motivo": f"Falha na consulta de estoque no ERP (porta 5433): {e}",
+                "motivo": f"Falha na consulta de estoque no ERP: {e}",
             }
 
     def consultar_clientes_erp(self, termo: str = "") -> dict:
@@ -431,12 +447,22 @@ class PostoTools:
         except Exception as e:
             return {
                 "status": "indisponivel",
-                "motivo": f"Falha na consulta de clientes no ERP (porta 5433): {e}",
+                "motivo": f"Falha na consulta de clientes no ERP: {e}",
             }
 
     def obter_telemetria_sre(self) -> dict:
         """Retorna métricas de saúde do PostgreSQL 16 para observabilidade."""
-        return self.rag.get_sre_metrics()
+        try:
+            return self.rag.get_sre_metrics()
+        except Exception as e:
+            return {
+                "status": "indisponivel",
+                "motivo": f"Métricas de telemetria SRE indisponíveis: {e}",
+                "database_health": None,
+                "table_stats": None,
+                "intencoes_stats": None,
+                "index_stats": [],
+            }
 
     @staticmethod
     def calcular_volume_encerrante(enc_ini: Decimal, enc_fim: Decimal, afericao: Decimal = Decimal("0.0")) -> Tuple[Decimal, Decimal, str]:
@@ -1370,13 +1396,13 @@ class PostoTools:
                 recommended_action=RecommendedAction(
                     label="Verificar conexão com ERP",
                     execution="external_manual",
-                    detail="Verificar se o serviço PostgreSQL local (porta 5433) está ativo."
+                    detail="Verificar se a conexão de dados com a retaguarda ERP está ativa."
                 ),
                 explanation=ReconciliationExplanation(text=f"Não foi possível consultar os dados da auditoria: {e}"),
             )
             return {
                 "status": "indisponivel",
-                "motivo": f"Falha na execução da auditoria de turno no ERP (porta 5433): {e}",
+                "motivo": f"Falha na execução da conciliação de turno no ERP: {e}",
                 "schema_version": "1.0",
                 "response_id": "reconcil-indisponivel",
                 "intent": "shift_reconciliation",
@@ -2251,7 +2277,7 @@ class PostoTools:
         except Exception as e:
             return {
                 "status": "indisponivel",
-                "motivo": f"Falha na previsão de esgotamento de tanques no ERP (porta 5433): {e}",
+                "motivo": f"Falha na previsão de esgotamento de tanques no ERP: {e}",
             }
 
     @staticmethod
@@ -3200,7 +3226,7 @@ class PostoTools:
         except Exception as e:
             return {
                 "status": "indisponivel",
-                "motivo": f"Falha na auditoria de pista e frentistas no ERP (porta 5433): {e}",
+                "motivo": f"Falha na consulta de pista e frentistas no ERP: {e}",
             }
         finally:
             if conn and not conn.closed:
@@ -3889,7 +3915,7 @@ class PostoTools:
         except Exception as e:
             return {
                 "status": "indisponivel",
-                "motivo": f"Falha na geração do LMC Oficial da ANP no ERP (porta 5433/5435): {e}",
+                "motivo": f"Falha na geração do LMC Oficial da ANP no ERP: {e}",
             }
         finally:
             if conn and not conn.closed:

@@ -42,7 +42,7 @@ class AuraTriggersController {
         icon: 'check-circle-2',
         color: 'cyan',
         badge: 'Auditoria',
-        desc: 'Triangulação entre automação CBC04 Companytec, vendas PDV e balanço volumétrico de tanques.',
+        desc: 'Triangulação contábil entre encerrantes de bicos na pista, vendas do PDV e balanço volumétrico de tanques.',
         defaultParams: { data: 'hoje' },
       },
       {
@@ -62,7 +62,7 @@ class AuraTriggersController {
         icon: 'shopping-cart',
         color: 'purple',
         badge: 'Inteligência PDV',
-        desc: 'Regras de associação Apriori de alta frequência com Lift, Confiança e scripts práticos para sugestão no caixa.',
+        desc: 'Combos e padrões de compras frequentes na conveniência, com relevância comprovada e scripts para o caixa.',
         defaultParams: { min_lift: 1.2, limit: 10 },
       },
       {
@@ -101,8 +101,8 @@ class AuraTriggersController {
         category: 'loja',
         icon: 'search',
         color: 'purple',
-        badge: 'RAG Híbrido',
-        desc: 'Recuperação vetorial HNSW + lexical GIN FTS com Reciprocal Rank Fusion (RRF) de produtos e combustíveis.',
+        badge: 'Catálogo & Preços',
+        desc: 'Pesquisa inteligente de combustíveis, conveniência e lubrificantes com correspondência precisa de sinônimos.',
         defaultParams: { termo: 'combustivel', top_k: 5 },
       },
       {
@@ -149,10 +149,10 @@ class AuraTriggersController {
              onclick="window.auraTriggers.executeTrigger('${tool.id}')">
           <div>
             <div class="flex items-center justify-between mb-3">
-              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold border ${tagBg}">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-sans font-semibold border ${tagBg}">
                 ${tool.badge}
               </span>
-              <span class="text-[11px] text-slate-400 font-mono group-hover:text-cyan-300 transition-colors flex items-center gap-1">
+              <span class="text-[11px] text-slate-400 font-sans group-hover:text-cyan-300 transition-colors flex items-center gap-1">
                 <span>1-Clique</span>
                 <svg class="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
               </span>
@@ -167,10 +167,10 @@ class AuraTriggersController {
             </p>
           </div>
 
-          <div class="mt-4 pt-3 border-t border-white/5 flex items-center justify-between font-mono text-[11px] text-slate-500">
-            <span class="text-slate-400">alias: ${tool.id}</span>
+          <div class="mt-4 pt-3 border-t border-white/5 flex items-center justify-between font-sans text-[11px] text-slate-500">
+            <span class="text-slate-400">Módulo: ${tool.badge}</span>
             <span class="text-cyan-400 font-semibold group-hover:text-cyan-300 flex items-center gap-1.5">
-              <span>Disparar</span>
+              <span>Consultar</span>
               <svg class="w-3.5 h-3.5 inline text-cyan-400 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" stroke-width="1.75"/><line x1="12" y1="1.5" x2="12" y2="5" stroke-width="1.75"/><line x1="12" y1="19" x2="12" y2="22.5" stroke-width="1.75"/><line x1="1.5" y1="12" x2="5" y2="12" stroke-width="1.75"/><line x1="19" y1="12" x2="22.5" y2="12" stroke-width="1.75"/><path d="M8 12.5l2.8 2.8L16.5 8.5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </span>
           </div>
@@ -242,11 +242,11 @@ class AuraTriggersController {
 
     if (titleEl) titleEl.textContent = tool.name;
     if (statusEl) {
-      statusEl.className = 'px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
-      statusEl.textContent = '✓ 200 OK SUCCESS';
+      statusEl.className = 'px-2.5 py-0.5 rounded text-[11px] font-sans font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+      statusEl.textContent = '✓ Consulta Concluída';
     }
     if (latencyEl) {
-      latencyEl.innerHTML = `<span class="inline-flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> <span>Latência: ${response.clientLatencyMs || response.latency_ms || 25} ms</span></span>`;
+      latencyEl.innerHTML = `<span class="inline-flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> <span>Tempo de Resposta: ${response.clientLatencyMs || response.latency_ms || 25} ms</span></span>`;
     }
 
     // Renderiza JSON bruto com syntax highlighting simples
@@ -271,7 +271,7 @@ class AuraTriggersController {
       let rows = '';
       data.detalhamento_tanques.forEach(t => {
         rows += `
-          <tr class="border-b border-white/5 text-xs font-mono hover:bg-white/[0.02] transition-colors">
+          <tr class="border-b border-white/5 text-xs font-sans hover:bg-white/[0.02] transition-colors">
             <td class="py-2.5 text-slate-300 font-bold">TQ-${t.codtan}</td>
             <td class="py-2.5 font-semibold text-slate-100">${t.combustivel}</td>
             <td class="py-2.5 text-right tabular-nums">${(t.saldo_atual_litros || 0).toLocaleString('pt-BR')} L</td>
@@ -293,8 +293,8 @@ class AuraTriggersController {
       const ullageTot = tanksList.reduce((acc, t) => acc + (Number(t.espaco_livre_ullage_litros) || 0), 0);
 
       return `
-        <div class="space-y-4">
-          <div class="p-3.5 rounded-xl glass-subcard border border-white/5 font-mono text-xs text-slate-300">
+        <div class="space-y-4 font-sans text-xs">
+          <div class="p-3.5 rounded-xl glass-subcard border border-white/5 text-xs text-slate-300">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div>Tanques Ativos: <strong class="text-emerald-400 tabular-nums">${totalAtivos}</strong></div>
               <div>Nível Crítico (&lt;15%): <strong class="${emRisco > 0 ? 'text-rose-400' : 'text-slate-400'} tabular-nums">${emRisco}</strong></div>
@@ -304,7 +304,7 @@ class AuraTriggersController {
           </div>
 
           <div class="overflow-x-auto">
-            <table class="w-full text-left font-mono text-xs">
+            <table class="w-full text-left font-sans text-xs">
               <thead>
                 <tr class="text-slate-400 border-b border-white/10">
                   <th class="pb-2.5">Tanque</th>
@@ -328,7 +328,7 @@ class AuraTriggersController {
     if (toolId === 'lmc_anp' && data.resumo_executivo) {
       const r = data.resumo_executivo;
       return `
-        <div class="space-y-4 font-mono text-xs">
+        <div class="space-y-4 font-sans text-xs">
           <div class="p-4 rounded-xl glass-subcard border border-emerald-500/40 flex items-center justify-between shadow-lg">
             <div>
               <div class="text-xs text-slate-400">Status Geral ANP</div>
@@ -386,7 +386,7 @@ class AuraTriggersController {
       const diagText = r.diagnostico_caixa || c.explanation?.text || 'Conferência de turno executada.';
 
       return `
-        <div class="space-y-4 font-mono text-xs">
+        <div class="space-y-4 font-sans text-xs">
           <div class="p-4 rounded-lg ${isPartial ? 'bg-amber-950/20 border border-amber-500/30' : (isUnavailable ? 'bg-rose-950/20 border border-rose-500/30' : 'bg-cyan-950/20 border border-cyan-500/30')} flex items-center justify-between">
             <div>
               <div class="text-xs text-slate-400">Status da Conciliação</div>
@@ -402,7 +402,7 @@ class AuraTriggersController {
             </div>
           </div>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded bg-slate-900 border border-slate-800">
-            <div>Faturamento Pista CBC04: <strong class="text-slate-100 block mt-0.5 tabular-nums">${autRevText}</strong></div>
+            <div>Faturamento Automação Pista: <strong class="text-slate-100 block mt-0.5 tabular-nums">${autRevText}</strong></div>
             <div>Faturamento Caixa PDV: <strong class="text-cyan-300 block mt-0.5 tabular-nums">${posRevText}</strong></div>
             <div>${isPartial ? 'Diferença Provisória:' : 'Diferença Caixa:'} <strong class="${isPartial ? 'text-amber-400' : 'text-emerald-400'} block mt-0.5 tabular-nums">${diffFormatted}</strong></div>
             <div>Diagnóstico: <span class="text-slate-400 block mt-0.5">${this.escapeHtml(diagText)}</span></div>
@@ -419,7 +419,7 @@ class AuraTriggersController {
           const vazao = Number(b.vazao_media_l_min || 0);
           const isLento = b.alerta_filtro_lento || (b.status_operacional === 'ATIVO' && vazao > 0 && vazao < 30);
           bicosList += `
-            <div class="p-3 rounded-xl glass-subcard border ${isLento ? 'border-amber-500/50 shadow-md shadow-amber-950/20 text-amber-300' : 'border-white/10 text-slate-300'} font-mono text-xs transition-all hover:-translate-y-0.5">
+            <div class="p-3 rounded-xl glass-subcard border ${isLento ? 'border-amber-500/50 shadow-md shadow-amber-950/20 text-amber-300' : 'border-white/10 text-slate-300'} font-sans text-xs transition-all hover:-translate-y-0.5">
               <div class="font-bold">Bico ${b.bico} (${b.combustivel})</div>
               <div class="text-[11px] text-slate-400 mt-1">Vazão: <strong class="tabular-nums">${vazao.toFixed(1)} L/min</strong> ${isLento ? '<span class="inline-flex items-center gap-1 text-amber-400 font-semibold"><svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke-width="1.75"/><line x1="12" y1="9" x2="12" y2="13" stroke-width="1.75"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg> LENTO</span>' : '<span class="text-emerald-400">✓ NORMAL</span>'}</div>
             </div>
@@ -431,8 +431,8 @@ class AuraTriggersController {
       if (data.ranking_frentistas) {
         data.ranking_frentistas.forEach((f, idx) => {
           frentRows += `
-            <tr class="border-b border-white/5 text-xs font-mono hover:bg-white/[0.02] transition-colors">
-              <td class="py-2.5 text-slate-400">${idx + 1}</td>
+            <tr class="border-b border-white/5 text-xs font-sans hover:bg-white/[0.02] transition-colors">
+              <td class="py-2.5 text-slate-400 tabular-nums">${idx + 1}</td>
               <td class="py-2.5 font-semibold text-slate-200">${f.nome}</td>
               <td class="py-2.5 text-right tabular-nums">${Number(f.total_litros || 0).toFixed(1)} L</td>
               <td class="py-2.5 text-right text-emerald-400 font-bold tabular-nums">R$ ${Number(f.faturamento_reais || 0).toFixed(2)}</td>
@@ -443,15 +443,15 @@ class AuraTriggersController {
       }
 
       return `
-        <div class="space-y-4 font-mono text-xs">
+        <div class="space-y-4 font-sans text-xs">
           <div>
             <h4 class="font-bold text-slate-200 mb-2">Auditoria de Vazão dos Bicos:</h4>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">${bicosList || '<div class="text-slate-500">Sem dados de bicos</div>'}</div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">${bicosList || '<div class="text-slate-500 font-sans">Sem dados de bicos</div>'}</div>
           </div>
           <div>
             <h4 class="font-bold text-slate-200 mb-2">Ranking de Frentistas:</h4>
             <div class="overflow-x-auto">
-              <table class="w-full text-left font-mono text-xs">
+              <table class="w-full text-left font-sans text-xs">
                 <thead>
                   <tr class="text-slate-400 border-b border-white/10">
                     <th class="pb-2.5">#</th>
@@ -475,7 +475,7 @@ class AuraTriggersController {
       if (data.produtos_mais_vendidos) {
         data.produtos_mais_vendidos.slice(0, 8).forEach(p => {
           topProds += `
-            <tr class="border-b border-white/5 text-xs font-mono hover:bg-white/[0.02] transition-colors">
+            <tr class="border-b border-white/5 text-xs font-sans hover:bg-white/[0.02] transition-colors">
               <td class="py-2 text-slate-200">${p.nompro || p.descricao || p.codpro}</td>
               <td class="py-2 text-right text-slate-300 tabular-nums">${Number(p.quantidade || p.quant || 0).toFixed(1)}</td>
               <td class="py-2 text-right text-emerald-400 font-semibold tabular-nums">R$ ${Number(p.valor_total || p.total || 0).toFixed(2)}</td>
@@ -484,7 +484,7 @@ class AuraTriggersController {
         });
       }
       return `
-        <div class="space-y-4 font-mono text-xs">
+        <div class="space-y-4 font-sans text-xs">
           <div class="grid grid-cols-2 md:grid-cols-3 gap-3 p-3.5 rounded-xl glass-subcard border border-white/5">
             <div>Status: <strong class="text-emerald-400">${data.status || 'OK'}</strong></div>
             <div>Destaque Hoje: <strong class="text-cyan-300">${data.ultimo_produto_vendido_destaque?.nompro || 'Registrado'}</strong></div>
@@ -493,7 +493,7 @@ class AuraTriggersController {
           <div>
             <h4 class="font-bold text-slate-200 mb-2">Top Produtos Mais Vendidos:</h4>
             <div class="overflow-x-auto">
-              <table class="w-full text-left font-mono text-xs">
+              <table class="w-full text-left font-sans text-xs">
                 <thead>
                   <tr class="text-slate-400 border-b border-white/10">
                     <th class="pb-2">Produto</th>
@@ -501,7 +501,7 @@ class AuraTriggersController {
                     <th class="pb-2 text-right">Faturamento</th>
                   </tr>
                 </thead>
-                <tbody>${topProds || '<tr><td colspan="3" class="py-2 text-slate-500">Sem itens</td></tr>'}</tbody>
+                <tbody>${topProds || '<tr><td colspan="3" class="py-2 text-slate-500 font-sans">Sem itens</td></tr>'}</tbody>
               </table>
             </div>
           </div>
@@ -514,7 +514,7 @@ class AuraTriggersController {
       let cards = '';
       data.top_combos_cross_selling.forEach(c => {
         cards += `
-          <div class="p-3.5 rounded-xl glass-subcard border border-purple-500/30 flex flex-col justify-between font-mono text-xs hover:-translate-y-0.5 transition-all">
+          <div class="p-3.5 rounded-xl glass-subcard border border-purple-500/30 flex flex-col justify-between font-sans text-xs hover:-translate-y-0.5 transition-all">
             <div class="flex items-center justify-between text-[11px] mb-1.5 pb-1 border-b border-white/5">
               <span class="text-purple-300 font-bold tabular-nums">LIFT: ${c.metricas?.lift?.toFixed(1)}x</span>
               <span class="text-slate-400 tabular-nums">Confiança: ${(c.metricas?.confianca * 100).toFixed(0)}%</span>
@@ -536,24 +536,24 @@ class AuraTriggersController {
       if (data.maiores_estoques) {
         data.maiores_estoques.slice(0, 10).forEach(e => {
           estRows += `
-            <tr class="border-b border-white/5 text-xs font-mono hover:bg-white/[0.02] transition-colors">
-              <td class="py-2 text-slate-400">${e.codpro}</td>
+            <tr class="border-b border-white/5 text-xs font-sans hover:bg-white/[0.02] transition-colors">
+              <td class="py-2 text-slate-400 tabular-nums">${e.codpro}</td>
               <td class="py-2 text-slate-200 font-semibold">${e.nompro}</td>
               <td class="py-2 text-right text-cyan-300 tabular-nums">${Number(e.estoque || 0).toFixed(1)} ${e.unidade || 'UN'}</td>
-              <td class="py-2 text-right text-emerald-400 tabular-nums">R$ ${Number(e.precovenda || 0).toFixed(2)}</td>
+              <td class="py-2 text-right text-emerald-400 tabular-nums font-semibold">R$ ${Number(e.precovenda || 0).toFixed(2)}</td>
             </tr>
           `;
         });
       }
       return `
-        <div class="space-y-4 font-mono text-xs">
+        <div class="space-y-4 font-sans text-xs">
           <div class="p-3.5 rounded-xl glass-subcard border border-white/5 flex items-center justify-between">
             <span class="text-slate-400">Status do Estoque ERP:</span> <strong class="text-emerald-400">${data.status || 'ONLINE'}</strong>
           </div>
           <div>
             <h4 class="font-bold text-slate-200 mb-2">Maiores Posições de Estoque Cadastradas:</h4>
             <div class="overflow-x-auto">
-              <table class="w-full text-left font-mono text-xs">
+              <table class="w-full text-left font-sans text-xs">
                 <thead>
                   <tr class="text-slate-400 border-b border-white/10">
                     <th class="pb-2">SKU</th>
@@ -562,7 +562,7 @@ class AuraTriggersController {
                     <th class="pb-2 text-right">Preço Venda</th>
                   </tr>
                 </thead>
-                <tbody>${estRows || '<tr><td colspan="4" class="py-2 text-slate-500">Nenhum estoque</td></tr>'}</tbody>
+                <tbody>${estRows || '<tr><td colspan="4" class="py-2 text-slate-500 font-sans">Nenhum estoque</td></tr>'}</tbody>
               </table>
             </div>
           </div>
@@ -576,8 +576,8 @@ class AuraTriggersController {
       if (data.ranking_compras_pedidos) {
         data.ranking_compras_pedidos.slice(0, 8).forEach((c, idx) => {
           cliRows += `
-            <tr class="border-b border-white/5 text-xs font-mono hover:bg-white/[0.02] transition-colors">
-              <td class="py-2.5 text-slate-400">${idx + 1}</td>
+            <tr class="border-b border-white/5 text-xs font-sans hover:bg-white/[0.02] transition-colors">
+              <td class="py-2.5 text-slate-400 tabular-nums">${idx + 1}</td>
               <td class="py-2.5 text-slate-200 font-semibold">${c.nome || c.cliente || 'Consumidor'}</td>
               <td class="py-2.5 text-right text-cyan-300 tabular-nums">${c.total_pedidos || 1} compras</td>
               <td class="py-2.5 text-right text-emerald-400 font-bold tabular-nums">R$ ${Number(c.total_gasto || c.faturamento || 0).toFixed(2)}</td>
@@ -586,7 +586,7 @@ class AuraTriggersController {
         });
       }
       return `
-        <div class="space-y-4 font-mono text-xs">
+        <div class="space-y-4 font-sans text-xs">
           <div class="grid grid-cols-2 gap-3 p-3.5 rounded-xl glass-subcard border border-white/5">
             <div>Clientes Cadastrados: <strong class="text-cyan-300 tabular-nums">${data.total_clientes_cadastrados || 'N/A'}</strong></div>
             <div>Observação PDV: <span class="text-slate-300">${data.observacao_pdv || 'Normal'}</span></div>
@@ -594,7 +594,7 @@ class AuraTriggersController {
           <div>
             <h4 class="font-bold text-slate-200 mb-2">Principais Clientes & Frotas:</h4>
             <div class="overflow-x-auto">
-              <table class="w-full text-left font-mono text-xs">
+              <table class="w-full text-left font-sans text-xs">
                 <thead>
                   <tr class="text-slate-400 border-b border-white/10">
                     <th class="pb-2.5">#</th>
@@ -603,7 +603,7 @@ class AuraTriggersController {
                     <th class="pb-2.5 text-right">Faturamento</th>
                   </tr>
                 </thead>
-                <tbody>${cliRows || '<tr><td colspan="4" class="py-2 text-slate-500">Sem clientes</td></tr>'}</tbody>
+                <tbody>${cliRows || '<tr><td colspan="4" class="py-2 text-slate-500 font-sans">Sem clientes</td></tr>'}</tbody>
               </table>
             </div>
           </div>
@@ -614,7 +614,7 @@ class AuraTriggersController {
     // 9. Dados Cadastrais da Filial
     if (toolId === 'dados_filial') {
       return `
-        <div class="space-y-3 font-mono text-xs p-4 rounded-xl glass-subcard border border-white/5">
+        <div class="space-y-3 font-sans text-xs p-4 rounded-xl glass-subcard border border-white/5">
           <div class="text-sm font-bold text-white border-b border-white/10 pb-2">${data.nome || data.razao_social || 'Posto'}</div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
             <div><span class="text-slate-400">Razão Social:</span> <strong class="text-slate-200">${data.razao_social || 'N/A'}</strong></div>
@@ -633,7 +633,7 @@ class AuraTriggersController {
       let prodCards = '';
       results.forEach(p => {
         prodCards += `
-          <div class="p-3 rounded-xl glass-subcard border border-purple-500/30 font-mono text-xs hover:-translate-y-0.5 transition-all">
+          <div class="p-3 rounded-xl glass-subcard border border-purple-500/30 font-sans text-xs hover:-translate-y-0.5 transition-all">
             <div class="flex items-center justify-between text-[11px] text-slate-400">
               <span class="tabular-nums">SKU: ${p.codpro || p.codigo}</span>
               ${p.score ? `<span class="text-purple-300 font-bold tabular-nums">Score: ${(p.score * 100).toFixed(0)}%</span>` : ''}
@@ -647,12 +647,12 @@ class AuraTriggersController {
         `;
       });
       return `
-        <div class="space-y-3 font-mono text-xs">
+        <div class="space-y-3 font-sans text-xs">
           <div class="flex items-center justify-between p-3 rounded-xl glass-subcard border border-white/5">
-            <span>Método de Busca: <strong class="text-purple-300">${data.metodo || 'Híbrido (HNSW + FTS)'}</strong></span>
+            <span>Método de Busca: <strong class="text-purple-300">${data.metodo || 'Busca Semântica & Catálogo Inteligente'}</strong></span>
             <span>Resultados: <strong class="text-cyan-300 tabular-nums">${results.length}</strong></span>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">${prodCards || '<div class="text-slate-500">Nenhum produto encontrado.</div>'}</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">${prodCards || '<div class="text-slate-500 font-sans">Nenhum produto encontrado.</div>'}</div>
         </div>
       `;
     }
@@ -663,22 +663,22 @@ class AuraTriggersController {
       if (val === null || val === undefined) continue;
       if (typeof val === 'object') {
         fields += `
-          <div class="p-2 rounded bg-slate-900/60 border border-slate-800 text-xs font-mono">
-            <span class="text-cyan-400 font-bold">${key}:</span>
-            <pre class="mt-1 text-slate-300 text-[11px] overflow-x-auto whitespace-pre-wrap">${JSON.stringify(val, null, 2)}</pre>
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs font-sans">
+            <span class="text-cyan-400 font-semibold">${key}:</span>
+            <pre class="mt-1 text-slate-300 text-[11px] overflow-x-auto whitespace-pre-wrap font-mono">${JSON.stringify(val, null, 2)}</pre>
           </div>
         `;
       } else {
         fields += `
-          <div class="flex items-baseline justify-between border-b border-slate-800/80 py-1.5 text-xs font-mono">
+          <div class="flex items-baseline justify-between border-b border-slate-800/80 py-1.5 text-xs font-sans">
             <span class="text-slate-400">${key}:</span>
-            <span class="text-slate-200 font-semibold">${String(val)}</span>
+            <span class="text-slate-200 font-medium">${String(val)}</span>
           </div>
         `;
       }
     }
 
-    return `<div class="space-y-2">${fields || '<div class="text-slate-400 text-xs">Visualização detalhada disponível na aba Payload JSON.</div>'}</div>`;
+    return `<div class="space-y-2 font-sans">${fields || '<div class="text-slate-400 text-xs">Visualização detalhada disponível na aba Dados Brutos (JSON).</div>'}</div>`;
   }
 
   /**
@@ -691,13 +691,13 @@ class AuraTriggersController {
 
     if (titleEl) titleEl.textContent = tool.name;
     if (statusEl) {
-      statusEl.className = 'px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40';
-      statusEl.textContent = 'ERRO 400';
+      statusEl.className = 'px-2.5 py-0.5 rounded text-[11px] font-sans font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40';
+      statusEl.textContent = 'Falha na Consulta';
     }
     if (formattedTab) {
       formattedTab.innerHTML = `
-        <div class="p-4 rounded-lg bg-rose-950/20 border border-rose-500/30 text-rose-300 font-mono text-xs">
-          <strong>Falha ao executar ferramenta:</strong> ${errorMsg}
+        <div class="p-4 rounded-xl bg-rose-950/20 border border-rose-500/30 text-rose-300 font-sans text-xs">
+          <strong>Falha ao executar consulta:</strong> ${errorMsg}
         </div>
       `;
     }

@@ -80,7 +80,7 @@
       
       <!-- Seção: Navegação de Telas -->
       <div class="space-y-1.5">
-        <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 px-2 font-semibold">
+        <span class="text-[10px] font-sans uppercase tracking-wider text-slate-400 px-2 font-semibold">
           Navegação Principal
         </span>
         <div class="space-y-1">
@@ -110,7 +110,7 @@
             </div>
             <div class="flex-1">
               <div class="font-semibold text-slate-100">Ações Rápidas (10)</div>
-              <div class="text-[10px] text-slate-400 font-normal">Diagnósticos Headless em 1-Clique</div>
+              <div class="text-[10px] text-slate-400 font-normal">Diagnósticos Executivos em 1-Clique</div>
             </div>
           </button>
 
@@ -128,7 +128,7 @@
 
       <!-- Seção: Gerenciamento da Sessão -->
       <div class="space-y-1.5 pt-2 border-t border-white/10">
-        <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 px-2 font-semibold">
+        <span class="text-[10px] font-sans uppercase tracking-wider text-slate-400 px-2 font-semibold">
           Gerenciamento da Conversa
         </span>
         <div class="space-y-1">
@@ -142,14 +142,14 @@
               <svg class="w-4 h-4 text-auraCyan flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><polygon points="12,6.5 16.5,9.5 16.5,14.5 12,17.5 7.5,14.5 7.5,9.5" stroke-width="1.25" fill="rgba(6,182,212,0.25)"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
               <span>Comandos Rápidos</span>
             </div>
-            <kbd class="px-1.5 py-0.5 rounded bg-white/10 border border-white/10 text-[10px] text-slate-400 font-mono">⌘K</kbd>
+            <kbd class="px-1.5 py-0.5 rounded bg-white/10 border border-white/10 text-[10px] text-slate-400 font-sans font-medium">⌘K</kbd>
           </button>
         </div>
       </div>
 
       <!-- Seção: Preferências do Sistema (F4-04) -->
       <div class="space-y-1.5 pt-2 border-t border-white/10">
-        <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 px-2 font-semibold">
+        <span class="text-[10px] font-sans uppercase tracking-wider text-slate-400 px-2 font-semibold">
           Preferências do Sistema
         </span>
         <div class="space-y-1">
@@ -158,21 +158,21 @@
               <i id="sidebar-sfx-icon" data-lucide="volume-2" class="w-4 h-4 text-slate-400"></i>
               <span id="sidebar-sfx-text">Efeitos Sonoros (SFX)</span>
             </div>
-            <span id="sidebar-sfx-badge" class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400">Mudo</span>
+            <span id="sidebar-sfx-badge" class="px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-slate-800 text-slate-400">Mudo</span>
           </button>
           <button id="sidebar-btn-toggle-gpu-guard" role="switch" aria-checked="false" class="w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all text-left text-xs" aria-label="Alternar Modo Alta Performance GPU Guard" title="Desativa filtros de desfoque pesado (backdrop-filter) para garantir 60 FPS cravados em tablets e celulares da pista">
             <div class="flex items-center gap-3">
               <svg id="sidebar-gpu-icon" class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" stroke-width="1.75"/><polygon points="12 6 15 11 12 16 9 11" stroke-width="1.5" fill="currentColor" fill-opacity="0.2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke-width="1.5" stroke-linecap="round"/></svg>
               <span id="sidebar-gpu-text">Modo Alta Performance (GPU Guard)</span>
             </div>
-            <span id="sidebar-gpu-badge" class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400">Desativado</span>
+            <span id="sidebar-gpu-badge" class="px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-slate-800 text-slate-400">Desativado</span>
           </button>
         </div>
       </div>
 
       <!-- Seção: Consultas Frequentes -->
       <div class="space-y-1.5 pt-2 border-t border-white/10">
-        <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 px-2 font-semibold">
+        <span class="text-[10px] font-sans uppercase tracking-wider text-slate-400 px-2 font-semibold">
           Consultas Frequentes
         </span>
         <div class="space-y-1">
@@ -220,9 +220,9 @@
     </div>
 
     <!-- Rodapé do Drawer -->
-    <div class="p-3 border-t border-white/10 bg-white/[0.01] flex items-center justify-between text-[11px] text-slate-500 font-mono">
+    <div class="p-3 border-t border-white/10 bg-white/[0.01] flex items-center justify-between text-[11px] text-slate-400 font-sans">
       <span>AURA Engine v2.8.1</span>
-      <span class="text-auraCyan/80 font-semibold">Deluxe Glass</span>
+      <span class="text-auraCyan/90 font-semibold">Deluxe Glass</span>
     </div>
 
   </aside>
@@ -308,7 +308,7 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="text-xs font-sans font-bold uppercase tracking-wider text-auraEmerald">Supervisão da Pista</span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-auraEmerald/20 text-auraEmerald-light border border-auraEmerald/30">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-sans font-semibold bg-auraEmerald/20 text-auraEmerald-light border border-auraEmerald/30">
                 Atendimento Sob Demanda
               </span>
             </div>
@@ -333,7 +333,7 @@
             <svg class="w-5 h-5 text-auraEmerald inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="12" height="18" rx="2" stroke-width="1.75"/><line x1="3" y1="9" x2="15" y2="9" stroke-width="1.5"/><line x1="2" y1="21" x2="16" y2="21" stroke-width="2"/><path d="M15 7h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V9.5l-2.5-3" stroke-width="1.75"/></svg>
             <h3 class="font-bold text-base text-white tracking-wide">Tanques Volumétricos & Previsão de Esgotamento (Run-Out)</h3>
           </div>
-          <span class="text-xs font-mono text-slate-400">Reserva Crítica Padrão: &lt;15%</span>
+          <span class="text-xs font-sans text-slate-400 font-medium">Reserva Crítica de Segurança: &lt;15%</span>
         </div>
 
         <!-- Grid de Tanques com Cilindros Visuais 3D -->
@@ -350,21 +350,21 @@
         </div>
       </div>
 
-      <!-- Gêmeo Digital da Estação & Topologia CBC04 -->
+      <!-- Estrutura Operacional & Conexões da Unidade -->
       <div class="glass-panel p-4 space-y-3 border-l-4 border-l-auraCyan bg-gradient-to-r from-auraCyan/5 via-slateSurface to-transparent">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2">
           <div class="flex items-center gap-2">
             <i data-lucide="layers" class="w-4 h-4 text-auraCyan"></i>
-            <h4 class="font-bold text-sm text-white font-mono">Gêmeo Digital da Estação & Topologia CBC04</h4>
+            <h4 class="font-bold text-sm text-white font-sans">Estrutura Operacional & Conexões da Unidade</h4>
           </div>
-          <div class="flex items-center gap-2 font-mono text-[10px]">
-            <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">AUTOMAÇÃO CBC04</span>
-            <span class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">INTEGRAÇÃO ERP</span>
-            <span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30">BUSCA HÍBRIDA RAG</span>
+          <div class="flex items-center gap-2 font-sans text-[10px]">
+            <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold">AUTOMAÇÃO DA PISTA</span>
+            <span class="px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-semibold">GESTÃO ERP</span>
+            <span class="px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/30 font-semibold">INTELIGÊNCIA AURA</span>
           </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 font-mono text-xs">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 font-sans text-xs">
           <!-- Ilhas de Abastecimento -->
           <div class="p-3.5 rounded-xl glass-subcard border border-white/5 space-y-2">
             <div class="flex items-center justify-between text-slate-300 font-bold text-[11px] border-b border-white/5 pb-1.5">
@@ -374,7 +374,7 @@
             <div class="text-[11px] text-slate-400 space-y-1">
               <div class="flex justify-between"><span>Ilha 01 (Bombas 01-02):</span> <strong class="text-slate-200">Gasolina / Etanol</strong></div>
               <div class="flex justify-between"><span>Ilha 02 (Bombas 03-04):</span> <strong class="text-slate-200">Diesel S10 / S500 / ARLA</strong></div>
-              <div class="flex justify-between pt-1 border-t border-white/5"><span>Protocolo Automação:</span> <strong class="text-cyan-300">Companytec CBC04</strong></div>
+              <div class="flex justify-between pt-1 border-t border-white/5"><span>Concentrador de Bombas:</span> <strong class="text-cyan-300">Conectado & Sincronizado</strong></div>
             </div>
           </div>
 
@@ -398,9 +398,9 @@
               <span class="text-purple-300 text-[10px] font-semibold">PDV 01</span>
             </div>
             <div class="text-[11px] text-slate-400 space-y-1">
-              <div class="flex justify-between"><span>Triangulação de Vendas:</span> <strong class="text-slate-200">Pista vs Caixa</strong></div>
-              <div class="flex justify-between"><span>Motor Cross-Selling:</span> <strong class="text-purple-300">Apriori + RAG</strong></div>
-              <div class="flex justify-between pt-1 border-t border-white/5"><span>Blindagem Dados:</span> <strong class="text-emerald-400">LGPD Sanitizer Ativo</strong></div>
+              <div class="flex justify-between"><span>Análise de Vendas:</span> <strong class="text-slate-200">Pista vs Caixa</strong></div>
+              <div class="flex justify-between"><span>Sugestões Inteligentes:</span> <strong class="text-purple-300">Vendas Cruzadas</strong></div>
+              <div class="flex justify-between pt-1 border-t border-white/5"><span>Segurança & Privacidade:</span> <strong class="text-emerald-400">LGPD Ativa</strong></div>
             </div>
           </div>
         </div>
@@ -411,18 +411,16 @@
         
         <!-- Coluna 1: Bicos de Abastecimento & Vazão L/min -->
         <div class="glass-panel p-4 space-y-3">
-          <div class="flex items-center justify-between border-slate-800 pb-2">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
             <div class="flex items-center gap-2">
               <svg class="w-4 h-4 text-auraCyan flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" stroke-width="1.75"/><path d="M12 7v5l3.5 2" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M7 16a6 6 0 0 1 10 0" stroke-width="1.5" stroke-dasharray="2 2"/></svg>
               <h4 class="font-bold text-sm text-slate-100">Bicos & Vazão da Pista</h4>
             </div>
-            <span class="text-[11px] font-mono text-slate-400">Min. Ideal: 30 L/min</span>
-          </div>
-            <span class="text-[11px] font-mono text-slate-400">Min. Ideal: 30 L/min</span>
+            <span class="text-[11px] font-sans text-slate-400 font-medium">Mínimo Ideal: 30 L/min</span>
           </div>
 
           <div id="cockpit-bicos-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[380px] overflow-y-auto pr-1">
-            <div class="text-slate-500 font-mono text-xs col-span-full py-4 text-center">Carregando bicos...</div>
+            <div class="text-slate-500 font-sans text-xs col-span-full py-4 text-center">Consultando bicos da pista...</div>
           </div>
         </div>
 
@@ -433,11 +431,11 @@
               <i data-lucide="users" class="w-4 h-4 text-auraPurple"></i>
               <h4 class="font-bold text-sm text-slate-100">Performance de Frentistas</h4>
             </div>
-            <span class="text-[11px] font-mono text-slate-400">Turno Atual</span>
+            <span class="text-[11px] font-sans text-slate-400 font-medium">Turno Atual</span>
           </div>
 
           <div id="cockpit-frentistas-table" class="max-h-[380px] overflow-y-auto pr-1">
-            <div class="text-slate-500 font-mono text-xs py-4 text-center">Carregando frentistas...</div>
+            <div class="text-slate-500 font-sans text-xs py-4 text-center">Consultando desempenho da equipe...</div>
           </div>
         </div>
 
@@ -448,11 +446,11 @@
               <i data-lucide="shield-alert" class="w-4 h-4 text-amber-400"></i>
               <h4 class="font-bold text-sm text-slate-100">Auditoria & Anomalias</h4>
             </div>
-            <span class="text-[11px] font-mono text-amber-400">CBC04 vs PDV</span>
+            <span class="text-[11px] font-sans font-semibold text-amber-400">Bombas vs Caixa</span>
           </div>
 
           <div id="cockpit-anomalias-list" class="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-            <div class="text-slate-500 font-mono text-xs py-4 text-center">Auditando eventos de pista...</div>
+            <div class="text-slate-500 font-sans text-xs py-4 text-center">Auditando eventos de pista...</div>
           </div>
         </div>
 
@@ -468,13 +466,13 @@
               <i data-lucide="receipt" class="w-4 h-4 text-auraCyan"></i>
               <h4 class="font-bold text-sm text-slate-100">Conciliação de Turno (Caixa vs Pista)</h4>
             </div>
-            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-auraCyan/10 text-auraCyan border border-auraCyan/30">
+            <span class="text-[10px] font-sans font-semibold px-2 py-0.5 rounded-full bg-auraCyan/10 text-auraCyan border border-auraCyan/30">
               AUDITORIA
             </span>
           </div>
 
           <div id="cockpit-turno-content">
-            <div class="text-slate-500 font-mono text-xs py-4 text-center">Carregando conciliação...</div>
+            <div class="text-slate-500 font-sans text-xs py-4 text-center">Carregando conciliação...</div>
           </div>
         </div>
 
@@ -485,31 +483,31 @@
               <i data-lucide="book-check" class="w-4 h-4 text-auraEmerald"></i>
               <h4 class="font-bold text-sm text-slate-100">LMC Oficial ANP (Portaria 26/1992)</h4>
             </div>
-            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-auraEmerald/10 text-auraEmerald border border-auraEmerald/30">
+            <span class="text-[10px] font-sans font-semibold px-2 py-0.5 rounded-full bg-auraEmerald/10 text-auraEmerald border border-auraEmerald/30">
               REGULATÓRIO
             </span>
           </div>
 
           <div id="cockpit-lmc-content">
-            <div class="text-slate-500 font-mono text-xs py-4 text-center">Auditando conformidade ANP...</div>
+            <div class="text-slate-500 font-sans text-xs py-4 text-center">Auditando conformidade ANP...</div>
           </div>
         </div>
 
       </div>
 
-      <!-- Seção 4: Cesta de Compras & Inteligência da Conveniência (Apriori) -->
+      <!-- Seção 4: Cesta de Compras & Inteligência da Conveniência -->
       <div class="glass-panel p-4 space-y-3 glass-card-purple">
         <div class="flex items-center justify-between border-b border-slate-800 pb-2">
           <div class="flex items-center gap-2">
             <i data-lucide="shopping-bag" class="w-4 h-4 text-auraPurple-light"></i>
-            <h4 class="font-bold text-sm text-slate-100">Oportunidades de Vendas Cruzadas na Conveniência (Market Basket)</h4>
+            <h4 class="font-bold text-sm text-slate-100">Oportunidades de Vendas Cruzadas na Conveniência</h4>
           </div>
-          <span class="text-xs font-mono text-auraPurple-light font-semibold">Lift &gt; 1.2x | Scripts PDV</span>
+          <span class="text-xs font-sans text-auraPurple-light font-semibold">Alta Relevância | Argumentos PDV</span>
         </div>
 
         <div id="cockpit-combos-container" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div class="text-slate-500 font-mono text-xs col-span-full py-3 text-center">
-            Processando regras de associação da conveniência...
+          <div class="text-slate-500 font-sans text-xs col-span-full py-3 text-center">
+            Identificando oportunidades de venda cruzada na loja...
           </div>
         </div>
       </div>
@@ -526,21 +524,21 @@
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
             <div class="flex items-center gap-2">
-              <span class="text-xs font-mono font-bold uppercase tracking-wider text-auraCyan">Execução Direta Headless</span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-auraCyan/20 text-auraCyan-light border border-auraCyan/30">
-                0 Tokens LLM • Sub-100ms
+              <span class="text-xs font-sans font-bold uppercase tracking-wider text-auraCyan">Diagnósticos & Ações Rápidas</span>
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-sans font-semibold bg-auraCyan/20 text-auraCyan-light border border-auraCyan/30">
+                Resposta Instantânea • 1-Clique
               </span>
             </div>
             <h2 class="text-lg font-bold text-white mt-0.5">Ações & Diagnósticos Executivos em 1-Clique</h2>
           </div>
           <p class="text-xs text-slate-400 font-sans max-w-md">
-            Invoque diagnósticos operacionais, fiscais e estratégicos diretamente sob demanda, sem latência.
+            Invoque diagnósticos operacionais, fiscais e estratégicos diretamente sob demanda, com máxima agilidade.
           </p>
         </div>
       </div>
 
       <!-- Filtros por Categoria -->
-      <div class="flex flex-wrap items-center gap-2 font-mono text-xs">
+      <div class="flex flex-wrap items-center gap-2 font-sans text-xs">
         <button class="trigger-filter-btn px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-white font-semibold transition-colors" data-filter="todos">
           Todos (10)
         </button>
@@ -570,11 +568,11 @@
       <div id="trigger-inspector-card" class="glass-panel p-5 space-y-4 hidden border-auraCyan/40">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
           <div class="flex items-center gap-3">
-            <h3 id="inspector-tool-title" class="font-bold text-base text-white">Resultado do Gatilho</h3>
-            <span id="inspector-status-badge" class="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-              200 OK
+            <h3 id="inspector-tool-title" class="font-bold text-base text-white">Resultado do Diagnóstico</h3>
+            <span id="inspector-status-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-sans font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+              Concluído
             </span>
-            <span id="inspector-latency-badge" class="font-mono text-xs text-auraCyan font-semibold flex items-center gap-1.5">
+            <span id="inspector-latency-badge" class="font-sans text-xs text-auraCyan font-semibold flex items-center gap-1.5">
               <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
               <span>25 ms</span>
             </span>
@@ -582,20 +580,20 @@
 
           <!-- Ações e Abas do Inspetor -->
           <div class="flex items-center gap-2">
-            <div class="flex items-center rounded-lg bg-slate-900 p-0.5 border border-slate-800 text-xs font-mono">
-              <button id="tab-inspector-formatted" class="px-2.5 py-1 rounded bg-slate-800 text-white font-semibold">
-                Visão Formatada
+            <div class="flex items-center rounded-lg bg-slate-900 p-0.5 border border-slate-800 text-xs font-sans">
+              <button id="tab-inspector-formatted" class="px-2.5 py-1 rounded-md bg-slate-800 text-white font-semibold">
+                Visão Executiva
               </button>
-              <button id="tab-inspector-json" class="px-2.5 py-1 rounded text-slate-400 hover:text-white">
-                Payload JSON
+              <button id="tab-inspector-json" class="px-2.5 py-1 rounded-md text-slate-400 hover:text-white">
+                Dados Brutos (JSON)
               </button>
             </div>
 
-            <button id="btn-copy-json" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono border border-slate-700 transition-colors">
-              Copiar JSON
+            <button id="btn-copy-json" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-sans border border-slate-700 transition-colors">
+              Copiar Dados
             </button>
 
-            <button id="btn-send-to-aura" class="px-3 py-1 rounded bg-auraPurple hover:bg-auraPurple-light text-white text-xs font-mono font-bold transition-colors flex items-center gap-1.5">
+            <button id="btn-send-to-aura" class="px-3 py-1 rounded-lg bg-auraPurple hover:bg-auraPurple-light text-white text-xs font-sans font-bold transition-colors flex items-center gap-1.5 shadow-sm">
               <span>Enviar p/ AURA</span>
               <svg class="w-3.5 h-3.5 aura-glyph text-cyan-200" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="12 2 20.66 7 20.66 17 12 22 3.34 17 3.34 7" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/></svg>
             </button>
@@ -611,9 +609,9 @@
               </div>
               <div>
                 <div class="skeleton-shimmer h-4 w-36 mb-1"></div>
-                <div class="text-[11px] text-cyan-400/80 font-mono flex items-center gap-1.5">
+                <div class="text-[11px] text-cyan-400/80 font-sans flex items-center gap-1.5">
                   <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
-                  <span>Consultando banco de dados ERP e calculando análises...</span>
+                  <span>Consultando registros da revenda e gerando indicadores...</span>
                 </div>
               </div>
             </div>
@@ -728,29 +726,29 @@
 
           <!-- Tanques Compactos -->
           <div class="glass-panel p-4 space-y-3">
-            <h4 class="font-bold text-sm text-white font-mono flex items-center gap-2">
+            <h4 class="font-bold text-sm text-white font-sans flex items-center gap-2">
               <svg class="w-4 h-4 text-auraEmerald flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="12" height="18" rx="2" stroke-width="1.75"/><line x1="3" y1="9" x2="15" y2="9" stroke-width="1.5"/><line x1="2" y1="21" x2="16" y2="21" stroke-width="2"/><path d="M15 7h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V9.5l-2.5-3" stroke-width="1.75"/></svg>
               <span>Autonomia de Tanques</span>
             </h4>
-            <div class="text-xs text-slate-400">
+            <div class="text-xs text-slate-400 font-sans">
               Clique em qualquer tanque para projetar compra de combustível ou conferir ullage de carreta.
             </div>
             <div id="split-tanks-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div class="col-span-full py-4 text-center text-slate-500 font-mono text-xs">
-                Sincronizando telemetria dos tanques ao vivo...
+              <div class="col-span-full py-4 text-center text-slate-400 font-sans text-xs">
+                Aguardando consulta dos tanques sob demanda...
               </div>
             </div>
           </div>
 
           <!-- Pista & Fechamento Resumido -->
           <div class="grid grid-cols-2 gap-3">
-            <div class="glass-panel p-3 font-mono text-xs space-y-1">
+            <div class="glass-panel p-3 font-sans text-xs space-y-1">
               <span class="text-slate-400">LMC ANP Portaria 26:</span>
               <div class="text-emerald-400 font-bold">✓ Conforme (±0.6%)</div>
               <div class="text-[10px] text-slate-400">10 de 10 tanques auditados</div>
             </div>
 
-            <div class="glass-panel p-3 font-mono text-xs space-y-1">
+            <div class="glass-panel p-3 font-sans text-xs space-y-1">
               <span class="text-slate-400">Conciliação Turno:</span>
               <div class="text-cyan-300 font-bold">Turno em Andamento</div>
               <div class="text-[10px] text-slate-400">Score de Triangulação: 85%</div>
@@ -810,14 +808,14 @@
         <input 
           id="palette-search-input"
           type="text" 
-          placeholder="Digite um comando, diagnóstico ou pergunta para a AURA... (ex: tanques, ANP, furos, combos)" 
-          class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none font-mono"
+          placeholder="Digite um comando, diagnóstico ou pergunta para a AURA... (ex: tanques, ANP, fechamento de caixa, combos)" 
+          class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none font-sans"
         />
-        <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-mono">ESC</kbd>
+        <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-sans">ESC</kbd>
       </div>
 
       <!-- Lista de Comandos Rápidos e Diagnósticos de 1-Clique -->
-      <div id="palette-items-list" class="max-h-[380px] overflow-y-auto divide-y divide-slate-800/40 text-xs font-mono">
+      <div id="palette-items-list" class="max-h-[380px] overflow-y-auto divide-y divide-slate-800/40 text-xs font-sans">
         
         <div onclick="window.auraGlance.executePaletteAction('Qual a previsão de esgotamento e a autonomia estimada dos tanques?')" class="palette-item">
           <div class="flex items-center gap-3">
@@ -832,7 +830,7 @@
 
         <div onclick="window.auraGlance.executePaletteAction('O LMC de ontem fechou dentro da tolerância oficial da ANP?')" class="palette-item">
           <div class="flex items-center gap-3">
-            <span class="p-1.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" stroke-width="1.75"/><rect x="8" y="2" width="8" height="4" rx="1" stroke-width="1.75"/></svg></span>
+            <span class="p-1.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 4h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V9.5l-2.5-3" stroke-width="1.75"/></svg></span>
             <div>
               <div class="font-bold text-slate-100">Auditoria LMC ANP (Portaria 26)</div>
               <div class="text-[11px] text-slate-400 font-sans">Conferência de perdas e ganhos físicos vs escriturados (±0.6%).</div>
@@ -846,7 +844,7 @@
             <span class="p-1.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center justify-center"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="6" width="20" height="12" rx="2" stroke-width="1.75"/><circle cx="12" cy="12" r="3" stroke-width="1.75"/><path d="M6 12h.01M18 12h.01" stroke-width="2"/></svg></span>
             <div>
               <div class="font-bold text-slate-100">Conciliação de Turno & Caixa</div>
-              <div class="text-[11px] text-slate-400 font-sans">Triangulação de encerrantes Companytec vs fechamento financeiro.</div>
+              <div class="text-[11px] text-slate-400 font-sans">Triangulação de encerrantes da pista vs fechamento financeiro.</div>
             </div>
           </div>
           <span class="text-[11px] text-auraCyan font-semibold">Executar ↵</span>
@@ -856,8 +854,8 @@
           <div class="flex items-center gap-3">
             <span class="p-1.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="21" r="1.5"/><circle cx="19" cy="21" r="1.5"/><path d="M2.5 3h3l2.4 12.3a1.5 1.5 0 0 0 1.5 1.2h10.2a1.5 1.5 0 0 0 1.5-1.1L23 7H6.5" stroke-width="1.75"/></svg></span>
             <div>
-              <div class="font-bold text-slate-100">Vendas Cruzadas da Conveniência (Market Basket)</div>
-              <div class="text-[11px] text-slate-400 font-sans">Pares com Lift &gt; 1.2x e scripts para aumento de ticket no caixa.</div>
+              <div class="font-bold text-slate-100">Vendas Cruzadas da Conveniência (Combos da Loja)</div>
+              <div class="text-[11px] text-slate-400 font-sans">Combos com alta relevância e scripts para aumento de ticket no caixa.</div>
             </div>
           </div>
           <span class="text-[11px] text-auraCyan font-semibold">Executar ↵</span>
@@ -893,7 +891,7 @@
               <div class="text-[11px] text-slate-400 font-sans">Visão volumétrica dos tanques de combustível e pista.</div>
             </div>
           </div>
-          <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-mono">2</kbd>
+          <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-sans">2</kbd>
         </div>
 
         <div onclick="window.auraApp.switchTab('split'); window.auraGlance.closeCommandPalette();" class="palette-item">
@@ -904,19 +902,19 @@
               <div class="text-[11px] text-slate-400 font-sans">Panorama da estação e Chat lado a lado.</div>
             </div>
           </div>
-          <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-mono">4</kbd>
+          <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-sans">4</kbd>
         </div>
 
       </div>
 
       <!-- Rodapé da Paleta -->
-      <div class="px-4 py-2 bg-slate-950/90 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+      <div class="px-4 py-2 bg-slate-950/90 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 font-sans">
         <div class="flex items-center gap-3">
           <span><kbd class="text-slate-400">↑↓</kbd> navegar</span>
           <span><kbd class="text-slate-400">↵</kbd> selecionar</span>
           <span><kbd class="text-slate-400">esc</kbd> fechar</span>
         </div>
-        <span class="text-auraCyan/80">AURA Command HUD</span>
+        <span class="text-auraCyan/90 font-medium">Comandos Executivos AURA</span>
       </div>
     </div>
   </div>
@@ -940,7 +938,7 @@
               Provisório
             </span>
           </div>
-          <p id="evidence-drawer-subtitle" class="text-[11px] text-slate-400 font-mono">Proveniência, fórmulas e triangulação detalhada</p>
+          <p id="evidence-drawer-subtitle" class="text-[11px] text-slate-400 font-sans">Origem dos dados, conciliação e conferência detalhada</p>
         </div>
       </div>
 
@@ -950,7 +948,7 @@
     </div>
 
     <!-- Abas / Filtros do Drawer -->
-    <div role="tablist" aria-label="Abas de Evidências da Conciliação" class="px-4 py-2.5 border-b border-white/5 bg-slate-900/50 flex items-center gap-2 text-xs font-mono overflow-x-auto">
+    <div role="tablist" aria-label="Abas de Evidências da Conciliação" class="px-4 py-2.5 border-b border-white/5 bg-slate-900/50 flex items-center gap-2 text-xs font-sans overflow-x-auto">
       <button role="tab" id="evidence-tab-resumo" aria-controls="evidence-drawer-content" aria-selected="true" tabindex="0" class="evidence-tab-btn active px-3 py-1.5 rounded-lg bg-slate-800 text-white font-semibold border border-slate-700" data-ev-tab="resumo">
         Resumo & Fontes
       </button>
@@ -973,10 +971,10 @@
       <!-- Injetado dinamicamente via aura-chat.js -->
     </div>
 
-    <!-- Rodapé Técnico do Drawer (Somente Leitura & Latência) -->
-    <div class="p-3 border-t border-white/10 bg-slate-950/80 flex items-center justify-between text-[11px] text-slate-500 font-mono">
-      <span>ERP Porta 5433 • Acesso Somente Leitura</span>
-      <span id="evidence-drawer-tech-info" class="text-cyan-400/80">AURA v1.0 Contrato</span>
+    <!-- Rodapé do Drawer de Evidências -->
+    <div class="p-3 border-t border-white/10 bg-slate-950/80 flex items-center justify-between text-[11px] text-slate-400 font-sans">
+      <span>Conexão Segura com Retaguarda ERP • Integridade Preservada</span>
+      <span id="evidence-drawer-tech-info" class="text-cyan-400 font-medium">AURA Precision Glass</span>
     </div>
   </aside>
 

@@ -586,11 +586,14 @@ class AuraEngine:
 
         # 2. Checagem Vector DB & Telemetria SRE
         vector_online = False
+        db_stats = {}
+        t_stats = {}
         try:
             sre_data = self.tools.obter_telemetria_sre()
-            vector_online = True
-            db_stats = sre_data.get("database_health", {})
-            t_stats = sre_data.get("table_stats", {})
+            if sre_data and sre_data.get("status") not in ("offline", "indisponivel"):
+                vector_online = True
+            db_stats = sre_data.get("database_health") or {}
+            t_stats = sre_data.get("table_stats") or {}
         except Exception:
             vector_online = False
 
@@ -1021,11 +1024,11 @@ Diretrizes Específicas por Assunto:
 
             elif intencao == "estoque_posicao":
                 resultado_bruto = self.tools.consultar_estoque_erp(termo=pergunta)
-                contexto_extra = f"Posição Real de Estoque e Tanques no ERP (porta 5433):\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+                contexto_extra = f"Posição Real de Estoque e Tanques no ERP:\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
 
             elif intencao == "clientes_ranking":
                 resultado_bruto = self.tools.consultar_clientes_erp(termo=pergunta)
-                contexto_extra = f"Dados de Clientes e Histórico de Compras no ERP (porta 5433):\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+                contexto_extra = f"Dados de Clientes e Histórico de Compras no ERP:\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
 
             else:
                 # Catálogo de produtos (RAG Híbrido HNSW + GIN FTS) com Cache Semântico

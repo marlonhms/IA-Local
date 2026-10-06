@@ -250,7 +250,7 @@ class AuraChatController {
               <p class="text-slate-400 text-xs">Assistente Executiva de Prontidão • Posto & PDV</p>
             </div>
           </div>
-          <span class="px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 hidden sm:inline-flex items-center gap-1.5">
+          <span class="px-2.5 py-1 rounded-full text-[10px] font-sans font-medium bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 hidden sm:inline-flex items-center gap-1.5">
             <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span> Sob Demanda
           </span>
         </div>
@@ -275,7 +275,7 @@ class AuraChatController {
                   </span>
                   <span class="text-white font-semibold text-xs group-hover:text-emerald-300 transition-colors">Autonomia de Tanques</span>
                 </div>
-                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold tabular-nums">Run-Out</span>
+                <span class="text-[9px] font-sans px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold tabular-nums">Run-Out</span>
               </div>
               <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Previsão em horas/dias, reserva de 15% e espaço de carreta (5.000L).</p>
             </button>
@@ -288,7 +288,7 @@ class AuraChatController {
                   </span>
                   <span class="text-white font-semibold text-xs group-hover:text-cyan-300 transition-colors">Conciliação de Turno</span>
                 </div>
-                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-semibold tabular-nums">CBC04 vs PDV</span>
+                <span class="text-[9px] font-sans px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-semibold tabular-nums">Pista vs PDV</span>
               </div>
               <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Triangulação de encerrantes físicos, sobras/quebras e faturamento.</p>
             </button>
@@ -301,7 +301,7 @@ class AuraChatController {
                   </span>
                   <span class="text-white font-semibold text-xs group-hover:text-purple-300 transition-colors">LMC Oficial ANP</span>
                 </div>
-                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-semibold tabular-nums">±0.6%</span>
+                <span class="text-[9px] font-sans px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-semibold tabular-nums">±0.6%</span>
               </div>
               <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Auditoria diária pela Portaria 26 com régua visual de conformidade legal.</p>
             </button>
@@ -314,7 +314,7 @@ class AuraChatController {
                   </span>
                   <span class="text-white font-semibold text-xs group-hover:text-amber-300 transition-colors">Vazão & Frentistas</span>
                 </div>
-                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold tabular-nums">&lt;30 L/min</span>
+                <span class="text-[9px] font-sans px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold tabular-nums">&lt;30 L/min</span>
               </div>
               <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Detecção preventiva de filtro sujo, produtividade e conversão de aditivada.</p>
             </button>
@@ -327,9 +327,9 @@ class AuraChatController {
                   </span>
                   <span class="text-white font-semibold text-xs group-hover:text-sky-300 transition-colors">Combos da Loja</span>
                 </div>
-                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-semibold tabular-nums">Lift ≥ 2.0x</span>
+                <span class="text-[9px] font-sans px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-semibold tabular-nums">Lift ≥ 2.0x</span>
               </div>
-              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Market Basket Analysis da conveniência com scripts práticos para balcão.</p>
+              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Análise de cestas e combos da loja com scripts práticos para o caixa.</p>
             </button>
 
             <button onclick="window.auraChat.sendUserPrompt('Quem são os maiores clientes e frotistas da revenda?')" class="group p-3.5 rounded-xl glass-subcard border border-white/10 hover:border-rose-500/50 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg shadow-sm active:scale-[0.98]">
@@ -340,7 +340,7 @@ class AuraChatController {
                   </span>
                   <span class="text-white font-semibold text-xs group-hover:text-rose-300 transition-colors">Clientes & Frotas</span>
                 </div>
-                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold tabular-nums">Ranking</span>
+                <span class="text-[9px] font-sans px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold tabular-nums">Ranking</span>
               </div>
               <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Faturamento acumulado por cliente, frotistas e volume de vendas.</p>
             </button>
@@ -352,7 +352,7 @@ class AuraChatController {
             <i data-lucide="info" class="w-3.5 h-3.5"></i>
             <span>Dica: Ao receber qualquer resposta, clique em <strong>"Ver Evidências"</strong> para abrir o painel com as fontes oficiais.</span>
           </span>
-          <kbd class="hidden sm:inline-block px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-400 font-mono">Esc fecha gaveta</kbd>
+          <kbd class="hidden sm:inline-block px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-400 font-sans font-medium">Esc fecha gaveta</kbd>
         </div>
       </div>
     `;
@@ -413,7 +413,7 @@ class AuraChatController {
     // Ativa pulso do Cognitive Reasoning Orb no header e define primeira etapa cognitiva
     const headerOrb = typeof document !== 'undefined' ? (document.getElementById('header-neural-core-orb') || document.querySelector('header .neural-core-orb')) : null;
     if (headerOrb) headerOrb.classList.add('reasoning-active');
-    this.updateCognitiveStep(messageContainerId, 'Consultando telemetria CBC04...', 'cyan');
+    this.updateCognitiveStep(messageContainerId, 'Consultando automação da pista...', 'cyan');
 
     // Força rolagem para o início da nova resposta
     this.scrollToBottom(true);
@@ -446,7 +446,7 @@ class AuraChatController {
             } else if (intentKey.includes('lmc')) {
               this.updateCognitiveStep(messageContainerId, 'Auditando conformidade fiscal Portaria ANP 26...', 'cyan');
             } else if (intentKey.includes('pista') || intentKey.includes('frentista') || intentKey.includes('pump')) {
-              this.updateCognitiveStep(messageContainerId, 'Auditando vazão de bicos CBC04 & frentistas...', 'cyan');
+              this.updateCognitiveStep(messageContainerId, 'Auditando vazão de bicos & frentistas...', 'cyan');
             } else if (intentKey.includes('cesta') || intentKey.includes('conveniencia') || intentKey.includes('combo')) {
               this.updateCognitiveStep(messageContainerId, 'Processando regras de associação da loja...', 'cyan');
             } else {
@@ -619,7 +619,7 @@ class AuraChatController {
       div.className = 'flex justify-end w-full animate-fade-in';
       div.innerHTML = `
         <div class="chat-bubble-user max-w-[85%] md:max-w-[70%] lg:max-w-[60%] ml-auto p-4 text-slate-100 text-sm">
-          <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 mb-1.5 pb-1 border-b border-white/5">
+          <div class="flex items-center justify-between text-[11px] font-sans font-medium text-slate-400 mb-1.5 pb-1 border-b border-white/5">
             <span class="font-bold text-cyan-400 flex items-center gap-1.5">
               <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
               <span>OPERADOR</span>
@@ -654,13 +654,13 @@ class AuraChatController {
                 <span class="relative z-10">A</span>
               </div>
               <span class="font-bold font-sans text-xs text-white">AURA</span>
-              <span class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20">AI</span>
+              <span class="px-1.5 py-0.5 rounded text-[9px] font-sans font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">AI</span>
             </div>
 
-            <div id="${containerId + suffix}-meta" class="flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
+            <div id="${containerId + suffix}-meta" class="flex flex-wrap items-center gap-1.5 font-sans text-[10px]">
               <span id="${containerId + suffix}-cognitive-chip" class="chip-cognitive-step px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5 transition-all">
                 <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
-                <span class="cognitive-step-label">Consultando telemetria CBC04...</span>
+                <span class="cognitive-step-label">Consultando automação da pista...</span>
               </span>
               <span id="${containerId + suffix}-intent-chip" class="hidden chip-intent"></span>
               <span id="${containerId + suffix}-tool-chip" class="hidden chip-tool-status"></span>
@@ -672,11 +672,11 @@ class AuraChatController {
 
           <!-- Texto em Streaming -->
           <div id="${containerId + suffix}-text" class="prose-aura typing-cursor">
-            <span class="text-slate-400 text-xs font-mono">Processando consulta analítica...</span>
+            <span class="text-slate-400 text-xs font-sans">Processando consulta analítica...</span>
           </div>
 
           <!-- Métricas e Confirmação da Resposta -->
-          <div id="${containerId + suffix}-telemetry" class="hidden pt-2 border-t border-slate-800/80 text-[10px] font-mono text-slate-400">
+          <div id="${containerId + suffix}-telemetry" class="hidden pt-2 border-t border-slate-800/80 text-[10px] font-sans text-slate-400">
           </div>
         </div>
       `;
@@ -704,7 +704,7 @@ class AuraChatController {
                 <span class="relative z-10">A</span>
               </div>
               <span class="font-bold font-sans text-xs text-white">AURA</span>
-              <span class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20">AI</span>
+              <span class="px-1.5 py-0.5 rounded text-[9px] font-sans font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">AI</span>
             </div>
             ${opts.isWelcome ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-sans font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Pronta para Atendimento</span>' : ''}
           </div>
@@ -768,7 +768,7 @@ class AuraChatController {
             </div>
             <div>
               <div class="skeleton-shimmer h-4 w-40 mb-1.5"></div>
-              <div class="text-[11px] text-cyan-400/80 font-mono flex items-center gap-1.5">
+              <div class="text-[11px] text-cyan-400/80 font-sans flex items-center gap-1.5">
                 <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
                 <span>Calculando ${this.escapeHtml(displayName)}...</span>
               </div>
@@ -1005,10 +1005,10 @@ class AuraChatController {
             <span>Schema Desconhecido</span>
           </span>
         </div>
-        <div class="p-3.5 rounded-xl bg-slate-900/80 border border-amber-500/30 text-amber-200/90 font-mono text-xs space-y-1.5">
+        <div class="p-3.5 rounded-xl bg-slate-900/80 border border-amber-500/30 text-amber-200/90 font-sans text-xs space-y-1.5">
           <div class="flex items-center gap-1.5"><span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span> <strong>Aviso de Conformidade e Governança:</strong></div>
           <p class="text-[11px] text-slate-300">
-            O payload analítico recebido para <strong>${this.escapeHtml(moduleName)}</strong> utiliza a versão <code>${this.escapeHtml(version)}</code>, incompatível com o renderizador atual. A exibição executiva foi suspensa para evitar inferências incorretas.
+            A estrutura de dados analíticos recebida para <strong>${this.escapeHtml(moduleName)}</strong> utiliza a versão <code>${this.escapeHtml(version)}</code>, incompatível com o renderizador atual. A exibição executiva foi suspensa para evitar inferências incorretas.
           </p>
         </div>
       </div>
@@ -1090,7 +1090,7 @@ class AuraChatController {
       const relBadges = artigos.slice(1, 3).map(art => {
         const mod = art.modulo ? art.modulo.toUpperCase() : 'GUIA';
         const tit = art.titulo || art.topico;
-        return `<span class="px-2 py-0.5 rounded-lg bg-slate-800/80 text-cyan-300/90 text-[10px] font-mono border border-slate-700/60 inline-flex items-center gap-1">${CHAT_ICONS.target} [${this.escapeHtml(mod)}] ${this.escapeHtml(tit)}</span>`;
+        return `<span class="px-2 py-0.5 rounded-lg bg-slate-800/80 text-cyan-300/90 text-[10px] font-sans font-medium border border-slate-700/60 inline-flex items-center gap-1">${CHAT_ICONS.target} [${this.escapeHtml(mod)}] ${this.escapeHtml(tit)}</span>`;
       }).join(' ');
       relatedHtml = `
         <div class="pt-2 border-t border-cyan-500/10 flex flex-wrap items-center gap-1.5">
@@ -1109,7 +1109,7 @@ class AuraChatController {
             </div>
             <div>
               <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase tracking-wider">${this.escapeHtml(modulo)}</span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-sans font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase tracking-wider">${this.escapeHtml(modulo)}</span>
                 <span class="text-white font-bold text-xs">${this.escapeHtml(titulo)}</span>
               </div>
               <p class="text-[11px] text-slate-400 leading-snug mt-0.5">${this.escapeHtml(subtitulo)}</p>
@@ -1272,13 +1272,14 @@ class AuraChatController {
       }
 
       tanksBarsHtml += `
-        <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5 font-mono text-xs">
+        <div class="p-3 rounded-xl glass-subcard border border-white/5 space-y-2 font-sans text-xs transition-all duration-200">
           <div class="flex items-center justify-between">
-            <span class="font-bold text-slate-100 flex items-center gap-1.5">
+            <span class="font-medium text-slate-100 flex items-center gap-1.5">
               <span>${statusIcon}</span>
-              <span>TQ ${this.escapeHtml(cod)} • ${this.escapeHtml(comb)}</span>
+              <span class="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 font-semibold">TQ ${this.escapeHtml(cod)}</span>
+              <span class="text-slate-200 font-semibold">${this.escapeHtml(comb)}</span>
             </span>
-            <span class="text-slate-300 font-semibold tabular-nums">${pct.toFixed(1)}% <span class="text-slate-500 font-normal">(${vol} / ${cap} L)</span></span>
+            <span class="text-slate-200 font-bold tabular-nums">${pct.toFixed(1)}% <span class="text-slate-400 font-normal text-[11px]">(${vol} / ${cap} L)</span></span>
           </div>
 
           <div class="widget-tank-track" style="margin: 4px 0;">
@@ -1288,8 +1289,8 @@ class AuraChatController {
           <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="text-cyan-300 font-semibold tabular-nums">${CHAT_ICONS.calendar}${hReservaStr}${hEsgotStr}</span>
-              <span class="text-slate-600">|</span>
-              <span class="text-slate-300 tabular-nums">${CHAT_ICONS.tank}Ullage: ${ullageL} L (${carretasTq}x 5k)</span>
+              <span class="text-slate-600">•</span>
+              <span class="text-slate-300 tabular-nums">${CHAT_ICONS.tank}Ullage: <strong class="text-cyan-300 font-semibold">${ullageL} L</strong> (${carretasTq}x 5k)</span>
             </div>
             <button type="button" class="widget-action-btn emerald flex items-center gap-1" onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual a melhor sugestão de pedido de carreta para o Tanque ${cod}?');">
               ${CHAT_ICONS.truck}<span>Pedir Carreta</span>
@@ -1308,7 +1309,7 @@ class AuraChatController {
             <span class="text-amber-400 font-bold">${CHAT_ICONS.alert}</span>
             <span class="font-semibold text-slate-200">${this.escapeHtml(p.label)}</span>
           </div>
-          <span class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+          <span class="text-[10px] text-slate-400 font-sans flex items-center gap-1">
             <span>Tanque</span>
             <span>↗</span>
           </span>
@@ -1317,7 +1318,7 @@ class AuraChatController {
 
       pendingHtml = `
         <div class="space-y-1.5">
-          <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">Alertas de Reposição:</span>
+          <span class="text-[10px] font-sans uppercase tracking-wider text-slate-400 font-semibold">Alertas de Reposição:</span>
           <div class="decision-pending-list">${itemsList}</div>
         </div>
       `;
@@ -1350,7 +1351,7 @@ class AuraChatController {
         <div class="decision-hero">
           <div class="decision-hero-header">
             <span class="decision-hero-label">${this.escapeHtml(heroLabel)}</span>
-            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">Tanque ${codCritico}</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-sans font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">Tanque ${codCritico}</span>
           </div>
           <div class="decision-hero-value ${heroColorClass}">
             ${heroValFormatted}
@@ -1385,7 +1386,7 @@ class AuraChatController {
 
         <!-- Barras de Tanques -->
         <div class="space-y-2 mt-1">
-          ${tanksBarsHtml || '<div class="text-xs font-mono text-slate-400">Nenhum tanque retornado.</div>'}
+          ${tanksBarsHtml || '<div class="text-xs font-sans text-slate-400">Nenhum tanque retornado.</div>'}
         </div>
 
         ${pendingHtml}
@@ -1553,7 +1554,7 @@ class AuraChatController {
       const codTan = cItem.tanque || '00';
 
       rowsHtml += `
-        <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs font-mono flex items-center justify-between gap-2">
+        <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs font-sans flex items-center justify-between gap-2">
           <div>
             <div class="font-bold text-slate-200">TQ ${this.escapeHtml(codTan)} • ${this.escapeHtml(nome)}</div>
             <div class="text-[10px] text-slate-400 tabular-nums">Escriturado: ${escLitros} L | Físico: ${fisLitros} L</div>
@@ -1577,7 +1578,7 @@ class AuraChatController {
             <span class="text-rose-400 font-bold">${CHAT_ICONS.alert}</span>
             <span class="font-semibold text-slate-200">${this.escapeHtml(p.label)}</span>
           </div>
-          <span class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+          <span class="text-[10px] text-slate-400 font-sans flex items-center gap-1">
             <span>LMC</span>
             <span>↗</span>
           </span>
@@ -1586,7 +1587,7 @@ class AuraChatController {
 
       pendingHtml = `
         <div class="space-y-1.5">
-          <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">Pendências Regulatórias:</span>
+          <span class="text-[10px] font-sans uppercase tracking-wider text-slate-400 font-semibold">Pendências Regulatórias:</span>
           <div class="decision-pending-list">${itemsList}</div>
         </div>
       `;
@@ -1619,7 +1620,7 @@ class AuraChatController {
         <div class="decision-hero">
           <div class="decision-hero-header">
             <span class="decision-hero-label">${this.escapeHtml(heroLabel)}</span>
-            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold ${dentroTolerancia ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}">
+            <span class="px-2 py-0.5 rounded text-[10px] font-sans font-semibold ${dentroTolerancia ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}">
               ${dentroTolerancia ? 'Dentro da Tolerância' : 'Fora do Limite Legal'}
             </span>
           </div>
@@ -1633,7 +1634,7 @@ class AuraChatController {
 
         <!-- Régua Visual da ANP [-0.6% a +0.6%] com Alternativa Textual Acessível (F5-09) -->
         <div class="widget-anp-ruler-container" role="figure" aria-label="Régua de Variação Volumétrica ANP: ${needleText} (tolerância permitida entre -0.6% e +0.6%)">
-          <div class="flex justify-between text-[10px] font-mono text-slate-400 px-1">
+          <div class="flex justify-between text-[10px] font-sans font-medium text-slate-400 px-1">
             <span class="text-rose-400 font-bold">-0.6% (Limite)</span>
             <span class="text-emerald-400 font-bold">0.0% (Equilíbrio)</span>
             <span class="text-rose-400 font-bold">+0.6% (Limite)</span>
@@ -1647,7 +1648,7 @@ class AuraChatController {
             </div>
           </div>
 
-          <div class="text-center font-mono text-xs mt-1">
+          <div class="text-center font-sans text-xs mt-1">
             <span class="text-slate-400">Desvio Regulatório: </span>
             <strong style="color: ${needleColor};" class="tabular-nums">${needleText}</strong>
             <span class="text-[10px] text-slate-500 ml-1">(${dentroTolerancia ? 'Dentro da tolerância legal de ±0.60%' : 'Inconformidade: requer verificação física'})</span>
@@ -1681,7 +1682,7 @@ class AuraChatController {
 
         <!-- Lista de Tanques -->
         <div class="space-y-1.5 mt-1">
-          ${rowsHtml || '<div class="text-xs font-mono text-slate-400">Nenhum tanque retornado no relatório.</div>'}
+          ${rowsHtml || '<div class="text-xs font-sans text-slate-400">Nenhum tanque retornado no relatório.</div>'}
         </div>
 
         ${pendingHtml}
@@ -1735,13 +1736,13 @@ class AuraChatController {
    * 1. Superfície única estável, sem cards aninhados.
    * 2. Semântica estrita: Análise parcial nunca é exibida como quebra definitiva.
    * 3. Métrica hero em destaque com números tabulares e formatação pt-BR.
-   * 4. Comparativo compacto entre Automação CBC04, Caixas PDV e Encerrantes Físicos.
+   * 4. Comparativo compacto entre Automação da Pista, Caixas PDV e Encerrantes Físicos.
    * 5. Limitações e pendências verificáveis transparentes.
    * 6. Acesso em 1 clique ao Drawer Lateral de Evidências e Fórmulas.
    */
   renderTurnoWidget(data) {
     if (!data || typeof data !== 'object') {
-      return `<div class="decision-card"><p class="text-xs text-slate-400">Dados de conciliação indisponíveis ou payload inválido.</p></div>`;
+      return `<div class="decision-card"><p class="text-xs text-slate-400 font-sans">Dados de conciliação indisponíveis ou formato não reconhecido.</p></div>`;
     }
 
     const c = data.contrato || data;
@@ -1758,12 +1759,12 @@ class AuraChatController {
             <span class="decision-status-badge status-neutral">
               <span>${CHAT_ICONS.alert}</span>
               <span>Schema Desconhecido</span>
-            </span>
+            </div>
           </div>
-          <div class="p-3.5 rounded-xl bg-slate-900/80 border border-amber-500/30 text-amber-200/90 font-mono text-xs space-y-1.5">
+          <div class="p-3.5 rounded-xl bg-slate-900/80 border border-amber-500/30 text-amber-200/90 font-sans text-xs space-y-1.5">
             <div class="flex items-center gap-1.5"><span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span> <strong>Aviso de Conformidade Contábil:</strong></div>
             <p class="text-[11px] text-slate-300">
-              O payload analítico recebido utiliza a versão <code>${this.escapeHtml(c.schema_version)}</code>, incompatível com o renderizador atual. Por governança e segurança financeira, a exibição de decisão foi suspensa.
+              A estrutura analítica de dados recebida utiliza a versão <code>${this.escapeHtml(c.schema_version)}</code>, incompatível com o renderizador atual. Por governança e segurança financeira, a exibição de decisão foi suspensa.
             </p>
           </div>
         </div>
@@ -1778,7 +1779,7 @@ class AuraChatController {
             <span class="decision-context-title">Auditoria Indisponível</span>
             <span class="decision-status-badge status-neutral">Sem Dados</span>
           </div>
-          <p class="text-xs text-slate-400 font-mono">Payload de conciliação vazio ou estrutura não reconhecida.</p>
+          <p class="text-xs text-slate-400 font-sans">Dados de conciliação vazios ou estrutura não reconhecida.</p>
         </div>
       `;
     }
@@ -1847,22 +1848,22 @@ class AuraChatController {
     if (isPartial) {
       diffColorClass = diffVal < 0 ? 'text-amber' : 'text-emerald';
       heroLabel = 'Diferença Provisória';
-      heroBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">Caixas em Aberto</span>`;
+      heroBadge = `<span class="px-2.5 py-0.5 rounded text-[10px] font-sans font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">Caixas em Aberto</span>`;
     } else if (isNoMovement || isUnavailable) {
       diffColorClass = 'text-slate-400';
       heroLabel = 'Situação';
     } else if (Math.abs(diffVal) < 0.01) {
       diffColorClass = 'text-emerald';
       heroLabel = 'Caixa Conciliado';
-      heroBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">100% Batido</span>`;
+      heroBadge = `<span class="px-2.5 py-0.5 rounded text-[10px] font-sans font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">100% Batido</span>`;
     } else if (diffVal < 0) {
       diffColorClass = 'text-rose';
       heroLabel = 'Falta Apurada';
-      heroBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">Furo de Caixa</span>`;
+      heroBadge = `<span class="px-2.5 py-0.5 rounded text-[10px] font-sans font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">Furo de Caixa</span>`;
     } else {
       diffColorClass = 'text-emerald';
       heroLabel = 'Sobra Apurada';
-      heroBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Sobra de Caixa</span>`;
+      heroBadge = `<span class="px-2.5 py-0.5 rounded text-[10px] font-sans font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Sobra de Caixa</span>`;
     }
 
     const diffFormatted = (isNoMovement || isUnavailable)
@@ -1904,7 +1905,7 @@ class AuraChatController {
               <span class="text-amber-400 font-bold">${CHAT_ICONS.alert}</span>
               <span class="font-semibold text-slate-200">${this.escapeHtml(p.label)}</span>
             </div>
-            <span class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+            <span class="text-[10px] text-slate-400 font-sans flex items-center gap-1">
               <span>${badgeTag}</span>
               <span>↗</span>
             </span>
@@ -1914,7 +1915,7 @@ class AuraChatController {
 
       pendingHtml = `
         <div class="space-y-1.5">
-          <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">Pendências Operacionais:</span>
+          <span class="text-[10px] font-sans uppercase tracking-wider text-slate-400 font-semibold">Pendências Operacionais:</span>
           <div class="decision-pending-list">${itemsList}</div>
         </div>
       `;
@@ -1934,7 +1935,7 @@ class AuraChatController {
               <span>•</span>
               <span>${CHAT_ICONS.pulse} ${this.escapeHtml(turnoAuditado)}</span>
               <span>•</span>
-              <span>${CHAT_ICONS.telemetry} CBC04 + PDV</span>
+              <span>${CHAT_ICONS.telemetry} Pista + PDV</span>
             </span>
           </div>
           <span class="decision-status-badge ${badgeClass}">
@@ -1963,7 +1964,7 @@ class AuraChatController {
         ${(!isNoMovement && !isUnavailable) ? `
           <div class="decision-comparison-grid">
             <div class="decision-comp-item">
-              <span class="decision-comp-label">Automação CBC04</span>
+              <span class="decision-comp-label">Automação da Pista</span>
               <strong class="decision-comp-val text-cyan-300">${this.formatBRL(autRev)}</strong>
               <span class="decision-comp-sub">${this.formatLiters(autVol, 1)} medidos</span>
             </div>
@@ -2071,9 +2072,9 @@ class AuraChatController {
     if (subEl) {
       const subMap = {
         'tank_forecast': `Unidade: ${c.context?.unit_id || 'Posto'} • Tanques & Previsão de Run-Out • ERP Leitura`,
-        'pump_performance': `Unidade: ${c.context?.unit_id || 'Posto'} • Telemetria CBC04 Companytec & PDV`,
+        'pump_performance': `Unidade: ${c.context?.unit_id || 'Posto'} • Automação da Pista & PDV`,
         'lmc_report': `Unidade: ${c.context?.unit_id || 'Posto'} • Portaria ANP 26/1992 • Tolerância ±0.60%`,
-        'market_basket': `Unidade: ${c.context?.unit_id || 'Loja'} • Market Basket PDV (pedido + itemped)`,
+        'market_basket': `Unidade: ${c.context?.unit_id || 'Loja'} • Cesta de Compras & Combos PDV`,
         'shift_reconciliation': `Unidade: ${c.context?.unit_id || 'Posto'} • Data: ${dataAuditada} • Turno: ${turnoAuditado}`
       };
       subEl.textContent = subMap[intent] || `Unidade: ${c.context?.unit_id || 'Posto'}`;
@@ -2146,7 +2147,7 @@ class AuraChatController {
    */
   renderEvidenceTabContent(data, tab) {
     if (!data || (typeof data !== 'object') || (!data.contrato && !data.resumo_executivo && !data.assessment && !data.metrics)) {
-      return `<div class="p-6 text-center text-slate-400 font-mono text-xs">Dados de evidência indisponíveis para este item.</div>`;
+      return `<div class="p-6 text-center text-slate-400 font-sans text-xs">Dados de evidência indisponíveis para este item.</div>`;
     }
 
     const c = data.contrato || data;
@@ -2169,8 +2170,8 @@ class AuraChatController {
               <h4 class="font-bold text-slate-100 flex items-center gap-2">
                 <span class="inline-flex text-cyan-400">${CHAT_ICONS.formula}</span><span>Fórmula de Autonomia até Reserva de Segurança (15%)</span>
               </h4>
-              <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
-                <div class="text-cyan-400 font-bold">Autonomia_15h = (Volume_Atual - Reserva_Tecnica_15%) / Consumo_Medio_Horario</div>
+              <div class="p-3 rounded-xl glass-subcard border border-white/5 font-sans text-xs space-y-2">
+                <div class="text-cyan-400 font-bold font-mono">Autonomia_15h = (Volume_Atual - Reserva_Tecnica_15%) / Consumo_Medio_Horario</div>
                 <div class="text-slate-300">
                   Reserva Crítica = Capacidade Nominal × 15% (Proteção contra sucção de sedimentos e cavitação da bomba).
                 </div>
@@ -2187,8 +2188,8 @@ class AuraChatController {
               <h4 class="font-bold text-slate-100 flex items-center gap-2">
                 <span class="inline-flex text-cyan-400">${CHAT_ICONS.pulse}</span><span>Fórmula de Esgotamento Total (0 L) vs Espaço Livre (Ullage)</span>
               </h4>
-              <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
-                <div class="text-cyan-400 font-bold">Autonomia_0h = Volume_Atual / Consumo_Medio_Horario</div>
+              <div class="p-3 rounded-xl glass-subcard border border-white/5 font-sans text-xs space-y-2">
+                <div class="text-cyan-400 font-bold font-mono">Autonomia_0h = Volume_Atual / Consumo_Medio_Horario</div>
                 <div class="text-amber-300">
                   Esgotamento Zero: ${menorEsg !== 'N/A' ? `${Number(menorEsg).toFixed(1)}h` : 'N/A'} (Zerar o tanque acarreta contaminação e perda de escorva).
                 </div>
@@ -2211,10 +2212,10 @@ class AuraChatController {
               <h4 class="font-bold text-slate-100 flex items-center gap-2">
                 <span class="inline-flex text-cyan-400">${CHAT_ICONS.formula}</span><span>Fórmula de Vazão Operacional de Bicos (L/min)</span>
               </h4>
-              <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
-                <div class="text-cyan-400 font-bold">Vazão (L/min) = Volume Abastecido (L) / Duração do Abastecimento (min)</div>
+              <div class="p-3 rounded-xl glass-subcard border border-white/5 font-sans text-xs space-y-2">
+                <div class="text-cyan-400 font-bold font-mono">Vazão (L/min) = Volume Abastecido (L) / Duração do Abastecimento (min)</div>
                 <div class="text-slate-300">
-                  Telemetria automatizada recebida via concentrador CBC04 Companytec.
+                  Telemetria automatizada recebida via concentrador de automação da pista.
                 </div>
                 <div class="text-amber-400 font-bold pt-1 border-t border-slate-800">
                   Threshold Operacional: Vazão &lt; 30.0 L/min indica saturação precoce de elemento filtrante ou perda de sucção da bomba mecânica.
@@ -2226,8 +2227,8 @@ class AuraChatController {
               <h4 class="font-bold text-slate-100 flex items-center gap-2">
                 <span class="inline-flex text-cyan-400">${CHAT_ICONS.nozzle}</span><span>Fórmula de Conversão em Gasolina Aditivada (%)</span>
               </h4>
-              <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
-                <div class="text-cyan-400 font-bold">Conversão Aditivada (%) = (Volume Aditivada / Volume Total do Colaborador) × 100</div>
+              <div class="p-3 rounded-xl glass-subcard border border-white/5 font-sans text-xs space-y-2">
+                <div class="text-cyan-400 font-bold font-mono">Conversão Aditivada (%) = (Volume Aditivada / Volume Total do Colaborador) × 100</div>
                 <div class="text-emerald-400">
                   Meta da Pista: ≥ 25.0% de conversão sobre o volume total abastecido pelo frentista.
                 </div>
@@ -2245,8 +2246,8 @@ class AuraChatController {
               <h4 class="font-bold text-slate-100 flex items-center gap-2">
                 <span class="inline-flex text-cyan-400">${CHAT_ICONS.formula}</span><span>Fórmula Legal da Portaria ANP nº 26/1992</span>
               </h4>
-              <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
-                <div class="text-cyan-400 font-bold">Estoque Escriturado = Estoque Inicial + Entradas Fiscais (NFe) - Saídas dos Bicos</div>
+              <div class="p-3 rounded-xl glass-subcard border border-white/5 font-sans text-xs space-y-2">
+                <div class="text-cyan-400 font-bold font-mono">Estoque Escriturado = Estoque Inicial + Entradas Fiscais (NFe) - Saídas dos Bicos</div>
                 <div class="text-slate-300">
                   Variação Volumétrica (L) = Estoque Físico Medido (Régua/Sonda) - Estoque Escriturado (L)
                 </div>
@@ -2269,8 +2270,8 @@ class AuraChatController {
               <h4 class="font-bold text-slate-100 flex items-center gap-2">
                 <span class="inline-flex text-cyan-400">${CHAT_ICONS.formula}</span><span>Fórmulas de Mineração de Regras de Associação</span>
               </h4>
-              <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
-                <div class="text-cyan-400 font-bold">Suporte(A ∪ B) = Cupons(A e B) / Total de Cupons (N)</div>
+              <div class="p-3 rounded-xl glass-subcard border border-white/5 font-sans text-xs space-y-2">
+                <div class="text-cyan-400 font-bold font-mono">Suporte(A ∪ B) = Cupons(A e B) / Total de Cupons (N)</div>
                 <div class="text-slate-300">
                   Confiança(A → B) = P(B | A) = Cupons(A e B) / Cupons(A)
                 </div>
@@ -2293,7 +2294,7 @@ class AuraChatController {
             <h4 class="font-bold text-slate-100 flex items-center gap-2">
               <span class="inline-flex text-slate-400">${CHAT_ICONS.pause}</span><span>Sem Movimentação Registrada</span>
             </h4>
-            <p class="text-slate-300 text-xs leading-relaxed p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono">
+            <p class="text-slate-300 text-xs leading-relaxed p-3.5 rounded-xl glass-subcard border border-white/5 font-sans">
               Não foram encontrados lançamentos de bicos, cupons fiscais ou movimentação de caixas para a data consultada (${this.escapeHtml(dataAuditada)}). Por isso, nenhuma diferença contábil ou volumétrica foi apurada.
             </p>
           </div>
@@ -2306,7 +2307,7 @@ class AuraChatController {
             <h4 class="font-bold text-slate-100 flex items-center gap-2">
               <span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span><span>Fonte Indisponível</span>
             </h4>
-            <p class="text-slate-300 text-xs leading-relaxed p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono">
+            <p class="text-slate-300 text-xs leading-relaxed p-3.5 rounded-xl glass-subcard border border-white/5 font-sans">
               A conexão com o banco de dados ERP não pôde ser estabelecida no momento da consulta. Não foi possível apurar fórmulas contábeis ou volumétricas.
             </p>
           </div>
@@ -2324,10 +2325,10 @@ class AuraChatController {
       let volumetricContent = '';
       if (encState === 'not_reported') {
         volumetricContent = `
-          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
-            <div class="text-cyan-400 font-bold">Triangulação Volumétrica: Pendência de Leitura Física</div>
+          <div class="p-3 rounded-xl glass-subcard border border-white/5 font-sans text-xs space-y-2">
+            <div class="text-cyan-400 font-bold font-mono">Triangulação Volumétrica: Pendência de Leitura Física</div>
             <div class="text-slate-300 space-y-1">
-              <div>Automação CBC04: <strong class="text-cyan-300">${this.formatLiters(autVol, 3)}</strong></div>
+              <div>Automação da Pista: <strong class="text-cyan-300 tabular-nums">${this.formatLiters(autVol, 3)}</strong></div>
               <div>Encerrantes Físicos: <strong class="text-amber-400">Pendente / Não digitado no módulo fechabomba</strong></div>
               <div class="pt-1 border-t border-slate-800 text-slate-400">Divergência Pista: <strong class="text-amber-300">Diferença provisória (aguardando leitura dos bicos)</strong></div>
             </div>
@@ -2338,11 +2339,11 @@ class AuraChatController {
         `;
       } else if (encState === 'zero_registered') {
         volumetricContent = `
-          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
-            <div class="text-cyan-400 font-bold">Divergência Pista = Volume Automação - Encerrantes Faturados</div>
+          <div class="p-3 rounded-xl glass-subcard border border-white/5 font-sans text-xs space-y-2">
+            <div class="text-cyan-400 font-bold font-mono">Divergência Pista = Volume Automação - Encerrantes Faturados</div>
             <div class="text-slate-300">
-              ${this.formatLiters(autVol, 3)} (CBC04) - ${this.formatLiters(0, 3)} (fechabomba) = 
-              <strong class="text-emerald-400">${this.formatLiters(0, 3)}</strong>
+              ${this.formatLiters(autVol, 3)} (Pista) - ${this.formatLiters(0, 3)} (fechabomba) = 
+              <strong class="text-emerald-400 tabular-nums">${this.formatLiters(0, 3)}</strong>
             </div>
           </div>
           <p class="text-slate-400 text-xs leading-relaxed">
@@ -2352,30 +2353,30 @@ class AuraChatController {
       } else {
         const diffVol = autVol - (encVol || 0);
         volumetricContent = `
-          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
-            <div class="text-cyan-400 font-bold">Divergência Pista = Volume Automação - Encerrantes Faturados</div>
+          <div class="p-3 rounded-xl glass-subcard border border-white/5 font-sans text-xs space-y-2">
+            <div class="text-cyan-400 font-bold font-mono">Divergência Pista = Volume Automação - Encerrantes Faturados</div>
             <div class="text-slate-300">
-              ${this.formatLiters(autVol, 3)} (CBC04) - ${this.formatLiters(encVol, 3)} (fechabomba) = 
-              <strong class="${Math.abs(diffVol) < 0.01 ? 'text-emerald-400' : 'text-amber-400'}">${diffVol > 0 ? '+' : ''}${this.formatLiters(diffVol, 3)}</strong>
+              ${this.formatLiters(autVol, 3)} (Pista) - ${this.formatLiters(encVol, 3)} (fechabomba) = 
+              <strong class="${Math.abs(diffVol) < 0.01 ? 'text-emerald-400' : 'text-amber-400'} tabular-nums">${diffVol > 0 ? '+' : ''}${this.formatLiters(diffVol, 3)}</strong>
             </div>
           </div>
           <p class="text-slate-400 text-xs leading-relaxed">
-            ${Math.abs(diffVol) < 0.01 ? `${CHAT_ICONS.check} Encerrantes físicos 100% batidos com a telemetria CBC04.` : `<span class="inline-flex text-amber-400 mr-1">${CHAT_ICONS.alert}</span> Diferença apurada entre medição mecânica e telemetria CBC04.`}
+            ${Math.abs(diffVol) < 0.01 ? `${CHAT_ICONS.check} Encerrantes físicos 100% batidos com a automação da pista.` : `<span class="inline-flex text-amber-400 mr-1">${CHAT_ICONS.alert}</span> Diferença apurada entre medição mecânica e automação da pista.`}
           </p>
         `;
       }
 
       return `
-        <div class="space-y-4">
+        <div class="space-y-4 font-sans text-xs">
           <div class="evidence-section-card">
             <h4 class="font-bold text-slate-100 flex items-center gap-2">
               <span class="inline-flex text-cyan-400">${CHAT_ICONS.formula}</span><span>Fórmula da Conciliação Financeira</span>
             </h4>
-            <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
-              <div class="text-cyan-400 font-bold">Diferença = Faturamento PDV - Automação CBC04</div>
+            <div class="p-3 rounded-xl glass-subcard border border-white/5 font-sans text-xs space-y-2">
+              <div class="text-cyan-400 font-bold font-mono">Diferença = Faturamento PDV - Automação da Pista</div>
               <div class="text-slate-300">
-                ${this.formatBRL(posRev)} (PDV) - ${this.formatBRL(autRev)} (CBC04) = 
-                <strong class="${diff < 0 ? 'text-amber-400' : 'text-emerald-400'}">${this.formatSignedBRL(diff)}</strong>
+                ${this.formatBRL(posRev)} (PDV) - ${this.formatBRL(autRev)} (Pista) = 
+                <strong class="${diff < 0 ? 'text-amber-400' : 'text-emerald-400'} tabular-nums">${this.formatSignedBRL(diff)}</strong>
               </div>
             </div>
             <p class="text-slate-400 text-xs leading-relaxed">
@@ -2399,7 +2400,7 @@ class AuraChatController {
     if (tab === 'bicos') {
       const nozzlesList = c.nozzles || data.auditoria_vazao_bicos || data.vazao_bicos || data.triangulacao_pista?.detalhamento_bicos || [];
       if (nozzlesList.length === 0) {
-        return `<div class="p-4 text-center text-slate-500 font-mono text-xs">Sem dados detalhados de bicos para esta consulta.</div>`;
+        return `<div class="p-4 text-center text-slate-500 font-sans text-xs">Sem dados detalhados de bicos para esta consulta.</div>`;
       }
 
       const rows = nozzlesList.map(b => {
@@ -2410,7 +2411,7 @@ class AuraChatController {
         const prod = b.combustivel || b.produto_nome || 'Combustível';
 
         return `
-          <tr class="border-b border-slate-800/80 text-[11px] font-mono">
+          <tr class="border-b border-slate-800/80 text-[11px] font-sans">
             <td class="py-2.5 font-bold text-slate-200">Bico ${this.escapeHtml(b.bico)}</td>
             <td class="py-2.5 text-slate-300">${this.escapeHtml(prod)}</td>
             <td class="py-2.5 text-right ${isLenta ? 'text-rose-400 font-bold' : 'text-emerald-300'} tabular-nums">${vazaoText}</td>
@@ -2425,13 +2426,13 @@ class AuraChatController {
       }).join('');
 
       return `
-        <div class="space-y-3">
-          <div class="flex items-center justify-between text-xs font-mono text-slate-400">
+        <div class="space-y-3 font-sans">
+          <div class="flex items-center justify-between text-xs text-slate-400">
             <span>Total de Bicos Monitorados: <strong>${nozzlesList.length}</strong></span>
-            <span>Automação: CBC04 Companytec</span>
+            <span>Automação: Concentrador de Pista</span>
           </div>
           <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60 p-1">
-            <table class="w-full text-left font-mono">
+            <table class="w-full text-left font-sans text-xs">
               <thead>
                 <tr class="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
                   <th class="p-2">Bico</th>
@@ -2455,7 +2456,7 @@ class AuraChatController {
       if (intent === 'market_basket') {
         const rulesList = c.detailed_rules || c.top_combos || data.regras_associacao_detalhadas || [];
         if (rulesList.length === 0) {
-          return `<div class="p-4 text-center text-slate-500 font-mono text-xs">Nenhuma regra minerada para esta consulta.</div>`;
+          return `<div class="p-4 text-center text-slate-500 font-sans text-xs">Nenhuma regra minerada para esta consulta.</div>`;
         }
 
         const rows = rulesList.map(r => {
@@ -2471,7 +2472,7 @@ class AuraChatController {
           const isForte = Boolean(r.forte_sinergia ?? (parseFloat(liftVal) >= 2.0));
 
           return `
-            <tr class="border-b border-slate-800/80 text-[11px] font-mono">
+            <tr class="border-b border-slate-800/80 text-[11px] font-sans">
               <td class="py-2.5 font-bold text-slate-200">${this.escapeHtml(regraStr)}</td>
               <td class="py-2.5 text-right text-slate-300 tabular-nums">${supVal}%</td>
               <td class="py-2.5 text-right text-cyan-300 tabular-nums">${confVal}%</td>
@@ -2486,13 +2487,13 @@ class AuraChatController {
         }).join('');
 
         return `
-          <div class="space-y-3">
-            <div class="flex items-center justify-between text-xs font-mono text-slate-400">
+          <div class="space-y-3 font-sans">
+            <div class="flex items-center justify-between text-xs text-slate-400">
               <span>Total de Regras Mineradas: <strong>${rulesList.length}</strong></span>
-              <span>Algoritmo: Market Basket PDV</span>
+              <span>Padrão de Compra: Combos PDV</span>
             </div>
             <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60 p-1">
-              <table class="w-full text-left font-mono">
+              <table class="w-full text-left font-sans text-xs">
                 <thead>
                   <tr class="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
                     <th class="p-2">Regra de Associação</th>
@@ -2512,13 +2513,13 @@ class AuraChatController {
       // Default: Conciliação de turno caixas
       const caixasList = data.triangulacao_caixa?.caixas || [];
       if (caixasList.length === 0) {
-        return `<div class="p-4 text-center text-slate-500 font-mono text-xs">Sem caixas registrados na data auditada.</div>`;
+        return `<div class="p-4 text-center text-slate-500 font-sans text-xs">Sem caixas registrados na data auditada.</div>`;
       }
 
       const rows = caixasList.map(cItem => {
         let opName = String(cItem.operador || 'Operador não informado').trim();
         return `
-          <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2 font-mono text-xs">
+          <div class="p-3.5 rounded-xl glass-subcard border border-white/5 space-y-2 font-sans text-xs">
             <div class="flex items-center justify-between">
               <span class="font-bold text-slate-100">Sessão #${this.escapeHtml(cItem.caixa_id ?? 'N/D')} • Terminal PDV ${this.escapeHtml(cItem.pdv ?? 'N/D')}</span>
               <span class="text-slate-400 text-[11px]">${this.escapeHtml(opName)}</span>
@@ -2531,7 +2532,7 @@ class AuraChatController {
         `;
       }).join('');
 
-      return `<div class="space-y-3">${rows}</div>`;
+      return `<div class="space-y-3 font-sans">${rows}</div>`;
     }
 
     // =========================================================================
@@ -2541,7 +2542,7 @@ class AuraChatController {
       if (intent === 'tank_forecast') {
         const tanksList = c.tanks || data.detalhamento_tanques || data.tanques || [];
         if (tanksList.length === 0) {
-          return `<div class="p-4 text-center text-slate-500 font-mono text-xs">Sem tanques auditados neste relatório.</div>`;
+          return `<div class="p-4 text-center text-slate-500 font-sans text-xs">Sem tanques auditados neste relatório.</div>`;
         }
 
         const rows = tanksList.map(t => {
@@ -2557,7 +2558,7 @@ class AuraChatController {
           const ullage = this.formatLiters(t.espaco_livre_ullage_litros ?? t.espaco_livre_descarga_litros ?? 0, 0);
 
           return `
-            <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2 font-mono text-xs">
+            <div class="p-3.5 rounded-xl glass-subcard border border-white/5 space-y-2 font-sans text-xs">
               <div class="flex items-center justify-between">
                 <span class="font-bold text-slate-100">TQ-${this.escapeHtml(cod)} • ${this.escapeHtml(comb)}</span>
                 <span class="text-slate-300 font-semibold tabular-nums">${pct}% (${saldo} / ${cap})</span>
@@ -2572,13 +2573,13 @@ class AuraChatController {
           `;
         }).join('');
 
-        return `<div class="space-y-3">${rows}</div>`;
+        return `<div class="space-y-3 font-sans">${rows}</div>`;
       }
 
       if (intent === 'lmc_report') {
         const tanksList = c.tanks || data.demonstrativo_por_combustivel || data.tanques || [];
         if (tanksList.length === 0) {
-          return `<div class="p-4 text-center text-slate-500 font-mono text-xs">Sem tanques auditados no LMC.</div>`;
+          return `<div class="p-4 text-center text-slate-500 font-sans text-xs">Sem tanques auditados no LMC.</div>`;
         }
 
         const rows = tanksList.map(t => {
@@ -2591,10 +2592,10 @@ class AuraChatController {
           const fisLitros = this.formatLiters(t.estoque_fisico_medido_litros ?? t.estoque_fisico_litros ?? t.movimentacao?.estoque_fisico_medido_litros ?? 0, 1);
 
           return `
-            <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2 font-mono text-xs">
+            <div class="p-3.5 rounded-xl glass-subcard border border-white/5 space-y-2 font-sans text-xs">
               <div class="flex items-center justify-between">
                 <span class="font-bold text-slate-100">TQ-${this.escapeHtml(cod)} • ${this.escapeHtml(comb)}</span>
-                <span class="px-2 py-0.5 rounded text-[10px] font-semibold inline-flex items-center gap-1 ${isConf ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}">
+                <span class="px-2.5 py-0.5 rounded text-[10px] font-semibold inline-flex items-center gap-1 ${isConf ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}">
                   ${isConf ? `${CHAT_ICONS.check} Conforme ANP (±0.6%)` : `${CHAT_ICONS.alert} Alerta ANP`}
                 </span>
               </div>
@@ -2608,36 +2609,36 @@ class AuraChatController {
           `;
         }).join('');
 
-        return `<div class="space-y-3">${rows}</div>`;
+        return `<div class="space-y-3 font-sans">${rows}</div>`;
       }
 
       // Default: Balanço de tanques turno
       const tanquesList = data.balanco_tanques?.detalhamento_tanques || [];
       if (tanquesList.length === 0) {
-        return `<div class="p-4 text-center text-slate-500 font-mono text-xs">Sem tanques auditados neste fechamento.</div>`;
+        return `<div class="p-4 text-center text-slate-500 font-sans text-xs">Sem tanques auditados neste fechamento.</div>`;
       }
 
       const rows = tanquesList.map(t => {
         const isConf = t.status_anp?.includes('CONFORME');
         return `
-          <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2 font-mono text-xs">
+          <div class="p-3.5 rounded-xl glass-subcard border border-white/5 space-y-2 font-sans text-xs">
             <div class="flex items-center justify-between">
               <span class="font-bold text-slate-100">TQ-${this.escapeHtml(t.codtan ?? 'N/D')} • ${this.escapeHtml(t.combustivel ?? 'N/D')}</span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-semibold inline-flex items-center gap-1 ${isConf ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}">
+              <span class="px-2.5 py-0.5 rounded text-[10px] font-semibold inline-flex items-center gap-1 ${isConf ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}">
                 ${isConf ? `${CHAT_ICONS.check} Conforme ANP` : `${CHAT_ICONS.alert} Alerta ANP`}
               </span>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-300 pt-1 border-t border-slate-800">
-              <div><span class="text-slate-400">Capacidade:</span> ${this.formatLiters(t.capacidade_litros, 0)}</div>
-              <div><span class="text-slate-400">Saldo Inicial:</span> ${this.formatLiters(t.saldo_inicial, 0)}</div>
-              <div><span class="text-slate-400">Saldo Final:</span> ${this.formatLiters(t.saldo_final, 0)}</div>
-              <div><span class="text-slate-400">Saída Bicos:</span> ${this.formatLiters(t.saida_bicos_litros, 1)}</div>
+              <div><span class="text-slate-400">Capacidade:</span> <span class="tabular-nums">${this.formatLiters(t.capacidade_litros, 0)}</span></div>
+              <div><span class="text-slate-400">Saldo Inicial:</span> <span class="tabular-nums">${this.formatLiters(t.saldo_inicial, 0)}</span></div>
+              <div><span class="text-slate-400">Saldo Final:</span> <span class="tabular-nums">${this.formatLiters(t.saldo_final, 0)}</span></div>
+              <div><span class="text-slate-400">Saída Bicos:</span> <span class="tabular-nums">${this.formatLiters(t.saida_bicos_litros, 1)}</span></div>
             </div>
           </div>
         `;
       }).join('');
 
-      return `<div class="space-y-3">${rows}</div>`;
+      return `<div class="space-y-3 font-sans">${rows}</div>`;
     }
 
     // =========================================================================
@@ -2649,7 +2650,7 @@ class AuraChatController {
       if (s.availability === 'unavailable') stBadge = `<span class="text-rose-400 font-semibold inline-flex items-center gap-1">${CHAT_ICONS.alert} Indisponível</span>`;
 
       return `
-        <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 flex items-center justify-between font-mono text-xs">
+        <div class="p-3.5 rounded-xl glass-subcard border border-white/5 flex items-center justify-between font-sans text-xs">
           <div>
             <div class="font-bold text-slate-200">${this.escapeHtml(s.label)}</div>
             <div class="text-[10px] text-slate-400">Atualização: ${s.data_as_of ? this.escapeHtml(s.data_as_of) : 'Tempo real'}</div>
@@ -2663,19 +2664,19 @@ class AuraChatController {
     const limText = assessment.limitation || data.resumo_executivo?.limitation || null;
 
     return `
-      <div class="space-y-4">
+      <div class="space-y-4 font-sans text-xs">
         <div class="evidence-section-card">
           <h4 class="font-bold text-slate-100 flex items-center gap-2">
             <span class="inline-flex text-cyan-400">${CHAT_ICONS.pulse}</span><span>Proveniência e Disponibilidade das Fontes</span>
           </h4>
-          <div class="space-y-2">${sourcesList || '<div class="text-slate-500">Fontes padrão do ERP (Somente Leitura)</div>'}</div>
+          <div class="space-y-2">${sourcesList || '<div class="text-slate-500 font-sans">Fontes padrão do ERP (Somente Leitura)</div>'}</div>
         </div>
 
         <div class="evidence-section-card">
           <h4 class="font-bold text-slate-100 flex items-center gap-2">
             <span class="inline-flex text-cyan-400">${CHAT_ICONS.audit}</span><span>Diagnóstico Executivo</span>
           </h4>
-          <p class="text-slate-300 leading-relaxed text-xs p-3 rounded-lg bg-slate-900 border border-slate-800">
+          <p class="text-slate-300 leading-relaxed text-xs p-3.5 rounded-xl glass-subcard border border-white/5 font-sans">
             ${this.escapeHtml(explanationText)}
           </p>
         </div>
@@ -2685,13 +2686,13 @@ class AuraChatController {
             <h4 class="font-bold text-slate-100 flex items-center gap-2">
               <span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span><span>Limitações e Premissas da Consulta</span>
             </h4>
-            <p class="text-amber-200/90 leading-relaxed text-xs p-3 rounded-lg bg-amber-950/20 border border-amber-500/20 font-mono">
+            <p class="text-amber-200/90 leading-relaxed text-xs p-3.5 rounded-xl bg-amber-950/20 border border-amber-500/20 font-sans">
               ${this.escapeHtml(limText)}
             </p>
           </div>
         ` : ''}
 
-        <div class="p-3 rounded-xl bg-slate-900/40 border border-slate-800/60 text-[10px] font-mono text-slate-500 flex items-center justify-between">
+        <div class="p-3.5 rounded-xl glass-subcard border border-white/5 text-[10px] font-sans text-slate-500 flex items-center justify-between">
           <span>Contrato: ${this.escapeHtml(c.schema_version || '1.0')} (${this.escapeHtml(intent)})</span>
           <span>ID: ${this.escapeHtml(c.response_id || 'N/A')}</span>
         </div>
@@ -2711,7 +2712,7 @@ class AuraChatController {
    */
   renderCombosWidget(data) {
     if (!data || typeof data !== 'object') {
-      return `<div class="decision-card"><p class="text-xs text-slate-400">Dados de Market Basket indisponíveis.</p></div>`;
+      return `<div class="decision-card"><p class="text-xs text-slate-400">Dados de combos e vendas cruzadas indisponíveis.</p></div>`;
     }
 
     const c = data.contrato || data;
@@ -2813,8 +2814,8 @@ class AuraChatController {
       const incrPct = pOrigVal > 0 ? ((pRecVal / pOrigVal) * 100).toFixed(1) : null;
 
       cardsHtml += `
-        <div class="widget-combo-card">
-          <div class="flex items-center justify-between text-xs font-mono mb-1">
+        <div class="widget-combo-card font-sans">
+          <div class="flex items-center justify-between text-xs mb-1">
             <span class="font-bold text-white flex items-center gap-1.5">
               <span>${isForte ? CHAT_ICONS.pulse : CHAT_ICONS.store}</span>
               <span>${this.escapeHtml(prodOrig)}</span>
@@ -2823,11 +2824,11 @@ class AuraChatController {
             <span class="font-bold text-auraCyan-light">${this.escapeHtml(prodDest)}</span>
           </div>
 
-          <div class="flex flex-wrap items-center gap-2 font-mono text-[10px] text-slate-400 my-1">
-            <span class="px-1.5 py-0.5 rounded ${isForte ? 'bg-purple-500/25 text-purple-200 border-purple-500/40' : 'bg-slate-800 text-slate-300 border-slate-700'} font-bold border tabular-nums flex items-center gap-1">
+          <div class="flex flex-wrap items-center gap-2 text-[10px] text-slate-400 my-1">
+            <span class="px-2 py-0.5 rounded ${isForte ? 'bg-purple-500/25 text-purple-200 border-purple-500/40' : 'bg-slate-800 text-slate-300 border-slate-700'} font-bold border tabular-nums flex items-center gap-1">
               ${CHAT_ICONS.pulse}<span>Lift ${lift}x</span>
             </span>
-            <span class="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 tabular-nums flex items-center gap-1">
+            <span class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 tabular-nums flex items-center gap-1 font-semibold">
               ${CHAT_ICONS.target}<span>Confiança ${conf}%</span>
             </span>
             <span class="tabular-nums flex items-center gap-1">${CHAT_ICONS.box}<span>${cupons} cupons</span></span>
@@ -2856,7 +2857,7 @@ class AuraChatController {
             <span class="text-purple-400 font-bold">${CHAT_ICONS.alert}</span>
             <span class="font-semibold text-slate-200">${this.escapeHtml(p.label)}</span>
           </div>
-          <span class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+          <span class="text-[10px] text-slate-400 font-sans flex items-center gap-1">
             <span>Combos</span>
             <span>↗</span>
           </span>
@@ -2865,7 +2866,7 @@ class AuraChatController {
 
       pendingHtml = `
         <div class="space-y-1.5">
-          <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">Oportunidades de Venda Cruzada:</span>
+          <span class="text-[10px] font-sans uppercase tracking-wider text-slate-400 font-semibold">Oportunidades de Venda Cruzada:</span>
           <div class="decision-pending-list">${itemsList}</div>
         </div>
       `;
@@ -2898,7 +2899,7 @@ class AuraChatController {
         <div class="decision-hero">
           <div class="decision-hero-header">
             <span class="decision-hero-label">${this.escapeHtml(heroLabel)}</span>
-            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+            <span class="px-2.5 py-0.5 rounded text-[10px] font-sans font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30">
               ${countForteSinergia} Combos Fortes
             </span>
           </div>
@@ -2935,7 +2936,7 @@ class AuraChatController {
 
         <!-- Lista de Combos Destaque -->
         <div class="space-y-2 mt-1">
-          ${cardsHtml || '<div class="text-xs font-mono text-slate-400">Nenhum combo com o filtro solicitado retornado.</div>'}
+          ${cardsHtml || '<div class="text-xs font-sans text-slate-400">Nenhum combo com o filtro solicitado retornado.</div>'}
         </div>
 
         ${pendingHtml}
@@ -3097,7 +3098,7 @@ class AuraChatController {
       const atends = f.total_abastecimentos ?? f.atendimentos_count ?? 0;
 
       frentsHtml += `
-        <div class="flex items-center justify-between p-2 rounded-xl bg-slate-900/60 border border-slate-800 text-xs font-mono">
+        <div class="flex items-center justify-between p-2 rounded-xl bg-slate-900/60 border border-slate-800 text-xs font-sans">
           <div class="flex items-center gap-2 font-bold text-white">
             ${rankBadge}
             <span>${this.escapeHtml(nomeFrent)}</span>
@@ -3117,7 +3118,7 @@ class AuraChatController {
     let bicosAlertHtml = '';
     if (bicosAlerta.length > 0) {
       bicosAlertHtml = `
-        <div class="p-3 rounded-xl bg-amber-950/25 border border-amber-500/30 text-amber-300 text-xs font-mono space-y-1.5">
+        <div class="p-3 rounded-xl bg-amber-950/25 border border-amber-500/30 text-amber-300 text-xs font-sans space-y-1.5">
           <div class="flex items-center gap-2 font-bold text-amber-400">
             <span class="inline-flex">${CHAT_ICONS.alert}</span>
             <span class="uppercase tracking-wider text-[11px]">Bicos com Alerta de Vazão Lenta (&lt; 30 L/min):</span>
@@ -3129,7 +3130,7 @@ class AuraChatController {
             ${bicosAlerta.map(b => {
               const vazao = parseFloat(b.vazao_media_l_min ?? b.vazao_litros_minuto ?? b.vazao_media_litros_minuto ?? 0).toFixed(1);
               const prod = b.combustivel || b.produto_nome || 'Combustível';
-              return `<div class="flex items-center justify-between text-[11px] p-1 rounded bg-slate-900/60 border border-amber-500/20">
+              return `<div class="flex items-center justify-between text-[11px] p-1 rounded bg-slate-900/60 border border-amber-500/20 font-sans">
                 <span>Bico <strong>${b.bico}</strong> (${this.escapeHtml(prod)})</span>
                 <strong class="text-rose-400 tabular-nums">${vazao} L/min</strong>
               </div>`;
@@ -3148,7 +3149,7 @@ class AuraChatController {
             <span class="text-amber-400 font-bold inline-flex">${CHAT_ICONS.wrench}</span>
             <span class="font-semibold text-slate-200">${this.escapeHtml(p.label)}</span>
           </div>
-          <span class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+          <span class="text-[10px] text-slate-400 font-sans flex items-center gap-1">
             <span>Bicos</span>
             <span>↗</span>
           </span>
@@ -3157,7 +3158,7 @@ class AuraChatController {
 
       pendingHtml = `
         <div class="space-y-1.5">
-          <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">Pendências Operacionais:</span>
+          <span class="text-[10px] font-sans uppercase tracking-wider text-slate-400 font-semibold">Pendências Operacionais:</span>
           <div class="decision-pending-list">${itemsList}</div>
         </div>
       `;
@@ -3190,7 +3191,7 @@ class AuraChatController {
         <div class="decision-hero">
           <div class="decision-hero-header">
             <span class="decision-hero-label">${this.escapeHtml(heroLabel)}</span>
-            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+            <span class="px-2.5 py-0.5 rounded text-[10px] font-sans font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
               Líder: ${this.escapeHtml(liderNome)}
             </span>
           </div>
@@ -3230,9 +3231,9 @@ class AuraChatController {
         ` : ''}
 
         <!-- Ranking de Frentistas -->
-        <div class="space-y-1.5 mt-1">
-          <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">Podium de Performance da Pista:</span>
-          ${frentsHtml || '<div class="text-xs font-mono text-slate-400">Nenhum frentista retornado.</div>'}
+        <div class="space-y-1.5 mt-1 font-sans">
+          <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Podium de Performance da Pista:</span>
+          ${frentsHtml || '<div class="text-xs text-slate-400">Nenhum frentista retornado.</div>'}
         </div>
 
         ${bicosAlertHtml}
@@ -3292,11 +3293,11 @@ class AuraChatController {
         <div class="widget-inline-header">
           <div class="flex items-center gap-2">
             <span class="inline-flex">${CHAT_ICONS.chart}</span>
-            <strong class="text-xs font-mono text-white uppercase tracking-wider">Diagnóstico: ${this.escapeHtml(displayName)}</strong>
+            <strong class="text-xs font-sans text-white uppercase tracking-wider font-semibold">Diagnóstico: ${this.escapeHtml(displayName)}</strong>
           </div>
-          <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-300 border border-slate-700">OK</span>
+          <span class="px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-slate-800 text-slate-300 border border-slate-700">OK</span>
         </div>
-        <div class="text-xs font-mono text-slate-300">
+        <div class="text-xs font-sans text-slate-300">
           ${this.escapeHtml(r.status || r.mensagem || 'Dados processados com sucesso.')}
         </div>
       </div>
@@ -3791,7 +3792,7 @@ class AuraChatController {
 
     const html = `
       <div class="flex flex-wrap items-center gap-3">
-        ${e2e ? `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Resposta em <strong class="text-emerald-300 font-mono">${e2e}</strong></span>` : ''}
+        ${e2e ? `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Resposta em <strong class="text-emerald-300 font-sans tabular-nums font-semibold">${e2e}</strong></span>` : ''}
         <span class="text-slate-500">•</span>
         <span>Motor: <strong class="text-purple-300">${model}</strong></span>
         ${lgpd > 0 ? `<span class="text-slate-500">•</span><span class="text-emerald-400/90 font-medium inline-flex items-center gap-1">${CHAT_ICONS.shield} LGPD: ${lgpd} dados protegidos</span>` : ''}
@@ -3813,7 +3814,7 @@ class AuraChatController {
     this.hideToolCardSkeleton(containerId);
     const textIds = [containerId + '-text', containerId + '-split-text'];
     const html = `
-      <div class="p-3 rounded bg-rose-950/20 border border-rose-500/40 text-rose-300 text-xs font-mono">
+      <div class="p-3.5 rounded-xl bg-rose-950/20 border border-rose-500/40 text-rose-300 text-xs font-sans">
         <strong class="inline-flex items-center gap-1">${CHAT_ICONS.alert} Falha de Conexão ou Resposta:</strong> ${this.escapeHtml(errorMsg)}
       </div>
     `;

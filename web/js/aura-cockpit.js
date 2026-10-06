@@ -63,7 +63,7 @@ class AuraCockpitController {
     const splitContainer = document.getElementById('split-tanks-grid');
     if (splitContainer && (!this.tanksData || this.tanksData.length === 0)) {
       splitContainer.innerHTML = `
-        <div class="col-span-full py-6 text-center text-slate-400 font-mono text-xs glass-panel p-4">
+        <div class="col-span-full py-6 text-center text-slate-400 font-sans text-xs glass-panel p-4">
           Consultas 100% sob demanda. Pergunte no chat ao lado ou <button onclick="window.auraCockpit.refreshAllData()" class="text-cyan-400 hover:underline font-bold">clique aqui</button> para apurar.
         </div>`;
     }
@@ -82,7 +82,7 @@ class AuraCockpitController {
     if (bicosContainer && !this.pistaData) {
       bicosContainer.innerHTML = `
         <div class="col-span-full py-6 text-center text-slate-400 font-sans text-xs glass-subcard p-4 rounded-xl border border-white/5">
-          <span>Telemetria de bicos CBC04 sob demanda.</span>
+          <span>Leitura de bicos e fluxo de abastecimento sob demanda.</span>
           <button onclick="window.auraCockpit.refreshAllData()" class="mt-2 block mx-auto px-3 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded border border-slate-700 text-xs transition-colors">
             Consultar Bicos ↺
           </button>
@@ -127,7 +127,7 @@ class AuraCockpitController {
     if (combosContainer && !this.combosData) {
       combosContainer.innerHTML = `
         <div class="col-span-full py-6 text-center text-slate-400 font-sans text-xs glass-subcard p-4 rounded-xl border border-white/5">
-          Regras de associação e Market Basket Analysis sob demanda.
+          Regras de associação e Combos da Loja sob demanda.
         </div>`;
     }
   }
@@ -209,11 +209,11 @@ class AuraCockpitController {
         this.renderPistaSection(pistaRes.data);
       } else if (!this.pistaData) {
         const b = document.getElementById('cockpit-bicos-grid');
-        if (b) b.innerHTML = '<div class="text-slate-500 font-mono text-xs col-span-full py-2">Sem sinal de bicos da pista (CBC04).</div>';
+        if (b) b.innerHTML = '<div class="text-slate-400 font-sans text-xs col-span-full py-2">Sem leitura dos bicos de abastecimento no momento.</div>';
         const f = document.getElementById('cockpit-frentistas-table');
-        if (f) f.innerHTML = '<div class="text-slate-500 font-mono text-xs py-2">Sem dados de frentistas disponíveis.</div>';
+        if (f) f.innerHTML = '<div class="text-slate-400 font-sans text-xs py-2">Sem dados de frentistas disponíveis.</div>';
         const a = document.getElementById('cockpit-anomalias-list');
-        if (a) a.innerHTML = '<div class="text-slate-500 font-mono text-xs py-2">Pista desconectada.</div>';
+        if (a) a.innerHTML = '<div class="text-slate-400 font-sans text-xs py-2">Comunicação com a pista temporariamente indisponível.</div>';
       }
 
       if (turnoRes && turnoRes.data) {
@@ -221,7 +221,7 @@ class AuraCockpitController {
         this.renderTurnoCard(turnoRes.data);
       } else if (!this.turnoData) {
         const t = document.getElementById('cockpit-turno-content');
-        if (t) t.innerHTML = '<div class="text-slate-500 font-mono text-xs py-2">Turno não localizado ou caixa fechado.</div>';
+        if (t) t.innerHTML = '<div class="text-slate-500 font-sans text-xs py-2">Turno não localizado ou caixa fechado.</div>';
       }
 
       if (lmcRes && lmcRes.data) {
@@ -229,7 +229,7 @@ class AuraCockpitController {
         this.renderLmcCard(lmcRes.data);
       } else if (!this.lmcData) {
         const l = document.getElementById('cockpit-lmc-content');
-        if (l) l.innerHTML = '<div class="text-slate-500 font-mono text-xs py-2">Livro LMC não consultado.</div>';
+        if (l) l.innerHTML = '<div class="text-slate-500 font-sans text-xs py-2">Livro LMC não consultado.</div>';
       }
 
       if (combosRes && combosRes.data) {
@@ -237,7 +237,7 @@ class AuraCockpitController {
         this.renderTopCombosBanner(combosRes.data);
       } else if (!this.combosData) {
         const c = document.getElementById('cockpit-combos-container');
-        if (c) c.innerHTML = '<div class="text-slate-500 font-mono text-xs col-span-full py-2">Sem regras de cesta registradas.</div>';
+        if (c) c.innerHTML = '<div class="text-slate-500 font-sans text-xs col-span-full py-2">Sem regras de cesta registradas.</div>';
       }
 
       this.updateLastSyncTimestamp();
@@ -271,7 +271,7 @@ class AuraCockpitController {
 
     if (!tanks || tanks.length === 0) {
       container.innerHTML = `
-        <div class="col-span-full py-8 text-center text-slate-400 font-mono text-sm">
+        <div class="col-span-full py-8 text-center text-slate-400 font-sans text-sm">
           Nenhum tanque configurado ou telemetria indisponível.
         </div>`;
       return;
@@ -338,82 +338,86 @@ class AuraCockpitController {
       }
 
       html += `
-        <div class="glass-panel p-4 flex flex-col justify-between relative overflow-hidden transition-all hover:scale-[1.01] ${borderAccent}">
+        <div class="glass-panel p-4 flex flex-col justify-between relative overflow-hidden transition-all duration-300 hover:scale-[1.01] ${borderAccent}">
           <!-- Topo do Card -->
-          <div class="flex items-start justify-between mb-3 pb-2 border-b border-white/5">
+          <div class="flex items-start justify-between mb-3 pb-2.5 border-b border-white/5">
             <div>
               <div class="flex items-center gap-2">
-                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-900 text-slate-200 border border-slate-700/80">
+                <span class="font-sans text-xs font-semibold px-2 py-0.5 rounded-md bg-white/5 text-slate-200 border border-white/10 tracking-wide">
                   TQ-${cod}
                 </span>
-                <span class="text-xs font-semibold px-2 py-0.5 rounded border ${tagBg}">
+                <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full border ${tagBg}">
                   ${comb}
                 </span>
               </div>
-              <div class="mt-1 text-slate-400 text-[11px] font-mono">
-                Bicos: ${(tank.bicos_conectados && tank.bicos_conectados.length) ? tank.bicos_conectados.join(', ') : 'Nenhum'}
+              <div class="mt-1.5 text-slate-400 text-[11px] font-sans flex items-center gap-1">
+                <span class="text-slate-500">Bicos:</span>
+                <span class="text-slate-300">${(tank.bicos_conectados && tank.bicos_conectados.length) ? tank.bicos_conectados.join(', ') : 'Nenhum'}</span>
               </div>
             </div>
 
             <!-- Badge de Status de Risco -->
             <div>
               ${isInativo ? `
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-sans font-semibold bg-slate-800 text-slate-400 border border-slate-700">
                   INATIVO
                 </span>
               ` : isCritical ? `
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-sans font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">
                   CRÍTICO &lt;15%
                 </span>
               ` : pct < 30 ? `
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-sans font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40">
                   ATENÇÃO
                 </span>
               ` : `
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-sans font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                   REGULAR
                 </span>
               `}
             </div>
           </div>
 
-          <!-- Centro: Medidor Cilíndrico de Fluido + Métricas -->
+          <!-- Centro: Medidor Cápsula Precision Glass + Métricas Executivas -->
           <div class="flex items-center gap-4 my-2">
-            <!-- Cilindro 3D Translúcido -->
+            <!-- Cápsula Precision Glass -->
             <div class="tank-gauge-container flex-shrink-0" title="Nível: ${pct.toFixed(1)}%">
+              <div class="tank-tick-75"></div>
+              <div class="tank-tick-50"></div>
+              <div class="tank-tick-25"></div>
               <div class="tank-critical-line"></div>
               <div class="tank-liquid ${fuelClass}" style="height: ${isInativo ? 0 : pct}%;"></div>
             </div>
 
             <!-- Dados Volumétricos Executivos -->
-            <div class="flex-1 space-y-1.5 font-mono text-xs">
-              <div class="flex items-baseline justify-between border-b border-white/5 pb-1">
-                <span class="text-slate-400">Saldo Atual:</span>
-                <span class="font-bold text-base tabular-nums ${isCritical ? 'text-rose-300' : 'text-slate-100'}">
-                  ${saldo.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L
-                </span>
+            <div class="flex-1 space-y-1.5 font-sans text-xs">
+              <div class="border-b border-white/5 pb-1">
+                <div class="text-[10px] uppercase tracking-wider text-slate-400 font-medium">Saldo Atual</div>
+                <div class="text-xl font-bold font-sans tabular-nums tracking-tight ${isCritical ? 'text-rose-400' : 'text-slate-100'}">
+                  ${saldo.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} <span class="text-xs font-normal text-slate-400">L</span>
+                </div>
               </div>
 
-              <div class="flex items-baseline justify-between border-b border-white/5 pb-1">
+              <div class="flex items-center justify-between border-b border-white/5 py-1">
                 <span class="text-slate-400">Capacidade:</span>
                 <span class="text-slate-300 tabular-nums">${cap.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L</span>
               </div>
 
-              <div class="flex items-baseline justify-between border-b border-white/5 pb-1">
-                <span class="text-slate-400">Nível:</span>
+              <div class="flex items-center justify-between border-b border-white/5 py-1">
+                <span class="text-slate-400">Ocupação:</span>
                 <span class="font-bold tabular-nums ${pct < 15 ? 'text-rose-400' : pct < 35 ? 'text-amber-400' : 'text-emerald-400'}">
                   ${pct.toFixed(1)}%
                 </span>
               </div>
 
-              <div class="flex items-baseline justify-between border-b border-white/5 pb-1">
-                <span class="text-slate-400">Espaço Livre:</span>
+              <div class="flex items-center justify-between border-b border-white/5 py-1">
+                <span class="text-slate-400">Espaço Livre (Ullage):</span>
                 <span class="text-cyan-300 font-semibold tabular-nums">${ullage.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L</span>
               </div>
 
-              <div class="flex items-baseline justify-between">
-                <span class="text-slate-400">Comporta Carreta:</span>
-                <span class="text-purple-300 font-bold tabular-nums flex items-center gap-1.5">
+              <div class="flex items-center justify-between pt-1">
+                <span class="text-slate-400">Descarga Carreta:</span>
+                <span class="text-purple-300 font-semibold tabular-nums flex items-center gap-1.5">
                   <svg class="w-3.5 h-3.5 text-purple-400 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="1" y="4" width="14" height="12" rx="1.5" stroke-width="1.75"/><path d="M15 8h4.5l2.5 3.5V16h-7V8z" stroke-width="1.75" stroke-linejoin="round"/><circle cx="5.5" cy="18.5" r="2.5" stroke-width="1.75"/><circle cx="18.5" cy="18.5" r="2.5" stroke-width="1.75"/></svg>
                   <span>${comp5k}x 5.000 L</span>
                 </span>
@@ -423,31 +427,31 @@ class AuraCockpitController {
 
           <!-- Rodapé do Card: Autonomia & Ação Rápida -->
           <div class="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between">
-            <div class="font-mono text-[11px] leading-tight">
+            <div class="font-sans text-[11px] leading-tight">
               ${isInativo ? `
                 <span class="text-slate-500">Sem consumo registrado</span>
               ` : isCritical ? `
                 <div class="text-rose-400 font-semibold space-y-0.5">
                   <div class="flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5 text-rose-400 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke-width="1.75" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="13" stroke-width="1.75" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
-                    <span>Reserva Crítica (&lt;15%): <strong class="tabular-nums">0.0h</strong></span>
+                    <svg class="w-3.5 h-3.5 text-rose-400 inline flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke-width="1.75" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="13" stroke-width="1.75" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
+                    <span>Reserva Crítica (&lt;15%)</span>
                   </div>
                   <div class="text-slate-400 text-[10px]">Esgotamento: <strong class="text-rose-300 tabular-nums">~${horasAutonomia.toFixed(0)}h</strong> (~${diasAutonomia.toFixed(1)}d)</div>
                 </div>
               ` : `
                 <div class="text-slate-300 space-y-0.5">
-                  <div>Autonomia 15%: <strong class="text-cyan-300 tabular-nums">~${horasCritica.toFixed(0)}h</strong></div>
-                  <div class="text-slate-400 text-[10px]">Esgotamento: <strong class="text-emerald-300 tabular-nums">~${horasAutonomia.toFixed(0)}h</strong> (~${diasAutonomia.toFixed(1)}d)</div>
+                  <div>Autonomia 15%: <strong class="text-cyan-300 tabular-nums font-semibold">~${horasCritica.toFixed(0)}h</strong></div>
+                  <div class="text-slate-400 text-[10px]">Esgotamento: <strong class="text-emerald-300 tabular-nums font-semibold">~${horasAutonomia.toFixed(0)}h</strong> (~${diasAutonomia.toFixed(1)}d)</div>
                 </div>
               `}
             </div>
 
             <button 
               onclick="window.auraApp.askAboutTank('${cod}', '${comb}')"
-              class="px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-cyan-300 hover:text-white border border-cyan-500/30 text-[11px] font-mono flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
-              title="Perguntar à AURA sobre este tanque">
-              <span>Perguntar</span>
-              <svg class="w-3 h-3 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+              class="px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-cyan-300 hover:text-white border border-cyan-500/30 text-xs font-sans font-medium flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+              title="Consultar à AURA sobre este tanque">
+              <span>Consultar</span>
+              <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
             </button>
           </div>
         </div>
@@ -468,12 +472,29 @@ class AuraCockpitController {
       const ocupMedia = capTot > 0 ? (saldoTot / capTot) * 100 : 0;
 
       summaryEl.innerHTML = `
-        <div class="flex flex-wrap items-center gap-3 text-xs font-mono text-slate-300">
-          <div class="px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800">Tanques: <strong class="text-emerald-400 tabular-nums">${totalAtivos}</strong></div>
-          <div class="px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800">Críticos: <strong class="${emRisco > 0 ? 'text-rose-400' : 'text-slate-400'} tabular-nums">${emRisco}</strong></div>
-          <div class="px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800">Saldo Geral: <strong class="text-slate-100 tabular-nums">${saldoTot.toLocaleString('pt-BR')} L</strong></div>
-          <div class="px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800">Ocupação: <strong class="text-cyan-400 tabular-nums">${ocupMedia.toFixed(1)}%</strong></div>
-          <div class="px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800">Ullage: <strong class="text-purple-300 tabular-nums">${ullageTot.toLocaleString('pt-BR')} L</strong></div>
+        <div class="flex flex-wrap items-center gap-2 text-xs font-sans">
+          <div class="px-3 py-1 rounded-full bg-slate-900/70 border border-white/10 text-slate-300 flex items-center gap-1.5 shadow-sm">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span>Tanques Ativos:</span>
+            <strong class="text-emerald-400 tabular-nums font-semibold">${totalAtivos}</strong>
+          </div>
+          <div class="px-3 py-1 rounded-full bg-slate-900/70 border ${emRisco > 0 ? 'border-rose-500/30' : 'border-white/10'} text-slate-300 flex items-center gap-1.5 shadow-sm">
+            <span class="w-1.5 h-1.5 rounded-full ${emRisco > 0 ? 'bg-rose-400 animate-pulse' : 'bg-slate-500'}"></span>
+            <span>Abaixo de 15%:</span>
+            <strong class="${emRisco > 0 ? 'text-rose-400' : 'text-slate-400'} tabular-nums font-semibold">${emRisco}</strong>
+          </div>
+          <div class="px-3 py-1 rounded-full bg-slate-900/70 border border-white/10 text-slate-300 flex items-center gap-1.5 shadow-sm">
+            <span class="text-slate-400">Saldo Total:</span>
+            <strong class="text-slate-100 tabular-nums font-semibold">${saldoTot.toLocaleString('pt-BR')} L</strong>
+          </div>
+          <div class="px-3 py-1 rounded-full bg-slate-900/70 border border-white/10 text-slate-300 flex items-center gap-1.5 shadow-sm">
+            <span class="text-slate-400">Ocupação Média:</span>
+            <strong class="text-cyan-300 tabular-nums font-semibold">${ocupMedia.toFixed(1)}%</strong>
+          </div>
+          <div class="px-3 py-1 rounded-full bg-slate-900/70 border border-white/10 text-slate-300 flex items-center gap-1.5 shadow-sm">
+            <span class="text-slate-400">Ullage Total:</span>
+            <strong class="text-purple-300 tabular-nums font-semibold">${ullageTot.toLocaleString('pt-BR')} L</strong>
+          </div>
         </div>
       `;
     }
@@ -493,7 +514,7 @@ class AuraCockpitController {
         const isInativo = b.status_operacional?.includes('INATIVO');
 
         bicosHtml += `
-          <div class="p-3 rounded-xl glass-subcard border ${isLento ? 'border-amber-500/50 shadow-md shadow-amber-950/25' : isInativo ? 'border-white/5 opacity-70' : 'border-white/10'} flex flex-col justify-between font-mono text-xs transition-all hover:-translate-y-0.5">
+          <div class="p-3 rounded-xl glass-subcard border ${isLento ? 'border-amber-500/50 shadow-md shadow-amber-950/25' : isInativo ? 'border-white/5 opacity-70' : 'border-white/10'} flex flex-col justify-between font-sans text-xs transition-all hover:-translate-y-0.5">
             <div class="flex items-center justify-between">
               <span class="font-bold text-slate-200">Bico ${b.bico}</span>
               <span class="text-[10px] text-slate-400 px-1.5 py-0.5 rounded bg-slate-800/80">Bomba ${b.bomba_fisica}</span>
@@ -516,14 +537,14 @@ class AuraCockpitController {
           </div>
         `;
       });
-      bicosContainer.innerHTML = bicosHtml || '<div class="text-slate-500 text-xs">Sem dados de bicos</div>';
+      bicosContainer.innerHTML = bicosHtml || '<div class="text-slate-500 text-xs font-sans">Sem dados de bicos</div>';
     }
 
     // 2. Ranking de Frentistas
     const frentistasContainer = document.getElementById('cockpit-frentistas-table');
     if (frentistasContainer && pista.ranking_frentistas) {
       let frentHtml = `
-        <table class="w-full text-left font-mono text-xs">
+        <table class="w-full text-left font-sans text-xs">
           <thead>
             <tr class="text-slate-400 border-b border-white/10 text-[11px]">
               <th class="pb-2">#</th>
@@ -541,7 +562,7 @@ class AuraCockpitController {
         const conv = Number(f.conversao_aditivada_pct || 0);
         frentHtml += `
           <tr class="hover:bg-white/[0.03] transition-colors">
-            <td class="py-2.5 text-slate-400">${idx + 1}</td>
+            <td class="py-2.5 text-slate-400 tabular-nums">${idx + 1}</td>
             <td class="py-2.5 font-semibold text-slate-200">
               ${f.nome}
               ${f.destaque_performance ? `<span class="block text-[10px] text-emerald-400 font-normal">${f.destaque_performance}</span>` : ''}
@@ -566,20 +587,20 @@ class AuraCockpitController {
     const anomaliasContainer = document.getElementById('cockpit-anomalias-list');
     if (anomaliasContainer && pista.anomalias_detectadas) {
       if (pista.anomalias_detectadas.length === 0) {
-        anomaliasContainer.innerHTML = '<div class="text-xs text-emerald-400 font-mono py-2">✓ Nenhuma anomalia crítica ou fraude na pista detectada.</div>';
+        anomaliasContainer.innerHTML = '<div class="text-xs text-emerald-400 font-sans py-2">✓ Nenhuma anomalia crítica ou fraude na pista detectada.</div>';
       } else {
         let anomHtml = '';
         pista.anomalias_detectadas.slice(0, 5).forEach(a => {
           anomHtml += `
-            <div class="p-2 rounded bg-slate-900 border border-slate-800 text-xs font-mono space-y-0.5">
+            <div class="p-2.5 rounded-xl glass-subcard border border-slate-800 text-xs font-sans space-y-0.5">
               <div class="flex items-center justify-between text-[11px]">
                 <span class="font-bold ${a.gravidade === 'ALTA' ? 'text-rose-400' : 'text-amber-400'}">
                   [${a.tipo}] Bico ${a.bico}
                 </span>
-                <span class="text-slate-400">${a.data_hora || ''}</span>
+                <span class="text-slate-400 tabular-nums">${a.data_hora || ''}</span>
               </div>
               <div class="text-slate-300 text-[11px]">${a.motivo}</div>
-              <div class="text-slate-400 text-[10px]">Volume: ${a.litros} L | Total: R$ ${Number(a.total_reais || 0).toFixed(2)} | Frentista: ${a.frentista}</div>
+              <div class="text-slate-400 text-[10px]">Volume: <span class="tabular-nums">${a.litros} L</span> | Total: <span class="tabular-nums">R$ ${Number(a.total_reais || 0).toFixed(2)}</span> | Frentista: ${a.frentista}</div>
             </div>
           `;
         });
@@ -660,7 +681,7 @@ class AuraCockpitController {
     const diagText = r.diagnostico_caixa || c.explanation?.text || 'Conferência de turno executada com sucesso.';
 
     el.innerHTML = `
-      <div class="space-y-3 font-mono text-xs">
+      <div class="space-y-3 font-sans text-xs">
         <div class="flex items-center justify-between">
           <span class="text-slate-400">Status da Conciliação:</span>
           <span class="font-bold px-2 py-0.5 rounded text-[11px] ${badgeClass}">
@@ -670,7 +691,7 @@ class AuraCockpitController {
 
         <div class="grid grid-cols-2 gap-2.5 p-3 rounded-xl glass-subcard border border-white/5">
           <div>
-            <div class="text-slate-400 text-[10px]">Faturamento Pista CBC04</div>
+            <div class="text-slate-400 text-[10px]">Faturamento Automação Pista</div>
             <div class="text-sm font-bold text-slate-100 tabular-nums">${autRevText}</div>
           </div>
           <div>
@@ -698,7 +719,7 @@ class AuraCockpitController {
         </div>
 
         <div class="pt-2 border-t border-white/5 flex items-center justify-between font-sans">
-          <span class="text-[10px] text-slate-400 font-mono">ERP Somente Leitura</span>
+          <span class="text-[10px] text-slate-400 font-sans">ERP Somente Leitura</span>
           <button 
             type="button"
             onclick="if (typeof window !== 'undefined') { window.__auraEvidenceStore = window.__auraEvidenceStore || {}; window.__auraEvidenceStore['cockpit_turno'] = window.auraCockpit?.turnoData; if (window.auraChat) window.auraChat.openEvidence('cockpit_turno', 'resumo'); }"
@@ -722,10 +743,10 @@ class AuraCockpitController {
     const isConforme = r.status_geral_anp === 'CONFORME_ANP';
 
     el.innerHTML = `
-      <div class="space-y-3 font-mono text-xs">
+      <div class="space-y-3 font-sans text-xs">
         <div class="flex items-center justify-between">
           <span class="text-slate-400">Conformidade Portaria 26/1992:</span>
-          <span class="font-bold px-2 py-0.5 rounded text-[11px] inline-flex items-center gap-1.5 ${isConforme ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'}">
+          <span class="font-bold px-2.5 py-0.5 rounded text-[11px] inline-flex items-center gap-1.5 ${isConforme ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'}">
             ${isConforme ? '<svg class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> CONFORME ANP (±0.6%)' : '<svg class="w-3.5 h-3.5 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke-width="1.75"/><line x1="12" y1="9" x2="12" y2="13" stroke-width="1.75"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg> ALERTA VOLUMÉTRICO'}
           </span>
         </div>
@@ -744,7 +765,7 @@ class AuraCockpitController {
         </div>
 
         <div class="text-[11px] text-slate-400">
-          Estoque Físico Total: <strong class="text-slate-200 tabular-nums">${(r.total_estoque_fisico_litros || 0).toLocaleString('pt-BR')} L</strong>
+          Estoque Físico Total: <strong class="text-slate-200 tabular-nums font-semibold">${(r.total_estoque_fisico_litros || 0).toLocaleString('pt-BR')} L</strong>
         </div>
       </div>
     `;
@@ -766,7 +787,7 @@ class AuraCockpitController {
       const incPct = Number(c.impacto_financeiro?.incremento_ticket_pct || 0);
 
       html += `
-        <div class="p-3.5 rounded-xl glass-subcard border border-purple-500/30 flex flex-col justify-between font-mono text-xs hover:-translate-y-0.5 transition-all">
+        <div class="p-3.5 rounded-xl glass-subcard border border-purple-500/30 flex flex-col justify-between font-sans text-xs hover:-translate-y-0.5 transition-all">
           <div>
             <div class="flex items-center justify-between text-[11px] mb-1.5 pb-1 border-b border-white/5">
               <span class="text-purple-300 font-bold tabular-nums">LIFT: ${lift.toFixed(1)}x</span>
@@ -984,33 +1005,50 @@ class AuraCockpitController {
       const comb = (t.combustivel || 'COMBUSTÍVEL').toUpperCase();
       const pct = Math.min(100, Math.max(0, Number(t.ocupacao_pct || 0)));
       const isCritical = t.alerta_critico || pct < 15;
+      const saldo = Number(t.saldo_atual_litros || 0);
       const ullage = Number(t.espaco_livre_ullage_litros || 0);
       const comp5k = t.compartimentos_5k || 0;
       const horasAutonomia = Number(t.autonomia_runout_horas || 0);
-      const horasCritica = Number(t.autonomia_critica_horas ?? 0);
 
       let statusColor = 'text-emerald-400';
+      let barColor = 'bg-emerald-400';
       let statusText = `Normal (~${horasAutonomia.toFixed(0)}h)`;
       let borderAccent = 'hover:border-emerald-500/50';
 
       if (isCritical) {
         statusColor = 'text-rose-400';
-        statusText = `Crítico <15% (Esgota ~${horasAutonomia.toFixed(0)}h)`;
+        barColor = 'bg-rose-400';
+        statusText = `Crítico <15% (~${horasAutonomia.toFixed(0)}h)`;
         borderAccent = 'border-rose-500/40 hover:border-rose-400 shadow-md shadow-rose-950/20';
       } else if (pct < 35) {
         statusColor = 'text-amber-400';
+        barColor = 'bg-amber-400';
         statusText = `Atenção (~${horasAutonomia.toFixed(0)}h)`;
         borderAccent = 'border-amber-500/30 hover:border-amber-400 shadow-md shadow-amber-950/20';
       }
 
       html += `
-        <button onclick="window.auraApp.askAboutTank('${cod}', '${comb}')" class="p-3 rounded-xl glass-subcard border ${borderAccent} text-left font-mono text-xs transition-all hover:-translate-y-0.5 group">
-          <div class="flex items-center justify-between">
-            <span class="font-bold text-slate-200 group-hover:text-white">TQ-${cod} ${comb}</span>
-            <span class="text-[10px] font-bold ${statusColor} tabular-nums">${pct.toFixed(0)}%</span>
+        <button onclick="window.auraApp.askAboutTank('${cod}', '${comb}')" class="p-3.5 rounded-xl glass-subcard border ${borderAccent} text-left font-sans text-xs transition-all duration-200 hover:-translate-y-0.5 group">
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-slate-200">TQ-${cod}</span>
+              <span class="font-medium text-slate-200 group-hover:text-white">${comb}</span>
+            </div>
+            <span class="text-xs font-bold ${statusColor} tabular-nums">${pct.toFixed(0)}%</span>
           </div>
-          <div class="${statusColor} font-semibold mt-1 tabular-nums">${statusText}</div>
-          <div class="text-slate-400 text-[10px] mt-0.5">Ullage: <strong class="text-cyan-300 tabular-nums">${ullage.toLocaleString('pt-BR')} L</strong> (${comp5k}x 5k)</div>
+
+          <div class="w-full h-1.5 rounded-full bg-slate-800/80 overflow-hidden my-2 border border-white/5">
+            <div class="h-full rounded-full ${barColor} transition-all duration-500" style="width: ${pct}%"></div>
+          </div>
+
+          <div class="flex items-center justify-between text-[11px] mt-1">
+            <span class="${statusColor} font-medium tabular-nums">${statusText}</span>
+            <span class="text-slate-400 tabular-nums">${saldo.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L</span>
+          </div>
+          <div class="text-slate-400 text-[10px] mt-1 flex items-center justify-between">
+            <span>Ullage: <strong class="text-cyan-300 tabular-nums">${ullage.toLocaleString('pt-BR')} L</strong></span>
+            <span class="text-purple-300 tabular-nums font-medium">${comp5k}x 5k</span>
+          </div>
         </button>
       `;
     });
