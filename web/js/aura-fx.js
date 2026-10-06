@@ -249,6 +249,11 @@
 
     init() {
       this.reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (window.matchMedia) {
+        window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
+          this.reducedMotion = e.matches;
+        });
+      }
       this.createCanvas();
       this.bindEvents();
       this.start();
@@ -309,6 +314,15 @@
 
     loop() {
       if (!this.isRunning) return;
+
+      const isGpuGuard = typeof document !== 'undefined' && document.documentElement.classList.contains('gpu-guard-active');
+      if (isGpuGuard || this.reducedMotion) {
+        if (this.ctx) this.ctx.clearRect(0, 0, this.width, this.height);
+        setTimeout(() => {
+          if (this.isRunning) requestAnimationFrame(() => this.loop());
+        }, 300);
+        return;
+      }
 
       this.updatePhysics();
       this.render();

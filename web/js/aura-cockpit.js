@@ -63,6 +63,60 @@ class AuraCockpitController {
           <span>Consultas 100% sob demanda</span>
         </div>`;
     }
+
+    // 3. Bicos da Pista
+    const bicosContainer = document.getElementById('cockpit-bicos-grid');
+    if (bicosContainer && !this.pistaData) {
+      bicosContainer.innerHTML = `
+        <div class="col-span-full py-6 text-center text-slate-400 font-sans text-xs glass-subcard p-4 rounded-xl border border-white/5">
+          <span>Telemetria de bicos CBC04 sob demanda.</span>
+          <button onclick="window.auraCockpit.refreshAllData()" class="mt-2 block mx-auto px-3 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded border border-slate-700 text-xs transition-colors">
+            Consultar Bicos ↺
+          </button>
+        </div>`;
+    }
+
+    // 4. Performance de Frentistas
+    const frentistasContainer = document.getElementById('cockpit-frentistas-table');
+    if (frentistasContainer && !this.pistaData) {
+      frentistasContainer.innerHTML = `
+        <div class="py-6 text-center text-slate-400 font-sans text-xs glass-subcard p-4 rounded-xl border border-white/5">
+          Aguardando consulta de produtividade da pista.
+        </div>`;
+    }
+
+    // 5. Conciliação de Turno
+    const turnoContainer = document.getElementById('cockpit-turno-content');
+    if (turnoContainer && !this.turnoData) {
+      turnoContainer.innerHTML = `
+        <div class="py-6 text-center text-slate-400 font-sans text-xs glass-subcard p-4 rounded-xl border border-white/5">
+          <span>Conciliação contábil e física disponível sob demanda.</span>
+          <button onclick="window.auraCockpit.refreshAllData()" class="mt-2 block mx-auto px-3 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded border border-slate-700 text-xs transition-colors">
+            Auditar Turno Agora ↺
+          </button>
+        </div>`;
+    }
+
+    // 6. Livro LMC Oficial ANP
+    const lmcContainer = document.getElementById('cockpit-lmc-content');
+    if (lmcContainer && !this.lmcData) {
+      lmcContainer.innerHTML = `
+        <div class="py-6 text-center text-slate-400 font-sans text-xs glass-subcard p-4 rounded-xl border border-white/5">
+          <span>Livro de Movimentação de Combustíveis (Portaria 26 ANP).</span>
+          <button onclick="window.auraCockpit.refreshAllData()" class="mt-2 block mx-auto px-3 py-1 bg-slate-800 hover:bg-slate-700 text-purple-300 rounded border border-slate-700 text-xs transition-colors">
+            Verificar Conformidade ANP ↺
+          </button>
+        </div>`;
+    }
+
+    // 7. Combos da Loja
+    const combosContainer = document.getElementById('cockpit-combos-container');
+    if (combosContainer && !this.combosData) {
+      combosContainer.innerHTML = `
+        <div class="col-span-full py-6 text-center text-slate-400 font-sans text-xs glass-subcard p-4 rounded-xl border border-white/5">
+          Regras de associação e Market Basket Analysis sob demanda.
+        </div>`;
+    }
   }
 
   /**
@@ -72,6 +126,7 @@ class AuraCockpitController {
     if (this.isLoading) return;
     this.isLoading = true;
     this.setRefreshSpinner(true);
+    this.renderLoadingSkeletons();
 
     try {
       // 1. Identificação da Estação
@@ -714,6 +769,175 @@ class AuraCockpitController {
     });
 
     el.innerHTML = html;
+  }
+
+  /**
+   * Renderiza skeleton loaders translúcidos em vidro líquido (shimmer wave)
+   * para tanques volumétricos, bicos, frentistas e cartões durante o carregamento.
+   */
+  renderLoadingSkeletons() {
+    // 1. Tanques Volumétricos (Cockpit)
+    const tanksContainer = document.getElementById('cockpit-tanks-grid');
+    if (tanksContainer) {
+      let html = '';
+      for (let i = 0; i < 4; i++) {
+        html += `
+          <div class="skeleton-glass p-4 rounded-2xl flex flex-col justify-between min-h-[190px] border border-white/10 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="skeleton-shimmer h-4 w-20"></div>
+              <div class="skeleton-shimmer h-4 w-14 rounded-full"></div>
+            </div>
+            <div class="space-y-2 my-1">
+              <div class="skeleton-shimmer h-5 w-36"></div>
+              <div class="skeleton-shimmer h-12 w-full rounded-xl"></div>
+              <div class="flex justify-between items-center pt-1">
+                <div class="skeleton-shimmer h-3 w-24"></div>
+                <div class="skeleton-shimmer h-4 w-16"></div>
+              </div>
+            </div>
+            <div class="pt-2 border-t border-white/5 flex justify-between items-center">
+              <div class="skeleton-shimmer h-3 w-28"></div>
+              <div class="skeleton-shimmer h-3 w-16"></div>
+            </div>
+          </div>
+        `;
+      }
+      tanksContainer.innerHTML = html;
+    }
+
+    // 2. Tanques Compactos (Split View)
+    const splitTanksContainer = document.getElementById('split-tanks-grid');
+    if (splitTanksContainer) {
+      let splitHtml = '';
+      for (let i = 0; i < 4; i++) {
+        splitHtml += `
+          <div class="skeleton-glass p-3 rounded-xl border border-white/10 space-y-2">
+            <div class="flex justify-between items-center">
+              <div class="skeleton-shimmer h-3.5 w-24"></div>
+              <div class="skeleton-shimmer h-3.5 w-10"></div>
+            </div>
+            <div class="skeleton-shimmer h-3 w-32"></div>
+            <div class="skeleton-shimmer h-2.5 w-20"></div>
+          </div>
+        `;
+      }
+      splitTanksContainer.innerHTML = splitHtml;
+    }
+
+    // 3. Bicos da Pista
+    const bicosContainer = document.getElementById('cockpit-bicos-grid');
+    if (bicosContainer) {
+      let bicosHtml = '';
+      for (let i = 0; i < 6; i++) {
+        bicosHtml += `
+          <div class="skeleton-glass p-2.5 rounded-xl border border-white/5 space-y-1.5">
+            <div class="flex justify-between items-center">
+              <div class="skeleton-shimmer h-3 w-12"></div>
+              <div class="skeleton-shimmer h-3 w-10 rounded"></div>
+            </div>
+            <div class="skeleton-shimmer h-4 w-20"></div>
+            <div class="skeleton-shimmer h-2 w-full rounded-full"></div>
+          </div>
+        `;
+      }
+      bicosContainer.innerHTML = bicosHtml;
+    }
+
+    // 4. Performance de Frentistas
+    const frentistasContainer = document.getElementById('cockpit-frentistas-table');
+    if (frentistasContainer) {
+      let frentistasHtml = '';
+      for (let i = 0; i < 3; i++) {
+        frentistasHtml += `
+          <div class="skeleton-glass p-2.5 rounded-xl border border-white/5 mb-2 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <div class="skeleton-shimmer w-7 h-7 rounded-full"></div>
+              <div class="space-y-1">
+                <div class="skeleton-shimmer h-3.5 w-24"></div>
+                <div class="skeleton-shimmer h-2.5 w-16"></div>
+              </div>
+            </div>
+            <div class="skeleton-shimmer h-4 w-16"></div>
+          </div>
+        `;
+      }
+      frentistasContainer.innerHTML = frentistasHtml;
+    }
+
+    // 5. Auditoria & Anomalias
+    const anomaliasContainer = document.getElementById('cockpit-anomalias-list');
+    if (anomaliasContainer) {
+      let anomaliasHtml = '';
+      for (let i = 0; i < 2; i++) {
+        anomaliasHtml += `
+          <div class="skeleton-glass p-3 rounded-xl border border-white/5 space-y-2">
+            <div class="skeleton-shimmer h-3 w-28"></div>
+            <div class="skeleton-shimmer h-4 w-full"></div>
+          </div>
+        `;
+      }
+      anomaliasContainer.innerHTML = anomaliasHtml;
+    }
+
+    // 6. Conciliação de Turno
+    const turnoContainer = document.getElementById('cockpit-turno-content');
+    if (turnoContainer) {
+      turnoContainer.innerHTML = `
+        <div class="skeleton-glass p-4 rounded-xl border border-cyan-500/20 space-y-3">
+          <div class="flex justify-between">
+            <div class="skeleton-shimmer h-4 w-32"></div>
+            <div class="skeleton-shimmer h-4 w-16 rounded-full"></div>
+          </div>
+          <div class="grid grid-cols-2 gap-3 py-1">
+            <div class="skeleton-shimmer h-12 w-full rounded-lg"></div>
+            <div class="skeleton-shimmer h-12 w-full rounded-lg"></div>
+          </div>
+          <div class="skeleton-shimmer h-3 w-48"></div>
+        </div>
+      `;
+    }
+
+    // 7. Livro LMC Oficial ANP
+    const lmcContainer = document.getElementById('cockpit-lmc-content');
+    if (lmcContainer) {
+      lmcContainer.innerHTML = `
+        <div class="skeleton-glass p-4 rounded-xl border border-emerald-500/20 space-y-3">
+          <div class="flex justify-between">
+            <div class="skeleton-shimmer h-4 w-36"></div>
+            <div class="skeleton-shimmer h-4 w-20 rounded-full"></div>
+          </div>
+          <div class="skeleton-shimmer h-8 w-full rounded-lg"></div>
+          <div class="skeleton-shimmer h-3 w-40"></div>
+        </div>
+      `;
+    }
+
+    // 8. Combos da Loja
+    const combosContainer = document.getElementById('cockpit-combos-container');
+    if (combosContainer) {
+      let combosHtml = '';
+      for (let i = 0; i < 3; i++) {
+        combosHtml += `
+          <div class="skeleton-glass p-3.5 rounded-xl border border-purple-500/20 space-y-2">
+            <div class="flex justify-between">
+              <div class="skeleton-shimmer h-4 w-28"></div>
+              <div class="skeleton-shimmer h-4 w-12 rounded"></div>
+            </div>
+            <div class="skeleton-shimmer h-3 w-36"></div>
+            <div class="skeleton-shimmer h-3 w-24"></div>
+          </div>
+        `;
+      }
+      combosContainer.innerHTML = combosHtml;
+    }
+
+    // 9. Summary Pill
+    const summaryEl = document.getElementById('cockpit-runout-summary');
+    if (summaryEl) {
+      summaryEl.innerHTML = `
+        <div class="skeleton-shimmer h-6 w-28 rounded-full"></div>
+      `;
+    }
   }
 
   setRefreshSpinner(isSpinning) {

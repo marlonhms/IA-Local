@@ -358,7 +358,13 @@ class AuraChatController {
 
     // 2. Prepara contêiner para a resposta da AURA
     const messageContainerId = 'aura-msg-' + Date.now();
+    this.currentMessageContainerId = messageContainerId;
     this.createAuraMessageBubble(messageContainerId);
+
+    // Ativa pulso do Cognitive Reasoning Orb no header e define primeira etapa cognitiva
+    const headerOrb = typeof document !== 'undefined' ? (document.getElementById('header-neural-core-orb') || document.querySelector('header .neural-core-orb')) : null;
+    if (headerOrb) headerOrb.classList.add('reasoning-active');
+    this.updateCognitiveStep(messageContainerId, 'Consultando telemetria CBC04...', 'cyan');
 
     // Força rolagem para o início da nova resposta
     this.scrollToBottom(true);
@@ -382,6 +388,21 @@ class AuraChatController {
           if (type === 'intent') {
             currentIntent = chunk.data || { intent: chunk.intent };
             this.updateIntentChip(messageContainerId, currentIntent);
+
+            const intentKey = (currentIntent.intent || currentIntent.name || '').toLowerCase();
+            if (intentKey.includes('turno') || intentKey.includes('fechamento')) {
+              this.updateCognitiveStep(messageContainerId, 'Confrontando caixas PDV & encerrantes...', 'cyan');
+            } else if (intentKey.includes('tanque') || intentKey.includes('run_out') || intentKey.includes('previsao')) {
+              this.updateCognitiveStep(messageContainerId, 'Consultando volumetria & autonomia dos tanques...', 'cyan');
+            } else if (intentKey.includes('lmc')) {
+              this.updateCognitiveStep(messageContainerId, 'Auditando conformidade fiscal Portaria ANP 26...', 'cyan');
+            } else if (intentKey.includes('pista') || intentKey.includes('frentista') || intentKey.includes('pump')) {
+              this.updateCognitiveStep(messageContainerId, 'Auditando vazão de bicos CBC04 & frentistas...', 'cyan');
+            } else if (intentKey.includes('cesta') || intentKey.includes('conveniencia') || intentKey.includes('combo')) {
+              this.updateCognitiveStep(messageContainerId, 'Processando regras de associação da loja...', 'cyan');
+            } else {
+              this.updateCognitiveStep(messageContainerId, 'Processando raciocínio cognitivo...', 'cyan');
+            }
           } 
           else if (type === 'tool_start') {
             const toolName = chunk.data?.tool_name || chunk.data?.intent || chunk.tool_name || chunk.intent || 'ferramenta';
@@ -391,9 +412,13 @@ class AuraChatController {
             const toolName = chunk.data?.tool_name || chunk.data?.intent || chunk.tool_name || chunk.intent || 'ferramenta';
             currentToolResult = chunk.data?.result || chunk.data || {};
             this.updateToolResultCard(messageContainerId, toolName, currentToolResult);
+            this.updateCognitiveStep(messageContainerId, 'Confrontando dados e regras de negócio...', 'purple');
           } 
           else if (type === 'delta') {
             const token = chunk.text || chunk.data?.text || '';
+            if (!fullResponseText && token.trim()) {
+              this.updateCognitiveStep(messageContainerId, 'Gerando diagnóstico executivo...', 'purple');
+            }
             fullResponseText += token;
             this.updateAuraText(messageContainerId, fullResponseText, true);
           } 
@@ -403,33 +428,66 @@ class AuraChatController {
           }
           else if (type === 'error') {
             const errorMsg = chunk.data?.error || chunk.text || 'Erro no processamento da solicitação';
+            this.hideToolCardSkeleton(messageContainerId);
             this.renderStreamError(messageContainerId, errorMsg);
+            this.finalizeCognitiveStep(messageContainerId, false);
             this.setStreamingState(false);
           }
           else if (type === 'done') {
             this.updateAuraText(messageContainerId, fullResponseText, false);
+            this.finalizeCognitiveStep(messageContainerId, true);
             this.setStreamingState(false);
           }
         },
         onDone: () => {
           this.updateAuraText(messageContainerId, fullResponseText, false);
+          this.finalizeCognitiveStep(messageContainerId, true);
           this.setStreamingState(false);
           this.scrollToBottom(false);
         },
         onError: (err) => {
-          console.error('[AuraChat] Erro no stream:', err);
-          this.renderStreamError(messageContainerId, err.message);
+          if (err && (err.name === 'AbortError' || String(err.message || '').toLowerCase().includes('abort'))) {
+            this.finalizeCognitiveStep(messageContainerId, false);
+            this.hideToolCardSkeleton(messageContainerId);
+          } else {
+            console.error('[AuraChat] Erro no stream:', err);
+            this.hideToolCardSkeleton(messageContainerId);
+            this.renderStreamError(messageContainerId, err.message);
+            this.finalizeCognitiveStep(messageContainerId, false);
+          }
           this.setStreamingState(false);
         },
       });
     } catch (err) {
-      console.error('[AuraChat] Erro fatal no chat:', err);
-      this.renderStreamError(messageContainerId, err.message);
+      if (err && (err.name === 'AbortError' || String(err.message || '').toLowerCase().includes('abort'))) {
+        this.finalizeCognitiveStep(messageContainerId, false);
+        this.hideToolCardSkeleton(messageContainerId);
+      } else {
+        console.error('[AuraChat] Erro fatal no chat:', err);
+        this.hideToolCardSkeleton(messageContainerId);
+        this.renderStreamError(messageContainerId, err.message);
+        this.finalizeCognitiveStep(messageContainerId, false);
+      }
       this.setStreamingState(false);
     }
   }
 
+  hideToolCardSkeleton(containerId) {
+    const cardIds = [containerId + '-tool-card', containerId + '-split-tool-card'];
+    cardIds.forEach(id => {
+      const cardEl = typeof document !== 'undefined' ? document.getElementById(id) : null;
+      if (cardEl && cardEl.querySelector('.skeleton-glass')) {
+        cardEl.innerHTML = '';
+        cardEl.classList.add('hidden');
+      }
+    });
+  }
+
   abortStreaming() {
+    if (this.currentMessageContainerId) {
+      this.finalizeCognitiveStep(this.currentMessageContainerId, false);
+      this.hideToolCardSkeleton(this.currentMessageContainerId);
+    }
     if (this.abortController) {
       this.abortController.abort();
       this.abortController = null;
@@ -490,6 +548,15 @@ class AuraChatController {
     if (splitInput) {
       splitInput.disabled = isStreaming;
     }
+
+    // Gerencia estado visual do Cognitive Reasoning Orb no header e nas bolhas
+    if (!isStreaming && typeof document !== 'undefined') {
+      const headerOrb = document.getElementById('header-neural-core-orb') || document.querySelector('header .neural-core-orb');
+      if (headerOrb) headerOrb.classList.remove('reasoning-active');
+      document.querySelectorAll('.chat-bubble-aura .neural-core-orb.reasoning-active').forEach(orb => {
+        orb.classList.remove('reasoning-active');
+      });
+    }
   }
 
   appendUserMessage(text) {
@@ -534,14 +601,18 @@ class AuraChatController {
           <!-- Header da Resposta com Núcleo e Tags -->
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
             <div class="flex items-center gap-2">
-              <div class="w-6 h-6 rounded-full bg-gradient-to-tr from-emerald-500 via-cyan-500 to-purple-600 flex items-center justify-center text-[10px] font-bold text-white shadow-sm ring-1 ring-white/20">
-                A
+              <div id="${containerId + suffix}-orb" class="neural-core-orb !w-6 !h-6 reasoning-active text-[10px] font-bold text-white flex items-center justify-center">
+                <span class="relative z-10">A</span>
               </div>
               <span class="font-bold font-sans text-xs text-white">AURA</span>
               <span class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20">AI</span>
             </div>
 
             <div id="${containerId + suffix}-meta" class="flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
+              <span id="${containerId + suffix}-cognitive-chip" class="chip-cognitive-step px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5 transition-all">
+                <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+                <span class="cognitive-step-label">Consultando telemetria CBC04...</span>
+              </span>
               <span id="${containerId + suffix}-intent-chip" class="hidden chip-intent"></span>
               <span id="${containerId + suffix}-tool-chip" class="hidden chip-tool-status"></span>
             </div>
@@ -580,8 +651,8 @@ class AuraChatController {
         <div class="chat-bubble-aura w-full max-w-full p-4.5 text-slate-100 text-sm space-y-3">
           <div class="flex items-center justify-between border-b border-white/10 pb-2">
             <div class="flex items-center gap-2">
-              <div class="w-6 h-6 rounded-full bg-gradient-to-tr from-emerald-500 via-cyan-500 to-purple-600 flex items-center justify-center text-[10px] font-bold text-white shadow-sm ring-1 ring-white/20">
-                A
+              <div class="neural-core-orb !w-6 !h-6 text-[10px] font-bold text-white flex items-center justify-center shadow-sm">
+                <span class="relative z-10">A</span>
               </div>
               <span class="font-bold font-sans text-xs text-white">AURA</span>
               <span class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20">AI</span>
@@ -632,14 +703,131 @@ class AuraChatController {
     return map[toolName] || toolName;
   }
 
+  /**
+   * Renderiza um card de skeleton dinâmico simulando a estrutura do futuro DecisionCard
+   * com brilho de vidro translúcido suave (.skeleton-glass) enquanto a IA calcula os dados.
+   */
+  renderDecisionCardSkeleton(toolName) {
+    const displayName = this.formatToolDisplayName(toolName);
+    return `
+      <div class="decision-card skeleton-glass p-4 sm:p-5 space-y-4 rounded-2xl border border-white/10 backdrop-blur-xl animate-fade-in my-2">
+        <!-- Topo do Card de Decisão: Título & Badge de Status -->
+        <div class="flex items-center justify-between border-b border-white/10 pb-3">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl skeleton-shimmer flex items-center justify-center text-cyan-400">
+              <span class="animate-pulse text-sm">⚡</span>
+            </div>
+            <div>
+              <div class="skeleton-shimmer h-4 w-40 mb-1.5"></div>
+              <div class="text-[11px] text-cyan-400/80 font-mono flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                <span>Calculando ${this.escapeHtml(displayName)}...</span>
+              </div>
+            </div>
+          </div>
+          <div class="skeleton-shimmer h-6 w-24 rounded-full"></div>
+        </div>
+
+        <!-- Hero Metric em Destaque -->
+        <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between">
+          <div class="space-y-1.5">
+            <div class="skeleton-shimmer h-3 w-28"></div>
+            <div class="skeleton-shimmer h-7 w-36"></div>
+          </div>
+          <div class="skeleton-shimmer h-8 w-20 rounded-lg"></div>
+        </div>
+
+        <!-- Grade de Métricas Simulada -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          <div class="p-2.5 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
+            <div class="skeleton-shimmer h-3 w-16"></div>
+            <div class="skeleton-shimmer h-4 w-24"></div>
+          </div>
+          <div class="p-2.5 rounded-lg bg-white/[0.02] border border-white/5 space-y-1">
+            <div class="skeleton-shimmer h-3 w-20"></div>
+            <div class="skeleton-shimmer h-4 w-20"></div>
+          </div>
+          <div class="p-2.5 rounded-lg bg-white/[0.02] border border-white/5 space-y-1 col-span-2 sm:col-span-1">
+            <div class="skeleton-shimmer h-3 w-14"></div>
+            <div class="skeleton-shimmer h-4 w-28"></div>
+          </div>
+        </div>
+
+        <!-- Rodapé do Card: Ações e Evidências -->
+        <div class="flex items-center justify-between pt-2 border-t border-white/5">
+          <div class="skeleton-shimmer h-7 w-28 rounded-lg"></div>
+          <div class="skeleton-shimmer h-7 w-32 rounded-lg"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  updateCognitiveStep(containerId, stepLabel, mode = 'cyan') {
+    const ids = [containerId + '-cognitive-chip', containerId + '-split-cognitive-chip'];
+    ids.forEach(id => {
+      const chip = typeof document !== 'undefined' ? document.getElementById(id) : null;
+      if (chip) {
+        const colorClass = mode === 'purple' 
+          ? 'bg-purple-500/10 text-purple-300 border-purple-500/30'
+          : mode === 'emerald'
+          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+          : 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30';
+        const pingClass = mode === 'purple' ? 'bg-purple-400' : mode === 'emerald' ? 'bg-emerald-400' : 'bg-cyan-400';
+
+        chip.className = `chip-cognitive-step px-2 py-0.5 rounded-full ${colorClass} border flex items-center gap-1.5 transition-all`;
+        chip.innerHTML = `
+          <span class="w-1.5 h-1.5 rounded-full ${pingClass} ${mode === 'emerald' ? '' : 'animate-ping'}"></span>
+          <span class="cognitive-step-label">${this.escapeHtml(stepLabel)}</span>
+        `;
+        chip.classList.remove('hidden');
+      }
+    });
+  }
+
+  finalizeCognitiveStep(containerId, success = true) {
+    const ids = [containerId + '-cognitive-chip', containerId + '-split-cognitive-chip'];
+    ids.forEach(id => {
+      const chip = typeof document !== 'undefined' ? document.getElementById(id) : null;
+      if (chip) {
+        if (success) {
+          chip.className = 'chip-cognitive-step px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5 transition-all';
+          chip.innerHTML = `
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span class="cognitive-step-label">Diagnóstico executivo concluído</span>
+          `;
+        } else {
+          chip.className = 'chip-cognitive-step px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1.5 transition-all';
+          chip.innerHTML = `
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+            <span class="cognitive-step-label">Processamento interrompido</span>
+          `;
+        }
+      }
+    });
+  }
+
   updateToolStartStatus(containerId, toolName) {
     const ids = [containerId + '-tool-chip', containerId + '-split-tool-chip'];
+    const cardIds = [containerId + '-tool-card', containerId + '-split-tool-card'];
     const displayName = this.formatToolDisplayName(toolName);
+
     ids.forEach(id => {
-      const chip = document.getElementById(id);
+      const chip = typeof document !== 'undefined' ? document.getElementById(id) : null;
       if (chip) {
         chip.innerHTML = `⚡ Consultando ${this.escapeHtml(displayName)}...`;
         chip.classList.remove('hidden');
+      }
+    });
+
+    this.updateCognitiveStep(containerId, `Consultando telemetria de ${displayName}...`, 'cyan');
+
+    // Renderiza card de skeleton dinâmico simulando a estrutura do DecisionCard
+    const skeletonHtml = this.renderDecisionCardSkeleton(toolName);
+    cardIds.forEach(id => {
+      const cardEl = typeof document !== 'undefined' ? document.getElementById(id) : null;
+      if (cardEl) {
+        cardEl.innerHTML = skeletonHtml;
+        cardEl.classList.remove('hidden');
       }
     });
   }
@@ -668,6 +856,14 @@ class AuraChatController {
         }
       });
       this.scrollToBottom();
+    } else {
+      cardIds.forEach(id => {
+        const cardEl = document.getElementById(id);
+        if (cardEl) {
+          cardEl.innerHTML = '';
+          cardEl.classList.add('hidden');
+        }
+      });
     }
   }
 
@@ -3562,6 +3758,7 @@ class AuraChatController {
   }
 
   renderStreamError(containerId, errorMsg) {
+    this.hideToolCardSkeleton(containerId);
     const textIds = [containerId + '-text', containerId + '-split-text'];
     const html = `
       <div class="p-3 rounded bg-rose-950/20 border border-rose-500/40 text-rose-300 text-xs font-mono">

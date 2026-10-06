@@ -102,6 +102,7 @@ class AuraApp {
   init() {
     this.bindNavigationTabs();
     this.bindSidebarEvents();
+    this.initGpuGuard();
     this.startClock();
 
     // Inicializa subsistemas
@@ -373,9 +374,86 @@ class AuraApp {
   }
 
   /**
-   * Alterna a visualização ativa
+   * Inicializa o Modo Alta Performance (GPU Guard) a partir das preferências do usuário
+   */
+  initGpuGuard() {
+    let saved = false;
+    try {
+      saved = localStorage.getItem('aura_gpu_guard') === 'true';
+    } catch (_) {}
+    this.applyGpuGuard(saved);
+
+    const btnGpu = document.getElementById('sidebar-btn-toggle-gpu-guard');
+    if (btnGpu) {
+      btnGpu.addEventListener('click', () => {
+        const nextState = !this.isGpuGuardActive();
+        this.applyGpuGuard(nextState);
+        try {
+          localStorage.setItem('aura_gpu_guard', nextState ? 'true' : 'false');
+        } catch (_) {}
+        if (window.auraAudio) window.auraAudio.playChime(nextState ? 750 : 500, 0.05);
+      });
+    }
+  }
+
+  isGpuGuardActive() {
+    return document.documentElement.classList.contains('gpu-guard-active');
+  }
+
+  applyGpuGuard(enabled) {
+    const root = document.documentElement;
+    const body = document.body;
+    if (enabled) {
+      root.classList.add('gpu-guard-active');
+      if (body) body.classList.add('gpu-guard-active');
+    } else {
+      root.classList.remove('gpu-guard-active');
+      if (body) body.classList.remove('gpu-guard-active');
+    }
+
+    const badge = document.getElementById('sidebar-gpu-badge');
+    const icon = document.getElementById('sidebar-gpu-icon');
+    const btnGpu = document.getElementById('sidebar-btn-toggle-gpu-guard');
+    if (btnGpu) {
+      btnGpu.setAttribute('aria-checked', enabled ? 'true' : 'false');
+    }
+    if (badge) {
+      badge.textContent = enabled ? 'Ativo (60 FPS)' : 'Desativado';
+      badge.className = enabled
+        ? 'px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+        : 'px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400';
+    }
+    if (icon) {
+      icon.className = enabled ? 'w-4 h-4 text-emerald-400' : 'w-4 h-4 text-slate-400';
+    }
+  }
+
+  /**
+   * Alterna a visualização ativa com transição fluida e cinematográfica
    */
   switchTab(tabName) {
+    const views = {
+      cockpit: document.getElementById('view-cockpit'),
+      triggers: document.getElementById('view-triggers'),
+      console: document.getElementById('view-console'),
+      split: document.getElementById('view-split')
+    };
+
+    // Previne repetição abrupta da animação se a aba atual já estiver visível
+    if (this.currentTab === tabName) {
+      const currentEl = views[tabName];
+      if (currentEl && !currentEl.classList.contains('hidden')) {
+        if (tabName === 'console') {
+          const input = document.getElementById('chat-input-text');
+          if (input) input.focus({ preventScroll: true });
+        } else if (tabName === 'split') {
+          const splitInput = document.getElementById('split-chat-input-text');
+          if (splitInput) splitInput.focus({ preventScroll: true });
+        }
+        return;
+      }
+    }
+
     this.currentTab = tabName;
 
     document.querySelectorAll('.nav-tab-btn').forEach(btn => {
@@ -387,25 +465,25 @@ class AuraApp {
       }
     });
 
-    const viewCockpit = document.getElementById('view-cockpit');
-    const viewTriggers = document.getElementById('view-triggers');
-    const viewConsole = document.getElementById('view-console');
-    const viewSplit = document.getElementById('view-split');
-
-    [viewCockpit, viewTriggers, viewConsole, viewSplit].forEach(v => {
-      if (v) v.classList.add('hidden');
+    Object.values(views).forEach(v => {
+      if (v) {
+        v.classList.add('hidden');
+        v.classList.remove('view-transition-active');
+      }
     });
 
-    if (tabName === 'cockpit') {
-      if (viewCockpit) viewCockpit.classList.remove('hidden');
-    } else if (tabName === 'triggers') {
-      if (viewTriggers) viewTriggers.classList.remove('hidden');
-    } else if (tabName === 'console') {
-      if (viewConsole) viewConsole.classList.remove('hidden');
+    const targetView = views[tabName];
+    if (targetView) {
+      targetView.classList.remove('hidden');
+      // Força reflow para disparar transição cinematográfica (200ms cubic-bezier)
+      void targetView.offsetWidth;
+      targetView.classList.add('view-transition-active');
+    }
+
+    if (tabName === 'console') {
       const input = document.getElementById('chat-input-text');
       if (input) input.focus({ preventScroll: true });
     } else if (tabName === 'split') {
-      if (viewSplit) viewSplit.classList.remove('hidden');
       const splitInput = document.getElementById('split-chat-input-text');
       if (splitInput) splitInput.focus({ preventScroll: true });
       // Assegura tanques renderizados
