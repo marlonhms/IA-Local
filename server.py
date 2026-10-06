@@ -39,11 +39,15 @@ def main():
     port = int(os.getenv("AURA_PORT", "8000"))
     auto_open = os.getenv("AURA_AUTO_OPEN", "1").lower() not in ("0", "false", "no")
 
+    local_access_url = f"http://127.0.0.1:{port}"
+    network_host_str = "Rede Local / Tailscale" if host == "0.0.0.0" else host
+
     print("=" * 75)
-    print("🚀 AURA // COGNITIVE OPERATIONS COCKPIT & SERVER")
-    print(f"   Endereço Local:  http://{host}:{port}")
-    print(f"   API Docs:        http://{host}:{port}/docs")
-    print(f"   Conexões:        ERP 5433 | Vector DB 5434 | SQLite WAL")
+    print("✨ AURA // ASSISTENTE EXECUTIVA DE PRONTIDÃO (POSTO & PDV)")
+    print(f"   Acesso Local:       {local_access_url}")
+    print(f"   Escuta em Rede:     http://{host}:{port} ({network_host_str})")
+    print(f"   Documentação API:   {local_access_url}/docs")
+    print(f"   Prontidão:          Supervisão Ativa de Pista, Tanques e Fechamento")
     print("=" * 75)
 
     if auto_open:
@@ -51,7 +55,7 @@ def main():
             import time
             time.sleep(1.2)
             try:
-                webbrowser.open(f"http://{host}:{port}")
+                webbrowser.open(local_access_url)
             except Exception:
                 pass
         threading.Thread(target=_open_browser, daemon=True).start()

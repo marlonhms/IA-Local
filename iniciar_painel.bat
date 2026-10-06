@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 > nul
-title AURA // Painel Operacional & Console Cognitivo
+title AURA // Assistente Executiva de Prontidão (Posto & PDV)
 
 echo ===========================================================================
-echo   AURA - AUTONOMOUS UNIFIED RETAIL ASSISTANT
-echo   Painel Operacional da Pista & Console Cognitivo
+echo   AURA - ASSISTENTE EXECUTIVA DE PRONTIDÃO
+echo   Supervisão Inteligente de Pista, Tanques e Fechamento
 echo ===========================================================================
 echo.
 
