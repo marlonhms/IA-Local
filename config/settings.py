@@ -75,11 +75,10 @@ DB_VECTOR_CONFIG = {
 
 # Modelos do Google Gemini
 DEFAULT_EMBEDDING_MODEL = os.getenv("DEFAULT_EMBEDDING_MODEL", "models/gemini-embedding-001")
-DEFAULT_LLM_MODEL = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-3.1-flash-lite")
+DEFAULT_LLM_MODEL = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-3.5-flash-lite")
 
 FALLBACK_MODELS = [
     DEFAULT_LLM_MODEL,
-    "models/gemini-3.5-flash-lite",
-    "models/gemini-3.6-flash",
+    "models/gemini-3.1-flash-lite",
     "models/gemini-flash-latest",
 ]

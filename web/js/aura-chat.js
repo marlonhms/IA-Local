@@ -74,6 +74,11 @@ class AuraChatController {
       'ajuda_sistema': this.renderAjudaSistemaWidget.bind(this),
       'conhecimento_aura': this.renderAjudaSistemaWidget.bind(this),
       'ajuda': this.renderAjudaSistemaWidget.bind(this),
+
+      'vendas_analitico': this.renderVendasAnaliticoWidget.bind(this),
+      'consultar_analise_vendas_erp': this.renderVendasAnaliticoWidget.bind(this),
+      'analise_vendas': this.renderVendasAnaliticoWidget.bind(this),
+      'vendas': this.renderVendasAnaliticoWidget.bind(this),
     };
   }
 
@@ -328,6 +333,7 @@ class AuraChatController {
     let currentIntent = null;
     let currentToolResult = null;
     let telemetryData = null;
+    let hasStreamError = false;
 
     this.abortController = new AbortController();
 
@@ -354,6 +360,8 @@ class AuraChatController {
               this.updateCognitiveStep(messageContainerId, 'Auditando vazão de bicos & frentistas...', 'cyan');
             } else if (intentKey.includes('cesta') || intentKey.includes('conveniencia') || intentKey.includes('combo')) {
               this.updateCognitiveStep(messageContainerId, 'Processando regras de associação da loja...', 'cyan');
+            } else if (intentKey.includes('venda') || intentKey.includes('faturamento')) {
+              this.updateCognitiveStep(messageContainerId, 'Consultando histórico de vendas & faturamento...', 'cyan');
             } else {
               this.updateCognitiveStep(messageContainerId, 'Processando raciocínio cognitivo...', 'cyan');
             }
@@ -381,6 +389,7 @@ class AuraChatController {
             this.updateTelemetryBadge(messageContainerId, telemetryData);
           }
           else if (type === 'error') {
+            hasStreamError = true;
             const errorMsg = chunk.data?.error || chunk.text || 'Erro no processamento da solicitação';
             this.hideToolCardSkeleton(messageContainerId);
             this.renderStreamError(messageContainerId, errorMsg);
@@ -388,18 +397,27 @@ class AuraChatController {
             this.setStreamingState(false);
           }
           else if (type === 'done') {
+            if (hasStreamError) return;
+            if (chunk.data?.error || chunk.data?.success === false) {
+              hasStreamError = true;
+              this.finalizeCognitiveStep(messageContainerId, false);
+              this.setStreamingState(false);
+              return;
+            }
             this.updateAuraText(messageContainerId, fullResponseText, false);
             this.finalizeCognitiveStep(messageContainerId, true);
             this.setStreamingState(false);
           }
         },
         onDone: () => {
+          if (hasStreamError) return;
           this.updateAuraText(messageContainerId, fullResponseText, false);
           this.finalizeCognitiveStep(messageContainerId, true);
           this.setStreamingState(false);
           this.scrollToBottom(false);
         },
         onError: (err) => {
+          hasStreamError = true;
           if (err && (err.name === 'AbortError' || String(err.message || '').toLowerCase().includes('abort'))) {
             this.finalizeCognitiveStep(messageContainerId, false);
             this.hideToolCardSkeleton(messageContainerId);
@@ -413,6 +431,7 @@ class AuraChatController {
         },
       });
     } catch (err) {
+      hasStreamError = true;
       if (err && (err.name === 'AbortError' || String(err.message || '').toLowerCase().includes('abort'))) {
         this.finalizeCognitiveStep(messageContainerId, false);
         this.hideToolCardSkeleton(messageContainerId);
@@ -869,6 +888,15 @@ class AuraChatController {
       Array.isArray(data.tanques)
     ) {
       return this.renderTankAutonomyWidget(data);
+    }
+    if (
+      data.ultimo_produto_vendido_destaque ||
+      data.produtos_mais_vendidos ||
+      data.resumo_hoje ||
+      Array.isArray(data.ultimos_produtos_conveniencia) ||
+      Array.isArray(data.ultimos_abastecimentos_pista)
+    ) {
+      return this.renderVendasAnaliticoWidget(data);
     }
 
     // 4. Fallback genérico executivo
@@ -2161,6 +2189,8 @@ class AuraChatController {
       'pump_performance': `Evidências: Performance da Pista (${dataAuditada})`,
       'lmc_report': `Evidências: Conciliação LMC ANP (${dataAuditada})`,
       'market_basket': `Evidências: Combos & Conveniência (${dataAuditada})`,
+      'vendas_analitico': `Evidências: Vendas & Faturamento (${dataAuditada})`,
+      'consultar_analise_vendas_erp': `Evidências: Vendas & Faturamento (${dataAuditada})`,
       'shift_reconciliation': `Evidências: ${dataAuditada} (${turnoAuditado})`
     };
 
@@ -2178,6 +2208,8 @@ class AuraChatController {
         'pump_performance': `Unidade: ${c.context?.unit_id || 'Posto'} • Automação da Pista & PDV`,
         'lmc_report': `Unidade: ${c.context?.unit_id || 'Posto'} • Portaria ANP 26/1992 • Tolerância ±0.60%`,
         'market_basket': `Unidade: ${c.context?.unit_id || 'Loja'} • Cesta de Compras & Combos PDV`,
+        'vendas_analitico': `Unidade: ${c.context?.unit_id || 'Posto 01'} • Histórico de Vendas & PDV • ERP`,
+        'consultar_analise_vendas_erp': `Unidade: ${c.context?.unit_id || 'Posto 01'} • Histórico de Vendas & PDV • ERP`,
         'shift_reconciliation': `Unidade: ${c.context?.unit_id || 'Posto'} • Data: ${dataAuditada} • Turno: ${turnoAuditado}`
       };
       subEl.textContent = subMap[intent] || `Unidade: ${c.context?.unit_id || 'Posto'}`;
@@ -2404,6 +2436,30 @@ class AuraChatController {
         `;
       }
 
+      if (intent === 'vendas_analitico' || intent === 'consultar_analise_vendas_erp') {
+        return `
+          <div class="space-y-4">
+            <div class="evidence-section-card">
+              <h4 class="font-bold text-slate-100 flex items-center gap-2">
+                <span class="inline-flex text-cyan-400">${CHAT_ICONS.formula}</span><span>Fórmula de Faturamento Consolidado do Posto</span>
+              </h4>
+              <div class="p-3 rounded-xl glass-subcard border border-white/5 font-sans text-xs space-y-2">
+                <div class="text-cyan-400 font-bold font-mono">Faturamento Total = Faturamento Pista + Faturamento Loja</div>
+                <div class="text-slate-300">
+                  Pista de Combustíveis: Total apurado no concentrador (volume medido em litros × preço unitário).
+                </div>
+                <div class="text-emerald-400 font-bold pt-1 border-t border-slate-800">
+                  Loja de Conveniência: Total dos cupons fiscais emitidos no PDV (pedido + itemped).
+                </div>
+              </div>
+              <p class="text-slate-400 text-xs leading-relaxed">
+                Dados integrados diretamente do ERP (PostgreSQL 16) com triangulação de abastecimentos.
+              </p>
+            </div>
+          </div>
+        `;
+      }
+
       // Default: shift_reconciliation
       if (assessment.finality === 'no_movement' || data.status === 'sem_movimento') {
         return `
@@ -2515,6 +2571,44 @@ class AuraChatController {
     // ABA: BICOS & PISTA
     // =========================================================================
     if (tab === 'bicos') {
+      if (intent === 'vendas_analitico' || intent === 'consultar_analise_vendas_erp') {
+        const abastList = data.ultimos_abastecimentos_pista || [];
+        if (abastList.length === 0) {
+          return `<div class="p-4 text-center text-slate-500 font-sans text-xs">Sem abastecimentos recentes registrados no concentrador.</div>`;
+        }
+        const rows = abastList.map(a => `
+          <tr class="border-b border-slate-800/80 text-[11px] font-sans">
+            <td class="py-2.5 font-bold text-slate-200">Bomba ${this.escapeHtml(a.bomba)}</td>
+            <td class="py-2.5 text-slate-300">${this.escapeHtml(a.nompro)}</td>
+            <td class="py-2.5 text-right text-cyan-300 tabular-nums">${this.formatLiters(a.litros, 3)}</td>
+            <td class="py-2.5 text-right text-emerald-300 font-semibold tabular-nums">${this.formatBRL(a.total)}</td>
+            <td class="py-2.5 text-right text-slate-400 tabular-nums">${this.escapeHtml(a.hora)}</td>
+          </tr>
+        `).join('');
+        return `
+          <div class="space-y-3 font-sans">
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span>Últimos Abastecimentos na Pista: <strong>${abastList.length}</strong></span>
+              <span>Concentrador Companytec CBC04</span>
+            </div>
+            <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60 p-1">
+              <table class="w-full text-left font-sans text-xs">
+                <thead>
+                  <tr class="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
+                    <th class="p-2">Bomba</th>
+                    <th class="p-2">Combustível</th>
+                    <th class="p-2 text-right">Litros</th>
+                    <th class="p-2 text-right">Total</th>
+                    <th class="p-2 text-right">Hora</th>
+                  </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }
+
       const nozzlesList = c.nozzles || data.auditoria_vazao_bicos || data.vazao_bicos || data.triangulacao_pista?.detalhamento_bicos || [];
       if (nozzlesList.length === 0) {
         return `<div class="p-4 text-center ${isUnavailable ? 'text-rose-300' : 'text-slate-500'} font-sans text-xs">${isUnavailable ? 'Leitura de bicos indisponível por falha na fonte primária.' : 'Sem dados detalhados de bicos para esta consulta.'}</div>`;
@@ -2570,6 +2664,42 @@ class AuraChatController {
     // ABA: CAIXAS & PDV (OU REGRAS DE CONVENIÊNCIA)
     // =========================================================================
     if (tab === 'caixas') {
+      if (intent === 'vendas_analitico' || intent === 'consultar_analise_vendas_erp') {
+        const prodsConv = data.ultimos_produtos_conveniencia || [];
+        if (prodsConv.length === 0) {
+          return `<div class="p-4 text-center text-slate-500 font-sans text-xs">Sem cupons recentes faturados na conveniência.</div>`;
+        }
+        const rows = prodsConv.map(p => `
+          <tr class="border-b border-slate-800/80 text-[11px] font-sans">
+            <td class="py-2.5 font-bold text-slate-200">Cupom #${this.escapeHtml(p.cupom || p.pedido)} (PDV ${this.escapeHtml(p.pdv)})</td>
+            <td class="py-2.5 text-slate-300">${this.escapeHtml(p.nompro)}</td>
+            <td class="py-2.5 text-right text-slate-300 tabular-nums">${p.quantidade} un</td>
+            <td class="py-2.5 text-right text-emerald-300 font-semibold tabular-nums">${this.formatBRL(p.total_item || p.total_pedido)}</td>
+          </tr>
+        `).join('');
+        return `
+          <div class="space-y-3 font-sans">
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span>Últimos Itens Faturados na Conveniência: <strong>${prodsConv.length}</strong></span>
+              <span>Módulo PDV / Caixa</span>
+            </div>
+            <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60 p-1">
+              <table class="w-full text-left font-sans text-xs">
+                <thead>
+                  <tr class="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
+                    <th class="p-2">Cupom / PDV</th>
+                    <th class="p-2">Produto</th>
+                    <th class="p-2 text-right">Qtd</th>
+                    <th class="p-2 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }
+
       if (intent === 'market_basket') {
         const rulesList = c.detailed_rules || c.top_combos || data.regras_associacao_detalhadas || [];
         if (rulesList.length === 0) {
@@ -2656,6 +2786,34 @@ class AuraChatController {
     // ABA: TANQUES & ANP
     // =========================================================================
     if (tab === 'tanques') {
+      if (intent === 'vendas_analitico' || intent === 'consultar_analise_vendas_erp') {
+        const prodsRank = data.produtos_mais_vendidos || [];
+        const rowsP = prodsRank.map((p, idx) => `
+          <div class="p-3 rounded-xl glass-subcard border border-white/5 flex items-center justify-between text-xs font-sans">
+            <div class="flex items-center gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-cyan-500/10 text-cyan-400 text-xs flex items-center justify-center font-bold">${idx + 1}</span>
+              <div>
+                <strong class="text-slate-100">${this.escapeHtml(p.nompro)}</strong>
+                <span class="text-[10px] text-slate-400 block">${p.total_saidas || 0} saídas faturadas</span>
+              </div>
+            </div>
+            <div class="text-right">
+              <strong class="text-emerald-300 tabular-nums">${this.formatBRL(p.receita_total)}</strong>
+              <span class="text-[10px] text-slate-400 block tabular-nums">${p.qtd_total} un/L</span>
+            </div>
+          </div>
+        `).join('');
+        return `
+          <div class="space-y-3 font-sans">
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span>Ranking Geral dos Mais Vendidos</span>
+              <span>Histórico Consolidado ERP</span>
+            </div>
+            <div class="space-y-2">${rowsP || '<div class="text-slate-500 text-center py-4">Sem dados no ranking.</div>'}</div>
+          </div>
+        `;
+      }
+
       if (intent === 'tank_forecast') {
         const tanksList = c.tanks || data.detalhamento_tanques || data.tanques || [];
         if (tanksList.length === 0) {
@@ -2761,6 +2919,61 @@ class AuraChatController {
     // =========================================================================
     // ABA PADRÃO: RESUMO & FONTES DE DADOS
     // =========================================================================
+    if (intent === 'vendas_analitico' || intent === 'consultar_analise_vendas_erp') {
+      const rHoje = data.resumo_hoje || {};
+      const ult = data.ultimo_produto_vendido_destaque || {};
+      const fatHoje = Number(rHoje.faturamento_conveniencia_hoje || 0) + Number(rHoje.faturamento_combustivel_hoje || 0);
+      return `
+        <div class="space-y-4 font-sans text-xs">
+          <div class="evidence-section-card">
+            <h4 class="font-bold text-slate-100 flex items-center gap-2">
+              <span class="inline-flex text-cyan-400">${CHAT_ICONS.chart}</span><span>Resumo da Operação Hoje (${this.escapeHtml(rHoje.data || 'Hoje')})</span>
+            </h4>
+            <div class="grid grid-cols-2 gap-2.5 pt-2">
+              <div class="p-3 rounded-xl glass-subcard border border-white/5">
+                <span class="text-slate-400 text-[11px] block">Faturamento Hoje:</span>
+                <strong class="text-emerald-400 text-sm tabular-nums">${this.formatBRL(fatHoje)}</strong>
+              </div>
+              <div class="p-3 rounded-xl glass-subcard border border-white/5">
+                <span class="text-slate-400 text-[11px] block">Conveniência:</span>
+                <strong class="text-cyan-300 text-sm tabular-nums">${this.formatBRL(rHoje.faturamento_conveniencia_hoje || 0)}</strong>
+                <span class="text-[10px] text-slate-400 block">${rHoje.pedidos_conveniencia_hoje || 0} pedidos</span>
+              </div>
+              <div class="p-3 rounded-xl glass-subcard border border-white/5">
+                <span class="text-slate-400 text-[11px] block">Pista / Litros:</span>
+                <strong class="text-slate-100 text-sm tabular-nums">${this.formatLiters(rHoje.litros_hoje || 0, 1)}</strong>
+                <span class="text-[10px] text-slate-400 block">${rHoje.abastecimentos_hoje || 0} abastecimentos</span>
+              </div>
+              <div class="p-3 rounded-xl glass-subcard border border-white/5">
+                <span class="text-slate-400 text-[11px] block">Receita Pista:</span>
+                <strong class="text-cyan-300 text-sm tabular-nums">${this.formatBRL(rHoje.faturamento_combustivel_hoje || 0)}</strong>
+              </div>
+            </div>
+          </div>
+
+          ${ult.produto ? `
+            <div class="evidence-section-card">
+              <h4 class="font-bold text-slate-100 flex items-center gap-2">
+                <span class="inline-flex text-purple-400">${CHAT_ICONS.store}</span><span>Última Venda Registrada (${this.escapeHtml(ult.origem || 'PDV')})</span>
+              </h4>
+              <div class="p-3 rounded-xl glass-subcard border border-white/5 space-y-1">
+                <div class="flex items-center justify-between">
+                  <strong class="text-slate-100">${this.escapeHtml(ult.produto)} (SKU: ${this.escapeHtml(ult.codigo_sku)})</strong>
+                  <strong class="text-emerald-300 tabular-nums">${this.formatBRL(ult.valor_total)}</strong>
+                </div>
+                <div class="text-slate-400 text-[11px]">Horário: ${this.escapeHtml(ult.data_hora)} • Cupom: ${this.escapeHtml(ult.cupom)} (PDV ${this.escapeHtml(ult.pdv)})</div>
+              </div>
+            </div>
+          ` : ''}
+
+          <div class="p-3.5 rounded-xl glass-subcard border border-white/5 text-[10px] text-slate-500 flex items-center justify-between">
+            <span>Fonte: ERP Posto 01 (PostgreSQL 16) • Automação CBC04</span>
+            <span>Status: Sincronizado</span>
+          </div>
+        </div>
+      `;
+    }
+
     const sourcesList = sources.map(s => {
       let stBadge = `<span class="text-emerald-400 font-semibold inline-flex items-center gap-1">${CHAT_ICONS.check} Disponível</span>`;
       if (s.availability === 'missing') stBadge = `<span class="text-amber-400 font-semibold inline-flex items-center gap-1">${CHAT_ICONS.clock} Pendente / Não lançado</span>`;
@@ -3470,6 +3683,200 @@ class AuraChatController {
   }
 
   /**
+   * Renderizador Especializado: Histórico de Vendas, PDV e Pista (AURA Precision Glass)
+   * Renderiza DecisionCard executivo com métricas de hoje, último produto vendido,
+   * top 5 mais vendidos e integração com EvidenceDrawer.
+   */
+  renderVendasAnaliticoWidget(data) {
+    if (!data || typeof data !== 'object') return '';
+    if (this.isSourceUnavailable(data)) {
+      return this.renderContingencyCard('Histórico & Projeção de Vendas', data, 'Qual a análise de vendas e faturamento de hoje?');
+    }
+
+    const c = data.contrato || data;
+    const resumoHoje = data.resumo_hoje || {};
+    const ultimoProd = data.ultimo_produto_vendido_destaque || {};
+    const topProds = data.produtos_mais_vendidos || [];
+    const resumoGeral = data.resumo_geral || {};
+
+    const dataHoje = resumoHoje.data || new Date().toISOString().split('T')[0];
+    const dataFormatada = this.formatDateBR(dataHoje);
+
+    const abastHoje = Number(resumoHoje.abastecimentos_hoje || 0);
+    const litrosHoje = Number(resumoHoje.litros_hoje || 0);
+    const fatCombHoje = Number(resumoHoje.faturamento_combustivel_hoje || 0);
+
+    const pedConvHoje = Number(resumoHoje.pedidos_conveniencia_hoje || 0);
+    const fatConvHoje = Number(resumoHoje.faturamento_conveniencia_hoje || 0);
+
+    const fatTotalHoje = fatCombHoje + fatConvHoje;
+    const temMovimentoHoje = (fatTotalHoje > 0 || abastHoje > 0 || pedConvHoje > 0);
+
+    const heroValor = temMovimentoHoje ? fatTotalHoje : Number(resumoGeral.faturamento_total || 0);
+    const heroLabel = temMovimentoHoje ? 'Faturamento Consolidado Hoje' : 'Faturamento Histórico Acumulado';
+    const heroSub = temMovimentoHoje
+      ? `${pedConvHoje} pedidos na loja • ${abastHoje} abastecimentos na pista`
+      : `${resumoGeral.total_abastecimentos || 0} abastecimentos históricos registrados`;
+
+    const statusBadge = temMovimentoHoje
+      ? `<span class="decision-status-badge status-adherent"><span>${CHAT_ICONS.check}</span><span>Operação Ativa</span></span>`
+      : `<span class="decision-status-badge status-neutral"><span>${CHAT_ICONS.telemetry}</span><span>Dados Apurados</span></span>`;
+
+    // Evidências
+    const evId = 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    if (typeof window !== 'undefined') {
+      if (!window.__auraEvidenceStore) window.__auraEvidenceStore = {};
+      window.__auraEvidenceStore[evId] = {
+        ...data,
+        intent: 'vendas_analitico',
+        context: { unit_id: 'posto_01', data_auditada: dataHoje }
+      };
+    }
+
+    // Top produtos list
+    let topProdsHtml = '';
+    if (topProds && topProds.length > 0) {
+      const items = topProds.slice(0, 3).map((p, idx) => {
+        const nome = p.nompro || 'Produto';
+        const qtd = Number(p.qtd_total || 0);
+        const rec = Number(p.receita_total || 0);
+        return `
+          <div class="p-2 rounded-lg bg-white/[0.02] border border-white/5 flex items-center justify-between text-xs font-sans">
+            <div class="flex items-center gap-2 truncate">
+              <span class="w-4 h-4 rounded-full bg-cyan-500/10 text-cyan-400 text-[10px] flex items-center justify-center font-bold font-mono">${idx + 1}</span>
+              <span class="text-slate-200 truncate font-medium">${this.escapeHtml(nome)}</span>
+            </div>
+            <div class="text-right flex-shrink-0 ml-2">
+              <span class="text-emerald-300 font-semibold tabular-nums">${this.formatBRL(rec)}</span>
+              <span class="text-[10px] text-slate-400 block tabular-nums">${qtd} un/L</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      topProdsHtml = `
+        <div class="space-y-1.5 pt-1">
+          <div class="flex items-center justify-between text-[11px] font-sans text-slate-400 font-semibold uppercase tracking-wider">
+            <span>Mais Vendidos (Líderes)</span>
+            <span class="text-[10px] text-cyan-400 cursor-pointer hover:underline" onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'tanques');">Ver ranking completo ↗</span>
+          </div>
+          <div class="space-y-1">${items}</div>
+        </div>
+      `;
+    }
+
+    // Último produto destaque
+    let ultimoProdHtml = '';
+    if (ultimoProd && ultimoProd.produto) {
+      const pNome = ultimoProd.produto;
+      const pOrigem = ultimoProd.origem || 'PDV';
+      const pHora = ultimoProd.data_hora ? String(ultimoProd.data_hora).split(' ')[1] || ultimoProd.data_hora : '';
+      const pTotal = Number(ultimoProd.valor_total || 0);
+
+      ultimoProdHtml = `
+        <div class="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-between text-xs font-sans">
+          <div class="flex items-center gap-2">
+            <span class="p-1 rounded-lg bg-purple-500/20 text-purple-300">${CHAT_ICONS.store}</span>
+            <div>
+              <div class="text-[10px] text-purple-300 font-semibold uppercase">Última Venda • ${this.escapeHtml(pOrigem)}</div>
+              <div class="text-slate-100 font-bold truncate max-w-[200px] sm:max-w-xs">${this.escapeHtml(pNome)}</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-emerald-300 font-bold tabular-nums">${this.formatBRL(pTotal)}</div>
+            <div class="text-[10px] text-slate-400">${this.escapeHtml(pHora)}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="decision-card" data-evidence-id="${evId}">
+        <!-- Topo do Card -->
+        <div class="decision-header">
+          <div class="decision-context">
+            <span class="decision-context-title">Diagnóstico de Vendas & Faturamento</span>
+            <span class="decision-context-sub">
+              <span>${CHAT_ICONS.calendar} ${this.escapeHtml(dataFormatada)}</span>
+              <span>•</span>
+              <span>${CHAT_ICONS.unit} Posto 01</span>
+              <span>•</span>
+              <span>${CHAT_ICONS.telemetry} Pista + PDV</span>
+            </span>
+          </div>
+          ${statusBadge}
+        </div>
+
+        <!-- Hero Metric -->
+        <div class="decision-hero">
+          <div class="decision-hero-header">
+            <span class="decision-hero-label">${this.escapeHtml(heroLabel)}</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-sans font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Receita Operacional</span>
+          </div>
+          <div class="decision-hero-value text-emerald-400 tabular-nums">
+            ${this.formatBRL(heroValor)}
+          </div>
+          <div class="decision-hero-sub text-slate-300">
+            ${this.escapeHtml(heroSub)}
+          </div>
+        </div>
+
+        <!-- Grade de Comparativo Pista vs Loja -->
+        <div class="decision-comparison-grid">
+          <div class="decision-comp-item">
+            <span class="decision-comp-label">Loja de Conveniência</span>
+            <strong class="decision-comp-val text-emerald-300 tabular-nums">${this.formatBRL(fatConvHoje)}</strong>
+            <span class="decision-comp-sub">${pedConvHoje} pedidos hoje</span>
+          </div>
+          <div class="decision-comp-item">
+            <span class="decision-comp-label">Pista de Combustíveis</span>
+            <strong class="decision-comp-val text-cyan-300 tabular-nums">${this.formatBRL(fatCombHoje)}</strong>
+            <span class="decision-comp-sub">${this.formatLiters(litrosHoje, 1)} hoje</span>
+          </div>
+          <div class="decision-comp-item">
+            <span class="decision-comp-label">Volume de Pista</span>
+            <strong class="decision-comp-val text-slate-100 tabular-nums">${abastHoje}</strong>
+            <span class="decision-comp-sub">abastecimentos</span>
+          </div>
+        </div>
+
+        ${ultimoProdHtml}
+        ${topProdsHtml}
+
+        <!-- Ações do Card -->
+        <div class="decision-actions">
+          <button 
+            type="button" 
+            class="decision-btn-primary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
+            title="Abrir extrato analítico com cupons e histórico">
+            ${CHAT_ICONS.audit}
+            <span>Extrato Completo de Vendas ↗</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="decision-btn-secondary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'caixas');"
+            title="Ver cupons fiscais da conveniência">
+            ${CHAT_ICONS.store}
+            <span>Cupons da Loja</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="decision-btn-secondary" 
+            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'bicos');"
+            title="Ver histórico de abastecimentos da pista">
+            ${CHAT_ICONS.nozzle}
+            <span>Abastecimentos Pista</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
    * Widget Genérico para outras ferramentas analíticas
    */
   renderGenericToolWidget(toolName, data) {
@@ -3480,17 +3887,20 @@ class AuraChatController {
     if (!data.resumo_executivo && !data.status) return '';
     const r = data.resumo_executivo || data;
     const displayName = this.formatToolDisplayName(toolName);
+    const rawMsg = String(r.mensagem || r.descricao || '').trim();
+    const isTechStatus = !rawMsg || ['ok', 'success', 'true', 'done', 'ready'].includes(rawMsg.toLowerCase());
+    const displayMsg = isTechStatus ? 'Dados operacionais apurados com sucesso junto ao ERP.' : rawMsg;
     return `
-      <div class="widget-inline-container border-l-4 border-l-slate-600">
+      <div class="widget-inline-container border-l-4 border-l-cyan-600">
         <div class="widget-inline-header">
           <div class="flex items-center gap-2">
             <span class="inline-flex">${CHAT_ICONS.chart}</span>
             <strong class="text-xs font-sans text-white uppercase tracking-wider font-semibold">Diagnóstico: ${this.escapeHtml(displayName)}</strong>
           </div>
-          <span class="px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-slate-800 text-slate-300 border border-slate-700">OK</span>
+          <span class="px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Apurado</span>
         </div>
         <div class="text-xs font-sans text-slate-300">
-          ${this.escapeHtml(r.status || r.mensagem || 'Dados processados com sucesso.')}
+          ${this.escapeHtml(displayMsg)}
         </div>
       </div>
     `;
@@ -4061,6 +4471,19 @@ class AuraChatController {
     if (val === null || val === undefined || isNaN(Number(val))) return '—';
     const num = Number(val);
     return `${num.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}%`;
+  }
+
+  formatDateBR(val) {
+    if (!val) return 'Hoje';
+    try {
+      const parts = String(val).split('T')[0].split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+      return String(val);
+    } catch (e) {
+      return String(val);
+    }
   }
 
   escapeHtml(str) {

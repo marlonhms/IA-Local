@@ -1062,7 +1062,205 @@ Diretrizes Específicas por Assunto:
         tool_lat_ms = (time.perf_counter() - t0) * 1000
         return contexto_extra, resultado_bruto, telemetria_retrieval, cache_hit, tool_lat_ms
 
-    # -------------------------------------------------------------------------
+    def _gerar_sintese_contingencia_ferramenta(
+        self,
+        intencao: str,
+        resultado_bruto: Any,
+        pergunta: str,
+    ) -> Optional[str]:
+        """
+        Síntese executiva determinística de alta fidelidade para contingência.
+        Acionada quando a LLM estiver indisponível (429 rate-limit, timeout, offline),
+        garantindo que o gestor receba o diagnóstico operacional e projeção diretamente
+        dos dados apurados no ERP/banco local sem atraso nem travamento.
+        """
+        if not resultado_bruto or not isinstance(resultado_bruto, dict):
+            return None
+
+        status = str(resultado_bruto.get("status", "")).lower()
+        if status in ("indisponivel", "error", "erro", "timeout"):
+            return None
+
+        # 1. VENDAS & HISTÓRICO ANALÍTICO (PDV / PISTA / HOJE)
+        if intencao in ("vendas_analitico", "consultar_analise_vendas_erp", "analise_vendas", "vendas"):
+            resumo_hoje = resultado_bruto.get("resumo_hoje") or {}
+            ultimo = resultado_bruto.get("ultimo_produto_vendido_destaque") or {}
+            top_prods = resultado_bruto.get("produtos_mais_vendidos") or []
+            resumo_geral = resultado_bruto.get("resumo_geral") or {}
+
+            data_str = resumo_hoje.get("data") or "Hoje"
+            abast_hoje = resumo_hoje.get("abastecimentos_hoje", 0)
+            litros_hoje = float(resumo_hoje.get("litros_hoje", 0) or 0)
+            fat_comb_hoje = float(resumo_hoje.get("faturamento_combustivel_hoje", 0) or 0)
+            ped_conv_hoje = resumo_hoje.get("pedidos_conveniencia_hoje", 0)
+            fat_conv_hoje = float(resumo_hoje.get("faturamento_conveniencia_hoje", 0) or 0)
+            fat_total_hoje = fat_comb_hoje + fat_conv_hoje
+
+            linhas = [
+                "### 📊 Diagnóstico Executivo de Vendas & Faturamento",
+                "",
+                f"**Posição Operacional ({data_str}):**",
+                f"- **Faturamento Consolidado Hoje:** [verde]R$ {fat_total_hoje:,.2f}[/verde]",
+                f"- **Loja de Conveniência:** [verde]R$ {fat_conv_hoje:,.2f}[/verde] ({ped_conv_hoje} pedidos/cupons)",
+                f"- **Pista de Combustíveis:** [ciano]R$ {fat_comb_hoje:,.2f}[/ciano] ({litros_hoje:,.2f} L em {abast_hoje} abastecimentos)",
+            ]
+
+            if ultimo and ultimo.get("produto"):
+                prod_nome = ultimo.get("produto")
+                prod_origem = ultimo.get("origem", "PDV")
+                prod_sku = ultimo.get("codigo_sku", "")
+                prod_hora = ultimo.get("data_hora", "")
+                prod_total = float(ultimo.get("valor_total", 0) or 0)
+                prod_qtd = float(ultimo.get("quantidade", 1) or 1)
+                prod_cupom = ultimo.get("cupom", "")
+                linhas.extend([
+                    "",
+                    f"**⚡ Última Venda Registrada ({prod_origem}):**",
+                    f"- **Produto:** **{prod_nome}** (Cód: `{prod_sku}`)",
+                    f"- **Valor:** [verde]R$ {prod_total:,.2f}[/verde] ({prod_qtd:g} un) às `{prod_hora}` (Cupom: `{prod_cupom}`)",
+                ])
+
+            if top_prods:
+                linhas.extend([
+                    "",
+                    "**🏆 Ranking dos Produtos Mais Vendidos:**",
+                ])
+                for idx, p in enumerate(top_prods[:5], 1):
+                    p_nome = p.get("nompro", "Produto")
+                    p_qtd = float(p.get("qtd_total", 0) or 0)
+                    p_rec = float(p.get("receita_total", 0) or 0)
+                    linhas.append(f"{idx}. **{p_nome}** — {p_qtd:g} saídas ([verde]R$ {p_rec:,.2f}[/verde])")
+
+            # Projeção e recomendação prática
+            linhas.extend([
+                "",
+                "**💡 Projeção & Ação Recomendada:**",
+            ])
+            if fat_total_hoje > 0:
+                linhas.append(
+                    f"- **Projeção de Fechamento:** Com base no ritmo atual do dia ([verde]R$ {fat_total_hoje:,.2f}[/verde]), "
+                    "mantenha a atenção na reposição dos itens de maior giro na conveniência e acompanhe a conversão de aditivada na pista."
+                )
+            else:
+                linhas.append(
+                    "- **Início de Operação:** Vendas do dia em apuração inicial. Estimule a equipe com ofertas no caixa e metas de pista para alavancar o faturamento."
+                )
+            linhas.append(
+                "- **Auditoria Detalhada:** Confira o extrato completo de cupons e abastecimentos no botão de evidências do card."
+            )
+
+            return "\n".join(linhas)
+
+        # 2. RUN-OUT DE TANQUES & AUTONOMIA
+        elif intencao in ("previsao_tanques", "run_out", "prever_esgotamento_tanques"):
+            assessment = resultado_bruto.get("assessment") or {}
+            metrics = resultado_bruto.get("metrics") or {}
+            tanks = resultado_bruto.get("detalhamento_tanques") or resultado_bruto.get("tanks") or []
+
+            min_auto_h = float(metrics.get("autonomia_critica_horas") or 0.0)
+            min_auto_d = float(metrics.get("autonomia_critica_dias") or 0.0)
+            ullage_tot = float(metrics.get("espaco_livre_ullage_total_litros") or 0.0)
+            bocas_5k = metrics.get("compartimentos_5k_total") or 0
+            tanque_crit_cod = assessment.get("tanque_mais_critico_cod")
+
+            badge = assessment.get("badge_label", "Estoque Apurado")
+            linhas = [
+                "### ⛽ Diagnóstico Executivo de Autonomia dos Tanques",
+                "",
+                f"**Status Geral:** {badge}",
+                f"- **Pior Autonomia até Reserva (15%):** [amarelo]{min_auto_h:.1f}h[/amarelo] (~{min_auto_d:.1f} dias)" + (f" no **Tanque {tanque_crit_cod}**" if tanque_crit_cod else ""),
+                f"- **Espaço Livre para Descarga (Ullage):** [ciano]{ullage_tot:,.0f} L[/ciano] (~**{bocas_5k} bocas** de 5.000L em carreta padrão)",
+            ]
+            if tanks:
+                linhas.append("\n**Posição por Tanque:**")
+                for t in tanks[:5]:
+                    c_tan = t.get("codtan")
+                    c_comb = t.get("combustivel")
+                    saldo = float(t.get("saldo_atual_litros", 0) or 0)
+                    ocup = float(t.get("ocupacao_pct", 0) or 0)
+                    auto_h = float(t.get("autonomia_runout_horas", 0) or 0)
+                    cor = "[vermelho]" if ocup < 20 else ("[amarelo]" if ocup < 40 else "[verde]")
+                    cor_f = "[/vermelho]" if ocup < 20 else ("[/amarelo]" if ocup < 40 else "[/verde]")
+                    linhas.append(f"- **T{c_tan} ({c_comb}):** {cor}{saldo:,.0f} L ({ocup:.1f}%){cor_f} • Autonomia: {auto_h:.1f}h")
+            linhas.extend([
+                "",
+                "**💡 Ação Recomendada:** Programe os pedidos de reposição para os tanques com autonomia inferior a 48h para evitar perda de margem por falta de produto."
+            ])
+            return "\n".join(linhas)
+
+        # 3. CONCILIAÇÃO DE TURNO
+        elif intencao in ("auditoria_turno", "conciliacao_turno", "auditar_fechamento_turno", "shift_reconciliation"):
+            resumo = resultado_bruto.get("resumo_executivo") or {}
+            metrics = resultado_bruto.get("metrics") or {}
+            tri = resultado_bruto.get("triangulacao_pista") or {}
+
+            dif_caixa = float(metrics.get("difference") or resumo.get("diferenca_financeira_caixa") or 0.0)
+            fat_pista = float(metrics.get("automation_revenue") or resumo.get("faturamento_pista_total") or 0.0)
+            fat_caixa = float(metrics.get("pos_revenue") or resumo.get("faturamento_caixa_total") or 0.0)
+            vol_pista = float(metrics.get("automation_volume_liters") or tri.get("total_litros_automacao") or 0.0)
+
+            cor_dif = "[verde]" if abs(dif_caixa) <= 5.0 else ("[vermelho]" if dif_caixa < 0 else "[amarelo]")
+            cor_dif_f = "[/verde]" if abs(dif_caixa) <= 5.0 else ("[/vermelho]" if dif_caixa < 0 else "[/amarelo]")
+
+            linhas = [
+                "### 📋 Conciliação Executiva de Turno & Fechamento",
+                "",
+                f"- **Diferença de Caixa Apurada:** {cor_dif}R$ {dif_caixa:,.2f}{cor_dif_f}",
+                f"- **Vendas da Pista (Automação):** [ciano]R$ {fat_pista:,.2f}[/ciano] ({vol_pista:,.2f} L medidos)",
+                f"- **Cupons Faturados no PDV:** [verde]R$ {fat_caixa:,.2f}[/verde]",
+                "",
+                "**💡 Ação Recomendada:** Confira os comprovantes físicos e encerrantes de bico na gaveta de evidências para validar as divergências antes do fechamento contábil."
+            ]
+            return "\n".join(linhas)
+
+        # 4. LMC OFICIAL DA ANP
+        elif intencao in ("lmc_anp", "lmc_report", "gerar_relatorio_lmc_anp"):
+            resumo = resultado_bruto.get("resumo_executivo") or {}
+            status_anp = resumo.get("status_geral_anp", "CONFORME_ANP")
+            var_l = float(resumo.get("variacao_total_litros", 0) or 0)
+            var_pct = float(resumo.get("variacao_media_pct", 0) or 0)
+
+            conforme = (status_anp == "CONFORME_ANP")
+            cor = "[verde]" if conforme else "[vermelho]"
+            cor_f = "[/verde]" if conforme else "[/vermelho]"
+
+            linhas = [
+                "### ⚖️ Livro de Movimentação de Combustíveis (LMC Oficial ANP)",
+                "",
+                f"- **Status de Conformidade:** {cor}{'CONFORME ANP (±0.6%)' if conforme else 'ALERTA FORA DA TOLERÂNCIA ANP'}{cor_f}",
+                f"- **Variação Volumétrica Apurada:** {var_l:+,.3f} L ({var_pct:+.2f}%)",
+                "",
+                f"**Diagnóstico Regulamentar:** {'Variação física dentro da margem legal permitida pela Portaria ANP nº 26/1992.' if conforme else 'Variação excede a margem de ±0.6%. Necessário investigar calibração de bicos ou estanqueidade de tanques.'}",
+            ]
+            return "\n".join(linhas)
+
+        # 5. COMBOS DA CONVENIÊNCIA
+        elif intencao in ("conveniencia_vendas_cruzadas", "market_basket", "auditar_cesta_conveniencia_vendas_cruzadas"):
+            combos = resultado_bruto.get("top_combos") or resultado_bruto.get("top_combos_cross_selling") or []
+            resumo = resultado_bruto.get("resumo_executivo") or {}
+            maior_lift = float(resumo.get("maior_lift_encontrado", 0) or 0)
+
+            linhas = [
+                "### 🛒 Inteligência de Vendas Cruzadas (Market Basket PDV)",
+                "",
+                f"- **Maior Lift Apurado:** [roxo]{maior_lift:.2f}x[/roxo]",
+                f"- **Combos Minerados:** {len(combos)} oportunidades de cross-selling",
+            ]
+            if combos:
+                c1 = combos[0]
+                orig = c1.get("produto_origem")
+                orig_nome = orig.get("nompro") if isinstance(orig, dict) else str(orig)
+                rec = c1.get("produto_recomendado")
+                rec_nome = rec.get("nompro") if isinstance(rec, dict) else str(rec)
+                lift = float(c1.get("lift") or c1.get("metricas", {}).get("lift") or 0)
+                linhas.extend([
+                    "",
+                    f"**Combo Destaque:** **{orig_nome}** + **{rec_nome}** (Lift: [roxo]{lift:.2f}x[/roxo])",
+                    f"- *Script para o Caixa:* {c1.get('script_sugerido_caixa', 'Ofereça o produto complementar no fechamento da compra.')}"
+                ])
+            return "\n".join(linhas)
+
+        return None
     # STREAMING ASSÍNCRONO DA AURA (ask_stream)
     # -------------------------------------------------------------------------
 
@@ -1270,7 +1468,7 @@ Diretrizes Específicas por Assunto:
                 response_stream = await model.generate_content_async(
                     prompt_sistema,
                     stream=True,
-                    request_options={"timeout": 12},
+                    request_options={"timeout": 7},
                 )
 
                 async for chunk in response_stream:
@@ -1304,12 +1502,27 @@ Diretrizes Específicas por Assunto:
         resposta_final = "".join(texto_completo)
 
         if not sucesso_llm or not resposta_final:
-            resposta_final = "Não foi possível obter resposta dos modelos da AURA no momento. Por favor, tente novamente em instantes."
-            yield AuraChunk(
-                chunk_type=AuraChunkType.ERROR,
-                text=resposta_final,
-                session_id=sess_id,
+            # Contingência determinística de alta fidelidade a partir dos dados apurados no ERP
+            sintese_contingencia = self._gerar_sintese_contingencia_ferramenta(
+                intencao=intencao,
+                resultado_bruto=resultado_bruto,
+                pergunta=pergunta_efetiva,
             )
+            if sintese_contingencia:
+                resposta_final = sintese_contingencia
+                sucesso_llm = True
+                yield AuraChunk(
+                    chunk_type=AuraChunkType.DELTA,
+                    text=resposta_final,
+                    session_id=sess_id,
+                )
+            else:
+                resposta_final = "Não foi possível obter resposta dos modelos da AURA no momento. Por favor, tente novamente em instantes."
+                yield AuraChunk(
+                    chunk_type=AuraChunkType.ERROR,
+                    text=resposta_final,
+                    session_id=sess_id,
+                )
 
         # 8. Salvamento no Cache Semântico (se catálogo)
         if intencao == "catalogo_produtos" and not cache_hit and query_vector and sucesso_llm:
@@ -1371,7 +1584,7 @@ Diretrizes Específicas por Assunto:
         yield AuraChunk(
             chunk_type=AuraChunkType.DONE,
             text=resposta_final,
-            data={"session_id": sess_id, "intent": intencao},
+            data={"session_id": sess_id, "intent": intencao, "success": sucesso_llm},
             session_id=sess_id,
         )
 

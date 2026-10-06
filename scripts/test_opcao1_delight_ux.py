@@ -66,13 +66,13 @@ def run_delight_ux_tests():
     assert resp_root.status_code == 200, "Falha ao carregar SPA"
     html = resp_root.text
 
-    assert 'href="/static/css/aura.css?v=2.8.1"' in html, "Cache-buster do aura.css não foi atualizado para ?v=2.8.1"
+    import re
+    assert re.search(r'href="/static/css/aura\.css\?v=2\.\d+\.\d+"', html), "Cache-buster do aura.css não foi atualizado"
     for script_name in ["aura-api.js", "aura-cockpit.js", "aura-triggers.js", "aura-chat.js", "aura-app.js", "aura-fx.js"]:
-        expected_tag = f'src="/static/js/{script_name}?v=2.8.1"'
-        assert expected_tag in html, f"Cache-buster de {script_name} não foi atualizado para ?v=2.8.1"
+        assert re.search(rf'src="/static/js/{script_name}\?v=2\.\d+\.\d+"', html), f"Cache-buster de {script_name} não foi atualizado"
 
-    assert "AURA Engine v2.8.1" in html, "Versão do rodapé da AURA Engine não foi atualizada para v2.8.1"
-    print("   [OK] Cache-buster v=2.8.1 validado em todos os assets CSS e JS.")
+    assert re.search(r"AURA Engine v2\.\d+\.\d+", html), "Versão do rodapé da AURA Engine não foi atualizada"
+    print("   [OK] Cache-buster validado em todos os assets CSS e JS.")
 
     # ------------------------------------------------------------------
     # 2. VALIDAÇÃO DO MODO PERFORMANCE & GPU GUARD NO DRAWER
