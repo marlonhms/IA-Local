@@ -266,25 +266,26 @@ class AuraChatController {
         <p class="text-slate-300 text-xs sm:text-sm">
           Estou conectada e pronta para apoiar suas decisões. Você pode me perguntar sobre a autonomia dos combustíveis, auditar o fechamento de turno e caixa, verificar a conformidade do LMC com a ANP ou analisar as vendas da loja.
         </p>
-        <div id="welcome-suggestions-container" class="pt-3 border-t border-white/10 space-y-2.5">
-          <span class="text-xs font-medium text-slate-400 flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
-            Sugestões executivas para iniciar:
-          </span>
-          <div class="welcome-suggestions-grid grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-            <button onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" class="quick-prompt-chip" aria-label="Consultar Autonomia de Tanques">
-              <svg class="w-3.5 h-3.5 text-emerald-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="11" height="18" rx="2" stroke-width="1.75"/><line x1="2" y1="21" x2="15" y2="21" stroke-width="1.75"/><path d="M14 8h2.5a2 2 0 0 1 2 2v6.5a1.5 1.5 0 0 0 3 0V9l-2-2" stroke-width="1.5"/></svg> <span>Autonomia dos Tanques</span>
-            </button>
-            <button onclick="window.auraChat.sendUserPrompt('Como fechou o último turno? Teve furo de caixa?')" class="quick-prompt-chip" aria-label="Consultar Fechamento de Turno e Caixa">
-              <svg class="w-3.5 h-3.5 text-cyan-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="6" width="20" height="12" rx="2" stroke-width="1.75"/><circle cx="12" cy="12" r="3" stroke-width="1.75"/><path d="M6 12h.01M18 12h.01" stroke-width="2"/></svg> <span>Fechamento & Caixa</span>
-            </button>
-            <button onclick="window.auraChat.sendUserPrompt('O LMC de ontem fechou dentro da tolerância oficial da ANP?')" class="quick-prompt-chip" aria-label="Consultar LMC Fiscal ANP">
-              <svg class="w-3.5 h-3.5 text-purple-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" stroke-width="1.75"/><rect x="8" y="2" width="8" height="4" rx="1" stroke-width="1.75"/></svg> <span>LMC Fiscal ANP (±0.6%)</span>
-            </button>
-            <button onclick="window.auraGlance ? window.auraGlance.openCommandPalette() : document.getElementById('btn-open-palette').click()" class="quick-prompt-chip !border-purple-500/30 text-purple-300 hover:text-purple-200" aria-label="Abrir mais consultas rápidas">
-              <svg class="w-3.5 h-3.5 text-purple-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><polygon points="12,6.5 16.5,9.5 16.5,14.5 12,17.5 7.5,14.5 7.5,9.5" stroke-width="1.25" fill="rgba(168,85,247,0.25)"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg> <span>Mais consultas (Ctrl+K)</span>
-            </button>
-          </div>
+      </div>
+      <!-- Rodapé do Card de Boas-Vindas: Sugestões Executivas com Espaçamento Inferior -->
+      <div id="welcome-suggestions-container" class="welcome-card-footer !mt-7 sm:!mt-8 pt-4 border-t border-white/10 space-y-2.5">
+        <span class="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+          Sugestões executivas para iniciar:
+        </span>
+        <div class="welcome-suggestions-grid grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+          <button onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" class="quick-prompt-chip" aria-label="Consultar Autonomia de Tanques">
+            <svg class="w-3.5 h-3.5 text-emerald-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="11" height="18" rx="2" stroke-width="1.75"/><line x1="2" y1="21" x2="15" y2="21" stroke-width="1.75"/><path d="M14 8h2.5a2 2 0 0 1 2 2v6.5a1.5 1.5 0 0 0 3 0V9l-2-2" stroke-width="1.5"/></svg> <span>Autonomia dos Tanques</span>
+          </button>
+          <button onclick="window.auraChat.sendUserPrompt('Como fechou o último turno? Teve furo de caixa?')" class="quick-prompt-chip" aria-label="Consultar Fechamento de Turno e Caixa">
+            <svg class="w-3.5 h-3.5 text-cyan-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="6" width="20" height="12" rx="2" stroke-width="1.75"/><circle cx="12" cy="12" r="3" stroke-width="1.75"/><path d="M6 12h.01M18 12h.01" stroke-width="2"/></svg> <span>Fechamento & Caixa</span>
+          </button>
+          <button onclick="window.auraChat.sendUserPrompt('O LMC de ontem fechou dentro da tolerância oficial da ANP?')" class="quick-prompt-chip" aria-label="Consultar LMC Fiscal ANP">
+            <svg class="w-3.5 h-3.5 text-purple-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" stroke-width="1.75"/><rect x="8" y="2" width="8" height="4" rx="1" stroke-width="1.75"/></svg> <span>LMC Fiscal ANP (±0.6%)</span>
+          </button>
+          <button onclick="window.auraGlance ? window.auraGlance.openCommandPalette() : document.getElementById('btn-open-palette').click()" class="quick-prompt-chip !border-purple-500/30 text-purple-300 hover:text-purple-200" aria-label="Abrir mais consultas rápidas">
+            <svg class="w-3.5 h-3.5 text-purple-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><polygon points="12,6.5 16.5,9.5 16.5,14.5 12,17.5 7.5,14.5 7.5,9.5" stroke-width="1.25" fill="rgba(168,85,247,0.25)"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg> <span>Mais consultas (Ctrl+K)</span>
+          </button>
         </div>
       </div>
     `;
@@ -325,7 +326,7 @@ class AuraChatController {
     this.announceToScreenReader('Consulta enviada para AURA. Aguardando processamento analítico.');
 
     // F4-07 & Clean UX: Remove as sugestões de boas-vindas para manter o layout ultra-clean após iniciar a conversa
-    const welcomeSuggestions = document.getElementById('welcome-suggestions-container');
+    const welcomeSuggestions = typeof document !== 'undefined' ? document.getElementById('welcome-suggestions-container') : null;
     if (welcomeSuggestions) {
       welcomeSuggestions.remove();
     }
@@ -641,7 +642,7 @@ class AuraChatController {
           </div>
           ${opts.isWelcome ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-sans font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Pronta para Atendimento</span>' : ''}
         </div>
-        <div class="w-full">${htmlContent}</div>
+        <div class="${opts.isWelcome ? 'w-full flex flex-col justify-between' : 'w-full'}">${htmlContent}</div>
       </div>
     `;
     feed.appendChild(div);

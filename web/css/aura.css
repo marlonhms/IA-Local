@@ -1363,6 +1363,34 @@ body {
 .quick-prompts-bar::-webkit-scrollbar {
   height: 4px;
 }
+/* Rodapé de Sugestões Executivas do Card de Boas-Vindas (Espaçamento Inferior Dedicado) */
+#welcome-suggestions-container,
+.welcome-card-footer {
+  display: block;
+  width: 100%;
+  margin-top: 1.75rem !important;
+  padding-top: 1rem !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.welcome-suggestions-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  #welcome-suggestions-container,
+  .welcome-card-footer {
+    margin-top: 2rem !important;
+    padding-top: 1.125rem !important;
+  }
+
+  .welcome-suggestions-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 
 .quick-prompt-chip {
   flex-shrink: 0;
@@ -1386,6 +1414,8 @@ body {
   touch-action: manipulation;
   width: 100%;
   text-align: left;
+  white-space: normal;
+  line-height: 1.35;
 }
 
 .quick-prompt-chip:hover {
