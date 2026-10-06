@@ -47,3 +47,11 @@ data/*.sqlite*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Android build & caches
+.gradle/
+.kotlin/
+local.properties
+**/build/
+*.apk
+*.aab
