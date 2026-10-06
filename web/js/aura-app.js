@@ -300,6 +300,9 @@ class AuraApp {
     window.auraCockpit.init();
     window.auraTriggers.renderGrid();
     window.auraChat.init();
+    if (window.auraAuxPanel && typeof window.auraAuxPanel.init === 'function') {
+      window.auraAuxPanel.init();
+    }
 
     // Inicia diretamente no Console Cognitivo (Mobile-First Workspace)
     this.switchTab('console');
@@ -394,6 +397,16 @@ class AuraApp {
           const btnPalette = document.getElementById('btn-open-palette');
           if (btnPalette) btnPalette.click();
         }
+      });
+    }
+
+    // Botão Painel Auxiliar na Gaveta
+    const btnSidebarAux = document.getElementById('sidebar-btn-aux-panel');
+    if (btnSidebarAux) {
+      btnSidebarAux.addEventListener('click', () => {
+        this.closeSidebar();
+        if (this.currentTab !== 'console') this.switchTab('console');
+        if (window.auraAuxPanel) window.auraAuxPanel.toggle();
       });
     }
 

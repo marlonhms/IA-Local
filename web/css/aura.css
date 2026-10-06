@@ -2342,4 +2342,157 @@ select:focus-visible,
   }
 }
 
+/* ==========================================================================
+   AURA COMPANION CANVAS / PAINEL AUXILIAR INTERATIVO (DUAL FOCUS WORKSPACE)
+   ========================================================================== */
+
+.aura-aux-panel {
+  background: rgba(12, 18, 30, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 48px -8px rgba(0, 0, 0, 0.8), 0 0 20px rgba(6, 182, 212, 0.08);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#view-console {
+  transition: max-width 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s ease;
+}
+
+#console-workspace-container {
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#chat-stream-column {
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Expansão ergonômica de tela ampla para o workspace Dual Focus */
+@media (min-width: 1280px) {
+  body:has(#view-console.aux-panel-active) main {
+    max-width: 94rem !important;
+  }
+}
+
+/* Estado Ativo no Desktop (Split Canvas 50/50 ou 45/55) */
+@media (min-width: 1024px) {
+  #view-console.aux-panel-active {
+    max-width: 92rem !important; /* ~1472px para ergonomia cinematográfica */
+  }
+
+  #view-console.aux-panel-active #chat-stream-column {
+    width: calc(48% - 0.5rem);
+    flex: 0 0 calc(48% - 0.5rem);
+  }
+
+  #view-console.aux-panel-active #aura-aux-panel {
+    display: flex !important;
+    width: calc(52% - 0.5rem);
+    flex: 0 0 calc(52% - 0.5rem);
+  }
+
+  /* Modo Expandido: foco no Canvas para auditorias densas (35% Chat / 65% Canvas) */
+  #view-console.aux-panel-active.aux-expanded #chat-stream-column {
+    width: calc(35% - 0.5rem);
+    flex: 0 0 calc(35% - 0.5rem);
+  }
+
+  #view-console.aux-panel-active.aux-expanded #aura-aux-panel {
+    width: calc(65% - 0.5rem);
+    flex: 0 0 calc(65% - 0.5rem);
+  }
+}
+
+/* Estado Ativo no Mobile/Tablet (< 1024px): Sheet Modal de Foco Total */
+@media (max-width: 1023px) {
+  #view-console.aux-panel-active #chat-stream-column {
+    width: 100% !important;
+    flex: 1 1 auto !important;
+  }
+
+  #view-console.aux-panel-active #aura-aux-panel {
+    display: flex !important;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 55 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100dvh !important;
+    border-radius: 0 !important;
+    background: rgba(7, 9, 14, 0.98) !important;
+    padding-top: env(safe-area-inset-top, 0);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+}
+
+/* Card e Portal de Companheiro no Chat Bubble (Liquid Glass Dual Focus) */
+.aux-companion-portal-banner,
+.aux-artifact-portal-card {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(6, 182, 212, 0.08) 50%, rgba(168, 85, 247, 0.05) 100%);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.6), 0 0 16px rgba(6, 182, 212, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: all var(--aura-motion-fast) ease;
+}
+
+.aux-companion-portal-banner:hover,
+.aux-artifact-portal-card:hover {
+  border-color: rgba(6, 182, 212, 0.5);
+  box-shadow: 0 10px 28px -4px rgba(0, 0, 0, 0.7), 0 0 22px rgba(6, 182, 212, 0.16);
+}
+
+/* Touch targets acessíveis (min 44px) nos controles de topo do canvas */
+.aux-panel-topbar button {
+  min-height: 44px;
+}
+
+/* Chips do Carrossel de Histórico no Aux Panel */
+.aux-artifact-chip {
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.aux-artifact-chip:hover {
+  transform: translateY(-1px);
+}
+
+/* Tabela Analítica Universal de Alto Desempenho */
+.aux-data-table th {
+  white-space: nowrap;
+}
+
+.aux-data-table td {
+  white-space: nowrap;
+}
+
+/* GPU Guard Mode - anulação de desfoques pesados para 60 FPS cravados */
+.gpu-guard-active .aura-aux-panel {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: #0d1420 !important;
+}
+
+.gpu-guard-active .aux-companion-portal-banner,
+.gpu-guard-active .aux-artifact-portal-card {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: #0f172a !important;
+}
+
+/* Suporte Estrito a Movimento Reduzido (WCAG 2.1 AA) */
+@media (prefers-reduced-motion: reduce) {
+  .aura-aux-panel,
+  #view-console,
+  #console-workspace-container,
+  #chat-stream-column,
+  .aux-companion-portal-banner,
+  .aux-artifact-portal-card {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+
 

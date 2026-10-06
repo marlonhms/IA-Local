@@ -482,6 +482,9 @@ class AuraChatController {
     this.renderSessionId();
     const feed = document.getElementById('chat-feed-container');
     if (feed) feed.innerHTML = '';
+    if (typeof window !== 'undefined' && window.auraAuxPanel && typeof window.auraAuxPanel.clearArtifacts === 'function') {
+      try { window.auraAuxPanel.clearArtifacts(); } catch (_) {}
+    }
     this.addWelcomeMessage();
   }
 
@@ -803,10 +806,72 @@ class AuraChatController {
     const widgetHtml = this.renderToolInlineWidget(toolName, resultData);
 
     if (widgetHtml) {
+      let artifactId = 'art_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+      let artifactTitle = this.formatToolDisplayName(toolName);
+      let artifactSubtitle = 'Resultado estruturado e auditável gerado pela AURA';
+
+      if (typeof window !== 'undefined' && window.auraAuxPanel && typeof window.auraAuxPanel.projectArtifact === 'function') {
+        try {
+          const art = window.auraAuxPanel.projectArtifact({
+            id: artifactId,
+            containerId: containerId,
+            toolName: toolName,
+            intent: resultData?.contrato?.intent || resultData?.intent,
+            data: resultData,
+            html: widgetHtml,
+            autoOpen: true
+          });
+          if (art && art.id) {
+            artifactId = art.id;
+            if (art.title) artifactTitle = art.title;
+            if (art.subtitle) artifactSubtitle = art.subtitle;
+          }
+        } catch (_) {}
+      }
+
+      const portalBannerHtml = `
+        <div class="aux-companion-portal-banner aux-artifact-portal-card mb-3 p-3.5 rounded-2xl bg-slate-900/90 border border-cyan-500/30 flex flex-col gap-2.5 shadow-lg backdrop-blur-md">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0 shadow-inner">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <rect x="2" y="3" width="20" height="18" rx="2.5" stroke-width="1.75"/>
+                  <line x1="13" y1="3" x2="13" y2="21" stroke-width="1.75"/>
+                  <circle cx="7.5" cy="12" r="2" fill="currentColor"/>
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs font-bold text-white flex items-center gap-1.5 truncate font-sans">
+                  <span>${this.escapeHtml(artifactTitle)}</span>
+                  <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Canvas</span>
+                </div>
+                <p class="text-[11px] text-slate-400 font-sans truncate">${this.escapeHtml(artifactSubtitle)}</p>
+              </div>
+            </div>
+
+            <!-- Ações: Ver no Painel (Primário) e Ver no Chat (Secundário) -->
+            <div class="flex items-center gap-2 self-end sm:self-auto flex-shrink-0 font-sans">
+              <button type="button" onclick="window.auraChat && window.auraChat.toggleInlineArtifact('${containerId}')" id="${containerId}-btn-toggle-inline" class="px-2.5 py-1.5 min-h-[36px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-medium transition-all flex items-center gap-1" title="Alternar visualização deste card no chat">
+                <span id="${containerId}-btn-toggle-label">Ver no Chat ▾</span>
+              </button>
+              <button type="button" onclick="window.auraAuxPanel && window.auraAuxPanel.open('${artifactId}')" class="px-3 py-1.5 min-h-[36px] rounded-xl bg-gradient-to-r from-cyan-500/20 to-purple-500/20 hover:from-cyan-500/30 hover:to-purple-500/30 text-cyan-200 hover:text-white border border-cyan-500/40 text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm" title="Abrir no Painel Auxiliar">
+                <span>Ver no Painel</span>
+                <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Contêiner do Widget Inline Desdobrável (fica recolhido para não poluir o feed quando o painel auxiliar estiver ativo) -->
+          <div id="${containerId}-inline-widget" class="hidden pt-2 border-t border-white/10 animate-fade-in">
+            ${widgetHtml}
+          </div>
+        </div>
+      `;
+
       cardIds.forEach(id => {
         const cardEl = document.getElementById(id);
         if (cardEl) {
-          cardEl.innerHTML = widgetHtml;
+          cardEl.innerHTML = portalBannerHtml;
           cardEl.classList.remove('hidden');
         }
       });
@@ -819,6 +884,23 @@ class AuraChatController {
           cardEl.classList.add('hidden');
         }
       });
+    }
+  }
+
+  toggleInlineArtifact(containerId) {
+    if (typeof document === 'undefined') return;
+    const widgetEl = document.getElementById(containerId + '-inline-widget');
+    const labelEl = document.getElementById(containerId + '-btn-toggle-label');
+    if (!widgetEl) return;
+
+    const isHidden = widgetEl.classList.contains('hidden');
+    if (isHidden) {
+      widgetEl.classList.remove('hidden');
+      if (labelEl) labelEl.textContent = 'Recolher no Chat ▴';
+      this.scrollToBottom();
+    } else {
+      widgetEl.classList.add('hidden');
+      if (labelEl) labelEl.textContent = 'Ver no Chat ▾';
     }
   }
 
