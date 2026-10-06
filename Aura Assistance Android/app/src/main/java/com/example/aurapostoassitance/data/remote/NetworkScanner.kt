@@ -19,23 +19,34 @@ class NetworkScanner @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private val scanClient = OkHttpClient.Builder()
-        .connectTimeout(800, TimeUnit.MILLISECONDS)
-        .readTimeout(800, TimeUnit.MILLISECONDS)
+        .connectTimeout(600, TimeUnit.MILLISECONDS)
+        .readTimeout(600, TimeUnit.MILLISECONDS)
         .build()
 
     suspend fun findAuraServer(): String? = withContext(Dispatchers.IO) {
-        val subnet = getSubnetPrefix() ?: "192.168.1."
-        Log.d("NetworkScanner", "Scanning subnet prefix: $subnet")
+        val detectedSubnet = getSubnetPrefix()
+        val subnets = mutableSetOf<String>()
+        if (detectedSubnet != null) {
+            subnets.add(detectedSubnet)
+        }
+        subnets.add("192.168.0.")
+        subnets.add("192.168.1.")
+        subnets.add("192.168.15.")
+        subnets.add("10.0.0.")
 
         val candidates = mutableListOf<String>()
         candidates.add("127.0.0.1")
         candidates.add("100.77.164.17")
-        
-        for (i in 1..254) {
-            candidates.add("$subnet$i")
+
+        for (sub in subnets) {
+            for (i in 1..254) {
+                candidates.add("$sub$i")
+            }
         }
 
-        val chunks = candidates.chunked(30)
+        Log.d("NetworkScanner", "Scanning candidates count: ${candidates.size}")
+
+        val chunks = candidates.chunked(40)
         for (chunk in chunks) {
             val deferreds = chunk.map { ip ->
                 async {

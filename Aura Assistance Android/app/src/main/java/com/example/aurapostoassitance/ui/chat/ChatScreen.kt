@@ -50,14 +50,18 @@ fun ChatScreen(
 
     val listState = rememberLazyListState()
 
-    // Auto-scroll to bottom when new messages arrive
-    LaunchedEffect(messages.size, messages.lastOrNull()?.text) {
+    // Auto-scroll to bottom when new messages arrive or when keyboard opens
+    val keyboardBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+    LaunchedEffect(messages.size, messages.lastOrNull()?.text, keyboardBottomPadding) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
     }
 
     Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .imePadding(),
         topBar = {
             TopAppBar(
                 title = {
