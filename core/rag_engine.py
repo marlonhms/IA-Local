@@ -84,7 +84,12 @@ class HybridRAGEngine:
 
     def _get_connection(self):
         """Abre conexão com o PostgreSQL do pgvector."""
-        return psycopg2.connect(**self.db_config)
+        conn = psycopg2.connect(**self.db_config)
+        try:
+            conn.set_client_encoding('UTF8')
+        except Exception:
+            pass
+        return conn
 
     def gerar_embedding(self, texto: str, task_type: str = "retrieval_query") -> List[float]:
         """Gera embedding de 768 dimensões com o Gemini."""

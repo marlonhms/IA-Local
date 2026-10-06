@@ -2258,3 +2258,88 @@ body.gpu-guard-active,
   color: #38bdf8;
 }
 
+/* ==========================================================================
+   FASE 6 — QUALIDADE, RESILIÊNCIA & ACESSIBILIDADE WCAG 2.1 AA
+   ========================================================================== */
+
+/* F6-03 & F6-04: Anunciador Acessível para Leitores de Tela (WCAG 2.1 AA) */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border-width: 0 !important;
+}
+
+/* F6-03: Anéis de Foco Visíveis de Alto Contraste (WCAG 2.1 AA - Focus Visible) */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #06b6d4 !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.25) !important;
+}
+
+.evidence-drawer button:focus-visible,
+.palette-container button:focus-visible,
+.palette-container input:focus-visible,
+.decision-btn-primary:focus-visible,
+.decision-btn-secondary:focus-visible {
+  outline: 2px solid #22d3ee !important;
+  outline-offset: 2px !important;
+}
+
+/* F6-05 & F4-09: Mobile Reflow Executivo (320px - 375px) sem horizontal clipping */
+@media (max-width: 375px) {
+  html, body {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+  }
+
+  .decision-card {
+    padding: 12px !important;
+    border-radius: 12px !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .decision-actions {
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+
+  .decision-btn-primary,
+  .decision-btn-secondary {
+    width: 100% !important;
+    justify-content: center !important;
+    min-height: 44px !important;
+  }
+
+  .evidence-drawer {
+    width: 100vw !important;
+    max-width: 100vw !important;
+  }
+
+  .palette-container {
+    width: 95vw !important;
+    margin: 10px auto !important;
+  }
+
+  /* Overflow estritamente contido em tabelas e containers de visualização */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    max-width: 100% !important;
+  }
+}
+
+

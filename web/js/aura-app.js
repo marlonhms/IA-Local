@@ -343,6 +343,8 @@ class AuraApp {
       if (!this.sidebarOpen) return;
 
       if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
         this.closeSidebar();
         return;
       }

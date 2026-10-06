@@ -34,13 +34,15 @@ const CHAT_ICONS = {
   terminal: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="4 17 10 11 4 5" stroke-width="2"/><line x1="12" y1="19" x2="20" y2="19" stroke-width="2"/></svg>',
   volume: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" stroke-width="1.75"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" stroke-width="1.75"/></svg>',
   folder: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke-width="1.75"/></svg>',
-  rocket: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09zM12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" stroke-width="1.75"/></svg>'
+  rocket: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09zM12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" stroke-width="1.75"/></svg>',
+  refresh: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 4 23 10 17 10" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><polyline points="1 20 1 14 7 14" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 };
 
 class AuraChatController {
   constructor() {
     this.sessionId = this.generateSessionId();
     this.isStreaming = false;
+    this.isSubmitting = false;
     this.abortController = null;
     this.messages = [];
     this.userScrolledUp = false;
@@ -77,6 +79,20 @@ class AuraChatController {
 
   generateSessionId() {
     return 'aura_ui_' + Math.random().toString(36).substring(2, 10);
+  }
+
+  /**
+   * F6-03 & F6-04: Anunciador Acessível para Leitores de Tela (WCAG 2.1 AA)
+   * Emite anúncios estáveis apenas em eventos-chave (início, ferramenta, término, erro),
+   * evitando poluição sonora a cada token do streaming.
+   */
+  announceToScreenReader(message) {
+    if (typeof document === 'undefined') return;
+    const el = document.getElementById('aura-sr-announcer');
+    if (el) {
+      el.textContent = '';
+      setTimeout(() => { el.textContent = message; }, 50);
+    }
   }
 
   autoResizeInput(textarea) {
@@ -188,7 +204,10 @@ class AuraChatController {
       const isDrawerOpen = evDrawer && evDrawer.classList.contains('open');
 
       if (e.key === 'Escape' && isDrawerOpen) {
+        e.preventDefault();
+        e.stopPropagation();
         this.closeEvidence();
+        return;
       }
 
       // Acessibilidade: Focus Trap dentro do Drawer aberto
@@ -363,6 +382,7 @@ class AuraChatController {
    * Dispara prompt vindo de atalhos rápidos ou outros módulos
    */
   sendUserPrompt(text) {
+    if (this.isSubmitting || this.isStreaming) return;
     const input = document.getElementById('chat-input-text');
     if (input) input.value = '';
     const splitInput = document.getElementById('split-chat-input-text');
@@ -374,6 +394,9 @@ class AuraChatController {
    * Envia a mensagem do usuário e inicia a conexão SSE
    */
   async handleSendMessage(promptText = null) {
+    if (this.isSubmitting || this.isStreaming) return;
+    this.isSubmitting = true;
+
     let query = promptText;
     const input = document.getElementById('chat-input-text');
     const splitInput = document.getElementById('split-chat-input-text');
@@ -386,7 +409,12 @@ class AuraChatController {
       }
     }
 
-    if (!query || this.isStreaming) return;
+    if (!query) {
+      this.isSubmitting = false;
+      return;
+    }
+
+    this.announceToScreenReader('Consulta enviada para AURA. Aguardando processamento analítico.');
 
     if (input) {
       input.value = '';
@@ -565,6 +593,9 @@ class AuraChatController {
 
   setStreamingState(isStreaming) {
     this.isStreaming = isStreaming;
+    if (!isStreaming) {
+      this.isSubmitting = false;
+    }
     const sendBtn = document.getElementById('btn-chat-send');
     const stopBtn = document.getElementById('btn-chat-stop');
     const input = document.getElementById('chat-input-text');
@@ -989,6 +1020,88 @@ class AuraChatController {
   }
 
   /**
+   * F6-06 / F1-08: Card de Contingência Executiva para Fontes Indisponíveis / Timeout / Erro
+   * Apresenta diagnóstico semântico honesto, limitação explícita e ação de contingência manual/reiteração.
+   */
+  renderContingencyCard(moduleName, data, retryPrompt = null) {
+    const motivo = data?.motivo || data?.mensagem || data?.error || 'Acesso à fonte de dados (ERP/Banco/Automação) temporariamente indisponível.';
+    const evId = 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    if (typeof window !== 'undefined') {
+      if (!window.__auraEvidenceStore) window.__auraEvidenceStore = {};
+      window.__auraEvidenceStore[evId] = data;
+    }
+
+    const defaultPrompts = {
+      'Conciliação de Turno & Caixa': 'Como fechou o último turno? Teve furo de caixa?',
+      'Autonomia de Tanques & Run-Out': 'Qual a previsão de esgotamento e a autonomia estimada dos tanques?',
+      'Performance da Pista & Frentistas': 'Há algum bico com vazão lenta ou alerta na pista?',
+      'Conciliação Físico-Contábil do LMC ANP': 'O LMC de ontem fechou dentro da tolerância oficial da ANP?',
+      'Combos & Vendas Cruzadas na Conveniência': 'Quais os combos de vendas cruzadas com maior Lift na conveniência?',
+    };
+    const promptToRetry = retryPrompt || defaultPrompts[moduleName] || 'Repetir a consulta anterior';
+
+    return `
+      <div class="decision-card decision-contingency-card" data-evidence-id="${evId}">
+        <div class="decision-header">
+          <div class="decision-context">
+            <span class="decision-context-title">${this.escapeHtml(moduleName)}</span>
+            <span class="decision-context-sub">
+              <span>${CHAT_ICONS.alert} Análise Suspensa</span>
+              <span>•</span>
+              <span>${CHAT_ICONS.unit} ${this.escapeHtml(data?.context?.unit_id || 'Posto')}</span>
+            </span>
+          </div>
+          <span class="decision-status-badge status-divergent">
+            <span>${CHAT_ICONS.alert}</span>
+            <span>Fonte Indisponível</span>
+          </span>
+        </div>
+
+        <div class="decision-hero">
+          <div class="decision-hero-header">
+            <span class="decision-hero-label">Status da Conexão</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-sans font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">Indisponibilidade Temporária</span>
+          </div>
+          <div class="decision-hero-value text-slate-400">
+            —
+          </div>
+          <div class="decision-hero-sub text-rose-300/90">
+            Não foi possível calcular indicadores oficiais. Fonte primária não respondeu dentro do tempo limite.
+          </div>
+        </div>
+
+        <div class="decision-limitation-callout border-rose-500/30 bg-rose-950/20 text-rose-200/90">
+          <span class="inline-flex text-rose-400">${CHAT_ICONS.alert}</span>
+          <div>
+            <strong class="font-semibold text-rose-300">Contingência Operacional:</strong>
+            <span class="text-rose-200/90">${this.escapeHtml(motivo)}</span>
+          </div>
+        </div>
+
+        <div class="decision-actions">
+          <button 
+            type="button" 
+            class="decision-btn-primary" 
+            onclick="if (window.auraChat) window.auraChat.sendUserPrompt('${this.escapeHtml(promptToRetry)}');"
+            title="Tentar executar a consulta novamente">
+            <span>${CHAT_ICONS.refresh}</span>
+            <span>Tentar Novamente</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="decision-btn-secondary" 
+            onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como verificar a integridade da conexão do ERP e banco local?');"
+            title="Verificar status e procedimento manual de contingência">
+            <span>${CHAT_ICONS.wrench}</span>
+            <span>Auditar Conexão do ERP</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
    * F1-08 / F5-01: Card de Fallback Seguro para Versão Desconhecida de Schema
    * Não inventa interpretação financeira ou operacional quando o schema não for suportado.
    */
@@ -1158,8 +1271,12 @@ class AuraChatController {
     const resumo = data.resumo_executivo || {};
     const tanksList = c.tanks || data.detalhamento_tanques || data.tanques || [];
 
-    const isNoMovement = assessment.status_code === 'SEM_MOVIMENTACAO' || assessment.status_code === 'SEM_REGISTROS' || data.status === 'sem_movimento' || tanksList.length === 0;
-    const isUnavailable = assessment.status_code === 'INDISPONIVEL' || data.status === 'indisponivel';
+    const isUnavailable = assessment.status_code === 'INDISPONIVEL' || assessment.finality === 'unavailable' || data.status === 'indisponivel' || data.status === 'timeout' || data.status === 'error';
+    const isNoMovement = !isUnavailable && (assessment.status_code === 'SEM_MOVIMENTACAO' || assessment.status_code === 'SEM_REGISTROS' || data.status === 'sem_movimento' || tanksList.length === 0);
+
+    if (isUnavailable && tanksList.length === 0 && !data.contrato && !data.resumo_executivo) {
+      return this.renderContingencyCard('Autonomia de Tanques & Run-Out', data, 'Qual a previsão de esgotamento e a autonomia estimada dos tanques?');
+    }
 
     const evId = 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     if (typeof window !== 'undefined') {
@@ -1173,14 +1290,14 @@ class AuraChatController {
     let badgeText = assessment.badge_label || 'Estoque Estável';
     const severity = assessment.severity || (resumo.status_geral?.includes('CRITICO') ? 'critical' : (resumo.status_geral?.includes('ATENCAO') ? 'attention' : 'normal'));
 
-    if (isNoMovement) {
-      badgeClass = 'status-neutral';
-      badgeIcon = CHAT_ICONS.pause;
-      badgeText = assessment.badge_label || 'Sem Registros';
-    } else if (isUnavailable) {
+    if (isUnavailable) {
       badgeClass = 'status-divergent';
       badgeIcon = CHAT_ICONS.alert;
       badgeText = 'Fonte Indisponível';
+    } else if (isNoMovement) {
+      badgeClass = 'status-neutral';
+      badgeIcon = CHAT_ICONS.pause;
+      badgeText = assessment.badge_label || 'Sem Registros';
     } else if (severity === 'critical') {
       badgeClass = 'status-divergent';
       badgeIcon = CHAT_ICONS.alert;
@@ -1202,7 +1319,7 @@ class AuraChatController {
 
     let heroValFormatted = '—';
     let heroColorClass = 'text-emerald';
-    if (tanksList.length === 0 || isNoMovement) {
+    if (isUnavailable || tanksList.length === 0 || isNoMovement) {
       heroValFormatted = '—';
       heroColorClass = 'text-slate-400';
     } else if (menorAutonomiaReserva !== null && menorAutonomiaReserva !== undefined && !isNaN(Number(menorAutonomiaReserva))) {
@@ -1215,7 +1332,9 @@ class AuraChatController {
 
     const heroLabel = 'Menor Autonomia de Pista';
     let heroSub = 'Tempo estimado até atingir a reserva crítica de segurança (15%).';
-    if (tanksList.length === 0 || isNoMovement) {
+    if (isUnavailable) {
+      heroSub = 'Telemetria de tanques e volumetria temporariamente indisponíveis no concentrador/ERP.';
+    } else if (tanksList.length === 0 || isNoMovement) {
       heroSub = 'Nenhum tanque localizado para os critérios informados.';
     } else if (menorAutonomiaEsgot !== null && menorAutonomiaEsgot !== undefined && !isNaN(Number(menorAutonomiaEsgot))) {
       heroSub = `Tanque ${codCritico} • Reserva técnica (15%) em ${heroValFormatted} • Esgotamento total (0%) em ${Number(menorAutonomiaEsgot).toFixed(1)}h.`;
@@ -1228,10 +1347,20 @@ class AuraChatController {
     const carretas5k = metrics.compartimentos_5k_total ?? metrics.carretas_capacidade_5k_sugeridas ?? resumo.carretas_capacidade_5k_sugeridas ?? Math.floor(ullageTotal / 5000);
     const pctGlobal = metrics.ocupacao_geral_pct !== undefined ? Number(metrics.ocupacao_geral_pct).toFixed(1) : (capTotal > 0 ? ((volTotal / capTotal) * 100).toFixed(1) : '0.0');
 
-    // Bloco de Limitação (F5-02)
+    // Bloco de Limitação (F5-02 / F6-01)
     let limitationHtml = '';
     const limText = assessment.limitation || resumo.limitation;
-    if (limText && !isNoMovement && !isUnavailable) {
+    if (isUnavailable) {
+      limitationHtml = `
+        <div class="decision-limitation-callout border-rose-500/30 bg-rose-950/20 text-rose-200/90">
+          <span class="inline-flex text-rose-400">${CHAT_ICONS.alert}</span>
+          <div>
+            <strong class="font-semibold text-rose-300">Contingência Operacional:</strong>
+            <span class="text-rose-200/90">${this.escapeHtml(limText || data.motivo || 'Telemetria de tanques temporariamente indisponível no concentrador/ERP.')}</span>
+          </div>
+        </div>
+      `;
+    } else if (limText && !isNoMovement) {
       limitationHtml = `
         <div class="decision-limitation-callout">
           <span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span>
@@ -1386,48 +1515,67 @@ class AuraChatController {
 
         <!-- Barras de Tanques -->
         <div class="space-y-2 mt-1">
-          ${tanksBarsHtml || '<div class="text-xs font-sans text-slate-400">Nenhum tanque retornado.</div>'}
+          ${isUnavailable ? '<div class="p-3 rounded-xl bg-slate-900/60 border border-rose-500/20 text-rose-300 text-xs font-sans">Leitura individual dos tanques suspensa por indisponibilidade da fonte.</div>' : (tanksBarsHtml || '<div class="text-xs font-sans text-slate-400">Nenhum tanque retornado.</div>')}
         </div>
 
         ${pendingHtml}
 
         <!-- Ações Permitidas -->
         <div class="decision-actions">
-          <button 
-            type="button" 
-            class="decision-btn-primary" 
-            onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual a melhor sugestão de pedido de carreta para o Tanque ${codCritico}?');"
-            title="Sugerir compra imediata com base no Ullage">
-            ${CHAT_ICONS.truck}
-            <span>${this.escapeHtml(recLabel)}</span>
-          </button>
+          ${isUnavailable ? `
+            <button 
+              type="button" 
+              class="decision-btn-primary" 
+              onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual a previsão de esgotamento e a autonomia estimada dos tanques?');"
+              title="Tentar executar a consulta novamente">
+              <span>${CHAT_ICONS.refresh}</span>
+              <span>Tentar Novamente</span>
+            </button>
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar estoque de combustível sem telemetria eletrônica?');"
+              title="Procedimento de contingência">
+              <span>${CHAT_ICONS.wrench}</span>
+              <span>Procedimento de Contingência</span>
+            </button>
+          ` : `
+            <button 
+              type="button" 
+              class="decision-btn-primary" 
+              onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual a melhor sugestão de pedido de carreta para o Tanque ${codCritico}?');"
+              title="Sugerir compra imediata com base no Ullage">
+              ${CHAT_ICONS.truck}
+              <span>${this.escapeHtml(recLabel)}</span>
+            </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
-            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
-            title="Ver fórmulas matemáticas de consumo médio e run-out">
-            ${CHAT_ICONS.formula}
-            <span>Como foi calculado</span>
-          </button>
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
+              title="Ver fórmulas matemáticas de consumo médio e run-out">
+              ${CHAT_ICONS.formula}
+              <span>Como foi calculado</span>
+            </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
-            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'tanques');"
-            title="Ver detalhamento completo dos tanques">
-            ${CHAT_ICONS.tank}
-            <span>Ver Tanques & Detalhes</span>
-          </button>
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'tanques');"
+              title="Ver detalhamento completo dos tanques">
+              ${CHAT_ICONS.tank}
+              <span>Ver Tanques & Detalhes</span>
+            </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
-            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
-            title="Ver fontes de telemetria e diagnóstico">
-            ${CHAT_ICONS.audit}
-            <span>Resumo & Fontes</span>
-          </button>
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
+              title="Ver fontes de telemetria e diagnóstico">
+              ${CHAT_ICONS.audit}
+              <span>Resumo & Fontes</span>
+            </button>
+          `}
         </div>
       </div>
     `;
@@ -1462,8 +1610,8 @@ class AuraChatController {
     const resumo = data.resumo_executivo || {};
     const items = c.tanks || data.demonstrativo_por_combustivel || data.tanques || [];
 
-    const isNoMovement = assessment.status_code === 'SEM_MOVIMENTACAO' || data.status === 'sem_movimento';
-    const isUnavailable = assessment.status_code === 'INDISPONIVEL' || data.status === 'indisponivel';
+    const isUnavailable = assessment.status_code === 'INDISPONIVEL' || data.status === 'indisponivel' || assessment.status_code === 'FONTE_INDISPONIVEL' || c.assessment?.finality === 'unavailable';
+    const isNoMovement = !isUnavailable && (assessment.status_code === 'SEM_MOVIMENTACAO' || data.status === 'sem_movimento');
 
     const evId = 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     if (typeof window !== 'undefined') {
@@ -1479,14 +1627,14 @@ class AuraChatController {
     let badgeIcon = isConforme ? CHAT_ICONS.check : CHAT_ICONS.alert;
     let badgeText = assessment.badge_label || (isConforme ? 'CONFORME ANP (±0.6%)' : 'FORA DA TOLERÂNCIA ANP');
 
-    if (isNoMovement) {
-      badgeClass = 'status-neutral';
-      badgeIcon = CHAT_ICONS.pause;
-      badgeText = 'Sem Movimentação';
-    } else if (isUnavailable) {
+    if (isUnavailable) {
       badgeClass = 'status-divergent';
       badgeIcon = CHAT_ICONS.alert;
       badgeText = 'Fonte Indisponível';
+    } else if (isNoMovement) {
+      badgeClass = 'status-neutral';
+      badgeIcon = CHAT_ICONS.pause;
+      badgeText = 'Sem Movimentação';
     }
 
     // Determina o desvio de maior magnitude para a régua regulatória [-1.2% a +1.2%]
@@ -1516,17 +1664,32 @@ class AuraChatController {
     const heroVal = isNoMovement || isUnavailable ? '—' : needleText;
     const heroColorClass = isNoMovement || isUnavailable ? 'text-slate-400' : (dentroTolerancia ? 'text-emerald' : 'text-rose');
     const tanquesConformes = metrics.total_tanques_conformes ?? metrics.tanques_conformes_count ?? items.filter(it => Math.abs(parseFloat(it.variacao_pct ?? it.auditoria_anp?.variacao_pct ?? 0)) <= 0.6).length;
-    const heroSub = `Portaria ANP 26/1992 • Tolerância legal: ±0.60% • ${tanquesConformes} de ${items.length} tanques em conformidade estrita.`;
+    let heroSub = `Portaria ANP 26/1992 • Tolerância legal: ±0.60% • ${tanquesConformes} de ${items.length} tanques em conformidade estrita.`;
+    if (isUnavailable) {
+      heroSub = 'Não foi possível apurar o balanço fiscal do LMC por indisponibilidade na fonte de dados.';
+    } else if (isNoMovement) {
+      heroSub = 'Nenhuma movimentação de combustíveis registrada no período.';
+    }
 
     // Valores do Comparativo
     const escTotal = Number(metrics.total_estoque_escriturado_litros ?? metrics.estoque_escriturado_total_litros ?? resumo.estoque_escriturado_total_litros ?? 0);
     const fisTotal = Number(metrics.total_estoque_fisico_litros ?? metrics.estoque_fisico_total_litros ?? resumo.estoque_fisico_total_litros ?? 0);
     const varTotalL = Number(metrics.variacao_volumetrica_total_litros ?? resumo.variacao_volumetrica_total_litros ?? (fisTotal - escTotal));
 
-    // Bloco de Limitação (F5-02)
+    // Bloco de Limitação (F5-02 / F6-01)
     let limitationHtml = '';
     const limText = assessment.limitation || resumo.limitation;
-    if (limText && !isNoMovement && !isUnavailable) {
+    if (isUnavailable) {
+      limitationHtml = `
+        <div class="decision-limitation-callout border-rose-500/30 bg-rose-950/20 text-rose-200/90">
+          <span class="inline-flex text-rose-400">${CHAT_ICONS.alert}</span>
+          <div>
+            <strong class="font-semibold text-rose-300">Contingência Operacional:</strong>
+            <span class="text-rose-200/90">${this.escapeHtml(limText || data.motivo || 'Livro de Movimentação de Combustíveis (LMC) indisponível no ERP fiscal.')}</span>
+          </div>
+        </div>
+      `;
+    } else if (limText && !isNoMovement) {
       limitationHtml = `
         <div class="decision-limitation-callout">
           <span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span>
@@ -1682,48 +1845,67 @@ class AuraChatController {
 
         <!-- Lista de Tanques -->
         <div class="space-y-1.5 mt-1">
-          ${rowsHtml || '<div class="text-xs font-sans text-slate-400">Nenhum tanque retornado no relatório.</div>'}
+          ${isUnavailable ? '<div class="p-3 rounded-xl bg-slate-900/60 border border-rose-500/20 text-rose-300 text-xs font-sans">Demonstrativo por combustível suspenso por indisponibilidade da fonte fiscal.</div>' : (rowsHtml || '<div class="text-xs font-sans text-slate-400">Nenhum tanque retornado no relatório.</div>')}
         </div>
 
         ${pendingHtml}
 
         <!-- Ações Permitidas -->
         <div class="decision-actions">
-          <button 
-            type="button" 
-            class="decision-btn-primary" 
-            onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar a divergência física no tanque de combustíveis?');"
-            title="Abrir procedimento de conferência de sonda e régua">
-            ${CHAT_ICONS.search}
-            <span>${this.escapeHtml(recLabel)}</span>
-          </button>
+          ${isUnavailable ? `
+            <button 
+              type="button" 
+              class="decision-btn-primary" 
+              onclick="if (window.auraChat) window.auraChat.sendUserPrompt('O LMC de ontem fechou dentro da tolerância oficial da ANP?');"
+              title="Tentar executar a consulta novamente">
+              <span>${CHAT_ICONS.refresh}</span>
+              <span>Tentar Novamente</span>
+            </button>
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como preencher o LMC em contingência sem sistema ERP?');"
+              title="Procedimento de contingência">
+              <span>${CHAT_ICONS.wrench}</span>
+              <span>Procedimento de Contingência</span>
+            </button>
+          ` : `
+            <button 
+              type="button" 
+              class="decision-btn-primary" 
+              onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar a divergência física no tanque de combustíveis?');"
+              title="Abrir procedimento de conferência de sonda e régua">
+              ${CHAT_ICONS.search}
+              <span>${this.escapeHtml(recLabel)}</span>
+            </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
-            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
-            title="Ver definição regulatória da Portaria 26 da ANP">
-            ${CHAT_ICONS.formula}
-            <span>Como foi calculado</span>
-          </button>
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
+              title="Ver definição regulatória da Portaria 26 da ANP">
+              ${CHAT_ICONS.formula}
+              <span>Como foi calculado</span>
+            </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
-            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'tanques');"
-            title="Ver balanço físico-contábil completo dos tanques">
-            ${CHAT_ICONS.tank}
-            <span>Ver Tanques & ANP</span>
-          </button>
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'tanques');"
+              title="Ver balanço físico-contábil completo dos tanques">
+              ${CHAT_ICONS.tank}
+              <span>Ver Tanques & ANP</span>
+            </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
-            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
-            title="Ver fontes fiscais e telemetria">
-            ${CHAT_ICONS.audit}
-            <span>Resumo & Fontes</span>
-          </button>
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
+              title="Ver fontes fiscais e telemetria">
+              ${CHAT_ICONS.audit}
+              <span>Resumo & Fontes</span>
+            </button>
+          `}
         </div>
       </div>
     `;
@@ -1791,10 +1973,9 @@ class AuraChatController {
     const resumo = data.resumo_executivo || {};
     const tri = data.triangulacao_pista || {};
 
-    const finality = assessment.finality || (resumo.status_conciliacao?.includes('ANDAMENTO') ? 'partial' : 'final');
-    const isPartial = finality === 'partial';
-    const isNoMovement = finality === 'no_movement' || data.status === 'sem_movimento';
-    const isUnavailable = finality === 'unavailable' || data.status === 'indisponivel';
+    const isUnavailable = assessment.finality === 'unavailable' || data.status === 'indisponivel' || assessment.status_code === 'INDISPONIVEL' || assessment.status_code === 'FONTE_INDISPONIVEL';
+    const isNoMovement = !isUnavailable && (assessment.finality === 'no_movement' || data.status === 'sem_movimento' || assessment.status_code === 'SEM_MOVIMENTACAO');
+    const isPartial = !isUnavailable && !isNoMovement && (assessment.finality === 'partial' || resumo.status_conciliacao?.includes('ANDAMENTO'));
 
     // Armazena payload na memória global de evidências
     const evId = 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
@@ -1808,7 +1989,11 @@ class AuraChatController {
     let badgeIcon = CHAT_ICONS.audit;
     let badgeText = assessment.badge_label || resumo.status_conciliacao || 'Turno';
 
-    if (isPartial) {
+    if (isUnavailable) {
+      badgeClass = 'status-divergent';
+      badgeIcon = CHAT_ICONS.alert;
+      badgeText = assessment.badge_label || 'Fonte indisponível';
+    } else if (isPartial) {
       badgeClass = 'status-partial';
       badgeIcon = CHAT_ICONS.clock;
       badgeText = assessment.badge_label || 'Análise parcial (provisória)';
@@ -1816,10 +2001,6 @@ class AuraChatController {
       badgeClass = 'status-neutral';
       badgeIcon = CHAT_ICONS.pause;
       badgeText = 'Sem movimentação';
-    } else if (isUnavailable) {
-      badgeClass = 'status-divergent';
-      badgeIcon = CHAT_ICONS.alert;
-      badgeText = 'Fonte indisponível';
     } else if (assessment.severity === 'critical' || resumo.status_conciliacao?.includes('FURO') || resumo.status_conciliacao?.includes('DIVERGENCIA')) {
       badgeClass = 'status-divergent';
       badgeIcon = CHAT_ICONS.alert;
@@ -1878,10 +2059,20 @@ class AuraChatController {
     const encState = metrics.physical_volume_state || (tri.total_litros_faturados_encerrante === 0 && autVol > 0 ? 'not_reported' : 'measured');
     const encVol = metrics.physical_volume_liters ?? (encState === 'not_reported' ? null : Number(tri.total_litros_faturados_encerrante || 0));
 
-    // Bloco de Limitação
+    // Bloco de Limitação (F1-03 / F6-01)
     let limitationHtml = '';
     const limText = assessment.limitation || (isPartial ? 'Caixas abertos no PDV e encerrantes pendentes no ERP' : null);
-    if (limText && !isNoMovement && !isUnavailable) {
+    if (isUnavailable) {
+      limitationHtml = `
+        <div class="decision-limitation-callout border-rose-500/30 bg-rose-950/20 text-rose-200/90">
+          <span class="inline-flex text-rose-400">${CHAT_ICONS.alert}</span>
+          <div>
+            <strong class="font-semibold text-rose-300">Contingência Operacional:</strong>
+            <span class="text-rose-200/90">${this.escapeHtml(limText || data.motivo || 'Fonte de dados do ERP ou banco local indisponível para conciliação.')}</span>
+          </div>
+        </div>
+      `;
+    } else if (limText && !isNoMovement) {
       limitationHtml = `
         <div class="decision-limitation-callout">
           <span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span>
@@ -1987,43 +2178,62 @@ class AuraChatController {
 
         <!-- Ações Permitidas (Uma primária + botões de evidência) -->
         <div class="decision-actions">
-          <button 
-            type="button" 
-            class="decision-btn-primary" 
-            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
-            title="Abrir painel lateral com proveniência e detalhamento">
-            ${CHAT_ICONS.audit}
-            <span>${this.escapeHtml(recLabel)} ↗</span>
-          </button>
-
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
-            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
-            title="Ver fórmula matemática e definição do cálculo">
-            ${CHAT_ICONS.formula}
-            <span>Como foi calculado</span>
-          </button>
-
-          ${pendingItems.length > 0 ? `
+          ${isUnavailable ? `
+            <button 
+              type="button" 
+              class="decision-btn-primary" 
+              onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual a conciliação do turno de hoje?');"
+              title="Tentar executar a consulta novamente">
+              <span>${CHAT_ICONS.refresh}</span>
+              <span>Tentar Novamente</span>
+            </button>
             <button 
               type="button" 
               class="decision-btn-secondary" 
-              onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
-              title="Ver lista de pendências impeditivas">
-              ${CHAT_ICONS.alert}
-              <span>Ver pendências (${pendingItems.length})</span>
+              onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar fechamento de turno em contingência sem ERP?');"
+              title="Procedimento de contingência">
+              <span>${CHAT_ICONS.wrench}</span>
+              <span>Procedimento de Contingência</span>
             </button>
-          ` : ''}
+          ` : `
+            <button 
+              type="button" 
+              class="decision-btn-primary" 
+              onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
+              title="Abrir painel lateral com proveniência e detalhamento">
+              ${CHAT_ICONS.audit}
+              <span>${this.escapeHtml(recLabel)} ↗</span>
+            </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
-            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'bicos');"
-            title="Ver todos os bicos da pista e encerrantes">
-            ${CHAT_ICONS.nozzle}
-            <span>Ver Bicos & Caixas</span>
-          </button>
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
+              title="Ver fórmula matemática e definição do cálculo">
+              ${CHAT_ICONS.formula}
+              <span>Como foi calculado</span>
+            </button>
+
+            ${pendingItems.length > 0 ? `
+              <button 
+                type="button" 
+                class="decision-btn-secondary" 
+                onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
+                title="Ver lista de pendências impeditivas">
+                ${CHAT_ICONS.alert}
+                <span>Ver pendências (${pendingItems.length})</span>
+              </button>
+            ` : ''}
+
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'bicos');"
+              title="Ver todos os bicos da pista e encerrantes">
+              ${CHAT_ICONS.nozzle}
+              <span>Ver Bicos & Caixas</span>
+            </button>
+          `}
         </div>
       </div>
     `;
@@ -2156,11 +2366,25 @@ class AuraChatController {
     const sources = c.sources || [];
     const intent = c.intent || data.intent || 'shift_reconciliation';
     const dataAuditada = data.data_auditada || c.context?.data_auditada || (c.context?.queried_at ? new Date(c.context.queried_at).toLocaleDateString('pt-BR') : 'Data Recente');
+    const isUnavailable = assessment.finality === 'unavailable' || data.status === 'indisponivel' || assessment.status_code === 'INDISPONIVEL' || assessment.status_code === 'FONTE_INDISPONIVEL';
 
     // =========================================================================
     // ABA: COMO FOI CALCULADO (FÓRMULAS & DEFINIÇÕES CANÔNICAS)
     // =========================================================================
     if (tab === 'formula') {
+      if (isUnavailable) {
+        return `
+          <div class="evidence-section-card">
+            <h4 class="font-bold text-slate-100 flex items-center gap-2">
+              <span class="inline-flex text-rose-400">${CHAT_ICONS.alert}</span><span>Fonte Indisponível</span>
+            </h4>
+            <p class="text-slate-300 text-xs leading-relaxed p-3.5 rounded-xl glass-subcard border border-rose-500/20 font-sans">
+              A conexão com o banco de dados ERP não pôde ser estabelecida no momento da consulta. O cálculo de fórmulas analíticas foi suspenso para preservar a integridade das métricas.
+            </p>
+          </div>
+        `;
+      }
+
       if (intent === 'tank_forecast') {
         const menorRes = assessment.horizonte_critico_horas ?? metrics.autonomia_critica_horas ?? metrics.menor_autonomia_runout_horas ?? assessment.menor_autonomia_horas ?? 'N/A';
         const menorEsg = assessment.horizonte_runout_horas ?? metrics.autonomia_runout_horas ?? metrics.menor_autonomia_esgotamento_horas ?? assessment.menor_autonomia_esgotamento_horas ?? 'N/A';
@@ -2400,7 +2624,8 @@ class AuraChatController {
     if (tab === 'bicos') {
       const nozzlesList = c.nozzles || data.auditoria_vazao_bicos || data.vazao_bicos || data.triangulacao_pista?.detalhamento_bicos || [];
       if (nozzlesList.length === 0) {
-        return `<div class="p-4 text-center text-slate-500 font-sans text-xs">Sem dados detalhados de bicos para esta consulta.</div>`;
+        const isUnavailable = assessment.finality === 'unavailable' || data.status === 'indisponivel' || assessment.status_code === 'INDISPONIVEL' || assessment.status_code === 'FONTE_INDISPONIVEL';
+        return `<div class="p-4 text-center ${isUnavailable ? 'text-rose-300' : 'text-slate-500'} font-sans text-xs">${isUnavailable ? 'Leitura de bicos indisponível por falha na fonte primária.' : 'Sem dados detalhados de bicos para esta consulta.'}</div>`;
       }
 
       const rows = nozzlesList.map(b => {
@@ -2456,7 +2681,7 @@ class AuraChatController {
       if (intent === 'market_basket') {
         const rulesList = c.detailed_rules || c.top_combos || data.regras_associacao_detalhadas || [];
         if (rulesList.length === 0) {
-          return `<div class="p-4 text-center text-slate-500 font-sans text-xs">Nenhuma regra minerada para esta consulta.</div>`;
+          return `<div class="p-4 text-center ${isUnavailable ? 'text-rose-300' : 'text-slate-500'} font-sans text-xs">${isUnavailable ? 'Mineração de regras indisponível por falha na base do PDV.' : 'Nenhuma regra minerada para esta consulta.'}</div>`;
         }
 
         const rows = rulesList.map(r => {
@@ -2513,7 +2738,7 @@ class AuraChatController {
       // Default: Conciliação de turno caixas
       const caixasList = data.triangulacao_caixa?.caixas || [];
       if (caixasList.length === 0) {
-        return `<div class="p-4 text-center text-slate-500 font-sans text-xs">Sem caixas registrados na data auditada.</div>`;
+        return `<div class="p-4 text-center ${isUnavailable ? 'text-rose-300' : 'text-slate-500'} font-sans text-xs">${isUnavailable ? 'Leitura de caixas e operadores suspensa por indisponibilidade da fonte ERP.' : 'Sem caixas registrados na data auditada.'}</div>`;
       }
 
       const rows = caixasList.map(cItem => {
@@ -2542,7 +2767,7 @@ class AuraChatController {
       if (intent === 'tank_forecast') {
         const tanksList = c.tanks || data.detalhamento_tanques || data.tanques || [];
         if (tanksList.length === 0) {
-          return `<div class="p-4 text-center text-slate-500 font-sans text-xs">Sem tanques auditados neste relatório.</div>`;
+          return `<div class="p-4 text-center ${isUnavailable ? 'text-rose-300' : 'text-slate-500'} font-sans text-xs">${isUnavailable ? 'Telemetria de tanques e saldo volumétrico indisponíveis no momento.' : 'Sem tanques auditados neste relatório.'}</div>`;
         }
 
         const rows = tanksList.map(t => {
@@ -2579,7 +2804,7 @@ class AuraChatController {
       if (intent === 'lmc_report') {
         const tanksList = c.tanks || data.demonstrativo_por_combustivel || data.tanques || [];
         if (tanksList.length === 0) {
-          return `<div class="p-4 text-center text-slate-500 font-sans text-xs">Sem tanques auditados no LMC.</div>`;
+          return `<div class="p-4 text-center ${isUnavailable ? 'text-rose-300' : 'text-slate-500'} font-sans text-xs">${isUnavailable ? 'Registros do LMC e escrituração de tanques indisponíveis no momento.' : 'Sem tanques auditados no LMC.'}</div>`;
         }
 
         const rows = tanksList.map(t => {
@@ -2615,7 +2840,7 @@ class AuraChatController {
       // Default: Balanço de tanques turno
       const tanquesList = data.balanco_tanques?.detalhamento_tanques || [];
       if (tanquesList.length === 0) {
-        return `<div class="p-4 text-center text-slate-500 font-sans text-xs">Sem tanques auditados neste fechamento.</div>`;
+        return `<div class="p-4 text-center ${isUnavailable ? 'text-rose-300' : 'text-slate-500'} font-sans text-xs">${isUnavailable ? 'Leitura de estoque e tanques indisponível por falha na fonte primária.' : 'Sem tanques auditados neste fechamento.'}</div>`;
       }
 
       const rows = tanquesList.map(t => {
@@ -2729,8 +2954,8 @@ class AuraChatController {
     const resumo = data.resumo_executivo || {};
     const combos = c.top_combos || data.top_combos_cross_selling || data.top_combos_oportunidades || data.regras_associacao_detalhadas || [];
 
-    const isNoMovement = assessment.status_code === 'SEM_REGISTROS' || data.status === 'sem_movimento';
-    const isUnavailable = assessment.status_code === 'INDISPONIVEL' || data.status === 'indisponivel';
+    const isUnavailable = assessment.status_code === 'INDISPONIVEL' || data.status === 'indisponivel' || assessment.status_code === 'FONTE_INDISPONIVEL' || c.assessment?.finality === 'unavailable';
+    const isNoMovement = !isUnavailable && (assessment.status_code === 'SEM_REGISTROS' || data.status === 'sem_movimento' || assessment.status_code === 'SEM_MOVIMENTACAO');
 
     const evId = 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     if (typeof window !== 'undefined') {
@@ -2753,14 +2978,14 @@ class AuraChatController {
     let badgeIcon = CHAT_ICONS.pulse;
     let badgeText = assessment.badge_label || `Max Lift: ${parseFloat(maxLiftVal).toFixed(2)}x`;
 
-    if (isNoMovement) {
-      badgeClass = 'status-neutral';
-      badgeIcon = CHAT_ICONS.pause;
-      badgeText = 'Sem Cupons';
-    } else if (isUnavailable) {
+    if (isUnavailable) {
       badgeClass = 'status-divergent';
       badgeIcon = CHAT_ICONS.alert;
       badgeText = 'Fonte Indisponível';
+    } else if (isNoMovement) {
+      badgeClass = 'status-neutral';
+      badgeIcon = CHAT_ICONS.pause;
+      badgeText = 'Sem Cupons';
     } else if (countForteSinergia > 0) {
       badgeClass = 'status-validated';
       badgeIcon = CHAT_ICONS.pulse;
@@ -2779,12 +3004,25 @@ class AuraChatController {
     const heroLabel = 'Maior Multiplicador de Sinergia (Lift)';
     const heroVal = isNoMovement || isUnavailable ? '—' : `${parseFloat(maxLiftVal).toFixed(2)}x`;
     const heroColorClass = isNoMovement || isUnavailable ? 'text-slate-400' : (parseFloat(maxLiftVal) >= 2.0 ? 'text-purple-300' : 'text-emerald');
-    const heroSub = `${countForteSinergia} combo(s) com forte sinergia (Lift ≥ 2.0x) • ${totalTransacoes} cupons analisados (${parseFloat(pctMultiplas).toFixed(1)}% cestas múltiplas).`;
+    let heroSub = `${countForteSinergia} combo(s) com forte sinergia (Lift ≥ 2.0x) • ${totalTransacoes} cupons analisados (${parseFloat(pctMultiplas).toFixed(1)}% cestas múltiplas).`;
+    if (isUnavailable) {
+      heroSub = 'Dados de cupons e cestas de conveniência temporariamente indisponíveis no PDV.';
+    }
 
-    // Bloco de Limitação (F5-02 & F5-08)
+    // Bloco de Limitação (F5-02 & F5-08 / F6-01)
     let limitationHtml = '';
     const limText = assessment.limitation || resumo.limitation;
-    if (limText && !isNoMovement && !isUnavailable) {
+    if (isUnavailable) {
+      limitationHtml = `
+        <div class="decision-limitation-callout border-rose-500/30 bg-rose-950/20 text-rose-200/90">
+          <span class="inline-flex text-rose-400">${CHAT_ICONS.alert}</span>
+          <div>
+            <strong class="font-semibold text-rose-300">Contingência Operacional:</strong>
+            <span class="text-rose-200/90">${this.escapeHtml(limText || data.motivo || 'Vendas da loja de conveniência indisponíveis para mineração de regras.')}</span>
+          </div>
+        </div>
+      `;
+    } else if (limText && !isNoMovement) {
       limitationHtml = `
         <div class="decision-limitation-callout">
           <span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span>
@@ -2936,48 +3174,67 @@ class AuraChatController {
 
         <!-- Lista de Combos Destaque -->
         <div class="space-y-2 mt-1">
-          ${cardsHtml || '<div class="text-xs font-sans text-slate-400">Nenhum combo com o filtro solicitado retornado.</div>'}
+          ${isUnavailable ? '<div class="p-3 rounded-xl bg-slate-900/60 border border-rose-500/20 text-rose-300 text-xs font-sans">Mineração de combos suspensa por indisponibilidade da fonte.</div>' : (cardsHtml || '<div class="text-xs font-sans text-slate-400">Nenhum combo com o filtro solicitado retornado.</div>')}
         </div>
 
         ${pendingHtml}
 
         <!-- Ações Permitidas -->
         <div class="decision-actions">
-          <button 
-            type="button" 
-            class="decision-btn-primary" 
-            onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Quais os scripts de balcão recomendados para a equipe do caixa?');"
-            title="Capacitar operadores com roteiro persuasivo no PDV">
-            ${CHAT_ICONS.store}
-            <span>${this.escapeHtml(recLabel)}</span>
-          </button>
+          ${isUnavailable ? `
+            <button 
+              type="button" 
+              class="decision-btn-primary" 
+              onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Quais os combos de conveniência com maior afinidade?');"
+              title="Tentar executar a consulta novamente">
+              <span>${CHAT_ICONS.refresh}</span>
+              <span>Tentar Novamente</span>
+            </button>
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar vendas de conveniência em contingência?');"
+              title="Procedimento de contingência">
+              <span>${CHAT_ICONS.wrench}</span>
+              <span>Procedimento de Contingência</span>
+            </button>
+          ` : `
+            <button 
+              type="button" 
+              class="decision-btn-primary" 
+              onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Quais os scripts de balcão recomendados para a equipe do caixa?');"
+              title="Capacitar operadores com roteiro persuasivo no PDV">
+              ${CHAT_ICONS.store}
+              <span>${this.escapeHtml(recLabel)}</span>
+            </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
-            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
-            title="Ver definições matemáticas de Suporte, Confiança e Lift">
-            ${CHAT_ICONS.formula}
-            <span>Como foi calculado</span>
-          </button>
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
+              title="Ver definições matemáticas de Suporte, Confiança e Lift">
+              ${CHAT_ICONS.formula}
+              <span>Como foi calculado</span>
+            </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
-            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'caixas');"
-            title="Ver tabela detalhada de todas as regras mineradas">
-            ${CHAT_ICONS.chart}
-            <span>Ver Regras Detalhadas</span>
-          </button>
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'caixas');"
+              title="Ver tabela detalhada de todas as regras mineradas">
+              ${CHAT_ICONS.chart}
+              <span>Ver Regras Detalhadas</span>
+            </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
-            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
-            title="Ver fontes de dados e diagnósticos">
-            ${CHAT_ICONS.audit}
-            <span>Resumo & Fontes</span>
-          </button>
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
+              title="Ver fontes de dados e diagnósticos">
+              ${CHAT_ICONS.audit}
+              <span>Resumo & Fontes</span>
+            </button>
+          `}
         </div>
       </div>
     `;
@@ -3013,8 +3270,8 @@ class AuraChatController {
     const ranking = c.ranking || data.ranking_frentistas || [];
     const nozzles = c.nozzles || data.auditoria_vazao_bicos || data.vazao_bicos || [];
 
-    const isNoMovement = assessment.status_code === 'SEM_MOVIMENTACAO' || data.status === 'sem_movimento';
-    const isUnavailable = assessment.status_code === 'INDISPONIVEL' || data.status === 'indisponivel';
+    const isUnavailable = assessment.status_code === 'INDISPONIVEL' || data.status === 'indisponivel' || assessment.status_code === 'FONTE_INDISPONIVEL' || c.assessment?.finality === 'unavailable';
+    const isNoMovement = !isUnavailable && (assessment.status_code === 'SEM_MOVIMENTACAO' || data.status === 'sem_movimento');
 
     const evId = 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     if (typeof window !== 'undefined') {
@@ -3031,14 +3288,14 @@ class AuraChatController {
     let badgeIcon = CHAT_ICONS.check;
     let badgeText = assessment.badge_label || (bicosLentosCount > 0 ? `${bicosLentosCount} Bicos Lentos (<30 L/min)` : 'Pista Operando Conforme');
 
-    if (isNoMovement) {
-      badgeClass = 'status-neutral';
-      badgeIcon = CHAT_ICONS.pause;
-      badgeText = assessment.badge_label || 'Sem Movimentação';
-    } else if (isUnavailable) {
+    if (isUnavailable) {
       badgeClass = 'status-divergent';
       badgeIcon = CHAT_ICONS.alert;
       badgeText = 'Fonte Indisponível';
+    } else if (isNoMovement) {
+      badgeClass = 'status-neutral';
+      badgeIcon = CHAT_ICONS.pause;
+      badgeText = assessment.badge_label || 'Sem Movimentação';
     } else if (bicosLentosCount > 0) {
       badgeClass = 'status-partial';
       badgeIcon = CHAT_ICONS.alert;
@@ -3059,19 +3316,32 @@ class AuraChatController {
     const heroLabel = 'Faturamento Total da Pista';
     const heroVal = isNoMovement || isUnavailable ? '—' : this.formatBRL(fatPista);
     const heroColorClass = isNoMovement || isUnavailable ? 'text-slate-400' : 'text-emerald';
-    const heroSub = ranking.length > 0
+    let heroSub = ranking.length > 0
       ? `Líder: ${liderNome} (${this.formatBRL(liderFat)}, Aditivada: ${liderAdit}%) • Ticket Médio da Pista: ${this.formatBRL(metrics.ticket_medio ?? metrics.ticket_medio_pista ?? resumo.ticket_medio_pista ?? 0)}.`
       : 'Sem abastecimentos registrados no período.';
+    if (isUnavailable) {
+      heroSub = 'Telemetria da pista e bicos temporariamente indisponível no concentrador.';
+    }
 
     // Comparativo Compacto
     const volPista = Number(metrics.total_litros ?? metrics.volume_total_litros ?? resumo.volume_total_litros ?? 0);
     const txAditGlobal = parseFloat(metrics.taxa_conversao_aditivada_geral_pct ?? metrics.taxa_conversao_aditivada_global_pct ?? resumo.conversao_aditivada_geral_pct ?? 0).toFixed(1);
     const vazaoMedia = parseFloat(metrics.vazao_media_l_min ?? metrics.vazao_media_geral_litros_minuto ?? resumo.vazao_media_pista_litros_minuto ?? 34.5).toFixed(1);
 
-    // Bloco de Limitação (F5-02 & F5-05)
+    // Bloco de Limitação (F5-02 & F5-05 / F6-01)
     let limitationHtml = '';
     const limText = assessment.limitation || resumo.limitation;
-    if (limText && !isNoMovement && !isUnavailable) {
+    if (isUnavailable) {
+      limitationHtml = `
+        <div class="decision-limitation-callout border-rose-500/30 bg-rose-950/20 text-rose-200/90">
+          <span class="inline-flex text-rose-400">${CHAT_ICONS.alert}</span>
+          <div>
+            <strong class="font-semibold text-rose-300">Contingência Operacional:</strong>
+            <span class="text-rose-200/90">${this.escapeHtml(limText || data.motivo || 'Telemetria de pista e concentrador de bicos temporariamente indisponíveis.')}</span>
+          </div>
+        </div>
+      `;
+    } else if (limText && !isNoMovement) {
       limitationHtml = `
         <div class="decision-limitation-callout">
           <span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span>
@@ -3233,7 +3503,7 @@ class AuraChatController {
         <!-- Ranking de Frentistas -->
         <div class="space-y-1.5 mt-1 font-sans">
           <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Podium de Performance da Pista:</span>
-          ${frentsHtml || '<div class="text-xs text-slate-400">Nenhum frentista retornado.</div>'}
+          ${isUnavailable ? '<div class="p-3 rounded-xl bg-slate-900/60 border border-rose-500/20 text-rose-300 text-xs font-sans">Leitura individual de frentistas suspensa por indisponibilidade da fonte.</div>' : (frentsHtml || '<div class="text-xs text-slate-400">Nenhum frentista retornado.</div>')}
         </div>
 
         ${bicosAlertHtml}
@@ -3241,41 +3511,60 @@ class AuraChatController {
 
         <!-- Ações Permitidas -->
         <div class="decision-actions">
-          <button 
-            type="button" 
-            class="decision-btn-primary" 
-            onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como programar a manutenção preventiva dos filtros de bicos de combustíveis?');"
-            title="Abrir diretrizes de manutenção de bicos e bombas">
-            <span class="text-xs inline-flex">${CHAT_ICONS.wrench}</span>
-            <span>${this.escapeHtml(recLabel)}</span>
-          </button>
+          ${isUnavailable ? `
+            <button 
+              type="button" 
+              class="decision-btn-primary" 
+              onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual o desempenho da pista e vazão de bicos hoje?');"
+              title="Tentar executar a consulta novamente">
+              <span>${CHAT_ICONS.refresh}</span>
+              <span>Tentar Novamente</span>
+            </button>
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar vazão de bicos manualmente em contingência?');"
+              title="Procedimento de contingência">
+              <span>${CHAT_ICONS.wrench}</span>
+              <span>Procedimento de Contingência</span>
+            </button>
+          ` : `
+            <button 
+              type="button" 
+              class="decision-btn-primary" 
+              onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como programar a manutenção preventiva dos filtros de bicos de combustíveis?');"
+              title="Abrir diretrizes de manutenção de bicos e bombas">
+              <span class="text-xs inline-flex">${CHAT_ICONS.wrench}</span>
+              <span>${this.escapeHtml(recLabel)}</span>
+            </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
-            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
-            title="Ver fórmulas de vazão e conversão de aditivada">
-            <span class="text-xs inline-flex">${CHAT_ICONS.formula}</span>
-            <span>Como foi calculado</span>
-          </button>
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
+              title="Ver fórmulas de vazão e conversão de aditivada">
+              <span class="text-xs inline-flex">${CHAT_ICONS.formula}</span>
+              <span>Como foi calculado</span>
+            </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
-            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'bicos');"
-            title="Ver detalhamento de todos os bicos da pista">
-            <span class="text-xs inline-flex">${CHAT_ICONS.nozzle}</span>
-            <span>Ver Bicos & Pista</span>
-          </button>
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'bicos');"
+              title="Ver detalhamento de todos os bicos da pista">
+              <span class="text-xs inline-flex">${CHAT_ICONS.nozzle}</span>
+              <span>Ver Bicos & Pista</span>
+            </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
-            onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
-            title="Ver fontes de dados e diagnósticos">
-            <span class="text-xs inline-flex">${CHAT_ICONS.audit}</span>
-            <span>Resumo & Fontes</span>
-          </button>
+            <button 
+              type="button" 
+              class="decision-btn-secondary" 
+              onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
+              title="Ver fontes de dados e diagnósticos">
+              <span class="text-xs inline-flex">${CHAT_ICONS.audit}</span>
+              <span>Resumo & Fontes</span>
+            </button>
+          `}
         </div>
       </div>
     `;

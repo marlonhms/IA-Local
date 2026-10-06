@@ -606,6 +606,10 @@ class SemanticRouter:
         """Retorna conexão ativa com o PostgreSQL do pgvector, reconectando se necessário."""
         if self._conn is None or self._conn.closed:
             self._conn = psycopg2.connect(**self.db_config)
+            try:
+                self._conn.set_client_encoding('UTF8')
+            except Exception:
+                pass
         return self._conn
 
     def close(self):

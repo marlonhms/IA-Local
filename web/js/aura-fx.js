@@ -495,14 +495,37 @@
     bindCommandPalette() {
       // Atalho de Teclado Global Executivo: Ctrl+K ou Cmd+K
       window.addEventListener('keydown', (e) => {
+        const modal = document.getElementById('aura-command-palette-modal');
+        const isPaletteOpen = modal && !modal.classList.contains('hidden');
+
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
           e.preventDefault();
           this.toggleCommandPalette();
+          return;
         }
 
         // Tecla ESC fecha a paleta
-        if (e.key === 'Escape') {
+        if (e.key === 'Escape' && isPaletteOpen) {
+          e.preventDefault();
+          e.stopPropagation();
           this.closeCommandPalette();
+          return;
+        }
+
+        // Acessibilidade WCAG 2.1 AA: Focus Trap dentro da Command Palette aberta
+        if (e.key === 'Tab' && isPaletteOpen) {
+          const focusables = modal.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex="-1"]), a[href], input:not([disabled])');
+          if (focusables.length > 0) {
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+              e.preventDefault();
+              last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+              e.preventDefault();
+              first.focus();
+            }
+          }
         }
 
         // Tecla "/" foca no input de chat no Desktop quando não estiver digitando
@@ -525,6 +548,16 @@
       const btnPalette = document.getElementById('btn-open-palette');
       if (btnPalette) {
         btnPalette.addEventListener('click', () => this.toggleCommandPalette());
+      }
+
+      // Clique no backdrop fora do container fecha a modal (F6-03)
+      const modalEl = document.getElementById('aura-command-palette-modal');
+      if (modalEl) {
+        modalEl.addEventListener('click', (e) => {
+          if (e.target === modalEl) {
+            this.closeCommandPalette();
+          }
+        });
       }
 
       // Input de busca dentro da Command Palette

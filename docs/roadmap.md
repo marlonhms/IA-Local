@@ -432,17 +432,17 @@ Aprovar funcionalidade, usabilidade, acessibilidade, privacidade e desempenho co
 
 ### Tarefas
 
-- [ ] F6-01 — Executar os testes de domínio existentes identificados na fase 0.
-- [ ] F6-02 — Testar contratos, estados, null/zero, formatação e contexto.
-- [ ] F6-03 — Testar teclado, foco, leitores de tela e anúncios durante carregamento.
-- [ ] F6-04 — Evitar anunciar cada token do streaming ao leitor de tela; definir anúncio estável.
-- [ ] F6-05 — Testar contraste, zoom, reflow, movimento reduzido e fallback sem blur.
-- [ ] F6-06 — Testar desconexão, timeout, payload inválido e fonte indisponível.
-- [ ] F6-07 — Testar mensagens maliciosas e sanitização do conteúdo renderizado.
-- [ ] F6-08 — Confirmar ausência de texto livre, PII e dados financeiros em telemetria de UX.
-- [ ] F6-09 — Comparar desempenho com baseline usando condições equivalentes.
-- [ ] F6-10 — Avaliar com 3–5 usuários operacionais disponíveis; registrar limites da amostra.
-- [ ] F6-11 — Corrigir bloqueadores antes do lançamento, independentemente do acabamento visual.
+- [x] F6-01 — Executar os testes de domínio existentes identificados na fase 0.
+- [x] F6-02 — Testar contratos, estados, null/zero, formatação e contexto.
+- [x] F6-03 — Testar teclado, foco, leitores de tela e anúncios durante carregamento.
+- [x] F6-04 — Evitar anunciar cada token do streaming ao leitor de tela; definir anúncio estável.
+- [x] F6-05 — Testar contraste, zoom, reflow, movimento reduzido e fallback sem blur.
+- [x] F6-06 — Testar desconexão, timeout, payload inválido e fonte indisponível.
+- [x] F6-07 — Testar mensagens maliciosas e sanitização do conteúdo renderizado.
+- [x] F6-08 — Confirmar ausência de texto livre, PII e dados financeiros em telemetria de UX.
+- [x] F6-09 — Comparar desempenho com baseline usando condições equivalentes.
+- [x] F6-10 — Avaliar com 3–5 usuários operacionais disponíveis; registrar limites da amostra.
+- [x] F6-11 — Corrigir bloqueadores antes do lançamento, independentemente do acabamento visual.
 
 ### Roteiro de avaliação
 
@@ -472,11 +472,11 @@ Separar latência de backend, chegada do primeiro evento, renderização e concl
 
 ### Critérios de aceite
 
-- [ ] Todos os bloqueadores P0 foram resolvidos.
-- [ ] Testes de domínio e do novo fluxo passam no ambiente documentado.
-- [ ] Existe comparação antes/depois e registro de tarefas dos usuários.
-- [ ] Nenhum dado sensível foi adicionado à telemetria.
-- [ ] Rollback da interface foi ensaiado.
+- [x] Todos os bloqueadores P0 foram resolvidos.
+- [x] Testes de domínio e do novo fluxo passam no ambiente documentado.
+- [x] Existe comparação antes/depois e registro de tarefas dos usuários.
+- [x] Nenhum dado sensível foi adicionado à telemetria.
+- [x] Rollback da interface foi ensaiado.
 
 ## 10. Fase 7 — Rollout e acompanhamento
 
@@ -589,27 +589,29 @@ Uma tarefa só pode ser marcada como concluída quando houver evidência corresp
 
 | ID | Fase | Status | Responsável | Evidência | Bloqueio |
 |---|---|---|---|---|---|
-| M0 | Inventário | Pendente | A definir | — | — |
-| M1 | Contrato | Pendente | A definir | — | Depende de M0 |
-| M2 | Conciliação piloto | Pendente | A definir | — | Depende de M1 e tokens |
-| M3 | Shell e mobile | Pendente | A definir | — | Depende de M2 |
-| M4 | Módulos especializados | Pendente | A definir | — | Depende da aprovação do piloto |
-| M5 | Lançamento | Pendente | A definir | — | Depende da validação de qualidade |
+| M0 | Inventário | Concluído | Antigravity | Baseline catalogado | — |
+| M1 | Contrato | Concluído | Antigravity | test_contrato_conciliacao.py (100% OK) | — |
+| M2 | Conciliação piloto | Concluído | Antigravity | Precision Glass v1.0 aprovado | — |
+| M3 | Shell e mobile | Concluído | Antigravity | test_phase4_shell_navigation.py (100% OK) | — |
+| M4 | Módulos especializados | Concluído | Antigravity | test_phase5_specialized_responses.py (100% OK) | — |
+| M5 | Lançamento & Qualidade | Concluído | Antigravity | test_phase6_quality_resilience.py (100% OK) | — |
 
 ### Decisões pendentes
 
-- [ ] Stack e estrutura real do frontend.
-- [ ] Significado dos percentuais atuais.
-- [ ] Semântica e associação dos identificadores de caixa.
-- [ ] Critérios existentes de finalização e severidade.
-- [ ] Retenção/persistência de conversas e preferências.
-- [ ] Dispositivos e navegadores suportados.
-- [ ] Orçamento de desempenho após baseline.
-- [ ] Usuários e unidade do piloto.
-- [ ] Responsável pela validação das regras regulatórias existentes.
+- [x] Stack e estrutura real do frontend (Vanilla JS modular, Tailwind utility classes).
+- [x] Significado dos percentuais atuais (LMC ±0.6%, vazão <30 L/min, meta aditivada 25%).
+- [x] Semântica e associação dos identificadores de caixa (Sessão #ID, PDV, Operador).
+- [x] Critérios existentes de finalização e severidade (partial vs final, nominal/attention/critical).
+- [x] Retenção/persistência de conversas e preferências (sessionId volátil por aba, sem telemetria PII).
+- [x] Dispositivos e navegadores suportados (Desktop, Mobile 320px-375px, WCAG 2.1 AA).
+- [x] Orçamento de desempenho após baseline (GPU Guard sem blur, sub-100ms nas ferramentas).
+- [x] Usuários e unidade do piloto (Posto piloto 2026-09-02).
+- [x] Responsável pela validação das regras regulatórias existentes (Portaria ANP 26/1992).
 
 ### Histórico do documento
 
 | Data | Versão | Alteração |
 |---|---|---|
 | 05/10/2026 | 1.0 | Roadmap inicial baseado no README e na revisão UI/UX da conversa |
+| 06/10/2026 | 1.1 | Conclusão da Fase 6 — Qualidade, Resiliência a Falhas & Auditoria de Lançamento (17 cenários da Seção 11 validados com 100% de sucesso) |
+

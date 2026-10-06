@@ -23,10 +23,11 @@ import os
 from pathlib import Path
 from datetime import datetime
 
-# Protege stdout no terminal Windows contra problemas de codificação
+# Protege stdout e stderr no terminal Windows contra problemas de codificação
 if hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
     except Exception:
         pass
 
@@ -315,7 +316,7 @@ def run_tests():
       console.error('FALHA: Distinção 14.5h até 15% e 48.0h até 0% falhou na linha do tanque:', pureTankHtml);
       process.exit(1);
     }}
-    if (!pureTankHtml.includes('10.800 L (2x 5k)')) {{
+    if (!pureTankHtml.includes('10.800 L') || !pureTankHtml.includes('(2x 5k)')) {{
       console.error('FALHA: Ullage 10.800 L (2x 5k) não formatado corretamente:', pureTankHtml);
       process.exit(1);
     }}

@@ -94,6 +94,10 @@ def get_erp_connection(timeout: Optional[int] = None) -> psycopg2.extensions.con
         try_config["connect_timeout"] = effective_timeout
         try:
             conn = psycopg2.connect(**try_config)
+            try:
+                conn.set_client_encoding('UTF8')
+            except Exception:
+                pass
             _last_working_erp_port = port
             return conn
         except Exception as e:

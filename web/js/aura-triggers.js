@@ -8,6 +8,7 @@ class AuraTriggersController {
     this.currentTool = null;
     this.currentResult = null;
     this.activeFilter = 'todos';
+    this.isExecuting = false;
   }
 
   /**
@@ -203,6 +204,9 @@ class AuraTriggersController {
    * Executa a ferramenta selecionada e exibe o resultado formatado
    */
   async executeTrigger(toolId, customParams = null) {
+    if (this.isExecuting) return;
+    this.isExecuting = true;
+
     const catalog = this.getToolsCatalog();
     const tool = catalog.find(t => t.id === toolId) || { id: toolId, name: toolId };
     this.currentTool = tool;
@@ -225,6 +229,7 @@ class AuraTriggersController {
       console.error('[AuraTriggers] Erro na execução:', err);
       this.renderErrorInspector(tool, err.message);
     } finally {
+      this.isExecuting = false;
       if (loadingEl) loadingEl.classList.add('hidden');
       if (resultEl) resultEl.classList.remove('hidden');
     }
@@ -737,5 +742,11 @@ class AuraTriggersController {
   }
 }
 
-// Instância singleton global
-window.auraTriggers = new AuraTriggersController();
+// Instância singleton global e export para ambientes Node/Testes
+if (typeof window !== 'undefined') {
+  window.auraTriggers = new AuraTriggersController();
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { AuraTriggersController };
+}
+
