@@ -318,6 +318,15 @@
       this.hzMultiplier = 60 / Math.max(30, hz);
     }
 
+    toggleGpuGuard(enabled) {
+      if (this.canvas) {
+        this.canvas.style.display = enabled ? 'none' : '';
+      }
+      if (enabled && this.ctx) {
+        this.ctx.clearRect(0, 0, this.width, this.height);
+      }
+    }
+
     start() {
       this.isRunning = true;
       this.loop();
@@ -328,11 +337,18 @@
 
       const isGpuGuard = typeof document !== 'undefined' && document.documentElement.classList.contains('gpu-guard-active');
       if (isGpuGuard || this.reducedMotion) {
+        if (this.canvas && this.canvas.style.display !== 'none') {
+          this.canvas.style.display = 'none';
+        }
         if (this.ctx) this.ctx.clearRect(0, 0, this.width, this.height);
         setTimeout(() => {
           if (this.isRunning) requestAnimationFrame(() => this.loop());
         }, 300);
         return;
+      }
+
+      if (this.canvas && this.canvas.style.display === 'none') {
+        this.canvas.style.display = '';
       }
 
       this.updatePhysics();

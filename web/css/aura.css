@@ -69,6 +69,12 @@
   box-sizing: border-box;
 }
 
+html, body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
 body {
   background-color: #07090e;
   color: #f1f5fa;
@@ -1362,8 +1368,8 @@ body {
   flex-shrink: 0;
   min-height: 40px;
   padding: 8px 14px;
-  border-radius: 9999px;
-  background: linear-gradient(145deg, rgba(18, 26, 44, 0.85) 0%, rgba(11, 17, 30, 0.95) 100%);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.09);
@@ -1375,14 +1381,16 @@ body {
   transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   touch-action: manipulation;
+  width: 100%;
+  text-align: left;
 }
 
 .quick-prompt-chip:hover {
-  background: linear-gradient(145deg, rgba(28, 40, 68, 0.95) 0%, rgba(16, 25, 44, 0.98) 100%);
-  border-color: rgba(6, 182, 212, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(6, 182, 212, 0.45);
   color: #ffffff;
   box-shadow: 0 4px 16px rgba(6, 182, 212, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   transform: translateY(-1.5px);
@@ -1412,18 +1420,19 @@ body {
 
 /* MessageComposer Moderno com Estados Claros de Foco & Auto-Resize (F4-06 & F4-09) */
 .message-composer-container {
-  background: linear-gradient(180deg, rgba(12, 18, 32, 0.92) 0%, rgba(7, 10, 18, 0.97) 100%);
-  backdrop-filter: blur(24px) saturate(190%);
-  -webkit-backdrop-filter: blur(24px) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(12, 18, 32, 0.94) 0%, rgba(7, 10, 18, 0.98) 100%);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   transition: border-color var(--aura-motion-fast) ease, box-shadow var(--aura-motion-fast) ease;
-  padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
+  padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
+  flex-shrink: 0;
 }
 
 .message-composer-container:focus-within {
-  border-color: rgba(6, 182, 212, 0.5) !important;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(6, 182, 212, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(6, 182, 212, 0.38) !important;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.6), 0 0 16px rgba(6, 182, 212, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 }
 
 #btn-chat-send {
@@ -1448,10 +1457,35 @@ body {
   scrollbar-width: thin;
 }
 
+#chat-input-text,
+#chat-input-text:focus,
+#chat-input-text:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* Altura Responsiva e Enquadramento do Workspace do Chat */
+#view-console {
+  height: calc(100dvh - 98px);
+  max-height: calc(100dvh - 98px);
+  min-height: 0;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+@supports not (height: 100dvh) {
+  #view-console {
+    height: calc(100vh - 98px);
+    max-height: calc(100vh - 98px);
+  }
+}
+
 /* Otimização Mobile para o Workspace do Chat (F4-08 & F4-09) */
 @media (max-width: 640px) {
   #view-console {
-    height: calc(100dvh - 86px) !important;
+    height: calc(100dvh - 88px) !important;
+    max-height: calc(100dvh - 88px) !important;
     min-height: 0 !important;
   }
   #chat-input-text {
@@ -2107,7 +2141,7 @@ body {
 /* ==========================================================================
    MODO ALTA PERFORMANCE & GPU GUARD (AURA Performance Mode)
    Desativa múltiplos backdrop-filter: blur() pesados em computadores e
-   smartphones modestos da pista, preservando 60 FPS cravados.
+   smartphones modestos da pista, preservando 60 FPS cravados e nitidez 100% cristalina.
    ========================================================================== */
 html.gpu-guard-active,
 body.gpu-guard-active,
@@ -2117,10 +2151,79 @@ body.gpu-guard-active,
 .gpu-guard-active *::after {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility !important;
+}
+
+/* Oculta camada de aurora boreal e desativa transforms/filtros pesados */
+.gpu-guard-active .aura-borealis-layer {
+  display: none !important;
+  filter: none !important;
+  transform: none !important;
+  will-change: auto !important;
+}
+
+/* Elimina transforms e will-change que forçam rasterização borrada de texto e artefatos na GPU */
+.gpu-guard-active #chat-feed-container,
+.gpu-guard-active #view-console,
+.gpu-guard-active #console-workspace-container,
+.gpu-guard-active #chat-stream-column,
+.gpu-guard-active #aura-aux-panel,
+.gpu-guard-active .aura-aux-panel,
+.gpu-guard-active .aux-visual-container,
+.gpu-guard-active .aux-data-table,
+.gpu-guard-active #aux-view-visual,
+.gpu-guard-active #aux-view-data,
+.gpu-guard-active #aux-view-schema,
+.gpu-guard-active #aux-view-audit,
+.gpu-guard-active .aux-companion-portal-banner,
+.gpu-guard-active .aux-artifact-portal-card,
+.gpu-guard-active .aux-artifact-chip,
+.gpu-guard-active .chat-bubble-aura,
+.gpu-guard-active .chat-bubble-user,
+.gpu-guard-active .decision-card,
+.gpu-guard-active .message-composer-container,
+.gpu-guard-active #chat-input-text,
+.gpu-guard-active .quick-prompt-chip,
+.gpu-guard-active .glass-panel,
+.gpu-guard-active .evidence-drawer,
+.gpu-guard-active .command-palette,
+.gpu-guard-active #view-cockpit,
+.gpu-guard-active #view-triggers {
+  transform: none !important;
+  will-change: auto !important;
+  filter: none !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility !important;
+}
+
+/* Desativa animação de transição com transform permanente no modo GPU */
+.gpu-guard-active .view-transition-active {
+  animation: none !important;
+  will-change: auto !important;
+  transform: none !important;
+}
+
+/* Precisão geométrica para ícones e glifos SVG sem desfoque */
+.gpu-guard-active svg,
+.gpu-guard-active i[data-lucide],
+.gpu-guard-active .aura-glyph {
+  shape-rendering: geometricPrecision !important;
+  transform: none !important;
+  filter: none !important;
+}
+
+/* Desativa blur nos orbes e overlays quando em GPU guard */
+.gpu-guard-active .neural-core-orb::after {
+  filter: none !important;
 }
 
 .gpu-guard-active .glass-panel {
   background-color: rgba(15, 23, 42, 0.96) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
 }
 
 .gpu-guard-active .liquid-glass-acrylic {
@@ -2137,6 +2240,8 @@ body.gpu-guard-active,
 
 .gpu-guard-active .chat-bubble-aura {
   background-color: rgba(15, 23, 42, 0.95) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
 }
 
 .gpu-guard-active .chat-bubble-user {
@@ -2279,7 +2384,7 @@ body.gpu-guard-active,
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
-textarea:focus-visible,
+textarea:not(#chat-input-text):focus-visible,
 select:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid #06b6d4 !important;

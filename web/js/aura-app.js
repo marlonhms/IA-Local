@@ -304,8 +304,8 @@ class AuraApp {
       window.auraAuxPanel.init();
     }
 
-    // Inicia diretamente no Console Cognitivo (Mobile-First Workspace)
-    this.switchTab('console');
+    // Inicia diretamente no Console Cognitivo (Mobile-First Workspace) com foco calmo
+    this.switchTab('console', false);
 
     applyIconsFallback();
   }
@@ -623,6 +623,10 @@ class AuraApp {
       if (body) body.classList.remove('gpu-guard-active');
     }
 
+    if (window.auraBorealis && typeof window.auraBorealis.toggleGpuGuard === 'function') {
+      try { window.auraBorealis.toggleGpuGuard(enabled); } catch (_) {}
+    }
+
     const badge = document.getElementById('sidebar-gpu-badge');
     const icon = document.getElementById('sidebar-gpu-icon');
     const btnGpu = document.getElementById('sidebar-btn-toggle-gpu-guard');
@@ -643,7 +647,7 @@ class AuraApp {
   /**
    * Alterna a visualização ativa com transição fluida e cinematográfica
    */
-  switchTab(tabName) {
+  switchTab(tabName, shouldFocus = true) {
     const views = {
       cockpit: document.getElementById('view-cockpit'),
       triggers: document.getElementById('view-triggers'),
@@ -654,7 +658,7 @@ class AuraApp {
     if (this.currentTab === tabName) {
       const currentEl = views[tabName];
       if (currentEl && !currentEl.classList.contains('hidden')) {
-        if (tabName === 'console') {
+        if (tabName === 'console' && shouldFocus) {
           const input = document.getElementById('chat-input-text');
           if (input) input.focus({ preventScroll: true });
         }
@@ -688,7 +692,7 @@ class AuraApp {
       targetView.classList.add('view-transition-active');
     }
 
-    if (tabName === 'console') {
+    if (tabName === 'console' && shouldFocus) {
       const input = document.getElementById('chat-input-text');
       if (input) input.focus({ preventScroll: true });
     }
