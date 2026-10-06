@@ -44,7 +44,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <!-- Folha de Estilos Customizada do Design System AURA -->
-  <link rel="stylesheet" href="/static/css/aura.css?v=2.9.4">
+  <link rel="stylesheet" href="/static/css/aura.css?v=2.9.6">
 </head>
 <body class="min-h-screen flex flex-col bg-obsidian text-slate-200 antialiased selection:bg-auraCyan/30 selection:text-white overflow-x-hidden">
 
@@ -663,10 +663,10 @@
         <div id="chat-stream-column" class="flex-1 flex flex-col min-w-0 space-y-3 relative h-full">
           
           <!-- Feed de Mensagens (Scrollable) - Ocupa 100% da altura e largura -->
-          <div id="chat-feed-container" class="glass-panel flex-1 min-h-0 p-4 sm:p-5 overflow-y-auto space-y-4 font-sans rounded-2xl relative scroll-smooth">
-            <div class="flex justify-start w-full animate-fade-in">
-              <div class="chat-bubble-aura w-full max-w-full p-4.5 text-slate-100 text-sm space-y-3">
-                <div class="flex items-center justify-between border-b border-white/10 pb-2">
+          <div id="chat-feed-container" class="glass-panel flex-1 min-h-0 p-4 sm:p-5 overflow-y-auto space-y-4 font-sans rounded-2xl relative scroll-smooth flex flex-col">
+            <div id="welcome-message-bubble" class="flex justify-start w-full h-full min-h-full flex-1 animate-fade-in welcome-message-wrapper">
+              <div class="chat-bubble-aura chat-bubble-welcome w-full max-w-full h-full min-h-full flex-1 flex flex-col justify-between p-4 sm:p-5 text-slate-100 text-sm space-y-3">
+                <div class="flex items-center justify-between border-b border-white/10 pb-2 flex-shrink-0">
                   <div class="flex items-center gap-2">
                     <div class="neural-core-orb !w-6 !h-6 text-[10px] font-bold text-white flex items-center justify-center shadow-sm">
                       <span class="relative z-10">A</span>
@@ -676,7 +676,7 @@
                   </div>
                   <span class="px-2 py-0.5 rounded-full text-[10px] font-sans font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Pronta para Atendimento</span>
                 </div>
-                <div class="w-full flex flex-col justify-between">
+                <div class="welcome-content-body w-full flex-1 flex flex-col justify-between">
                   <div class="space-y-3 font-sans text-slate-200 leading-relaxed text-sm">
                     <p>
                       Olá! Sou a <strong>AURA</strong>, sua assistente executiva para operações de pista, conveniência e gestão do posto.
@@ -685,8 +685,8 @@
                       Estou conectada e pronta para apoiar suas decisões. Você pode me perguntar sobre a autonomia dos combustíveis, auditar o fechamento de turno e caixa, verificar a conformidade do LMC com a ANP ou analisar as vendas da loja.
                     </p>
                   </div>
-                  <!-- Rodapé do Card de Boas-Vindas: Sugestões Executivas com Espaçamento Inferior -->
-                  <div id="welcome-suggestions-container" class="welcome-card-footer !mt-7 sm:!mt-8 pt-4 border-t border-white/10 space-y-2.5">
+                  <!-- Rodapé do Card de Boas-Vindas: Sugestões Executivas Ancoradas na Base -->
+                  <div id="welcome-suggestions-container" class="welcome-card-footer mt-auto !mt-auto pt-4 border-t border-white/10 space-y-2.5">
                     <span class="text-xs font-medium text-slate-400 flex items-center gap-1.5">
                       <svg class="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
                       Sugestões executivas para iniciar:
@@ -1026,12 +1026,12 @@
   <!-- =========================================================================
        SCRIPTS JAVASCRIPT MODULARES DA AURA
        ========================================================================= -->
-  <script src="/static/js/aura-api.js?v=2.9.4"></script>
-  <script src="/static/js/aura-cockpit.js?v=2.9.4"></script>
-  <script src="/static/js/aura-triggers.js?v=2.9.4"></script>
-  <script src="/static/js/aura-aux-panel.js?v=2.9.4"></script>
-  <script src="/static/js/aura-chat.js?v=2.9.4"></script>
-  <script src="/static/js/aura-app.js?v=2.9.4"></script>
-  <script src="/static/js/aura-fx.js?v=2.9.4"></script>
+  <script src="/static/js/aura-api.js?v=2.9.6"></script>
+  <script src="/static/js/aura-cockpit.js?v=2.9.6"></script>
+  <script src="/static/js/aura-triggers.js?v=2.9.6"></script>
+  <script src="/static/js/aura-aux-panel.js?v=2.9.6"></script>
+  <script src="/static/js/aura-chat.js?v=2.9.6"></script>
+  <script src="/static/js/aura-app.js?v=2.9.6"></script>
+  <script src="/static/js/aura-fx.js?v=2.9.6"></script>
 </body>
 </html>

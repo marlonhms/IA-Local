@@ -267,8 +267,8 @@ class AuraChatController {
           Estou conectada e pronta para apoiar suas decisões. Você pode me perguntar sobre a autonomia dos combustíveis, auditar o fechamento de turno e caixa, verificar a conformidade do LMC com a ANP ou analisar as vendas da loja.
         </p>
       </div>
-      <!-- Rodapé do Card de Boas-Vindas: Sugestões Executivas com Espaçamento Inferior -->
-      <div id="welcome-suggestions-container" class="welcome-card-footer !mt-7 sm:!mt-8 pt-4 border-t border-white/10 space-y-2.5">
+      <!-- Rodapé do Card de Boas-Vindas: Sugestões Executivas Ancoradas na Base -->
+      <div id="welcome-suggestions-container" class="welcome-card-footer mt-auto !mt-auto pt-4 border-t border-white/10 space-y-2.5">
         <span class="text-xs font-medium text-slate-400 flex items-center gap-1.5">
           <svg class="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
           Sugestões executivas para iniciar:
@@ -329,6 +329,24 @@ class AuraChatController {
     const welcomeSuggestions = typeof document !== 'undefined' ? document.getElementById('welcome-suggestions-container') : null;
     if (welcomeSuggestions) {
       welcomeSuggestions.remove();
+    }
+
+    // Adapta o card de boas-vindas para altura natural após iniciar a conversa
+    const feed = typeof document !== 'undefined' ? document.getElementById('chat-feed-container') : null;
+    const welcomeBubble = typeof document !== 'undefined' ? (document.getElementById('welcome-message-bubble') || (feed && feed.children && feed.children[0])) : null;
+    if (welcomeBubble && welcomeBubble.classList) {
+      welcomeBubble.classList.add('welcome-message-collapsed');
+      ['h-full', 'min-h-full', 'flex-1', 'welcome-message-wrapper'].forEach(c => welcomeBubble.classList.remove(c));
+      const innerBubble = welcomeBubble.querySelector ? welcomeBubble.querySelector('.chat-bubble-aura') : null;
+      if (innerBubble && innerBubble.classList) {
+        innerBubble.classList.add('welcome-message-collapsed');
+        ['h-full', 'min-h-full', 'flex-1', 'chat-bubble-welcome'].forEach(c => innerBubble.classList.remove(c));
+      }
+      const innerBody = welcomeBubble.querySelector ? welcomeBubble.querySelector('.welcome-content-body') : null;
+      if (innerBody && innerBody.classList) {
+        innerBody.classList.add('welcome-message-collapsed');
+        ['flex-1', 'justify-between'].forEach(c => innerBody.classList.remove(c));
+      }
     }
 
     if (input) {
@@ -584,7 +602,7 @@ class AuraChatController {
     div.id = containerId;
     div.className = 'flex justify-start w-full animate-fade-in';
     div.innerHTML = `
-      <div class="chat-bubble-aura w-full max-w-full p-4.5 text-slate-100 text-sm space-y-3">
+      <div class="chat-bubble-aura w-full max-w-full p-4 sm:p-5 text-slate-100 text-sm space-y-3">
         <!-- Header da Resposta com Núcleo e Tags -->
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
           <div class="flex items-center gap-2">
@@ -629,10 +647,15 @@ class AuraChatController {
     if (!feed) return;
 
     const div = document.createElement('div');
-    div.className = 'flex justify-start w-full animate-fade-in';
+    if (opts.isWelcome) {
+      div.id = 'welcome-message-bubble';
+      div.className = 'flex justify-start w-full h-full min-h-full flex-1 animate-fade-in welcome-message-wrapper';
+    } else {
+      div.className = 'flex justify-start w-full animate-fade-in';
+    }
     div.innerHTML = `
-      <div class="chat-bubble-aura w-full max-w-full p-4.5 text-slate-100 text-sm space-y-3">
-        <div class="flex items-center justify-between border-b border-white/10 pb-2">
+      <div class="chat-bubble-aura ${opts.isWelcome ? 'chat-bubble-welcome w-full max-w-full h-full min-h-full flex-1 flex flex-col justify-between p-4 sm:p-5 text-slate-100 text-sm space-y-3' : 'w-full max-w-full p-4 sm:p-5 text-slate-100 text-sm space-y-3'}">
+        <div class="flex items-center justify-between border-b border-white/10 pb-2 ${opts.isWelcome ? 'flex-shrink-0' : ''}">
           <div class="flex items-center gap-2">
             <div class="neural-core-orb !w-6 !h-6 text-[10px] font-bold text-white flex items-center justify-center shadow-sm">
               <span class="relative z-10">A</span>
@@ -642,7 +665,7 @@ class AuraChatController {
           </div>
           ${opts.isWelcome ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-sans font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Pronta para Atendimento</span>' : ''}
         </div>
-        <div class="${opts.isWelcome ? 'w-full flex flex-col justify-between' : 'w-full'}">${htmlContent}</div>
+        <div class="${opts.isWelcome ? 'welcome-content-body w-full flex flex-col justify-between flex-1' : 'w-full'}">${htmlContent}</div>
       </div>
     `;
     feed.appendChild(div);

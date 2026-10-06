@@ -552,6 +552,7 @@ body {
 .chat-bubble-aura {
   width: 100%;
   max-width: 100%;
+  padding: 1.125rem;
   background: linear-gradient(180deg, rgba(14, 21, 37, 0.88) 0%, rgba(9, 14, 26, 0.96) 100%);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -1363,12 +1364,51 @@ body {
 .quick-prompts-bar::-webkit-scrollbar {
   height: 4px;
 }
-/* Rodapé de Sugestões Executivas do Card de Boas-Vindas (Espaçamento Inferior Dedicado) */
+/* Container do Feed de Mensagens */
+#chat-feed-container {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Welcome Card: Ocupa altura total disponível e expande com segurança caso o conteúdo seja maior */
+#welcome-message-bubble:not(.welcome-message-collapsed),
+.welcome-message-wrapper:not(.welcome-message-collapsed) {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: auto;
+  min-height: 100%;
+  flex: 1 0 auto;
+}
+
+#welcome-message-bubble:not(.welcome-message-collapsed) .chat-bubble-aura,
+.welcome-message-wrapper:not(.welcome-message-collapsed) .chat-bubble-aura,
+.chat-bubble-welcome:not(.welcome-message-collapsed) {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 100%;
+  height: auto;
+  min-height: 100%;
+  flex: 1 0 auto;
+}
+
+.welcome-content-body:not(.welcome-message-collapsed) {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 100%;
+  height: auto;
+  flex: 1 0 auto;
+  min-height: 0;
+}
+
+/* Rodapé de Sugestões Executivas do Card de Boas-Vindas (Ancoragem na Base com Espaço Livre no Meio) */
 #welcome-suggestions-container,
 .welcome-card-footer {
   display: block;
   width: 100%;
-  margin-top: 1.75rem !important;
+  margin-top: auto !important;
   padding-top: 1rem !important;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -1383,13 +1423,31 @@ body {
 @media (min-width: 640px) {
   #welcome-suggestions-container,
   .welcome-card-footer {
-    margin-top: 2rem !important;
+    margin-top: auto !important;
     padding-top: 1.125rem !important;
   }
 
   .welcome-suggestions-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* Quando as sugestões são removidas ou a conversa começa, a bolha volta ao tamanho natural */
+#welcome-message-bubble.welcome-message-collapsed,
+.welcome-message-wrapper.welcome-message-collapsed,
+.chat-bubble-welcome.welcome-message-collapsed,
+#chat-feed-container:not(:has(#welcome-suggestions-container)) #welcome-message-bubble,
+#chat-feed-container:not(:has(#welcome-suggestions-container)) .welcome-message-wrapper,
+#chat-feed-container:not(:has(#welcome-suggestions-container)) .chat-bubble-welcome {
+  height: auto !important;
+  min-height: auto !important;
+  flex: 0 1 auto !important;
+}
+
+.welcome-content-body.welcome-message-collapsed,
+#chat-feed-container:not(:has(#welcome-suggestions-container)) .welcome-content-body {
+  height: auto !important;
+  flex: 0 1 auto !important;
 }
 
 .quick-prompt-chip {

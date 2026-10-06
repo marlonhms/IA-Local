@@ -68,11 +68,13 @@ def run_welcome_footer_tests():
     )
     assert pattern_intro_closed.search(html), "O container de sugestões ainda está colado dentro do bloco de texto da apresentação!"
 
-    # Verifica classes de espaçamento inferior (rodapé)
-    assert "!mt-7" in html or "mt-6" in html or "mt-8" in html, "Espaçamento superior de rodapé (margin-top) ausente"
+    # Verifica classes de espaçamento inferior (rodapé ancorado na base)
+    assert "mt-auto" in html or "!mt-auto" in html, "Espaçamento superior de rodapé (mt-auto) ausente no container de sugestões"
+    assert "h-full" in html, "Classe h-full ausente no container de boas-vindas"
+    assert "flex-1" in html, "Classe flex-1 ausente para expansão vertical total"
     assert "pt-4" in html, "Padding-top de rodapé ausente"
     assert "border-t" in html, "Borda divisória superior do rodapé ausente"
-    print("   [OK] HTML validado: bloco de apresentação fechado, sugestões desacopladas no rodapé com respiro visual.")
+    print("   [OK] HTML validado: bloco de apresentação fechado, sugestões ancoradas na base com mt-auto e altura total (h-full/flex-1).")
 
     # ------------------------------------------------------------------
     # 2. VALIDAÇÃO DE ESTILOS CSS EM web/css/aura.css
@@ -84,10 +86,11 @@ def run_welcome_footer_tests():
 
     assert "#welcome-suggestions-container" in css, "Seletor #welcome-suggestions-container ausente no aura.css"
     assert ".welcome-card-footer" in css, "Seletor .welcome-card-footer ausente no aura.css"
-    assert "margin-top:" in css, "Propriedade margin-top ausente no rodapé de sugestões"
+    assert "margin-top: auto" in css, "Propriedade margin-top: auto ausente no rodapé de sugestões em aura.css"
     assert "border-top:" in css, "Propriedade border-top ausente no rodapé de sugestões"
     assert ".welcome-suggestions-grid" in css, "Classe .welcome-suggestions-grid ausente no aura.css"
-    print("   [OK] CSS validado: regras dedicadas para #welcome-suggestions-container, .welcome-card-footer e grid responsivo.")
+    assert "#welcome-message-bubble" in css or ".welcome-message-wrapper" in css, "Regras de altura total do welcome card ausentes no aura.css"
+    print("   [OK] CSS validado: regras dedicadas para margin-top: auto, altura total e ancoragem inferior.")
 
     # ------------------------------------------------------------------
     # 3. VALIDAÇÃO DE CHIPS E GATILHOS EXECUTIVOS (F4-07)
@@ -122,8 +125,8 @@ def run_welcome_footer_tests():
         this.value = '';
         this.style = {};
         this.classList = {
-          add: (c) => { if (!this.className.includes(c)) this.className += ' ' + c; },
-          remove: (c) => { this.className = this.className.replace(new RegExp('\\b' + c + '\\b', 'g'), '').trim(); },
+          add: (...classes) => { classes.forEach(c => { if (!this.className.includes(c)) this.className += ' ' + c; }); },
+          remove: (...classes) => { classes.forEach(c => { this.className = this.className.replace(new RegExp('\\b' + c + '\\b', 'g'), '').trim(); }); },
           contains: (c) => this.className.includes(c)
         };
       }
@@ -238,6 +241,14 @@ def run_welcome_footer_tests():
       console.error('FALHA: estrutura flex flex-col justify-between ausente no addWelcomeMessage (assimetria com index.html)!');
       process.exit(1);
     }
+    if (!welcomeMsgDiv.innerHTML.includes('mt-auto')) {
+      console.error('FALHA: classe mt-auto ausente no addWelcomeMessage!');
+      process.exit(1);
+    }
+    if (!welcomeMsgDiv.className.includes('welcome-message-wrapper') || !welcomeMsgDiv.className.includes('h-full')) {
+      console.error('FALHA: welcome-message-wrapper e h-full ausentes na div gerada pelo addWelcomeMessage!');
+      process.exit(1);
+    }
 
     // Verifica que o elemento de sugestões foi automaticamente registrado no DOM mock pelo parser
     if (!document.getElementById('welcome-suggestions-container')) {
@@ -251,6 +262,16 @@ def run_welcome_footer_tests():
     // 3. Verifica que welcome-suggestions-container FOI ESTREITAMENTE REMOVIDO
     if (document.getElementById('welcome-suggestions-container') !== null) {
       console.error('FALHA: welcome-suggestions-container NÃO foi removido após o primeiro envio!');
+      process.exit(1);
+    }
+
+    // Verifica que o card de boas-vindas perdeu h-full para não ocupar 100% da tela durante a conversa e ganhou classe de colapso
+    if (welcomeMsgDiv.className.includes('h-full') || welcomeMsgDiv.className.includes('welcome-message-wrapper')) {
+      console.error('FALHA: classes de tela cheia não foram limpas da mensagem de boas-vindas após primeiro envio!');
+      process.exit(1);
+    }
+    if (!welcomeMsgDiv.className.includes('welcome-message-collapsed')) {
+      console.error('FALHA: classe welcome-message-collapsed ausente para colapso seguro!');
       process.exit(1);
     }
 
@@ -274,6 +295,10 @@ def run_welcome_footer_tests():
     const newWelcome = feed.children[0];
     if (!newWelcome.innerHTML.includes('welcome-suggestions-container') || !newWelcome.innerHTML.includes('welcome-card-footer')) {
       console.error('FALHA: clearSession não restaurou o rodapé de sugestões!');
+      process.exit(1);
+    }
+    if (!newWelcome.className.includes('welcome-message-wrapper') || !newWelcome.className.includes('h-full')) {
+      console.error('FALHA: clearSession não restaurou classes de altura total!');
       process.exit(1);
     }
     if (!document.getElementById('welcome-suggestions-container')) {
@@ -302,6 +327,109 @@ def run_welcome_footer_tests():
     assert res_node.returncode == 0, f"Erro nos testes Node.js:\n{res_node.stderr}\nSTDOUT:\n{res_node.stdout}"
     assert "NODE_WELCOME_TEST_SUCCESS" in res_node.stdout
     print("   [OK] Lógica JS validada: adição no rodapé, remoção estrita no 1º envio, tolerância no 2º envio, restauração em clearSession e novo ciclo.")
+
+    # ------------------------------------------------------------------
+    # 5. VALIDAÇÃO REAL DE LAYOUT GEOMÉTRICO VIA HEADLESS BROWSER (PLAYWRIGHT)
+    # ------------------------------------------------------------------
+    print("\n5. Testando Layout Geométrico e Ancoragem em Navegador Real (Edge Headless)...")
+    import threading
+    import time
+    import uvicorn
+    from playwright.sync_api import sync_playwright
+
+    server_port = 8996
+    def _run_srv():
+        uvicorn.run(app, host="127.0.0.1", port=server_port, log_level="error")
+
+    t_srv = threading.Thread(target=_run_srv, daemon=True)
+    t_srv.start()
+    time.sleep(1.2)
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(channel="msedge", headless=True)
+
+        # A. Desktop 1280x800: Sugestões ancoradas na base com espaço livre entre texto e chips
+        page_desk = browser.new_page(viewport={"width": 1280, "height": 800})
+        page_desk.goto(f"http://127.0.0.1:{server_port}")
+        page_desk.wait_for_selector("#welcome-suggestions-container")
+        page_desk.evaluate("""() => {
+            const btn = document.querySelector('button[onclick*="view-console"]') || document.getElementById('tab-view-console');
+            if (btn) btn.click();
+        }""")
+        time.sleep(0.4)
+
+        metrics_desk = page_desk.evaluate("""() => {
+            const bubble = document.getElementById('welcome-message-bubble');
+            const inner = bubble.querySelector('.chat-bubble-aura');
+            const textIntro = bubble.querySelector('.welcome-content-body > div');
+            const sugg = document.getElementById('welcome-suggestions-container');
+            const rBubble = bubble.getBoundingClientRect();
+            const rInner = inner.getBoundingClientRect();
+            const rText = textIntro ? textIntro.getBoundingClientRect() : { bottom: 0 };
+            const rSugg = sugg.getBoundingClientRect();
+            return {
+                bubbleHeight: rBubble.height,
+                innerBottom: rInner.bottom,
+                suggBottom: rSugg.bottom,
+                suggTop: rSugg.top,
+                textBottom: rText.bottom,
+                gapBetweenTextAndSuggestions: rSugg.top - rText.bottom,
+                distanceFromBottom: rInner.bottom - rSugg.bottom
+            };
+        }""")
+        assert metrics_desk["gapBetweenTextAndSuggestions"] > 100, f"Espaço vazio não alocado entre texto e sugestões: {metrics_desk['gapBetweenTextAndSuggestions']}px"
+        assert metrics_desk["distanceFromBottom"] < 40, f"Sugestões não estão ancoradas na base: {metrics_desk['distanceFromBottom']}px do rodapé"
+        assert metrics_desk["suggBottom"] <= metrics_desk["innerBottom"] + 2, "Sugestões vazaram para fora do card!"
+        print(f"   [OK] Desktop 1280x800: espaço livre intermediário de {metrics_desk['gapBetweenTextAndSuggestions']:.1f}px e sugestões ancoradas a {metrics_desk['distanceFromBottom']:.1f}px da borda inferior.")
+
+        # B. Viewport Restrito / Landscape 667x375: Card deve expandir naturalmente sem truncar nem vazar chips
+        page_small = browser.new_page(viewport={"width": 667, "height": 375})
+        page_small.goto(f"http://127.0.0.1:{server_port}")
+        page_small.wait_for_selector("#welcome-suggestions-container")
+        page_small.evaluate("""() => {
+            const btn = document.querySelector('button[onclick*="view-console"]') || document.getElementById('tab-view-console');
+            if (btn) btn.click();
+        }""")
+        time.sleep(0.4)
+
+        metrics_small = page_small.evaluate("""() => {
+            const bubble = document.getElementById('welcome-message-bubble');
+            const inner = bubble.querySelector('.chat-bubble-aura');
+            const sugg = document.getElementById('welcome-suggestions-container');
+            const rInner = inner.getBoundingClientRect();
+            const rSugg = sugg.getBoundingClientRect();
+            return {
+                bubbleHeight: rInner.height,
+                innerBottom: rInner.bottom,
+                suggBottom: rSugg.bottom,
+                overflows: rSugg.bottom > (rInner.bottom + 2)
+            };
+        }""")
+        assert not metrics_small["overflows"], f"Em viewport restrito as sugestões vazaram fora do card: {metrics_small}"
+        assert metrics_small["bubbleHeight"] >= 280, f"Card não expandiu para conter o conteúdo em viewport restrito: {metrics_small['bubbleHeight']}px"
+        print(f"   [OK] Viewport 667x375: card expandiu com segurança para {metrics_small['bubbleHeight']:.1f}px sem estourar bordas nem vazar sugestões.")
+
+        # C. Interação: Enviar mensagem colapsa o card de boas-vindas para altura natural
+        btn_chip = page_desk.locator("#welcome-suggestions-container button:has-text('Autonomia dos Tanques')")
+        btn_chip.click()
+        time.sleep(1.0)
+
+        post_click = page_desk.evaluate("""() => {
+            const sugg = document.getElementById('welcome-suggestions-container');
+            const bubble = document.getElementById('welcome-message-bubble');
+            return {
+                suggExists: !!sugg,
+                collapsed: bubble ? bubble.classList.contains('welcome-message-collapsed') : false,
+                height: bubble ? bubble.getBoundingClientRect().height : 0
+            };
+        }""")
+        assert not post_click["suggExists"], "Sugestões ainda existem no DOM após clique!"
+        assert post_click["collapsed"], "Classe welcome-message-collapsed não foi adicionada ao card!"
+        assert post_click["height"] < 320, f"Card não colapsou para altura natural após envio: {post_click['height']}px"
+        assert post_click["height"] < metrics_desk["bubbleHeight"] * 0.6, f"Card não encolheu significativamente: {post_click['height']}px de {metrics_desk['bubbleHeight']}px"
+        print(f"   [OK] Primeiro envio: sugestões removidas e card colapsado para altura natural ({post_click['height']:.1f}px de {metrics_desk['bubbleHeight']:.1f}px).")
+
+        browser.close()
 
     print("\n" + "=" * 78)
     print("🎉 TODOS OS TESTES DE POSICIONAMENTO E REMOÇÃO PASSARAM COM 100% DE SUCESSO!")
