@@ -212,7 +212,7 @@
       const badge = document.getElementById('hud-hz-badge');
       const val = document.getElementById('hud-hz-value');
       if (val) {
-        val.textContent = `⚡ ${tierName}`;
+        val.textContent = tierName;
       }
       if (badge) {
         badge.title = `Taxa de Atualização do Monitor Sincronizada: ${rawFps.toFixed(1)} FPS (${snappedHz}Hz nativo)`;

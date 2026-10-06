@@ -2040,3 +2040,96 @@ body.gpu-guard-active,
   -webkit-font-feature-settings: "tnum";
   font-feature-settings: "tnum";
 }
+
+/* ==========================================================================
+   AURA PROPRIETARY BRAND ICONOGRAPHY & PRECISION GLASS GLYPHS (v2.8.0)
+   Elimina ícones genéricos Lucide e sparkles clichês por insígnias exclusivas
+   ========================================================================== */
+
+.aura-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.aura-glyph svg {
+  display: block;
+}
+
+.aura-core-insignia {
+  filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.45));
+  transition: transform 0.25s ease, filter 0.25s ease;
+}
+
+.aura-core-insignia:hover {
+  filter: drop-shadow(0 0 12px rgba(6, 182, 212, 0.7));
+  transform: scale(1.05);
+}
+
+.aura-brand-pedestal {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(15, 23, 42, 0.75) 50%, rgba(6, 182, 212, 0.15) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 25px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: all 0.3s ease;
+}
+
+.aura-brand-pedestal:hover {
+  border-color: rgba(16, 185, 129, 0.55);
+  box-shadow: 0 0 35px rgba(16, 185, 129, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.aura-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.aura-icon-badge-emerald {
+  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+}
+
+.aura-icon-badge-cyan {
+  border-color: rgba(6, 182, 212, 0.3);
+  background: rgba(6, 182, 212, 0.12);
+  color: #22d3ee;
+}
+
+.aura-icon-badge-purple {
+  border-color: rgba(124, 58, 237, 0.3);
+  background: rgba(124, 58, 237, 0.12);
+  color: #c084fc;
+}
+
+.aura-icon-badge-amber {
+  border-color: rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+}
+
+.aura-icon-badge-rose {
+  border-color: rgba(244, 63, 94, 0.3);
+  background: rgba(244, 63, 94, 0.12);
+  color: #fb7185;
+}
+
+.aura-icon-badge-sky {
+  border-color: rgba(14, 165, 233, 0.3);
+  background: rgba(14, 165, 233, 0.12);
+  color: #38bdf8;
+}
+

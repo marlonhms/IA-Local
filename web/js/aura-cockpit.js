@@ -27,8 +27,15 @@ class AuraCockpitController {
     if (container && (!this.tanksData || this.tanksData.length === 0)) {
       container.innerHTML = `
         <div class="col-span-full py-10 px-6 text-center glass-panel border border-slate-800/80 rounded-2xl bg-gradient-to-b from-slate-900/40 to-slate-950/60 shadow-lg">
-          <div class="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-3">
-            <i data-lucide="fuel" class="w-6 h-6 text-emerald-400"></i>
+          <div class="w-14 h-14 rounded-2xl aura-brand-pedestal flex items-center justify-center mx-auto mb-3">
+            <svg class="w-7 h-7 text-emerald-400 aura-glyph" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="3" y="3" width="11" height="18" rx="2" stroke="currentColor" stroke-width="1.75"/>
+              <rect x="5.5" y="6" width="6" height="4" rx="0.8" stroke="currentColor" stroke-width="1.2" stroke-opacity="0.9"/>
+              <path d="M14 8h2.5a2 2 0 0 1 2 2v6.5a1.5 1.5 0 0 0 3 0V9l-2-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="2" y1="21" x2="15" y2="21" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+              <line x1="6" y1="14" x2="11" y2="14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              <line x1="6" y1="17" x2="9" y2="17" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
           </div>
           <h4 class="text-white font-bold text-base mb-1">Panorama Operacional Sob Demanda</h4>
           <p class="text-slate-400 text-xs max-w-md mx-auto mb-4 leading-relaxed font-sans">
@@ -40,7 +47,13 @@ class AuraCockpitController {
               <span>Consultar Panorama Agora</span>
             </button>
             <button onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" class="px-4 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-200 border border-purple-500/30 text-xs font-semibold transition-all shadow-sm flex items-center gap-2">
-              <i data-lucide="sparkles" class="w-4 h-4 text-purple-400"></i>
+              <svg class="w-4 h-4 text-purple-300 aura-glyph aura-core-insignia" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="12 2 20.66 7 20.66 17 12 22 3.34 17 3.34 7" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+                <polygon points="12 6 17.2 9 17.2 15 12 18 6.8 15 6.8 9" stroke="currentColor" stroke-width="1.25" stroke-opacity="0.6" stroke-linejoin="round"/>
+                <circle cx="12" cy="12" r="2.2" fill="currentColor"/>
+                <line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <line x1="12" y1="18" x2="12" y2="22" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
               <span>Perguntar no Chat</span>
             </button>
           </div>
@@ -183,7 +196,7 @@ class AuraCockpitController {
         if (container && (!this.tanksData || this.tanksData.length === 0)) {
           container.innerHTML = `
             <div class="col-span-full py-8 text-center text-amber-400 font-sans text-sm glass-panel p-4">
-              ⚠️ Dados volumétricos temporariamente indisponíveis no momento.
+              <span class="inline-flex items-center gap-2"><svg class="w-4 h-4 text-amber-400 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke-width="1.75"/><line x1="12" y1="9" x2="12" y2="13" stroke-width="1.75"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg> <span>Dados volumétricos temporariamente indisponíveis no momento.</span></span>
               <button onclick="window.auraCockpit.refreshAllData()" class="mt-2 block mx-auto px-3 py-1 bg-slate-800 text-cyan-300 rounded border border-slate-700 hover:bg-slate-700 text-xs">
                 Tentar Novamente ↺
               </button>
@@ -400,8 +413,8 @@ class AuraCockpitController {
 
               <div class="flex items-baseline justify-between">
                 <span class="text-slate-400">Comporta Carreta:</span>
-                <span class="text-purple-300 font-bold tabular-nums flex items-center gap-1">
-                  <span>🚚</span>
+                <span class="text-purple-300 font-bold tabular-nums flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5 text-purple-400 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="1" y="4" width="14" height="12" rx="1.5" stroke-width="1.75"/><path d="M15 8h4.5l2.5 3.5V16h-7V8z" stroke-width="1.75" stroke-linejoin="round"/><circle cx="5.5" cy="18.5" r="2.5" stroke-width="1.75"/><circle cx="18.5" cy="18.5" r="2.5" stroke-width="1.75"/></svg>
                   <span>${comp5k}x 5.000 L</span>
                 </span>
               </div>
@@ -415,8 +428,8 @@ class AuraCockpitController {
                 <span class="text-slate-500">Sem consumo registrado</span>
               ` : isCritical ? `
                 <div class="text-rose-400 font-semibold space-y-0.5">
-                  <div class="flex items-center gap-1">
-                    <span>⚠️</span>
+                  <div class="flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-rose-400 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke-width="1.75" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="13" stroke-width="1.75" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
                     <span>Reserva Crítica (&lt;15%): <strong class="tabular-nums">0.0h</strong></span>
                   </div>
                   <div class="text-slate-400 text-[10px]">Esgotamento: <strong class="text-rose-300 tabular-nums">~${horasAutonomia.toFixed(0)}h</strong> (~${diasAutonomia.toFixed(1)}d)</div>
@@ -495,8 +508,9 @@ class AuraCockpitController {
             </div>
             
             ${isLento ? `
-              <div class="mt-1.5 text-[10px] text-amber-300 font-semibold flex items-center gap-1 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30">
-                <span>⚠️ Filtro Lento (&lt;30 L/min)</span>
+              <div class="mt-1.5 text-[10px] text-amber-300 font-semibold flex items-center gap-1.5 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30">
+                <svg class="w-3 h-3 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke-width="1.75" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="13" stroke-width="1.75" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
+                <span>Filtro Lento (&lt;30 L/min)</span>
               </div>
             ` : ''}
           </div>
@@ -673,8 +687,9 @@ class AuraCockpitController {
         </div>
 
         ${limitation && !isNoMovement && !isUnavailable ? `
-          <div class="text-[11px] text-amber-300 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/25">
-            ⚠️ <strong>Limitação:</strong> ${this.escapeHtml(limitation)}
+          <div class="text-[11px] text-amber-300 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/25 flex items-start gap-1.5">
+            <svg class="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke-width="1.75" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="13" stroke-width="1.75" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
+            <div><strong>Limitação:</strong> ${this.escapeHtml(limitation)}</div>
           </div>
         ` : ''}
 
@@ -710,8 +725,8 @@ class AuraCockpitController {
       <div class="space-y-3 font-mono text-xs">
         <div class="flex items-center justify-between">
           <span class="text-slate-400">Conformidade Portaria 26/1992:</span>
-          <span class="font-bold px-2 py-0.5 rounded text-[11px] ${isConforme ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'}">
-            ${isConforme ? '✓ CONFORME ANP (±0.6%)' : '⚠️ ALERTA VOLUMÉTRICO'}
+          <span class="font-bold px-2 py-0.5 rounded text-[11px] inline-flex items-center gap-1.5 ${isConforme ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'}">
+            ${isConforme ? '<svg class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> CONFORME ANP (±0.6%)' : '<svg class="w-3.5 h-3.5 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke-width="1.75"/><line x1="12" y1="9" x2="12" y2="13" stroke-width="1.75"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg> ALERTA VOLUMÉTRICO'}
           </span>
         </div>
 

@@ -169,9 +169,9 @@ class AuraTriggersController {
 
           <div class="mt-4 pt-3 border-t border-white/5 flex items-center justify-between font-mono text-[11px] text-slate-500">
             <span class="text-slate-400">alias: ${tool.id}</span>
-            <span class="text-cyan-400 font-semibold group-hover:text-cyan-300 flex items-center gap-1">
+            <span class="text-cyan-400 font-semibold group-hover:text-cyan-300 flex items-center gap-1.5">
               <span>Disparar</span>
-              <span>⚡</span>
+              <svg class="w-3.5 h-3.5 inline text-cyan-400 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" stroke-width="1.75"/><line x1="12" y1="1.5" x2="12" y2="5" stroke-width="1.75"/><line x1="12" y1="19" x2="12" y2="22.5" stroke-width="1.75"/><line x1="1.5" y1="12" x2="5" y2="12" stroke-width="1.75"/><line x1="19" y1="12" x2="22.5" y2="12" stroke-width="1.75"/><path d="M8 12.5l2.8 2.8L16.5 8.5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </span>
           </div>
         </div>
@@ -246,7 +246,7 @@ class AuraTriggersController {
       statusEl.textContent = '✓ 200 OK SUCCESS';
     }
     if (latencyEl) {
-      latencyEl.textContent = `⚡ Latência: ${response.clientLatencyMs || response.latency_ms || 25} ms`;
+      latencyEl.innerHTML = `<span class="inline-flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> <span>Latência: ${response.clientLatencyMs || response.latency_ms || 25} ms</span></span>`;
     }
 
     // Renderiza JSON bruto com syntax highlighting simples
@@ -421,7 +421,7 @@ class AuraTriggersController {
           bicosList += `
             <div class="p-3 rounded-xl glass-subcard border ${isLento ? 'border-amber-500/50 shadow-md shadow-amber-950/20 text-amber-300' : 'border-white/10 text-slate-300'} font-mono text-xs transition-all hover:-translate-y-0.5">
               <div class="font-bold">Bico ${b.bico} (${b.combustivel})</div>
-              <div class="text-[11px] text-slate-400 mt-1">Vazão: <strong class="tabular-nums">${vazao.toFixed(1)} L/min</strong> ${isLento ? '⚠️ LENTO' : '✓'}</div>
+              <div class="text-[11px] text-slate-400 mt-1">Vazão: <strong class="tabular-nums">${vazao.toFixed(1)} L/min</strong> ${isLento ? '<span class="inline-flex items-center gap-1 text-amber-400 font-semibold"><svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke-width="1.75"/><line x1="12" y1="9" x2="12" y2="13" stroke-width="1.75"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg> LENTO</span>' : '<span class="text-emerald-400">✓ NORMAL</span>'}</div>
             </div>
           `;
         });

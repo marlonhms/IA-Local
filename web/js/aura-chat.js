@@ -6,6 +6,37 @@
  * espelhamento em tempo real com a Visão Split e memória de sessão durável.
  */
 
+const CHAT_ICONS = {
+  truck: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="1" y="4" width="14" height="12" rx="1.5" stroke-width="1.75"/><path d="M15 8h4.5l2.5 3.5V16h-7V8z" stroke-width="1.75" stroke-linejoin="round"/><circle cx="5.5" cy="18.5" r="2.5" stroke-width="1.75"/><circle cx="18.5" cy="18.5" r="2.5" stroke-width="1.75"/></svg>',
+  formula: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 3L3 21h18V3z" stroke-width="1.75" stroke-linejoin="round"/><line x1="9" y1="21" x2="9" y2="17" stroke-width="1.5"/><line x1="13" y1="21" x2="13" y2="15" stroke-width="1.5"/><line x1="17" y1="21" x2="17" y2="13" stroke-width="1.5"/></svg>',
+  tank: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="11" height="18" rx="2" stroke-width="1.75"/><line x1="2" y1="21" x2="15" y2="21" stroke-width="1.75"/><path d="M14 8h2.5a2 2 0 0 1 2 2v6.5a1.5 1.5 0 0 0 3 0V9l-2-2" stroke-width="1.5"/></svg>',
+  audit: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" stroke-width="1.75"/><rect x="8" y="2" width="8" height="4" rx="1" stroke-width="1.75"/></svg>',
+  search: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8" stroke-width="1.75"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke-width="1.75"/></svg>',
+  store: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" stroke-width="1.75"/><line x1="3" y1="6" x2="21" y2="6" stroke-width="1.75"/></svg>',
+  nozzle: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" stroke-width="1.75"/></svg>',
+  chart: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10" stroke-width="2"/><line x1="12" y1="20" x2="12" y2="4" stroke-width="2"/><line x1="6" y1="20" x2="6" y2="14" stroke-width="2"/></svg>',
+  calendar: '<svg class="w-3 h-3 inline mr-1 flex-shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2" stroke-width="2"/><line x1="16" y1="2" x2="16" y2="6" stroke-width="2"/><line x1="8" y1="2" x2="8" y2="6" stroke-width="2"/><line x1="3" y1="10" x2="21" y2="10" stroke-width="2"/></svg>',
+  unit: '<svg class="w-3 h-3 inline mr-1 flex-shrink-0 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="2" width="16" height="20" rx="2" stroke-width="2"/><line x1="9" y1="22" x2="9" y2="12" stroke-width="2"/><line x1="15" y1="22" x2="15" y2="12" stroke-width="2"/></svg>',
+  check: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  alert: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke-width="1.75" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="13" stroke-width="1.75" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>',
+  pulse: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  target: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke-width="2"/><circle cx="12" cy="12" r="6" stroke-width="2"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>',
+  box: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0 text-purple-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" stroke-width="1.75"/><line x1="3" y1="9" x2="21" y2="9" stroke-width="1.5"/></svg>',
+  dialog: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  wrench: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" stroke-width="1.75"/></svg>',
+  pause: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="6" y="4" width="4" height="16" rx="1" stroke-width="1.75"/><rect x="14" y="4" width="4" height="16" rx="1" stroke-width="1.75"/></svg>',
+  core: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="12 2 20.66 7 20.66 17 12 22 3.34 17 3.34 7" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/></svg>',
+  sparkles: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="12 2 20.66 7 20.66 17 12 22 3.34 17 3.34 7" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/></svg>',
+  telemetry: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" stroke-width="1.75"/><path d="M12 7v5l3.5 2" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M7 16a6 6 0 0 1 10 0" stroke-width="1.5" stroke-dasharray="2 2"/></svg>',
+  shield: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-width="1.75"/><path d="M9 12l2 2 4-4" stroke-width="1.75"/></svg>',
+  clock: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" stroke-width="1.75"/><polyline points="12 6 12 12 15 15" stroke-width="1.75"/></svg>',
+  bulb: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18h6m-4 4h2a8 8 0 1 0-8-8c0 2.2 1 4.2 2.5 5.5.6.5 1 1.5 1.5 2.5z" stroke-width="1.75"/></svg>',
+  terminal: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="4 17 10 11 4 5" stroke-width="2"/><line x1="12" y1="19" x2="20" y2="19" stroke-width="2"/></svg>',
+  volume: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" stroke-width="1.75"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" stroke-width="1.75"/></svg>',
+  folder: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke-width="1.75"/></svg>',
+  rocket: '<svg class="w-3.5 h-3.5 inline mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09zM12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" stroke-width="1.75"/></svg>'
+};
+
 class AuraChatController {
   constructor() {
     this.sessionId = this.generateSessionId();
@@ -201,7 +232,13 @@ class AuraChatController {
         <div class="flex items-start justify-between gap-3 pb-3.5 border-b border-white/10">
           <div class="flex items-center gap-3">
             <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-cyan-500/25 via-sky-500/20 to-purple-500/25 border border-cyan-400/40 flex items-center justify-center text-cyan-300 shadow-lg shadow-cyan-950/30">
-              <i data-lucide="sparkles" class="w-5 h-5 text-cyan-300"></i>
+              <svg class="w-6 h-6 text-cyan-300 aura-glyph aura-core-insignia" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="12 2 20.66 7 20.66 17 12 22 3.34 17 3.34 7" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+                <polygon points="12 6 17.2 9 17.2 15 12 18 6.8 15 6.8 9" stroke="currentColor" stroke-width="1.25" stroke-opacity="0.6" stroke-linejoin="round"/>
+                <circle cx="12" cy="12" r="2.2" fill="currentColor"/>
+                <line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <line x1="12" y1="18" x2="12" y2="22" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
             </div>
             <div>
               <div class="flex items-center gap-2">
@@ -225,7 +262,7 @@ class AuraChatController {
         <!-- Grade de Consultas Executivas em 1-Toque (Acionam os DecisionCards Reais) -->
         <div class="space-y-2.5 pt-1">
           <div class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-            <i data-lucide="compass" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke-width="1.75"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" stroke-width="1.5"/></svg>
             <span>Diagnósticos Especializados (Toque para auditar agora):</span>
           </div>
 
@@ -233,7 +270,9 @@ class AuraChatController {
             <button onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" class="group p-3.5 rounded-xl glass-subcard border border-white/10 hover:border-emerald-500/50 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg shadow-sm active:scale-[0.98]">
               <div class="flex items-center justify-between mb-1.5">
                 <div class="flex items-center gap-2">
-                  <span class="text-base">⛽</span>
+                  <span class="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="11" height="18" rx="2" stroke-width="1.75"/><rect x="5.5" y="6" width="6" height="4" rx="0.8" stroke-width="1.2"/><path d="M14 8h2.5a2 2 0 0 1 2 2v6.5a1.5 1.5 0 0 0 3 0V9l-2-2" stroke-width="1.6" stroke-linecap="round"/><line x1="2" y1="21" x2="15" y2="21" stroke-width="1.75"/></svg>
+                  </span>
                   <span class="text-white font-semibold text-xs group-hover:text-emerald-300 transition-colors">Autonomia de Tanques</span>
                 </div>
                 <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold tabular-nums">Run-Out</span>
@@ -244,7 +283,9 @@ class AuraChatController {
             <button onclick="window.auraChat.sendUserPrompt('Como fechou o último turno? Teve furo de caixa?')" class="group p-3.5 rounded-xl glass-subcard border border-white/10 hover:border-cyan-500/50 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg shadow-sm active:scale-[0.98]">
               <div class="flex items-center justify-between mb-1.5">
                 <div class="flex items-center gap-2">
-                  <span class="text-base">💰</span>
+                  <span class="w-6 h-6 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="5" width="20" height="14" rx="2" stroke-width="1.75"/><circle cx="12" cy="12" r="3.5" stroke-width="1.5"/><line x1="6" y1="12" x2="6.01" y2="12" stroke-width="2"/><line x1="18" y1="12" x2="18.01" y2="12" stroke-width="2"/></svg>
+                  </span>
                   <span class="text-white font-semibold text-xs group-hover:text-cyan-300 transition-colors">Conciliação de Turno</span>
                 </div>
                 <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-semibold tabular-nums">CBC04 vs PDV</span>
@@ -255,7 +296,9 @@ class AuraChatController {
             <button onclick="window.auraChat.sendUserPrompt('O LMC de ontem fechou dentro da tolerância oficial da ANP?')" class="group p-3.5 rounded-xl glass-subcard border border-white/10 hover:border-purple-500/50 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg shadow-sm active:scale-[0.98]">
               <div class="flex items-center justify-between mb-1.5">
                 <div class="flex items-center gap-2">
-                  <span class="text-base">📋</span>
+                  <span class="w-6 h-6 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke-width="1.75"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15z" stroke-width="1.75"/><path d="M9 10l2 2 4-4" stroke-width="1.75" stroke-linecap="round"/></svg>
+                  </span>
                   <span class="text-white font-semibold text-xs group-hover:text-purple-300 transition-colors">LMC Oficial ANP</span>
                 </div>
                 <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-semibold tabular-nums">±0.6%</span>
@@ -266,7 +309,9 @@ class AuraChatController {
             <button onclick="window.auraChat.sendUserPrompt('Há algum bico com vazão lenta ou alerta na pista?')" class="group p-3.5 rounded-xl glass-subcard border border-white/10 hover:border-amber-500/50 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg shadow-sm active:scale-[0.98]">
               <div class="flex items-center justify-between mb-1.5">
                 <div class="flex items-center gap-2">
-                  <span class="text-base">⚡</span>
+                  <span class="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 13l4-4 4 4" stroke-width="1.75" stroke-linecap="round"/><path d="M7 9v12" stroke-width="1.75" stroke-linecap="round"/><path d="M14 5l4 4-4 4" stroke-width="1.75" stroke-linecap="round"/><path d="M18 9H10" stroke-width="1.75" stroke-linecap="round"/><circle cx="18" cy="18" r="3" stroke-width="1.5"/></svg>
+                  </span>
                   <span class="text-white font-semibold text-xs group-hover:text-amber-300 transition-colors">Vazão & Frentistas</span>
                 </div>
                 <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold tabular-nums">&lt;30 L/min</span>
@@ -277,7 +322,9 @@ class AuraChatController {
             <button onclick="window.auraChat.sendUserPrompt('Quais os combos de vendas cruzadas com maior Lift na conveniência?')" class="group p-3.5 rounded-xl glass-subcard border border-white/10 hover:border-sky-500/50 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg shadow-sm active:scale-[0.98]">
               <div class="flex items-center justify-between mb-1.5">
                 <div class="flex items-center gap-2">
-                  <span class="text-base">🛒</span>
+                  <span class="w-6 h-6 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-400 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" stroke-width="1.75"/><line x1="3" y1="6" x2="21" y2="6" stroke-width="1.75"/><path d="M16 10a4 4 0 0 1-8 0" stroke-width="1.75"/></svg>
+                  </span>
                   <span class="text-white font-semibold text-xs group-hover:text-sky-300 transition-colors">Combos da Loja</span>
                 </div>
                 <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-semibold tabular-nums">Lift ≥ 2.0x</span>
@@ -288,7 +335,9 @@ class AuraChatController {
             <button onclick="window.auraChat.sendUserPrompt('Quem são os maiores clientes e frotistas da revenda?')" class="group p-3.5 rounded-xl glass-subcard border border-white/10 hover:border-rose-500/50 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg shadow-sm active:scale-[0.98]">
               <div class="flex items-center justify-between mb-1.5">
                 <div class="flex items-center gap-2">
-                  <span class="text-base">🏆</span>
+                  <span class="w-6 h-6 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="11" r="2.5" fill="currentColor" fill-opacity="0.3"/></svg>
+                  </span>
                   <span class="text-white font-semibold text-xs group-hover:text-rose-300 transition-colors">Clientes & Frotas</span>
                 </div>
                 <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold tabular-nums">Ranking</span>
@@ -676,7 +725,7 @@ class AuraChatController {
     ids.forEach(id => {
       const chip = document.getElementById(id);
       if (chip) {
-        chip.innerHTML = `🎯 ${name}${conf}`;
+        chip.innerHTML = `${CHAT_ICONS.target} ${name}${conf}`;
         chip.classList.remove('hidden');
       }
     });
@@ -715,7 +764,7 @@ class AuraChatController {
         <div class="flex items-center justify-between border-b border-white/10 pb-3">
           <div class="flex items-center gap-2.5">
             <div class="w-8 h-8 rounded-xl skeleton-shimmer flex items-center justify-center text-cyan-400">
-              <span class="animate-pulse text-sm">⚡</span>
+              <span class="animate-pulse text-sm inline-flex">${CHAT_ICONS.pulse}</span>
             </div>
             <div>
               <div class="skeleton-shimmer h-4 w-40 mb-1.5"></div>
@@ -814,7 +863,7 @@ class AuraChatController {
     ids.forEach(id => {
       const chip = typeof document !== 'undefined' ? document.getElementById(id) : null;
       if (chip) {
-        chip.innerHTML = `⚡ Consultando ${this.escapeHtml(displayName)}...`;
+        chip.innerHTML = `${CHAT_ICONS.pulse} Consultando ${this.escapeHtml(displayName)}...`;
         chip.classList.remove('hidden');
       }
     });
@@ -840,7 +889,7 @@ class AuraChatController {
     chipIds.forEach(id => {
       const chip = document.getElementById(id);
       if (chip) {
-        chip.innerHTML = `✓ ${this.escapeHtml(displayName)} apurado`;
+        chip.innerHTML = `${CHAT_ICONS.check} ${this.escapeHtml(displayName)} apurado`;
         chip.className = 'chip-intent text-emerald-300 border-emerald-500/30 bg-emerald-500/10';
       }
     });
@@ -952,12 +1001,12 @@ class AuraChatController {
             <span class="decision-context-sub">Contrato AURA Precision Glass v1.0 esperado • ${this.escapeHtml(moduleName)}</span>
           </div>
           <span class="decision-status-badge status-neutral">
-            <span>⚠️</span>
+            <span>${CHAT_ICONS.alert}</span>
             <span>Schema Desconhecido</span>
           </span>
         </div>
         <div class="p-3.5 rounded-xl bg-slate-900/80 border border-amber-500/30 text-amber-200/90 font-mono text-xs space-y-1.5">
-          <div>⚠️ <strong>Aviso de Conformidade e Governança:</strong></div>
+          <div class="flex items-center gap-1.5"><span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span> <strong>Aviso de Conformidade e Governança:</strong></div>
           <p class="text-[11px] text-slate-300">
             O payload analítico recebido para <strong>${this.escapeHtml(moduleName)}</strong> utiliza a versão <code>${this.escapeHtml(version)}</code>, incompatível com o renderizador atual. A exibição executiva foi suspensa para evitar inferências incorretas.
           </p>
@@ -986,7 +1035,7 @@ class AuraChatController {
             type="button"
             onclick="if (window.auraAudio) window.auraAudio.playChime(650, 0.05); if (window.auraApp) window.auraApp.switchTab('${this.escapeHtml(action.target)}');" 
             class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
-            <span class="text-sm">🚀</span>
+            <span class="inline-flex">${CHAT_ICONS.rocket}</span>
             <span>${this.escapeHtml(label)}</span>
             <svg class="w-3.5 h-3.5 text-cyan-300 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
@@ -999,7 +1048,7 @@ class AuraChatController {
             type="button"
             onclick="if (window.auraApp) window.auraApp.openSidebar();" 
             class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
-            <span class="text-sm">📂</span>
+            <span class="inline-flex">${CHAT_ICONS.folder}</span>
             <span>${this.escapeHtml(label)}</span>
           </button>
         `;
@@ -1009,7 +1058,7 @@ class AuraChatController {
             type="button"
             onclick="const btn = document.getElementById('btn-open-palette'); if (btn) btn.click();" 
             class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
-            <span class="text-sm">⌨️</span>
+            <span class="inline-flex">${CHAT_ICONS.terminal}</span>
             <span>${this.escapeHtml(label)}</span>
           </button>
         `;
@@ -1019,7 +1068,7 @@ class AuraChatController {
             type="button"
             onclick="const btn = document.getElementById('sidebar-btn-toggle-sfx') || document.getElementById('btn-toggle-sfx'); if (btn) { btn.click(); } else if (window.auraAudio) { const m = window.auraAudio.toggleMute(); if (window.auraApp) window.auraApp.syncSfxButtons(m); }" 
             class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
-            <span class="text-sm">🔊</span>
+            <span class="inline-flex">${CHAT_ICONS.volume}</span>
             <span>${this.escapeHtml(label)}</span>
           </button>
         `;
@@ -1029,7 +1078,7 @@ class AuraChatController {
             type="button"
             onclick="if (window.auraApp) window.auraApp.switchTab('cockpit');" 
             class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
-            <span class="text-sm">⚡</span>
+            <span class="inline-flex">${CHAT_ICONS.pulse}</span>
             <span>${this.escapeHtml(label)}</span>
           </button>
         `;
@@ -1041,7 +1090,7 @@ class AuraChatController {
       const relBadges = artigos.slice(1, 3).map(art => {
         const mod = art.modulo ? art.modulo.toUpperCase() : 'GUIA';
         const tit = art.titulo || art.topico;
-        return `<span class="px-2 py-0.5 rounded-lg bg-slate-800/80 text-cyan-300/90 text-[10px] font-mono border border-slate-700/60 inline-flex items-center gap-1">📌 [${this.escapeHtml(mod)}] ${this.escapeHtml(tit)}</span>`;
+        return `<span class="px-2 py-0.5 rounded-lg bg-slate-800/80 text-cyan-300/90 text-[10px] font-mono border border-slate-700/60 inline-flex items-center gap-1">${CHAT_ICONS.target} [${this.escapeHtml(mod)}] ${this.escapeHtml(tit)}</span>`;
       }).join(' ');
       relatedHtml = `
         <div class="pt-2 border-t border-cyan-500/10 flex flex-wrap items-center gap-1.5">
@@ -1056,7 +1105,7 @@ class AuraChatController {
         <div class="flex items-center justify-between border-b border-cyan-500/20 pb-2.5">
           <div class="flex items-center gap-2.5">
             <div class="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-300 shadow-inner">
-              <span class="text-sm">💡</span>
+              <span class="inline-flex">${CHAT_ICONS.bulb}</span>
             </div>
             <div>
               <div class="flex items-center gap-2">
@@ -1120,29 +1169,29 @@ class AuraChatController {
 
     // Status Badges Semânticos com Ícone (F5-09)
     let badgeClass = 'status-validated';
-    let badgeIcon = '✓';
+    let badgeIcon = CHAT_ICONS.check;
     let badgeText = assessment.badge_label || 'Estoque Estável';
     const severity = assessment.severity || (resumo.status_geral?.includes('CRITICO') ? 'critical' : (resumo.status_geral?.includes('ATENCAO') ? 'attention' : 'normal'));
 
     if (isNoMovement) {
       badgeClass = 'status-neutral';
-      badgeIcon = '⏸️';
+      badgeIcon = CHAT_ICONS.pause;
       badgeText = assessment.badge_label || 'Sem Registros';
     } else if (isUnavailable) {
       badgeClass = 'status-divergent';
-      badgeIcon = '⚠️';
+      badgeIcon = CHAT_ICONS.alert;
       badgeText = 'Fonte Indisponível';
     } else if (severity === 'critical') {
       badgeClass = 'status-divergent';
-      badgeIcon = '🚨';
+      badgeIcon = CHAT_ICONS.alert;
       badgeText = assessment.badge_label || 'Estoque Crítico (< 12h)';
     } else if (severity === 'attention') {
       badgeClass = 'status-partial';
-      badgeIcon = '⚠️';
+      badgeIcon = CHAT_ICONS.alert;
       badgeText = assessment.badge_label || 'Atenção Estoque';
     } else {
       badgeClass = 'status-validated';
-      badgeIcon = '✓';
+      badgeIcon = CHAT_ICONS.check;
       badgeText = assessment.badge_label || 'Estoque Confortável';
     }
 
@@ -1185,7 +1234,7 @@ class AuraChatController {
     if (limText && !isNoMovement && !isUnavailable) {
       limitationHtml = `
         <div class="decision-limitation-callout">
-          <span class="text-sm">⚠️</span>
+          <span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span>
           <div>
             <strong class="font-semibold">Premissa e Limitação:</strong>
             <span class="text-amber-200/90">${this.escapeHtml(limText)}</span>
@@ -1212,14 +1261,14 @@ class AuraChatController {
       const carretasTq = t.compartimentos_5k ?? t.sugestao_carreta_5k ?? Math.floor((t.espaco_livre_ullage_litros || 0) / 5000);
 
       let fillClass = 'normal';
-      let statusIcon = '🟢';
+      let statusIcon = '<span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>';
       const statusOp = String(t.status_operacional || '').toUpperCase();
       if (pct < 15 || statusOp.includes('CRÍTICO') || (hReserva !== null && hReserva < 12)) {
         fillClass = 'critical';
-        statusIcon = '🚨';
+        statusIcon = '<span class="w-2 h-2 rounded-full bg-rose-400 inline-block animate-pulse"></span>';
       } else if (pct < 30 || statusOp.includes('ATENÇÃO') || (hReserva !== null && hReserva < 24)) {
         fillClass = 'warning';
-        statusIcon = '🟡';
+        statusIcon = '<span class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>';
       }
 
       tanksBarsHtml += `
@@ -1238,12 +1287,12 @@ class AuraChatController {
 
           <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
             <div class="flex items-center gap-1.5 flex-wrap">
-              <span class="text-cyan-300 font-semibold tabular-nums">⏱ ${hReservaStr}${hEsgotStr}</span>
+              <span class="text-cyan-300 font-semibold tabular-nums">${CHAT_ICONS.calendar}${hReservaStr}${hEsgotStr}</span>
               <span class="text-slate-600">|</span>
-              <span class="text-slate-300 tabular-nums">📦 Ullage: ${ullageL} L (${carretasTq}x 5k)</span>
+              <span class="text-slate-300 tabular-nums">${CHAT_ICONS.tank}Ullage: ${ullageL} L (${carretasTq}x 5k)</span>
             </div>
-            <button type="button" class="widget-action-btn emerald" onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual a melhor sugestão de pedido de carreta para o Tanque ${cod}?');">
-              🚚 Pedir Carreta
+            <button type="button" class="widget-action-btn emerald flex items-center gap-1" onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual a melhor sugestão de pedido de carreta para o Tanque ${cod}?');">
+              ${CHAT_ICONS.truck}<span>Pedir Carreta</span>
             </button>
           </div>
         </div>
@@ -1256,7 +1305,7 @@ class AuraChatController {
       const itemsList = pendingItems.map(p => `
         <div class="decision-pending-item cursor-pointer hover:bg-amber-500/10 transition-colors" onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'tanques');" title="Ver detalhes nas evidências">
           <div class="flex items-center gap-2">
-            <span class="text-amber-400 font-bold">⏳</span>
+            <span class="text-amber-400 font-bold">${CHAT_ICONS.alert}</span>
             <span class="font-semibold text-slate-200">${this.escapeHtml(p.label)}</span>
           </div>
           <span class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
@@ -1284,11 +1333,11 @@ class AuraChatController {
           <div class="decision-context">
             <span class="decision-context-title">${this.escapeHtml(assessment.title || 'Autonomia de Tanques & Previsão de Run-Out')}</span>
             <span class="decision-context-sub">
-              <span>📅 ${this.escapeHtml(dataConsulta)}</span>
+              <span>${CHAT_ICONS.calendar} ${this.escapeHtml(dataConsulta)}</span>
               <span>•</span>
-              <span>⛽ ${tanksList.length} Tanques Monitorados</span>
+              <span>${CHAT_ICONS.tank} ${tanksList.length} Tanques Monitorados</span>
               <span>•</span>
-              <span>🏢 ${this.escapeHtml(c.context?.unit_id || 'Posto')}</span>
+              <span>${CHAT_ICONS.unit} ${this.escapeHtml(c.context?.unit_id || 'Posto')}</span>
             </span>
           </div>
           <span class="decision-status-badge ${badgeClass}">
@@ -1348,7 +1397,7 @@ class AuraChatController {
             class="decision-btn-primary" 
             onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual a melhor sugestão de pedido de carreta para o Tanque ${codCritico}?');"
             title="Sugerir compra imediata com base no Ullage">
-            <span class="text-xs">🚚</span>
+            ${CHAT_ICONS.truck}
             <span>${this.escapeHtml(recLabel)}</span>
           </button>
 
@@ -1357,7 +1406,7 @@ class AuraChatController {
             class="decision-btn-secondary" 
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
             title="Ver fórmulas matemáticas de consumo médio e run-out">
-            <span class="text-xs">📐</span>
+            ${CHAT_ICONS.formula}
             <span>Como foi calculado</span>
           </button>
 
@@ -1366,7 +1415,7 @@ class AuraChatController {
             class="decision-btn-secondary" 
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'tanques');"
             title="Ver detalhamento completo dos tanques">
-            <span class="text-xs">⛽</span>
+            ${CHAT_ICONS.tank}
             <span>Ver Tanques & Detalhes</span>
           </button>
 
@@ -1375,7 +1424,7 @@ class AuraChatController {
             class="decision-btn-secondary" 
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
             title="Ver fontes de telemetria e diagnóstico">
-            <span class="text-xs">📋</span>
+            ${CHAT_ICONS.audit}
             <span>Resumo & Fontes</span>
           </button>
         </div>
@@ -1426,16 +1475,16 @@ class AuraChatController {
     const isConforme = statusGeral === 'CONFORME_ANP' || statusGeral === 'CONFORME';
 
     let badgeClass = isConforme ? 'status-validated' : 'status-divergent';
-    let badgeIcon = isConforme ? '✓' : '🚨';
-    let badgeText = assessment.badge_label || (isConforme ? '✓ CONFORME ANP (±0.6%)' : '🚨 FORA DA TOLERÂNCIA ANP');
+    let badgeIcon = isConforme ? CHAT_ICONS.check : CHAT_ICONS.alert;
+    let badgeText = assessment.badge_label || (isConforme ? 'CONFORME ANP (±0.6%)' : 'FORA DA TOLERÂNCIA ANP');
 
     if (isNoMovement) {
       badgeClass = 'status-neutral';
-      badgeIcon = '⏸️';
+      badgeIcon = CHAT_ICONS.pause;
       badgeText = 'Sem Movimentação';
     } else if (isUnavailable) {
       badgeClass = 'status-divergent';
-      badgeIcon = '⚠️';
+      badgeIcon = CHAT_ICONS.alert;
       badgeText = 'Fonte Indisponível';
     }
 
@@ -1479,7 +1528,7 @@ class AuraChatController {
     if (limText && !isNoMovement && !isUnavailable) {
       limitationHtml = `
         <div class="decision-limitation-callout">
-          <span class="text-sm">⚠️</span>
+          <span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span>
           <div>
             <strong class="font-semibold">Marco Regulatório & Premissa:</strong>
             <span class="text-amber-200/90">${this.escapeHtml(limText)}</span>
@@ -1495,8 +1544,8 @@ class AuraChatController {
       const vP = parseFloat(cItem.variacao_pct ?? cItem.auditoria_anp?.variacao_pct ?? cItem.variacao_percentual ?? 0);
       const cConf = Math.abs(vP) <= 0.60;
       const tagConf = cConf
-        ? '<span class="text-emerald-400 font-bold">✓ Conforme</span>'
-        : '<span class="text-rose-400 font-bold">🚨 Alerta ANP</span>';
+        ? `<span class="text-emerald-400 font-bold inline-flex items-center gap-1">${CHAT_ICONS.check} Conforme</span>`
+        : `<span class="text-rose-400 font-bold inline-flex items-center gap-1">${CHAT_ICONS.alert} Alerta ANP</span>`;
 
       const escLitros = parseFloat(cItem.estoque_escriturado_litros ?? cItem.movimentacao?.estoque_escriturado_litros ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
       const fisLitros = parseFloat(cItem.estoque_fisico_medido_litros ?? cItem.estoque_fisico_litros ?? cItem.movimentacao?.estoque_fisico_medido_litros ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
@@ -1525,7 +1574,7 @@ class AuraChatController {
       const itemsList = pendingItems.map(p => `
         <div class="decision-pending-item cursor-pointer hover:bg-rose-500/10 transition-colors" onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'tanques');" title="Ver detalhes nas evidências">
           <div class="flex items-center gap-2">
-            <span class="text-rose-400 font-bold">🚨</span>
+            <span class="text-rose-400 font-bold">${CHAT_ICONS.alert}</span>
             <span class="font-semibold text-slate-200">${this.escapeHtml(p.label)}</span>
           </div>
           <span class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
@@ -1553,11 +1602,11 @@ class AuraChatController {
           <div class="decision-context">
             <span class="decision-context-title">${this.escapeHtml(assessment.title || 'Conciliação Físico-Contábil do LMC ANP')}</span>
             <span class="decision-context-sub">
-              <span>📅 ${this.escapeHtml(dataConsulta)}</span>
+              <span>${CHAT_ICONS.calendar} ${this.escapeHtml(dataConsulta)}</span>
               <span>•</span>
-              <span>📋 Portaria ANP 26/1992</span>
+              <span>${CHAT_ICONS.audit} Portaria ANP 26/1992</span>
               <span>•</span>
-              <span>🏢 ${this.escapeHtml(c.context?.unit_id || 'Posto')}</span>
+              <span>${CHAT_ICONS.unit} ${this.escapeHtml(c.context?.unit_id || 'Posto')}</span>
             </span>
           </div>
           <span class="decision-status-badge ${badgeClass}">
@@ -1644,7 +1693,7 @@ class AuraChatController {
             class="decision-btn-primary" 
             onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar a divergência física no tanque de combustíveis?');"
             title="Abrir procedimento de conferência de sonda e régua">
-            <span class="text-xs">🔍</span>
+            ${CHAT_ICONS.search}
             <span>${this.escapeHtml(recLabel)}</span>
           </button>
 
@@ -1653,7 +1702,7 @@ class AuraChatController {
             class="decision-btn-secondary" 
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
             title="Ver definição regulatória da Portaria 26 da ANP">
-            <span class="text-xs">📐</span>
+            ${CHAT_ICONS.formula}
             <span>Como foi calculado</span>
           </button>
 
@@ -1662,7 +1711,7 @@ class AuraChatController {
             class="decision-btn-secondary" 
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'tanques');"
             title="Ver balanço físico-contábil completo dos tanques">
-            <span class="text-xs">⛽</span>
+            ${CHAT_ICONS.tank}
             <span>Ver Tanques & ANP</span>
           </button>
 
@@ -1671,7 +1720,7 @@ class AuraChatController {
             class="decision-btn-secondary" 
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
             title="Ver fontes fiscais e telemetria">
-            <span class="text-xs">📋</span>
+            ${CHAT_ICONS.audit}
             <span>Resumo & Fontes</span>
           </button>
         </div>
@@ -1707,12 +1756,12 @@ class AuraChatController {
               <span class="decision-context-sub">Contrato AURA Precision Glass v1.0 esperado</span>
             </div>
             <span class="decision-status-badge status-neutral">
-              <span>⚠️</span>
+              <span>${CHAT_ICONS.alert}</span>
               <span>Schema Desconhecido</span>
             </span>
           </div>
           <div class="p-3.5 rounded-xl bg-slate-900/80 border border-amber-500/30 text-amber-200/90 font-mono text-xs space-y-1.5">
-            <div>⚠️ <strong>Aviso de Conformidade Contábil:</strong></div>
+            <div class="flex items-center gap-1.5"><span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span> <strong>Aviso de Conformidade Contábil:</strong></div>
             <p class="text-[11px] text-slate-300">
               O payload analítico recebido utiliza a versão <code>${this.escapeHtml(c.schema_version)}</code>, incompatível com o renderizador atual. Por governança e segurança financeira, a exibição de decisão foi suspensa.
             </p>
@@ -1755,28 +1804,28 @@ class AuraChatController {
 
     // Badges de Status Semânticos
     let badgeClass = 'status-neutral';
-    let badgeIcon = '📋';
+    let badgeIcon = CHAT_ICONS.audit;
     let badgeText = assessment.badge_label || resumo.status_conciliacao || 'Turno';
 
     if (isPartial) {
       badgeClass = 'status-partial';
-      badgeIcon = '⏳';
+      badgeIcon = CHAT_ICONS.clock;
       badgeText = assessment.badge_label || 'Análise parcial (provisória)';
     } else if (isNoMovement) {
       badgeClass = 'status-neutral';
-      badgeIcon = '⏸️';
+      badgeIcon = CHAT_ICONS.pause;
       badgeText = 'Sem movimentação';
     } else if (isUnavailable) {
       badgeClass = 'status-divergent';
-      badgeIcon = '⚠️';
+      badgeIcon = CHAT_ICONS.alert;
       badgeText = 'Fonte indisponível';
     } else if (assessment.severity === 'critical' || resumo.status_conciliacao?.includes('FURO') || resumo.status_conciliacao?.includes('DIVERGENCIA')) {
       badgeClass = 'status-divergent';
-      badgeIcon = '🚨';
+      badgeIcon = CHAT_ICONS.alert;
       badgeText = assessment.badge_label || 'Divergência confirmada';
     } else {
       badgeClass = 'status-validated';
-      badgeIcon = '✓';
+      badgeIcon = CHAT_ICONS.check;
       badgeText = assessment.badge_label || 'Conciliação validada';
     }
 
@@ -1834,7 +1883,7 @@ class AuraChatController {
     if (limText && !isNoMovement && !isUnavailable) {
       limitationHtml = `
         <div class="decision-limitation-callout">
-          <span class="text-sm">⚠️</span>
+          <span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span>
           <div>
             <strong class="font-semibold">Limitação da Análise:</strong>
             <span class="text-amber-200/90">${this.escapeHtml(limText)}</span>
@@ -1852,7 +1901,7 @@ class AuraChatController {
         return `
           <div class="decision-pending-item cursor-pointer hover:bg-amber-500/10 transition-colors" onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', '${targetTab}');" title="Ver detalhes desta pendência nas evidências">
             <div class="flex items-center gap-2">
-              <span class="text-amber-400 font-bold">⏳</span>
+              <span class="text-amber-400 font-bold">${CHAT_ICONS.alert}</span>
               <span class="font-semibold text-slate-200">${this.escapeHtml(p.label)}</span>
             </div>
             <span class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
@@ -1881,11 +1930,11 @@ class AuraChatController {
           <div class="decision-context">
             <span class="decision-context-title">${this.escapeHtml(title)}</span>
             <span class="decision-context-sub">
-              <span>📅 ${this.escapeHtml(dataAuditada)}</span>
+              <span>${CHAT_ICONS.calendar} ${this.escapeHtml(dataAuditada)}</span>
               <span>•</span>
-              <span>⏰ ${this.escapeHtml(turnoAuditado)}</span>
+              <span>${CHAT_ICONS.pulse} ${this.escapeHtml(turnoAuditado)}</span>
               <span>•</span>
-              <span>⛽ CBC04 + PDV</span>
+              <span>${CHAT_ICONS.telemetry} CBC04 + PDV</span>
             </span>
           </div>
           <span class="decision-status-badge ${badgeClass}">
@@ -1942,7 +1991,7 @@ class AuraChatController {
             class="decision-btn-primary" 
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
             title="Abrir painel lateral com proveniência e detalhamento">
-            <span class="text-xs">📋</span>
+            ${CHAT_ICONS.audit}
             <span>${this.escapeHtml(recLabel)} ↗</span>
           </button>
 
@@ -1951,7 +2000,7 @@ class AuraChatController {
             class="decision-btn-secondary" 
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
             title="Ver fórmula matemática e definição do cálculo">
-            <span class="text-xs">📐</span>
+            ${CHAT_ICONS.formula}
             <span>Como foi calculado</span>
           </button>
 
@@ -1961,7 +2010,7 @@ class AuraChatController {
               class="decision-btn-secondary" 
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
               title="Ver lista de pendências impeditivas">
-              <span class="text-xs">⏳</span>
+              ${CHAT_ICONS.alert}
               <span>Ver pendências (${pendingItems.length})</span>
             </button>
           ` : ''}
@@ -1971,7 +2020,7 @@ class AuraChatController {
             class="decision-btn-secondary" 
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'bicos');"
             title="Ver todos os bicos da pista e encerrantes">
-            <span class="text-xs">⛽</span>
+            ${CHAT_ICONS.nozzle}
             <span>Ver Bicos & Caixas</span>
           </button>
         </div>
@@ -2118,7 +2167,7 @@ class AuraChatController {
           <div class="space-y-4">
             <div class="evidence-section-card">
               <h4 class="font-bold text-slate-100 flex items-center gap-2">
-                <span>📐</span><span>Fórmula de Autonomia até Reserva de Segurança (15%)</span>
+                <span class="inline-flex text-cyan-400">${CHAT_ICONS.formula}</span><span>Fórmula de Autonomia até Reserva de Segurança (15%)</span>
               </h4>
               <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
                 <div class="text-cyan-400 font-bold">Autonomia_15h = (Volume_Atual - Reserva_Tecnica_15%) / Consumo_Medio_Horario</div>
@@ -2136,7 +2185,7 @@ class AuraChatController {
 
             <div class="evidence-section-card">
               <h4 class="font-bold text-slate-100 flex items-center gap-2">
-                <span>⏱</span><span>Fórmula de Esgotamento Total (0 L) vs Espaço Livre (Ullage)</span>
+                <span class="inline-flex text-cyan-400">${CHAT_ICONS.pulse}</span><span>Fórmula de Esgotamento Total (0 L) vs Espaço Livre (Ullage)</span>
               </h4>
               <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
                 <div class="text-cyan-400 font-bold">Autonomia_0h = Volume_Atual / Consumo_Medio_Horario</div>
@@ -2160,7 +2209,7 @@ class AuraChatController {
           <div class="space-y-4">
             <div class="evidence-section-card">
               <h4 class="font-bold text-slate-100 flex items-center gap-2">
-                <span>📐</span><span>Fórmula de Vazão Operacional de Bicos (L/min)</span>
+                <span class="inline-flex text-cyan-400">${CHAT_ICONS.formula}</span><span>Fórmula de Vazão Operacional de Bicos (L/min)</span>
               </h4>
               <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
                 <div class="text-cyan-400 font-bold">Vazão (L/min) = Volume Abastecido (L) / Duração do Abastecimento (min)</div>
@@ -2175,7 +2224,7 @@ class AuraChatController {
 
             <div class="evidence-section-card">
               <h4 class="font-bold text-slate-100 flex items-center gap-2">
-                <span>⛽</span><span>Fórmula de Conversão em Gasolina Aditivada (%)</span>
+                <span class="inline-flex text-cyan-400">${CHAT_ICONS.nozzle}</span><span>Fórmula de Conversão em Gasolina Aditivada (%)</span>
               </h4>
               <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
                 <div class="text-cyan-400 font-bold">Conversão Aditivada (%) = (Volume Aditivada / Volume Total do Colaborador) × 100</div>
@@ -2194,7 +2243,7 @@ class AuraChatController {
           <div class="space-y-4">
             <div class="evidence-section-card">
               <h4 class="font-bold text-slate-100 flex items-center gap-2">
-                <span>📐</span><span>Fórmula Legal da Portaria ANP nº 26/1992</span>
+                <span class="inline-flex text-cyan-400">${CHAT_ICONS.formula}</span><span>Fórmula Legal da Portaria ANP nº 26/1992</span>
               </h4>
               <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
                 <div class="text-cyan-400 font-bold">Estoque Escriturado = Estoque Inicial + Entradas Fiscais (NFe) - Saídas dos Bicos</div>
@@ -2218,7 +2267,7 @@ class AuraChatController {
           <div class="space-y-4">
             <div class="evidence-section-card">
               <h4 class="font-bold text-slate-100 flex items-center gap-2">
-                <span>📐</span><span>Fórmulas de Mineração de Regras de Associação</span>
+                <span class="inline-flex text-cyan-400">${CHAT_ICONS.formula}</span><span>Fórmulas de Mineração de Regras de Associação</span>
               </h4>
               <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
                 <div class="text-cyan-400 font-bold">Suporte(A ∪ B) = Cupons(A e B) / Total de Cupons (N)</div>
@@ -2242,7 +2291,7 @@ class AuraChatController {
         return `
           <div class="evidence-section-card">
             <h4 class="font-bold text-slate-100 flex items-center gap-2">
-              <span>⏸️</span><span>Sem Movimentação Registrada</span>
+              <span class="inline-flex text-slate-400">${CHAT_ICONS.pause}</span><span>Sem Movimentação Registrada</span>
             </h4>
             <p class="text-slate-300 text-xs leading-relaxed p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono">
               Não foram encontrados lançamentos de bicos, cupons fiscais ou movimentação de caixas para a data consultada (${this.escapeHtml(dataAuditada)}). Por isso, nenhuma diferença contábil ou volumétrica foi apurada.
@@ -2255,7 +2304,7 @@ class AuraChatController {
         return `
           <div class="evidence-section-card">
             <h4 class="font-bold text-slate-100 flex items-center gap-2">
-              <span>⚠️</span><span>Fonte Indisponível</span>
+              <span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span><span>Fonte Indisponível</span>
             </h4>
             <p class="text-slate-300 text-xs leading-relaxed p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono">
               A conexão com o banco de dados ERP não pôde ser estabelecida no momento da consulta. Não foi possível apurar fórmulas contábeis ou volumétricas.
@@ -2284,7 +2333,7 @@ class AuraChatController {
             </div>
           </div>
           <p class="text-slate-400 text-xs leading-relaxed">
-            ⚠️ <strong>Dado ausente:</strong> A ausência de digitação de encerrantes mecânicos <em>não representa 0 L medidos</em>. O fechamento físico permanece provisório até a conferência pelo chefe de pista.
+            <span class="inline-flex text-amber-400 mr-1">${CHAT_ICONS.alert}</span><strong>Dado ausente:</strong> A ausência de digitação de encerrantes mecânicos <em>não representa 0 L medidos</em>. O fechamento físico permanece provisório até a conferência pelo chefe de pista.
           </p>
         `;
       } else if (encState === 'zero_registered') {
@@ -2297,7 +2346,7 @@ class AuraChatController {
             </div>
           </div>
           <p class="text-slate-400 text-xs leading-relaxed">
-            ✓ Zero efetivamente registrado: Turno confirmado sem saídas nos bicos.
+            ${CHAT_ICONS.check} Zero efetivamente registrado: Turno confirmado sem saídas nos bicos.
           </p>
         `;
       } else {
@@ -2311,7 +2360,7 @@ class AuraChatController {
             </div>
           </div>
           <p class="text-slate-400 text-xs leading-relaxed">
-            ${Math.abs(diffVol) < 0.01 ? '✓ Encerrantes físicos 100% batidos com a telemetria CBC04.' : '⚠️ Diferença apurada entre medição mecânica e telemetria CBC04.'}
+            ${Math.abs(diffVol) < 0.01 ? `${CHAT_ICONS.check} Encerrantes físicos 100% batidos com a telemetria CBC04.` : `<span class="inline-flex text-amber-400 mr-1">${CHAT_ICONS.alert}</span> Diferença apurada entre medição mecânica e telemetria CBC04.`}
           </p>
         `;
       }
@@ -2320,7 +2369,7 @@ class AuraChatController {
         <div class="space-y-4">
           <div class="evidence-section-card">
             <h4 class="font-bold text-slate-100 flex items-center gap-2">
-              <span>📐</span><span>Fórmula da Conciliação Financeira</span>
+              <span class="inline-flex text-cyan-400">${CHAT_ICONS.formula}</span><span>Fórmula da Conciliação Financeira</span>
             </h4>
             <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs space-y-2">
               <div class="text-cyan-400 font-bold">Diferença = Faturamento PDV - Automação CBC04</div>
@@ -2330,13 +2379,13 @@ class AuraChatController {
               </div>
             </div>
             <p class="text-slate-400 text-xs leading-relaxed">
-              ${assessment.finality === 'partial' ? '⚠️ <strong>Diferença Provisória:</strong> Como os operadores ainda possuem caixa aberto no PDV e/ou encerrantes mecânicos pendentes, esta diferença não representa uma quebra confirmada.' : '✓ <strong>Diferença Definitiva:</strong> Fechamento apurado após o encerramento formal de todos os caixas.'}
+              ${assessment.finality === 'partial' ? `<span class="inline-flex text-amber-400 mr-1">${CHAT_ICONS.alert}</span><strong>Diferença Provisória:</strong> Como os operadores ainda possuem caixa aberto no PDV e/ou encerrantes mecânicos pendentes, esta diferença não representa uma quebra confirmada.` : `${CHAT_ICONS.check} <strong>Diferença Definitiva:</strong> Fechamento apurado após o encerramento formal de todos os caixas.`}
             </p>
           </div>
 
           <div class="evidence-section-card">
             <h4 class="font-bold text-slate-100 flex items-center gap-2">
-              <span>⛽</span><span>Triangulação Volumétrica da Pista</span>
+              <span class="inline-flex text-cyan-400">${CHAT_ICONS.nozzle}</span><span>Triangulação Volumétrica da Pista</span>
             </h4>
             ${volumetricContent}
           </div>
@@ -2367,8 +2416,8 @@ class AuraChatController {
             <td class="py-2.5 text-right ${isLenta ? 'text-rose-400 font-bold' : 'text-emerald-300'} tabular-nums">${vazaoText}</td>
             <td class="py-2.5 text-right text-cyan-300 tabular-nums">${volText}</td>
             <td class="py-2.5 text-right">
-              <span class="px-1.5 py-0.5 rounded text-[10px] ${isLenta ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'}">
-                ${isLenta ? '⚠️ Filtro Lento' : '✓ Normal'}
+              <span class="px-1.5 py-0.5 rounded text-[10px] inline-flex items-center gap-1 ${isLenta ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'}">
+                ${isLenta ? `${CHAT_ICONS.alert} Filtro Lento` : `${CHAT_ICONS.check} Normal`}
               </span>
             </td>
           </tr>
@@ -2428,8 +2477,8 @@ class AuraChatController {
               <td class="py-2.5 text-right text-cyan-300 tabular-nums">${confVal}%</td>
               <td class="py-2.5 text-right ${isForte ? 'text-purple-300 font-bold' : 'text-slate-200'} tabular-nums">${liftVal}x</td>
               <td class="py-2.5 text-right">
-                <span class="px-1.5 py-0.5 rounded text-[10px] ${isForte ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-slate-800 text-slate-400'}">
-                  ${isForte ? '⚡ Forte Sinergia' : '✓ Positiva'}
+                <span class="px-1.5 py-0.5 rounded text-[10px] inline-flex items-center gap-1 ${isForte ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-slate-800 text-slate-400'}">
+                  ${isForte ? `${CHAT_ICONS.pulse} Forte Sinergia` : `${CHAT_ICONS.check} Positiva`}
                 </span>
               </td>
             </tr>
@@ -2545,8 +2594,8 @@ class AuraChatController {
             <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2 font-mono text-xs">
               <div class="flex items-center justify-between">
                 <span class="font-bold text-slate-100">TQ-${this.escapeHtml(cod)} • ${this.escapeHtml(comb)}</span>
-                <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${isConf ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}">
-                  ${isConf ? '✓ Conforme ANP (±0.6%)' : '🚨 Alerta ANP'}
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold inline-flex items-center gap-1 ${isConf ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}">
+                  ${isConf ? `${CHAT_ICONS.check} Conforme ANP (±0.6%)` : `${CHAT_ICONS.alert} Alerta ANP`}
                 </span>
               </div>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-300 pt-1 border-t border-slate-800">
@@ -2574,8 +2623,8 @@ class AuraChatController {
           <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2 font-mono text-xs">
             <div class="flex items-center justify-between">
               <span class="font-bold text-slate-100">TQ-${this.escapeHtml(t.codtan ?? 'N/D')} • ${this.escapeHtml(t.combustivel ?? 'N/D')}</span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${isConf ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}">
-                ${isConf ? '✓ Conforme ANP' : '⚠️ Alerta ANP'}
+              <span class="px-2 py-0.5 rounded text-[10px] font-semibold inline-flex items-center gap-1 ${isConf ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}">
+                ${isConf ? `${CHAT_ICONS.check} Conforme ANP` : `${CHAT_ICONS.alert} Alerta ANP`}
               </span>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-300 pt-1 border-t border-slate-800">
@@ -2595,9 +2644,9 @@ class AuraChatController {
     // ABA PADRÃO: RESUMO & FONTES DE DADOS
     // =========================================================================
     const sourcesList = sources.map(s => {
-      let stBadge = '<span class="text-emerald-400 font-semibold">✓ Disponível</span>';
-      if (s.availability === 'missing') stBadge = '<span class="text-amber-400 font-semibold">⏳ Pendente / Não lançado</span>';
-      if (s.availability === 'unavailable') stBadge = '<span class="text-rose-400 font-semibold">⚠️ Indisponível</span>';
+      let stBadge = `<span class="text-emerald-400 font-semibold inline-flex items-center gap-1">${CHAT_ICONS.check} Disponível</span>`;
+      if (s.availability === 'missing') stBadge = `<span class="text-amber-400 font-semibold inline-flex items-center gap-1">${CHAT_ICONS.clock} Pendente / Não lançado</span>`;
+      if (s.availability === 'unavailable') stBadge = `<span class="text-rose-400 font-semibold inline-flex items-center gap-1">${CHAT_ICONS.alert} Indisponível</span>`;
 
       return `
         <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 flex items-center justify-between font-mono text-xs">
@@ -2617,14 +2666,14 @@ class AuraChatController {
       <div class="space-y-4">
         <div class="evidence-section-card">
           <h4 class="font-bold text-slate-100 flex items-center gap-2">
-            <span>📡</span><span>Proveniência e Disponibilidade das Fontes</span>
+            <span class="inline-flex text-cyan-400">${CHAT_ICONS.pulse}</span><span>Proveniência e Disponibilidade das Fontes</span>
           </h4>
           <div class="space-y-2">${sourcesList || '<div class="text-slate-500">Fontes padrão do ERP (Somente Leitura)</div>'}</div>
         </div>
 
         <div class="evidence-section-card">
           <h4 class="font-bold text-slate-100 flex items-center gap-2">
-            <span>📝</span><span>Diagnóstico Executivo</span>
+            <span class="inline-flex text-cyan-400">${CHAT_ICONS.audit}</span><span>Diagnóstico Executivo</span>
           </h4>
           <p class="text-slate-300 leading-relaxed text-xs p-3 rounded-lg bg-slate-900 border border-slate-800">
             ${this.escapeHtml(explanationText)}
@@ -2634,7 +2683,7 @@ class AuraChatController {
         ${limText ? `
           <div class="evidence-section-card">
             <h4 class="font-bold text-slate-100 flex items-center gap-2">
-              <span>⚠️</span><span>Limitações e Premissas da Consulta</span>
+              <span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span><span>Limitações e Premissas da Consulta</span>
             </h4>
             <p class="text-amber-200/90 leading-relaxed text-xs p-3 rounded-lg bg-amber-950/20 border border-amber-500/20 font-mono">
               ${this.escapeHtml(limText)}
@@ -2700,28 +2749,28 @@ class AuraChatController {
 
     // Badges Semânticos
     let badgeClass = 'status-validated';
-    let badgeIcon = '⚡';
-    let badgeText = assessment.badge_label || `⚡ Max Lift: ${parseFloat(maxLiftVal).toFixed(2)}x`;
+    let badgeIcon = CHAT_ICONS.pulse;
+    let badgeText = assessment.badge_label || `Max Lift: ${parseFloat(maxLiftVal).toFixed(2)}x`;
 
     if (isNoMovement) {
       badgeClass = 'status-neutral';
-      badgeIcon = '⏸️';
+      badgeIcon = CHAT_ICONS.pause;
       badgeText = 'Sem Cupons';
     } else if (isUnavailable) {
       badgeClass = 'status-divergent';
-      badgeIcon = '⚠️';
+      badgeIcon = CHAT_ICONS.alert;
       badgeText = 'Fonte Indisponível';
     } else if (countForteSinergia > 0) {
       badgeClass = 'status-validated';
-      badgeIcon = '⚡';
-      badgeText = assessment.badge_label || `⚡ Max Lift: ${parseFloat(maxLiftVal).toFixed(2)}x`;
+      badgeIcon = CHAT_ICONS.pulse;
+      badgeText = assessment.badge_label || `Max Lift: ${parseFloat(maxLiftVal).toFixed(2)}x`;
     } else if (totalMultiplas === 0) {
       badgeClass = 'status-partial';
-      badgeIcon = '⚠️';
+      badgeIcon = CHAT_ICONS.alert;
       badgeText = 'Cestas sem Multiplicidade';
     } else {
       badgeClass = 'status-neutral';
-      badgeIcon = '✓';
+      badgeIcon = CHAT_ICONS.check;
       badgeText = 'Regras Mineradas';
     }
 
@@ -2737,7 +2786,7 @@ class AuraChatController {
     if (limText && !isNoMovement && !isUnavailable) {
       limitationHtml = `
         <div class="decision-limitation-callout">
-          <span class="text-sm">⚠️</span>
+          <span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span>
           <div>
             <strong class="font-semibold">Premissa Estatística & Limitação:</strong>
             <span class="text-amber-200/90">${this.escapeHtml(limText)}</span>
@@ -2767,7 +2816,7 @@ class AuraChatController {
         <div class="widget-combo-card">
           <div class="flex items-center justify-between text-xs font-mono mb-1">
             <span class="font-bold text-white flex items-center gap-1.5">
-              <span>${isForte ? '⚡' : '🛒'}</span>
+              <span>${isForte ? CHAT_ICONS.pulse : CHAT_ICONS.store}</span>
               <span>${this.escapeHtml(prodOrig)}</span>
             </span>
             <span class="text-purple-400 font-bold">➔</span>
@@ -2775,23 +2824,23 @@ class AuraChatController {
           </div>
 
           <div class="flex flex-wrap items-center gap-2 font-mono text-[10px] text-slate-400 my-1">
-            <span class="px-1.5 py-0.5 rounded ${isForte ? 'bg-purple-500/25 text-purple-200 border-purple-500/40' : 'bg-slate-800 text-slate-300 border-slate-700'} font-bold border tabular-nums">
-              ⚡ Lift ${lift}x
+            <span class="px-1.5 py-0.5 rounded ${isForte ? 'bg-purple-500/25 text-purple-200 border-purple-500/40' : 'bg-slate-800 text-slate-300 border-slate-700'} font-bold border tabular-nums flex items-center gap-1">
+              ${CHAT_ICONS.pulse}<span>Lift ${lift}x</span>
             </span>
-            <span class="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 tabular-nums">
-              🎯 Confiança ${conf}%
+            <span class="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 tabular-nums flex items-center gap-1">
+              ${CHAT_ICONS.target}<span>Confiança ${conf}%</span>
             </span>
-            <span class="tabular-nums">📦 ${cupons} cupons</span>
+            <span class="tabular-nums flex items-center gap-1">${CHAT_ICONS.box}<span>${cupons} cupons</span></span>
             ${pRecVal > 0 ? `<span class="text-emerald-400 font-semibold tabular-nums">+${this.formatBRL(pRecVal)}${incrPct ? ` (+${incrPct}%)` : ''}</span>` : ''}
           </div>
 
           <div class="widget-combo-script-box">
-            <strong>🗣 Script no Balcão:</strong> "${this.escapeHtml(script)}"
+            <strong>${CHAT_ICONS.dialog}Script no Balcão:</strong> "${this.escapeHtml(script)}"
           </div>
 
           <div class="flex justify-end mt-2">
-            <button type="button" class="widget-action-btn purple" onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual o estoque atual de ${this.escapeHtml(prodDest)}?');">
-              📦 Checar Estoque (${this.escapeHtml(prodDestShort)})
+            <button type="button" class="widget-action-btn purple flex items-center gap-1" onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual o estoque atual de ${this.escapeHtml(prodDest)}?');">
+              ${CHAT_ICONS.box}<span>Checar Estoque</span> <span>(${this.escapeHtml(prodDestShort)})</span>
             </button>
           </div>
         </div>
@@ -2804,7 +2853,7 @@ class AuraChatController {
       const itemsList = pendingItems.map(p => `
         <div class="decision-pending-item cursor-pointer hover:bg-purple-500/10 transition-colors" onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'caixas');" title="Ver detalhes nas evidências">
           <div class="flex items-center gap-2">
-            <span class="text-purple-400 font-bold">💡</span>
+            <span class="text-purple-400 font-bold">${CHAT_ICONS.alert}</span>
             <span class="font-semibold text-slate-200">${this.escapeHtml(p.label)}</span>
           </div>
           <span class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
@@ -2832,11 +2881,11 @@ class AuraChatController {
           <div class="decision-context">
             <span class="decision-context-title">${this.escapeHtml(assessment.title || 'Combos & Vendas Cruzadas (Conveniência)')}</span>
             <span class="decision-context-sub">
-              <span>📅 ${this.escapeHtml(dataConsulta)}</span>
+              <span>${CHAT_ICONS.calendar} ${this.escapeHtml(dataConsulta)}</span>
               <span>•</span>
-              <span>🛒 PDV / Cestas de Compras</span>
+              <span>${CHAT_ICONS.store} PDV / Cestas de Compras</span>
               <span>•</span>
-              <span>🏢 ${this.escapeHtml(c.context?.unit_id || 'Loja')}</span>
+              <span>${CHAT_ICONS.unit} ${this.escapeHtml(c.context?.unit_id || 'Loja')}</span>
             </span>
           </div>
           <span class="decision-status-badge ${badgeClass}">
@@ -2898,7 +2947,7 @@ class AuraChatController {
             class="decision-btn-primary" 
             onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Quais os scripts de balcão recomendados para a equipe do caixa?');"
             title="Capacitar operadores com roteiro persuasivo no PDV">
-            <span class="text-xs">🛒</span>
+            ${CHAT_ICONS.store}
             <span>${this.escapeHtml(recLabel)}</span>
           </button>
 
@@ -2907,7 +2956,7 @@ class AuraChatController {
             class="decision-btn-secondary" 
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
             title="Ver definições matemáticas de Suporte, Confiança e Lift">
-            <span class="text-xs">📐</span>
+            ${CHAT_ICONS.formula}
             <span>Como foi calculado</span>
           </button>
 
@@ -2916,7 +2965,7 @@ class AuraChatController {
             class="decision-btn-secondary" 
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'caixas');"
             title="Ver tabela detalhada de todas as regras mineradas">
-            <span class="text-xs">📊</span>
+            ${CHAT_ICONS.chart}
             <span>Ver Regras Detalhadas</span>
           </button>
 
@@ -2925,7 +2974,7 @@ class AuraChatController {
             class="decision-btn-secondary" 
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
             title="Ver fontes de dados e diagnósticos">
-            <span class="text-xs">📋</span>
+            ${CHAT_ICONS.audit}
             <span>Resumo & Fontes</span>
           </button>
         </div>
@@ -2978,25 +3027,25 @@ class AuraChatController {
 
     // Badges Semânticos com Ícone (F5-09)
     let badgeClass = 'status-validated';
-    let badgeIcon = '✓';
-    let badgeText = assessment.badge_label || (bicosLentosCount > 0 ? `⚠️ ${bicosLentosCount} Bicos Lentos (<30 L/min)` : '✓ Pista Operando Conforme');
+    let badgeIcon = CHAT_ICONS.check;
+    let badgeText = assessment.badge_label || (bicosLentosCount > 0 ? `${bicosLentosCount} Bicos Lentos (<30 L/min)` : 'Pista Operando Conforme');
 
     if (isNoMovement) {
       badgeClass = 'status-neutral';
-      badgeIcon = '⏸️';
+      badgeIcon = CHAT_ICONS.pause;
       badgeText = assessment.badge_label || 'Sem Movimentação';
     } else if (isUnavailable) {
       badgeClass = 'status-divergent';
-      badgeIcon = '⚠️';
+      badgeIcon = CHAT_ICONS.alert;
       badgeText = 'Fonte Indisponível';
     } else if (bicosLentosCount > 0) {
       badgeClass = 'status-partial';
-      badgeIcon = '⚠️';
-      badgeText = assessment.badge_label || `⚠️ ${bicosLentosCount} Bicos Lentos (<30 L/min)`;
+      badgeIcon = CHAT_ICONS.alert;
+      badgeText = assessment.badge_label || `${bicosLentosCount} Bicos Lentos (<30 L/min)`;
     } else {
       badgeClass = 'status-validated';
-      badgeIcon = '✓';
-      badgeText = assessment.badge_label || '✓ Pista Operando Conforme';
+      badgeIcon = CHAT_ICONS.check;
+      badgeText = assessment.badge_label || 'Pista Operando Conforme';
     }
 
     // Hero Metric: Faturamento da Pista
@@ -3024,7 +3073,7 @@ class AuraChatController {
     if (limText && !isNoMovement && !isUnavailable) {
       limitationHtml = `
         <div class="decision-limitation-callout">
-          <span class="text-sm">⚠️</span>
+          <span class="inline-flex text-amber-400">${CHAT_ICONS.alert}</span>
           <div>
             <strong class="font-semibold">Premissa Operacional & Telemetria:</strong>
             <span class="text-amber-200/90">${this.escapeHtml(limText)}</span>
@@ -3036,8 +3085,11 @@ class AuraChatController {
     // Ranking de Frentistas (Top 3)
     let frentsHtml = '';
     ranking.slice(0, 3).forEach((f, idx) => {
-      const medals = ['🥇', '🥈', '🥉'];
-      const med = medals[idx] || '👤';
+      const rankBadge = idx === 0
+        ? '<span class="inline-flex items-center justify-center w-5 h-5 rounded-md text-[10px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/40">#1</span>'
+        : idx === 1
+          ? '<span class="inline-flex items-center justify-center w-5 h-5 rounded-md text-[10px] font-bold bg-slate-300/20 text-slate-200 border border-slate-300/40">#2</span>'
+          : '<span class="inline-flex items-center justify-center w-5 h-5 rounded-md text-[10px] font-bold bg-amber-700/20 text-amber-500 border border-amber-600/40">#3</span>';
       const nomeFrent = f.nome || f.frentista || 'Colaborador';
       const fat = this.formatBRL(f.faturamento_reais || 0);
       const aditVal = parseFloat(f.conversao_aditivada_pct ?? f.percentual_aditivada ?? 0);
@@ -3047,7 +3099,7 @@ class AuraChatController {
       frentsHtml += `
         <div class="flex items-center justify-between p-2 rounded-xl bg-slate-900/60 border border-slate-800 text-xs font-mono">
           <div class="flex items-center gap-2 font-bold text-white">
-            <span class="text-sm">${med}</span>
+            ${rankBadge}
             <span>${this.escapeHtml(nomeFrent)}</span>
             ${atends > 0 ? `<span class="text-[10px] text-slate-500 font-normal">(${atends} atends)</span>` : ''}
           </div>
@@ -3067,7 +3119,7 @@ class AuraChatController {
       bicosAlertHtml = `
         <div class="p-3 rounded-xl bg-amber-950/25 border border-amber-500/30 text-amber-300 text-xs font-mono space-y-1.5">
           <div class="flex items-center gap-2 font-bold text-amber-400">
-            <span>⚠️</span>
+            <span class="inline-flex">${CHAT_ICONS.alert}</span>
             <span class="uppercase tracking-wider text-[11px]">Bicos com Alerta de Vazão Lenta (&lt; 30 L/min):</span>
           </div>
           <p class="text-[10px] text-slate-300">
@@ -3093,7 +3145,7 @@ class AuraChatController {
       const itemsList = pendingItems.map(p => `
         <div class="decision-pending-item cursor-pointer hover:bg-amber-500/10 transition-colors" onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'bicos');" title="Ver detalhes nas evidências">
           <div class="flex items-center gap-2">
-            <span class="text-amber-400 font-bold">🔧</span>
+            <span class="text-amber-400 font-bold inline-flex">${CHAT_ICONS.wrench}</span>
             <span class="font-semibold text-slate-200">${this.escapeHtml(p.label)}</span>
           </div>
           <span class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
@@ -3121,11 +3173,11 @@ class AuraChatController {
           <div class="decision-context">
             <span class="decision-context-title">${this.escapeHtml(assessment.title || 'Performance da Pista & Frentistas')}</span>
             <span class="decision-context-sub">
-              <span>📅 ${this.escapeHtml(dataConsulta)}</span>
+              <span>${CHAT_ICONS.calendar} ${this.escapeHtml(dataConsulta)}</span>
               <span>•</span>
-              <span>⛽ ${nozzles.length} Bicos Monitorados</span>
+              <span>${CHAT_ICONS.nozzle} ${nozzles.length} Bicos Monitorados</span>
               <span>•</span>
-              <span>🏢 ${this.escapeHtml(c.context?.unit_id || 'Posto')}</span>
+              <span>${CHAT_ICONS.unit} ${this.escapeHtml(c.context?.unit_id || 'Posto')}</span>
             </span>
           </div>
           <span class="decision-status-badge ${badgeClass}">
@@ -3193,7 +3245,7 @@ class AuraChatController {
             class="decision-btn-primary" 
             onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como programar a manutenção preventiva dos filtros de bicos de combustíveis?');"
             title="Abrir diretrizes de manutenção de bicos e bombas">
-            <span class="text-xs">🔧</span>
+            <span class="text-xs inline-flex">${CHAT_ICONS.wrench}</span>
             <span>${this.escapeHtml(recLabel)}</span>
           </button>
 
@@ -3202,7 +3254,7 @@ class AuraChatController {
             class="decision-btn-secondary" 
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
             title="Ver fórmulas de vazão e conversão de aditivada">
-            <span class="text-xs">📐</span>
+            <span class="text-xs inline-flex">${CHAT_ICONS.formula}</span>
             <span>Como foi calculado</span>
           </button>
 
@@ -3211,7 +3263,7 @@ class AuraChatController {
             class="decision-btn-secondary" 
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'bicos');"
             title="Ver detalhamento de todos os bicos da pista">
-            <span class="text-xs">⛽</span>
+            <span class="text-xs inline-flex">${CHAT_ICONS.nozzle}</span>
             <span>Ver Bicos & Pista</span>
           </button>
 
@@ -3220,7 +3272,7 @@ class AuraChatController {
             class="decision-btn-secondary" 
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
             title="Ver fontes de dados e diagnósticos">
-            <span class="text-xs">📋</span>
+            <span class="text-xs inline-flex">${CHAT_ICONS.audit}</span>
             <span>Resumo & Fontes</span>
           </button>
         </div>
@@ -3239,7 +3291,7 @@ class AuraChatController {
       <div class="widget-inline-container border-l-4 border-l-slate-600">
         <div class="widget-inline-header">
           <div class="flex items-center gap-2">
-            <span class="text-sm">📊</span>
+            <span class="inline-flex">${CHAT_ICONS.chart}</span>
             <strong class="text-xs font-mono text-white uppercase tracking-wider">Diagnóstico: ${this.escapeHtml(displayName)}</strong>
           </div>
           <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-300 border border-slate-700">OK</span>
@@ -3742,7 +3794,7 @@ class AuraChatController {
         ${e2e ? `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Resposta em <strong class="text-emerald-300 font-mono">${e2e}</strong></span>` : ''}
         <span class="text-slate-500">•</span>
         <span>Motor: <strong class="text-purple-300">${model}</strong></span>
-        ${lgpd > 0 ? `<span class="text-slate-500">•</span><span class="text-emerald-400/90 font-medium">🛡️ LGPD: ${lgpd} dados protegidos</span>` : ''}
+        ${lgpd > 0 ? `<span class="text-slate-500">•</span><span class="text-emerald-400/90 font-medium inline-flex items-center gap-1">${CHAT_ICONS.shield} LGPD: ${lgpd} dados protegidos</span>` : ''}
       </div>
     `;
 
@@ -3762,7 +3814,7 @@ class AuraChatController {
     const textIds = [containerId + '-text', containerId + '-split-text'];
     const html = `
       <div class="p-3 rounded bg-rose-950/20 border border-rose-500/40 text-rose-300 text-xs font-mono">
-        <strong>⚠️ Falha de Conexão ou Resposta:</strong> ${this.escapeHtml(errorMsg)}
+        <strong class="inline-flex items-center gap-1">${CHAT_ICONS.alert} Falha de Conexão ou Resposta:</strong> ${this.escapeHtml(errorMsg)}
       </div>
     `;
 
