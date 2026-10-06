@@ -320,8 +320,8 @@ def run_tests():
     # Saldo atual = 4624.356 L.
     # Se a medição física for 4624.356 - 0.20 L:
     # Δ = -0.200 L -> Δ% = (-0.200 / 10.0) * 100 = -2.0% (Crítico! Supera ±0.6%)
-    saldo_base_tq1 = 4624.356
-    ef_alerta = saldo_base_tq1 - 0.20
+    saldo_base_tq1 = tq1["movimentacao"]["estoque_escriturado_litros"]
+    ef_alerta = round(saldo_base_tq1 - 0.20, 3)
 
     rel_alerta = tools.gerar_relatorio_lmc_anp(
         data="2026-09-02",

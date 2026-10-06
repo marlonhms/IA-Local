@@ -35,7 +35,7 @@ app = create_aura_app()
 
 
 def main():
-    host = os.getenv("AURA_HOST", "127.0.0.1")
+    host = os.getenv("AURA_HOST", "0.0.0.0")
     port = int(os.getenv("AURA_PORT", "8000"))
     auto_open = os.getenv("AURA_AUTO_OPEN", "1").lower() not in ("0", "false", "no")
 

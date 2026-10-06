@@ -365,9 +365,9 @@ def run_phase6_quality_tests():
     # =========================================================================
     print("\n18. Executando Validação Completa de Degradação Graciosa e Acessibilidade no Node.js...")
 
-    node_phase6_script = f"""
-    const {{ AuraChatController }} = require('./web/js/aura-chat.js');
-    const {{ AuraTriggersController }} = require('./web/js/aura-triggers.js');
+    node_phase6_script = """
+    const { AuraChatController } = require('./web/js/aura-chat.js');
+    const { AuraTriggersController } = require('./web/js/aura-triggers.js');
     const fs = require('fs');
 
     const chat = new AuraChatController();
@@ -375,120 +375,238 @@ def run_phase6_quality_tests():
 
     // 1. Validar Anunciador de Tela Acessível no HTML
     const htmlContent = fs.readFileSync('./web/index.html', 'utf8');
-    if (!htmlContent.includes('id="aura-sr-announcer"') || !htmlContent.includes('aria-live="polite"')) {{
+    if (!htmlContent.includes('id="aura-sr-announcer"') || !htmlContent.includes('aria-live="polite"')) {
       console.error('FALHA: #aura-sr-announcer com aria-live=polite ausente em web/index.html');
       process.exit(1);
-    }}
+    }
     console.log('[NODE] 1. Anunciador WCAG 2.1 AA (#aura-sr-announcer) validado no index.html');
 
     // 2. Validar Guardas de Duplo Clique
-    if (chat.isSubmitting !== false) {{
+    if (chat.isSubmitting !== false) {
       console.error('FALHA: chat.isSubmitting inicial não é false');
       process.exit(1);
-    }}
-    if (triggers.isExecuting !== false) {{
+    }
+    if (triggers.isExecuting !== false) {
       console.error('FALHA: triggers.isExecuting inicial não é false');
       process.exit(1);
-    }}
+    }
     console.log('[NODE] 2. Guardas anti-duplicação (isSubmitting e isExecuting) validados');
 
     // 3. Validar Degradação Graciosa nos 5 Widgets com Fonte Indisponível
-    const unavailPayload = {json.dumps(c5.model_dump(), ensure_ascii=False)};
+    const unavailPayload = __UNAVAIL_PAYLOAD__;
 
     // Widget 1: Turno
     const turnoHtml = chat.renderTurnoWidget(unavailPayload);
-    if (!turnoHtml.includes('status-divergent') || !turnoHtml.includes('Fonte Indisponível')) {{
+    if (!turnoHtml.includes('status-divergent') || !turnoHtml.includes('Fonte Indisponível')) {
       console.error('FALHA: renderTurnoWidget não exibiu status Fonte Indisponível:', turnoHtml);
       process.exit(1);
-    }}
-    if (!turnoHtml.includes('Tentar Novamente') || !turnoHtml.includes('Procedimento de Contingência')) {{
+    }
+    if (!turnoHtml.includes('Tentar Novamente') || !turnoHtml.includes('Procedimento de Contingência')) {
       console.error('FALHA: Ações de contingência ausentes no renderTurnoWidget:', turnoHtml);
       process.exit(1);
-    }}
+    }
 
     // Widget 2: Tanques
     const tankPayload = JSON.parse(JSON.stringify(unavailPayload));
     tankPayload.intent = 'tank_forecast';
     const tankHtml = chat.renderTankAutonomyWidget(tankPayload);
-    if (!tankHtml.includes('Fonte Indisponível') || !tankHtml.includes('Tentar Novamente')) {{
+    if (!tankHtml.includes('Fonte Indisponível') || !tankHtml.includes('Tentar Novamente')) {
       console.error('FALHA: renderTankAutonomyWidget não tratou fonte indisponível graciosamente:', tankHtml);
       process.exit(1);
-    }}
+    }
 
     // Widget 3: Pista & Frentistas
     const pistaPayload = JSON.parse(JSON.stringify(unavailPayload));
     pistaPayload.intent = 'pump_performance';
     const pistaHtml = chat.renderDesempenhoPistaWidget(pistaPayload);
-    if (!pistaHtml.includes('Fonte Indisponível') || !pistaHtml.includes('Tentar Novamente')) {{
+    if (!pistaHtml.includes('Fonte Indisponível') || !pistaHtml.includes('Tentar Novamente')) {
       console.error('FALHA: renderDesempenhoPistaWidget não tratou fonte indisponível graciosamente:', pistaHtml);
       process.exit(1);
-    }}
+    }
 
     // Widget 4: LMC ANP
     const lmcPayload = JSON.parse(JSON.stringify(unavailPayload));
     lmcPayload.intent = 'lmc_report';
     const lmcHtml = chat.renderLmcAnpWidget(lmcPayload);
-    if (!lmcHtml.includes('Fonte Indisponível') || !lmcHtml.includes('Tentar Novamente')) {{
+    if (!lmcHtml.includes('Fonte Indisponível') || !lmcHtml.includes('Tentar Novamente')) {
       console.error('FALHA: renderLmcAnpWidget não tratou fonte indisponível graciosamente:', lmcHtml);
       process.exit(1);
-    }}
+    }
 
     // Widget 5: Combos & Conveniência
     const combosPayload = JSON.parse(JSON.stringify(unavailPayload));
     combosPayload.intent = 'market_basket';
     const combosHtml = chat.renderCombosWidget(combosPayload);
-    if (!combosHtml.includes('Fonte Indisponível') || !combosHtml.includes('Tentar Novamente')) {{
+    if (!combosHtml.includes('Fonte Indisponível') || !combosHtml.includes('Tentar Novamente')) {
       console.error('FALHA: renderCombosWidget não tratou fonte indisponível graciosamente:', combosHtml);
       process.exit(1);
-    }}
+    }
     console.log('[NODE] 3. Todos os 5 Widgets canônicos exibem degradação graciosa com botões de contingência');
 
     // 4. Validar Abas do Evidence Drawer em Estado Indisponível
     const tabFormula = chat.renderEvidenceTabContent(unavailPayload, 'formula');
-    if (!tabFormula.includes('Fonte Indisponível') || !tabFormula.includes('A conexão com o banco de dados ERP não pôde ser estabelecida')) {{
+    if (!tabFormula.includes('Fonte Indisponível') || !tabFormula.includes('A conexão com o banco de dados ERP não pôde ser estabelecida')) {
       console.error('FALHA: Aba formula em indisponibilidade não renderizou aviso claro:', tabFormula);
       process.exit(1);
-    }}
+    }
 
     const tabBicos = chat.renderEvidenceTabContent(unavailPayload, 'bicos');
-    if (!tabBicos.includes('indisponível')) {{
+    if (!tabBicos.includes('indisponível')) {
       console.error('FALHA: Aba bicos em indisponibilidade não exibiu aviso semântico:', tabBicos);
       process.exit(1);
-    }}
+    }
 
     const tabCaixas = chat.renderEvidenceTabContent(unavailPayload, 'caixas');
-    if (!tabCaixas.includes('indisponibilidade')) {{
+    if (!tabCaixas.includes('indisponibilidade')) {
       console.error('FALHA: Aba caixas em indisponibilidade não exibiu aviso semântico:', tabCaixas);
       process.exit(1);
-    }}
+    }
 
     const tabTanques = chat.renderEvidenceTabContent(unavailPayload, 'tanques');
-    if (!tabTanques.includes('indisponível')) {{
+    if (!tabTanques.includes('indisponível')) {
       console.error('FALHA: Aba tanques em indisponibilidade não exibiu aviso semântico:', tabTanques);
       process.exit(1);
-    }}
+    }
     console.log('[NODE] 4. Todas as abas do Evidence Drawer renderizam mensagens semânticas em contingência');
 
     // 5. Validar Fallback de Schema Desconhecido (F1-08 / F5-01)
-    const unknownSchemaData = {{ schema_version: '3.0', assessment: {{ title: 'Versão 3' }} }};
+    const unknownSchemaData = { schema_version: '3.0', assessment: { title: 'Versão 3' } };
     const fallbackHtml = chat.renderTurnoWidget(unknownSchemaData);
-    if (!fallbackHtml.includes('Versão de Contrato Não Suportada (v3.0)')) {{
+    if (!fallbackHtml.includes('Versão de Contrato Não Suportada (v3.0)')) {
       console.error('FALHA: Fallback de versão de contrato não acionado:', fallbackHtml);
       process.exit(1);
-    }}
+    }
     console.log('[NODE] 5. Fallback de governança ativo para versões desconhecidas de schema');
 
     // 6. Validar Sanitização XSS Extrema
     const dirtyXss = '<script>evil()</script><img src=x onerror=hack()>';
     const cleanXss = chat.escapeHtml(dirtyXss);
-    if (cleanXss.includes('<script>') || cleanXss.includes('<img')) {{
+    if (cleanXss.includes('<script>') || cleanXss.includes('<img')) {
       console.error('FALHA: escapeHtml falhou em neutralizar tags HTML:', cleanXss);
       process.exit(1);
-    }}
+    }
     console.log('[NODE] 6. Blindagem contra injeção de scripts e vetores XSS validada');
 
+    // 7. Validar Resiliência a Entradas Null / Undefined em Todos os Renderizadores
+    const nullRenderers = [
+      () => chat.renderTurnoWidget(null),
+      () => chat.renderTurnoWidget(undefined),
+      () => chat.renderTankAutonomyWidget(null),
+      () => chat.renderTankAutonomyWidget(undefined),
+      () => chat.renderDesempenhoPistaWidget(null),
+      () => chat.renderDesempenhoPistaWidget(undefined),
+      () => chat.renderLmcAnpWidget(null),
+      () => chat.renderLmcAnpWidget(undefined),
+      () => chat.renderCombosWidget(null),
+      () => chat.renderCombosWidget(undefined),
+      () => chat.renderAjudaSistemaWidget(null),
+      () => chat.renderAjudaSistemaWidget(undefined),
+      () => chat.renderGenericToolWidget('generic', null),
+      () => chat.renderGenericToolWidget('generic', undefined),
+      () => chat.renderEvidenceTabContent(null, 'formula'),
+      () => chat.renderEvidenceTabContent(undefined, 'bicos'),
+      () => chat.renderEvidenceTabContent(null, 'tanques'),
+      () => chat.renderEvidenceTabContent(null, 'caixas'),
+    ];
+
+    for (let i = 0; i < nullRenderers.length; i++) {
+      try {
+        const resHtml = nullRenderers[i]();
+        if (typeof resHtml !== 'string') {
+          console.error(`FALHA: Renderer ${i} não retornou string ao receber null/undefined:`, resHtml);
+          process.exit(1);
+        }
+      } catch (err) {
+        console.error(`FALHA: Renderer ${i} lançou exceção com null/undefined:`, err);
+        process.exit(1);
+      }
+    }
+    console.log('[NODE] 7. Resiliência completa contra null e undefined em todos os renderizadores');
+
+    // 8. Validar Degradação Graciosa sob Dicionários Planos de Erro / Indisponibilidade (core/tools.py)
+    const flatErrorPayloads = [
+      { status: 'indisponivel', motivo: 'Conexão recusada na porta 5433 (PostgreSQL ERP offline)' },
+      { status: 'unavailable', error: 'Timeout de rede ao consultar concentrador' },
+      { error: 'Falha crítica de leitura no ERP' },
+      { status: 'erro', mensagem: 'Database connection failed' },
+    ];
+
+    for (const flatErr of flatErrorPayloads) {
+      const turnoErr = chat.renderTurnoWidget(flatErr);
+      const tankErr = chat.renderTankAutonomyWidget(flatErr);
+      const pistaErr = chat.renderDesempenhoPistaWidget(flatErr);
+      const lmcErr = chat.renderLmcAnpWidget(flatErr);
+      const combosErr = chat.renderCombosWidget(flatErr);
+      const genericErr = chat.renderGenericToolWidget('auditoria_contingencia', flatErr);
+
+      const allCards = [turnoErr, tankErr, pistaErr, lmcErr, combosErr, genericErr];
+      for (const card of allCards) {
+        if (!card.includes('Tentar Novamente') || !card.includes('Procedimento de Contingência')) {
+          console.error('FALHA: Payload plano de erro não renderizou card de contingência com ações:', card);
+          process.exit(1);
+        }
+      }
+    }
+    console.log('[NODE] 8. Payloads planos de erro/indisponibilidade degradam graciosamente com contingência');
+
+    // 9. Validar que LMC NUNCA Apresenta "Dentro da Tolerância" ou "0.00%" quando Fonte está Indisponível
+    const lmcUnavail1 = chat.renderLmcAnpWidget({ status: 'indisponivel', motivo: 'ERP Offline' });
+    const lmcUnavail2 = chat.renderLmcAnpWidget(unavailPayload);
+    const lmcUnavail3 = chat.renderLmcAnpWidget({ status: 'unavailable', error: 'Timeout' });
+
+    for (const lmcHtml of [lmcUnavail1, lmcUnavail2, lmcUnavail3]) {
+      if (lmcHtml.includes('Dentro da Tolerância') || lmcHtml.includes('0.00%') || lmcHtml.includes('0,00%')) {
+        console.error('FALHA: LMC exibiu falsa conformidade regulatória sob fonte indisponível:', lmcHtml);
+        process.exit(1);
+      }
+    }
+    console.log('[NODE] 9. LMC ANP blindado contra falsos positivos de conformidade regulatória');
+
+    // 10. Validar Chips de Tool e Inspector sob Falha de Fonte
+    const mockToolCard = { innerHTML: '', classList: { add: () => {}, remove: () => {} } };
+    const mockToolChip = { innerHTML: '', className: '', classList: { remove: () => {} } };
+    const mockStatusBadge = { innerHTML: '', className: '', textContent: '' };
+    const mockLatencyBadge = { innerHTML: '', className: '', textContent: '' };
+    const mockFormattedTab = { innerHTML: '' };
+    const mockJsonTab = { innerHTML: '' };
+
+    global.document = {
+      getElementById: (id) => {
+        if (id.includes('tool-card')) return mockToolCard;
+        if (id.includes('tool-chip')) return mockToolChip;
+        if (id === 'inspector-status-badge') return mockStatusBadge;
+        if (id === 'inspector-latency-badge') return mockLatencyBadge;
+        if (id === 'inspector-content-formatted') return mockFormattedTab;
+        if (id === 'inspector-content-json') return mockJsonTab;
+        return null;
+      },
+      querySelectorAll: (sel) => []
+    };
+
+    // 10.1 updateToolResultCard sob indisponibilidade
+    chat.updateToolResultCard('test-unavail', 'fechamento_turno', { status: 'indisponivel' });
+    if (!mockToolChip.className.includes('text-rose-300') || !mockToolChip.innerHTML.includes('indisponível')) {
+      console.error('FALHA: updateToolResultCard não exibiu badge de aviso para fonte indisponível:', mockToolChip);
+      process.exit(1);
+    }
+
+    // 10.2 updateToolResultCard sob sucesso
+    chat.updateToolResultCard('test-ok', 'fechamento_turno', { status: 'sucesso', resumo_executivo: {} });
+    if (!mockToolChip.className.includes('text-emerald-300') || !mockToolChip.innerHTML.includes('apurado')) {
+      console.error('FALHA: updateToolResultCard não exibiu badge de sucesso para consulta válida:', mockToolChip);
+      process.exit(1);
+    }
+
+    // 10.3 renderResultInspector sob indisponibilidade
+    triggers.renderResultInspector({ name: 'Conciliação LMC' }, { data: { status: 'indisponivel', motivo: 'ERP Offline' } });
+    if (!mockStatusBadge.textContent.includes('Fonte Indisponível') || !mockStatusBadge.className.includes('text-rose-300')) {
+      console.error('FALHA: renderResultInspector não exibiu status rose para fonte indisponível:', mockStatusBadge);
+      process.exit(1);
+    }
+    console.log('[NODE] 10. Indicadores e badges de status visual sob falha devidamente testados');
+
     console.log('NODE_PHASE6_TESTS_OK');
-    """
+    """.replace("__UNAVAIL_PAYLOAD__", json.dumps(c5.model_dump(), ensure_ascii=False))
 
     res_node = subprocess.run(
         ["node", "-e", node_phase6_script],

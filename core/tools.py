@@ -3516,7 +3516,8 @@ class PostoTools:
                         TRIM(b.codtan) AS codtan,
                         TRIM(b.codpro) AS codpro
                     FROM bombas b
-                    WHERE b.codtan IS NOT NULL;
+                    WHERE b.codtan IS NOT NULL
+                    ORDER BY b.codbom ASC;
                 """)
                 linhas_bombas = cur.fetchall()
                 bicos_por_tanque: Dict[str, List[str]] = {}
@@ -3669,7 +3670,7 @@ class PostoTools:
                     tolerancia_pct=0.6,
                 )
 
-                bicos = bicos_por_tanque.get(cod_tan, [])
+                bicos = sorted(bicos_por_tanque.get(cod_tan, []))
 
                 item_tanque = {
                     "tanque": cod_tan,

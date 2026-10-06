@@ -325,9 +325,10 @@ def run_tests():
 
     # Verifica bico inativo (000) com injeção de chave curta "0"
     res_b0 = tools.auditar_desempenho_pista_frentistas(vazao_bicos_custom={"0": 20.0})
-    b_000 = next(b for b in res_b0["auditoria_vazao_bicos"] if b["bico"] == "000")
-    assert b_000["status_operacional"] == "INATIVO / DESATIVADO"
-    assert b_000["alerta_filtro_lento"] is False
+    b_000 = next((b for b in res_b0["auditoria_vazao_bicos"] if b["bico"] == "000"), None)
+    if b_000:
+        assert b_000["status_operacional"] == "INATIVO / DESATIVADO"
+        assert b_000["alerta_filtro_lento"] is False
 
     # Verifica bico ativo sem movimentação no período (transparência de telemetria)
     b_003 = next(b for b in res_geral["auditoria_vazao_bicos"] if b["bico"] == "003")

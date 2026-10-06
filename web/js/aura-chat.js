@@ -216,6 +216,11 @@ class AuraChatController {
         if (focusableEls.length > 0) {
           const firstEl = focusableEls[0];
           const lastEl = focusableEls[focusableEls.length - 1];
+          if (!evDrawer.contains(document.activeElement)) {
+            e.preventDefault();
+            firstEl.focus();
+            return;
+          }
           if (e.shiftKey) {
             if (document.activeElement === firstEl) {
               e.preventDefault();
@@ -231,10 +236,29 @@ class AuraChatController {
       }
     });
 
-    document.querySelectorAll('.evidence-tab-btn').forEach(btn => {
+    const tabBtns = Array.from(document.querySelectorAll('.evidence-tab-btn'));
+    tabBtns.forEach((btn, idx) => {
       btn.addEventListener('click', () => {
         const tab = btn.getAttribute('data-ev-tab');
         this.switchEvidenceTab(tab);
+      });
+      // Suporte a navegação por setas (WCAG 2.1 AA - Design Pattern Tablist)
+      btn.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          const nextBtn = tabBtns[(idx + 1) % tabBtns.length];
+          if (nextBtn) {
+            nextBtn.focus();
+            nextBtn.click();
+          }
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          const prevBtn = tabBtns[(idx - 1 + tabBtns.length) % tabBtns.length];
+          if (prevBtn) {
+            prevBtn.focus();
+            prevBtn.click();
+          }
+        }
       });
     });
   }
@@ -916,12 +940,18 @@ class AuraChatController {
     const cardIds = [containerId + '-tool-card', containerId + '-split-tool-card'];
     const chipIds = [containerId + '-tool-chip', containerId + '-split-tool-chip'];
     const displayName = this.formatToolDisplayName(toolName);
+    const isUnavail = this.isSourceUnavailable(resultData);
 
     chipIds.forEach(id => {
       const chip = document.getElementById(id);
       if (chip) {
-        chip.innerHTML = `${CHAT_ICONS.check} ${this.escapeHtml(displayName)} apurado`;
-        chip.className = 'chip-intent text-emerald-300 border-emerald-500/30 bg-emerald-500/10';
+        if (isUnavail) {
+          chip.innerHTML = `${CHAT_ICONS.alert} ${this.escapeHtml(displayName)} indisponível`;
+          chip.className = 'chip-intent text-rose-300 border-rose-500/30 bg-rose-500/10';
+        } else {
+          chip.innerHTML = `${CHAT_ICONS.check} ${this.escapeHtml(displayName)} apurado`;
+          chip.className = 'chip-intent text-emerald-300 border-emerald-500/30 bg-emerald-500/10';
+        }
       }
     });
 
@@ -1020,11 +1050,35 @@ class AuraChatController {
   }
 
   /**
+   * Avalia com precisão se a fonte de dados (ERP/Banco/Automação) está offline, em timeout ou inacessível.
+   */
+  isSourceUnavailable(data, assessment = null) {
+    if (!data || typeof data !== 'object') return false;
+    const c = data.contrato || data;
+    const a = assessment || c.assessment || {};
+    return Boolean(
+      a.finality === 'unavailable' ||
+      a.status_code === 'INDISPONIVEL' ||
+      a.status_code === 'FONTE_INDISPONIVEL' ||
+      data.status === 'indisponivel' ||
+      data.status === 'unavailable' ||
+      data.status === 'timeout' ||
+      data.status === 'error' ||
+      data.status === 'erro' ||
+      data.status_code === 'INDISPONIVEL' ||
+      data.status_code === 'FONTE_INDISPONIVEL' ||
+      data.error ||
+      c.error
+    );
+  }
+
+  /**
    * F6-06 / F1-08: Card de Contingência Executiva para Fontes Indisponíveis / Timeout / Erro
    * Apresenta diagnóstico semântico honesto, limitação explícita e ação de contingência manual/reiteração.
    */
   renderContingencyCard(moduleName, data, retryPrompt = null) {
-    const motivo = data?.motivo || data?.mensagem || data?.error || 'Acesso à fonte de dados (ERP/Banco/Automação) temporariamente indisponível.';
+    const c = data?.contrato || data;
+    const motivo = data?.motivo || data?.mensagem || data?.error || c?.error || data?.context?.error || c?.assessment?.limitation || 'Acesso à fonte de dados (ERP/Banco/Automação) temporariamente indisponível.';
     const evId = 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     if (typeof window !== 'undefined') {
       if (!window.__auraEvidenceStore) window.__auraEvidenceStore = {};
@@ -1032,13 +1086,14 @@ class AuraChatController {
     }
 
     const defaultPrompts = {
-      'Conciliação de Turno & Caixa': 'Como fechou o último turno? Teve furo de caixa?',
+      'Conciliação de Turno & Caixa': 'Qual a conciliação do turno de hoje?',
       'Autonomia de Tanques & Run-Out': 'Qual a previsão de esgotamento e a autonomia estimada dos tanques?',
-      'Performance da Pista & Frentistas': 'Há algum bico com vazão lenta ou alerta na pista?',
+      'Performance da Pista & Frentistas': 'Qual o desempenho da pista e vazão de bicos hoje?',
       'Conciliação Físico-Contábil do LMC ANP': 'O LMC de ontem fechou dentro da tolerância oficial da ANP?',
-      'Combos & Vendas Cruzadas na Conveniência': 'Quais os combos de vendas cruzadas com maior Lift na conveniência?',
+      'Combos & Vendas Cruzadas na Conveniência': 'Quais os combos de conveniência com maior afinidade?',
     };
     const promptToRetry = retryPrompt || defaultPrompts[moduleName] || 'Repetir a consulta anterior';
+    const escapedPrompt = this.escapeHtml(String(promptToRetry).replace(/'/g, "\\'"));
 
     return `
       <div class="decision-card decision-contingency-card" data-evidence-id="${evId}">
@@ -1048,12 +1103,12 @@ class AuraChatController {
             <span class="decision-context-sub">
               <span>${CHAT_ICONS.alert} Análise Suspensa</span>
               <span>•</span>
-              <span>${CHAT_ICONS.unit} ${this.escapeHtml(data?.context?.unit_id || 'Posto')}</span>
+              <span>${CHAT_ICONS.unit} ${this.escapeHtml(c?.context?.unit_id || 'Posto')}</span>
             </span>
           </div>
           <span class="decision-status-badge status-divergent">
             <span>${CHAT_ICONS.alert}</span>
-            <span>Fonte Indisponível</span>
+            <span>${this.escapeHtml(c?.assessment?.badge_label || 'Fonte Indisponível')}</span>
           </span>
         </div>
 
@@ -1082,7 +1137,7 @@ class AuraChatController {
           <button 
             type="button" 
             class="decision-btn-primary" 
-            onclick="if (window.auraChat) window.auraChat.sendUserPrompt('${this.escapeHtml(promptToRetry)}');"
+            onclick="if (window.auraChat) window.auraChat.sendUserPrompt('${escapedPrompt}');"
             title="Tentar executar a consulta novamente">
             <span>${CHAT_ICONS.refresh}</span>
             <span>Tentar Novamente</span>
@@ -1094,7 +1149,7 @@ class AuraChatController {
             onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como verificar a integridade da conexão do ERP e banco local?');"
             title="Verificar status e procedimento manual de contingência">
             <span>${CHAT_ICONS.wrench}</span>
-            <span>Auditar Conexão do ERP</span>
+            <span>Procedimento de Contingência</span>
           </button>
         </div>
       </div>
@@ -1132,6 +1187,7 @@ class AuraChatController {
    * Widget de Auto-Conhecimento e Atalho Interativo da UI
    */
   renderAjudaSistemaWidget(data) {
+    if (!data || typeof data !== 'object') return '';
     const action = data.ui_action || (data.artigos && data.artigos[0]?.ui_action) || null;
     const artigos = data.artigos || [];
     const topArtigo = artigos.length > 0 ? artigos[0] : null;
@@ -1271,10 +1327,10 @@ class AuraChatController {
     const resumo = data.resumo_executivo || {};
     const tanksList = c.tanks || data.detalhamento_tanques || data.tanques || [];
 
-    const isUnavailable = assessment.status_code === 'INDISPONIVEL' || assessment.finality === 'unavailable' || data.status === 'indisponivel' || data.status === 'timeout' || data.status === 'error';
-    const isNoMovement = !isUnavailable && (assessment.status_code === 'SEM_MOVIMENTACAO' || assessment.status_code === 'SEM_REGISTROS' || data.status === 'sem_movimento' || tanksList.length === 0);
+    const isUnavailable = this.isSourceUnavailable(data, assessment);
+    const isNoMovement = !isUnavailable && (assessment.status_code === 'SEM_MOVIMENTACAO' || assessment.status_code === 'SEM_REGISTROS' || data.status === 'sem_movimento' || (!data.error && tanksList.length === 0));
 
-    if (isUnavailable && tanksList.length === 0 && !data.contrato && !data.resumo_executivo) {
+    if (isUnavailable) {
       return this.renderContingencyCard('Autonomia de Tanques & Run-Out', data, 'Qual a previsão de esgotamento e a autonomia estimada dos tanques?');
     }
 
@@ -1609,9 +1665,12 @@ class AuraChatController {
     const action = c.recommended_action || {};
     const resumo = data.resumo_executivo || {};
     const items = c.tanks || data.demonstrativo_por_combustivel || data.tanques || [];
-
-    const isUnavailable = assessment.status_code === 'INDISPONIVEL' || data.status === 'indisponivel' || assessment.status_code === 'FONTE_INDISPONIVEL' || c.assessment?.finality === 'unavailable';
+    const isUnavailable = this.isSourceUnavailable(data, assessment);
     const isNoMovement = !isUnavailable && (assessment.status_code === 'SEM_MOVIMENTACAO' || data.status === 'sem_movimento');
+
+    if (isUnavailable) {
+      return this.renderContingencyCard('Conciliação Físico-Contábil do LMC ANP', data, 'O LMC de ontem fechou dentro da tolerância oficial da ANP?');
+    }
 
     const evId = 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     if (typeof window !== 'undefined') {
@@ -1955,6 +2014,9 @@ class AuraChatController {
 
     // Validação mínima de payload válido
     if (!data.contrato && !data.assessment && !data.metrics && !data.resumo_executivo) {
+      if (this.isSourceUnavailable(data)) {
+        return this.renderContingencyCard('Conciliação de Turno & Caixa', data, 'Qual a conciliação do turno de hoje?');
+      }
       return `
         <div class="decision-card">
           <div class="decision-header">
@@ -1973,9 +2035,13 @@ class AuraChatController {
     const resumo = data.resumo_executivo || {};
     const tri = data.triangulacao_pista || {};
 
-    const isUnavailable = assessment.finality === 'unavailable' || data.status === 'indisponivel' || assessment.status_code === 'INDISPONIVEL' || assessment.status_code === 'FONTE_INDISPONIVEL';
+    const isUnavailable = this.isSourceUnavailable(data, assessment);
     const isNoMovement = !isUnavailable && (assessment.finality === 'no_movement' || data.status === 'sem_movimento' || assessment.status_code === 'SEM_MOVIMENTACAO');
     const isPartial = !isUnavailable && !isNoMovement && (assessment.finality === 'partial' || resumo.status_conciliacao?.includes('ANDAMENTO'));
+
+    if (isUnavailable) {
+      return this.renderContingencyCard('Conciliação de Turno & Caixa', data, 'Qual a conciliação do turno de hoje?');
+    }
 
     // Armazena payload na memória global de evidências
     const evId = 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
@@ -1992,7 +2058,7 @@ class AuraChatController {
     if (isUnavailable) {
       badgeClass = 'status-divergent';
       badgeIcon = CHAT_ICONS.alert;
-      badgeText = assessment.badge_label || 'Fonte indisponível';
+      badgeText = assessment.badge_label || 'Fonte Indisponível';
     } else if (isPartial) {
       badgeClass = 'status-partial';
       badgeIcon = CHAT_ICONS.clock;
@@ -2273,10 +2339,11 @@ class AuraChatController {
     };
 
     if (titleEl) titleEl.textContent = titleMap[intent] || `Evidências: ${dataAuditada}`;
+    const isUnavail = this.isSourceUnavailable(data, assessment);
     if (chipEl) {
-      chipEl.textContent = assessment.badge_label || (assessment.finality === 'partial' ? 'Provisório' : 'Validado');
-      const isCrit = assessment.severity === 'critical';
-      const isAttn = assessment.severity === 'attention' || assessment.finality === 'partial';
+      chipEl.textContent = assessment.badge_label || (isUnavail ? 'Fonte Indisponível' : (assessment.finality === 'partial' ? 'Provisório' : 'Validado'));
+      const isCrit = assessment.severity === 'critical' || isUnavail;
+      const isAttn = !isUnavail && (assessment.severity === 'attention' || assessment.finality === 'partial');
       chipEl.className = `px-2 py-0.5 rounded-full text-[10px] font-sans font-semibold ${isCrit ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30' : (isAttn ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30')}`;
     }
     if (subEl) {
@@ -2356,7 +2423,7 @@ class AuraChatController {
    * 5. market_basket
    */
   renderEvidenceTabContent(data, tab) {
-    if (!data || (typeof data !== 'object') || (!data.contrato && !data.resumo_executivo && !data.assessment && !data.metrics)) {
+    if (!data || (typeof data !== 'object') || (!data.contrato && !data.resumo_executivo && !data.assessment && !data.metrics && !this.isSourceUnavailable(data))) {
       return `<div class="p-6 text-center text-slate-400 font-sans text-xs">Dados de evidência indisponíveis para este item.</div>`;
     }
 
@@ -2366,7 +2433,7 @@ class AuraChatController {
     const sources = c.sources || [];
     const intent = c.intent || data.intent || 'shift_reconciliation';
     const dataAuditada = data.data_auditada || c.context?.data_auditada || (c.context?.queried_at ? new Date(c.context.queried_at).toLocaleDateString('pt-BR') : 'Data Recente');
-    const isUnavailable = assessment.finality === 'unavailable' || data.status === 'indisponivel' || assessment.status_code === 'INDISPONIVEL' || assessment.status_code === 'FONTE_INDISPONIVEL';
+    const isUnavailable = this.isSourceUnavailable(data, assessment);
 
     // =========================================================================
     // ABA: COMO FOI CALCULADO (FÓRMULAS & DEFINIÇÕES CANÔNICAS)
@@ -2624,7 +2691,6 @@ class AuraChatController {
     if (tab === 'bicos') {
       const nozzlesList = c.nozzles || data.auditoria_vazao_bicos || data.vazao_bicos || data.triangulacao_pista?.detalhamento_bicos || [];
       if (nozzlesList.length === 0) {
-        const isUnavailable = assessment.finality === 'unavailable' || data.status === 'indisponivel' || assessment.status_code === 'INDISPONIVEL' || assessment.status_code === 'FONTE_INDISPONIVEL';
         return `<div class="p-4 text-center ${isUnavailable ? 'text-rose-300' : 'text-slate-500'} font-sans text-xs">${isUnavailable ? 'Leitura de bicos indisponível por falha na fonte primária.' : 'Sem dados detalhados de bicos para esta consulta.'}</div>`;
       }
 
@@ -2953,9 +3019,12 @@ class AuraChatController {
     const action = c.recommended_action || {};
     const resumo = data.resumo_executivo || {};
     const combos = c.top_combos || data.top_combos_cross_selling || data.top_combos_oportunidades || data.regras_associacao_detalhadas || [];
-
-    const isUnavailable = assessment.status_code === 'INDISPONIVEL' || data.status === 'indisponivel' || assessment.status_code === 'FONTE_INDISPONIVEL' || c.assessment?.finality === 'unavailable';
+    const isUnavailable = this.isSourceUnavailable(data, assessment);
     const isNoMovement = !isUnavailable && (assessment.status_code === 'SEM_REGISTROS' || data.status === 'sem_movimento' || assessment.status_code === 'SEM_MOVIMENTACAO');
+
+    if (isUnavailable) {
+      return this.renderContingencyCard('Combos & Vendas Cruzadas na Conveniência', data, 'Quais os combos de conveniência com maior afinidade?');
+    }
 
     const evId = 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     if (typeof window !== 'undefined') {
@@ -3270,8 +3339,12 @@ class AuraChatController {
     const ranking = c.ranking || data.ranking_frentistas || [];
     const nozzles = c.nozzles || data.auditoria_vazao_bicos || data.vazao_bicos || [];
 
-    const isUnavailable = assessment.status_code === 'INDISPONIVEL' || data.status === 'indisponivel' || assessment.status_code === 'FONTE_INDISPONIVEL' || c.assessment?.finality === 'unavailable';
+    const isUnavailable = this.isSourceUnavailable(data, assessment);
     const isNoMovement = !isUnavailable && (assessment.status_code === 'SEM_MOVIMENTACAO' || data.status === 'sem_movimento');
+
+    if (isUnavailable) {
+      return this.renderContingencyCard('Performance da Pista & Frentistas', data, 'Qual o desempenho da pista e vazão de bicos hoje?');
+    }
 
     const evId = 'ev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     if (typeof window !== 'undefined') {
@@ -3574,6 +3647,10 @@ class AuraChatController {
    * Widget Genérico para outras ferramentas analíticas
    */
   renderGenericToolWidget(toolName, data) {
+    if (!data || typeof data !== 'object') return '';
+    if (this.isSourceUnavailable(data)) {
+      return this.renderContingencyCard(this.formatToolDisplayName(toolName), data);
+    }
     if (!data.resumo_executivo && !data.status) return '';
     const r = data.resumo_executivo || data;
     const displayName = this.formatToolDisplayName(toolName);

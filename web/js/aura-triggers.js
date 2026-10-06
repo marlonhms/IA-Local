@@ -244,11 +244,18 @@ class AuraTriggersController {
     const latencyEl = document.getElementById('inspector-latency-badge');
     const formattedTab = document.getElementById('inspector-content-formatted');
     const jsonTab = document.getElementById('inspector-content-json');
+    const dataObj = response.data || response;
+    const isUnavail = dataObj?.status === 'indisponivel' || dataObj?.status === 'unavailable' || dataObj?.status === 'error' || dataObj?.status === 'erro' || Boolean(dataObj?.error);
 
     if (titleEl) titleEl.textContent = tool.name;
     if (statusEl) {
-      statusEl.className = 'px-2.5 py-0.5 rounded text-[11px] font-sans font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
-      statusEl.textContent = '✓ Consulta Concluída';
+      if (isUnavail) {
+        statusEl.className = 'px-2.5 py-0.5 rounded text-[11px] font-sans font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40';
+        statusEl.textContent = '⚠ Fonte Indisponível';
+      } else {
+        statusEl.className = 'px-2.5 py-0.5 rounded text-[11px] font-sans font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        statusEl.textContent = '✓ Consulta Concluída';
+      }
     }
     if (latencyEl) {
       latencyEl.innerHTML = `<span class="inline-flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> <span>Tempo de Resposta: ${response.clientLatencyMs || response.latency_ms || 25} ms</span></span>`;
@@ -269,7 +276,25 @@ class AuraTriggersController {
    * Constrói HTML formatado sob medida para cada tipo de ferramenta
    */
   buildFormattedHtml(toolId, data) {
-    if (!data) return '<div class="text-slate-400">Nenhum dado retornado.</div>';
+    if (!data) return '<div class="text-slate-400 font-sans text-xs">Nenhum dado retornado.</div>';
+
+    if (data.status === 'indisponivel' || data.status === 'unavailable' || data.status === 'error' || data.status === 'erro' || data.error) {
+      const motivo = data.motivo || data.mensagem || data.error || 'Acesso à fonte primária (ERP/Banco) temporariamente indisponível.';
+      return `
+        <div class="p-4 rounded-xl bg-rose-950/20 border border-rose-500/30 text-rose-300 font-sans text-xs space-y-2">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-rose-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke-width="1.75" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="13" stroke-width="1.75" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
+            <strong class="font-semibold text-rose-200">Indisponibilidade da Fonte (ERP/Banco):</strong>
+          </div>
+          <p class="text-rose-200/90 leading-relaxed">${this.escapeHtml(motivo)}</p>
+          <div class="pt-2">
+            <button type="button" class="px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 text-xs font-semibold cursor-pointer transition-colors" onclick="if (window.auraTriggers) window.auraTriggers.executeTrigger('${toolId}');">
+              Tentar Novamente
+            </button>
+          </div>
+        </div>
+      `;
+    }
 
     // 1. Run-Out de Tanques
     if (toolId === 'run_out' && data.detalhamento_tanques) {

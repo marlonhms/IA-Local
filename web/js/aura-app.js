@@ -357,6 +357,12 @@ class AuraApp {
         const first = focusables[0];
         const last = focusables[focusables.length - 1];
 
+        if (!drawer.contains(document.activeElement)) {
+          e.preventDefault();
+          first.focus();
+          return;
+        }
+
         if (e.shiftKey && document.activeElement === first) {
           e.preventDefault();
           last.focus();

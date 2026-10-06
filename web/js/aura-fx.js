@@ -518,6 +518,11 @@
           if (focusables.length > 0) {
             const first = focusables[0];
             const last = focusables[focusables.length - 1];
+            if (!modal.contains(document.activeElement)) {
+              e.preventDefault();
+              first.focus();
+              return;
+            }
             if (e.shiftKey && document.activeElement === first) {
               e.preventDefault();
               last.focus();
