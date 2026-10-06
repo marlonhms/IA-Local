@@ -469,7 +469,7 @@ class AuraApp {
     }
 
     if (sfxIcon) {
-      sfxIcon.className = isMuted ? 'w-4 h-4 text-slate-400' : 'w-4 h-4 text-emerald-400';
+      sfxIcon.setAttribute('class', isMuted ? 'w-4 h-4 text-slate-400' : 'w-4 h-4 text-emerald-400');
     }
   }
 
@@ -615,7 +615,7 @@ class AuraApp {
         : 'px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400';
     }
     if (icon) {
-      icon.className = enabled ? 'w-4 h-4 text-emerald-400' : 'w-4 h-4 text-slate-400';
+      icon.setAttribute('class', enabled ? 'w-4 h-4 text-emerald-400' : 'w-4 h-4 text-slate-400');
     }
   }
 

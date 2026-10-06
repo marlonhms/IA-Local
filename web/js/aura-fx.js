@@ -65,7 +65,7 @@
         label.textContent = mode === 'desktop' ? 'DESKTOP' : 'MOBILE';
       }
       if (icon) {
-        icon.className = mode === 'desktop' ? 'w-3 h-3 text-auraCyan' : 'w-3 h-3 text-auraEmerald';
+        icon.setAttribute('class', mode === 'desktop' ? 'w-3 h-3 text-auraCyan' : 'w-3 h-3 text-auraEmerald');
       }
       if (badge) {
         badge.title = `Modo Atual: ${mode.toUpperCase()} (Clique para alternar visão)`;

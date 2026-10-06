@@ -16,7 +16,7 @@ import asyncio
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query, status
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -190,6 +190,17 @@ def create_aura_app(engine: Optional[AuraEngine] = None) -> FastAPI:
     web_dir = Path(__file__).resolve().parent.parent / "web"
     if web_dir.exists():
         app.mount("/static", StaticFiles(directory=str(web_dir)), name="static")
+
+        @app.get("/favicon.ico", include_in_schema=False)
+        async def serve_favicon():
+            svg_icon = (
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
+                '<circle cx="16" cy="16" r="14" fill="#07090e" stroke="#06b6d4" stroke-width="2"/>'
+                '<circle cx="16" cy="16" r="6" fill="#10b981"/>'
+                '<path d="M16 4 L16 10 M16 22 L16 28 M4 16 L10 16 M22 16 L28 16" stroke="#7c3aed" stroke-width="2"/>'
+                '</svg>'
+            )
+            return Response(content=svg_icon, media_type="image/svg+xml")
 
         @app.get("/", include_in_schema=False)
         @app.get("/dashboard", include_in_schema=False)
