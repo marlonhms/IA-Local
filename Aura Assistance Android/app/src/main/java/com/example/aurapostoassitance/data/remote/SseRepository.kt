@@ -29,7 +29,9 @@ class SseRepository @Inject constructor(
             {
                 "query": "$query",
                 "session_id": "$sessionId",
-                "stream": true
+                "stream": true,
+                "tenant_id": "posto_01",
+                "filial_id": "59050"
             }
         """.trimIndent()
         

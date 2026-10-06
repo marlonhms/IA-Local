@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aurapostoassitance.data.local.ChatDao
 import com.example.aurapostoassitance.data.local.ChatMessageEntity
+import com.example.aurapostoassitance.data.local.ChatSessionEntity
 import com.example.aurapostoassitance.data.remote.SseEvent
 import com.example.aurapostoassitance.data.remote.SseRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,8 +32,17 @@ class ChatViewModel @Inject constructor(
     private val chatDao: ChatDao
 ) : ViewModel() {
 
+    private val _currentSessionId = MutableStateFlow("default")
+    val currentSessionId: StateFlow<String> = _currentSessionId.asStateFlow()
+
+    private val _currentSessionTitle = MutableStateFlow("AURA Cockpit")
+    val currentSessionTitle: StateFlow<String> = _currentSessionTitle.asStateFlow()
+
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
+
+    private val _sessions = MutableStateFlow<List<ChatSessionEntity>>(emptyList())
+    val sessions: StateFlow<List<ChatSessionEntity>> = _sessions.asStateFlow()
 
     private val _isAuraTyping = MutableStateFlow(false)
     val isAuraTyping: StateFlow<Boolean> = _isAuraTyping.asStateFlow()
@@ -39,9 +50,32 @@ class ChatViewModel @Inject constructor(
     private val _auraStatusMessage = MutableStateFlow<String?>(null)
     val auraStatusMessage: StateFlow<String?> = _auraStatusMessage.asStateFlow()
 
+    private var messageCollectJob: Job? = null
+
     init {
+        // Collect all chat sessions
         viewModelScope.launch {
-            chatDao.getAllMessages().collect { entities ->
+            chatDao.getAllSessions().collect { sessionList ->
+                _sessions.value = sessionList
+            }
+        }
+        // Load default session
+        loadSession("default", "AURA Cockpit")
+    }
+
+    fun loadSession(sessionId: String, title: String) {
+        _currentSessionId.value = sessionId
+        _currentSessionTitle.value = title
+
+        // Ensure session exists in DB
+        viewModelScope.launch {
+            chatDao.insertSession(ChatSessionEntity(sessionId, title))
+        }
+
+        // Cancel previous message collector and collect for new session
+        messageCollectJob?.cancel()
+        messageCollectJob = viewModelScope.launch {
+            chatDao.getMessagesForSession(sessionId).collect { entities ->
                 val uiMessages = entities.map {
                     ChatMessage(it.id, it.text, it.isFromUser, false)
                 }
@@ -50,8 +84,34 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    fun createNewChat(title: String = "Novo Chat"): String {
+        val newSessionId = "chat_" + System.currentTimeMillis()
+        loadSession(newSessionId, title)
+        return newSessionId
+    }
+
+    fun clearCurrentChat() {
+        val activeSessionId = _currentSessionId.value
+        viewModelScope.launch {
+            chatDao.clearSessionMessages(activeSessionId)
+            _messages.value = emptyList()
+        }
+    }
+
+    fun deleteSession(sessionId: String) {
+        viewModelScope.launch {
+            chatDao.deleteSession(sessionId)
+            chatDao.clearSessionMessages(sessionId)
+            if (_currentSessionId.value == sessionId) {
+                loadSession("default", "AURA Cockpit")
+            }
+        }
+    }
+
     fun sendMessage(query: String) {
         if (query.isBlank()) return
+
+        val activeSessionId = _currentSessionId.value
 
         val userMessage = ChatMessage(
             id = System.currentTimeMillis().toString(),
@@ -60,7 +120,14 @@ class ChatViewModel @Inject constructor(
         )
         
         viewModelScope.launch {
-            chatDao.insertMessage(ChatMessageEntity(userMessage.id, userMessage.text, userMessage.isFromUser))
+            chatDao.insertMessage(
+                ChatMessageEntity(
+                    id = userMessage.id,
+                    sessionId = activeSessionId,
+                    text = userMessage.text,
+                    isFromUser = userMessage.isFromUser
+                )
+            )
         }
 
         val auraMessageId = "aura_" + System.currentTimeMillis().toString()
@@ -78,7 +145,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             var currentAuraText = ""
 
-            sseRepository.streamChat(query)
+            sseRepository.streamChat(query, sessionId = activeSessionId)
                 .catch { e ->
                     val errorMessage = if (e is SocketTimeoutException) {
                         "⚠️ O sinal de rede está fraco (Timeout). Chegue mais perto do Wi-Fi do posto para concluir a consulta."
@@ -91,7 +158,14 @@ class ChatViewModel @Inject constructor(
                     updateAuraMessage(auraMessageId, finalErrorText, false)
                     _isAuraTyping.value = false
                     _auraStatusMessage.value = null
-                    chatDao.insertMessage(ChatMessageEntity(auraMessageId, finalErrorText, false))
+                    chatDao.insertMessage(
+                        ChatMessageEntity(
+                            id = auraMessageId,
+                            sessionId = activeSessionId,
+                            text = finalErrorText,
+                            isFromUser = false
+                        )
+                    )
                 }
                 .onCompletion {
                     if (_isAuraTyping.value) {
@@ -99,7 +173,14 @@ class ChatViewModel @Inject constructor(
                         _isAuraTyping.value = false
                         _auraStatusMessage.value = null
                         if (currentAuraText.isNotBlank()) {
-                            chatDao.insertMessage(ChatMessageEntity(auraMessageId, currentAuraText, false))
+                            chatDao.insertMessage(
+                                ChatMessageEntity(
+                                    id = auraMessageId,
+                                    sessionId = activeSessionId,
+                                    text = currentAuraText,
+                                    isFromUser = false
+                                )
+                            )
                         }
                     }
                 }
@@ -117,14 +198,28 @@ class ChatViewModel @Inject constructor(
                             updateAuraMessage(auraMessageId, finalErrorText, false)
                             _isAuraTyping.value = false
                             _auraStatusMessage.value = null
-                            chatDao.insertMessage(ChatMessageEntity(auraMessageId, finalErrorText, false))
+                            chatDao.insertMessage(
+                                ChatMessageEntity(
+                                    id = auraMessageId,
+                                    sessionId = activeSessionId,
+                                    text = finalErrorText,
+                                    isFromUser = false
+                                )
+                            )
                         }
                         is SseEvent.Done -> {
                             updateAuraMessage(auraMessageId, currentAuraText, false)
                             _isAuraTyping.value = false
                             _auraStatusMessage.value = null
                             if (currentAuraText.isNotBlank()) {
-                                chatDao.insertMessage(ChatMessageEntity(auraMessageId, currentAuraText, false))
+                                chatDao.insertMessage(
+                                    ChatMessageEntity(
+                                        id = auraMessageId,
+                                        sessionId = activeSessionId,
+                                        text = currentAuraText,
+                                        isFromUser = false
+                                    )
+                                )
                             }
                         }
                     }

@@ -22,7 +22,9 @@ object DatabaseModule {
             appContext,
             AppDatabase::class.java,
             "aura_database"
-        ).build()
+        )
+        .fallbackToDestructiveMigration()
+        .build()
     }
 
     @Provides
