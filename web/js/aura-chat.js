@@ -829,44 +829,13 @@ class AuraChatController {
         } catch (_) {}
       }
 
-      const portalBannerHtml = `
-        <div class="aux-companion-portal-banner aux-artifact-portal-card mb-3 p-3.5 rounded-2xl bg-slate-900/90 border border-cyan-500/30 flex flex-col gap-2.5 shadow-lg backdrop-blur-md">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-            <div class="flex items-center gap-3 min-w-0">
-              <div class="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0 shadow-inner">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <rect x="2" y="3" width="20" height="18" rx="2.5" stroke-width="1.75"/>
-                  <line x1="13" y1="3" x2="13" y2="21" stroke-width="1.75"/>
-                  <circle cx="7.5" cy="12" r="2" fill="currentColor"/>
-                </svg>
-              </div>
-              <div class="min-w-0">
-                <div class="text-xs font-bold text-white flex items-center gap-1.5 truncate font-sans">
-                  <span>${this.escapeHtml(artifactTitle)}</span>
-                  <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Canvas</span>
-                </div>
-                <p class="text-[11px] text-slate-400 font-sans truncate">${this.escapeHtml(artifactSubtitle)}</p>
-              </div>
-            </div>
-
-            <!-- Ações: Ver no Painel (Primário) e Ver no Chat (Secundário) -->
-            <div class="flex items-center gap-2 self-end sm:self-auto flex-shrink-0 font-sans">
-              <button type="button" onclick="window.auraChat && window.auraChat.toggleInlineArtifact('${containerId}')" id="${containerId}-btn-toggle-inline" class="px-2.5 py-1.5 min-h-[36px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-medium transition-all flex items-center gap-1" title="Alternar visualização deste card no chat">
-                <span id="${containerId}-btn-toggle-label">Ver no Chat ▾</span>
-              </button>
-              <button type="button" onclick="window.auraAuxPanel && window.auraAuxPanel.open('${artifactId}')" class="px-3 py-1.5 min-h-[36px] rounded-xl bg-gradient-to-r from-cyan-500/20 to-purple-500/20 hover:from-cyan-500/30 hover:to-purple-500/30 text-cyan-200 hover:text-white border border-cyan-500/40 text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm" title="Abrir no Painel Auxiliar">
-                <span>Ver no Painel</span>
-                <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </button>
-            </div>
-          </div>
-
-          <!-- Contêiner do Widget Inline Desdobrável (fica recolhido para não poluir o feed quando o painel auxiliar estiver ativo) -->
-          <div id="${containerId}-inline-widget" class="hidden pt-2 border-t border-white/10 animate-fade-in">
-            ${widgetHtml}
-          </div>
-        </div>
-      `;
+      const portalBannerHtml = this.renderCompanionPortalCard({
+        artifactId,
+        artifactTitle,
+        artifactSubtitle,
+        containerId,
+        widgetHtml
+      });
 
       cardIds.forEach(id => {
         const cardEl = document.getElementById(id);
@@ -887,20 +856,118 @@ class AuraChatController {
     }
   }
 
+  /**
+   * Reconhecimento inteligente de tela (Mobile <768px vs PC >=768px)
+   */
+  isMobileDevice(win = (typeof window !== 'undefined' ? window : null)) {
+    if (!win) return false;
+    // 1. Override manual do HUD de dispositivo (prioridade máxima para comutação e testes)
+    if (win.auraFx && typeof win.auraFx.override === 'string') {
+      if (win.auraFx.override === 'mobile') return true;
+      if (win.auraFx.override === 'desktop') return false;
+    }
+    // 2. Viewport width padrão da janela informada (< 768px Mobile, >= 768px Desktop/PC)
+    if (typeof win.innerWidth === 'number') {
+      return win.innerWidth < 768;
+    }
+    // 3. Media query reativa
+    if (win.matchMedia && typeof win.matchMedia === 'function') {
+      return win.matchMedia('(max-width: 767px)').matches;
+    }
+    // 4. Atributo data-device no DOM (fallback se innerWidth não estiver disponível)
+    if (typeof document !== 'undefined' && document.documentElement) {
+      const dev = document.documentElement.getAttribute('data-device');
+      if (dev === 'mobile') return true;
+      if (dev === 'desktop') return false;
+    }
+    // 5. Fallback para helpers de dispositivo
+    if (win.auraFx && typeof win.auraFx.isMobileDevice === 'function') {
+      return win.auraFx.isMobileDevice();
+    }
+    if (win.auraFx && typeof win.auraFx.isMobile === 'function') {
+      return win.auraFx.isMobile();
+    }
+    return false;
+  }
+
+  isDesktopDevice(win = (typeof window !== 'undefined' ? window : null)) {
+    return !this.isMobileDevice(win);
+  }
+
+  /**
+   * Renderiza o Card Portal do AURA Companion Canvas acoplado ao chat
+   * Regra Inteligente:
+   * - Mobile (<768px): Exibe SOMENTE "Ver no Chat ▾" (card desdobra inline no chat)
+   * - PC / Desktop (>=768px): Exibe SOMENTE "Ver no Painel" (destaca o canvas lateral)
+   */
+  renderCompanionPortalCard({ artifactId, artifactTitle, artifactSubtitle, containerId, widgetHtml }) {
+    return `
+      <div class="aux-companion-portal-banner aux-artifact-portal-card mb-3 p-3.5 rounded-2xl bg-slate-900/90 border border-cyan-500/30 flex flex-col gap-2.5 shadow-lg backdrop-blur-md">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0 shadow-inner">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <rect x="2" y="3" width="20" height="18" rx="2.5" stroke-width="1.75"/>
+                <line x1="13" y1="3" x2="13" y2="21" stroke-width="1.75"/>
+                <circle cx="7.5" cy="12" r="2" fill="currentColor"/>
+              </svg>
+            </div>
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-white flex items-center gap-1.5 truncate font-sans">
+                <span>${this.escapeHtml(artifactTitle)}</span>
+                <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Canvas</span>
+              </div>
+              <p class="text-[11px] text-slate-400 font-sans truncate">${this.escapeHtml(artifactSubtitle)}</p>
+            </div>
+          </div>
+
+          <!-- Ações Inteligentes: Ver no Chat (Mobile <768px) vs Ver no Painel (PC >=768px) -->
+          <div class="flex items-center gap-2 self-end sm:self-auto flex-shrink-0 font-sans">
+            <!-- Mobile: Somente Ver no Chat inline -->
+            <button type="button" onclick="window.auraChat && window.auraChat.toggleInlineArtifact('${containerId}')" id="${containerId}-btn-toggle-inline" aria-expanded="false" aria-controls="${containerId}-inline-widget" class="aux-btn-view-chat inline-flex md:hidden px-2.5 py-1.5 min-h-[36px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-medium transition-all items-center gap-1 active:scale-95" title="Alternar visualização deste card no chat">
+              <span id="${containerId}-btn-toggle-label">Ver no Chat ▾</span>
+            </button>
+            <!-- PC / Desktop: Somente Ver no Painel lateral -->
+            <button type="button" onclick="window.auraAuxPanel && window.auraAuxPanel.open('${artifactId}')" id="${containerId}-btn-open-panel" class="aux-btn-view-panel hidden md:inline-flex px-3 py-1.5 min-h-[36px] rounded-xl bg-gradient-to-r from-cyan-500/20 to-purple-500/20 hover:from-cyan-500/30 hover:to-purple-500/30 text-cyan-200 hover:text-white border border-cyan-500/40 text-xs font-semibold items-center gap-1.5 transition-all active:scale-95 shadow-sm" title="Abrir no Painel Auxiliar">
+              <span>Ver no Painel</span>
+              <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Contêiner do Widget Inline Desdobrável (fica recolhido para não poluir o feed quando o painel auxiliar estiver ativo) -->
+        <div id="${containerId}-inline-widget" class="hidden pt-2 border-t border-white/10 animate-fade-in">
+          ${widgetHtml}
+        </div>
+      </div>
+    `;
+  }
+
   toggleInlineArtifact(containerId) {
     if (typeof document === 'undefined') return;
     const widgetEl = document.getElementById(containerId + '-inline-widget');
     const labelEl = document.getElementById(containerId + '-btn-toggle-label');
+    const toggleBtn = document.getElementById(containerId + '-btn-toggle-inline');
     if (!widgetEl) return;
 
     const isHidden = widgetEl.classList.contains('hidden');
     if (isHidden) {
       widgetEl.classList.remove('hidden');
       if (labelEl) labelEl.textContent = 'Recolher no Chat ▴';
-      this.scrollToBottom();
+      if (toggleBtn) {
+        toggleBtn.setAttribute('aria-expanded', 'true');
+        toggleBtn.classList.add('bg-white/15', 'text-white', 'border-white/20');
+      }
+      if (typeof this.scrollToBottom === 'function') {
+        setTimeout(() => this.scrollToBottom(), 50);
+      }
     } else {
       widgetEl.classList.add('hidden');
       if (labelEl) labelEl.textContent = 'Ver no Chat ▾';
+      if (toggleBtn) {
+        toggleBtn.setAttribute('aria-expanded', 'false');
+        toggleBtn.classList.remove('bg-white/15', 'text-white', 'border-white/20');
+      }
     }
   }
 

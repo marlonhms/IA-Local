@@ -26,6 +26,50 @@ class AuraAuxPanel {
     this.previousFocusedElement = null;
   }
 
+  /**
+   * Reconhecimento inteligente de tela (Mobile <768px vs PC >=768px)
+   * Respeita:
+   * 1. Override manual do HUD de dispositivo (window.auraFx?.override)
+   * 2. Atributo data-device no elemento raiz do DOM
+   * 3. Viewport width padrão (< 768px mobile, >= 768px desktop)
+   * 4. Media query (max-width: 767px)
+   * 5. Helper window.auraFx?.isMobileDevice() / isMobile()
+   */
+  isMobileDevice(win = (typeof window !== 'undefined' ? window : null)) {
+    if (!win) return false;
+    // 1. Override manual do HUD de dispositivo (prioridade máxima para comutação e testes)
+    if (win.auraFx && typeof win.auraFx.override === 'string') {
+      if (win.auraFx.override === 'mobile') return true;
+      if (win.auraFx.override === 'desktop') return false;
+    }
+    // 2. Viewport width padrão da janela informada (< 768px Mobile, >= 768px Desktop/PC)
+    if (typeof win.innerWidth === 'number') {
+      return win.innerWidth < 768;
+    }
+    // 3. Media query reativa
+    if (win.matchMedia && typeof win.matchMedia === 'function') {
+      return win.matchMedia('(max-width: 767px)').matches;
+    }
+    // 4. Atributo data-device no DOM (fallback se innerWidth não estiver disponível)
+    if (typeof document !== 'undefined' && document.documentElement) {
+      const dev = document.documentElement.getAttribute('data-device');
+      if (dev === 'mobile') return true;
+      if (dev === 'desktop') return false;
+    }
+    // 5. Fallback para helpers de dispositivo
+    if (win.auraFx && typeof win.auraFx.isMobileDevice === 'function') {
+      return win.auraFx.isMobileDevice();
+    }
+    if (win.auraFx && typeof win.auraFx.isMobile === 'function') {
+      return win.auraFx.isMobile();
+    }
+    return false;
+  }
+
+  isDesktopDevice(win = (typeof window !== 'undefined' ? window : null)) {
+    return !this.isMobileDevice(win);
+  }
+
   init() {
     this.bindEvents();
     this.updateToggleState();
@@ -147,12 +191,13 @@ class AuraAuxPanel {
     this.updateToggleState(true);
     this.renderActiveArtifact();
 
-    // Auto-abre no desktop se o usuário não tiver fechado explicitamente
+    // Auto-abre no PC/Desktop (>= 768px) se autoOpen for verdadeiro e usuário não tiver dispensado
+    // Em Mobile (< 768px), NUNCA auto-abre o painel lateral cobrindo a conversa do chat
     if (autoOpen && typeof window !== 'undefined') {
-      const isDesktop = window.innerWidth >= 1024;
-      if (isDesktop && !this.userDismissed) {
+      const isMobile = this.isMobileDevice();
+      if (!isMobile && !this.userDismissed) {
         this.open(artifact.id, false);
-      } else if (!isDesktop) {
+      } else if (!isMobile && this.userDismissed) {
         this.showPeekToast(artifact.title);
       }
     }
@@ -388,6 +433,8 @@ class AuraAuxPanel {
 
   showPeekToast(title) {
     if (typeof document === 'undefined') return;
+    // Em mobile, respeita a regra inteligente: não exibe toast sugerindo abrir painel lateral
+    if (this.isMobileDevice()) return;
     const toast = document.getElementById('aux-artifact-peek-toast');
     const label = document.getElementById('aux-peek-toast-label');
     if (toast && label) {

@@ -27,7 +27,7 @@
       window.addEventListener('resize', () => this.detect(), { passive: true });
       if (window.matchMedia) {
         window.matchMedia('(pointer: coarse)').addEventListener('change', () => this.detect());
-        window.matchMedia('(max-width: 1024px)').addEventListener('change', () => this.detect());
+        window.matchMedia('(max-width: 767px)').addEventListener('change', () => this.detect());
       }
       this.bindHudControls();
     }
@@ -38,11 +38,14 @@
         return;
       }
 
-      const hasCoarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-      const isNarrow = window.innerWidth < 1024;
-      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      // Regra canônica: < 768px é Mobile, >= 768px é Desktop/PC
+      const isNarrow = typeof window.innerWidth === 'number'
+        ? window.innerWidth < 768
+        : (window.matchMedia ? window.matchMedia('(max-width: 767px)').matches : false);
+      const isMobileUA = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
 
-      const detected = (hasCoarsePointer || isNarrow || isMobileUA) ? 'mobile' : 'desktop';
+      // Telas amplas (>= 768px) são PC/Desktop mesmo se houver touch pointer (ex: notebooks touchscreen, Surface, iPad landscape)
+      const detected = (isNarrow || (isMobileUA && (typeof window.innerWidth === 'number' ? window.innerWidth < 768 : true))) ? 'mobile' : 'desktop';
       this.applyMode(detected);
     }
 
@@ -117,6 +120,14 @@
 
     isMobile() {
       return this.mode === 'mobile';
+    }
+
+    isMobileDevice() {
+      return this.isMobile();
+    }
+
+    isDesktopDevice() {
+      return this.isDesktop();
     }
   }
 
@@ -634,6 +645,7 @@
   // INICIALIZAÇÃO GLOBAL DOS SUBSISTEMAS FX
   // ==========================================================================
   window.auraDevice = new AuraDeviceManager();
+  window.auraFx = window.auraDevice; // alias canônico para recursos de FX & Device
   window.auraHz = new AuraRefreshRateMonitor();
   window.auraBorealis = new AuraBorealisEngine();
   window.auraGlance = new AuraGlanceEngine();

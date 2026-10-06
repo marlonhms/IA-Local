@@ -119,7 +119,11 @@ def run_aux_panel_tests():
     assert ".aux-expanded" in css, "Regra de canvas expandido .aux-expanded ausente"
     assert ".gpu-guard-active .aura-aux-panel" in css, "Otimização de GPU Guard para o painel ausente"
     assert "@media (prefers-reduced-motion: reduce)" in css, "Acessibilidade para movimento reduzido ausente"
-    print("   [OK] Design System CSS validado: Split Desktop, Sheet Mobile, GPU Guard e Acessibilidade.")
+    assert ".aux-btn-view-chat" in css, "Regra .aux-btn-view-chat ausente no CSS"
+    assert ".aux-btn-view-panel" in css, "Regra .aux-btn-view-panel ausente no CSS"
+    assert "@media (min-width: 768px)" in css, "Media query de 768px para PC ausente no CSS"
+    assert '[data-device="desktop"]' in css and '[data-device="mobile"]' in css, "Regras de data-device ausentes no CSS"
+    print("   [OK] Design System CSS validado: Split Desktop, Sheet Mobile, GPU Guard, Acessibilidade e Reconhecimento Inteligente.")
 
     # ------------------------------------------------------------------
     # 3. VALIDAÇÃO DA LÓGICA FRONTEND VIA NODE.JS
@@ -461,7 +465,214 @@ def run_aux_panel_tests():
       console.error('FALHA: toggleInlineArtifact ausente no AuraChatController');
       process.exit(1);
     }}
-    console.log('[NODE]    ✓ toggleInlineArtifact verificado no controlador de conversação');
+    if (typeof chat.renderCompanionPortalCard !== 'function') {{
+      console.error('FALHA: renderCompanionPortalCard ausente no AuraChatController');
+      process.exit(1);
+    }}
+
+    const portalHtml = chat.renderCompanionPortalCard({{
+      artifactId: 'art-teste-portal',
+      artifactTitle: 'Autonomia Tanques',
+      artifactSubtitle: 'Auditoria de Estoque',
+      containerId: 'msg-99',
+      widgetHtml: '<div class="decision-card">Card Teste</div>'
+    }});
+
+    // Validação estrita das classes e regras inteligentes no HTML do portal
+    if (!portalHtml.includes('aux-btn-view-chat') || !portalHtml.includes('inline-flex md:hidden')) {{
+      console.error('FALHA: Botão Ver no Chat não configurado com classes mobile-only (aux-btn-view-chat inline-flex md:hidden):', portalHtml);
+      process.exit(1);
+    }}
+    if (!portalHtml.includes('aux-btn-view-panel') || !portalHtml.includes('hidden md:inline-flex')) {{
+      console.error('FALHA: Botão Ver no Painel não configurado com classes pc-only (aux-btn-view-panel hidden md:inline-flex):', portalHtml);
+      process.exit(1);
+    }}
+    if (!portalHtml.includes('Ver no Chat ▾') || !portalHtml.includes('Ver no Painel')) {{
+      console.error('FALHA: Textos canônicos dos botões ausentes no portal card');
+      process.exit(1);
+    }}
+    console.log('[NODE]    ✓ Companion Portal Card gerado com separação estrita Mobile vs PC (classes utilitárias OK)');
+
+    // =========================================================================
+    // TESTE 15: RECONHECIMENTO INTELIGENTE DE TELA (MOBILE <768px VS PC >=768px)
+    // =========================================================================
+    console.log('[NODE] 15. Validando Reconhecimento Inteligente de Tela (isMobileDevice)...');
+    
+    // Viewport Mobile (< 768px)
+    const mobileWin320 = {{ innerWidth: 320 }};
+    const mobileWin375 = {{ innerWidth: 375 }};
+    const mobileWin767 = {{ innerWidth: 767 }};
+    if (!panel.isMobileDevice(mobileWin320) || !chat.isMobileDevice(mobileWin320)) {{
+      console.error('FALHA: 320px deve ser reconhecido como mobile');
+      process.exit(1);
+    }}
+    if (!panel.isMobileDevice(mobileWin375) || !chat.isMobileDevice(mobileWin375)) {{
+      console.error('FALHA: 375px deve ser reconhecido como mobile');
+      process.exit(1);
+    }}
+    if (!panel.isMobileDevice(mobileWin767) || !chat.isMobileDevice(mobileWin767)) {{
+      console.error('FALHA: 767px deve ser reconhecido como mobile');
+      process.exit(1);
+    }}
+    if (panel.isDesktopDevice(mobileWin375) || chat.isDesktopDevice(mobileWin375)) {{
+      console.error('FALHA: isDesktopDevice deve retornar false para 375px');
+      process.exit(1);
+    }}
+
+    // Viewport PC / Desktop (>= 768px)
+    const pcWin768 = {{ innerWidth: 768 }};
+    const pcWin800 = {{ innerWidth: 800 }};
+    const pcWin1024 = {{ innerWidth: 1024 }};
+    const pcWin1920 = {{ innerWidth: 1920 }};
+    if (panel.isMobileDevice(pcWin768) || chat.isMobileDevice(pcWin768)) {{
+      console.error('FALHA: 768px deve ser reconhecido como PC/Desktop');
+      process.exit(1);
+    }}
+    if (panel.isMobileDevice(pcWin800) || chat.isMobileDevice(pcWin800)) {{
+      console.error('FALHA: 800px deve ser reconhecido como PC/Desktop');
+      process.exit(1);
+    }}
+    if (panel.isMobileDevice(pcWin1024) || chat.isMobileDevice(pcWin1024)) {{
+      console.error('FALHA: 1024px deve ser reconhecido como PC/Desktop');
+      process.exit(1);
+    }}
+    if (!panel.isDesktopDevice(pcWin768) || !chat.isDesktopDevice(pcWin768)) {{
+      console.error('FALHA: isDesktopDevice deve retornar true para 768px');
+      process.exit(1);
+    }}
+    if (!panel.isDesktopDevice(pcWin1920) || !chat.isDesktopDevice(pcWin1920)) {{
+      console.error('FALHA: 1920px deve ser reconhecido como PC/Desktop');
+      process.exit(1);
+    }}
+
+    // Blindagem contra DOM residual: data-device="mobile" no elemento raiz NÃO pode anular innerWidth >= 768px
+    global.document = {{
+      documentElement: {{
+        getAttribute: (attr) => attr === 'data-device' ? 'mobile' : null
+      }}
+    }};
+    if (panel.isMobileDevice(pcWin768) || chat.isMobileDevice(pcWin768)) {{
+      console.error('FALHA: innerWidth: 768px foi indevidamente sobrescrito por data-device=\"mobile\" no DOM!');
+      process.exit(1);
+    }}
+    if (panel.isMobileDevice(pcWin1024) || chat.isMobileDevice(pcWin1024)) {{
+      console.error('FALHA: innerWidth: 1024px foi indevidamente sobrescrito por data-device=\"mobile\" no DOM!');
+      process.exit(1);
+    }}
+    // Do mesmo modo, data-device="desktop" no DOM NÃO pode anular innerWidth < 768px
+    global.document = {{
+      documentElement: {{
+        getAttribute: (attr) => attr === 'data-device' ? 'desktop' : null
+      }}
+    }};
+    if (!panel.isMobileDevice(mobileWin375) || !chat.isMobileDevice(mobileWin375)) {{
+      console.error('FALHA: innerWidth: 375px foi indevidamente sobrescrito por data-device=\"desktop\" no DOM!');
+      process.exit(1);
+    }}
+    delete global.document;
+
+    // Override manual explícito do HUD (AuraFx) prevalece soberano
+    const overrideMobile = {{ auraFx: {{ override: 'mobile' }}, innerWidth: 1440 }};
+    const overrideDesktop = {{ auraFx: {{ override: 'desktop' }}, innerWidth: 360 }};
+    if (!panel.isMobileDevice(overrideMobile)) {{
+      console.error('FALHA: Override manual mobile deve prevalecer sobre viewport 1440px');
+      process.exit(1);
+    }}
+    if (panel.isMobileDevice(overrideDesktop)) {{
+      console.error('FALHA: Override manual desktop deve prevalecer sobre viewport 360px');
+      process.exit(1);
+    }}
+    console.log('[NODE]    ✓ Reconhecimento inteligente de tela validado para Mobile (<768px), PC (>=768px), blindagem DOM e overrides HUD');
+
+    // =========================================================================
+    // TESTE 16: AUTO-OPEN INTELIGENTE (DESATIVADO EM MOBILE, ATIVADO EM PC)
+    // =========================================================================
+    console.log('[NODE] 16. Validando Regra de Auto-Open: Bloqueado no Mobile, Ativado no PC...');
+    
+    // 16.1 Simulação Mobile (375px e 767px): autoOpen: true NÃO deve abrir o painel lateral
+    global.window = {{
+      innerWidth: 375,
+      auraFx: {{ override: null, isMobile: () => true }},
+      auraAudio: {{ playChime: () => {{}} }}
+    }};
+    const mobilePanel = new AuraAuxPanel();
+    mobilePanel.projectArtifact({{
+      id: 'art-mobile-auto-test',
+      data: {{ status: 'ok', teste: true }},
+      html: '<div>Mobile</div>',
+      autoOpen: true
+    }});
+    if (mobilePanel.isOpen !== false) {{
+      console.error('FALHA: autoOpen: true abriu indevidamente o painel em tela mobile 375px!');
+      process.exit(1);
+    }}
+    
+    // Teste no limite de borda 767px (ainda mobile)
+    global.window.innerWidth = 767;
+    const mobilePanel767 = new AuraAuxPanel();
+    mobilePanel767.projectArtifact({{
+      id: 'art-mobile-767-auto-test',
+      data: {{ status: 'ok', teste: true }},
+      html: '<div>Mobile 767</div>',
+      autoOpen: true
+    }});
+    if (mobilePanel767.isOpen !== false) {{
+      console.error('FALHA: autoOpen: true abriu indevidamente o painel na borda mobile 767px!');
+      process.exit(1);
+    }}
+    console.log('[NODE]    ✓ Mobile: autoOpen respeitado em 375px e 767px (painel permaneceu fechado p/ foco no chat)');
+
+    // 16.2 Simulação PC / Desktop no limite exato de 768px: autoOpen: true DEVE abrir o painel lateral suavemente
+    global.window = {{
+      innerWidth: 768,
+      auraFx: {{ override: null, isMobile: () => false }},
+      auraAudio: {{ playChime: () => {{}} }}
+    }};
+    const pcPanel768 = new AuraAuxPanel();
+    pcPanel768.projectArtifact({{
+      id: 'art-pc-768-auto-test',
+      data: {{ status: 'ok', teste: true }},
+      html: '<div>Desktop 768px</div>',
+      autoOpen: true
+    }});
+    if (pcPanel768.isOpen !== true) {{
+      console.error('FALHA: autoOpen: true não abriu o painel lateral no limiar de PC 768px!');
+      process.exit(1);
+    }}
+    console.log('[NODE]    ✓ PC / Desktop (768px): autoOpen abriu o painel lateral suavemente no limiar de tela ampla');
+
+    // 16.3 Simulação PC / Desktop padrão (1024px): autoOpen: true DEVE abrir o painel lateral suavemente
+    global.window.innerWidth = 1024;
+    const pcPanel = new AuraAuxPanel();
+    pcPanel.projectArtifact({{
+      id: 'art-pc-auto-test',
+      data: {{ status: 'ok', teste: true }},
+      html: '<div>Desktop 1024px</div>',
+      autoOpen: true
+    }});
+    if (pcPanel.isOpen !== true) {{
+      console.error('FALHA: autoOpen: true não abriu o painel lateral em tela de PC 1024px!');
+      process.exit(1);
+    }}
+    console.log('[NODE]    ✓ PC / Desktop (1024px): autoOpen abriu o painel lateral suavemente (Dual Focus ativo)');
+
+    // 16.4 Simulação PC com fechamento voluntário prévio (userDismissed): NÃO deve forçar reabertura
+    const pcPanelDismissed = new AuraAuxPanel();
+    pcPanelDismissed.userDismissed = true;
+    pcPanelDismissed.projectArtifact({{
+      id: 'art-pc-dismissed-test',
+      data: {{ status: 'ok', teste: true }},
+      html: '<div>Dismissed</div>',
+      autoOpen: true
+    }});
+    if (pcPanelDismissed.isOpen !== false) {{
+      console.error('FALHA: autoOpen não respeitou userDismissed no PC!');
+      process.exit(1);
+    }}
+    console.log('[NODE]    ✓ PC / Desktop: userDismissed respeitou a decisão do operador');
+
+    // Limpa global.window
+    delete global.window;
 
     console.log('AURA_AUX_PANEL_NODE_OK');
     """
