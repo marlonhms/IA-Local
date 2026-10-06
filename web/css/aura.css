@@ -1702,13 +1702,24 @@ body {
   will-change: transform;
 }
 
+#aura-sidebar-drawer:not(.open) {
+  transform: translateX(-100%) !important;
+  pointer-events: none !important;
+}
+
 #aura-sidebar-drawer.open {
   transform: translateX(0) !important;
+  pointer-events: auto !important;
 }
 
 #aura-sidebar-overlay {
   transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity;
+}
+
+#aura-sidebar-overlay:not(.open) {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 #aura-sidebar-overlay.open {
@@ -2077,13 +2088,40 @@ body {
   color: var(--aura-text);
 }
 
-.evidence-drawer.open {
-  transform: translateX(0) !important;
+/* O EvidenceDrawer permanece estritamente fora da tela e inativo quando fechado */
+#aura-evidence-drawer[aria-hidden="true"],
+#evidence-drawer[aria-hidden="true"],
+.evidence-drawer[aria-hidden="true"],
+#aura-evidence-drawer:not(.open),
+#evidence-drawer:not(.open),
+.evidence-drawer:not(.open) {
+  transform: translateX(100%) !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
 }
 
+#aura-evidence-drawer.open,
+#evidence-drawer.open,
+.evidence-drawer.open {
+  transform: translateX(0) !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+}
+
+#aura-evidence-drawer-overlay[aria-hidden="true"],
+.evidence-drawer-overlay[aria-hidden="true"],
+#aura-evidence-drawer-overlay:not(.open),
+.evidence-drawer-overlay:not(.open) {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+#aura-evidence-drawer-overlay.open,
 .evidence-drawer-overlay.open {
   opacity: 1 !important;
   pointer-events: auto !important;
+  visibility: visible !important;
 }
 
 .evidence-section-card {
@@ -2102,6 +2140,9 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  pointer-events: auto !important;
+  z-index: 10;
 }
 
 .evidence-tab-btn {
@@ -2129,12 +2170,17 @@ body {
   .view-transition-active,
   .decision-card,
   .decision-btn-primary,
-  .decision-btn-secondary,
-  .evidence-drawer,
-  .evidence-drawer-overlay {
+  .decision-btn-secondary {
     transition: none !important;
     animation: none !important;
     transform: none !important;
+  }
+  .evidence-drawer,
+  .evidence-drawer-overlay,
+  #aura-sidebar-drawer,
+  #aura-sidebar-overlay {
+    transition: none !important;
+    animation: none !important;
   }
 }
 
@@ -2187,8 +2233,6 @@ body.gpu-guard-active,
 .gpu-guard-active #chat-input-text,
 .gpu-guard-active .quick-prompt-chip,
 .gpu-guard-active .glass-panel,
-.gpu-guard-active .evidence-drawer,
-.gpu-guard-active .command-palette,
 .gpu-guard-active #view-cockpit,
 .gpu-guard-active #view-triggers {
   transform: none !important;
@@ -2252,12 +2296,91 @@ body.gpu-guard-active,
   background-color: rgba(15, 23, 42, 0.96) !important;
 }
 
+.gpu-guard-active #aura-evidence-drawer,
+.gpu-guard-active #evidence-drawer,
 .gpu-guard-active .evidence-drawer {
   background-color: rgba(9, 14, 24, 0.98) !important;
 }
 
+/* GPU Guard: Garante que modais e drawers preservem o estado estritamente fechado ou aberto */
+.gpu-guard-active #aura-evidence-drawer[aria-hidden="true"],
+.gpu-guard-active #evidence-drawer[aria-hidden="true"],
+.gpu-guard-active .evidence-drawer[aria-hidden="true"],
+.gpu-guard-active #aura-evidence-drawer:not(.open),
+.gpu-guard-active #evidence-drawer:not(.open),
+.gpu-guard-active .evidence-drawer:not(.open) {
+  transform: translateX(100%) !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+.gpu-guard-active #aura-evidence-drawer.open,
+.gpu-guard-active #evidence-drawer.open,
+.gpu-guard-active .evidence-drawer.open {
+  transform: translateX(0) !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+  transition: none !important;
+}
+
+.gpu-guard-active #aura-evidence-drawer-overlay,
 .gpu-guard-active .evidence-drawer-overlay {
   background-color: rgba(2, 6, 23, 0.85) !important;
+}
+
+.gpu-guard-active #aura-evidence-drawer-overlay[aria-hidden="true"],
+.gpu-guard-active .evidence-drawer-overlay[aria-hidden="true"],
+.gpu-guard-active #aura-evidence-drawer-overlay:not(.open),
+.gpu-guard-active .evidence-drawer-overlay:not(.open) {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+.gpu-guard-active #aura-evidence-drawer-overlay.open,
+.gpu-guard-active .evidence-drawer-overlay.open {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+  transition: none !important;
+}
+
+.gpu-guard-active #aura-sidebar-drawer:not(.open) {
+  transform: translateX(-100%) !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+.gpu-guard-active #aura-sidebar-drawer.open {
+  transform: translateX(0) !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+}
+
+.gpu-guard-active #aura-sidebar-overlay:not(.open) {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+.gpu-guard-active #aura-sidebar-overlay.open {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+}
+
+.gpu-guard-active #aura-aux-panel.hidden,
+.gpu-guard-active .aura-aux-panel.hidden,
+.gpu-guard-active #view-console:not(.aux-panel-active) #aura-aux-panel,
+.gpu-guard-active #view-console:not(.aux-panel-active) .aura-aux-panel {
+  display: none !important;
+}
+
+.gpu-guard-active #aura-command-palette-modal.hidden,
+.gpu-guard-active #command-palette-backdrop.hidden,
+.gpu-guard-active .command-palette-backdrop.hidden,
+.gpu-guard-active .palette-modal-backdrop.hidden {
+  display: none !important;
 }
 
 .gpu-guard-active .command-palette {

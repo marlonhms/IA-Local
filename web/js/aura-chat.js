@@ -186,8 +186,11 @@ class AuraChatController {
     if (evOverlay) evOverlay.addEventListener('click', () => this.closeEvidence());
 
     document.addEventListener('keydown', (e) => {
-      const evDrawer = document.getElementById('aura-evidence-drawer');
-      const isDrawerOpen = evDrawer && evDrawer.classList.contains('open');
+      const evDrawer = document.getElementById('aura-evidence-drawer') || document.getElementById('evidence-drawer');
+      const isDrawerOpen = evDrawer && (
+        evDrawer.classList.contains('open') ||
+        evDrawer.getAttribute('aria-hidden') === 'false'
+      );
 
       if (e.key === 'Escape' && isDrawerOpen) {
         e.preventDefault();
@@ -2345,8 +2348,8 @@ class AuraChatController {
     const store = (typeof window !== 'undefined' && window.__auraEvidenceStore) || {};
     const data = store[evId] || {};
 
-    const drawer = document.getElementById('aura-evidence-drawer');
-    const overlay = document.getElementById('aura-evidence-drawer-overlay');
+    const drawer = document.getElementById('aura-evidence-drawer') || document.getElementById('evidence-drawer');
+    const overlay = document.getElementById('aura-evidence-drawer-overlay') || document.getElementById('evidence-drawer-overlay');
     const titleEl = document.getElementById('evidence-drawer-title');
     const chipEl = document.getElementById('evidence-drawer-status-chip');
     const subEl = document.getElementById('evidence-drawer-subtitle');
@@ -2394,6 +2397,8 @@ class AuraChatController {
 
     overlay.classList.add('open');
     drawer.classList.add('open');
+    drawer.setAttribute('aria-hidden', 'false');
+    overlay.setAttribute('aria-hidden', 'false');
 
     const closeBtn = document.getElementById('btn-close-evidence-drawer');
     if (closeBtn) closeBtn.focus();
@@ -2405,10 +2410,16 @@ class AuraChatController {
    */
   closeEvidence() {
     if (typeof document === 'undefined') return;
-    const drawer = document.getElementById('aura-evidence-drawer');
-    const overlay = document.getElementById('aura-evidence-drawer-overlay');
-    if (drawer) drawer.classList.remove('open');
-    if (overlay) overlay.classList.remove('open');
+    const drawer = document.getElementById('aura-evidence-drawer') || document.getElementById('evidence-drawer');
+    const overlay = document.getElementById('aura-evidence-drawer-overlay') || document.getElementById('evidence-drawer-overlay');
+    if (drawer) {
+      drawer.classList.remove('open');
+      drawer.setAttribute('aria-hidden', 'true');
+    }
+    if (overlay) {
+      overlay.classList.remove('open');
+      overlay.setAttribute('aria-hidden', 'true');
+    }
 
     if (this.lastFocusedElement && typeof this.lastFocusedElement.focus === 'function') {
       try {

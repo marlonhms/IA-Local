@@ -597,7 +597,8 @@ class AuraApp {
 
     const btnGpu = document.getElementById('sidebar-btn-toggle-gpu-guard');
     if (btnGpu) {
-      btnGpu.addEventListener('click', () => {
+      btnGpu.addEventListener('click', (e) => {
+        if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
         const nextState = !this.isGpuGuardActive();
         this.applyGpuGuard(nextState);
         try {
@@ -625,6 +626,22 @@ class AuraApp {
 
     if (window.auraBorealis && typeof window.auraBorealis.toggleGpuGuard === 'function') {
       try { window.auraBorealis.toggleGpuGuard(enabled); } catch (_) {}
+    }
+
+    // Garante que o Drawer de Evidências permaneça fechado caso não esteja explicitamente aberto
+    const evDrawer = document.getElementById('aura-evidence-drawer') || document.getElementById('evidence-drawer');
+    const evOverlay = document.getElementById('aura-evidence-drawer-overlay') || document.getElementById('evidence-drawer-overlay');
+    if (evDrawer && !evDrawer.classList.contains('open')) {
+      if (window.auraChat && typeof window.auraChat.closeEvidence === 'function') {
+        window.auraChat.closeEvidence();
+      } else {
+        evDrawer.classList.remove('open');
+        evDrawer.setAttribute('aria-hidden', 'true');
+        if (evOverlay) {
+          evOverlay.classList.remove('open');
+          evOverlay.setAttribute('aria-hidden', 'true');
+        }
+      }
     }
 
     const badge = document.getElementById('sidebar-gpu-badge');
@@ -726,7 +743,15 @@ class AuraApp {
 }
 
 // Instanciação e boot
-window.auraApp = new AuraApp();
-document.addEventListener('DOMContentLoaded', () => {
-  window.auraApp.init();
-});
+if (typeof window !== 'undefined') {
+  window.auraApp = new AuraApp();
+  if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+      window.auraApp.init();
+    });
+  }
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { AuraApp };
+}
