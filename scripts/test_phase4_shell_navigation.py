@@ -106,11 +106,11 @@ def run_phase4_tests():
     assert 'role="dialog"' in html and 'aria-modal="true"' in html, "Atributos ARIA de modal/dialog ausentes no drawer"
     assert 'id="btn-close-sidebar"' in html, "Botão de fechar menu lateral ausente"
 
-    # 4 Telas principais consolidadas
+    # 3 Telas principais consolidadas (foco total na conversação da AURA)
     assert 'data-tab="console"' in html, "Aba Assistente AURA ausente"
     assert 'data-tab="cockpit"' in html, "Aba Panorama Operacional ausente"
     assert 'data-tab="triggers"' in html, "Aba Ações Rápidas ausente"
-    assert 'data-tab="split"' in html, "Aba Visão Integrada ausente"
+    assert 'data-tab="split"' not in html, "Aba Visão Integrada não deve estar presente"
 
     # SFX movido para Preferências do Sistema (F4-04)
     assert "Preferências do Sistema" in html, "Seção de Preferências do Sistema ausente no menu lateral"
@@ -213,7 +213,6 @@ def run_phase4_tests():
     global.document = {
       getElementById: (id) => {
         if (id === 'chat-feed-container') return mockFeed;
-        if (id === 'split-chat-feed-container') return mockSplitFeed;
         return null;
       }
     };
@@ -221,14 +220,14 @@ def run_phase4_tests():
     // Caso A: Usuário lendo histórico (userScrolledUp = true) e force = false -> NÃO deve forçar scrollTop
     chat.userScrolledUp = true;
     chat.scrollToBottom(false);
-    if (mockFeed.scrollTop !== 0 || mockSplitFeed.scrollTop !== 0) {
+    if (mockFeed.scrollTop !== 0) {
       console.error('FALHA: scrollToBottom forçou rolagem enquanto usuário lia histórico!');
       process.exit(1);
     }
 
     // Caso B: force = true (nova mensagem enviada) -> DEVE atualizar scrollTop
     chat.scrollToBottom(true);
-    if (mockFeed.scrollTop !== 1000 || mockSplitFeed.scrollTop !== 1000) {
+    if (mockFeed.scrollTop !== 1000) {
       console.error('FALHA: scrollToBottom com force=true não rolou para o fim!');
       process.exit(1);
     }
@@ -241,7 +240,6 @@ def run_phase4_tests():
     global.document.getElementById = (id) => {
       if (id === 'chat-input-text') return mockInput;
       if (id === 'chat-feed-container') return mockFeed;
-      if (id === 'split-chat-feed-container') return mockSplitFeed;
       return null;
     };
     chat.isStreaming = true;

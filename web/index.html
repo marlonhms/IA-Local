@@ -114,15 +114,6 @@
             </div>
           </button>
 
-          <button class="nav-tab-btn sidebar-nav-item tab-split min-h-[48px]" data-tab="split" aria-label="Visão Integrada">
-            <div class="p-1.5 rounded-lg bg-sky-500/15 text-sky-400 border border-sky-500/20 flex items-center justify-center">
-              <svg class="w-4 h-4 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="4" width="20" height="13" rx="2" stroke-width="1.75"/><line x1="12" y1="4" x2="12" y2="17" stroke-width="2"/><line x1="8" y1="21" x2="16" y2="21" stroke-width="2"/><line x1="12" y1="17" x2="12" y2="21" stroke-width="2"/></svg>
-            </div>
-            <div class="flex-1">
-              <div class="font-semibold text-slate-100">Visão Integrada</div>
-              <div class="text-[10px] text-slate-400 font-normal">Split Screen (Dados + Conversa)</div>
-            </div>
-          </button>
         </div>
       </div>
 
@@ -637,7 +628,7 @@
     <!-- =======================================================================
          VIEW 3: WORKSPACE DE ASSISTÊNCIA DA AURA (IMERSIVO TOTAL)
          ========================================================================= -->
-    <div id="view-console" class="space-y-3 view-transition-active flex flex-col h-[calc(100vh-76px)] min-h-[480px] relative">
+    <div id="view-console" class="max-w-3xl lg:max-w-4xl mx-auto w-full space-y-3 view-transition-active flex flex-col h-[calc(100vh-76px)] min-h-[480px] relative">
       
       <!-- Feed de Mensagens (Scrollable) - Ocupa 100% da altura e largura -->
       <div id="chat-feed-container" class="glass-panel flex-1 p-4 sm:p-5 overflow-y-auto space-y-4 font-sans rounded-2xl relative scroll-smooth">
@@ -707,93 +698,6 @@
     </div>
 
 
-    <!-- =======================================================================
-         VIEW 4: VISÃO SPLIT (PANORAMA + CHAT LADO A LADO)
-         ======================================================================= -->
-    <div id="view-split" class="hidden view-transition-active">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 h-[calc(100vh-90px)] min-h-[500px]">
-        
-        <!-- Esquerda: Panorama Resumido (7 colunas) -->
-        <div class="lg:col-span-7 overflow-y-auto space-y-4 pr-1">
-          <!-- Banner Rápido -->
-          <div class="glass-panel p-3 border-l-3 border-l-auraEmerald font-sans text-xs text-slate-300 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <span class="w-2.5 h-2.5 rounded-full bg-auraEmerald animate-pulse"></span>
-              <strong>Panorama Operacional Integrado</strong>
-            </div>
-            <button onclick="window.auraCockpit.refreshAllData()" class="text-auraCyan hover:underline font-medium">Consultar Sob Demanda ↺</button>
-          </div>
-
-          <!-- Tanques Compactos -->
-          <div class="glass-panel p-4 space-y-3">
-            <h4 class="font-bold text-sm text-white font-sans flex items-center gap-2">
-              <svg class="w-4 h-4 text-auraEmerald flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="12" height="18" rx="2" stroke-width="1.75"/><line x1="3" y1="9" x2="15" y2="9" stroke-width="1.5"/><line x1="2" y1="21" x2="16" y2="21" stroke-width="2"/><path d="M15 7h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V9.5l-2.5-3" stroke-width="1.75"/></svg>
-              <span>Autonomia de Tanques</span>
-            </h4>
-            <div class="text-xs text-slate-400 font-sans">
-              Clique em qualquer tanque para projetar compra de combustível ou conferir ullage de carreta.
-            </div>
-            <div id="split-tanks-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div class="col-span-full py-4 text-center text-slate-400 font-sans text-xs">
-                Aguardando consulta dos tanques sob demanda...
-              </div>
-            </div>
-          </div>
-
-          <!-- Pista & Fechamento Resumido -->
-          <div class="grid grid-cols-2 gap-3">
-            <div class="glass-panel p-3 font-sans text-xs space-y-1">
-              <span class="text-slate-400">LMC ANP Portaria 26:</span>
-              <div class="text-emerald-400 font-bold">✓ Conforme (±0.6%)</div>
-              <div class="text-[10px] text-slate-400">10 de 10 tanques auditados</div>
-            </div>
-
-            <div class="glass-panel p-3 font-sans text-xs space-y-1">
-              <span class="text-slate-400">Conciliação Turno:</span>
-              <div class="text-cyan-300 font-bold">Turno em Andamento</div>
-              <div class="text-[10px] text-slate-400">Score de Triangulação: 85%</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Direita: Chat AURA Integrado (5 colunas) -->
-        <div class="lg:col-span-5 flex flex-col h-full space-y-3">
-          <div class="glass-panel px-3 py-2 flex items-center justify-between border-auraPurple/30">
-            <div class="flex items-center gap-2">
-              <div class="w-2.5 h-2.5 rounded-full bg-auraPurple-light animate-pulse"></div>
-              <span class="font-sans text-xs font-semibold text-white">Chat AURA Integrado</span>
-            </div>
-            <button onclick="window.auraApp.switchTab('console')" class="text-xs font-sans text-auraCyan hover:underline">
-              Expandir ↗
-            </button>
-          </div>
-
-          <!-- Feed de Mensagens no Split (espelhado com o Chat) -->
-          <div id="split-chat-feed-container" class="glass-panel flex-1 p-3 overflow-y-auto font-sans text-xs space-y-3">
-            <div class="p-3 rounded bg-slate-900 border border-slate-800 text-slate-300 font-sans text-xs flex items-center gap-2">
-              <svg class="w-4 h-4 text-cyan-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke-width="1.75"/><line x1="12" y1="16" x2="12" y2="12" stroke-width="2"/><line x1="12" y1="8" x2="12.01" y2="8" stroke-width="2"/></svg>
-              <span>Modo Split ativo. As mensagens são sincronizadas diretamente com a Assistente AURA.</span>
-            </div>
-          </div>
-
-          <!-- Input Split com envio direto -->
-          <div class="glass-panel p-2 flex items-center gap-2 border-slate-700/80 bg-slate-950/80">
-            <input 
-              id="split-chat-input-text"
-              type="text" 
-              placeholder="Pergunte à AURA mantendo a operação à vista..." 
-              class="flex-1 bg-transparent px-2 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none font-sans"
-            />
-            <button 
-              id="btn-split-chat-send" 
-              class="min-h-[40px] min-w-[44px] px-3.5 py-2 rounded-lg bg-gradient-to-r from-auraEmerald to-auraCyan hover:brightness-110 text-slate-950 font-bold text-xs font-sans transition-all flex items-center justify-center">
-              Enviar
-            </button>
-          </div>
-        </div>
-
-      </div>
-    </div>
 
   </main>
 
@@ -894,16 +798,6 @@
           <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-sans">2</kbd>
         </div>
 
-        <div onclick="window.auraApp.switchTab('split'); window.auraGlance.closeCommandPalette();" class="palette-item">
-          <div class="flex items-center gap-3">
-            <span class="p-1.5 rounded bg-slate-800 text-slate-300 border border-slate-700/60 flex items-center justify-center"><svg class="w-4 h-4 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="4" width="20" height="13" rx="2" stroke-width="1.75"/><line x1="12" y1="4" x2="12" y2="17" stroke-width="2"/><line x1="8" y1="21" x2="16" y2="21" stroke-width="2"/><line x1="12" y1="17" x2="12" y2="21" stroke-width="2"/></svg></span>
-            <div>
-              <div class="font-bold text-slate-100">Alternar para Visão Integrada</div>
-              <div class="text-[11px] text-slate-400 font-sans">Panorama da estação e Chat lado a lado.</div>
-            </div>
-          </div>
-          <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-sans">4</kbd>
-        </div>
 
       </div>
 

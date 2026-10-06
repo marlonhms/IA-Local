@@ -123,9 +123,6 @@ class AuraChatController {
     const clearBtn = document.getElementById('btn-chat-clear');
     const newChatBtn = document.getElementById('btn-new-chat');
 
-    const splitInput = document.getElementById('split-chat-input-text');
-    const splitSendBtn = document.getElementById('btn-split-chat-send');
-
     if (input) {
       input.addEventListener('input', () => {
         this.autoResizeInput(input);
@@ -141,23 +138,12 @@ class AuraChatController {
       });
     }
 
-    if (splitInput) {
-      splitInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          this.handleSendMessage();
-        }
-      });
-    }
-
     if (sendBtn) sendBtn.addEventListener('click', () => this.handleSendMessage());
-    if (splitSendBtn) splitSendBtn.addEventListener('click', () => this.handleSendMessage());
     if (stopBtn) stopBtn.addEventListener('click', () => this.abortStreaming());
     if (clearBtn) clearBtn.addEventListener('click', () => this.clearSession());
 
     // F4-12 & F4-13: Detecção de rolagem e botão flutuante de mensagens recentes
     const chatFeed = document.getElementById('chat-feed-container');
-    const splitFeed = document.getElementById('split-chat-feed-container');
     const scrollBtn = document.getElementById('btn-scroll-bottom');
 
     if (chatFeed) {
@@ -172,14 +158,6 @@ class AuraChatController {
             scrollBtn.classList.add('hidden');
           }
         }
-      }, { passive: true });
-    }
-
-    if (splitFeed) {
-      splitFeed.addEventListener('scroll', () => {
-        const threshold = 80;
-        const isAtBottom = (splitFeed.scrollHeight - splitFeed.scrollTop - splitFeed.clientHeight) <= threshold;
-        this.userScrolledUp = !isAtBottom;
       }, { passive: true });
     }
 
@@ -270,133 +248,16 @@ class AuraChatController {
 
   addWelcomeMessage() {
     const welcomeHtml = `
-      <div class="decision-card !p-6 border-cyan-500/30 bg-gradient-to-b from-slate-900/95 via-slate-900/85 to-slate-950/98 space-y-5 shadow-2xl backdrop-blur-2xl">
-        <!-- Cabeçalho Executivo Precision Glass Deluxe -->
-        <div class="flex items-start justify-between gap-3 pb-3.5 border-b border-white/10">
-          <div class="flex items-center gap-3">
-            <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-cyan-500/25 via-sky-500/20 to-purple-500/25 border border-cyan-400/40 flex items-center justify-center text-cyan-300 shadow-lg shadow-cyan-950/30">
-              <svg class="w-6 h-6 text-cyan-300 aura-glyph aura-core-insignia" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <polygon points="12 2 20.66 7 20.66 17 12 22 3.34 17 3.34 7" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
-                <polygon points="12 6 17.2 9 17.2 15 12 18 6.8 15 6.8 9" stroke="currentColor" stroke-width="1.25" stroke-opacity="0.6" stroke-linejoin="round"/>
-                <circle cx="12" cy="12" r="2.2" fill="currentColor"/>
-                <line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                <line x1="12" y1="18" x2="12" y2="22" stroke-width="1.5" stroke-linecap="round"/>
-              </svg>
-            </div>
-            <div>
-              <div class="flex items-center gap-2">
-                <h3 class="text-white font-bold text-base tracking-wide">AURA // Decisão & Supervisão</h3>
-                <span class="px-2.5 py-0.5 rounded-full text-[9px] font-sans font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                  Precision Glass Deluxe
-                </span>
-              </div>
-              <p class="text-slate-400 text-xs">Assistente Executiva de Prontidão • Posto & PDV</p>
-            </div>
-          </div>
-          <span class="px-2.5 py-1 rounded-full text-[10px] font-sans font-medium bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 hidden sm:inline-flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span> Sob Demanda
-          </span>
-        </div>
-
-        <p class="text-slate-200 text-sm leading-relaxed">
-          Estou de prontidão para iluminar tomadas de decisão rápidas na pista e no PDV com <strong>diagnósticos estruturados, cálculos contábeis oficiais e evidências verificáveis</strong>.
+      <div class="space-y-3 font-sans text-slate-200 leading-relaxed text-sm">
+        <p>
+          Olá! Sou a <strong>AURA</strong>, sua assistente executiva para operações de pista, conveniência e gestão do posto.
         </p>
-
-        <!-- Grade de Consultas Executivas em 1-Toque (Acionam os DecisionCards Reais) -->
-        <div class="space-y-2.5 pt-1">
-          <div class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke-width="1.75"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" stroke-width="1.5"/></svg>
-            <span>Diagnósticos Especializados (Toque para auditar agora):</span>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full">
-            <button onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" class="group p-3.5 rounded-xl glass-subcard border border-white/10 hover:border-emerald-500/50 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg shadow-sm active:scale-[0.98]">
-              <div class="flex items-center justify-between mb-1.5">
-                <div class="flex items-center gap-2">
-                  <span class="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center flex-shrink-0">
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="11" height="18" rx="2" stroke-width="1.75"/><rect x="5.5" y="6" width="6" height="4" rx="0.8" stroke-width="1.2"/><path d="M14 8h2.5a2 2 0 0 1 2 2v6.5a1.5 1.5 0 0 0 3 0V9l-2-2" stroke-width="1.6" stroke-linecap="round"/><line x1="2" y1="21" x2="15" y2="21" stroke-width="1.75"/></svg>
-                  </span>
-                  <span class="text-white font-semibold text-xs group-hover:text-emerald-300 transition-colors">Autonomia de Tanques</span>
-                </div>
-                <span class="text-[9px] font-sans px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold tabular-nums">Run-Out</span>
-              </div>
-              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Previsão em horas/dias, reserva de 15% e espaço de carreta (5.000L).</p>
-            </button>
-
-            <button onclick="window.auraChat.sendUserPrompt('Como fechou o último turno? Teve furo de caixa?')" class="group p-3.5 rounded-xl glass-subcard border border-white/10 hover:border-cyan-500/50 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg shadow-sm active:scale-[0.98]">
-              <div class="flex items-center justify-between mb-1.5">
-                <div class="flex items-center gap-2">
-                  <span class="w-6 h-6 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 flex items-center justify-center flex-shrink-0">
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="5" width="20" height="14" rx="2" stroke-width="1.75"/><circle cx="12" cy="12" r="3.5" stroke-width="1.5"/><line x1="6" y1="12" x2="6.01" y2="12" stroke-width="2"/><line x1="18" y1="12" x2="18.01" y2="12" stroke-width="2"/></svg>
-                  </span>
-                  <span class="text-white font-semibold text-xs group-hover:text-cyan-300 transition-colors">Conciliação de Turno</span>
-                </div>
-                <span class="text-[9px] font-sans px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-semibold tabular-nums">Pista vs PDV</span>
-              </div>
-              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Triangulação de encerrantes físicos, sobras/quebras e faturamento.</p>
-            </button>
-
-            <button onclick="window.auraChat.sendUserPrompt('O LMC de ontem fechou dentro da tolerância oficial da ANP?')" class="group p-3.5 rounded-xl glass-subcard border border-white/10 hover:border-purple-500/50 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg shadow-sm active:scale-[0.98]">
-              <div class="flex items-center justify-between mb-1.5">
-                <div class="flex items-center gap-2">
-                  <span class="w-6 h-6 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center flex-shrink-0">
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke-width="1.75"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15z" stroke-width="1.75"/><path d="M9 10l2 2 4-4" stroke-width="1.75" stroke-linecap="round"/></svg>
-                  </span>
-                  <span class="text-white font-semibold text-xs group-hover:text-purple-300 transition-colors">LMC Oficial ANP</span>
-                </div>
-                <span class="text-[9px] font-sans px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-semibold tabular-nums">±0.6%</span>
-              </div>
-              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Auditoria diária pela Portaria 26 com régua visual de conformidade legal.</p>
-            </button>
-
-            <button onclick="window.auraChat.sendUserPrompt('Há algum bico com vazão lenta ou alerta na pista?')" class="group p-3.5 rounded-xl glass-subcard border border-white/10 hover:border-amber-500/50 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg shadow-sm active:scale-[0.98]">
-              <div class="flex items-center justify-between mb-1.5">
-                <div class="flex items-center gap-2">
-                  <span class="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center flex-shrink-0">
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 13l4-4 4 4" stroke-width="1.75" stroke-linecap="round"/><path d="M7 9v12" stroke-width="1.75" stroke-linecap="round"/><path d="M14 5l4 4-4 4" stroke-width="1.75" stroke-linecap="round"/><path d="M18 9H10" stroke-width="1.75" stroke-linecap="round"/><circle cx="18" cy="18" r="3" stroke-width="1.5"/></svg>
-                  </span>
-                  <span class="text-white font-semibold text-xs group-hover:text-amber-300 transition-colors">Vazão & Frentistas</span>
-                </div>
-                <span class="text-[9px] font-sans px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold tabular-nums">&lt;30 L/min</span>
-              </div>
-              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Detecção preventiva de filtro sujo, produtividade e conversão de aditivada.</p>
-            </button>
-
-            <button onclick="window.auraChat.sendUserPrompt('Quais os combos de vendas cruzadas com maior Lift na conveniência?')" class="group p-3.5 rounded-xl glass-subcard border border-white/10 hover:border-sky-500/50 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg shadow-sm active:scale-[0.98]">
-              <div class="flex items-center justify-between mb-1.5">
-                <div class="flex items-center gap-2">
-                  <span class="w-6 h-6 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-400 flex items-center justify-center flex-shrink-0">
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" stroke-width="1.75"/><line x1="3" y1="6" x2="21" y2="6" stroke-width="1.75"/><path d="M16 10a4 4 0 0 1-8 0" stroke-width="1.75"/></svg>
-                  </span>
-                  <span class="text-white font-semibold text-xs group-hover:text-sky-300 transition-colors">Combos da Loja</span>
-                </div>
-                <span class="text-[9px] font-sans px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-semibold tabular-nums">Lift ≥ 2.0x</span>
-              </div>
-              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Análise de cestas e combos da loja com scripts práticos para o caixa.</p>
-            </button>
-
-            <button onclick="window.auraChat.sendUserPrompt('Quem são os maiores clientes e frotistas da revenda?')" class="group p-3.5 rounded-xl glass-subcard border border-white/10 hover:border-rose-500/50 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg shadow-sm active:scale-[0.98]">
-              <div class="flex items-center justify-between mb-1.5">
-                <div class="flex items-center gap-2">
-                  <span class="w-6 h-6 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center flex-shrink-0">
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="11" r="2.5" fill="currentColor" fill-opacity="0.3"/></svg>
-                  </span>
-                  <span class="text-white font-semibold text-xs group-hover:text-rose-300 transition-colors">Clientes & Frotas</span>
-                </div>
-                <span class="text-[9px] font-sans px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold tabular-nums">Ranking</span>
-              </div>
-              <p class="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">Faturamento acumulado por cliente, frotistas e volume de vendas.</p>
-            </button>
-          </div>
-        </div>
-
-        <div class="p-3 rounded-xl glass-subcard border border-cyan-500/20 flex items-center justify-between text-xs text-slate-300">
-          <span class="flex items-center gap-1.5 text-cyan-300">
-            <i data-lucide="info" class="w-3.5 h-3.5"></i>
-            <span>Dica: Ao receber qualquer resposta, clique em <strong>"Ver Evidências"</strong> para abrir o painel com as fontes oficiais.</span>
-          </span>
-          <kbd class="hidden sm:inline-block px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-400 font-sans font-medium">Esc fecha gaveta</kbd>
-        </div>
+        <p class="text-slate-300">
+          Estou conectada e pronta para apoiar suas decisões. Você pode me perguntar sobre a autonomia dos combustíveis, auditar o fechamento de turno e caixa, verificar a conformidade do LMC com a ANP ou analisar as vendas da loja.
+        </p>
+        <p class="text-xs text-slate-400 pt-1">
+          Como posso ajudar você agora? Digite sua dúvida abaixo ou selecione um dos atalhos rápidos.
+        </p>
       </div>
     `;
     this.appendAuraMessage(welcomeHtml, { isWelcome: true });
@@ -409,8 +270,6 @@ class AuraChatController {
     if (this.isSubmitting || this.isStreaming) return;
     const input = document.getElementById('chat-input-text');
     if (input) input.value = '';
-    const splitInput = document.getElementById('split-chat-input-text');
-    if (splitInput) splitInput.value = '';
     this.handleSendMessage(text);
   }
 
@@ -423,13 +282,10 @@ class AuraChatController {
 
     let query = promptText;
     const input = document.getElementById('chat-input-text');
-    const splitInput = document.getElementById('split-chat-input-text');
 
     if (!query) {
       if (input && input.value.trim()) {
         query = input.value.trim();
-      } else if (splitInput && splitInput.value.trim()) {
-        query = splitInput.value.trim();
       }
     }
 
@@ -444,9 +300,6 @@ class AuraChatController {
       input.value = '';
       input.style.height = 'auto';
     }
-    if (splitInput) {
-      splitInput.value = '';
-    }
 
     this.userScrolledUp = false;
     const scrollBtn = document.getElementById('btn-scroll-bottom');
@@ -454,7 +307,7 @@ class AuraChatController {
 
     this.setStreamingState(true);
 
-    // 1. Adiciona a mensagem do usuário na tela (Console e Split)
+    // 1. Adiciona a mensagem do usuário na tela
     this.appendUserMessage(query);
 
     // 2. Prepara contêiner para a resposta da AURA
@@ -610,8 +463,6 @@ class AuraChatController {
     this.renderSessionId();
     const feed = document.getElementById('chat-feed-container');
     if (feed) feed.innerHTML = '';
-    const splitFeed = document.getElementById('split-chat-feed-container');
-    if (splitFeed) splitFeed.innerHTML = '';
     this.addWelcomeMessage();
   }
 
@@ -624,9 +475,6 @@ class AuraChatController {
     const stopBtn = document.getElementById('btn-chat-stop');
     const input = document.getElementById('chat-input-text');
 
-    const splitSendBtn = document.getElementById('btn-split-chat-send');
-    const splitInput = document.getElementById('split-chat-input-text');
-
     if (sendBtn && stopBtn) {
       if (isStreaming) {
         sendBtn.classList.add('hidden');
@@ -637,20 +485,11 @@ class AuraChatController {
       }
     }
 
-    if (splitSendBtn) {
-      splitSendBtn.disabled = isStreaming;
-      splitSendBtn.textContent = isStreaming ? 'Gerando...' : 'Enviar';
-    }
-
     if (input) {
       input.disabled = isStreaming;
       if (!isStreaming && typeof window !== 'undefined' && window.innerWidth >= 768 && typeof input.focus === 'function') {
         input.focus({ preventScroll: true });
       }
-    }
-
-    if (splitInput) {
-      splitInput.disabled = isStreaming;
     }
 
     // Gerencia estado visual do Cognitive Reasoning Orb no header e nas bolhas
@@ -664,110 +503,97 @@ class AuraChatController {
   }
 
   appendUserMessage(text) {
-    const feeds = [
-      document.getElementById('chat-feed-container'),
-      document.getElementById('split-chat-feed-container')
-    ].filter(Boolean);
+    const feed = document.getElementById('chat-feed-container');
+    if (!feed) return;
 
-    feeds.forEach(feed => {
-      const div = document.createElement('div');
-      div.className = 'flex justify-end w-full animate-fade-in';
-      div.innerHTML = `
-        <div class="chat-bubble-user max-w-[85%] md:max-w-[70%] lg:max-w-[60%] ml-auto p-4 text-slate-100 text-sm">
-          <div class="flex items-center justify-between text-[11px] font-sans font-medium text-slate-400 mb-1.5 pb-1 border-b border-white/5">
-            <span class="font-bold text-cyan-400 flex items-center gap-1.5">
-              <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-              <span>OPERADOR</span>
-            </span>
-            <span class="text-slate-400 tabular-nums">${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-          </div>
-          <div class="leading-relaxed whitespace-pre-wrap">${this.escapeHtml(text)}</div>
+    const div = document.createElement('div');
+    div.className = 'flex justify-end w-full animate-fade-in';
+    div.innerHTML = `
+      <div class="chat-bubble-user max-w-[85%] md:max-w-[70%] lg:max-w-[65%] ml-auto p-4 text-slate-100 text-sm">
+        <div class="flex items-center justify-between text-[11px] font-sans font-medium text-slate-400 mb-1.5 pb-1 border-b border-white/5">
+          <span class="font-bold text-cyan-400 flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+            <span>OPERADOR</span>
+          </span>
+          <span class="text-slate-400 tabular-nums">${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
         </div>
-      `;
-      feed.appendChild(div);
-    });
-
+        <div class="leading-relaxed whitespace-pre-wrap">${this.escapeHtml(text)}</div>
+      </div>
+    `;
+    feed.appendChild(div);
     this.scrollToBottom();
   }
 
   createAuraMessageBubble(containerId) {
-    const feeds = [
-      { el: document.getElementById('chat-feed-container'), suffix: '' },
-      { el: document.getElementById('split-chat-feed-container'), suffix: '-split' }
-    ].filter(item => Boolean(item.el));
+    const feed = document.getElementById('chat-feed-container');
+    if (!feed) return null;
 
-    feeds.forEach(({ el, suffix }) => {
-      const div = document.createElement('div');
-      div.id = containerId + suffix;
-      div.className = 'flex justify-start w-full animate-fade-in';
-      div.innerHTML = `
-        <div class="chat-bubble-aura w-full max-w-full p-4.5 text-slate-100 text-sm space-y-3">
-          <!-- Header da Resposta com Núcleo e Tags -->
-          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
-            <div class="flex items-center gap-2">
-              <div id="${containerId + suffix}-orb" class="neural-core-orb !w-6 !h-6 reasoning-active text-[10px] font-bold text-white flex items-center justify-center">
-                <span class="relative z-10">A</span>
-              </div>
-              <span class="font-bold font-sans text-xs text-white">AURA</span>
-              <span class="px-1.5 py-0.5 rounded text-[9px] font-sans font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">AI</span>
+    const div = document.createElement('div');
+    div.id = containerId;
+    div.className = 'flex justify-start w-full animate-fade-in';
+    div.innerHTML = `
+      <div class="chat-bubble-aura w-full max-w-full p-4.5 text-slate-100 text-sm space-y-3">
+        <!-- Header da Resposta com Núcleo e Tags -->
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
+          <div class="flex items-center gap-2">
+            <div id="${containerId}-orb" class="neural-core-orb !w-6 !h-6 reasoning-active text-[10px] font-bold text-white flex items-center justify-center">
+              <span class="relative z-10">A</span>
             </div>
-
-            <div id="${containerId + suffix}-meta" class="flex flex-wrap items-center gap-1.5 font-sans text-[10px]">
-              <span id="${containerId + suffix}-cognitive-chip" class="chip-cognitive-step px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5 transition-all">
-                <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
-                <span class="cognitive-step-label">Consultando automação da pista...</span>
-              </span>
-              <span id="${containerId + suffix}-intent-chip" class="hidden chip-intent"></span>
-              <span id="${containerId + suffix}-tool-chip" class="hidden chip-tool-status"></span>
-            </div>
+            <span class="font-bold font-sans text-xs text-white">AURA</span>
+            <span class="px-1.5 py-0.5 rounded text-[9px] font-sans font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">AI</span>
           </div>
 
-          <!-- Card de Resultado da Ferramenta Estruturada (se houver) -->
-          <div id="${containerId + suffix}-tool-card" class="hidden w-full"></div>
-
-          <!-- Texto em Streaming -->
-          <div id="${containerId + suffix}-text" class="prose-aura typing-cursor">
-            <span class="text-slate-400 text-xs font-sans">Processando consulta analítica...</span>
-          </div>
-
-          <!-- Métricas e Confirmação da Resposta -->
-          <div id="${containerId + suffix}-telemetry" class="hidden pt-2 border-t border-slate-800/80 text-[10px] font-sans text-slate-400">
+          <div id="${containerId}-meta" class="flex flex-wrap items-center gap-1.5 font-sans text-[10px]">
+            <span id="${containerId}-cognitive-chip" class="chip-cognitive-step px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5 transition-all">
+              <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+              <span class="cognitive-step-label">Consultando automação da pista...</span>
+            </span>
+            <span id="${containerId}-intent-chip" class="hidden chip-intent"></span>
+            <span id="${containerId}-tool-chip" class="hidden chip-tool-status"></span>
           </div>
         </div>
-      `;
-      el.appendChild(div);
-    });
+
+        <!-- Card de Resultado da Ferramenta Estruturada (se houver) -->
+        <div id="${containerId}-tool-card" class="hidden w-full"></div>
+
+        <!-- Texto em Streaming -->
+        <div id="${containerId}-text" class="prose-aura typing-cursor">
+          <span class="text-slate-400 text-xs font-sans">Processando consulta analítica...</span>
+        </div>
+
+        <!-- Métricas e Confirmação da Resposta -->
+        <div id="${containerId}-telemetry" class="hidden pt-2 border-t border-slate-800/80 text-[10px] font-sans text-slate-400">
+        </div>
+      </div>
+    `;
+    feed.appendChild(div);
 
     this.scrollToBottom();
     return document.getElementById(containerId);
   }
 
   appendAuraMessage(htmlContent, opts = {}) {
-    const feeds = [
-      document.getElementById('chat-feed-container'),
-      document.getElementById('split-chat-feed-container')
-    ].filter(Boolean);
+    const feed = document.getElementById('chat-feed-container');
+    if (!feed) return;
 
-    feeds.forEach(feed => {
-      const div = document.createElement('div');
-      div.className = 'flex justify-start w-full animate-fade-in';
-      div.innerHTML = `
-        <div class="chat-bubble-aura w-full max-w-full p-4.5 text-slate-100 text-sm space-y-3">
-          <div class="flex items-center justify-between border-b border-white/10 pb-2">
-            <div class="flex items-center gap-2">
-              <div class="neural-core-orb !w-6 !h-6 text-[10px] font-bold text-white flex items-center justify-center shadow-sm">
-                <span class="relative z-10">A</span>
-              </div>
-              <span class="font-bold font-sans text-xs text-white">AURA</span>
-              <span class="px-1.5 py-0.5 rounded text-[9px] font-sans font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">AI</span>
+    const div = document.createElement('div');
+    div.className = 'flex justify-start w-full animate-fade-in';
+    div.innerHTML = `
+      <div class="chat-bubble-aura w-full max-w-full p-4.5 text-slate-100 text-sm space-y-3">
+        <div class="flex items-center justify-between border-b border-white/10 pb-2">
+          <div class="flex items-center gap-2">
+            <div class="neural-core-orb !w-6 !h-6 text-[10px] font-bold text-white flex items-center justify-center shadow-sm">
+              <span class="relative z-10">A</span>
             </div>
-            ${opts.isWelcome ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-sans font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Pronta para Atendimento</span>' : ''}
+            <span class="font-bold font-sans text-xs text-white">AURA</span>
+            <span class="px-1.5 py-0.5 rounded text-[9px] font-sans font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">AI</span>
           </div>
-          <div class="w-full">${htmlContent}</div>
+          ${opts.isWelcome ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-sans font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Pronta para Atendimento</span>' : ''}
         </div>
-      `;
-      feed.appendChild(div);
-    });
+        <div class="w-full">${htmlContent}</div>
+      </div>
+    `;
+    feed.appendChild(div);
 
     this.scrollToBottom();
   }
@@ -4197,16 +4023,10 @@ class AuraChatController {
   }
 
   scrollToBottom(force = false) {
-    const feeds = [
-      document.getElementById('chat-feed-container'),
-      document.getElementById('split-chat-feed-container')
-    ];
-
-    feeds.forEach(feed => {
-      if (feed && (force || !this.userScrolledUp)) {
-        feed.scrollTop = feed.scrollHeight;
-      }
-    });
+    const feed = document.getElementById('chat-feed-container');
+    if (feed && (force || !this.userScrolledUp)) {
+      feed.scrollTop = feed.scrollHeight;
+    }
   }
 
   formatBRL(val) {

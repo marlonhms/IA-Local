@@ -634,8 +634,7 @@ class AuraApp {
     const views = {
       cockpit: document.getElementById('view-cockpit'),
       triggers: document.getElementById('view-triggers'),
-      console: document.getElementById('view-console'),
-      split: document.getElementById('view-split')
+      console: document.getElementById('view-console')
     };
 
     // Previne repetição abrupta da animação se a aba atual já estiver visível
@@ -645,9 +644,6 @@ class AuraApp {
         if (tabName === 'console') {
           const input = document.getElementById('chat-input-text');
           if (input) input.focus({ preventScroll: true });
-        } else if (tabName === 'split') {
-          const splitInput = document.getElementById('split-chat-input-text');
-          if (splitInput) splitInput.focus({ preventScroll: true });
         }
         return;
       }
@@ -682,13 +678,6 @@ class AuraApp {
     if (tabName === 'console') {
       const input = document.getElementById('chat-input-text');
       if (input) input.focus({ preventScroll: true });
-    } else if (tabName === 'split') {
-      const splitInput = document.getElementById('split-chat-input-text');
-      if (splitInput) splitInput.focus({ preventScroll: true });
-      // Assegura tanques renderizados
-      if (window.auraCockpit && window.auraCockpit.tanksData) {
-        window.auraCockpit.renderSplitTanks(window.auraCockpit.tanksData);
-      }
     }
 
     applyIconsFallback();
@@ -699,12 +688,8 @@ class AuraApp {
    */
   askAboutTank(codtan, combustivel) {
     const prompt = `Qual a previsão de esgotamento e a autonomia estimada para o tanque ${codtan} (${combustivel})? Devemos emitir pedido de carreta para hoje?`;
-    if (this.currentTab === 'split') {
-      window.auraChat.sendUserPrompt(prompt);
-    } else {
-      this.switchTab('console');
-      window.auraChat.sendUserPrompt(prompt);
-    }
+    this.switchTab('console');
+    window.auraChat.sendUserPrompt(prompt);
   }
 
   startClock() {

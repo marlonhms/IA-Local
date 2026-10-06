@@ -124,9 +124,10 @@ def run_delight_ux_tests():
     assert 'id="view-cockpit"' in html and 'view-transition-active' in html, "view-cockpit sem view-transition-active"
     assert 'id="view-triggers"' in html, "view-triggers ausente"
     assert 'id="view-console"' in html, "view-console ausente"
-    assert 'id="view-split"' in html, "view-split ausente"
+    assert 'max-w-3xl' in html or 'max-w-4xl' in html, "view-console sem restrição ergonômica de largura"
+    assert 'id="view-split"' not in html, "view-split não deve estar presente"
     assert 'id="trigger-inspector-loading"' in html and 'skeleton-glass' in html, "trigger-inspector-loading não utiliza skeleton-glass"
-    print("   [OK] Views, gatilhos analíticos e orbe do header estruturados com suporte a transições suaves e skeletons.")
+    print("   [OK] Views (foco na conversação), gatilhos analíticos e orbe do header estruturados com suporte a transições suaves e skeletons.")
 
     # ------------------------------------------------------------------
     # 5. TESTES FUNCIONAIS FRONTEND VIA NODE.JS (Chat & Cockpit Skeletons)

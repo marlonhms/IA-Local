@@ -540,12 +540,11 @@
           if (input) input.focus();
         }
 
-        // Atalhos 1, 2, 3, 4 para alternar abas no Desktop
+        // Atalhos 1, 2, 3 para alternar abas no Desktop
         if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
           if (e.key === '1') window.auraApp && window.auraApp.switchTab('console');
           if (e.key === '2') window.auraApp && window.auraApp.switchTab('cockpit');
           if (e.key === '3') window.auraApp && window.auraApp.switchTab('triggers');
-          if (e.key === '4') window.auraApp && window.auraApp.switchTab('split');
         }
       });
 
