@@ -123,6 +123,91 @@ def run_showcase_tests():
     print("   [OK] Etapa 4 (DecisionCard Precision Glass & Companion Canvas com Auditoria Profunda) validada.")
 
     # =========================================================================
+    # 2B. GENERALIZAÇÃO DE TERMOS DE NEGÓCIO E SUPORTE MULTISSETORIAL
+    # =========================================================================
+    print("\n2B. Testando Generalização dos Termos de Negócio (Multissetorial: Postos, Bares, Lojas, Padarias)...")
+    content_lower = html_content.lower()
+
+    # Termos antigos específicos que DEVEM ter sido eliminados
+    assert "cnpj da revenda" not in content_lower, "Termo antigo 'CNPJ da revenda' ainda presente"
+    assert "cpf do frentista" not in content_lower, "Termo antigo 'CPF do frentista' ainda presente"
+    assert "cartão faturado" not in content_lower, "Termo antigo 'Cartão faturado' ainda presente (deve ser genérico fiscal)"
+    assert "credencial de pista" not in content_lower, "Termo antigo 'Credencial de pista' ainda presente"
+    assert "credencial da pista" not in content_lower, "Termo antigo 'Credencial da pista' ainda presente"
+
+    # Termos genéricos e novos campos presentes
+    assert "cnpj:" in content_lower or "cnpj" in content_lower
+    assert "cpf:" in content_lower or "cpf" in content_lower
+    assert "identificador fiscal de transação" in content_lower, "Identificador fiscal de transação ausente"
+    assert "credenciais" in content_lower, "Termo generalizado 'Credenciais' ausente"
+    assert "credencias:" not in content_lower and "credencias " not in content_lower, "Erro ortográfico 'credencias' detectado"
+    
+    # Validação multissetorial expressa (postos, padarias, bares, lojas, franquias)
+    multisector_terms = ["posto", "padaria", "bar", "loja", "varejo", "franquias"]
+    for mst in multisector_terms:
+        assert mst in content_lower, f"Segmento multissetorial '{mst}' ausente no showcase"
+    print("   [OK] Termos generalizados (CNPJ, CPF, Identificador Fiscal de Transação, Credenciais) e segmentos validados.")
+
+    # =========================================================================
+    # 2C. CONFORMIDADE EXPLÍCITA COM A LGPD (LEI 13.709/2018)
+    # =========================================================================
+    print("\n2C. Testando Destaque e Citações Explícitas à LGPD (Lei 13.709/2018)...")
+    assert "lgpd" in content_lower, "Menção à LGPD ausente"
+    assert "13.709" in content_lower, "Citação à Lei 13.709 ausente"
+    assert "privacy by design" in content_lower, "Princípio 'Privacy by Design' ausente"
+    print("   [OK] Conformidade com a LGPD (Lei 13.709/2018 e Privacy by Design) validada.")
+
+    # =========================================================================
+    # 2D. MINI JANELA DE CHAT DA AURA + FLUXOGRAMA / GRAFO MODERNO LADO A LADO
+    # =========================================================================
+    print("\n2D. Testando Mini Janela de Chat da AURA + Fluxograma / Grafo Moderno...")
+    assert "sec-chat-graph" in html_content, "Seção #sec-chat-graph ausente"
+    assert "mini-chat-aura" in html_content, "Componente #mini-chat-aura ausente"
+    assert "aura-flowchart-graph" in html_content, "Componente #aura-flowchart-graph ausente"
+    assert "mini-chat-action-toast" in html_content, "Toast de feedback do mini chat ausente"
+    assert "alert(" not in html_content, "Uso de alert() bloqueante detectado no showcase (deve ser feedback inline suave)"
+    
+    # 4 Cenários Multissetoriais no Chat
+    assert "scenario-btn-varejo" in html_content, "Botão cenário varejo/padaria ausente"
+    assert "scenario-btn-posto" in html_content, "Botão cenário postos ausente"
+    assert "scenario-btn-loja" in html_content, "Botão cenário loja ausente"
+    assert "scenario-btn-fiscal" in html_content, "Botão cenário fiscal ausente"
+    assert "btn-simulate-chat-flow" in html_content, "Botão de simulação de fluxo do chat ausente"
+
+    # 5 Nós Conectados do Fluxograma / Grafo
+    assert "graph-node-prompt" in html_content, "Nó de Prompt do grafo ausente"
+    assert "graph-node-lgpd" in html_content, "Nó do Escudo LGPD do grafo ausente"
+    assert "graph-node-motor" in html_content, "Nó do Motor de Borda do grafo ausente"
+    assert "graph-node-regras" in html_content, "Nó de Regras de Negócio do grafo ausente"
+    assert "graph-node-decisao" in html_content, "Nó de Decisão do grafo ausente"
+    assert "graph-node-detail-panel" in html_content, "Painel de detalhes do nó do grafo ausente"
+    print("   [OK] Mini Janela de Chat da AURA + Fluxograma / Grafo Moderno de 5 nós conectados validados.")
+
+    # =========================================================================
+    # 2E. PAINEL & MATRIZ DE DIFERENCIAÇÃO OPERACIONAL REFORÇADO (ROI)
+    # =========================================================================
+    print("\n2E. Testando Painel & Matriz de Diferenciação Operacional Reforçado...")
+    assert "sec-diferenciacao" in html_content, "Seção #sec-diferenciacao ausente"
+    assert "Matriz de Diferenciação Operacional" in html_content, "Matriz de diferenciação ausente"
+    assert "Quebras de Caixa" in html_content, "Destaque 'Quebras de Caixa' ausente"
+    assert "Desvios de Estoque" in html_content, "Destaque 'Desvios de Estoque' ausente"
+    assert "Dashboards de BI Passivos" in html_content, "Coluna comparativa de BI passivo ausente"
+    assert "roi-card" in html_content, "Classe .roi-card ausente nos cards de ROI"
+    assert "Prejuízo evitado:" in html_content, "Métrica de prejuízo evitado ausente na diferenciação"
+    print("   [OK] Painel & Matriz de Diferenciação Operacional (Quebras de Caixa, Desvios, ROI) validados.")
+
+    # =========================================================================
+    # 2F. SCROLLYTELLING E ANIMAÇÕES DINÂMICAS NO SCROLL
+    # =========================================================================
+    print("\n2F. Testando Recursos de Scrollytelling e Animações no Scroll...")
+    assert "scroll-progress-bar" in html_content, "Barra de progresso de scroll ausente"
+    assert "scroll-nav-rail" in html_content, "Trilho lateral flutuante de scroll ausente"
+    assert "scroll-reveal" in html_content, "Classes de scroll-reveal ausentes"
+    assert "scroll-smooth" in html_content, "Classe scroll-smooth ausente"
+    assert "runGraphPulseAnimation" in html_content, "Função de animação do grafo ausente"
+    print("   [OK] Scrollytelling, barra de progresso, trilho lateral e classes scroll-reveal validados.")
+
+    # =========================================================================
     # 3. CONTROLES DO TOUR INTERATIVO E PLAYER
     # =========================================================================
     print("\n3. Testando Controles do Tour Interativo...")
@@ -256,7 +341,12 @@ def run_showcase_tests():
       'simulatePipelinePulse',
       'inspectNode',
       'simulateActionClick',
-      'toggleStep4Tab'
+      'toggleStep4Tab',
+      'selectChatScenario',
+      'simulateChatSubmit',
+      'simulateChatActionClick',
+      'inspectGraphNode',
+      'scrollToSection'
     ];
 
     if (!window.auraTour) {{
@@ -274,7 +364,8 @@ def run_showcase_tests():
     console.log('NODE_SHOWCASE_API_VALIDATED');
     """
     proc_node = subprocess.run(
-        ["node", "-e", node_sim_code],
+        ["node"],
+        input=node_sim_code,
         text=True,
         encoding="utf-8",
         capture_output=True,

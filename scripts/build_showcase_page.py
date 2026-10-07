@@ -1,4 +1,24 @@
-<!DOCTYPE html>
+"""
+Gerador da Página de Apresentação e Showcase Executivo AURA (web/showcase.html)
+Atualizado com:
+1. Scrollytelling e animações dinâmicas no scroll (barra de progresso, rail lateral, reveal suave).
+2. Generalização dos termos de negócio (multissetorial: postos, padarias, bares, lojas, franquias).
+   - "CNPJ" (em vez de "CNPJ da revenda")
+   - "CPF" (em vez de "CPF do frentista")
+   - "IDENTIFICADOR FISCAL DE TRANSAÇÃO" (em vez de "CARTÃO FATURADO")
+   - "CREDENCIAIS" (em vez de "CREDENCIAL DA PISTA")
+3. Mini Janela de Chat da AURA + Fluxograma / Grafo Moderno Lado a Lado:
+   - Cenários multissetoriais rápidos
+   - Fluxograma de 5 nós conectados (Prompt -> LGPD -> Motor -> Regras -> DecisionCard)
+   - Destaque explícito para a LGPD (Lei 13.709/2018)
+4. Suavização de efeitos de glow nos botões (estética Obsidian & Liquid Glass de luxo).
+5. Painel e Matriz de Diferenciação Operacional reforçados (onde está o verdadeiro valor do produto).
+"""
+
+from pathlib import Path
+
+def generate_showcase_html():
+    html = """<!DOCTYPE html>
 <html lang="pt-BR" class="scroll-smooth">
 <head>
   <meta charset="UTF-8">
@@ -2745,3 +2765,11 @@
   </script>
 </body>
 </html>
+"""
+    return html
+
+if __name__ == "__main__":
+    out_path = Path(__file__).resolve().parent.parent / "web" / "showcase.html"
+    content = generate_showcase_html()
+    out_path.write_text(content, encoding="utf-8")
+    print(f"showcase.html gerado com sucesso em: {out_path} ({len(content)} bytes)")
