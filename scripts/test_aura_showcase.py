@@ -300,7 +300,11 @@ def run_showcase_tests():
     assert "body-regular" in html_content, "Classe tipográfica .body-regular (16px) ausente"
     assert "home_agents-title" in html_content, "Classe de títulos .home_agents-title ausente"
     assert "home_agents-feature-desc" in html_content, "Classe de descrições .home_agents-feature-desc ausente"
-    print("   [OK] Sistema Tipográfico Executivo (Geist, Newsreader, heading-medium 40px e body-regular 16px) validado.")
+    assert "card-title-serif" in html_content, "Classe tipográfica .card-title-serif ausente nos cards do showcase"
+    assert "card-desc-geist" in html_content, "Classe tipográfica .card-desc-geist ausente nos cards do showcase"
+    assert "heading-small" in html_content, "Classe tipográfica .heading-small ausente nos cards do showcase"
+    assert "body-small" in html_content, "Classe tipográfica .body-small ausente nos cards do showcase"
+    print("   [OK] Sistema Tipográfico Executivo (Geist, Newsreader, heading-medium 40px, heading-small 18px-20px, card-title-serif, card-desc-geist) validado.")
 
     # =========================================================================
     # 2F. SCROLLYTELLING E ANIMAÇÕES DINÂMICAS NO SCROLL

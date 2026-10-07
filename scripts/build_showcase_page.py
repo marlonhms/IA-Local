@@ -118,18 +118,20 @@ def generate_showcase_html():
       }
     }
 
-    .heading-small {
+    .heading-small,
+    .card-title-serif {
       font-family: var(--font-serif);
-      font-size: 1.35rem;
+      font-size: 1.15rem; /* ~18.5px */
       font-weight: 400;
       letter-spacing: -0.015em;
       line-height: 1.25;
       color: #ffffff;
-      margin: 0px 0px 8px;
+      margin: 0px 0px 6px;
     }
     @media (min-width: 640px) {
-      .heading-small {
-        font-size: 1.5rem; /* 24px */
+      .heading-small,
+      .card-title-serif {
+        font-size: 1.25rem; /* 20px */
       }
     }
 
@@ -143,11 +145,18 @@ def generate_showcase_html():
       margin: 2px 0px 0px;
     }
 
-    .body-small {
+    .body-small,
+    .card-desc-geist {
       font-family: var(--font-sans);
       font-size: 14px;
-      line-height: 1.55;
+      line-height: 1.6;
       color: #94a3b8;
+    }
+    @media (min-width: 640px) {
+      .body-small,
+      .card-desc-geist {
+        font-size: 15px;
+      }
     }
 
     .showcase-mesh-bg {
@@ -222,6 +231,15 @@ def generate_showcase_html():
 
     .obsidian-card:hover {
       border-color: rgba(255, 255, 255, 0.14);
+    }
+
+    /* Tipografia Padrão Editorial nos Cards Internos */
+    .obsidian-card h3,
+    .obsidian-card h4,
+    .roi-card h4 {
+      font-family: var(--font-serif);
+      letter-spacing: -0.015em;
+      line-height: 1.25;
     }
 
     /* Conectores SVG com Pulso de Fótons Discreto */
@@ -928,7 +946,7 @@ def generate_showcase_html():
                 
                 <!-- Balão de Texto da Resposta Executiva -->
                 <div class="p-3.5 rounded-2xl rounded-tl-sm bg-slate-900/90 border border-white/[0.08] text-slate-200 leading-relaxed space-y-3" id="chat-aura-response-bubble">
-                  <p id="chat-response-narrative" class="font-sans text-xs text-slate-200">
+                  <p id="chat-response-narrative" class="card-desc-geist body-small text-slate-200 text-xs sm:text-[13.5px] leading-relaxed">
                     Hoje (Turno Atual), o item líder absoluto em volume e faturamento é a <strong>Gasolina Comum</strong> com <strong>4.820 Litros</strong> vendidos (R$ 29.835,80 faturados), respondendo por 69,6% das vendas do turno. Em seguida: <strong>Diesel S-10</strong> (2.340 L) e <strong>Conveniência/Café</strong> (312 unid.). Fechamento de caixa 100% auditado com R$ 0,00 de divergência.
                   </p>
 
@@ -937,7 +955,7 @@ def generate_showcase_html():
                     <div class="flex items-center justify-between border-b border-white/[0.08] pb-2">
                       <div class="flex items-center gap-2">
                         <i data-lucide="sparkles" class="w-4 h-4 text-cyan-400"></i>
-                        <span class="font-bold text-white text-xs" id="mini-dc-title">Diagnóstico Operacional Consolidado</span>
+                        <h4 class="card-title-serif font-serif text-sm sm:text-base font-normal text-white" id="mini-dc-title">Diagnóstico Operacional Consolidado</h4>
                       </div>
                       <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25" id="mini-dc-badge">
                         MARGEM OTIMIZADA
@@ -1041,11 +1059,11 @@ def generate_showcase_html():
                   <i data-lucide="compass" class="w-4 h-4"></i>
                 </div>
                 <div>
-                  <div class="font-bold text-white flex items-center gap-2">
+                  <h4 class="card-title-serif font-serif text-[15px] sm:text-base font-normal text-white flex items-center gap-2">
                     <span>1. Compreensão da Pergunta</span>
                     <span class="px-1.5 py-0.2 rounded text-[9px] bg-purple-500/15 text-purple-300 font-mono">vendas_analitico</span>
-                  </div>
-                  <div class="text-[10px] text-slate-400">Entende linguagem natural direta, sem fórmulas, códigos ou relatórios manuais</div>
+                  </h4>
+                  <p class="card-desc-geist text-[11px] sm:text-xs text-slate-400">Entende linguagem natural direta, sem fórmulas, códigos ou relatórios manuais</p>
                 </div>
               </div>
               <div class="flex items-center gap-2">
@@ -1075,11 +1093,11 @@ def generate_showcase_html():
                   <i data-lucide="gauge" class="w-4 h-4"></i>
                 </div>
                 <div>
-                  <div class="font-bold text-white flex items-center gap-2">
+                  <h4 class="card-title-serif font-serif text-[15px] sm:text-base font-normal text-white flex items-center gap-2">
                     <span>2. Telemetria de Pista & Concentrador de PDV</span>
                     <span class="px-1.5 py-0.2 rounded text-[9px] bg-cyan-500/15 text-cyan-300 font-mono">Borda Local</span>
-                  </div>
-                  <div class="text-[10px] text-slate-400">Leitura direta de encerrantes, bicos, tanques e estoques físicos da loja</div>
+                  </h4>
+                  <p class="card-desc-geist text-[11px] sm:text-xs text-slate-400">Leitura direta de encerrantes, bicos, tanques e estoques físicos da loja</p>
                 </div>
               </div>
               <div class="flex items-center gap-2">
@@ -1110,11 +1128,11 @@ def generate_showcase_html():
                     <i data-lucide="shield-check" class="w-4 h-4"></i>
                   </div>
                   <div>
-                    <div class="font-bold text-white flex items-center gap-2">
+                    <h4 class="card-title-serif font-serif text-[15px] sm:text-base font-normal text-white flex items-center gap-2">
                       <span>3. Escudo AURA Guard™: Proteção de Dados Pessoais</span>
                       <span class="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/15 text-emerald-300 font-mono">Lei 13.709/2018</span>
-                    </div>
-                    <div class="text-[10px] text-slate-400">Identificação e remoção instantânea de dados pessoais em poeira antes da análise • 100% LGPD</div>
+                    </h4>
+                    <p class="card-desc-geist text-[11px] sm:text-xs text-slate-400">Identificação e remoção instantânea de dados pessoais em poeira antes da análise • 100% LGPD</p>
                   </div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -1184,11 +1202,11 @@ def generate_showcase_html():
                   <i data-lucide="scale" class="w-4 h-4"></i>
                 </div>
                 <div>
-                  <div class="font-bold text-white flex items-center gap-2">
+                  <h4 class="card-title-serif font-serif text-[15px] sm:text-base font-normal text-white flex items-center gap-2">
                     <span>4. Motor de Auditoria & Conferência Exata</span>
                     <span class="px-1.5 py-0.2 rounded text-[9px] bg-amber-500/15 text-amber-300 font-mono">Auditoria Fiscal</span>
-                  </div>
-                  <div class="text-[10px] text-slate-400">Conferência matemática direta de estoques, notas fiscais e fechamento de caixa sem erros</div>
+                  </h4>
+                  <p class="card-desc-geist text-[11px] sm:text-xs text-slate-400">Conferência matemática direta de estoques, notas fiscais e fechamento de caixa sem erros</p>
                 </div>
               </div>
               <div class="flex items-center gap-2">
@@ -1218,11 +1236,11 @@ def generate_showcase_html():
                   <i data-lucide="check-circle-2" class="w-4 h-4"></i>
                 </div>
                 <div>
-                  <div class="font-bold text-white flex items-center gap-2">
+                  <h4 class="card-title-serif font-serif text-[15px] sm:text-base font-normal text-white flex items-center gap-2">
                     <span>5. Entrega de Decisão & DecisionCard™</span>
                     <span class="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/15 text-emerald-300 font-mono">1 Clique</span>
-                  </div>
-                  <div class="text-[10px] text-slate-400">Resumo executivo pronto com botões de ação imediata enviados para o chat</div>
+                  </h4>
+                  <p class="card-desc-geist text-[11px] sm:text-xs text-slate-400">Resumo executivo pronto com botões de ação imediata enviados para o chat</p>
                 </div>
               </div>
               <div class="flex items-center gap-2">
@@ -1252,7 +1270,7 @@ def generate_showcase_html():
             <div class="flex items-center justify-between border-b border-white/[0.08] pb-2">
               <div class="flex items-center gap-2">
                 <i data-lucide="layers" class="w-4 h-4 text-purple-400"></i>
-                <span class="font-bold text-white text-xs">Companion Canvas™ • Auditoria Profunda</span>
+                <h4 class="card-title-serif font-serif text-sm sm:text-base font-normal text-white">Companion Canvas™ • Auditoria Profunda</h4>
               </div>
               <button onclick="window.auraTour.toggleStep4Tab('decisioncard')" class="text-slate-400 hover:text-white text-xs">✕ Fechar</button>
             </div>
@@ -1328,44 +1346,44 @@ def generate_showcase_html():
         </p>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 font-sans">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        <div class="obsidian-card p-5 rounded-2xl space-y-3">
+        <div class="obsidian-card p-5 sm:p-6 rounded-2xl space-y-3.5">
           <div class="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center border border-cyan-500/20">
             <i data-lucide="shield" class="w-5 h-5"></i>
           </div>
-          <h3 class="font-bold text-white text-sm">Escudo de Privacidade AURA Guard™</h3>
-          <p class="text-xs text-slate-400 leading-relaxed">
+          <h3 class="card-title-serif heading-small text-lg sm:text-[19px] font-serif font-normal text-white">Escudo de Privacidade AURA Guard™</h3>
+          <p class="card-desc-geist body-small text-slate-300/90 text-sm leading-relaxed">
             Identificação e remoção instantânea de qualquer dado pessoal de clientes ou funcionários antes de qualquer análise, garantindo proteção total e conformidade com a LGPD.
           </p>
         </div>
 
-        <div class="obsidian-card p-5 rounded-2xl space-y-3">
+        <div class="obsidian-card p-5 sm:p-6 rounded-2xl space-y-3.5">
           <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
             <i data-lucide="server" class="w-5 h-5"></i>
           </div>
-          <h3 class="font-bold text-white text-sm">Processamento Local & Soberania dos Dados</h3>
-          <p class="text-xs text-slate-400 leading-relaxed">
+          <h3 class="card-title-serif heading-small text-lg sm:text-[19px] font-serif font-normal text-white">Processamento Local & Soberania dos Dados</h3>
+          <p class="card-desc-geist body-small text-slate-300/90 text-sm leading-relaxed">
             Conecta direto na infraestrutura do banco da sua empresa. Sem faturas abusivas por milhões de tokens para processar seus próprios dados: cálculos determinísticos no seu ambiente e inteligência rápida e econômica.
           </p>
         </div>
 
-        <div class="obsidian-card p-5 rounded-2xl space-y-3">
+        <div class="obsidian-card p-5 sm:p-6 rounded-2xl space-y-3.5">
           <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center border border-purple-500/20">
             <i data-lucide="calculator" class="w-5 h-5"></i>
           </div>
-          <h3 class="font-bold text-white text-sm">Cálculos Exatos e Livres de Erros</h3>
-          <p class="text-xs text-slate-400 leading-relaxed">
+          <h3 class="card-title-serif heading-small text-lg sm:text-[19px] font-serif font-normal text-white">Cálculos Exatos e Livres de Erros</h3>
+          <p class="card-desc-geist body-small text-slate-300/90 text-sm leading-relaxed">
             Conferência matemática direta das vendas, notas fiscais e fechamento de caixa centavo a centavo. A inteligência nunca chuta nem inventa valores: calcula apenas números reais do seu sistema.
           </p>
         </div>
 
-        <div class="obsidian-card p-5 rounded-2xl space-y-3">
+        <div class="obsidian-card p-5 sm:p-6 rounded-2xl space-y-3.5">
           <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/20">
             <i data-lucide="zap" class="w-5 h-5"></i>
           </div>
-          <h3 class="font-bold text-white text-sm">Ação Imediata em 1 Clique</h3>
-          <p class="text-xs text-slate-400 leading-relaxed">
+          <h3 class="card-title-serif heading-small text-lg sm:text-[19px] font-serif font-normal text-white">Ação Imediata em 1 Clique</h3>
+          <p class="card-desc-geist body-small text-slate-300/90 text-sm leading-relaxed">
             Transforma o diagnóstico do negócio em decisões práticas na hora: gere pedidos a fornecedores ou avise encarregados com um único clique antes que falte produto.
           </p>
         </div>
@@ -1405,7 +1423,7 @@ def generate_showcase_html():
           <div class="flex items-center justify-between border-b border-white/[0.06] pb-3">
             <div class="flex items-center gap-2">
               <i data-lucide="bar-chart-3" class="w-4 h-4 text-cyan-400"></i>
-              <span class="font-bold text-white text-xs">Cost and Unit Cost Trend</span>
+              <h4 class="card-title-serif font-serif text-base sm:text-[17px] font-normal text-white">Cost and Unit Cost Trend</h4>
               <span class="text-[10px] text-slate-400 font-mono">(Últimos 7 dias)</span>
             </div>
             <div class="flex items-center gap-1 text-[10px] font-mono">
@@ -1415,24 +1433,24 @@ def generate_showcase_html():
             </div>
           </div>
           <!-- Prompt Executivo da Consulta (Harness.io Cost Management Style) -->
-          <div class="p-3 rounded-xl bg-slate-900/80 border border-white/[0.08] flex items-center gap-2.5 text-xs">
+          <div class="p-3.5 rounded-xl bg-slate-900/80 border border-white/[0.08] flex items-center gap-2.5 text-xs">
             <span class="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 flex items-center justify-center flex-shrink-0">
               <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
             </span>
             <div class="flex-1 min-w-0">
               <div class="text-[10px] text-slate-400 font-mono">Prompt Executivo:</div>
-              <div class="text-white font-medium text-[11px] truncate">"Auditar custo unitário e desperdício de tokens na conciliação dos últimos 7 dias"</div>
+              <div class="text-white font-medium text-xs sm:text-[13px] truncate">"Auditar custo unitário e desperdício de tokens na conciliação dos últimos 7 dias"</div>
             </div>
             <span class="px-2 py-0.5 rounded text-[9px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 flex-shrink-0">Executado na Borda</span>
           </div>
 
           <!-- Raciocínio & Diagnóstico de Custo da AURA -->
           <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-1.5 text-xs">
-            <div class="flex items-center gap-2 text-cyan-300 font-semibold text-[11px]">
+            <div class="flex items-center gap-2 text-cyan-300 font-semibold text-xs sm:text-[13px]">
               <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i>
-              <span>Diagnóstico de Custo de Borda</span>
+              <span class="card-title-serif font-serif text-[15px] font-normal text-cyan-300">Diagnóstico de Custo de Borda</span>
             </div>
-            <p class="text-slate-300 leading-relaxed text-[11px]">
+            <p class="card-desc-geist body-small text-slate-300 leading-relaxed text-xs sm:text-[13px]">
               A AURA processou <strong>14.820 consultas e conciliações</strong> no banco local do cliente com custo de tokens reduzido em <strong>94,8%</strong>. O custo unitário por decisão executiva foi de R$ 0,0002, contra R$ 0,38 no mercado de nuvem tradicional.
             </p>
           </div>
@@ -1531,43 +1549,43 @@ def generate_showcase_html():
         </div>
 
         <!-- Direita: Três Pilares de Visibilidade e Governança de Custos de IA -->
-        <div class="lg:col-span-5 flex flex-col justify-between space-y-3 font-sans text-xs">
+        <div class="lg:col-span-5 flex flex-col justify-between space-y-3.5">
           
-          <div class="p-4 rounded-2xl bg-slate-950/60 border border-white/[0.06] space-y-1.5">
+          <div class="p-4 sm:p-5 rounded-2xl bg-slate-950/60 border border-white/[0.06] space-y-2">
             <div class="flex items-center justify-between">
-              <span class="font-bold text-white text-xs flex items-center gap-1.5">
-                <i data-lucide="eye" class="w-4 h-4 text-cyan-400"></i>
-                Visibilidade de Custos de IA em Tempo Real
-              </span>
-              <span class="px-2 py-0.5 rounded text-[9px] font-mono bg-cyan-500/10 text-cyan-300">100% Auditável</span>
+              <h4 class="card-title-serif heading-small text-base sm:text-[18px] font-serif font-normal text-white flex items-center gap-2">
+                <i data-lucide="eye" class="w-4 h-4 text-cyan-400 flex-shrink-0"></i>
+                <span>Visibilidade de Custos de IA em Tempo Real</span>
+              </h4>
+              <span class="px-2.5 py-0.5 rounded text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">100% Auditável</span>
             </div>
-            <p class="text-slate-400 leading-relaxed text-[11px]">
+            <p class="card-desc-geist body-small text-slate-300/90 text-sm leading-relaxed">
               Cada consulta, auditoria de caixa ou conferência fiscal tem custo monitorado centavo a centavo. Sem surpresas na fatura no final do mês.
             </p>
           </div>
 
-          <div class="p-4 rounded-2xl bg-slate-950/60 border border-white/[0.06] space-y-1.5">
+          <div class="p-4 sm:p-5 rounded-2xl bg-slate-950/60 border border-white/[0.06] space-y-2">
             <div class="flex items-center justify-between">
-              <span class="font-bold text-white text-xs flex items-center gap-1.5">
-                <i data-lucide="cloud-off" class="w-4 h-4 text-emerald-400"></i>
-                Eliminação Total de Desperdício em Nuvem
-              </span>
-              <span class="px-2 py-0.5 rounded text-[9px] font-mono bg-emerald-500/10 text-emerald-300">-95% Tokens</span>
+              <h4 class="card-title-serif heading-small text-base sm:text-[18px] font-serif font-normal text-white flex items-center gap-2">
+                <i data-lucide="cloud-off" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+                <span>Eliminação Total de Desperdício em Nuvem</span>
+              </h4>
+              <span class="px-2.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">-95% Tokens</span>
             </div>
-            <p class="text-slate-400 leading-relaxed text-[11px]">
+            <p class="card-desc-geist body-small text-slate-300/90 text-sm leading-relaxed">
               O mercado tradicional cobra para reprocessar dados que já são da sua empresa. A AURA roda as contas diretamente no seu banco e aciona inteligência apenas para conclusões de valor.
             </p>
           </div>
 
-          <div class="p-4 rounded-2xl bg-slate-950/60 border border-white/[0.06] space-y-1.5">
+          <div class="p-4 sm:p-5 rounded-2xl bg-slate-950/60 border border-white/[0.06] space-y-2">
             <div class="flex items-center justify-between">
-              <span class="font-bold text-white text-xs flex items-center gap-1.5">
-                <i data-lucide="shield-alert" class="w-4 h-4 text-purple-400"></i>
-                Governança Orçamentária e Previsibilidade
-              </span>
-              <span class="px-2 py-0.5 rounded text-[9px] font-mono bg-purple-500/10 text-purple-300">Controle Fixo</span>
+              <h4 class="card-title-serif heading-small text-base sm:text-[18px] font-serif font-normal text-white flex items-center gap-2">
+                <i data-lucide="shield-alert" class="w-4 h-4 text-purple-400 flex-shrink-0"></i>
+                <span>Governança Orçamentária e Previsibilidade</span>
+              </h4>
+              <span class="px-2.5 py-0.5 rounded text-[10px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20">Controle Fixo</span>
             </div>
-            <p class="text-slate-400 leading-relaxed text-[11px]">
+            <p class="card-desc-geist body-small text-slate-300/90 text-sm leading-relaxed">
               Políticas rígidas de teto de processamento e execução local garantem que sua despesa com tecnologia seja perfeitamente previsível durante todo o ano.
             </p>
           </div>
@@ -1611,10 +1629,10 @@ def generate_showcase_html():
         <!-- Coluna 1: Contexto Operacional Selecionável (3 Colunas) -->
         <div class="lg:col-span-3 p-4 rounded-2xl bg-slate-950/70 border border-white/[0.08] space-y-3 font-sans text-xs">
           <div class="flex items-center justify-between border-b border-white/[0.06] pb-2 text-[11px]">
-            <span class="font-bold text-white flex items-center gap-1.5">
+            <h4 class="card-title-serif font-serif text-sm sm:text-[15px] font-normal text-white flex items-center gap-1.5">
               <i data-lucide="layers" class="w-3.5 h-3.5 text-cyan-400"></i>
-              Contexto do Negócio
-            </span>
+              <span>Contexto do Negócio</span>
+            </h4>
             <span class="text-[10px] font-mono text-cyan-300">5 nós</span>
           </div>
 
@@ -1763,19 +1781,19 @@ def generate_showcase_html():
         <!-- Coluna 3: Raciocínio & Orquestração da AURA (3 Colunas) -->
         <div class="lg:col-span-3 p-4 rounded-2xl bg-slate-950/70 border border-white/[0.08] flex flex-col justify-between space-y-3 font-sans text-xs">
           <div class="flex items-center justify-between border-b border-white/[0.06] pb-2 text-[11px]">
-            <span class="font-bold text-white flex items-center gap-1.5">
+            <h4 class="card-title-serif font-serif text-sm sm:text-[15px] font-normal text-white flex items-center gap-1.5">
               <i data-lucide="brain" class="w-3.5 h-3.5 text-emerald-400"></i>
-              Reasoning & Ação
-            </span>
+              <span>Reasoning & Ação</span>
+            </h4>
             <span class="text-[10px] font-mono text-emerald-300">1 Clique</span>
           </div>
 
           <!-- Diagnóstico Relacional em Tempo Real -->
           <div class="space-y-2 flex-1">
-            <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-1">
+            <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-1.5">
               <div class="text-[10px] text-slate-400 uppercase font-mono">Cruzamento de Vendas vs Tanques</div>
-              <div class="font-bold text-white text-[11px]" id="kg-reasoning-title">Reconciliação Litro a Litro</div>
-              <p class="text-[10px] text-slate-300 leading-relaxed" id="kg-reasoning-text">
+              <div class="card-title-serif heading-small font-serif text-base sm:text-[17px] font-normal text-white" id="kg-reasoning-title">Reconciliação Litro a Litro</div>
+              <p class="card-desc-geist body-small text-slate-300 text-xs sm:text-[13px] leading-relaxed" id="kg-reasoning-text">
                 O cupom NFC-e #3526 foi conciliado com o bico 04 e o Tanque 02 em 12ms. Nenhuma quebra física ou fiscal identificada no turno.
               </p>
             </div>
@@ -1822,21 +1840,21 @@ def generate_showcase_html():
       </div>
 
       <!-- 4 Cards de Destaque do Valor Operacional com Mini Dashboards e Gráficos Animados no Scroll -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 font-sans">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         
         <!-- CARD 1: QUEBRAS DE CAIXA (Com Mini Sparkline de Auditoria Horária) -->
-        <div class="roi-card p-4 rounded-2xl bg-slate-900/90 border border-emerald-500/25 space-y-3">
+        <div class="roi-card p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-emerald-500/25 space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-[10px] font-mono text-emerald-400 uppercase">Prevenção Financeira</span>
             <i data-lucide="scale" class="w-4 h-4 text-emerald-400"></i>
           </div>
-          <div class="text-base font-extrabold text-white">Detecção de Quebras de Caixa</div>
-          <p class="text-xs text-slate-400 leading-relaxed">
+          <h4 class="card-title-serif heading-small text-lg sm:text-[19px] font-serif font-normal text-white">Detecção de Quebras de Caixa</h4>
+          <p class="card-desc-geist body-small text-slate-300/90 text-sm leading-relaxed">
             Identificação de discrepâncias centavo a centavo turno a turno. Estanca sangrias e desvios no mesmo dia, sem surpresas no fim do mês.
           </p>
 
           <!-- Mini Gráfico de Auditoria Horária Centavo a Centavo -->
-          <div class="p-2.5 rounded-xl bg-black/50 border border-white/[0.05] space-y-1.5">
+          <div class="p-2.5 rounded-xl bg-black/50 border border-white/[0.05] space-y-1.5 font-sans">
             <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
               <span>Auditoria Horária</span>
               <span class="text-emerald-400 font-bold">R$ 0,00 Dif.</span>
@@ -1853,22 +1871,22 @@ def generate_showcase_html():
             <div class="text-[9px] text-slate-400 font-mono text-center">06h • 09h • 12h • 15h • 18h • Agora</div>
           </div>
 
-          <div class="text-[10px] text-emerald-300 font-semibold pt-1">✓ Prejuízo evitado: R$ 3.800 a R$ 12.000 / mês</div>
+          <div class="text-[10px] text-emerald-300 font-semibold pt-1 font-sans">✓ Prejuízo evitado: R$ 3.800 a R$ 12.000 / mês</div>
         </div>
 
         <!-- CARD 2: DESVIOS DE ESTOQUE (Com Mini Barra de Calibração Volumétrica) -->
-        <div class="roi-card p-4 rounded-2xl bg-slate-900/90 border border-cyan-500/25 space-y-3">
+        <div class="roi-card p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-cyan-500/25 space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-[10px] font-mono text-cyan-400 uppercase">Controle Físico Real</span>
             <i data-lucide="boxes" class="w-4 h-4 text-cyan-400"></i>
           </div>
-          <div class="text-base font-extrabold text-white">Auditoria de Desvios de Estoque</div>
-          <p class="text-xs text-slate-400 leading-relaxed">
+          <h4 class="card-title-serif heading-small text-lg sm:text-[19px] font-serif font-normal text-white">Auditoria de Desvios de Estoque</h4>
+          <p class="card-desc-geist body-small text-slate-300/90 text-sm leading-relaxed">
             Cruzamento contínuo entre saídas fiscais registradas e estoque físico real em tanques, balcões e gôndolas. Fim da "perda aceita".
           </p>
 
           <!-- Mini Barra de Calibração Volumétrica Físico vs Fiscal -->
-          <div class="p-2.5 rounded-xl bg-black/50 border border-white/[0.05] space-y-1.5">
+          <div class="p-2.5 rounded-xl bg-black/50 border border-white/[0.05] space-y-1.5 font-sans">
             <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
               <span>Calibração Físico x Fiscal</span>
               <span class="text-cyan-300 font-bold">100.0% Match</span>
@@ -1882,22 +1900,22 @@ def generate_showcase_html():
             </div>
           </div>
 
-          <div class="text-[10px] text-cyan-300 font-semibold pt-1">✓ Fim do sumiço oculto de mercadorias</div>
+          <div class="text-[10px] text-cyan-300 font-semibold pt-1 font-sans">✓ Fim do sumiço oculto de mercadorias</div>
         </div>
 
         <!-- CARD 3: ECONOMIA DE TOKENS (Com Mini Comparativo Nuvem vs Local) -->
-        <div class="roi-card p-4 rounded-2xl bg-slate-900/90 border border-purple-500/25 space-y-3">
+        <div class="roi-card p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-purple-500/25 space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-[10px] font-mono text-purple-400 uppercase">Eficiência & Soberania</span>
             <i data-lucide="database" class="w-4 h-4 text-purple-400"></i>
           </div>
-          <div class="text-base font-extrabold text-white">Economia Brutal de Tokens</div>
-          <p class="text-xs text-slate-400 leading-relaxed">
+          <h4 class="card-title-serif heading-small text-lg sm:text-[19px] font-serif font-normal text-white">Economia Brutal de Tokens</h4>
+          <p class="card-desc-geist body-small text-slate-300/90 text-sm leading-relaxed">
             Conecta diretamente ao banco da empresa: cálculos estruturados na máquina local e inteligência acionada apenas para conclusões complexas, sem surpresas na fatura.
           </p>
 
           <!-- Mini Gráfico de Barras de Redução de Tokens -->
-          <div class="p-2.5 rounded-xl bg-black/50 border border-white/[0.05] space-y-1.5">
+          <div class="p-2.5 rounded-xl bg-black/50 border border-white/[0.05] space-y-1.5 font-sans">
             <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
               <span>Consumo Mensal de Tokens</span>
               <span class="text-purple-300 font-bold">-95% Redução</span>
@@ -1920,22 +1938,22 @@ def generate_showcase_html():
             </div>
           </div>
 
-          <div class="text-[10px] text-purple-300 font-semibold pt-1">✓ Redução de 90% a 95% em consumo de tokens</div>
+          <div class="text-[10px] text-purple-300 font-semibold pt-1 font-sans">✓ Redução de 90% a 95% em consumo de tokens</div>
         </div>
 
         <!-- CARD 4: PRODUTIVIDADE GERENCIAL (Com Medidor de Redução de Horas) -->
-        <div class="roi-card p-4 rounded-2xl bg-slate-900/90 border border-amber-500/25 space-y-3">
+        <div class="roi-card p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-amber-500/25 space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-[10px] font-mono text-amber-400 uppercase">Produtividade Gerencial</span>
             <i data-lucide="clock" class="w-4 h-4 text-amber-400"></i>
           </div>
-          <div class="text-base font-extrabold text-white">De Horas para 10 Segundos</div>
-          <p class="text-xs text-slate-400 leading-relaxed">
+          <h4 class="card-title-serif heading-small text-lg sm:text-[19px] font-serif font-normal text-white">De Horas para 10 Segundos</h4>
+          <p class="card-desc-geist body-small text-slate-300/90 text-sm leading-relaxed">
             Elimina o preenchimento manual de planilhas e conferência de filipetas. Entrega DecisionCards prontos com ação em 1-toque e Run-Out preditivo.
           </p>
 
           <!-- Mini Medidor Comparativo de Velocidade -->
-          <div class="p-2.5 rounded-xl bg-black/50 border border-white/[0.05] space-y-1.5">
+          <div class="p-2.5 rounded-xl bg-black/50 border border-white/[0.05] space-y-1.5 font-sans">
             <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
               <span>Tempo de Tomada de Decisão</span>
               <span class="text-amber-300 font-bold">1080x Mais Rápido</span>
@@ -1949,7 +1967,7 @@ def generate_showcase_html():
             </div>
           </div>
 
-          <div class="text-[10px] text-amber-300 font-semibold pt-1">✓ Mais de 60 horas/mês economizadas por gestor</div>
+          <div class="text-[10px] text-amber-300 font-semibold pt-1 font-sans">✓ Mais de 60 horas/mês economizadas por gestor</div>
         </div>
 
       </div>
@@ -1961,47 +1979,47 @@ def generate_showcase_html():
             <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[10px] font-mono uppercase tracking-wider mb-1">
               Soberania dos Dados & Arquitetura Inteligente
             </div>
-            <h4 class="text-base sm:text-lg font-bold text-white font-display-title">
+            <h4 class="heading-small text-xl sm:text-2xl font-serif font-normal text-white font-display-title">
               O Mercado Tradicional de IA vs A Abordagem Direta no Banco da AURA
             </h4>
           </div>
-          <span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 inline-flex items-center gap-1.5 w-fit">
+          <span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 inline-flex items-center gap-1.5 w-fit font-sans">
             <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
             Até 95% de Economia em Tokens
           </span>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 font-sans text-xs">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <!-- Coluna 1: O Mercado Tradicional de IA -->
-          <div class="p-4 rounded-xl bg-slate-900/60 border border-rose-500/20 space-y-2.5">
+          <div class="p-4 sm:p-5 rounded-xl bg-slate-900/60 border border-rose-500/20 space-y-2.5">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-rose-300 flex items-center gap-1.5">
-                <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-400"></i>
-                Como o Mercado Tradicional de IA Opera
-              </span>
+              <h5 class="card-title-serif font-serif text-sm sm:text-base text-rose-300 font-normal flex items-center gap-1.5">
+                <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-400 flex-shrink-0"></i>
+                <span>Como o Mercado Tradicional de IA Opera</span>
+              </h5>
               <span class="px-2 py-0.5 rounded text-[9px] font-mono bg-rose-500/15 text-rose-300">Ineficiente & Caro</span>
             </div>
-            <p class="text-slate-300 leading-relaxed">
+            <p class="card-desc-geist body-small text-slate-300 leading-relaxed text-sm">
               Envia <span class="text-rose-200 font-semibold">dados brutos e desorganizados</span> para servidores externos em nuvem, sem validação prévia e sem organização dos dados. Espera que a inteligência calcule tudo no escuro, consumindo recursos de forma descontrolada e <strong class="text-white">cobrando faturas caras por milhões de tokens para processar informações que já pertencem à sua própria empresa</strong>.
             </p>
-            <div class="text-[11px] text-rose-300 font-mono pt-1">
+            <div class="text-xs text-rose-300 font-mono pt-1">
               ✕ O cliente paga caro para processar a sua própria informação.
             </div>
           </div>
 
           <!-- Coluna 2: A Abordagem AURA -->
-          <div class="p-4 rounded-xl bg-slate-900/60 border border-emerald-500/25 space-y-2.5">
+          <div class="p-4 sm:p-5 rounded-xl bg-slate-900/60 border border-emerald-500/25 space-y-2.5">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
-                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
-                A Abordagem Inteligente da AURA
-              </span>
+              <h5 class="card-title-serif font-serif text-sm sm:text-base text-emerald-300 font-normal flex items-center gap-1.5">
+                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+                <span>A Abordagem Inteligente da AURA</span>
+              </h5>
               <span class="px-2 py-0.5 rounded text-[9px] font-mono bg-emerald-500/15 text-emerald-300">Conexão Local Direta</span>
             </div>
-            <p class="text-slate-300 leading-relaxed">
+            <p class="card-desc-geist body-small text-slate-300 leading-relaxed text-sm">
               Conecta <span class="text-emerald-200 font-semibold">direto na infraestrutura do banco do cliente</span>. Realiza todas as contas e conciliações de forma estruturada e exata na própria máquina local. A inteligência só é acionada para <strong class="text-white">cálculos estruturados, síntese estratégica e conclusões complexas</strong>. Isso garante fidelidade matemática, segurança, assertividade e respostas em milissegundos, com economia de até 95% em custos de tokens.
             </p>
-            <div class="text-[11px] text-emerald-300 font-mono font-semibold pt-1">
+            <div class="text-xs text-emerald-300 font-mono font-semibold pt-1">
               ✓ Cálculos estruturados locais, respostas em milissegundos e zero surpresas no fim do mês.
             </div>
           </div>
@@ -2130,54 +2148,54 @@ def generate_showcase_html():
         <p class="body-regular home_agents-feature-desc text-center max-w-xl mx-auto">Respostas diretas sobre governança, integração e segurança da AURA.</p>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 font-sans text-xs">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         
-        <div class="obsidian-card p-5 rounded-2xl space-y-2">
-          <h4 class="font-bold text-slate-100 flex items-center gap-2">
-            <i data-lucide="help-circle" class="w-4 h-4 text-cyan-400"></i>
-            A AURA substitui o sistema ERP atual da minha empresa?
+        <div class="obsidian-card p-5 sm:p-6 rounded-2xl space-y-2.5">
+          <h4 class="card-title-serif font-serif text-base sm:text-[18px] font-normal text-white flex items-center gap-2.5">
+            <i data-lucide="help-circle" class="w-4 h-4 text-cyan-400 flex-shrink-0"></i>
+            <span>A AURA substitui o sistema ERP atual da minha empresa?</span>
           </h4>
-          <p class="text-slate-400 leading-relaxed">
+          <p class="card-desc-geist body-small text-slate-300/90 text-sm leading-relaxed">
             Não. A AURA atua como uma supervisora de inteligência e auditoria contínua que se conecta ao seu ERP e automação existente, acelerando a tomada de decisões no dia a dia em postos, lojas, bares ou padarias.
           </p>
         </div>
 
-        <div class="obsidian-card p-5 rounded-2xl space-y-2">
-          <h4 class="font-bold text-slate-100 flex items-center gap-2">
-            <i data-lucide="lock" class="w-4 h-4 text-emerald-400"></i>
-            Meus dados de faturamento e clientes saem da minha empresa?
+        <div class="obsidian-card p-5 sm:p-6 rounded-2xl space-y-2.5">
+          <h4 class="card-title-serif font-serif text-base sm:text-[18px] font-normal text-white flex items-center gap-2.5">
+            <i data-lucide="lock" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+            <span>Meus dados de faturamento e clientes saem da minha empresa?</span>
           </h4>
-          <p class="text-slate-400 leading-relaxed">
+          <p class="card-desc-geist body-small text-slate-300/90 text-sm leading-relaxed">
             Absolutamente não. Em total conformidade com a LGPD (Lei 13.709/2018), qualquer dado de identificação pessoal (como CPF ou nomes) é removido automaticamente antes da análise. Todo o processamento funciona dentro da sua própria estrutura e nada de confidencial é enviado para servidores externos.
           </p>
         </div>
 
-        <div class="obsidian-card p-5 rounded-2xl space-y-2">
-          <h4 class="font-bold text-slate-100 flex items-center gap-2">
-            <i data-lucide="coins" class="w-4 h-4 text-emerald-400"></i>
-            Por que a AURA economiza até 95% em tokens comparada a outras soluções?
+        <div class="obsidian-card p-5 sm:p-6 rounded-2xl space-y-2.5">
+          <h4 class="card-title-serif font-serif text-base sm:text-[18px] font-normal text-white flex items-center gap-2.5">
+            <i data-lucide="coins" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+            <span>Por que a AURA economiza até 95% em tokens comparada a outras soluções?</span>
           </h4>
-          <p class="text-slate-400 leading-relaxed">
+          <p class="card-desc-geist body-small text-slate-300/90 text-sm leading-relaxed">
             Muitas ferramentas hoje enviam dados brutos e desorganizados para servidores em nuvem, sem validação prévia nem filtros de segurança, cobrando dos clientes faturas caras por milhões de tokens para ler dados que já são deles. A AURA trabalha conectada diretamente à infraestrutura do banco do cliente, realizando todas as contas no próprio ambiente local. A inteligência só é acionada para análises estruturadas e conclusões executivas, garantindo economia de até 95% em consumo de tokens, máxima assertividade, respostas em milissegundos e custo previsível.
           </p>
         </div>
 
-        <div class="obsidian-card p-5 rounded-2xl space-y-2">
-          <h4 class="font-bold text-slate-100 flex items-center gap-2">
-            <i data-lucide="clock" class="w-4 h-4 text-purple-400"></i>
-            Qual é a curva de aprendizado da equipe operacional?
+        <div class="obsidian-card p-5 sm:p-6 rounded-2xl space-y-2.5">
+          <h4 class="card-title-serif font-serif text-base sm:text-[18px] font-normal text-white flex items-center gap-2.5">
+            <i data-lucide="clock" class="w-4 h-4 text-purple-400 flex-shrink-0"></i>
+            <span>Qual é a curva de aprendizado da equipe operacional?</span>
           </h4>
-          <p class="text-slate-400 leading-relaxed">
+          <p class="card-desc-geist body-small text-slate-300/90 text-sm leading-relaxed">
             Zero minutos. A AURA compreende linguagem falada ou escrita natural em português do Brasil e entrega DecisionCards autoexplicativos que qualquer gerente, caixa ou encarregado opera intuitivamente em 1 clique.
           </p>
         </div>
 
-        <div class="obsidian-card p-5 rounded-2xl space-y-2 md:col-span-2">
-          <h4 class="font-bold text-slate-100 flex items-center gap-2">
-            <i data-lucide="check" class="w-4 h-4 text-amber-400"></i>
-            A inteligência pode errar contas ou inventar números?
+        <div class="obsidian-card p-5 sm:p-6 rounded-2xl space-y-2.5 md:col-span-2">
+          <h4 class="card-title-serif font-serif text-base sm:text-[18px] font-normal text-white flex items-center gap-2.5">
+            <i data-lucide="check" class="w-4 h-4 text-amber-400 flex-shrink-0"></i>
+            <span>A inteligência pode errar contas ou inventar números?</span>
           </h4>
-          <p class="text-slate-400 leading-relaxed">
+          <p class="card-desc-geist body-small text-slate-300/90 text-sm leading-relaxed">
             Não. A AURA não inventa nem faz suposições com valores financeiros ou de estoque. Toda conta de faturamento, volume e fechamento de caixa é calculada diretamente a partir dos cupons fiscais e leituras do seu sistema. Cada número é auditado matematicamente com exatidão antes de ser apresentado.
           </p>
         </div>
