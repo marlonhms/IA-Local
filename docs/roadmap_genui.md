@@ -4,7 +4,7 @@
 
 - **Data de Criação:** 07/10/2026  
 - **Versão do Documento:** 2.1.0 (Evolução Estratégica: Mentor de Decisão & Inteligência Analítica)  
-- **Status:** Proposto para Execução Imediata  
+- **Status:** Fases 0 e 1 Concluídas (P0 Homologado) | Fase 2 em Planejamento  
 - **Documento de Referência Arquitetural:** [`docs/Arquitetura GenUI para Edge AI.md`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/Arquitetura%20GenUI%20para%20Edge%20AI.md)  
 - **Repositório:** `C:\Users\Marlon\Documents\Agent PC\ia-banco-local`  
 - **Público-alvo:** Diretoria Executiva, Engenharia de Software, Arquitetura de IA e Gestores de Negócio B2B  
@@ -322,11 +322,11 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 
 ---
 
-### Fase 1 — Backend: Protocolo SSE Multiplexado & Envelopes Tipados (P0)
+### Fase 1 — Backend: Protocolo SSE Multiplexado & Envelopes Tipados (P0) [CONCLUÍDA EM 07/10/2026]
 **Objetivo:** Evoluir `core/aura_api.py` e `core/aura_engine.py` para emitir o fluxo de streaming em duas etapas bem demarcadas (Resumo Executivo inicial seguido de Structured Output encapsulado em envelope GenUI).
 
-- [ ] **F1-01 — Extensão do Modelo `AuraChunkType` em `core/aura_engine.py`:**  
-  Adicionar os novos tipos de chunks no Enum:
+- [x] **F1-01 — Extensão do Modelo `AuraChunkType` em `core/aura_engine.py`:**  
+  Adicionados os novos tipos de chunks no Enum:
   ```python
   class AuraChunkType(str, Enum):
       DELTA = "delta"                      # Texto puro em streaming (Resumo Executivo)
@@ -340,8 +340,8 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
       ERROR = "error"                      # Notificação de falha
       DONE = "done"                        # Finalização do stream
   ```
-- [ ] **F1-02 — Envelope Pydantic Canônico para Componentes GenUI (`core/schemas/genui.py`):**  
-  Criar schema unificado com metadados de ciclo de vida e idempotência:
+- [x] **F1-02 — Envelope Pydantic Canônico para Componentes GenUI (`core/schemas/genui.py`):**  
+  Criado schema unificado com metadados de ciclo de vida e idempotência:
   ```python
   class GenUIActionOption(BaseModel):
       model_config = ConfigDict(frozen=True)
@@ -363,19 +363,19 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
       props: Dict[str, Any] = Field(..., description="Camada 2: Propriedades puras do widget")
       actions: List[GenUIActionOption] = Field(default_factory=list, description="Camada 3: Action Sheets")
   ```
-- [ ] **F1-03 — Ajuste do Gerador de Streaming no `AuraEngine.ask_stream()`:**  
+- [x] **F1-03 — Ajuste do Gerador de Streaming no `AuraEngine.ask_stream()`:**  
   Ao processar uma pergunta com intenção analítica identificada:
   1. Emitir `ui_skeleton` com o nome do componente a ser renderizado e o texto contextual ("Consultando volumetria dos tanques...").
   2. Emitir tokens textuais do Resumo Executivo (`DELTA`) enquanto a ferramenta finaliza os cálculos.
   3. Emitir o evento `ui_complete` contendo a serialização do `GenUIEnvelope`.
   4. Finalizar com `DONE`.
-- [ ] **F1-04 — Suíte de Testes Automatizada do Backend (`scripts/test_genui_engine_sse.py`):**  
-  Validar a ordem cronológica estrita de emissão dos chunks, sem quebra de formato SSE.
+- [x] **F1-04 — Suíte de Testes Automatizada do Backend (`scripts/test_genui_engine_sse.py`):**  
+  Validação estrita da ordem cronológica de emissão (`intent` -> `ui_skeleton` -> `delta` -> `ui_complete` -> `done`), isolamento de JSON bruto e zero regressões.
 
-**Critério de Aceite da Fase 1:**  
-- O endpoint `/api/v1/aura/chat` transmite SSE compatível com clientes legados e com o novo protocolo GenUI.
-- Nenhum token de JSON vaza como texto comum no chat.
-- Teste `test_genui_engine_sse.py` aprovado com 100% de sucesso.
+**Critério de Aceite da Fase 1 (100% Aprovado):**  
+- [x] O endpoint `/api/v1/aura/chat` transmite SSE compatível com clientes legados e com o novo protocolo GenUI.
+- [x] Nenhum token de JSON vaza como texto comum no chat.
+- [x] Teste `test_genui_engine_sse.py` aprovado com 100% de sucesso.
 
 ---
 

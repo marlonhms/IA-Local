@@ -27,7 +27,7 @@ from pathlib import Path
 from enum import Enum
 from typing import AsyncIterator, Optional, Dict, Any, List, Tuple, Union
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 import google.generativeai as genai
 
 # Diretório raiz
@@ -45,6 +45,8 @@ from core.rag_engine import HybridRAGEngine
 from core.tools import PostoTools, get_erp_connection
 from core.sanitizer import central_log_sanitizer
 from core.semantic_router import SemanticRouter, classificar_intencao_heuristica, RETRY_REGEX
+from core.schemas.idempotency import generate_tool_call_id, generate_action_id
+from core.schemas.genui import GenUIEnvelope, GenUIActionOption, GenUIActionResult
 
 
 # =============================================================================
@@ -53,14 +55,19 @@ from core.semantic_router import SemanticRouter, classificar_intencao_heuristica
 
 class AuraChunkType(str, Enum):
     """Tipos de blocos emitidos no streaming assíncrono da AURA."""
-    DELTA = "delta"                # Token ou fragmento textual de resposta
-    INTENT = "intent"              # Detecção de intenção pelo roteador semântico
-    TOOL_START = "tool_start"      # Notificação de início de execução de ferramenta
-    TOOL_RESULT = "tool_result"    # Dados estruturados retornados pela ferramenta
-    CACHE_HIT = "cache_hit"        # Resposta recuperada instantaneamente do cache semântico
-    TELEMETRY = "telemetry"        # Métricas de observabilidade e latência SRE
-    ERROR = "error"                # Notificação de erro no processamento
-    DONE = "done"                  # Finalização da requisição
+    DELTA = "delta"                      # Token ou fragmento textual de resposta (Resumo Executivo)
+    INTENT = "intent"                    # Detecção de intenção pelo roteador semântico
+    TOOL_START = "tool_start"            # Notificação de início de execução de ferramenta
+    TOOL_RESULT = "tool_result"          # Dados estruturados retornados pela ferramenta
+    UI_SKELETON = "ui_skeleton"          # Sinal para exibir esqueleto do widget (< 100ms)
+    UI_DELTA = "ui_delta"                # Fragmentos fracionados de JSON de props
+    UI_COMPLETE = "ui_complete"          # Payload completo e validado da ferramenta (GenUIEnvelope)
+    UI_ACTION_RESULT = "ui_action_result"# Confirmação de ação transacional executada (F1-01)
+    UI_ACTION_FEEDBACK = "ui_action_feedback"# Feedback assíncrono com Action Voucher (Protocolo SSE v1.0)
+    CACHE_HIT = "cache_hit"              # Resposta recuperada instantaneamente do cache semântico
+    TELEMETRY = "telemetry"              # Métricas de observabilidade e latência SRE
+    ERROR = "error"                      # Notificação de erro no processamento
+    DONE = "done"                        # Finalização da requisição
 
 
 class AuraChunk(BaseModel):
@@ -71,6 +78,24 @@ class AuraChunk(BaseModel):
     text: Optional[str] = Field(default=None, description="Conteúdo textual do token ou mensagem")
     data: Optional[Dict[str, Any]] = Field(default=None, description="Metadados ou carga útil estruturada")
     session_id: Optional[str] = Field(default=None, description="ID da sessão vinculada")
+    tool_call_id: Optional[str] = Field(default=None, description="UUID da invocação da ferramenta (RFC 4122 v4)")
+    component_name: Optional[str] = Field(default=None, description="Nome do componente no SecureComponentRegistry")
+    title: Optional[str] = Field(default=None, description="Título contextual ou mensagem de status do skeleton")
+    envelope: Optional[Dict[str, Any]] = Field(default=None, description="Envelope canônico GenUI estruturado")
+
+    @model_validator(mode="after")
+    def sync_envelope_and_data(self) -> "AuraChunk":
+        """Garante que envelope e data estejam sincronizados em chunks UI_COMPLETE."""
+        if self.chunk_type == AuraChunkType.UI_COMPLETE:
+            if self.envelope is not None and self.data is None:
+                self.data = self.envelope
+            elif self.data is not None and self.envelope is None:
+                self.envelope = self.data
+        return self
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serializa o chunk em dicionário seguro para consumo SSE ou JSON."""
+        return self.model_dump(mode="json", exclude_none=True)
 
     def to_sse(self) -> str:
         """Formata o chunk no padrão Server-Sent Events (SSE)."""
@@ -90,6 +115,8 @@ class AuraResponse(BaseModel):
     routing_method: str = Field(..., description="Método utilizado no roteamento (pgvector ou heurística)")
     tool_name: Optional[str] = Field(default=None, description="Nome da ferramenta executada")
     tool_result: Optional[Dict[str, Any]] = Field(default=None, description="Resultado bruto da ferramenta")
+    tool_call_id: Optional[str] = Field(default=None, description="Identificador único da chamada de ferramenta")
+    envelope: Optional[Dict[str, Any]] = Field(default=None, description="Envelope canônico GenUI serializado")
     telemetry: Dict[str, Any] = Field(default_factory=dict, description="Telemetria SRE da consulta")
     cache_hit: bool = Field(default=False, description="Se a resposta veio do cache semântico")
     lgpd_sanitized_count: int = Field(default=0, description="Quantidade de entidades sensíveis ofuscadas")
@@ -493,6 +520,306 @@ def classificar_intencao(pergunta: str, router: Optional[SemanticRouter] = None)
         intencao, _, _ = router.route(pergunta)
         return intencao
     return classificar_intencao_heuristica(pergunta)
+
+
+# =============================================================================
+# MAPEAMENTO DO CATÁLOGO DE COMPONENTES GENUI & BUILDER CANÔNICO
+# =============================================================================
+
+GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
+    "previsao_tanques": {
+        "component_name": "render_TankRunOutForecastUI",
+        "client_component": "TankForecastWidget",
+        "title": "Analisando autonomia e volumetria dos tanques...",
+    },
+    "auditoria_turno": {
+        "component_name": "render_ShiftReconciliationUI",
+        "client_component": "ShiftReconciliationWidget",
+        "title": "Auditando fechamento de turno e conciliação de caixa...",
+    },
+    "lmc_anp": {
+        "component_name": "render_LMCReportUI",
+        "client_component": "LMCReportWidget",
+        "title": "Verificando conformidade do LMC (Portaria ANP nº 26)...",
+    },
+    "desempenho_pista_frentistas": {
+        "component_name": "render_PumpPerformanceUI",
+        "client_component": "PumpPerformanceWidget",
+        "title": "Analisando desempenho de pista, frentistas e vazão de bicos...",
+    },
+    "conveniencia_vendas_cruzadas": {
+        "component_name": "render_BasketUpsellStrategyUI",
+        "client_component": "BasketUpsellWidget",
+        "title": "Minerando oportunidades de vendas cruzadas no PDV...",
+    },
+    "vendas_analitico": {
+        "component_name": "render_MarginAnalysisUI",
+        "client_component": "MarginProfitabilityWidget",
+        "title": "Analisando histórico de vendas e rentabilidade...",
+    },
+    "sre_metricas": {
+        "component_name": "render_SRETelemetryUI",
+        "client_component": "SRETelemetryWidget",
+        "title": "Coletando telemetria de observabilidade SRE...",
+    },
+    "ajuda_sistema": {
+        "component_name": "render_AuraSystemGuideUI",
+        "client_component": "AuraSystemGuideWidget",
+        "title": "Consultando documentação e recursos da plataforma AURA...",
+    },
+    "estoque_posicao": {
+        "component_name": "render_TankRunOutForecastUI",
+        "client_component": "TankForecastWidget",
+        "title": "Consultando posição de estoque e volumetria dos tanques...",
+    },
+}
+
+
+def build_canonical_genui_envelope(
+    intencao: str,
+    tool_call_id: str,
+    resultado_bruto: Any,
+    executive_summary: str,
+) -> Optional[GenUIEnvelope]:
+    """
+    Constrói um envelope canônico GenUIEnvelope a partir dos dados analíticos determinísticos
+    e do resumo executivo gerado.
+    Retorna None se a intenção não estiver mapeada ou se resultado_bruto indicar erro ou ausência de dados.
+    """
+    mapping = GENUI_COMPONENT_REGISTRY_MAP.get(intencao)
+    if not mapping:
+        return None
+
+    if not resultado_bruto:
+        return None
+
+    # Se resultado_bruto indica erro de execução de ferramenta, bloqueia geração de envelope com mutações
+    if isinstance(resultado_bruto, dict):
+        if resultado_bruto.get("status") == "error" or "error" in resultado_bruto or resultado_bruto.get("sucesso") is False:
+            return None
+
+    # Prepara propriedades determinísticas (Camada 2)
+    props: Dict[str, Any] = {}
+    if isinstance(resultado_bruto, dict):
+        props = dict(resultado_bruto)
+    elif resultado_bruto is not None:
+        props = {"data": resultado_bruto}
+
+    # Prepara ações transacionais (Camada 3)
+    actions: List[GenUIActionOption] = []
+
+    if intencao in ("previsao_tanques", "estoque_posicao"):
+        sugestoes = props.get("sugestoes_pedidos", []) if isinstance(props, dict) else []
+        if sugestoes and len(sugestoes) > 0:
+            sug_top = sugestoes[0]
+            litros = int(sug_top.get("volume_sugerido_litros", 15000))
+            tanque_cod = sug_top.get("tanque", "01")
+            comb_nome = sug_top.get("combustivel", "Combustível")
+            label_pedido = f"Pedir Carreta ({comb_nome} - {litros:,} L)".replace(",", ".")
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label=label_pedido,
+                    action_type="mutation",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={
+                        "intent": intencao,
+                        "operacao": "pedido_carreta",
+                        "litros": litros,
+                        "tanque": tanque_cod,
+                        "combustivel": comb_nome,
+                    },
+                )
+            )
+        else:
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="Pedir Carreta de Combustível (15.000 L)",
+                    action_type="mutation",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": intencao, "operacao": "pedido_carreta", "litros": 15000},
+                )
+            )
+        actions.append(
+            GenUIActionOption(
+                action_id=generate_action_id(),
+                label="Projetar no Companion Canvas",
+                action_type="inspection",
+                variant="secondary",
+                is_destructive=False,
+                requires_confirmation=False,
+                payload={"perspective": "tanques"},
+            )
+        )
+
+    elif intencao == "auditoria_turno":
+        actions.append(
+            GenUIActionOption(
+                action_id=generate_action_id(),
+                label="Homologar Fechamento de Turno",
+                action_type="mutation",
+                variant="primary",
+                is_destructive=False,
+                requires_confirmation=True,
+                payload={"intent": intencao, "operacao": "homologar_fechamento"},
+            )
+        )
+        actions.append(
+            GenUIActionOption(
+                action_id=generate_action_id(),
+                label="Auditar Caixa no Canvas",
+                action_type="inspection",
+                variant="secondary",
+                is_destructive=False,
+                requires_confirmation=False,
+                payload={"perspective": "caixas"},
+            )
+        )
+
+    elif intencao == "lmc_anp":
+        actions.append(
+            GenUIActionOption(
+                action_id=generate_action_id(),
+                label="Emitir Termo de Conformidade ANP",
+                action_type="mutation",
+                variant="primary",
+                is_destructive=False,
+                requires_confirmation=True,
+                payload={"intent": intencao, "norma": "Portaria ANP 26"},
+            )
+        )
+        actions.append(
+            GenUIActionOption(
+                action_id=generate_action_id(),
+                label="Inspecionar Variações no Canvas",
+                action_type="inspection",
+                variant="secondary",
+                is_destructive=False,
+                requires_confirmation=False,
+                payload={"perspective": "tanques"},
+            )
+        )
+
+    elif intencao == "desempenho_pista_frentistas":
+        actions.append(
+            GenUIActionOption(
+                action_id=generate_action_id(),
+                label="Ajustar Escala da Pista",
+                action_type="mutation",
+                variant="primary",
+                is_destructive=False,
+                requires_confirmation=True,
+                payload={"intent": intencao, "operacao": "ajuste_escala"},
+            )
+        )
+        actions.append(
+            GenUIActionOption(
+                action_id=generate_action_id(),
+                label="Inspecionar Bicos no Canvas",
+                action_type="inspection",
+                variant="secondary",
+                is_destructive=False,
+                requires_confirmation=False,
+                payload={"perspective": "bicos"},
+            )
+        )
+
+    elif intencao == "conveniencia_vendas_cruzadas":
+        combos = props.get("combos", []) if isinstance(props, dict) else []
+        if combos and len(combos) > 0:
+            c_top = combos[0]
+            orig = c_top.get("origem") or c_top.get("produto_origem", "Produto")
+            rec = c_top.get("recomendado") or c_top.get("produto_recomendado", "Item")
+            label_combo = f"Ativar Combo no PDV ({orig} + {rec})"
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label=label_combo,
+                    action_type="mutation",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": intencao, "operacao": "ativar_combo", "origem": orig, "recomendado": rec},
+                )
+            )
+        else:
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="Ativar Campanha de Balcão no PDV",
+                    action_type="mutation",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": intencao, "operacao": "ativar_combo"},
+                )
+            )
+        actions.append(
+            GenUIActionOption(
+                action_id=generate_action_id(),
+                label="Simular Lift no Canvas",
+                action_type="inspection",
+                variant="secondary",
+                is_destructive=False,
+                requires_confirmation=False,
+                payload={"perspective": "conveniencia"},
+            )
+        )
+
+    elif intencao == "vendas_analitico":
+        actions.append(
+            GenUIActionOption(
+                action_id=generate_action_id(),
+                label="Destacar Produtos de Alta Margem",
+                action_type="mutation",
+                variant="primary",
+                is_destructive=False,
+                requires_confirmation=True,
+                payload={"intent": intencao, "operacao": "destacar_margem"},
+            )
+        )
+        actions.append(
+            GenUIActionOption(
+                action_id=generate_action_id(),
+                label="Auditar Vendas no Canvas",
+                action_type="inspection",
+                variant="secondary",
+                is_destructive=False,
+                requires_confirmation=False,
+                payload={"perspective": "vendas"},
+            )
+        )
+
+    else:
+        # Ação genérica de inspeção no Canvas
+        actions.append(
+            GenUIActionOption(
+                action_id=generate_action_id(),
+                label="Projetar no Companion Canvas",
+                action_type="inspection",
+                variant="secondary",
+                is_destructive=False,
+                requires_confirmation=False,
+                payload={"intent": intencao},
+            )
+        )
+
+    return GenUIEnvelope(
+        schema_version="1.0",
+        tool_call_id=tool_call_id,
+        component_name=mapping["component_name"],
+        client_component=mapping.get("client_component"),
+        intent=intencao,
+        executive_summary=executive_summary,
+        props=props,
+        actions=actions,
+        ttl_seconds=900,
+    )
 
 
 # =============================================================================
@@ -1260,6 +1587,40 @@ Diretrizes Específicas por Assunto:
                 ])
             return "\n".join(linhas)
 
+        elif intencao in ("dados_filial", "empresa", "filial"):
+            nome = resultado_bruto.get("nome", "Posto")
+            razao = resultado_bruto.get("razao_social", nome)
+            cnpj = resultado_bruto.get("cnpj", "")
+            end = resultado_bruto.get("endereco", "")
+            pdv = resultado_bruto.get("pdv", "")
+            linhas = [
+                f"### 🏢 Dados Cadastrais da Empresa ({nome})",
+                "",
+                f"- **Razão Social:** {razao}",
+                f"- **CNPJ:** {cnpj}",
+                f"- **Endereço:** {end}",
+                f"- **PDV:** {pdv}",
+            ]
+            return "\n".join(linhas)
+
+        elif intencao in ("sre_metricas", "telemetria_sre"):
+            linhas = [
+                "### 📈 Telemetria e Saúde Operacional (SRE)",
+                "",
+                f"- **Conexões PostgreSQL:** {resultado_bruto.get('conexoes_ativas', 0)} ativas",
+                f"- **Cache Hit Ratio:** {resultado_bruto.get('cache_hit_ratio_pct', 99.9)}%",
+            ]
+            return "\n".join(linhas)
+
+        # Fallback genérico para qualquer ferramenta com dados válidos
+        if isinstance(resultado_bruto, dict) and len(resultado_bruto) > 0:
+            linhas = [f"### 📋 Resumo Operacional ({intencao.replace('_', ' ').title()})", ""]
+            for k, v in list(resultado_bruto.items())[:6]:
+                if not isinstance(v, (dict, list)):
+                    linhas.append(f"- **{k.replace('_', ' ').title()}:** {v}")
+            if len(linhas) > 2:
+                return "\n".join(linhas)
+
         return None
     # STREAMING ASSÍNCRONO DA AURA (ask_stream)
     # -------------------------------------------------------------------------
@@ -1312,6 +1673,7 @@ Diretrizes Específicas por Assunto:
         # 2. Roteamento Semântico Vetorial / Heurístico (sobre a pergunta efetiva)
         intencao, confianca, telemetria_rota = self.router.route(pergunta_efetiva)
         query_vector = telemetria_rota.get("query_vector")
+        tool_call_id = generate_tool_call_id()
 
         tool_start_msg = (
             f"Repetindo consulta anterior: '{retry_pergunta_anterior}'..."
@@ -1328,6 +1690,7 @@ Diretrizes Específicas por Assunto:
                 "routing_telemetry": telemetria_rota,
                 "is_retry": is_retry,
                 "retry_target": retry_pergunta_anterior,
+                "tool_call_id": tool_call_id,
             },
             session_id=sess_id,
         )
@@ -1335,9 +1698,28 @@ Diretrizes Específicas por Assunto:
         yield AuraChunk(
             chunk_type=AuraChunkType.TOOL_START,
             text=tool_start_msg,
-            data={"intent": intencao, "tool_name": intencao},
+            data={"intent": intencao, "tool_name": intencao, "tool_call_id": tool_call_id},
             session_id=sess_id,
         )
+
+        # Se intenção mapeada no catálogo GenUI, emite ui_skeleton precursor (<100ms)
+        genui_meta = GENUI_COMPONENT_REGISTRY_MAP.get(intencao)
+        if genui_meta:
+            yield AuraChunk(
+                chunk_type=AuraChunkType.UI_SKELETON,
+                tool_call_id=tool_call_id,
+                component_name=genui_meta["component_name"],
+                title=genui_meta["title"],
+                session_id=sess_id,
+                data={
+                    "chunk_type": "ui_skeleton",
+                    "tool_call_id": tool_call_id,
+                    "component_name": genui_meta["component_name"],
+                    "client_component": genui_meta.get("client_component"),
+                    "title": genui_meta["title"],
+                    "session_id": sess_id,
+                },
+            )
 
         # 3. Execução da Ferramenta correspondente
         (
@@ -1524,6 +1906,26 @@ Diretrizes Específicas por Assunto:
                     session_id=sess_id,
                 )
 
+        # 7.5. Emissão do Envelope Canônico GenUI (ui_complete) para a Camada 2 & 3
+        if genui_meta:
+            envelope = build_canonical_genui_envelope(
+                intencao=intencao,
+                tool_call_id=tool_call_id,
+                resultado_bruto=resultado_bruto,
+                executive_summary=resposta_final,
+            )
+            if envelope:
+                envelope_payload = envelope.to_sse_payload()
+                yield AuraChunk(
+                    chunk_type=AuraChunkType.UI_COMPLETE,
+                    tool_call_id=tool_call_id,
+                    component_name=genui_meta["component_name"],
+                    title=genui_meta.get("title"),
+                    envelope=envelope_payload,
+                    data=envelope_payload,
+                    session_id=sess_id,
+                )
+
         # 8. Salvamento no Cache Semântico (se catálogo)
         if intencao == "catalogo_produtos" and not cache_hit and query_vector and sucesso_llm:
             frases_bloqueio = ["não há registros", "erro", "indisponível", "não foi possível", "não encontrei"]
@@ -1612,6 +2014,8 @@ Diretrizes Específicas por Assunto:
         cache_hit = False
         telemetria = {}
         tool_result = None
+        envelope_data: Optional[Dict[str, Any]] = None
+        tool_call_id_val: Optional[str] = None
 
         async for chunk in self.ask_stream(
             query,
@@ -1624,6 +2028,7 @@ Diretrizes Específicas por Assunto:
                 intencao_detectada = chunk.data.get("intent", intencao_detectada)
                 confianca = chunk.data.get("confidence", 0.0)
                 metodo_rota = chunk.data.get("routing_telemetry", {}).get("method", metodo_rota)
+                tool_call_id_val = chunk.tool_call_id or chunk.data.get("tool_call_id")
 
             elif chunk.chunk_type == AuraChunkType.CACHE_HIT:
                 cache_hit = True
@@ -1631,7 +2036,16 @@ Diretrizes Específicas por Assunto:
             elif chunk.chunk_type == AuraChunkType.TOOL_RESULT and chunk.data:
                 tool_result = chunk.data.get("result", chunk.data)
 
-            elif chunk.chunk_type == AuraChunkType.DELTA and chunk.text:
+            elif chunk.chunk_type == AuraChunkType.UI_SKELETON:
+                if chunk.tool_call_id and not tool_call_id_val:
+                    tool_call_id_val = chunk.tool_call_id
+
+            elif chunk.chunk_type == AuraChunkType.UI_COMPLETE:
+                envelope_data = chunk.envelope or chunk.data
+                if chunk.tool_call_id:
+                    tool_call_id_val = chunk.tool_call_id
+
+            elif chunk.chunk_type in (AuraChunkType.DELTA, AuraChunkType.ERROR) and chunk.text:
                 texto_chunks.append(chunk.text)
 
             elif chunk.chunk_type == AuraChunkType.TELEMETRY and chunk.data:
@@ -1648,7 +2062,10 @@ Diretrizes Específicas por Assunto:
             routing_method=metodo_rota,
             tool_name=intencao_detectada,
             tool_result=tool_result,
+            tool_call_id=tool_call_id_val,
+            envelope=envelope_data,
             telemetry=telemetria,
             cache_hit=cache_hit,
             lgpd_sanitized_count=telemetria.get("lgpd_redacted_count", 0),
         )
+

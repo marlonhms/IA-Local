@@ -67,6 +67,11 @@ from core.schemas.idempotency import (
     validate_action_id,
     IdempotencyKey,
 )
+from core.schemas.genui import (
+    GenUIActionOption,
+    GenUIEnvelope,
+    GenUIActionResult,
+)
 
 __all__ = [
     "BranchStatus",
@@ -121,5 +126,9 @@ __all__ = [
     "validate_tool_call_id",
     "validate_action_id",
     "IdempotencyKey",
+    "GenUIActionOption",
+    "GenUIEnvelope",
+    "GenUIActionResult",
 ]
+
 
