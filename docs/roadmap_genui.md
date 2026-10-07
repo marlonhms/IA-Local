@@ -1,46 +1,34 @@
 # Roadmap Executivo & Técnico: Implementação de GenUI & Server-Driven UI no AURA Edge AI
 
-> **AURA IntelligentUI (GenUI/SDUI v1.0)** — Transformando a interface conversacional da AURA em um cockpit transacional, efémero e determinístico no Edge, com micro-widgets reativos em 3 camadas, idempotência criptográfica, Guided Decoding e isolamento cibernético.
+> **AURA IntelligentUI (GenUI/SDUI v1.0) — O Mentor de Decisões Executivo no Edge:** Transformando a AURA de um leitor passivo de relatórios ou medidor de telemetria em um **verdadeiro mentor de negócios especialista em análises profundas, previsões preditivas, consultas multidimensionais e comparações estratégicas para tomadas de decisão assertivas**.
 
 - **Data de Criação:** 07/10/2026  
-- **Versão do Documento:** 2.0.0 (Revisão Técnica & Alinhamento Arquitetural Definitivo)  
+- **Versão do Documento:** 2.1.0 (Evolução Estratégica: Mentor de Decisão & Inteligência Analítica)  
 - **Status:** Proposto para Execução Imediata  
 - **Documento de Referência Arquitetural:** [`docs/Arquitetura GenUI para Edge AI.md`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/Arquitetura%20GenUI%20para%20Edge%20AI.md)  
 - **Repositório:** `C:\Users\Marlon\Documents\Agent PC\ia-banco-local`  
-- **Público-alvo:** Engenharia de Software, Arquitetura de IA, UX/UI Designers e Operações de Postos B2B  
+- **Público-alvo:** Diretoria Executiva, Engenharia de Software, Arquitetura de IA e Gestores de Negócio B2B  
 
 ---
 
-## 1. Visão Executiva & Contexto Estratégico
+## 1. Visão Executiva & Reposicionamento Estratégico
 
-### 1.1 O Desafio e a Tese de Valor
-O paradigma tradicional de interfaces para modelos de linguagem (LLMs) apoia-se na devolução de texto livre ou tabelas estáticas formatadas em **Markdown**. No contexto de operações críticas e de alta intensidade no varejo de combustíveis e lojas de conveniência (B2B), este formato impõe sérias deficiências cognitivas e operacionais:
-1. **Sobrecarga Cognitiva (Cognitive Overhead):** O gestor do posto precisa garimpar blocos densos de texto para encontrar métricas vitais de autonomia de tanques, bicos com vazão defasada ou divergências de caixa PDV.
-2. **Ausência de Affordances Transacionais:** Tabelas Markdown não oferecem botões de ação imediata (e.g., aprovação de compra de carreta, bloqueio de bico descalibrado ou homologação fiscal), forçando o operador a abrir o ERP legado, buscar telas secundárias e digitar dados manualmente.
-3. **Riscos de Segurança Cibernética:** Parsers genéricos de Markdown expõem o cliente a vulnerabilidades de injeção de tags HTML/XSS e violam diretrizes do **OWASP Top 10 for LLMs** (especialmente **LLM01 - Prompt Injection** e **LLM03 - Excessive Agency**).
+### 1.1 O Fim do "Medidor Ambulante" e a Tese do Mentor de Decisão
+Operações comerciais modernas (postos com sondas automáticas Veeder-Root/Companytec, lojas de conveniência, varejo e franquias) **já possuem hardware e painéis passivos que medem estoques e volumes brutos**. O mercado não precisa de mais um "medidor ambulante" que apenas repete o que sensores já registram.
 
-A arquitetura **Generative UI (GenUI)** combinada com **Server-Driven UI (SDUI)** resolve esses atritos. O modelo de linguagem deixa de ser um "gerador de texto livre" e assume a função de **motor de raciocínio, classificação e decisão de estado**. A interface no navegador transforma-se em um orquestrador efémero de **micro-widgets nativos em três camadas**, renderizados dinamicamente a partir de **Structured Outputs tipados** (Pydantic v2 no backend / contratos rígidos no cliente).
+O gargalo real do gestor e do dono da empresa é a **ausência de inteligência acionável e mentoria estratégica**:
+1. **Dados Sem Lucro:** Sistemas legados mostram faturamento bruto, mas ocultam onde a margem está sendo corroída (taxas de cartão, produtos de baixa rentabilidade, descontos descontrolados).
+2. **Incapacidade de Simulação (Cenários "What-If"):** O gestor não sabe o impacto de reajustar o preço em R$ 0,05, alterar o mix de vendas ou trocar a escala de operadores.
+3. **Falta de Comparações Acionáveis:** Nenhuma ferramenta tradicional cruza organicamente o Turno A vs Turno B, Operador 1 vs Operador 2 em conversão de alto valor, ou Dia Atual vs Média Histórica com explicação causal de por que um performou melhor que o outro.
+4. **Decisões Reativas e Tardias:** Quebras de caixa, desvios e estoques estagnados só são percebidos no fechamento do mês, quando o prejuízo já ocorreu.
 
-```
-+----------------------------------------------------------------------------------------------------+
-|                                    PARADIGMA TRADICIONAL (MARKDOWN)                                |
-|  Usuário: "Como estão os tanques?"                                                                  |
-|  LLM: "Olá! Segue o status:                                                                       |
-|        - Tanque 04 (Diesel S10): 3.200 L restantes. Autonomia de 4.2 horas. Recomendo comprar."     |
-|  [Problema: Sem ação direta, sem gráfico, requer digitação manual no ERP, risco de alucinação]     |
-+----------------------------------------------------------------------------------------------------+
-                                                  ▼
-+----------------------------------------------------------------------------------------------------+
-|                                    PARADIGMA GENUI / SDUI (AURA)                                   |
-|  Usuário: "Como estão os tanques?"                                                                  |
-|  Backend: Roteador -> Consulta SQL ERP 5433 -> Cálculo Determinístico -> Envelopamento GenUI        |
-|  Stream SSE:                                                                                       |
-|    1. Camada 1: Resumo Executivo em Streaming (TTFT < 300ms)                                       |
-|    2. Camada 2: Skeleton UI -> Hidratação de Widget Nativo (Gauges SVG, 15% vs 0L, Espaço Livre)    |
-|    3. Camada 3: Action Sheet Transacional com Idempotência [⚡ Aprovar Pedido de Carreta 15.000 L]  |
-|  [Vantagem: 100% determinístico, zero código vindo do LLM, ação em 1 clique com rollback]          |
-+----------------------------------------------------------------------------------------------------+
-```
+A AURA assume o papel de **Mentor de Decisão de Borda (Executive Decision Mentor)**:
+Ela combina a soberania do banco de dados local com GenUI e Server-Driven UI para entregar:
+- **Análise Profunda:** Decomposição de margem real líquida por categoria, produto e modalidade de recebimento.
+- **Previsões Preditivas:** Projeção de fluxo de caixa, demanda de pico e comportamento de clientes.
+- **Consultas Multidimensionais:** Perguntas complexas respondidas com diagnósticos claros e memória de cálculo auditável.
+- **Comparações & Benchmarks:** Confronto de turnos, colaboradores e períodos com identificação imediata de gaps e oportunidades de ganho.
+- **Decisão Assertiva em 1 Toque:** Action Sheets executivas que permitem aplicar correções imediatas com segurança.
 
 ### 1.2 Princípios Inegociáveis de Engenharia da AURA
 1. **Zero Regressão na Stack Existente:** Manter 100% da compatibilidade funcional com as 11 ferramentas analíticas (`core/tools.py`), os contratos Pydantic v1.0 (`core/schemas/`), o Companion Canvas de 4 perspectivas (`web/js/aura-aux-panel.js`), a suíte de DecisionCards (`web/js/aura-chat.js`) e as rotas do FastAPI (`core/aura_api.py`).
@@ -232,18 +220,18 @@ Nas perguntas subsequentes da mesma sessão, os tokens de atenção do modelo in
 
 ---
 
-## 6. Catálogo Canônico dos 6 Micro-Widgets Primários (Especificação de Contratos)
+## 6. Catálogo Canônico de Micro-Widgets do Mentor de Decisões (Especificação de Contratos)
 
-Abaixo está a especificação completa dos 6 micro-widgets que compõem o catálogo canônico da AURA IntelligentUI:
+Abaixo está a especificação do catálogo canônico da AURA IntelligentUI, projetado para atuar como **mentor executivo de negócios**, indo muito além de telemetria estática:
 
-| Invocação Canônica (`tool_name`) | Nome do Componente no Cliente | Contrato Backend Vinculado | Visualização Rica (Camada 2) | Action Sheet Transacional (Camada 3) |
+| Invocação Canônica (`tool_name`) | Nome do Componente no Cliente | Contrato Backend Vinculado | Visualização Rica: Análise & Mentoria (Camada 2) | Action Sheet Transacional: Decisão Assertiva (Camada 3) |
 | :--- | :--- | :--- | :--- | :--- |
-| **`render_TankRunOutForecastUI`** | `TankForecastWidget` | `TankForecastContract` | Gauges de nível, autonomia crítica (15%) vs run-out (0L), espaço livre para descarga em múltiplos de 5.000 L. | • `Aprovar Pedido de Carreta (15.000 L)`<br>• `Ver Detalhes dos Tanques no Canvas` |
-| **`render_ShiftReconciliationUI`** | `ShiftReconciliationWidget` | `ShiftReconciliationContract` | Triangulação trilateral (Automação Companytec x Caixas PDV x Encerrantes físicos), quebra/sobra em R$. | • `Homologar Fechamento de Caixa`<br>• `Notificar Divergência de Turno`<br>• `Auditar no Canvas` |
-| **`render_PumpPerformanceUI`** | `PumpPerformanceWidget` | `PumpPerformanceContract` | Ranking de frentistas por ticket médio, bicos com vazão lenta (<30 L/min), comparativo de produtividade. | • `Solicitar Aferição de Bico Lento`<br>• `Emitir Ordem de Manutenção`<br>• `Inspecionar Pista no Canvas` |
-| **`render_LMCComplianceUI`** | `LMCComplianceWidget` | `LMCReportContract` | Régua visual de variação volumétrica ANP [-0.60% a +0.60%], status de conformidade da Portaria 26. | • `Validar Fechamento LMC do Dia`<br>• `Exportar Livro Digital ANP`<br>• `Inspecionar Livro no Canvas` |
-| **`render_MarketBasketUI`** | `MarketBasketWidget` | `MarketBasketContract` | Cartões de top combos com Lift >= 2.0x, suporte e confiança, script prático sugerido para o operador de caixa. | • `Ativar Promoção no PDV`<br>• `Imprimir Script de Balcão`<br>• `Explorar Regras no Canvas` |
-| **`render_StationHealthUI`** | `StationHealthWidget` | `StationStatus` | Latência dos bancos locais (5433 ERP, 5434 pgvector), status de conexões ativas, integridade de índices HNSW. | • `Forçar Sincronização de Dados`<br>• `Limpar Cache Semântico`<br>• `Diagnóstico de Rede` |
+| **`render_ExecutiveBriefingUI`** | `ExecutiveBriefingWidget` | `ExecutiveBriefingContract` | **Diagnóstico Executivo do Dia:** Lucro bruto estimado, margem líquida real, 3 pontos críticos de atenção no negócio e gap de faturamento vs meta. | • `Aplicar Recomendações do Dia`<br>• `Ajustar Metas de Pista/Caixa`<br>• `Projetar Cenário no Canvas` |
+| **`render_MarginAnalysisUI`** | `MarginProfitabilityWidget` | `MarginAnalysisContract` | **Análise de Margem Real & Meios de Pagamento:** Decomposição de margem líquida por categoria (Combustíveis, Conveniência, Troca de Óleo) e impacto real de taxas de cartões e vouchers frota. | • `Simular Repasse de Taxa de Cartão`<br>• `Destacar Produtos de Alta Margem`<br>• `Auditar Custos no Canvas` |
+| **`render_PredictiveScenarioUI`** | `PredictiveScenarioWidget` | `PredictiveForecastContract` | **Simulador Preditivo ("What-If"):** Projeção de fluxo de caixa para os próximos 3 a 7 dias, elasticidade de demanda em simulações de preço (+/- R$ 0,05) e previsão de pico de fluxo por horário. | • `Homologar Cenário Simulado`<br>• `Agendar Compra no Ponto Ótimo`<br>• `Exportar Estudo Preditivo` |
+| **`render_BenchmarkComparisonUI`** | `ComparativeBenchmarkWidget` | `ComparativeBenchmarkContract` | **Comparações & Benchmarks Lado a Lado:** Turno 1 vs Turno 2 (faturamento, quebra de caixa, mix), Operador A vs B em conversão de aditivada/lubrificantes, e Este Período vs Mês Anterior. | • `Bonificar Operadores Destaque`<br>• `Acionar Treinamento de Abordagem`<br>• `Inspecionar Turnos no Canvas` |
+| **`render_FinancialLeakAuditUI`** | `FinancialLeakAuditWidget` | `ShiftReconciliationContract` | **Mentor de Prevenção de Fugas & Quebras:** Auditoria contínua de caixa PDV, cancelamentos excessivos de cupons, sangrias e furos de estoque físico vs fiscal em tempo real. | • `Estancar Quebra de Caixa no Turno`<br>• `Bloquear Desconto Anômalo`<br>• `Auditar Caixa no Canvas` |
+| **`render_BasketUpsellStrategyUI`** | `BasketUpsellWidget` | `MarketBasketContract` | **Mentor de Alavancagem de Ticket Médio:** Pares de vendas cruzadas com alto Lift (Pista x Conveniência x Serviços), impacto projetado no faturamento e script prático para a equipe. | • `Ativar Campanha de Balcão no PDV`<br>• `Imprimir Script de Abordagem`<br>• `Simular Impacto no Canvas` |
 
 ---
 
@@ -424,13 +412,13 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 
 ---
 
-### Fase 3 — Micro-Widget Piloto em 3 Camadas: `TankRunOutForecastUI` (P0)
-**Objetivo:** Construir a primeira implementação completa fim-a-fim da arquitetura GenUI para o fluxo crítico de **Previsão de Esgotamento de Tanques e Pedido de Carreta**.
+### Fase 3 — Micro-Widget Piloto em 3 Camadas: `ExecutiveDecisionMentorUI` (P0)
+**Objetivo:** Construir a primeira implementação completa fim-a-fim da arquitetura GenUI para o fluxo de **Mentoria Executiva de Decisão & Briefing Estratégico do Negócio** (cruzando margem real, pontos de atenção operacional e recomendações prioritárias com simulação).
 
-- [ ] **F3-01 — Componente `TankForecastWidget` no `SecureComponentRegistry`:**  
-  Implementar a classe de componente no frontend em `web/js/genui/tank-widget.js`:
+- [ ] **F3-01 — Componente `ExecutiveBriefingWidget` no `SecureComponentRegistry`:**  
+  Implementar a classe de componente no frontend em `web/js/genui/decision-mentor-widget.js`:
   ```javascript
-  class TankForecastWidget {
+  class ExecutiveBriefingWidget {
     constructor(payload) {
       this.toolCallId = payload.tool_call_id;
       this.summary = payload.executive_summary;
@@ -440,25 +428,25 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
       this.eventListeners = {};
     }
     mount() { /* Constrói as 3 camadas em elementos DOM puros */ }
-    renderLayer1() { /* Resumo Executivo com badge de urgência */ }
-    renderLayer2() { /* Gauges de nível, autonomia 15% vs 0L, espaço livre */ }
-    renderLayer3() { /* Action Sheet: Botão de aprovação de carreta */ }
+    renderLayer1() { /* Resumo Executivo: Lucro do dia, margem líquida e alerta crítico */ }
+    renderLayer2() { /* Painel Analítico: Margem por categoria, gaps de meta e benchmarking */ }
+    renderLayer3() { /* Action Sheet: Ações assertivas em 1 clique (Ajustar metas, bonificar, conter perdas) */ }
     applyOptimisticState(newState) { /* Trava o botão e exibe badge otimista */ }
     rollbackOptimisticState(errorMsg) { /* Restaura estado e exibe erro */ }
-    projectToCanvas() { /* Despacha visualização para window.auraAuxPanel */ }
+    projectToCanvas() { /* Despacha visualização profunda para window.auraAuxPanel */ }
   }
   ```
-- [ ] **F3-02 — Construção da Visualização Rica (Camada 2):**  
-  Renderizar medidores visuais de combustível com gradientes semânticos (vermelho para estoque <15%, amarelo para atenção, verde para estável) e cálculo do espaço livre para descarga em compartimentos de 5.000 L.
-- [ ] **F3-03 — Construção da Action Sheet Transacional (Camada 3):**  
-  Implementar o botão `⚡ Aprovar Pedido de Carreta (15.000 L)` com dados pré-parametrizados e indicação de status `Proposta pela IA (Requer Confirmação)`.
+- [ ] **F3-02 — Construção da Visualização Rica (Camada 2 - Diagnóstico de Rentabilidade):**  
+  Renderizar indicadores visuais de rentabilidade real (margem líquida descontando taxas de pagamento, produtos de alta tração vs itens de queima de margem, e comparativo de desempenho vs dia anterior).
+- [ ] **F3-03 — Construção da Action Sheet Transacional (Camada 3 - Tomada de Decisão):**  
+  Implementar botões executivos com propostas pré-calculadas pela IA: `⚡ Aplicar Recomendações do Turno`, `🎯 Ajustar Foco da Equipe` e `🔍 Simular Cenário no Canvas`.
 - [ ] **F3-04 — Projeção Paralela no Companion Canvas:**  
-  Ao renderizar o widget inline no chat, sincronizar automaticamente a projeção detalhada para o painel auxiliar (`window.auraAuxPanel.projectArtifact`), permitindo inspeção profunda em tela dividida no PC sem perder o foco do diálogo.
+  Ao renderizar o widget inline no chat, sincronizar automaticamente a análise completa com gráficos de decomposição para o painel auxiliar (`window.auraAuxPanel.projectArtifact`), permitindo inspeção lado a lado no Desktop sem sobrecarregar a conversa.
 
 **Critério de Aceite da Fase 3:**  
-- Pergunta *"Qual a previsão dos tanques?"* renderiza o Resumo, o widget com gauges e a Action Sheet.
+- Perguntas executivas como *"Qual o diagnóstico do meu negócio hoje?"* ou *"Onde estou perdendo margem?"* renderizam o Resumo, o widget analítico e a Action Sheet de decisão.
 - Componente 100% responsivo (Compact Card no Mobile e Dual Workspace no Desktop).
-- Verificação funcional com dados reais do banco PostgreSQL do posto.
+- Verificação funcional com dados reais do banco PostgreSQL do cliente.
 
 ---
 
@@ -547,33 +535,34 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 
 ---
 
-### Fase 6 — Expansão do Catálogo de Micro-Widgets Inteligentes (P2)
-**Objetivo:** Migrar os demais módulos analíticos da AURA para o padrão GenUI de 3 camadas com Action Sheets.
+### Fase 6 — Expansão do Catálogo de Micro-Widgets do Mentor de Decisões (P2)
+**Objetivo:** Implementar os módulos analíticos avançados de mentoria estratégica, comparações multidimensionais e simulação de cenários no padrão GenUI de 3 camadas com Action Sheets assertivas.
 
-- [ ] **F6-01 — Micro-Widget `ShiftReconciliationUI` (Auditoria de Turno & Caixa):**  
-  - **Camada 1:** Resumo Executivo informando status de conciliação e divergência apurada em R$.
-  - **Camada 2:** Matriz comparativa entre valores de encerrantes de bico, caixas PDV e cartões.
-  - **Camada 3:** Action Sheet com botões: `Homologar Fechamento de Caixa` e `Exportar Relatório Fiscal`.
-- [ ] **F6-02 — Micro-Widget `PumpPerformanceUI` (Vazão de Bicos & Frentistas):**  
-  - **Camada 1:** Diagnóstico da pista (média de vazão L/min e bicos com alerta metrológico).
-  - **Camada 2:** Gráfico comparativo de vazão e tabela de desempenho da equipe de pista.
-  - **Camada 3:** Action Sheet: `Solicitar Aferição de Bico Lento (<30 L/min)` e `Imprimir Escala`.
-- [ ] **F6-03 — Micro-Widget `LMCComplianceUI` (Auditoria ANP Portaria 26):**  
-  - **Camada 1:** Síntese de conformidade do Livro de Movimentação de Combustíveis do dia.
-  - **Camada 2:** Régua visual da tolerância legal de variação física [-0.60% a +0.60%].
-  - **Camada 3:** Action Sheet: `Validar Livro Digital ANP` e `Auditar Tanques com Variação`.
-- [ ] **F6-04 — Micro-Widget `MarketBasketUI` (Combos & Conveniência):**  
-  - **Camada 1:** Oportunidades de vendas cruzadas com alto coeficiente de Lift.
-  - **Camada 2:** Cartões dos top combos com métricas de Suporte, Confiança e Ticket Médio Adicional.
-  - **Camada 3:** Action Sheet: `Ativar Sugestão no PDV` e `Imprimir Script de Balcão`.
-- [ ] **F6-05 — Micro-Widget `StationHealthUI` (Status de Conexão e Borda):**  
-  - **Camada 1:** Resumo de saúde operacional da filial do posto.
-  - **Camada 2:** Latência de ping do ERP local (5433) e do banco pgvector (5434).
-  - **Camada 3:** Action Sheet: `Forçar Reconexão de Banco` e `Limpar Cache Semântico`.
+- [ ] **F6-01 — Micro-Widget `MarginAnalysisUI` (Análise de Margem Real & Meios de Pagamento):**  
+  - **Camada 1:** Síntese executiva da margem líquida real consolidada e impacto de taxas financeiras.
+  - **Camada 2:** Decomposição visual de rentabilidade por linha de negócio (Combustíveis, Conveniência, Lubrificantes/Serviços) e taxa média de desconto por bandeira de cartão/voucher.
+  - **Camada 3:** Action Sheet: `Simular Repasse de Taxa de Cartão`, `Reprecificar Produto com Margem Negativa` e `Auditar Custos no Canvas`.
+- [ ] **F6-02 — Micro-Widget `PredictiveScenarioUI` (Simulador de Cenários "What-If" & Demanda):**  
+  - **Camada 1:** Projeção preditiva de faturamento e volume para os próximos 3 a 7 dias com base em histórico e sazonalidade.
+  - **Camada 2:** Gráfico interativo com controles deslizantes ou simulações prontas (+/- R$ 0,05 no preço, impacto no volume e margem de contribuição).
+  - **Camada 3:** Action Sheet: `Aplicar Cenário Simulado`, `Agendar Compras no Ponto Ótimo` e `Exportar Projeção`.
+- [ ] **F6-03 — Micro-Widget `BenchmarkComparisonUI` (Comparações & Benchmarks Lado a Lado):**  
+  - **Camada 1:** Resumo executivo de contraste apontando onde está o gap de desempenho e quem puxou o resultado para cima ou para baixo.
+  - **Camada 2:** Painel comparativo em colunas paralelas (Turno A vs Turno B, Operador 1 vs Operador 2 em conversão de aditivada/lubrificantes, ou Dia Atual vs Média Histórica).
+  - **Camada 3:** Action Sheet: `Bonificar Colaborador Destaque`, `Acionar Treinamento de Abordagem de Pista` e `Inspecionar Turnos no Canvas`.
+- [ ] **F6-04 — Micro-Widget `FinancialLeakAuditUI` (Mentor de Prevenção de Fugas de Caixa & Desvios):**  
+  - **Camada 1:** Alerta em tempo real de quebras de caixa, sangrias anômalas ou cancelamentos de cupons fiscais.
+  - **Camada 2:** Matriz de conferência centavo a centavo entre faturamento registrado, gaveta física e conciliação de cartões TEF.
+  - **Camada 3:** Action Sheet: `Estancar Quebra no Turno Vigente`, `Auditar Cancelamentos Suspeitos` e `Homologar Fechamento no Canvas`.
+- [ ] **F6-05 — Micro-Widget `BasketUpsellStrategyUI` (Alavancagem de Ticket Médio & Cross-Selling):**  
+  - **Camada 1:** Oportunidades de vendas cruzadas com alto coeficiente de Lift (ex: Pista + Conveniência, Combustível + Aditivo).
+  - **Camada 2:** Cartões dos top combos com métricas de Suporte, Confiança e potencial de faturamento adicional em R$.
+  - **Camada 3:** Action Sheet: `Ativar Campanha de Balcão no PDV`, `Imprimir Script de Abordagem para Operadores` e `Simular Ganho Mensal`.
 
 **Critério de Aceite da Fase 6:**  
-- Todos os 6 módulos possuem renderizadores nativos padronizados registrados no `SecureComponentRegistry`.
+- Todos os 5 módulos de inteligência decisória possuem renderizadores nativos padronizados registrados no `SecureComponentRegistry`.
 - A estética de design segue com perfeição o tema AURA Precision Glass.
+- Consultas complexas do usuário acionam o widget analítico correspondente com diagnóstico e opções de decisão assertivas.
 
 ---
 
