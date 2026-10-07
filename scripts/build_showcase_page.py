@@ -17,6 +17,11 @@ def generate_showcase_html():
   <title>AURA // Apresentação & Showcase Executivo (Simulação Autônoma em Tempo Real)</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.ico">
 
+  <!-- Tipografia Editorial & Executiva de Alta Precisão (Geist + Newsreader / Editorial Serif - Padrão Harness.io) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -24,6 +29,11 @@ def generate_showcase_html():
       darkMode: 'class',
       theme: {
         extend: {
+          fontFamily: {
+            sans: ['Geist', 'Verdana', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            serif: ['Newsreader', 'Stkbureauserif Book', 'Instrument Serif', 'Georgia', 'Cambria', 'Times New Roman', 'serif'],
+            mono: ['Geist Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+          },
           colors: {
             obsidian: '#07090e',
             obsidianDeep: '#0b0e14',
@@ -58,6 +68,88 @@ def generate_showcase_html():
 
   <style>
     /* Estilos Customizados do Showcase Executivo - Acabamento Obsidian & Zero Edge Glow */
+    /* =========================================================================
+       SISTEMA TIPOGRÁFICO EXECUTIVO (INSPIRADO EM HARNESS.IO)
+       - Headings: Editorial Serif Book ("Newsreader", "Stkbureauserif Book", Georgia)
+       - Body / Feature Desc: 16px Geist, Verdana, sans-serif
+       - Mono: Geist Mono
+       ========================================================================= */
+    :root {
+      --font-serif: 'Newsreader', 'Stkbureauserif Book', 'Instrument Serif', Georgia, 'Times New Roman', serif;
+      --font-sans: 'Geist', Verdana, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      font-size: 16px;
+      line-height: 1.6;
+      color: #e2e8f0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+
+    /* Títulos em Serif Editorial Book (Harness.io Pattern) */
+    .font-display-title,
+    .font-serif-heading,
+    .heading-medium,
+    .home_agents-title {
+      font-family: var(--font-serif);
+      font-weight: 400; /* Book weight refinado */
+      letter-spacing: -0.018em;
+      line-height: 1.18;
+    }
+
+    /* Heading Medium exato da Harness (Screenshot 2: 40px "Stkbureauserif Book", Georgia, margin 0 0 12px) */
+    .heading-medium,
+    .home_agents-title {
+      font-size: 1.85rem;
+      margin: 0px 0px 12px;
+      color: #ffffff;
+      font-family: var(--font-serif);
+      font-weight: 400;
+      line-height: 1.2;
+    }
+    @media (min-width: 640px) {
+      .heading-medium,
+      .home_agents-title {
+        font-size: 2.5rem; /* 40px exatos da Harness */
+      }
+    }
+
+    .heading-small {
+      font-family: var(--font-serif);
+      font-size: 1.35rem;
+      font-weight: 400;
+      letter-spacing: -0.015em;
+      line-height: 1.25;
+      color: #ffffff;
+      margin: 0px 0px 8px;
+    }
+    @media (min-width: 640px) {
+      .heading-small {
+        font-size: 1.5rem; /* 24px */
+      }
+    }
+
+    /* Body Regular exato da Harness (Screenshot 1: 16px Geist, Verdana, margin 2px 0 0, color #94a3b8) */
+    .body-regular,
+    .home_agents-feature-desc {
+      font-family: var(--font-sans);
+      font-size: 16px;
+      line-height: 1.6;
+      color: #94a3b8;
+      margin: 2px 0px 0px;
+    }
+
+    .body-small {
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.55;
+      color: #94a3b8;
+    }
+
     .showcase-mesh-bg {
       background-color: #07090e;
       background-image: 
@@ -541,14 +633,14 @@ def generate_showcase_html():
           <span class="font-semibold tracking-wider uppercase text-[10px]">Arquitetura Universal: Postos • Padarias • Bares • Lojas • Franquias</span>
         </div>
 
-        <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-[1.15] font-display-title">
+        <h1 class="text-3xl sm:text-5xl lg:text-[50px] font-normal tracking-[-0.02em] text-white leading-[1.14] font-display-title">
           O Cérebro Operacional de Qualquer Comércio ou Ponto de Venda. <br>
           <span class="bg-gradient-to-r from-cyan-400 via-emerald-300 to-purple-400 bg-clip-text text-transparent">
             Proteção Absoluta de Dados & 100% LGPD.
           </span>
         </h1>
 
-        <p class="text-sm sm:text-base text-slate-300 leading-relaxed font-sans max-w-xl">
+        <p class="body-regular home_agents-feature-desc text-slate-300 text-[15px] sm:text-base leading-relaxed max-w-xl">
           Acompanhe como a AURA funciona na prática: role a página para ver a pergunta sendo analisada, os dados confidenciais protegidos na hora e a resposta executiva sendo gerada em segundos.
         </p>
 
@@ -1228,10 +1320,10 @@ def generate_showcase_html():
           <i data-lucide="shield" class="w-3.5 h-3.5"></i>
           <span>Privacidade e Segurança Conforme Lei 13.709/2018</span>
         </div>
-        <h2 class="text-2xl sm:text-3xl font-bold text-white font-display-title">
+        <h2 class="heading-medium home_agents-title text-center font-display-title">
           Como a AURA Protege os seus Dados e o seu Negócio
         </h2>
-        <p class="text-xs sm:text-sm text-slate-400 font-sans">
+        <p class="body-regular home_agents-feature-desc text-center max-w-xl mx-auto">
           Projetada para que números estratégicos de estoque, vendas e faturamento fiquem 100% seguros e sob controle total do dono da empresa.
         </p>
       </div>
@@ -1292,8 +1384,8 @@ def generate_showcase_html():
           <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[10px] font-mono uppercase tracking-wider mb-2">
             Cost Management Agent • Visibilidade Financeira
           </div>
-          <h3 class="text-xl sm:text-2xl font-bold text-white font-display-title">Auditoria e Governança de Custo de IA</h3>
-          <p class="text-xs text-slate-400 font-sans max-w-2xl mt-1">
+          <h3 class="heading-medium home_agents-title font-display-title">Auditoria e Governança de Custo de IA</h3>
+          <p class="body-regular home_agents-feature-desc max-w-2xl">
             Inspirada na arquitetura de governança da Harness.io: visibilidade total de consumo, controle unitário de custos e corte de 95% em gastos com processamento em nuvem.
           </p>
         </div>
@@ -1497,8 +1589,8 @@ def generate_showcase_html():
           <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[10px] font-mono uppercase tracking-wider mb-2">
             Knowledge Graph • Modelo Harness.io
           </div>
-          <h3 class="text-xl sm:text-2xl font-bold text-white font-display-title">Grafo de Conhecimento Operacional da AURA</h3>
-          <p class="text-xs text-slate-400 font-sans max-w-2xl mt-1">
+          <h3 class="heading-medium home_agents-title font-display-title">Grafo de Conhecimento Operacional da AURA</h3>
+          <p class="body-regular home_agents-feature-desc max-w-2xl">
             Conexão relacional entre dados brutos de PDV, estoque físico, fechamento de caixa e regras fiscais em uma malha viva e inteligente.
           </p>
         </div>
@@ -1716,8 +1808,8 @@ def generate_showcase_html():
           <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[10px] font-mono uppercase tracking-wider mb-2">
             O Valor Real do Produto está na Linha de Frente da Operação
           </div>
-          <h3 class="text-xl sm:text-2xl font-bold text-white font-display-title">Matriz de Diferenciação Operacional & ROI</h3>
-          <p class="text-xs text-slate-400 font-sans max-w-2xl mt-1">
+          <h3 class="heading-medium home_agents-title font-display-title">Matriz de Diferenciação Operacional & ROI</h3>
+          <p class="body-regular home_agents-feature-desc max-w-2xl">
             Enquanto ERPs convencionais apenas registram prejuízos passados e painéis comuns só desenham gráficos sem ação, a AURA atua no dia a dia da operação. Ela estanca quebras de caixa, identifica desvios de estoque e agiliza decisões em tempo real, conectada diretamente ao banco de dados da sua empresa e sem cobranças abusivas por milhões de tokens.
           </p>
         </div>
@@ -2034,8 +2126,8 @@ def generate_showcase_html():
          ========================================================================= -->
     <section id="sec-faq" class="space-y-6 scroll-reveal">
       <div class="text-center max-w-xl mx-auto space-y-1">
-        <h3 class="text-xl sm:text-2xl font-bold text-white font-display-title">Perguntas Frequentes da Diretoria</h3>
-        <p class="text-xs text-slate-400 font-sans">Respostas diretas sobre governança, integração e segurança da AURA.</p>
+        <h3 class="heading-medium home_agents-title text-center font-display-title">Perguntas Frequentes da Diretoria</h3>
+        <p class="body-regular home_agents-feature-desc text-center max-w-xl mx-auto">Respostas diretas sobre governança, integração e segurança da AURA.</p>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 font-sans text-xs">
@@ -2100,10 +2192,10 @@ def generate_showcase_html():
       <div class="inline-flex items-center justify-center p-3 rounded-2xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
         <i data-lucide="sparkles" class="w-8 h-8"></i>
       </div>
-      <h2 class="text-2xl sm:text-4xl font-extrabold text-white font-display-title">
+      <h2 class="text-2xl sm:text-4xl lg:text-[44px] font-normal text-white font-display-title mb-3">
         Pronto para Elevar o Padrão Operacional do seu Negócio?
       </h2>
-      <p class="text-xs sm:text-sm text-slate-300 font-sans max-w-xl mx-auto">
+      <p class="body-regular text-slate-300 max-w-xl mx-auto">
         Acesse agora o console completo da AURA para conversar com a assistente, consultar o panorama operacional em tempo real ou disparar diagnósticos executivos em 1 clique.
       </p>
       <div class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2 font-sans">

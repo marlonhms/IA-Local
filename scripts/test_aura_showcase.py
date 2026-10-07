@@ -291,6 +291,18 @@ def run_showcase_tests():
     print("   [OK] Seção de Knowledge Graph (3 colunas, constelação SVG e orquestração estilo Harness.io) validada.")
 
     # =========================================================================
+    # 2K. SISTEMA TIPOGRÁFICO EXECUTIVO (GEIST + EDITORIAL SERIF ESTILO HARNESS.IO)
+    # =========================================================================
+    print("\n2K. Testando Sistema Tipográfico Executivo (Geist + Editorial Serif Estilo Harness.io)...")
+    assert "Geist" in html_content, "Fonte 'Geist' para corpo de texto ausente no showcase"
+    assert "Newsreader" in html_content or "Stkbureauserif" in html_content, "Fonte serif editorial ausente para títulos no showcase"
+    assert "heading-medium" in html_content, "Classe tipográfica .heading-medium (40px) ausente"
+    assert "body-regular" in html_content, "Classe tipográfica .body-regular (16px) ausente"
+    assert "home_agents-title" in html_content, "Classe de títulos .home_agents-title ausente"
+    assert "home_agents-feature-desc" in html_content, "Classe de descrições .home_agents-feature-desc ausente"
+    print("   [OK] Sistema Tipográfico Executivo (Geist, Newsreader, heading-medium 40px e body-regular 16px) validado.")
+
+    # =========================================================================
     # 2F. SCROLLYTELLING E ANIMAÇÕES DINÂMICAS NO SCROLL
     # =========================================================================
     print("\n2F. Testando Recursos de Scrollytelling e Animações no Scroll...")
