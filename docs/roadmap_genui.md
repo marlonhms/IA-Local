@@ -303,22 +303,22 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 
 ---
 
-### Fase 0 — Inventário, Baseline & Arquitetura do Protocolo GenUI (P0)
+### Fase 0 — Inventário, Baseline & Arquitetura do Protocolo GenUI (P0) [CONCLUÍDA EM 07/10/2026]
 **Objetivo:** Estabelecer o contrato formal do protocolo GenUI, configurar os identificadores de rastreabilidade e isolar o ambiente sem tocar nas rotas ativas de produção.
 
-- [ ] **F0-01 — Especificação Formal do Protocolo de Streaming GenUI:**  
-  Documentar os tipos canônicos de chunks SSE: `delta` (texto puro), `ui_skeleton` (ativação do skeleton no cliente), `ui_delta` (fragmentos parciais de JSON da ferramenta), `ui_complete` (payload final tipado e validado) e `ui_action_feedback` (retorno de ações executadas).
-- [ ] **F0-02 — Criação do Registro Centralizado de Componentes no Frontend (`web/js/aura-genui.js`):**  
-  Estruturar `window.SecureComponentRegistry` com suporte dual (global `window` no browser e `module.exports` para testes headless no Node.js). Nenhuma tag arbitrária gerada por IA terá autorização para instanciar elementos fora deste catálogo (mitigação de OWASP LLM03).
-- [ ] **F0-03 — Padronização de IDs de Idempotência Criptográfica:**  
-  Garantir que toda requisição e todo bloco de resposta estruturado possua um UUID canônico (`tool_call_id` no backend e `action_id` para cada ação proposta no payload).
-- [ ] **F0-04 — Criação do Módulo de Testes de Linha de Base:**  
-  Criar o script `scripts/test_genui_baseline.py` para verificar a integridade dos contratos atuais antes de qualquer modificação.
+- [x] **F0-01 — Especificação Formal do Protocolo de Streaming GenUI:**  
+  Documentação formal homologada em [`docs/protocolo_streaming_genui.md`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/protocolo_streaming_genui.md). Mapeados e especificados os tipos canônicos de chunks SSE: `delta` (Resumo Executivo), `ui_skeleton` (placeholder sub-100ms), `ui_delta` (streaming de props), `ui_complete` (envelope canônico validado) e `ui_action_feedback` (confirmação com Action Voucher assinado).
+- [x] **F0-02 — Criação do Registro Centralizado de Componentes no Frontend (`web/js/aura-genui.js`):**  
+  Implementado `window.AuraGenUI` e `window.SecureComponentRegistry` com arquitetura Zero-Bundler (nativa para navegador e `module.exports` para Node.js). Inclui `registerComponent`, `resolveComponent` (mitigação estrita de OWASP LLM03 - Agência Excessiva), `escapeHtml` (mitigação de OWASP LLM01 - XSS) e integração no shell `web/index.html` com atributo `defer` e cache-buster.
+- [x] **F0-03 — Padronização de IDs de Idempotência Criptográfica:**  
+  Módulo `core/schemas/idempotency.py` criado e exportado em `core/schemas/__init__.py`. Geradores e validadores RFC 4122 UUID v4 padronizados para `tool_call_id` e `action_id` em Python e JavaScript (`web/js/aura-genui.js`), acompanhados do modelo Pydantic `IdempotencyKey`.
+- [x] **F0-04 — Criação do Módulo de Testes de Linha de Base (`scripts/test_genui_baseline.py`):**  
+  Suíte automatizada completa criada e executada com 100% de sucesso validando: (1) Idempotência Python; (2) Shell e rotas estáticas; (3) SecureComponentRegistry, bloqueio LLM03 e XSS no Node.js; (4) Zero regressão com 100% de aprovação nas 4 suítes analíticas existentes (`test_aura_aux_panel.py`, `test_phase5_specialized_responses.py`, `test_phase6_quality_resilience.py`, `test_aura_showcase.py`).
 
-**Critério de Aceite da Fase 0:**  
-- Contratos de protocolo documentados e revisados.
-- `SecureComponentRegistry` declarado e acessível em `window.SecureComponentRegistry`.
-- Todos os testes de linha de base passando com 100% de sucesso.
+**Critério de Aceite da Fase 0 (100% Aprovado):**  
+- [x] Contratos de protocolo documentados e revisados (`docs/protocolo_streaming_genui.md`).
+- [x] `SecureComponentRegistry` declarado e acessível em `window.SecureComponentRegistry` e `window.AuraGenUI`.
+- [x] Todos os testes de linha de base e suítes de regressão passando com 100% de sucesso (`scripts/test_genui_baseline.py`).
 
 ---
 

@@ -58,6 +58,15 @@ from core.schemas.market_basket import (
     MarketBasketExplanation,
     MarketBasketContract,
 )
+from core.schemas.idempotency import (
+    generate_uuid4,
+    generate_tool_call_id,
+    generate_action_id,
+    is_valid_uuid4,
+    validate_tool_call_id,
+    validate_action_id,
+    IdempotencyKey,
+)
 
 __all__ = [
     "BranchStatus",
@@ -105,5 +114,12 @@ __all__ = [
     "MarketBasketContext",
     "MarketBasketExplanation",
     "MarketBasketContract",
+    "generate_uuid4",
+    "generate_tool_call_id",
+    "generate_action_id",
+    "is_valid_uuid4",
+    "validate_tool_call_id",
+    "validate_action_id",
+    "IdempotencyKey",
 ]
 
