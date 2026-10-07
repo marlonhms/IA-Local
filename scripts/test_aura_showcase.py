@@ -281,6 +281,11 @@ def run_showcase_tests():
     assert "kg-node-tolerancias" in html_content, "Nó SVG de Tolerâncias do Knowledge Graph ausente"
     assert "kg-node-core" in html_content, "Nó Central AURA Core do Knowledge Graph ausente"
     assert "kg-node-selected" in html_content, "Classe de nó ativo .kg-node-selected ausente no SVG"
+    assert "homepage-knowledge-graph-v3_globe" in html_content, "Container do globo 3D em nuvem de pontos ausente"
+    assert "homepage-knowledge-graph-v3_dots" in html_content, "Camada de nuvem de pontos 3D ausente"
+    assert "homepage-knowledge-graph-v3_dot" in html_content, "Dots 3D da esfera holográfica ausentes"
+    assert "homepage-knowledge-graph-v3_edges" in html_content, "Arestas dinâmicas do grafo ausentes"
+    assert "homepage-knowledge-graph-v3_nodes" in html_content, "Nós semânticos com halo e núcleo ausentes"
     assert "Reasoning & Ação" in html_content, "Coluna 3 (Reasoning & Orquestração da AURA) ausente"
     assert "highlightKnowledgeNode" in html_content, "Função de destaque do grafo ausente"
     print("   [OK] Seção de Knowledge Graph (3 colunas, constelação SVG e orquestração estilo Harness.io) validada.")

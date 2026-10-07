@@ -1,0 +1,145 @@
+bloco gráfico de custo
+
+<div class="cost-management-agent-visual_stage">
+
+    <!-- Reasoning card (behind, fades at the bottom) -->
+    <div class="cost-management-agent-visual_reasoning-card">
+
+      <span class="cost-management-agent-visual_reasoning-head cost-management-agent-visual_reveal is-visible">
+        <svg class="cost-management-agent-visual_reasoning-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="18 15 12 9 6 15"></polyline>
+        </svg>
+        Thought for 6 seconds
+      </span>
+
+      <p class="cost-management-agent-visual_reasoning-summary cost-management-agent-visual_reveal is-visible">
+        Here are the total AI spend this month: <span class="cost-management-agent-visual_reasoning-summary-emphasis">$142,400 across 6 teams.</span>
+      </p>
+
+      <div class="cost-management-agent-visual_spend-row cost-management-agent-visual_spend-row--1 cost-management-agent-visual_reveal is-visible">
+        <span class="cost-management-agent-visual_spend-label">1. Platform Eng — $107,000</span>
+        <span class="cost-management-agent-visual_spend-status">
+          <span class="cost-management-agent-visual_spend-dot cost-management-agent-visual_spend-dot--high" aria-hidden="true"></span>
+          <span class="cost-management-agent-visual_spend-status-text">High</span>
+        </span>
+        <span class="cost-management-agent-visual_spend-model">(GPT-4o, Claude 3.5 Sonnet)</span>
+      </div>
+
+      <div class="cost-management-agent-visual_spend-row cost-management-agent-visual_spend-row--2 cost-management-agent-visual_reveal is-visible">
+        <span class="cost-management-agent-visual_spend-label">2. Data Science — $31,700</span>
+        <span class="cost-management-agent-visual_spend-status">
+          <span class="cost-management-agent-visual_spend-dot cost-management-agent-visual_spend-dot--ok" aria-hidden="true"></span>
+          <span class="cost-management-agent-visual_spend-status-text">Within Budget</span>
+        </span>
+        <span class="cost-management-agent-visual_spend-model">(Gemini 1.5 Pro)</span>
+      </div>
+
+      <div class="cost-management-agent-visual_spend-row cost-management-agent-visual_spend-row--3 cost-management-agent-visual_reveal is-visible">
+        <span class="cost-management-agent-visual_spend-label">3. Product — $24,100</span>
+        <span class="cost-management-agent-visual_spend-status">
+          <span class="cost-management-agent-visual_spend-dot cost-management-agent-visual_spend-dot--ok" aria-hidden="true"></span>
+          <span class="cost-management-agent-visual_spend-status-text">Within Budget</span>
+        </span>
+        <span class="cost-management-agent-visual_spend-model">(GPT-4o-mini)</span>
+      </div>
+
+      <p class="cost-management-agent-visual_reasoning-note cost-management-agent-visual_reveal is-visible">
+        Spend is up 34% month-over-month. Platform Eng has no spend limits configured.
+      </p>
+
+    </div><!-- /reasoning-card -->
+
+    <!-- Chart card (double container, overlaps the reasoning card) -->
+    <div class="cost-management-agent-visual_chart-card">
+      <div class="cost-management-agent-visual_chart-inner">
+
+        <div class="cost-management-agent-visual_chart-heading">
+          <span class="cost-management-agent-visual_chart-heading-text">Cost and Unit Cost Trend</span>
+        </div>
+
+        <div class="cost-management-agent-visual_chart-body">
+          <svg class="cost-management-agent-visual_chart-svg" viewBox="0 0 404 240" preserveAspectRatio="xMidYMid meet">
+
+            <!-- Gridlines + y labels ($0k .. $20k) -->
+            <line class="cost-management-agent-visual_grid-line" x1="40" y1="200" x2="396" y2="200"></line>
+            <text class="cost-management-agent-visual_grid-label" x="32" y="203">$0k</text>
+            <line class="cost-management-agent-visual_grid-line" x1="40" y1="153" x2="396" y2="153"></line>
+            <text class="cost-management-agent-visual_grid-label" x="32" y="156">$5k</text>
+            <line class="cost-management-agent-visual_grid-line" x1="40" y1="106" x2="396" y2="106"></line>
+            <text class="cost-management-agent-visual_grid-label" x="32" y="109">$10k</text>
+            <line class="cost-management-agent-visual_grid-line" x1="40" y1="59" x2="396" y2="59"></line>
+            <text class="cost-management-agent-visual_grid-label" x="32" y="62">$15k</text>
+            <line class="cost-management-agent-visual_grid-line" x1="40" y1="12" x2="396" y2="12"></line>
+            <text class="cost-management-agent-visual_grid-label" x="32" y="15">$20k</text>
+
+            <!-- Bars — grow from the baseline with a staggered left-to-right cascade
+                 (JS: growBars() writes --seg-y/--seg-h per segment each frame). -->
+            <g class="cost-management-agent-visual_bar" data-bar-index="0">
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="anthropic" data-v="3.2" x="59.6" width="32" style="--seg-h: 29.08px; --seg-y: 170.92px;"></rect>
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="openai" data-v="2.4" x="59.6" width="32" style="--seg-h: 21.56px; --seg-y: 148.36px;"></rect>
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="bedrock" data-v="2.6" x="59.6" width="32" style="--seg-h: 23.44px; --seg-y: 123.92px;"></rect>
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="vertex" data-v="1.4" x="59.6" width="32" rx="3" style="--seg-h: 12.16px; --seg-y: 110.76px;"></rect>
+              <text class="cost-management-agent-visual_bar-label" x="75.6" y="216">07/26</text>
+            </g>
+            <g class="cost-management-agent-visual_bar" data-bar-index="1">
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="anthropic" data-v="4.0" x="130.8" width="32" style="--seg-h: 36.60px; --seg-y: 163.40px;"></rect>
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="openai" data-v="3.0" x="130.8" width="32" style="--seg-h: 27.20px; --seg-y: 135.20px;"></rect>
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="bedrock" data-v="3.2" x="130.8" width="32" style="--seg-h: 29.08px; --seg-y: 105.12px;"></rect>
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="vertex" data-v="1.8" x="130.8" width="32" rx="3" style="--seg-h: 15.92px; --seg-y: 88.20px;"></rect>
+              <text class="cost-management-agent-visual_bar-label" x="146.8" y="216">07/30</text>
+            </g>
+            <g class="cost-management-agent-visual_bar" data-bar-index="2">
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="anthropic" data-v="4.8" x="202" width="32" style="--seg-h: 44.12px; --seg-y: 155.88px;"></rect>
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="openai" data-v="3.6" x="202" width="32" style="--seg-h: 32.84px; --seg-y: 122.04px;"></rect>
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="bedrock" data-v="3.9" x="202" width="32" style="--seg-h: 35.66px; --seg-y: 85.38px;"></rect>
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="vertex" data-v="2.4" x="202" width="32" rx="3" style="--seg-h: 21.56px; --seg-y: 62.82px;"></rect>
+              <text class="cost-management-agent-visual_bar-label" x="218" y="216">08/03</text>
+            </g>
+            <g class="cost-management-agent-visual_bar" data-bar-index="3">
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="anthropic" data-v="5.4" x="273.2" width="32" style="--seg-h: 49.76px; --seg-y: 150.24px;"></rect>
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="openai" data-v="4.2" x="273.2" width="32" style="--seg-h: 38.48px; --seg-y: 110.76px;"></rect>
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="bedrock" data-v="4.4" x="273.2" width="32" style="--seg-h: 40.36px; --seg-y: 69.40px;"></rect>
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="vertex" data-v="2.8" x="273.2" width="32" rx="3" style="--seg-h: 25.32px; --seg-y: 43.08px;"></rect>
+              <text class="cost-management-agent-visual_bar-label" x="289.2" y="216">08/07</text>
+            </g>
+            <g class="cost-management-agent-visual_bar" data-bar-index="4">
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="anthropic" data-v="6.2" x="344.4" width="32" style="--seg-h: 57.14px; --seg-y: 142.86px;"></rect>
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="openai" data-v="4.8" x="344.4" width="32" style="--seg-h: 44.01px; --seg-y: 97.85px;"></rect>
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="bedrock" data-v="5.0" x="344.4" width="32" style="--seg-h: 45.89px; --seg-y: 50.96px;"></rect>
+              <rect class="cost-management-agent-visual_bar-seg" data-provider="vertex" data-v="2.9" x="344.4" width="32" rx="3" style="--seg-h: 26.20px; --seg-y: 23.76px;"></rect>
+              <text class="cost-management-agent-visual_bar-label cost-management-agent-visual_bar-label--last" x="360.4" y="216">08/13</text>
+            </g>
+
+          </svg>
+        </div><!-- /chart-body -->
+
+        <div class="cost-management-agent-visual_chart-legend">
+          <span class="cost-management-agent-visual_legend-item">
+            <span class="cost-management-agent-visual_legend-swatch cost-management-agent-visual_legend-swatch--anthropic" aria-hidden="true"></span>
+            <span class="cost-management-agent-visual_legend-label">Anthropic</span>
+          </span>
+          <span class="cost-management-agent-visual_legend-item">
+            <span class="cost-management-agent-visual_legend-swatch cost-management-agent-visual_legend-swatch--openai" aria-hidden="true"></span>
+            <span class="cost-management-agent-visual_legend-label">OpenAI</span>
+          </span>
+          <span class="cost-management-agent-visual_legend-item">
+            <span class="cost-management-agent-visual_legend-swatch cost-management-agent-visual_legend-swatch--bedrock" aria-hidden="true"></span>
+            <span class="cost-management-agent-visual_legend-label">Bedrock</span>
+          </span>
+          <span class="cost-management-agent-visual_legend-item">
+            <span class="cost-management-agent-visual_legend-swatch cost-management-agent-visual_legend-swatch--vertex" aria-hidden="true"></span>
+            <span class="cost-management-agent-visual_legend-label">Vertex</span>
+          </span>
+        </div><!-- /chart-legend -->
+
+      </div><!-- /chart-inner -->
+    </div><!-- /chart-card -->
+
+    <!-- Prompt bubble (on top) — absorbed AgentChatBubble -->
+    <div class="cost-management-agent-visual_bubble-wrap cost-management-agent-visual_reveal is-visible">
+      <div class="cost-management-agent-visual_bubble">
+        Break down my AI spend by team and model for this month.
+      </div>
+    </div>
+
+  </div>

@@ -1,0 +1,682 @@
+bloco de mini dash -----
+<div class="runtime-security-agent-visual_card runtime-security-agent-visual_card--threats">
+      <div class="runtime-security-agent-visual_card-body">
+        <div class="runtime-security-agent-visual_card-header">
+          <div class="runtime-security-agent-visual_card-title-row">
+            <span class="runtime-security-agent-visual_card-title">Top threat types by threat activities</span>
+          </div>
+          <span class="runtime-security-agent-visual_card-subtitle">Counts of top threat types triggered</span>
+        </div>
+        <div class="runtime-security-agent-visual_donut-row">
+          <div class="runtime-security-agent-visual_donut" data-total="261">
+            <svg class="runtime-security-agent-visual_donut-svg" viewBox="0 0 140 140" width="140" height="140" aria-hidden="true">
+              <g transform="rotate(-90 70 70)">
+                <circle class="runtime-security-agent-visual_donut-seg runtime-security-agent-visual_donut-seg--blue" cx="70" cy="70" r="62.5" data-value="181" style="--rsav-dash: 271.3315470784255 121.36753462029861; --rsav-offset: 0;"></circle>
+                <circle class="runtime-security-agent-visual_donut-seg runtime-security-agent-visual_donut-seg--blue-light" cx="70" cy="70" r="62.5" data-value="78" style="--rsav-dash: 116.35834625479113 276.340735443933; --rsav-offset: -272.3315470784255;"></circle>
+                <circle class="runtime-security-agent-visual_donut-seg runtime-security-agent-visual_donut-seg--yellow" cx="70" cy="70" r="62.5" data-value="2" style="--rsav-dash: 2.0091883655074643 390.6898933332167; --rsav-offset: -389.6898933332166;"></circle>
+              </g>
+            </svg>
+            <div class="runtime-security-agent-visual_donut-overlay">
+              <span class="runtime-security-agent-visual_donut-total-label">Total</span>
+              <span class="runtime-security-agent-visual_donut-value" data-count-to="261" data-duration="1200" data-delay="100">261</span>
+            </div>
+          </div>
+          <div class="runtime-security-agent-visual_legend runtime-security-agent-visual_legend--threats">
+            <div class="runtime-security-agent-visual_legend-row">
+              <span class="runtime-security-agent-visual_legend-left">
+                <span class="runtime-security-agent-visual_legend-marker runtime-security-agent-visual_legend-marker--round runtime-security-agent-visual_legend-marker--blue" aria-hidden="true"></span>
+                <span class="runtime-security-agent-visual_legend-label">Prompt Injection</span>
+              </span>
+              <span class="runtime-security-agent-visual_legend-value">181</span>
+            </div>
+            <div class="runtime-security-agent-visual_legend-row">
+              <span class="runtime-security-agent-visual_legend-left">
+                <span class="runtime-security-agent-visual_legend-marker runtime-security-agent-visual_legend-marker--round runtime-security-agent-visual_legend-marker--blue-light" aria-hidden="true"></span>
+                <span class="runtime-security-agent-visual_legend-label">Prompt Text Evasion</span>
+              </span>
+              <span class="runtime-security-agent-visual_legend-value">78</span>
+            </div>
+            <div class="runtime-security-agent-visual_legend-row">
+              <span class="runtime-security-agent-visual_legend-left">
+                <span class="runtime-security-agent-visual_legend-marker runtime-security-agent-visual_legend-marker--round runtime-security-agent-visual_legend-marker--yellow" aria-hidden="true"></span>
+                <span class="runtime-security-agent-visual_legend-label">Code Detected In Prompt</span>
+              </span>
+              <span class="runtime-security-agent-visual_legend-value">2</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+--------------
+
+Bloco de tabela
+
+<div class="security-testing-agent-visual_body">
+
+            <!-- Search field -->
+            <div class="security-testing-agent-visual_search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#98A1AE" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.3-4.3"></path>
+              </svg>
+              <span class="security-testing-agent-visual_search-text">Search</span>
+            </div>
+
+            <!-- Executions table -->
+            <div class="security-testing-agent-visual_table">
+              <div class="security-testing-agent-visual_table-header">
+                <span class="security-testing-agent-visual_table-header-cell">Package</span>
+                <span class="security-testing-agent-visual_table-header-cell">Ecosystem</span>
+                <span class="security-testing-agent-visual_table-header-cell">Severity</span>
+                <span class="security-testing-agent-visual_table-header-cell">Targets</span>
+                <span class="security-testing-agent-visual_table-header-cell">Agent status</span>
+              </div>
+
+              <div class="security-testing-agent-visual_row is-visible">
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--pkg">altair</span>
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--eco">pypi</span>
+                <span class="security-testing-agent-visual_cell"><span class="security-testing-agent-visual_badge security-testing-agent-visual_badge--warning">High</span></span>
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--targets">17</span>
+                <span class="security-testing-agent-visual_cell"><span class="security-testing-agent-visual_badge security-testing-agent-visual_badge--success">Completed</span></span>
+              </div>
+
+              <div class="security-testing-agent-visual_row is-visible">
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--pkg">litellm</span>
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--eco">pypi</span>
+                <span class="security-testing-agent-visual_cell"><span class="security-testing-agent-visual_badge security-testing-agent-visual_badge--danger">Critical</span></span>
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--targets">7</span>
+                <span class="security-testing-agent-visual_cell"><span class="security-testing-agent-visual_badge security-testing-agent-visual_badge--success">Completed</span></span>
+              </div>
+
+              <div class="security-testing-agent-visual_row is-visible">
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--pkg">axios</span>
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--eco">npm</span>
+                <span class="security-testing-agent-visual_cell"><span class="security-testing-agent-visual_badge security-testing-agent-visual_badge--danger">Critical</span></span>
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--targets">79</span>
+                <span class="security-testing-agent-visual_cell"><span class="security-testing-agent-visual_badge security-testing-agent-visual_badge--success">Completed</span></span>
+              </div>
+
+              <div class="security-testing-agent-visual_row is-visible">
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--pkg">seaborn</span>
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--eco">pypi</span>
+                <span class="security-testing-agent-visual_cell"><span class="security-testing-agent-visual_badge security-testing-agent-visual_badge--warning">High</span></span>
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--targets">17</span>
+                <span class="security-testing-agent-visual_cell"><span class="security-testing-agent-visual_badge security-testing-agent-visual_badge--success">Completed</span></span>
+              </div>
+
+              <div class="security-testing-agent-visual_row is-visible">
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--pkg">scipy</span>
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--eco">pypi</span>
+                <span class="security-testing-agent-visual_cell"><span class="security-testing-agent-visual_badge security-testing-agent-visual_badge--danger">Critical</span></span>
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--targets">23</span>
+                <span class="security-testing-agent-visual_cell"><span class="security-testing-agent-visual_badge security-testing-agent-visual_badge--success">Completed</span></span>
+              </div>
+
+              <div class="security-testing-agent-visual_row is-visible">
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--pkg">sanic</span>
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--eco">pypi</span>
+                <span class="security-testing-agent-visual_cell"><span class="security-testing-agent-visual_badge security-testing-agent-visual_badge--warning">High</span></span>
+                <span class="security-testing-agent-visual_cell security-testing-agent-visual_cell--targets">20</span>
+                <span class="security-testing-agent-visual_cell"><span class="security-testing-agent-visual_badge security-testing-agent-visual_badge--success">Completed</span></span>
+              </div>
+
+            </div><!-- /table -->
+          </div>
+
+----------------------
+
+Bloco de fluxo
+
+<div data-embed="software-delivery-agent-visual" class="software-delivery-agent-visual" data-wds-init="1">
+
+  <style>
+    /* LOCAL PREVIEW ONLY — this <style> block is NOT the Webflow inject
+       artifact. The Webflow inject artifact is software-delivery-agent-visual.css
+       (identical rules, minus the two @media blocks documented above). */
+
+    [data-embed="software-delivery-agent-visual"],
+    [data-embed="software-delivery-agent-visual"] * {
+      box-sizing: border-box;
+    }
+
+    [data-embed="software-delivery-agent-visual"] {
+      --sdav-mask-0: url("data:image/svg+xml,<url-encoded svg>");
+      --sdav-mask-1: url("data:image/svg+xml,%3Csvg%20preserveAspectRatio%3D%22none%22%20overflow%3D%22visible%22%20style%3D%22display%3A%20block%3B%22%20width%3D%2217.72%22%20height%3D%2216.345%22%20viewBox%3D%220%200%2017.72%2016.345%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%20%3Cg%20id%3D%22Vector%22%3E%20%3Cpath%20d%3D%22M8.24232%2010.235C8.24232%2010.6147%207.93452%2010.9225%207.55482%2010.9225C7.17513%2010.9225%206.86732%2010.6147%206.86732%2010.235C6.86732%209.8553%207.17513%209.5475%207.55482%209.5475C7.93452%209.5475%208.24232%209.8553%208.24232%2010.235Z%22%20fill%3D%22black%22/%3E%20%3Cpath%20d%3D%22M7.1299%209.68696L6.62623%2010.0311V10.0311L7.1299%209.68696ZM7.47017%2010.136L7.93766%209.74417L7.93766%209.74417L7.47017%2010.136ZM7.09666%2010.6374C7.31893%2010.8906%207.70434%2010.9157%207.95751%2010.6934C8.21069%2010.4711%208.23574%2010.0857%208.01348%209.83256L7.55507%2010.235L7.09666%2010.6374ZM15.2823%209.74417C15.0659%2010.0024%2015.0998%2010.3871%2015.358%2010.6035C15.6162%2010.8199%2016.0009%2010.7861%2016.2173%2010.5279L15.7498%2010.136L15.2823%209.74417ZM11.61%2010.235H11C11%2012.9357%208.81067%2015.125%206.11%2015.125V15.735V16.345C9.48446%2016.345%2012.22%2013.6095%2012.22%2010.235H11.61ZM6.11%2015.735V15.125C3.40933%2015.125%201.22%2012.9357%201.22%2010.235H0.61H0C0%2013.6095%202.73554%2016.345%206.11%2016.345V15.735ZM0.61%2010.235H1.22C1.22%207.53433%203.40933%205.345%206.11%205.345V4.735V4.125C2.73554%204.125%200%206.86054%200%2010.235H0.61ZM6.11%204.735V5.345C8.81067%205.345%2011%207.53433%2011%2010.235H11.61H12.22C12.22%206.86054%209.48446%204.125%206.11%204.125V4.735ZM6.11%206.35415H6.72C6.72%203.4934%208.93403%201.22%2011.61%201.22V0.61V0C8.21084%200%205.5%202.87009%205.5%206.35415H6.11ZM11.61%200.61V1.22C14.286%201.22%2016.5%203.4934%2016.5%206.35415H17.11H17.72C17.72%202.87009%2015.0092%200%2011.61%200V0.61ZM7.1299%209.68696L7.63356%209.34283C7.0595%208.50262%206.72%207.47179%206.72%206.35415H6.11H5.5C5.5%207.72164%205.91604%208.99164%206.62623%2010.0311L7.1299%209.68696ZM7.47017%2010.136L7.93766%209.74417C7.83018%209.61595%207.72866%209.48201%207.63356%209.34283L7.1299%209.68696L6.62623%2010.0311C6.74383%2010.2032%206.86949%2010.369%207.00268%2010.5279L7.47017%2010.136ZM7.55507%2010.235L8.01348%209.83256C7.98789%209.80341%207.96261%209.77395%207.93766%209.74417L7.47017%2010.136L7.00267%2010.5279C7.0336%2010.5648%207.06493%2010.6013%207.09666%2010.6374L7.55507%2010.235ZM17.11%206.35415H16.5C16.5%207.65668%2016.0388%208.84167%2015.2823%209.74417L15.7498%2010.136L16.2173%2010.5279C17.1547%209.40962%2017.72%207.94831%2017.72%206.35415H17.11ZM8.24232%2010.235H7.63232C7.63232%2010.2778%207.59763%2010.3125%207.55482%2010.3125V10.9225V11.5325C8.27141%2011.5325%208.85232%2010.9516%208.85232%2010.235H8.24232ZM7.55482%2010.9225V10.3125C7.51202%2010.3125%207.47732%2010.2778%207.47732%2010.235H6.86732H6.25732C6.25732%2010.9516%206.83823%2011.5325%207.55482%2011.5325V10.9225ZM6.86732%2010.235H7.47732C7.47732%2010.1922%207.51202%2010.1575%207.55482%2010.1575V9.5475V8.9375C6.83823%208.9375%206.25732%209.51841%206.25732%2010.235H6.86732ZM7.55482%209.5475V10.1575C7.59763%2010.1575%207.63232%2010.1922%207.63232%2010.235H8.24232H8.85232C8.85232%209.51841%208.27141%208.9375%207.55482%208.9375V9.5475Z%22%20fill%3D%22black%22/%3E%20%3C/g%3E%20%3C/svg%3E");
+      --sdav-mask-2: url("data:image/svg+xml,%3Csvg%20preserveAspectRatio%3D%22none%22%20overflow%3D%22visible%22%20style%3D%22display%3A%20block%3B%22%20width%3D%2219.0951%22%20height%3D%2210.1575%22%20viewBox%3D%220%200%2019.0951%2010.1575%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%20%3Cg%20id%3D%22Vector%22%3E%20%3Cpath%20d%3D%22M7.26613%205.07871C7.26613%205.45841%206.95832%205.76621%206.57863%205.76621C6.19893%205.76621%205.89113%205.45841%205.89113%205.07871C5.89113%204.69902%206.19893%204.39121%206.57863%204.39121C6.95832%204.39121%207.26613%204.69902%207.26613%205.07871Z%22%20fill%3D%22black%22/%3E%20%3Cpath%20d%3D%22M8.15244%201.59747L7.78028%202.08079V2.08079L8.15244%201.59747ZM12.1545%205.44886C12.4214%205.65439%2012.8045%205.60462%2013.01%205.33768C13.2155%205.07075%2013.1657%204.68774%2012.8988%204.48221L12.5267%204.96553L12.1545%205.44886ZM4.62606%209.51886L4.5435%2010.1233L4.55218%2010.1244L4.62606%209.51886ZM9.41814%207.55035L9.9095%207.91189L9.91382%207.90587L9.41814%207.55035ZM11.0408%208.56168L11.4156%208.08041V8.08041L11.0408%208.56168ZM11.0408%201.59575L10.666%201.11443L10.6599%201.11928L11.0408%201.59575ZM13.7184%200.612831L13.7399%201.22245L13.7184%200.612831ZM6.94324%204.59744C6.67744%204.39044%206.29416%204.43811%206.08716%204.70391C5.88017%204.96971%205.92784%205.35299%206.19364%205.55999L6.56844%205.07871L6.94324%204.59744ZM9.53427%207.38842L9.90907%206.90715V6.90715L9.53427%207.38842ZM8.15244%201.59747L7.78028%202.08079L9.25047%203.2128L9.62262%202.72948L9.99477%202.24615L8.52459%201.11414L8.15244%201.59747ZM9.62262%202.72948L9.25047%203.2128L12.1545%205.44886L12.5267%204.96553L12.8988%204.48221L9.99477%202.24615L9.62262%202.72948ZM8.15244%201.59747L8.52459%201.11414C5.11912%20-1.508%200%200.789681%200%205.08651H0.61H1.22C1.22%201.89019%205.10644%200.0219904%207.78028%202.08079L8.15244%201.59747ZM4.62606%209.51886L4.70862%208.91447C2.81633%208.656%201.22%207.14909%201.22%205.08651H0.61H0C0%207.85486%202.14685%209.79588%204.54351%2010.1232L4.62606%209.51886ZM4.62606%209.51886L4.55218%2010.1244C5.14433%2010.1966%206.08349%2010.1671%207.06619%209.86779C8.05533%209.56653%209.12313%208.98055%209.90946%207.91187L9.41814%207.55035L8.92681%207.18883C8.33405%207.99443%207.51718%208.4551%206.71074%208.70072C5.89786%208.94829%205.13053%208.96588%204.69994%208.91335L4.62606%209.51886ZM11.0408%208.56168L10.666%209.04296C14.0419%2011.672%2019.0951%209.35782%2019.0951%205.07871H18.4851H17.8751C17.8751%208.27972%2014.04%2010.1242%2011.4156%208.08041L11.0408%208.56168ZM11.0408%201.59575L11.4156%202.07702C12.1352%201.51661%2012.9439%201.2505%2013.7399%201.22245L13.7184%200.612831L13.697%200.00320953C12.6527%200.0400065%2011.5949%200.391088%2010.666%201.11447L11.0408%201.59575ZM13.7184%200.612831L13.7399%201.22245C15.8739%201.14725%2017.8751%202.75962%2017.8751%205.07871H18.4851H19.0951C19.0951%201.97278%2016.421%20-0.0927822%2013.697%200.00320953L13.7184%200.612831ZM11.0408%201.59575L10.6599%201.11928L9.24173%202.25301L9.62262%202.72948L10.0035%203.20594L11.4217%202.07221L11.0408%201.59575ZM6.56844%205.07871L6.19364%205.55999L9.15947%207.8697L9.53427%207.38842L9.90907%206.90715L6.94324%204.59744L6.56844%205.07871ZM9.53427%207.38842L9.15947%207.8697L10.666%209.04296L11.0408%208.56168L11.4156%208.08041L9.90907%206.90715L9.53427%207.38842ZM9.41814%207.55035L9.91382%207.90587L10.03%207.74395L9.53427%207.38842L9.03859%207.0329L8.92245%207.19482L9.41814%207.55035ZM7.26613%205.07871H6.65613C6.65613%205.12152%206.62143%205.15621%206.57863%205.15621V5.76621V6.37621C7.29522%206.37621%207.87613%205.7953%207.87613%205.07871H7.26613ZM6.57863%205.76621V5.15621C6.53583%205.15621%206.50113%205.12152%206.50113%205.07871H5.89113H5.28113C5.28113%205.7953%205.86204%206.37621%206.57863%206.37621V5.76621ZM5.89113%205.07871H6.50113C6.50113%205.03591%206.53583%205.00121%206.57863%205.00121V4.39121V3.78121C5.86204%203.78121%205.28113%204.36212%205.28113%205.07871H5.89113ZM6.57863%204.39121V5.00121C6.62143%205.00121%206.65613%205.03591%206.65613%205.07871H7.26613H7.87613C7.87613%204.36212%207.29522%203.78121%206.57863%203.78121V4.39121Z%22%20fill%3D%22black%22/%3E%20%3C/g%3E%20%3C/svg%3E");
+      --sdav-mask-3: url("data:image/svg+xml,%3Csvg%20preserveAspectRatio%3D%22none%22%20overflow%3D%22visible%22%20style%3D%22display%3A%20block%3B%22%20width%3D%2220.47%22%20height%3D%2220.47%22%20viewBox%3D%220%200%2020.47%2020.47%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%20%3Cpath%20id%3D%22Vector%22%20d%3D%22M8.8663%208.10306C9.20319%208.10306%209.4763%207.82995%209.4763%207.49306C9.4763%207.15616%209.20319%206.88306%208.8663%206.88306V7.49306V8.10306ZM7.50756%207.49306V6.88306V6.88306V7.49306ZM7.51072%2012.9931V12.3831V12.3831V12.9931ZM13.6725%2013.6031C14.0094%2013.6031%2014.2825%2013.3299%2014.2825%2012.9931C14.2825%2012.6562%2014.0094%2012.3831%2013.6725%2012.3831V12.9931V13.6031ZM19.86%2010.235H19.25C19.25%2015.2138%2015.2138%2019.25%2010.235%2019.25V19.86V20.47C15.8876%2020.47%2020.47%2015.8876%2020.47%2010.235H19.86ZM10.235%2019.86V19.25C5.25615%2019.25%201.22%2015.2138%201.22%2010.235H0.61H0C0%2015.8876%204.58237%2020.47%2010.235%2020.47V19.86ZM0.61%2010.235H1.22C1.22%205.25615%205.25615%201.22%2010.235%201.22V0.61V0C4.58237%200%200%204.58237%200%2010.235H0.61ZM10.235%200.61V1.22C15.2138%201.22%2019.25%205.25615%2019.25%2010.235H19.86H20.47C20.47%204.58237%2015.8876%200%2010.235%200V0.61ZM8.8663%207.49306V6.88306H7.50756V7.49306V8.10306H8.8663V7.49306ZM7.50756%207.49306V6.88306C6.61215%206.88306%205.7501%207.22878%205.11189%207.84937L5.53715%208.2867L5.96241%208.72403C6.36937%208.3283%206.92487%208.10306%207.50756%208.10306V7.49306ZM5.53715%208.2867L5.11189%207.84937C4.46006%208.48321%204.12498%209.38038%204.12498%2010.2476H4.73498H5.34498C5.34498%209.67745%205.56907%209.10651%205.96241%208.72403L5.53715%208.2867ZM4.73498%2010.2476H4.12498C4.12498%2011.1336%204.4871%2011.9798%205.12589%2012.6009L5.55115%2012.1636L5.97641%2011.7263C5.57003%2011.3311%205.34498%2010.7988%205.34498%2010.2476H4.73498ZM5.55115%2012.1636L5.12589%2012.6009C5.7475%2013.2054%206.59328%2013.6031%207.51072%2013.6031V12.9931V12.3831C6.95007%2012.3831%206.39997%2012.1381%205.97641%2011.7263L5.55115%2012.1636ZM7.51072%2012.9931V13.6031H13.6725V12.9931V12.3831H7.51072V12.9931ZM8.85998%207.485H8.24998C8.24998%208.20159%208.83089%208.7825%209.54748%208.7825V8.1725V7.5625C9.50468%207.5625%209.46998%207.5278%209.46998%207.485H8.85998ZM9.54748%208.1725V8.7825C10.2641%208.7825%2010.845%208.20159%2010.845%207.485H10.235H9.62498C9.62498%207.5278%209.59028%207.5625%209.54748%207.5625V8.1725ZM10.235%207.485H10.845C10.845%206.76841%2010.2641%206.1875%209.54748%206.1875V6.7975V7.4075C9.59028%207.4075%209.62498%207.4422%209.62498%207.485H10.235ZM9.54748%206.7975V6.1875C8.83089%206.1875%208.24998%206.76841%208.24998%207.485H8.85998H9.46998C9.46998%207.4422%209.50468%207.4075%209.54748%207.4075V6.7975ZM12.985%207.485H12.375C12.375%208.20159%2012.9559%208.7825%2013.6725%208.7825V8.1725V7.5625C13.6297%207.5625%2013.595%207.5278%2013.595%207.485H12.985ZM13.6725%208.1725V8.7825C14.3891%208.7825%2014.97%208.20159%2014.97%207.485H14.36H13.75C13.75%207.5278%2013.7153%207.5625%2013.6725%207.5625V8.1725ZM14.36%207.485H14.97C14.97%206.76841%2014.3891%206.1875%2013.6725%206.1875V6.7975V7.4075C13.7153%207.4075%2013.75%207.4422%2013.75%207.485H14.36ZM13.6725%206.7975V6.1875C12.9559%206.1875%2012.375%206.76841%2012.375%207.485H12.985H13.595C13.595%207.4422%2013.6297%207.4075%2013.6725%207.4075V6.7975ZM12.985%2012.985H12.375C12.375%2013.7016%2012.9559%2014.2825%2013.6725%2014.2825V13.6725V13.0625C13.6297%2013.0625%2013.595%2013.0278%2013.595%2012.985H12.985ZM13.6725%2013.6725V14.2825C14.3891%2014.2825%2014.97%2013.7016%2014.97%2012.985H14.36H13.75C13.75%2013.0278%2013.7153%2013.0625%2013.6725%2013.0625V13.6725ZM14.36%2012.985H14.97C14.97%2012.2684%2014.3891%2011.6875%2013.6725%2011.6875V12.2975V12.9075C13.7153%2012.9075%2013.75%2012.9422%2013.75%2012.985H14.36ZM13.6725%2012.2975V11.6875C12.9559%2011.6875%2012.375%2012.2684%2012.375%2012.985H12.985H13.595C13.595%2012.9422%2013.6297%2012.9075%2013.6725%2012.9075V12.2975Z%22%20fill%3D%22black%22/%3E%20%3C/svg%3E");
+      --sdav-mask-4: url("data:image/svg+xml,%3Csvg%20width%3D%2211.1%22%20height%3D%2211.1%22%20viewBox%3D%220%200%2011.1%2011.1%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%20%3Cpath%20d%3D%22M3.05%205.8L4.55%207.3L8.05%203.8M5.55%2010.55C8.3114%2010.55%2010.55%208.3114%2010.55%205.55C10.55%202.78858%208.3114%200.55%205.55%200.55C2.78858%200.55%200.55%202.78858%200.55%205.55C0.55%208.3114%202.78858%2010.55%205.55%2010.55Z%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.1%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%20%3C/svg%3E");
+      display: grid;
+      grid-template-columns: minmax(0, 280px) minmax(190px, 240px);
+      column-gap: 32px;
+      align-items: start;
+      max-width: 552px;
+      margin: 0 auto;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif; /* --pds-font-family */
+      padding: 34px 0 8px;
+    }
+
+    /* ── Grid slot placement (static — never changes at runtime) ─────── */
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_step-slot--1 { grid-column: 1; grid-row: 1; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_step-slot--2 { grid-column: 1; grid-row: 3; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_step-slot--3 { grid-column: 1; grid-row: 5; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_connector-slot--1 { grid-column: 1; grid-row: 2; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_connector-slot--2 { grid-column: 1; grid-row: 4; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_reason-slot--1 { grid-column: 2; grid-row: 1; position: relative; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_reason-slot--2 { grid-column: 2; grid-row: 3; position: relative; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_reason-slot--3 { grid-column: 2; grid-row: 5; position: relative; }
+
+    /* ── Pipeline step card ────────────────────────────────────────── */
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 14px;
+      width: 100%;
+      background-color: #ffffff; /* --pds-bg-primary */
+      border: 1px solid #D0D5DD; /* --pds-border-default */
+      border-radius: 12px;
+      box-shadow: 0px 8px 8px rgba(0,0,0,0.04);
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_card.is-success {
+      border-color: #65B000; /* --pds-status-success */
+      box-shadow: 0 0 0 3px color-mix(in srgb, #65B000 16%, transparent), 0px 8px 16px rgba(0,0,0,0.04);
+    }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_card.is-running {
+      border-color: color-mix(in srgb, #F49B00 30%, #D0D5DD); /* --pds-status-running / --pds-border-default */
+    }
+    /* Yellow stroke travelling around the perimeter while running. */
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_card.is-running::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 12px;
+      padding: 1.5px;
+      background: conic-gradient(from var(--software-delivery-agent-visual-angle, 0deg),
+        transparent 0deg, transparent 250deg, #F49B00 322deg, transparent 360deg); /* --pds-status-running */
+      /* claude-rules-ignore: mask paint — alpha only, not a design color */
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      animation: software-delivery-agent-visual-spin 1.4s linear infinite;
+      pointer-events: none;
+    }
+    @property --software-delivery-agent-visual-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+    @keyframes software-delivery-agent-visual-spin { to { --software-delivery-agent-visual-angle: 360deg; } }
+
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_card-head { display: flex; align-items: center; gap: 8px; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_card-title { font-size: 14px; font-weight: 500; color: #22272B; letter-spacing: -0.14px; } /* --pds-text-md / --pds-font-medium / --pds-text-primary */
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_card-divider { display: block; height: 1px; margin: 0 -14px; background-color: #E4E7EB; } /* --pds-border-subtle */
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_card-detail { margin: 0; font-size: 13px; color: #7C8696; letter-spacing: -0.16px; } /* --pds-text-base / --pds-text-tertiary */
+
+    /* Status chip sitting 6px above the card's top-left; persists once a
+       step has started (yellow "Running" → green "Success" that stays even
+       after the border reverts to grey at 'done'). */
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_badge {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 0;
+      align-items: center;
+      gap: 5px;
+      height: 24px;
+      padding: 0 9px;
+      border-radius: 6px;
+      font-size: 13px; /* --pds-text-base */
+      font-weight: 500; /* --pds-font-medium */
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_badge.is-visible { display: inline-flex; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_badge--running {
+      color: color-mix(in srgb, #F49B00 85%, black);
+      border-color: color-mix(in srgb, #F49B00 50%, transparent);
+      background-color: color-mix(in srgb, #F49B00 12%, #ffffff); /* --pds-status-running / --pds-bg-primary */
+    }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_badge--success {
+      color: #448600; /* --pds-status-success-text */
+      border-color: #C8EF8C; /* --pds-status-success-border */
+      background-color: #F8FFEB; /* --pds-status-success-bg */
+    }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_spin { animation: software-delivery-agent-visual-rotate 0.9s linear infinite; }
+    @keyframes software-delivery-agent-visual-rotate { to { transform: rotate(360deg); } }
+
+    /* ── MaskIcon (HDS glyph tinted via CSS mask, inlined as data: URIs) ── */
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_mask-icon {
+      display: inline-block;
+      flex-shrink: 0;
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+      -webkit-mask-position: center;
+      mask-position: center;
+      -webkit-mask-size: contain;
+      mask-size: contain;
+    }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_mask-icon--step {
+      width: 18px;
+      height: 18px;
+      background-color: #22272B; /* --pds-text-primary */
+      -webkit-mask-image: var(--sdav-mask-1);
+      mask-image: var(--sdav-mask-1);
+    }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_mask-icon--deploy {
+      width: 20px;
+      height: 20px;
+      background-color: #22272B; /* --pds-text-primary */
+      -webkit-mask-image: var(--sdav-mask-2);
+      mask-image: var(--sdav-mask-2);
+    }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_mask-icon--substep {
+      width: 17px;
+      height: 17px;
+      background-color: #5F6B7C; /* --pds-text-secondary */
+      -webkit-mask-image: var(--sdav-mask-3);
+      mask-image: var(--sdav-mask-3);
+    }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_mask-icon--check {
+      width: 14px;
+      height: 14px;
+      background-color: currentColor;
+      -webkit-mask-image: var(--sdav-mask-4);
+      mask-image: var(--sdav-mask-4);
+    }
+
+    /* ── Nested step-card widget (Build / Deploy) ─────────────────── */
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_substep { position: relative; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_substep-stack {
+      position: absolute;
+      background-color: #ffffff; /* --pds-bg-primary */
+      border: 1px solid #E4E7EB; /* --pds-border-subtle */
+      border-radius: 8px; /* --pds-radius-lg */
+      box-shadow: 0 2px 8px rgba(134,137,146,0.08);
+    }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_substep-stack--1 { top: 6px; bottom: 6px; right: 2px; width: 24px; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_substep-stack--2 { top: 3px; bottom: 3px; right: 5px; width: 20px; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_substep-card {
+      position: relative;
+      margin-right: 8px;
+      background-color: #ffffff; /* --pds-bg-primary */
+      border: 1px solid #E4E7EB; /* --pds-border-subtle */
+      border-radius: 8px; /* --pds-radius-lg */
+      box-shadow: 0 2px 4px rgba(134,137,146,0.08);
+      overflow: hidden;
+    }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_substep-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 16px;
+      font-size: 14px; /* --pds-text-md */
+      font-weight: 500; /* --pds-font-medium */
+      color: #22272B; /* --pds-text-primary */
+      letter-spacing: -0.32px;
+    }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_substep-foot {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      padding: 7px 16px;
+      background-color: #FAFBFC; /* --pds-bg-secondary */
+      border-top: 1px solid #E4E7EB; /* --pds-border-subtle */
+      font-family: 'Roboto Mono', 'Monaco', 'Courier New', monospace; /* --pds-font-family-mono */
+      font-size: 12px;
+      color: #5F6B7C; /* --pds-text-secondary */
+    }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_substep-foot svg { display: block; flex-shrink: 0; }
+
+    /* ── Connector between step cards ─────────────────────────────── */
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_connector { display: flex; justify-content: center; margin-top: -5px; position: relative; z-index: 2; }
+
+    /* ── Reasoning column ──────────────────────────────────────────── */
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_reason {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding-top: 8px;
+    }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_reason.is-active { display: block; }
+
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_reason-view { display: none; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_reason-view.is-visible { display: block; }
+
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_reason-head { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #7C8696; } /* --pds-text-sm / --pds-text-tertiary */
+    /* claude-rules-ignore: font-family: inherit is a button reset, not a hardcoded font */
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_reason-toggle { appearance: none; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; font-family: inherit; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_chevron { transition: transform 0.25s ease; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_chevron.is-open { transform: rotate(180deg); }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_reason-body { border-left: 1px solid #E4E7EB; padding-left: 17px; margin-top: 8px; } /* --pds-border-subtle */
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_reason-body--done { border-left: none; padding-left: 0; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_reason-text { margin: 0; font-size: 12px; line-height: 1.66; letter-spacing: -0.28px; color: #7C8696; } /* --pds-text-sm / --pds-text-tertiary */
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_reason-text--result { font-size: 13px; color: #22272B; } /* --pds-text-base / --pds-text-primary */
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_collapsible { overflow: hidden; max-height: 0; transition: max-height 0.3s ease; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_collapsible.is-open { max-height: 160px; }
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_reason-thinking { border-left: 1px solid #E4E7EB; padding-left: 17px; margin-bottom: 12px; } /* --pds-border-subtle */
+
+    [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_shimmer {
+      background: linear-gradient(100deg, #7C8696 30%, #22272B 50%, #7C8696 70%); /* --pds-text-tertiary / --pds-text-primary */
+      background-size: 220% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: software-delivery-agent-visual-shimmer 1.8s linear infinite;
+    }
+    @keyframes software-delivery-agent-visual-shimmer { from { background-position: 180% 0; } to { background-position: -80% 0; } }
+
+    /* Mobile: narrow the step cards to hand more room to the reasoning column,
+       and bump the reasoning type up a step so it stays comfortable to read.
+       LOCAL PREVIEW ONLY — omitted from the Webflow inject artifact; apply as
+       post-inject data_style_tool breakpoint calls (see header comment). */
+    @media (max-width: 640px) {
+      [data-embed="software-delivery-agent-visual"] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 16px; }
+      [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_reason-head { font-size: 13px; } /* --pds-text-base */
+      [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_reason-text { font-size: 13px; } /* --pds-text-base */
+      [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_reason-text--result { font-size: 14px; } /* --pds-text-md */
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_card.is-running::before,
+      [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_spin,
+      [data-embed="software-delivery-agent-visual"] .software-delivery-agent-visual_shimmer {
+        animation: none;
+      }
+    }
+  </style>
+
+  <!-- Step 1 — Review -->
+  <div class="software-delivery-agent-visual_step-slot software-delivery-agent-visual_step-slot--1">
+    <div class="software-delivery-agent-visual_card" data-step="0">
+      <span class="software-delivery-agent-visual_badge software-delivery-agent-visual_badge--running">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="software-delivery-agent-visual_spin" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+        Running
+      </span>
+      <span class="software-delivery-agent-visual_badge software-delivery-agent-visual_badge--success is-visible">
+        <span class="software-delivery-agent-visual_mask-icon software-delivery-agent-visual_mask-icon--check" aria-hidden="true"></span>
+        Success
+      </span>
+      <div class="software-delivery-agent-visual_card-head">
+        <span class="software-delivery-agent-visual_mask-icon software-delivery-agent-visual_mask-icon--step" aria-hidden="true"></span>
+        <span class="software-delivery-agent-visual_card-title">Review</span>
+      </div>
+      <span class="software-delivery-agent-visual_card-divider" aria-hidden="true"></span>
+      <p class="software-delivery-agent-visual_card-detail">Agent reviews PR for code quality, standards and risk</p>
+    </div>
+  </div>
+
+  <!-- Connector 1 → 2 -->
+  <div class="software-delivery-agent-visual_connector-slot software-delivery-agent-visual_connector-slot--1">
+    <div class="software-delivery-agent-visual_connector" aria-hidden="true">
+      <svg width="12" height="72" viewBox="0 0 12 72" fill="none">
+        <circle cx="6" cy="5" r="3.25" fill="#ffffff" stroke="#D0D5DD" stroke-width="1.5"></circle>
+        <line x1="6" y1="8.5" x2="6" y2="64" stroke="#D0D5DD" stroke-width="1.5"></line>
+        <path d="M2.5 60 L6 64.5 L9.5 60" fill="none" stroke="#D0D5DD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Reasoning 1 -->
+  <div class="software-delivery-agent-visual_reason-slot software-delivery-agent-visual_reason-slot--1">
+    <div class="software-delivery-agent-visual_reason is-active" data-reason="0">
+      <div class="software-delivery-agent-visual_reason-view software-delivery-agent-visual_reason-view--running">
+        <div class="software-delivery-agent-visual_reason-head">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+          <span class="software-delivery-agent-visual_shimmer">Thinking</span>
+        </div>
+        <div class="software-delivery-agent-visual_reason-body">
+          <p class="software-delivery-agent-visual_reason-text">Reviewing PR for policy adherence, style, and quality...</p>
+        </div>
+      </div>
+      <div class="software-delivery-agent-visual_reason-view software-delivery-agent-visual_reason-view--done is-visible">
+        <button type="button" class="software-delivery-agent-visual_reason-head software-delivery-agent-visual_reason-toggle" aria-expanded="false">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="software-delivery-agent-visual_chevron" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+          Thought for 4s
+        </button>
+        <div class="software-delivery-agent-visual_reason-body software-delivery-agent-visual_reason-body--done">
+          <div class="software-delivery-agent-visual_collapsible">
+            <p class="software-delivery-agent-visual_reason-text software-delivery-agent-visual_reason-thinking">Reviewing PR for policy adherence, style, and quality...</p>
+          </div>
+          <p class="software-delivery-agent-visual_reason-text software-delivery-agent-visual_reason-text--result">Pull request reviewed. Coding standards met, no policy violations detected.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2 — Build -->
+  <div class="software-delivery-agent-visual_step-slot software-delivery-agent-visual_step-slot--2">
+    <div class="software-delivery-agent-visual_card" data-step="1">
+      <span class="software-delivery-agent-visual_badge software-delivery-agent-visual_badge--running">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="software-delivery-agent-visual_spin" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+        Running
+      </span>
+      <span class="software-delivery-agent-visual_badge software-delivery-agent-visual_badge--success is-visible">
+        <span class="software-delivery-agent-visual_mask-icon software-delivery-agent-visual_mask-icon--check" aria-hidden="true"></span>
+        Success
+      </span>
+      <div class="software-delivery-agent-visual_card-head">
+        <span class="software-delivery-agent-visual_mask-icon software-delivery-agent-visual_mask-icon--step" aria-hidden="true"></span>
+        <span class="software-delivery-agent-visual_card-title">Build</span>
+      </div>
+      <div class="software-delivery-agent-visual_substep">
+        <span class="software-delivery-agent-visual_substep-stack software-delivery-agent-visual_substep-stack--1" aria-hidden="true"></span>
+        <span class="software-delivery-agent-visual_substep-stack software-delivery-agent-visual_substep-stack--2" aria-hidden="true"></span>
+        <div class="software-delivery-agent-visual_substep-card">
+          <div class="software-delivery-agent-visual_substep-head">
+            <span class="software-delivery-agent-visual_mask-icon software-delivery-agent-visual_mask-icon--substep" aria-hidden="true"></span>
+            <span>Cache Restore</span>
+          </div>
+          <div class="software-delivery-agent-visual_substep-foot">
+            <span>+2 more</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connector 2 → 3 -->
+  <div class="software-delivery-agent-visual_connector-slot software-delivery-agent-visual_connector-slot--2">
+    <div class="software-delivery-agent-visual_connector" aria-hidden="true">
+      <svg width="12" height="72" viewBox="0 0 12 72" fill="none">
+        <circle cx="6" cy="5" r="3.25" fill="#ffffff" stroke="#D0D5DD" stroke-width="1.5"></circle>
+        <line x1="6" y1="8.5" x2="6" y2="64" stroke="#D0D5DD" stroke-width="1.5"></line>
+        <path d="M2.5 60 L6 64.5 L9.5 60" fill="none" stroke="#D0D5DD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Reasoning 2 -->
+  <div class="software-delivery-agent-visual_reason-slot software-delivery-agent-visual_reason-slot--2">
+    <div class="software-delivery-agent-visual_reason is-active" data-reason="1">
+      <div class="software-delivery-agent-visual_reason-view software-delivery-agent-visual_reason-view--running">
+        <div class="software-delivery-agent-visual_reason-head">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+          <span class="software-delivery-agent-visual_shimmer">Thinking</span>
+        </div>
+        <div class="software-delivery-agent-visual_reason-body">
+          <p class="software-delivery-agent-visual_reason-text">Selecting tests required for the changes in this build...</p>
+        </div>
+      </div>
+      <div class="software-delivery-agent-visual_reason-view software-delivery-agent-visual_reason-view--done is-visible">
+        <button type="button" class="software-delivery-agent-visual_reason-head software-delivery-agent-visual_reason-toggle" aria-expanded="false">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="software-delivery-agent-visual_chevron" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+          Thought for 6s
+        </button>
+        <div class="software-delivery-agent-visual_reason-body software-delivery-agent-visual_reason-body--done">
+          <div class="software-delivery-agent-visual_collapsible">
+            <p class="software-delivery-agent-visual_reason-text software-delivery-agent-visual_reason-thinking">Selecting tests required for the changes in this build...</p>
+          </div>
+          <p class="software-delivery-agent-visual_reason-text software-delivery-agent-visual_reason-text--result">Build complete. Ran 38 of 412 tests, artifact signed and pushed to the registry</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3 — Deploy -->
+  <div class="software-delivery-agent-visual_step-slot software-delivery-agent-visual_step-slot--3">
+    <div class="software-delivery-agent-visual_card" data-step="2">
+      <span class="software-delivery-agent-visual_badge software-delivery-agent-visual_badge--running">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="software-delivery-agent-visual_spin" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+        Running
+      </span>
+      <span class="software-delivery-agent-visual_badge software-delivery-agent-visual_badge--success is-visible">
+        <span class="software-delivery-agent-visual_mask-icon software-delivery-agent-visual_mask-icon--check" aria-hidden="true"></span>
+        Success
+      </span>
+      <div class="software-delivery-agent-visual_card-head">
+        <span class="software-delivery-agent-visual_mask-icon software-delivery-agent-visual_mask-icon--deploy" aria-hidden="true"></span>
+        <span class="software-delivery-agent-visual_card-title">Deploy</span>
+      </div>
+      <div class="software-delivery-agent-visual_substep">
+        <span class="software-delivery-agent-visual_substep-stack software-delivery-agent-visual_substep-stack--1" aria-hidden="true"></span>
+        <span class="software-delivery-agent-visual_substep-stack software-delivery-agent-visual_substep-stack--2" aria-hidden="true"></span>
+        <div class="software-delivery-agent-visual_substep-card">
+          <div class="software-delivery-agent-visual_substep-head">
+            <span class="software-delivery-agent-visual_mask-icon software-delivery-agent-visual_mask-icon--substep" aria-hidden="true"></span>
+            <span>Canary rollout</span>
+          </div>
+          <div class="software-delivery-agent-visual_substep-foot">
+            <span>+2 more</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reasoning 3 -->
+  <div class="software-delivery-agent-visual_reason-slot software-delivery-agent-visual_reason-slot--3">
+    <div class="software-delivery-agent-visual_reason is-active" data-reason="2">
+      <div class="software-delivery-agent-visual_reason-view software-delivery-agent-visual_reason-view--running">
+        <div class="software-delivery-agent-visual_reason-head">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+          <span class="software-delivery-agent-visual_shimmer">Thinking</span>
+        </div>
+        <div class="software-delivery-agent-visual_reason-body">
+          <p class="software-delivery-agent-visual_reason-text">Rollout 10% complete. Now I'm verifying canary against baseline metrics.</p>
+        </div>
+      </div>
+      <div class="software-delivery-agent-visual_reason-view software-delivery-agent-visual_reason-view--done is-visible">
+        <button type="button" class="software-delivery-agent-visual_reason-head software-delivery-agent-visual_reason-toggle" aria-expanded="false">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="software-delivery-agent-visual_chevron" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+          Thought for 6s
+        </button>
+        <div class="software-delivery-agent-visual_reason-body software-delivery-agent-visual_reason-body--done">
+          <div class="software-delivery-agent-visual_collapsible">
+            <p class="software-delivery-agent-visual_reason-text software-delivery-agent-visual_reason-thinking">Rollout 10% complete. Now I'm verifying canary against baseline metrics.</p>
+          </div>
+          <p class="software-delivery-agent-visual_reason-text software-delivery-agent-visual_reason-text--result">Rollout complete. Deployment has been verified as healthy.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+document.querySelectorAll('[data-embed="software-delivery-agent-visual"]:not([data-wds-init])').forEach(function (root) {
+  root.setAttribute('data-wds-init', '1');
+
+  // Timing constants mirror the source verbatim: t starts at 350ms; each
+  // step's 'running'→'success' duration is its own runMs; FLASH_MS is the
+  // green success hold before the card border reverts to grey ('done').
+  var STEP_RUN_MS = [2400, 2600, 3000];
+  var FLASH_MS = 700;
+
+  var cards = root.querySelectorAll('.software-delivery-agent-visual_card');
+  var reasons = root.querySelectorAll('.software-delivery-agent-visual_reason');
+
+  function setStatus(i, status) {
+    var card = cards[i];
+    var reason = reasons[i];
+    if (!card || !reason) { return; }
+
+    var runningBadge = card.querySelector('.software-delivery-agent-visual_badge--running');
+    var successBadge = card.querySelector('.software-delivery-agent-visual_badge--success');
+    var runningView = reason.querySelector('.software-delivery-agent-visual_reason-view--running');
+    var doneView = reason.querySelector('.software-delivery-agent-visual_reason-view--done');
+
+    card.classList.remove('is-running', 'is-success');
+    if (runningBadge) { runningBadge.classList.remove('is-visible'); }
+    if (successBadge) { successBadge.classList.remove('is-visible'); }
+    if (runningView) { runningView.classList.remove('is-visible'); }
+    if (doneView) { doneView.classList.remove('is-visible'); }
+
+    if (status === 'pending') {
+      reason.classList.remove('is-active');
+      return;
+    }
+
+    reason.classList.add('is-active');
+
+    if (status === 'running') {
+      card.classList.add('is-running');
+      if (runningBadge) { runningBadge.classList.add('is-visible'); }
+      if (runningView) { runningView.classList.add('is-visible'); }
+      return;
+    }
+
+    if (status === 'success') {
+      card.classList.add('is-success');
+      if (successBadge) { successBadge.classList.add('is-visible'); }
+      if (doneView) { doneView.classList.add('is-visible'); }
+      return;
+    }
+
+    // status === 'done' — border reverts to grey; the success chip and the
+    // "Thought for Xs" reasoning view persist (showChip = status !== 'pending').
+    if (successBadge) { successBadge.classList.add('is-visible'); }
+    if (doneView) { doneView.classList.add('is-visible'); }
+  }
+
+  function runSequence() {
+    var t = 350;
+    for (var i = 0; i < STEP_RUN_MS.length; i++) {
+      (function (idx, runAt, runMs) {
+        setTimeout(function () { setStatus(idx, 'running'); }, runAt);
+        setTimeout(function () { setStatus(idx, 'success'); }, runAt + runMs);
+        setTimeout(function () { setStatus(idx, 'done'); }, runAt + runMs + FLASH_MS);
+      })(i, t, STEP_RUN_MS[i]);
+      // Next step's 'running' starts when the current step flips to 'success'
+      // (its green flash overlaps the next step's start) — mirrors source.
+      t = t + STEP_RUN_MS[i];
+    }
+  }
+
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduce) {
+    // Reduced motion: all steps jump straight to 'done', no timers.
+    for (var d = 0; d < cards.length; d++) { setStatus(d, 'done'); }
+  } else if (typeof IntersectionObserver !== 'undefined') {
+    var io = new IntersectionObserver(function (entries) {
+      if (entries[0].isIntersecting) {
+        runSequence();
+        io.disconnect();
+      }
+    }, { threshold: 0.4 });
+    io.observe(root);
+  } else {
+    runSequence();
+  }
+
+  // ---- Accordion toggle: the "Thought for Xs" heading expands the
+  // reasoning text, pushing the result down (source: per-Reasoning `open`
+  // state, toggled by the ChevronDown click handler). ----
+  root.querySelectorAll('.software-delivery-agent-visual_reason-toggle').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var wasOpen = btn.getAttribute('aria-expanded') === 'true';
+      var next = !wasOpen;
+      btn.setAttribute('aria-expanded', String(next));
+      var chevron = btn.querySelector('.software-delivery-agent-visual_chevron');
+      if (chevron) { chevron.classList.toggle('is-open', next); }
+      var body = btn.parentElement;
+      var collapsible = body ? body.querySelector('.software-delivery-agent-visual_collapsible') : null;
+      if (collapsible) { collapsible.classList.toggle('is-open', next); }
+    });
+  });
+});
+  </script>
+
+</div>
