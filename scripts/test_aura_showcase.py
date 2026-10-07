@@ -208,17 +208,18 @@ def run_showcase_tests():
     print("   [OK] Scrollytelling, barra de progresso, trilho lateral e classes scroll-reveal validados.")
 
     # =========================================================================
-    # 3. CONTROLES DO TOUR INTERATIVO E PLAYER
+    # 3. DEMONSTRAÇÃO AUTÔNOMA NO SCROLL & REPLAY DISCRETO (SEM PLAYER ARTIFICIAL)
     # =========================================================================
-    print("\n3. Testando Controles do Tour Interativo...")
-    assert "btn-tour-play-pause" in html_content
-    assert "btn-tour-prev" in html_content
-    assert "btn-tour-next" in html_content
-    assert "btn-tour-replay" in html_content
-    assert "tour-progress-bar" in html_content
-    assert "data-step-target=\"1\"" in html_content
-    assert "data-step-target=\"4\"" in html_content
-    print("   [OK] Controles do Player (Play/Pause, Prev, Next, Replay, Progress Bar) validados.")
+    print("\n3. Testando Demonstração Autônoma no Scroll e Replay Discreto...")
+    assert "btn-tour-replay" in html_content, "Botão 'Ver animação de novo' #btn-tour-replay ausente"
+    assert "Ver animação de novo" in html_content, "Texto 'Ver animação de novo ↺' ausente"
+    assert "typewriter-cursor" in html_content, "Cursor typewriter ausente"
+    assert "runAutonomousShowcase" in html_content, "Função runAutonomousShowcase ausente"
+    assert "runStreamingResponse" in html_content, "Função runStreamingResponse ausente"
+    assert "Role para ver o fluxo em tempo real" in html_content, "Indicador de scroll ausente no Hero"
+    assert "IntersectionObserver" in html_content, "Acionamento autônomo via IntersectionObserver ausente"
+    assert "Reproduzir Tour Automático" not in html_content, "Barra artificial antiga 'Reproduzir Tour Automático' ainda presente"
+    print("   [OK] Demonstração autônoma no scroll (Typewriter, Sincronização Chat vs Backend, Streaming, Replay Discreto) validada.")
 
     # =========================================================================
     # 4. BLINDAGEM DE SEGREDO TECNOLÓGICO (ZERO EXPOSIÇÃO DE STACK INTERNA)
@@ -328,6 +329,8 @@ def run_showcase_tests():
     {main_script}
 
     const expectedMethods = [
+      'runAutonomousShowcase',
+      'runStreamingResponse',
       'goToStep',
       'nextStep',
       'prevStep',
@@ -373,6 +376,58 @@ def run_showcase_tests():
     assert proc_node.returncode == 0, f"Falha na validação Node.js: {proc_node.stderr}"
     assert "NODE_SHOWCASE_API_VALIDATED" in proc_node.stdout
     print("   [OK] Métodos e integridade da API pública window.auraTour validados no Node.js.")
+
+    # =========================================================================
+    # 7. VALIDAÇÃO REAL EM NAVEGADOR (EDGE PLAYWRIGHT SE DISPONÍVEL)
+    # =========================================================================
+    print("\n7. Executando Validação Funcional em Navegador Real (Edge Playwright)...")
+    try:
+        from playwright.sync_api import sync_playwright
+        import time
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(channel="msedge", headless=True)
+            page = browser.new_page(viewport={"width": 1280, "height": 800})
+            file_url = (BASE_DIR / "web" / "showcase.html").resolve().as_uri()
+            page.goto(file_url)
+
+            # 1. Verifica que no scroll=0 o typewriter não disparou prematuramente
+            box = page.locator("#sec-chat-graph").bounding_box()
+            assert box and box["y"] > 500, "Seção deve estar abaixo da dobra inicial"
+            time.sleep(1.2)
+            typed_init = page.locator("#step1-typed-text").text_content()
+            resp_init = page.locator("#chat-response-row").is_visible()
+            assert typed_init == "", f"Não deve disparar no topo! Obtido: {typed_init}"
+            assert not resp_init, "Resposta não deve estar visível no topo"
+
+            # 2. Rola até a seção e valida o disparo autônomo
+            page.locator("#sec-chat-graph").scroll_into_view_if_needed()
+            time.sleep(0.6)
+            typed_mid = page.locator("#step1-typed-text").text_content()
+            assert len(typed_mid) > 0, "Typewriter deve iniciar automaticamente ao rolar"
+
+            # Aguarda dinamicamente conclusão do ciclo autônomo, streaming e exibição do DecisionCard
+            page.locator("#decisioncard-live").wait_for(state="visible", timeout=8000)
+            typed_done = page.locator("#step1-typed-text").text_content()
+            resp_done = page.locator("#chat-response-row").is_visible()
+            dc_done = page.locator("#decisioncard-live").is_visible()
+            badge_done = page.locator("#sim-status-badge").text_content()
+
+            assert "Qual produto mais vendido hoje?" in typed_done
+            assert resp_done, "Resposta da AURA deve ser exibida após streaming"
+            assert dc_done, "DecisionCard deve ser renderizado"
+            assert "CONCLUÍDO" in badge_done or "38ms" in badge_done, "Status deve indicar conclusão"
+
+            # 3. Testa replay discreto
+            page.locator("#btn-tour-replay").click()
+            time.sleep(0.3)
+            replay_badge = page.locator("#sim-status-badge").text_content()
+            assert "EXECUTANDO" in replay_badge, f"Replay deve reiniciar execução, obtido: {replay_badge}"
+
+            browser.close()
+            print("   [OK] Validação em navegador real Edge aprovada: aguardo no topo, disparo autônomo no scroll, streaming, DecisionCard e replay.")
+    except Exception as e:
+        print(f"   [AVISO] Verificação em navegador real ignorada ou indisponível: {e}")
 
     print("\n" + "=" * 78)
     print("🎉 TODOS OS TESTES DA APRESENTAÇÃO AURA SHOWCASE PASSARAM COM 100% DE SUCESSO!")

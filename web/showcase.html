@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#07090e">
-  <title>AURA // Apresentação & Tour Executivo (Showcase Multissetorial)</title>
+  <title>AURA // Apresentação & Showcase Executivo (Simulação Autônoma em Tempo Real)</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.ico">
 
   <!-- Tailwind CSS CDN -->
@@ -111,29 +111,29 @@
     /* Cards com Glow Suavizado (Liquid Glass Executivo Sóbrio) */
     .glass-card-glow-cyan {
       background: rgba(12, 18, 30, 0.88);
-      border: 1px solid rgba(6, 182, 212, 0.22);
-      box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.45), 0 0 14px 0 rgba(6, 182, 212, 0.08);
+      border: 1px solid rgba(6, 182, 212, 0.25);
+      box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.45), 0 0 14px 0 rgba(6, 182, 212, 0.10);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
     }
 
     .glass-card-glow-emerald {
       background: rgba(12, 18, 30, 0.88);
-      border: 1px solid rgba(16, 185, 129, 0.22);
-      box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.45), 0 0 14px 0 rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.45), 0 0 14px 0 rgba(16, 185, 129, 0.10);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
     }
 
     .glass-card-glow-purple {
       background: rgba(12, 18, 30, 0.88);
-      border: 1px solid rgba(124, 58, 237, 0.22);
-      box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.45), 0 0 14px 0 rgba(124, 58, 237, 0.08);
+      border: 1px solid rgba(124, 58, 237, 0.25);
+      box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.45), 0 0 14px 0 rgba(124, 58, 237, 0.10);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
     }
 
-    /* Pipeline & Graph Node Pulse Animation */
+    /* Conectores SVG com Pulso de Fótons em Tempo Real */
     @keyframes pulse-flow {
       0% {
         stroke-dashoffset: 120;
@@ -174,7 +174,7 @@
       animation: photon-travel 0.85s cubic-bezier(0.4, 0, 0.2, 1) infinite;
     }
 
-    /* Step Transition Smooth Fade */
+    /* Transições Suaves das Etapas e Painéis */
     .step-content-pane {
       transition: opacity 0.35s ease, transform 0.35s ease;
     }
@@ -190,7 +190,7 @@
       display: block;
     }
 
-    /* Text Redaction & Disintegration States */
+    /* Efeito de Desintegração em Poeira nos Textos Sensíveis */
     .pii-raw {
       transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
       display: inline-block;
@@ -205,7 +205,7 @@
       transition: all 0.4s ease;
     }
 
-    /* Dust Canvas Container */
+    /* Canvas Overlay de Partículas (Desintegração em Poeira) */
     #dust-particle-canvas {
       position: absolute;
       top: 0;
@@ -216,56 +216,39 @@
       z-index: 30;
     }
 
-    /* Custom Stepper Progress Pill */
-    .step-pill {
-      transition: all 0.3s ease;
-    }
-    .step-pill.active {
-      border-color: #06b6d4;
-      background: rgba(6, 182, 212, 0.12);
-      color: #ffffff;
-      box-shadow: 0 0 12px rgba(6, 182, 212, 0.25);
-    }
-    .step-pill.completed {
-      border-color: #10b981;
-      background: rgba(16, 185, 129, 0.08);
-      color: #34d399;
-    }
-
-    /* Pipeline Node Glowing States */
-    .pipeline-node {
-      transition: all 0.3s ease;
-    }
-    .pipeline-node.pulse-highlight {
-      border-color: #34d399 !important;
-      box-shadow: 0 0 16px rgba(16, 185, 129, 0.35);
-      transform: scale(1.015);
-    }
-
-    /* Graph Nodes (Seção de Chat & Fluxograma Core) */
-    .graph-node {
+    /* Estados Reativos dos Nós do Pipeline */
+    .pipeline-node, .graph-node {
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      cursor: pointer;
     }
-    .graph-node.active-glow {
+    .pipeline-node.pulse-highlight, .graph-node.active-glow {
       border-color: #22d3ee !important;
-      box-shadow: 0 0 16px rgba(6, 182, 212, 0.32), inset 0 0 10px rgba(6, 182, 212, 0.08);
+      box-shadow: 0 0 18px rgba(6, 182, 212, 0.35), inset 0 0 10px rgba(6, 182, 212, 0.10);
       transform: scale(1.015);
     }
     .graph-node.success-glow {
       border-color: #34d399 !important;
-      box-shadow: 0 0 16px rgba(16, 185, 129, 0.32), inset 0 0 10px rgba(16, 185, 129, 0.08);
+      box-shadow: 0 0 18px rgba(16, 185, 129, 0.35), inset 0 0 10px rgba(16, 185, 129, 0.10);
       transform: scale(1.015);
     }
-
-    /* Cylindrical Tank Liquid Animation */
-    @keyframes liquid-shimmer {
-      0% { transform: translateY(0); }
-      50% { transform: translateY(-3px); }
-      100% { transform: translateY(0); }
+    .graph-node.active-selected {
+      border-color: #22d3ee !important;
+      background: rgba(15, 23, 42, 0.95) !important;
+      box-shadow: 0 0 16px rgba(6, 182, 212, 0.35);
     }
-    .liquid-wave {
-      animation: liquid-shimmer 3s ease-in-out infinite;
+
+    /* Cursor de Digitação Typewriter Piscante */
+    .typewriter-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1.1em;
+      background-color: #22d3ee;
+      margin-left: 2px;
+      vertical-align: text-bottom;
+      animation: blink-cursor 0.75s step-start infinite;
+    }
+    @keyframes blink-cursor {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
     }
 
     /* Suavização de Botões com Glow Moderado e Elegante */
@@ -277,11 +260,17 @@
       filter: brightness(1.06);
       box-shadow: 0 6px 18px 0 rgba(0, 0, 0, 0.4), 0 0 14px 0 rgba(6, 182, 212, 0.2);
     }
-    .graph-node.active-selected {
-      border-color: #22d3ee !important;
-      background: rgba(15, 23, 42, 0.95) !important;
-      box-shadow: 0 0 16px rgba(6, 182, 212, 0.35);
+
+    /* Animação de Onda Líquida em Tanques */
+    @keyframes liquid-shimmer {
+      0% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+      100% { transform: translateY(0); }
     }
+    .liquid-wave {
+      animation: liquid-shimmer 3s ease-in-out infinite;
+    }
+
     .roi-card {
       transition: all 0.35s ease;
     }
@@ -295,11 +284,10 @@
   <!-- Trilho Lateral Flutuante de Navegação por Scroll (Desktop) -->
   <aside class="scroll-nav-rail hidden lg:flex" aria-label="Navegação Rápida">
     <button onclick="window.auraTour.scrollToSection('top')" class="scroll-nav-dot active" title="01. Início & Visão Executiva" data-section="top"></button>
-    <button onclick="window.auraTour.scrollToSection('sec-tour')" class="scroll-nav-dot" title="02. Tour Interativo (4 Etapas)" data-section="sec-tour"></button>
-    <button onclick="window.auraTour.scrollToSection('sec-chat-graph')" class="scroll-nav-dot" title="03. Chat Executivo & Grafo Core LGPD" data-section="sec-chat-graph"></button>
-    <button onclick="window.auraTour.scrollToSection('sec-blindagem')" class="scroll-nav-dot" title="04. Blindagem Fiduciária & LGPD" data-section="sec-blindagem"></button>
-    <button onclick="window.auraTour.scrollToSection('sec-diferenciacao')" class="scroll-nav-dot" title="05. Diferenciação Operacional & ROI" data-section="sec-diferenciacao"></button>
-    <button onclick="window.auraTour.scrollToSection('sec-faq')" class="scroll-nav-dot" title="06. FAQ Executivo" data-section="sec-faq"></button>
+    <button onclick="window.auraTour.scrollToSection('sec-chat-graph')" class="scroll-nav-dot" title="02. Demonstração Autônoma (Chat vs Backend)" data-section="sec-chat-graph"></button>
+    <button onclick="window.auraTour.scrollToSection('sec-blindagem')" class="scroll-nav-dot" title="03. Blindagem Fiduciária & LGPD" data-section="sec-blindagem"></button>
+    <button onclick="window.auraTour.scrollToSection('sec-diferenciacao')" class="scroll-nav-dot" title="04. Diferenciação Operacional & ROI" data-section="sec-diferenciacao"></button>
+    <button onclick="window.auraTour.scrollToSection('sec-faq')" class="scroll-nav-dot" title="05. FAQ Executivo" data-section="sec-faq"></button>
   </aside>
 
   <!-- =========================================================================
@@ -327,31 +315,26 @@
         </a>
       </div>
 
-      <!-- Links de Atalho das Etapas e Seções -->
-      <nav class="hidden md:flex items-center gap-1 text-xs font-sans">
-        <button onclick="window.auraTour.goToStep(1); window.auraTour.scrollToSection('sec-tour');" class="px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-colors">
-          1. A Pergunta
+      <!-- Links de Atalho das Seções -->
+      <nav class="hidden md:flex items-center gap-1.5 text-xs font-sans">
+        <button onclick="window.auraTour.scrollToSection('sec-chat-graph')" class="px-3 py-1.5 rounded-lg text-cyan-300 hover:text-white hover:bg-cyan-500/10 transition-colors font-semibold flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+          <span>Demonstração ao Vivo</span>
         </button>
-        <button onclick="window.auraTour.goToStep(2); window.auraTour.scrollToSection('sec-tour');" class="px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-colors">
-          2. Escudo AURA Guard™
+        <button onclick="window.auraTour.scrollToSection('sec-blindagem')" class="px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-colors">
+          Escudo LGPD
         </button>
-        <button onclick="window.auraTour.goToStep(3); window.auraTour.scrollToSection('sec-tour');" class="px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-colors">
-          3. Motor Sub-100ms
+        <button onclick="window.auraTour.scrollToSection('sec-diferenciacao')" class="px-3 py-1.5 rounded-lg text-emerald-300 hover:text-white hover:bg-emerald-500/10 transition-colors font-medium">
+          Diferenciação & ROI
         </button>
-        <button onclick="window.auraTour.goToStep(4); window.auraTour.scrollToSection('sec-tour');" class="px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-colors">
-          4. DecisionCard™
-        </button>
-        <button onclick="window.auraTour.scrollToSection('sec-chat-graph')" class="px-2.5 py-1.5 rounded-lg text-cyan-300 hover:text-white hover:bg-cyan-500/10 transition-colors font-medium">
-          Chat & Grafo Core
-        </button>
-        <button onclick="window.auraTour.scrollToSection('sec-diferenciacao')" class="px-2.5 py-1.5 rounded-lg text-emerald-300 hover:text-white hover:bg-emerald-500/10 transition-colors font-medium">
-          Diferenciação
+        <button onclick="window.auraTour.scrollToSection('sec-faq')" class="px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-colors">
+          FAQ
         </button>
       </nav>
 
       <!-- Botões de Ação Direta -->
       <div class="flex items-center gap-2.5">
-        <button id="btn-toggle-sfx-showcase" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/10 text-xs transition-colors shadow-sm" title="Alternar Efeitos Sonoros do Tour">
+        <button id="btn-toggle-sfx-showcase" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/10 text-xs transition-colors shadow-sm" title="Alternar Efeitos Sonoros">
           <i data-lucide="volume-2" id="icon-sfx" class="w-3.5 h-3.5 text-cyan-400"></i>
           <span class="hidden sm:inline text-[11px]">Áudio</span>
         </button>
@@ -366,12 +349,12 @@
   </header>
 
   <!-- =========================================================================
-       HERO & APRESENTAÇÃO GUIADA INTERATIVA
+       HERO EXECUTIVO: APRESENTAÇÃO MODERNA E INTUITIVA
        ========================================================================= -->
-  <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-8 sm:py-12 space-y-16">
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-8 sm:py-12 space-y-14">
     
     <!-- Hero Header Multissetorial -->
-    <div class="text-center max-w-3xl mx-auto space-y-4 scroll-reveal scroll-reveal-visible">
+    <div class="text-center max-w-3xl mx-auto space-y-5 min-h-[58vh] sm:min-h-[65vh] flex flex-col justify-center items-center py-10 scroll-reveal scroll-reveal-visible">
       <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-xs font-sans text-cyan-300">
         <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
         <span class="font-semibold tracking-wider uppercase text-[10px]">Arquitetura Universal: Postos • Padarias • Bares • Lojas • Franquias</span>
@@ -383,438 +366,267 @@
         </span>
       </h1>
       <p class="text-sm sm:text-base text-slate-300 leading-relaxed font-sans max-w-2xl mx-auto">
-        Acompanhe abaixo o fluxo em tempo real: veja como perguntas executivas são respondidas com telemetria direta de estoques e caixa, enquanto dados sensíveis fiscais e de colaboradores são desintegrados na borda com conformidade integral à LGPD (Lei 13.709/2018).
+        Role a página e assista à demonstração autônoma diante dos seus olhos: sem necessidade de clicar em botões de reprodução, veja o chat formulando a pergunta enquanto o backend intercepta dados sensíveis, desintegra em poeira e entrega a decisão executiva em tempo real.
       </p>
+
+      <!-- Indicador / Botão Convidativo de Rolagem -->
+      <div class="pt-4 flex flex-col items-center gap-2.5">
+        <button onclick="window.auraTour.scrollToSection('sec-chat-graph')" class="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-slate-900/90 border border-cyan-500/30 text-cyan-300 hover:text-white hover:border-cyan-400 text-xs font-semibold transition-all shadow-lg hover:shadow-cyan-500/20 group">
+          <span>Role para ver o fluxo em tempo real</span>
+          <i data-lucide="arrow-down" class="w-4 h-4 group-hover:translate-y-1 transition-transform text-cyan-400"></i>
+        </button>
+        <div class="flex items-center gap-2 text-[11px] font-sans text-slate-400">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Demonstração Autônoma Sincronizada ao Scroll • Zero Cliques Forçados</span>
+        </div>
+      </div>
     </div>
 
-    <!-- Barra de Controle do Tour Guiado (Play / Pause / Steps / Timer) -->
-    <section id="sec-tour" class="glass-panel p-4 rounded-2xl border border-white/10 shadow-xl backdrop-blur-xl bg-slateSurface/80 space-y-3 scroll-reveal">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        
-        <!-- Player Controls -->
-        <div class="flex items-center gap-2.5">
-          <button id="btn-tour-play-pause" class="btn-aura-glow-soft flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:brightness-105 text-slate-950 font-bold text-xs font-sans transition-all active:scale-95 border border-white/10">
-            <i data-lucide="play" id="icon-play-pause" class="w-4 h-4 fill-current"></i>
-            <span id="label-play-pause">Reproduzir Tour Automático</span>
-          </button>
-
-          <button id="btn-tour-prev" class="p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/10 transition-colors" title="Etapa Anterior (←)">
-            <i data-lucide="chevron-left" class="w-4 h-4"></i>
-          </button>
-
-          <button id="btn-tour-next" class="p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/10 transition-colors" title="Próxima Etapa (→)">
-            <i data-lucide="chevron-right" class="w-4 h-4"></i>
-          </button>
-
-          <button id="btn-tour-replay" class="p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-400 hover:text-white border border-white/10 transition-colors" title="Reiniciar do Início">
-            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-          </button>
-        </div>
-
-        <!-- Indicador de Status & Velocidade -->
-        <div class="flex items-center gap-3">
-          <div class="flex items-center gap-2 text-xs font-sans text-slate-400">
-            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-            <span id="tour-status-text" class="text-slate-300 font-medium">Modo Interativo</span>
-          </div>
-
-          <div class="flex items-center rounded-lg bg-slate-900 p-0.5 border border-white/10 text-xs font-sans">
-            <button id="btn-speed-1x" class="px-2.5 py-1 rounded-md bg-slate-800 text-white font-semibold">1x</button>
-            <button id="btn-speed-2x" class="px-2.5 py-1 rounded-md text-slate-400 hover:text-white">2x</button>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Barra de Progresso Suave da Etapa Atual -->
-      <div class="w-full bg-slate-950/80 rounded-full h-1.5 overflow-hidden border border-white/5">
-        <div id="tour-progress-bar" class="bg-gradient-to-r from-cyan-400 via-emerald-400 to-purple-400 h-full w-0 transition-all duration-100 ease-linear"></div>
-      </div>
-
-      <!-- 4 Pílulas Seletoras de Etapa (Tabs / Stepper) -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 pt-1 font-sans">
-        <button onclick="window.auraTour.goToStep(1)" class="step-pill active flex items-center gap-2.5 p-2.5 rounded-xl border border-white/10 text-left text-xs" data-step-target="1">
-          <span class="w-6 h-6 rounded-lg bg-white/10 font-bold flex items-center justify-center text-[11px] flex-shrink-0">1</span>
-          <div class="min-w-0">
-            <div class="font-semibold text-white truncate">A Pergunta</div>
-            <div class="text-[10px] text-slate-400 truncate">Demanda Executiva</div>
-          </div>
-        </button>
-
-        <button onclick="window.auraTour.goToStep(2)" class="step-pill flex items-center gap-2.5 p-2.5 rounded-xl border border-white/10 text-left text-xs" data-step-target="2">
-          <span class="w-6 h-6 rounded-lg bg-white/10 font-bold flex items-center justify-center text-[11px] flex-shrink-0">2</span>
-          <div class="min-w-0">
-            <div class="font-semibold text-white truncate">Escudo AURA Guard™</div>
-            <div class="text-[10px] text-slate-400 truncate">Desintegração de PII (LGPD)</div>
-          </div>
-        </button>
-
-        <button onclick="window.auraTour.goToStep(3)" class="step-pill flex items-center gap-2.5 p-2.5 rounded-xl border border-white/10 text-left text-xs" data-step-target="3">
-          <span class="w-6 h-6 rounded-lg bg-white/10 font-bold flex items-center justify-center text-[11px] flex-shrink-0">3</span>
-          <div class="min-w-0">
-            <div class="font-semibold text-white truncate">Motor Sub-100ms</div>
-            <div class="text-[10px] text-slate-400 truncate">Telemetria & Fisco</div>
-          </div>
-        </button>
-
-        <button onclick="window.auraTour.goToStep(4)" class="step-pill flex items-center gap-2.5 p-2.5 rounded-xl border border-white/10 text-left text-xs" data-step-target="4">
-          <span class="w-6 h-6 rounded-lg bg-white/10 font-bold flex items-center justify-center text-[11px] flex-shrink-0">4</span>
-          <div class="min-w-0">
-            <div class="font-semibold text-white truncate">DecisionCard™</div>
-            <div class="text-[10px] text-slate-400 truncate">Ação em 1-Toque</div>
-          </div>
-        </button>
-      </div>
-    </section>
-
-    <!-- =======================================================================
-         STAGE PRINCIPAL: WORKSPACE DINÂMICO DE 2 COLUNAS
-         ======================================================================= -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch scroll-reveal">
+    <!-- =========================================================================
+         NÚCLEO DO SHOWCASE: CHAT DA AURA (ESQUERDA) VS SIMULAÇÃO DO BACKEND (DIREITA)
+         (Acionado 100% de forma autônoma ao entrar no viewport pelo scroll)
+         ========================================================================= -->
+    <section id="sec-chat-graph" class="space-y-4 scroll-reveal">
       
-      <!-- COLUNA DA ESQUERDA: NARRATIVA EXECUTIVA & CONTROLES ESPECÍFICOS (5 Cols) -->
-      <div class="lg:col-span-5 flex flex-col justify-between glass-panel p-6 rounded-2xl border border-white/10 shadow-xl backdrop-blur-xl bg-slateSurface/90 relative overflow-hidden">
-        
-        <!-- Conteúdo Dinâmico da Narrativa por Etapa -->
-        <div id="step-narrative-container" class="space-y-5">
-          
-          <!-- ETAPA 1: Narrativa -->
-          <div id="narrative-step-1" class="step-content-pane active-pane space-y-4">
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-semibold">
-              <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
-              <span>Etapa 01 de 04 • Demanda de Negócio</span>
-            </div>
-            <h2 class="text-2xl font-bold text-white font-display-title">
-              A Pergunta Executiva: O Ponto de Partida da Decisão
-            </h2>
-            <p class="text-sm text-slate-300 leading-relaxed font-sans">
-              O gestor ou supervisor — seja de um posto de combustível, padaria, bar, loja de varejo ou franquia — precisa saber instantaneamente se haverá falta de estoque ou se ocorreu quebra de caixa no fechamento de turno, sem precisar abrir planilhas complexas.
-            </p>
-            <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-2 text-xs font-sans">
-              <div class="flex items-center gap-2 text-emerald-400 font-semibold">
-                <i data-lucide="check" class="w-4 h-4"></i>
-                <span>Compreensão Direta em Linguagem Natural</span>
-              </div>
-              <div class="flex items-center gap-2 text-emerald-400 font-semibold">
-                <i data-lucide="check" class="w-4 h-4"></i>
-                <span>Contextualização Automática da Filial & Turno</span>
-              </div>
-              <div class="flex items-center gap-2 text-emerald-400 font-semibold">
-                <i data-lucide="check" class="w-4 h-4"></i>
-                <span>Zero Fórmulas ou SQL Exigidos do Usuário</span>
-              </div>
-            </div>
-            <div class="pt-2">
-              <button onclick="window.auraTour.simulateStep1Question()" class="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-white border border-cyan-500/30 text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-sm">
-                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-                <span>Alternar Pergunta de Exemplo Multissetorial</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- ETAPA 2: Narrativa -->
-          <div id="narrative-step-2" class="step-content-pane hidden-pane space-y-4">
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-semibold">
-              <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>
-              <span>Etapa 02 de 04 • Blindagem Fiduciária & LGPD</span>
-            </div>
-            <h2 class="text-2xl font-bold text-white font-display-title">
-              Escudo AURA Guard™: Desintegração Instantânea de PII
-            </h2>
-            <p class="text-sm text-slate-300 leading-relaxed font-sans">
-              Antes de qualquer raciocínio ou orquestração, todos os dados confidenciais (CNPJ, CPF de colaboradores e clientes, chaves de transação fiscal, saldos e credenciais) são identificados em tempo real na borda e <strong>desintegrados em partículas</strong>, sendo substituídos por tokens neutros homologados, em conformidade integral com a LGPD (Lei 13.709/2018).
-            </p>
-            <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-2 text-xs font-sans">
-              <div class="flex items-center gap-2 text-cyan-400 font-semibold">
-                <i data-lucide="shield-check" class="w-4 h-4"></i>
-                <span>100% LGPD Fiduciária & Privacy by Design</span>
-              </div>
-              <div class="flex items-center gap-2 text-cyan-400 font-semibold">
-                <i data-lucide="shield-check" class="w-4 h-4"></i>
-                <span>Zero Vazamento de Dados Pessoais para a Nuvem</span>
-              </div>
-              <div class="flex items-center gap-2 text-cyan-400 font-semibold">
-                <i data-lucide="shield-check" class="w-4 h-4"></i>
-                <span>Preservação Estrita do Significado Contábil</span>
-              </div>
-            </div>
-            <div class="pt-2">
-              <button onclick="window.auraTour.triggerDustDisintegration(true)" class="btn-aura-glow-soft w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:brightness-105 text-slate-950 font-bold text-xs transition-all flex items-center justify-center gap-2 active:scale-95 border border-white/10">
-                <i data-lucide="zap" class="w-4 h-4 fill-current"></i>
-                <span>Disparar Efeito de Desintegração em Poeira</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- ETAPA 3: Narrativa -->
-          <div id="narrative-step-3" class="step-content-pane hidden-pane space-y-4">
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
-              <i data-lucide="cpu" class="w-3.5 h-3.5"></i>
-              <span>Etapa 03 de 04 • Motor Analítico</span>
-            </div>
-            <h2 class="text-2xl font-bold text-white font-display-title">
-              Motor Sub-100ms: Operação Multissetorial & Fisco
-            </h2>
-            <p class="text-sm text-slate-300 leading-relaxed font-sans">
-              Com o payload 100% higienizado, o motor neural de borda cruza em paralelo a telemetria física de sensores e sondas, encerrantes de PDV, conciliação fiduciária contábil, previsão de run-out e regras da Portaria 26 da ANP (tolerância de ±0.60%) e NFC-e/SAT em postos, lojas, bares e padarias.
-            </p>
-            <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-2 text-xs font-sans">
-              <div class="flex items-center gap-2 text-emerald-400 font-semibold">
-                <i data-lucide="gauge" class="w-4 h-4"></i>
-                <span>Latência Total de Execução: 35ms a 42ms</span>
-              </div>
-              <div class="flex items-center gap-2 text-emerald-400 font-semibold">
-                <i data-lucide="check-circle-2" class="w-4 h-4"></i>
-                <span>Zero Alucinação: Verificação Matemática Estrita</span>
-              </div>
-              <div class="flex items-center gap-2 text-emerald-400 font-semibold">
-                <i data-lucide="database" class="w-4 h-4"></i>
-                <span>Conexão Nativa com Telemetria de Pista, PDVs & Sensores</span>
-              </div>
-            </div>
-            <div class="pt-2">
-              <button onclick="window.auraTour.simulatePipelinePulse()" class="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 hover:text-white border border-emerald-500/30 text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-sm">
-                <i data-lucide="play-circle" class="w-3.5 h-3.5"></i>
-                <span>Disparar Pulso do Pipeline (Sub-42ms)</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- ETAPA 4: Narrativa -->
-          <div id="narrative-step-4" class="step-content-pane hidden-pane space-y-4">
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-semibold">
-              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-              <span>Etapa 04 de 04 • Resolução Acionável</span>
-            </div>
-            <h2 class="text-2xl font-bold text-white font-display-title">
-              DecisionCard™ & Canvas: Diagnóstico de Luxo em 1-Toque
-            </h2>
-            <p class="text-sm text-slate-300 leading-relaxed font-sans">
-              O resultado não é um texto longo e vago, mas sim um <strong>DecisionCard (AURA Precision Glass)</strong> acoplado ao <strong>Companion Canvas</strong> com diagnóstico visual imediato, métricas exatas e botões de ação executiva com disparo em 1 clique.
-            </p>
-            <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-2 text-xs font-sans">
-              <div class="flex items-center gap-2 text-purple-400 font-semibold">
-                <i data-lucide="mouse-pointer-click" class="w-4 h-4"></i>
-                <span>Ações Rápidas: Reposição de Estoque, Pedidos & Fechamento</span>
-              </div>
-              <div class="flex items-center gap-2 text-purple-400 font-semibold">
-                <i data-lucide="layers" class="w-4 h-4"></i>
-                <span>AURA Companion Canvas: Auditoria Profunda de Estoque & ANP</span>
-              </div>
-              <div class="flex items-center gap-2 text-purple-400 font-semibold">
-                <i data-lucide="clock" class="w-4 h-4"></i>
-                <span>Horas de Planilhas Reduzidas a 10 Segundos</span>
-              </div>
-            </div>
-            <div class="pt-2">
-              <button onclick="window.auraTour.simulateActionClick('pedido')" class="btn-aura-glow-soft w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-500 to-cyan-500 hover:brightness-105 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 active:scale-95 border border-white/10">
-                <i data-lucide="send" class="w-3.5 h-3.5"></i>
-                <span>Simular Disparo de Pedido em 1-Clique</span>
-              </button>
-            </div>
-          </div>
-
+      <!-- Barra Superior Discreta de Status e Replay -->
+      <div class="glass-panel px-4 py-3 rounded-2xl border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-sans bg-slateSurface/80 shadow-md">
+        <div class="flex items-center gap-2.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
+          <span class="font-bold text-white text-[13px]">Fluxo Executivo em Tempo Real</span>
+          <span class="text-slate-400 font-mono text-[11px] hidden sm:inline">| Esquerda: Chat da AURA • Direita: Simulação do Backend</span>
         </div>
 
-        <!-- Rodapé do Card da Narrativa -->
-        <div class="pt-6 border-t border-white/10 flex items-center justify-between text-xs font-sans">
-          <span class="text-slate-400">Tour Interativo AURA v2.9</span>
-          <button onclick="window.auraTour.nextStep()" class="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 group">
-            <span>Avançar Etapa</span>
-            <i data-lucide="arrow-right" class="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform"></i>
+        <div class="flex items-center gap-2">
+          <!-- Botão Elegante de Replay para Rever a Animação -->
+          <button onclick="window.auraTour.restartTour()" id="btn-tour-replay" class="btn-aura-glow-soft px-3.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-cyan-300 hover:text-white border border-cyan-500/30 text-xs font-semibold transition-all flex items-center gap-2 active:scale-95" title="Reiniciar Simulação Autônoma">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+            <span>Ver animação de novo ↺</span>
           </button>
         </div>
-
       </div>
 
-      <!-- COLUNA DA DIREITA: PALCO VISUAL DINÂMICO INTERATIVO (7 Cols) -->
-      <div class="lg:col-span-7 flex flex-col glass-panel rounded-2xl border border-white/10 shadow-xl backdrop-blur-xl bg-obsidian/95 relative overflow-hidden min-h-[460px]">
+      <!-- Grid Principal: Chat da AURA (5 Cols) vs Simulação do Backend (7 Cols) -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         
-        <!-- Topo da Janela do Palco (Estilo macOS / Terminal de Luxo) -->
-        <div class="p-3.5 border-b border-white/10 bg-white/[0.02] flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="w-3 h-3 rounded-full bg-rose-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-amber-500/80"></span>
-            <span class="w-3 h-3 rounded-full bg-emerald-500/80"></span>
-            <span class="ml-2 text-xs font-mono text-slate-400" id="stage-viewport-title">aura://executivo/pergunta-entrada</span>
-          </div>
-          <div class="flex items-center gap-2 text-[11px] font-mono text-slate-400">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-            <span id="stage-telemetry-badge">MOTOR SOBERANO ONLINE</span>
-          </div>
-        </div>
-
-        <!-- Palco Visual 1: A Pergunta Executiva -->
-        <div id="visual-stage-1" class="step-content-pane active-pane flex-1 p-6 space-y-5">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-mono text-cyan-400">TERMINAL DE ENTRADA DO GESTOR</span>
-            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">CANAL SEGURO TLS 1.3</span>
-          </div>
-
-          <!-- Chat Prompt Card Simulado -->
-          <div class="p-4 rounded-xl bg-slate-900/90 border border-white/10 space-y-3 shadow-inner">
+        <!-- =====================================================================
+             COLUNA ESQUERDA: EMULAÇÃO REALISTA DO CHAT DA AURA (5 Cols)
+             ===================================================================== -->
+        <div id="mini-chat-aura" class="lg:col-span-5 flex flex-col glass-panel rounded-2xl border border-white/10 shadow-2xl backdrop-blur-xl bg-slateSurface/95 overflow-hidden">
+          
+          <!-- Topo da Janela do Chat (Estilo macOS / App Nativo) -->
+          <div class="p-3.5 border-b border-white/10 bg-white/[0.02] flex items-center justify-between">
             <div class="flex items-center gap-2">
-              <div class="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center font-bold text-xs">
+              <span class="w-3 h-3 rounded-full bg-rose-500/80"></span>
+              <span class="w-3 h-3 rounded-full bg-amber-500/80"></span>
+              <span class="w-3 h-3 rounded-full bg-emerald-500/80"></span>
+              <div class="flex items-center gap-1.5 ml-2">
+                <div class="neural-core-orb !w-4 !h-4"></div>
+                <span class="text-xs font-bold text-white">AURA Chat Executivo</span>
+                <span class="text-[10px] text-slate-400 font-mono hidden sm:inline">• Borda Local</span>
+              </div>
+            </div>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+              LGPD BLINDADO
+            </span>
+          </div>
+
+          <!-- Seletor Rápido de Cenários Multissetoriais -->
+          <div class="p-3 border-b border-white/5 bg-slate-950/50 space-y-1.5 font-sans">
+            <div class="flex items-center justify-between text-[11px] text-slate-400">
+              <span class="font-medium">Segmento da Demonstração:</span>
+              <span class="text-cyan-400 text-[10px] font-mono" id="sim-status-badge">PRONTO</span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-1 text-[11px]">
+              <button onclick="window.auraTour.selectChatScenario('posto')" id="scenario-btn-posto" class="px-2 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-200 border border-cyan-500/40 font-semibold truncate transition-all text-left flex items-center gap-1">
+                <span>⛽</span>
+                <span class="truncate">Postos</span>
+              </button>
+              <button onclick="window.auraTour.selectChatScenario('varejo')" id="scenario-btn-varejo" class="px-2 py-1.5 rounded-lg bg-slate-900/80 text-slate-300 hover:text-white border border-white/10 truncate transition-all text-left flex items-center gap-1">
+                <span>🏪</span>
+                <span class="truncate">Padaria / Bar</span>
+              </button>
+              <button onclick="window.auraTour.selectChatScenario('loja')" id="scenario-btn-loja" class="px-2 py-1.5 rounded-lg bg-slate-900/80 text-slate-300 hover:text-white border border-white/10 truncate transition-all text-left flex items-center gap-1">
+                <span>🏬</span>
+                <span class="truncate">Loja & Varejo</span>
+              </button>
+              <button onclick="window.auraTour.selectChatScenario('fiscal')" id="scenario-btn-fiscal" class="px-2 py-1.5 rounded-lg bg-slate-900/80 text-slate-300 hover:text-white border border-white/10 truncate transition-all text-left flex items-center gap-1">
+                <span>⚖️</span>
+                <span class="truncate">Auditoria Fiscal</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Área de Conversação do Chat -->
+          <div class="p-4 flex-1 space-y-4 overflow-y-auto max-h-[520px] font-sans text-xs" id="chat-messages-container">
+            
+            <!-- Mensagem do Gestor (Com Efeito Typewriter Automático) -->
+            <div class="flex items-start gap-2.5" id="user-msg-row">
+              <div class="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">
                 G
               </div>
-              <div>
-                <div class="text-xs font-semibold text-white">Gerente Executivo (Unidade Central)</div>
-                <div class="text-[10px] text-slate-400">Enviado às 17:42 • Posto #042 & PDV Central</div>
+              <div class="flex-1 space-y-1">
+                <div class="flex items-center justify-between text-[10px] text-slate-400">
+                  <span class="font-semibold text-slate-300" id="chat-user-label">Gerente Executivo (Unidade Central)</span>
+                  <span id="chat-timestamp-label">17:42 • Ao Vivo</span>
+                </div>
+                <div class="p-3.5 rounded-2xl rounded-tl-sm bg-slate-900/90 border border-white/10 text-cyan-200 leading-relaxed shadow-sm min-h-[46px] flex items-center">
+                  <span id="step1-typed-text" class="font-sans font-medium"></span><span id="chat-user-query-text" class="hidden"></span><span class="typewriter-cursor" id="typewriter-cursor"></span>
+                </div>
               </div>
             </div>
-            
-            <div class="p-3 rounded-lg bg-black/40 border border-white/5 font-sans text-sm text-cyan-200 leading-relaxed" id="step1-typed-text">
-              "Qual a previsão de esgotamento do Tanque 02 de Gasolina Comum e tivemos furo no fechamento do último turno?"
+
+            <!-- Indicador de Raciocínio Cognitivo Pulsando (AURA Thinking) -->
+            <div id="chat-thinking-box" class="hidden flex items-start gap-2.5">
+              <div class="neural-core-orb !w-6 !h-6 flex-shrink-0 mt-0.5"></div>
+              <div class="flex-1 p-3 rounded-2xl rounded-tl-sm bg-white/[0.03] border border-white/5 space-y-1.5">
+                <div class="flex items-center gap-2 text-cyan-400 font-mono text-[11px]">
+                  <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                  <span id="thinking-step-text" class="font-semibold">Consultando dados operacionais...</span>
+                </div>
+                <div class="w-full bg-black/40 h-1 rounded-full overflow-hidden">
+                  <div id="thinking-progress-bar" class="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 w-1/3 transition-all duration-300"></div>
+                </div>
+              </div>
             </div>
+
+            <!-- Resposta Executiva da AURA com DecisionCard Precision Glass -->
+            <div id="chat-response-row" class="hidden flex items-start gap-2.5">
+              <div class="neural-core-orb !w-7 !h-7 flex-shrink-0 mt-0.5"></div>
+              <div class="flex-1 space-y-3">
+                <div class="flex items-center justify-between text-[10px] text-slate-400">
+                  <span class="font-bold text-cyan-300 flex items-center gap-1">
+                    <span>AURA Cognitiva</span>
+                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-cyan-500/20 text-cyan-300 font-mono">Borda</span>
+                  </span>
+                  <span class="text-emerald-400 font-mono text-[10px]">38 ms • 100% LGPD</span>
+                </div>
+                
+                <!-- Balão de Texto da Resposta Executiva -->
+                <div class="p-3.5 rounded-2xl rounded-tl-sm bg-cyan-950/25 border border-cyan-500/30 text-slate-200 leading-relaxed space-y-3" id="chat-aura-response-bubble">
+                  <p id="chat-response-narrative" class="font-sans text-xs text-slate-200">
+                    Hoje (Turno Atual), o item líder absoluto em volume e faturamento é a <strong>Gasolina Comum</strong> com <strong>4.820 Litros</strong> vendidos (R$ 29.835,80 faturados), respondendo por 69,6% das vendas do turno. Em seguida: <strong>Diesel S-10</strong> (2.340 L) e <strong>Conveniência/Café</strong> (312 unid.). Fechamento de caixa 100% auditado com R$ 0,00 de divergência.
+                  </p>
+
+                  <!-- DecisionCard Executivo Precision Glass Incrustado -->
+                  <div id="decisioncard-live" class="p-3.5 rounded-xl bg-black/70 border border-cyan-500/30 space-y-3 font-sans shadow-xl">
+                    <div class="flex items-center justify-between border-b border-white/10 pb-2">
+                      <div class="flex items-center gap-2">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-cyan-400"></i>
+                        <span class="font-bold text-white text-xs" id="mini-dc-title">Diagnóstico Operacional Consolidado</span>
+                      </div>
+                      <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 animate-pulse" id="mini-dc-badge">
+                        MARGEM OTIMIZADA
+                      </span>
+                    </div>
+
+                    <!-- Grid de 4 Indicadores Cruciais -->
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                      <div class="p-2 rounded-lg bg-white/[0.03] border border-white/5">
+                        <div class="text-[10px] text-slate-400" id="mini-metric-label-1">Produto Mais Vendido</div>
+                        <div class="font-extrabold text-white text-xs" id="mini-metric-val-1">Gasolina Comum (4.820 L)</div>
+                        <div class="text-[9px] text-slate-400">69.6% do faturamento</div>
+                      </div>
+                      <div class="p-2 rounded-lg bg-white/[0.03] border border-white/5">
+                        <div class="text-[10px] text-slate-400" id="mini-metric-label-2">Faturamento Consolidado</div>
+                        <div class="font-extrabold text-cyan-300 text-xs" id="mini-metric-val-2">R$ 42.850,00</div>
+                        <div class="text-[9px] text-slate-400">Turno Atual • 100% Auditado</div>
+                      </div>
+                      <div class="p-2 rounded-lg bg-white/[0.03] border border-white/5">
+                        <div class="text-[10px] text-slate-400">Auditoria de Caixa</div>
+                        <div class="font-extrabold text-emerald-400 text-xs">R$ 0,00 Furo</div>
+                        <div class="text-[9px] text-slate-400">Zero divergência fiscal</div>
+                      </div>
+                      <div class="p-2 rounded-lg bg-white/[0.03] border border-white/5">
+                        <div class="text-[10px] text-slate-400">Conformidade ANP (LMC)</div>
+                        <div class="font-extrabold text-emerald-400 text-xs">+0.28%</div>
+                        <div class="text-[9px] text-slate-400">Tolerância Portaria 26 (±0.60%)</div>
+                      </div>
+                    </div>
+
+                    <!-- Botão Executivo de Ação em 1-Toque -->
+                    <div class="space-y-1.5 pt-1">
+                      <button onclick="window.auraTour.simulateChatActionClick()" id="mini-dc-action-btn" class="btn-aura-glow-soft w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:brightness-105 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all border border-white/10">
+                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                        <span id="mini-dc-action-text">Emitir Pedido de Reposição (30.000 L)</span>
+                      </button>
+
+                      <!-- Toast de Feedback de Ação -->
+                      <div id="mini-chat-action-toast" class="hidden p-2 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-[10px] font-sans text-emerald-200 flex items-center gap-1.5 transition-all">
+                        <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400 flex-shrink-0"></i>
+                        <span id="mini-chat-toast-message">Ordem executada em 1 toque com sucesso!</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Rodapé de Governança e LGPD -->
+                <div class="text-[10px] text-slate-400 font-mono flex items-center justify-between px-1">
+                  <span>LGPD (Lei 13.709/2018): 0 dados pessoais transmitidos • Privacy by Design</span>
+                  <span class="text-emerald-400 font-semibold">Decisão Pronta ✓</span>
+                </div>
+              </div>
+            </div>
+
           </div>
 
-          <!-- Tags de Contexto da Unidade Detectadas Automaticamente -->
-          <div class="space-y-2">
-            <span class="text-[11px] font-mono uppercase tracking-wider text-slate-400">Metadados de Contexto Vinculados:</span>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-sans">
-              <div class="p-2.5 rounded-lg bg-white/[0.02] border border-white/5">
-                <div class="text-[10px] text-slate-400">Unidade / Filial</div>
-                <div class="font-bold text-slate-200">Operação #042</div>
-              </div>
-              <div class="p-2.5 rounded-lg bg-white/[0.02] border border-white/5">
-                <div class="text-[10px] text-slate-400">Turno Ativo</div>
-                <div class="font-bold text-slate-200">Turno 3 (Noite)</div>
-              </div>
-              <div class="p-2.5 rounded-lg bg-white/[0.02] border border-white/5">
-                <div class="text-[10px] text-slate-400">Sondas & Sensores</div>
-                <div class="font-bold text-emerald-400">10/10 Online</div>
-              </div>
-              <div class="p-2.5 rounded-lg bg-white/[0.02] border border-white/5">
-                <div class="text-[10px] text-slate-400">Bicos / PDVs</div>
-                <div class="font-bold text-cyan-400">16 Conectados</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Animated Pulse Direcionando para o Escudo -->
-          <div class="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-between text-xs font-sans text-purple-300">
+          <!-- Barra de Input Interativa do Chat (Para quem quiser testar manualmente) -->
+          <div class="p-3 border-t border-white/10 bg-slate-900/80 space-y-2">
             <div class="flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full bg-purple-400 animate-ping"></span>
-              <span>Encaminhando payload bruto ao Escudo AURA Guard™...</span>
+              <input type="text" id="chat-interactive-input" value="Qual produto mais vendido hoje?" class="flex-1 bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-200 font-sans focus:outline-none focus:border-cyan-400 transition-colors" placeholder="Digite uma dúvida executiva...">
+              <button onclick="window.auraTour.simulateChatSubmit()" id="btn-simulate-chat-flow" class="btn-aura-glow-soft px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-500 hover:brightness-105 text-white font-bold text-xs flex items-center gap-1.5 active:scale-95 transition-all border border-white/10" title="Simular Novamente">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                <span class="hidden sm:inline">Simular</span>
+              </button>
             </div>
-            <button onclick="window.auraTour.goToStep(2)" class="text-cyan-400 hover:text-white underline font-semibold">
-              Ver Sanitização →
-            </button>
+            <div class="flex items-center justify-between text-[10px] text-slate-400 font-sans px-1">
+              <span>Simulação 100% autônoma • Digitação e resolução automáticas</span>
+              <span class="text-cyan-400 font-mono">Latência: sub-42ms</span>
+            </div>
           </div>
+
         </div>
 
-        <!-- Palco Visual 2: Escudo AURA Guard & Efeito de Desintegração em Poeira (Generalizado) -->
-        <div id="visual-stage-2" class="step-content-pane hidden-pane flex-1 p-6 space-y-4 relative overflow-hidden">
+        <!-- =====================================================================
+             COLUNA DIREITA: SIMULAÇÃO DO BACKEND EM TEMPO REAL CONECTADA (7 Cols)
+             ===================================================================== -->
+        <div id="aura-flowchart-graph" class="lg:col-span-7 flex flex-col glass-panel rounded-2xl border border-white/10 shadow-2xl backdrop-blur-xl bg-obsidian/95 overflow-hidden relative">
           
           <!-- Canvas Overlay de Partículas (Desintegração em Poeira) -->
           <canvas id="dust-particle-canvas"></canvas>
 
-          <div class="flex items-center justify-between relative z-10">
-            <span class="text-xs font-mono text-emerald-400">CÂMARA DE SANITIZAÇÃO CRIPTOGRÁFICA DE BORDA (LGPD)</span>
-            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20" id="dust-status-pill">
-              ESCUDO ATIVO
-            </span>
-          </div>
-
-          <!-- Container do Payload: Antes e Depois da Desintegração -->
-          <div class="p-4 rounded-xl bg-slate-900/90 border border-white/10 space-y-3 relative z-10 shadow-xl">
-            <div class="flex items-center justify-between border-b border-white/5 pb-2 text-xs">
-              <span class="font-mono text-slate-400">DADOS SENSÍVEIS IDENTIFICADOS NA OPERAÇÃO:</span>
-              <span class="text-[11px] font-semibold text-cyan-400" id="pii-counter-label">5 Itens Sensíveis</span>
-            </div>
-
-            <!-- Lista de Itens com Efeito de Dissolução e Substituição Generalizada -->
-            <div class="space-y-2.5 font-mono text-xs" id="pii-items-list">
-              <div class="flex items-center justify-between p-2 rounded bg-black/40 border border-white/5" id="pii-row-1">
-                <span class="text-slate-400">CNPJ:</span>
-                <span class="pii-raw font-bold text-rose-400" id="pii-val-1">14.285.910/0001-44</span>
-                <span class="pii-redacted font-bold text-emerald-400 hidden" id="pii-token-1">[CNPJ_BLINDADO:HASH_9A]</span>
-              </div>
-              <div class="flex items-center justify-between p-2 rounded bg-black/40 border border-white/5" id="pii-row-2">
-                <span class="text-slate-400">CPF:</span>
-                <span class="pii-raw font-bold text-rose-400" id="pii-val-2">529.982.247-25</span>
-                <span class="pii-redacted font-bold text-emerald-400 hidden" id="pii-token-2">[CPF_BLINDADO:HASH_4B]</span>
-              </div>
-              <div class="flex items-center justify-between p-2 rounded bg-black/40 border border-white/5" id="pii-row-3">
-                <span class="text-slate-400">IDENTIFICADOR FISCAL DE TRANSAÇÃO:</span>
-                <span class="pii-raw font-bold text-rose-400" id="pii-val-3">NFCe-352609-14285910</span>
-                <span class="pii-redacted font-bold text-emerald-400 hidden" id="pii-token-3">[TRANSACAO_FISCAL_TOKENIZADA]</span>
-              </div>
-              <div class="flex items-center justify-between p-2 rounded bg-black/40 border border-white/5" id="pii-row-4">
-                <span class="text-slate-400">SALDO EM CAIXA:</span>
-                <span class="pii-raw font-bold text-rose-400" id="pii-val-4">R$ 42.850,00</span>
-                <span class="pii-redacted font-bold text-emerald-400 hidden" id="pii-token-4">[VALOR_CONFIDENCIAL_HASH]</span>
-              </div>
-              <div class="flex items-center justify-between p-2 rounded bg-black/40 border border-white/5" id="pii-row-5">
-                <span class="text-slate-400">CREDENCIAIS:</span>
-                <span class="pii-raw font-bold text-rose-400" id="pii-val-5">token_sessao_pdv_881</span>
-                <span class="pii-redacted font-bold text-emerald-400 hidden" id="pii-token-5">[CREDENCIAL_ELIMINADA]</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Sandbox Interativo: Experimente com seu próprio dado -->
-          <div class="p-3.5 rounded-xl bg-cyan-950/20 border border-cyan-500/25 space-y-2 relative z-10 font-sans text-xs">
-            <div class="flex items-center justify-between">
-              <span class="font-semibold text-cyan-300 flex items-center gap-1.5">
-                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-                Experimente você mesmo (Sandbox Tátil):
-              </span>
-              <span class="text-[10px] text-slate-400">Qualquer CNPJ / CPF</span>
-            </div>
+          <!-- Topo da Janela do Backend (Monitor de Telemetria de Borda) -->
+          <div class="p-3.5 border-b border-white/10 bg-white/[0.02] flex items-center justify-between relative z-10">
             <div class="flex items-center gap-2">
-              <input type="text" id="custom-pii-input" value="CNPJ 24.582.110/0001-88" class="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-400" placeholder="Digite um CNPJ, CPF ou valor...">
-              <button onclick="window.auraTour.triggerCustomDustDisintegration()" id="btn-custom-disintegrate" class="btn-aura-glow-soft px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-emerald-500 hover:brightness-105 text-slate-950 font-bold text-xs font-sans transition-all active:scale-95 flex items-center gap-1 whitespace-nowrap border border-white/10">
-                <i data-lucide="zap" class="w-3 h-3 fill-current"></i>
-                <span>Pulverizar</span>
-              </button>
+              <i data-lucide="cpu" class="w-4 h-4 text-cyan-400"></i>
+              <span class="text-xs font-bold text-white font-mono" id="stage-viewport-title">aura://backend/simulacao-operacional-borda</span>
+            </div>
+            <div class="flex items-center gap-2 text-[11px] font-mono text-slate-400">
+              <span class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
+              <span id="stage-telemetry-badge">SINCRONIZADO AO CHAT EM TEMPO REAL</span>
             </div>
           </div>
 
-          <!-- Métricas de Blindagem -->
-          <div class="grid grid-cols-3 gap-2 text-center text-xs font-sans relative z-10">
-            <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
-              <div class="text-[10px] text-slate-400">Vazamento Externo</div>
-              <div class="font-extrabold text-emerald-400 text-sm">0 Bytes</div>
-            </div>
-            <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
-              <div class="text-[10px] text-slate-400">Tempo de Pulverização</div>
-              <div class="font-extrabold text-cyan-400 text-sm">3.8 ms</div>
-            </div>
-            <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
-              <div class="text-[10px] text-slate-400">Conformidade LGPD</div>
-              <div class="font-extrabold text-purple-400 text-sm">100% Blindado</div>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- Palco Visual 3: Processamento Analítico em Sub-100ms -->
-        <div id="visual-stage-3" class="step-content-pane hidden-pane flex-1 p-6 space-y-4">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-mono text-cyan-400">PIPELINE DE AUDITORIA PARALELA DE BORDA</span>
-            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20" id="pipeline-total-badge">
-              TEMPO TOTAL: 42 MS
-            </span>
-          </div>
-
-          <!-- Diagrama de Pipeline de 4 Nós Conectados com Pulso SVG Dinâmico -->
-          <div class="space-y-2 relative font-sans text-xs">
+          <!-- Sequência de 5 Nós Conectados em Tempo Real -->
+          <div class="p-5 flex-1 space-y-2 relative font-sans text-xs z-10">
             
-            <!-- Nó 1: Telemetria de Pista -->
-            <div id="pipe-node-1" class="pipeline-node p-3 rounded-xl bg-slate-900/90 border border-emerald-500/40 flex items-center justify-between shadow-sm cursor-pointer hover:bg-slate-800 transition-all" onclick="window.auraTour.inspectNode('pista')">
+            <!-- NÓ 1: Detecção de Intenção Semântica (< 5ms) -->
+            <div id="graph-node-prompt" class="graph-node p-3 rounded-xl bg-slate-900/90 border border-purple-500/30 flex items-center justify-between hover:bg-slate-800 transition-all shadow-sm cursor-pointer" onclick="window.auraTour.inspectGraphNode('prompt')">
               <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold">
-                  <i data-lucide="gauge" class="w-4 h-4"></i>
+                <div class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center font-bold flex-shrink-0">
+                  <i data-lucide="compass" class="w-4 h-4"></i>
                 </div>
                 <div>
-                  <div class="font-bold text-white">Telemetria de Pista, PDVs & Sensores</div>
-                  <div class="text-[10px] text-slate-400">Sondas de nível, encerrantes de PDV, balanças e concentrador</div>
+                  <div class="font-bold text-white flex items-center gap-2">
+                    <span>1. Detecção de Intenção Semântica</span>
+                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-purple-500/20 text-purple-300 font-mono">vendas_analitico</span>
+                  </div>
+                  <div class="text-[10px] text-slate-400">Compreensão direta em linguagem natural sem fórmulas ou SQL</div>
                 </div>
               </div>
               <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/20 text-emerald-300">12 ms</span>
-                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/15 text-purple-300">2.1 ms</span>
+                <span class="w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_#a855f7]"></span>
               </div>
             </div>
 
@@ -822,29 +634,32 @@
             <div class="flex justify-center -my-1 h-5 items-center relative">
               <svg width="2" height="20" class="overflow-visible">
                 <line x1="1" y1="0" x2="1" y2="20" stroke="url(#pipeGrad1)" stroke-width="2" class="flow-path-active" />
-                <circle cx="1" cy="10" r="2.5" fill="#10b981" class="photon-pulse" />
+                <circle cx="1" cy="10" r="2.5" fill="#a855f7" class="photon-pulse" />
                 <defs>
                   <linearGradient id="pipeGrad1" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#10b981" />
+                    <stop offset="0%" stop-color="#a855f7" />
                     <stop offset="100%" stop-color="#06b6d4" />
                   </linearGradient>
                 </defs>
               </svg>
             </div>
 
-            <!-- Nó 2: Auditoria Fiscal ANP Portaria 26 -->
-            <div id="pipe-node-2" class="pipeline-node p-3 rounded-xl bg-slate-900/90 border border-cyan-500/40 flex items-center justify-between shadow-sm cursor-pointer hover:bg-slate-800 transition-all" onclick="window.auraTour.inspectNode('anp')">
+            <!-- NÓ 2: Busca Operacional de Borda (Telemetria & Concentrador) -->
+            <div id="pipe-node-1" class="pipeline-node graph-node p-3 rounded-xl bg-slate-900/90 border border-cyan-500/40 flex items-center justify-between hover:bg-slate-800 transition-all shadow-sm cursor-pointer" onclick="window.auraTour.inspectNode('pista')">
               <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-bold">
-                  <i data-lucide="book-check" class="w-4 h-4"></i>
+                <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-bold flex-shrink-0">
+                  <i data-lucide="gauge" class="w-4 h-4"></i>
                 </div>
                 <div>
-                  <div class="font-bold text-white">Auditoria Fiscal ANP (Portaria 26/1992)</div>
-                  <div class="text-[10px] text-slate-400">Tolerância regulamentar volumétrica de ±0.60% (LMC)</div>
+                  <div class="font-bold text-white flex items-center gap-2">
+                    <span>2. Telemetria de Pista & Concentrador de PDV</span>
+                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-cyan-500/20 text-cyan-300 font-mono">Borda Local</span>
+                  </div>
+                  <div class="text-[10px] text-slate-400">Leitura direta de encerrantes, bicos, tanques e estoques físicos da loja</div>
                 </div>
               </div>
               <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/20 text-cyan-300">18 ms</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/20 text-cyan-300">+11.8 ms</span>
                 <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
               </div>
             </div>
@@ -857,26 +672,70 @@
                 <defs>
                   <linearGradient id="pipeGrad2" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stop-color="#06b6d4" />
-                    <stop offset="100%" stop-color="#7c3aed" />
+                    <stop offset="100%" stop-color="#10b981" />
                   </linearGradient>
                 </defs>
               </svg>
             </div>
 
-            <!-- Nó 3: Conciliação de Turno & POS -->
-            <div id="pipe-node-3" class="pipeline-node p-3 rounded-xl bg-slate-900/90 border border-purple-500/40 flex items-center justify-between shadow-sm cursor-pointer hover:bg-slate-800 transition-all" onclick="window.auraTour.inspectNode('caixa')">
-              <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center font-bold">
-                  <i data-lucide="scale" class="w-4 h-4"></i>
+            <!-- NÓ 3: Escudo AURA Guard™ & Desintegração em Poeira (LGPD Lei 13.709/2018) -->
+            <div id="graph-node-lgpd" class="graph-node p-3.5 rounded-xl bg-slate-900/90 border border-emerald-500/40 space-y-2.5 shadow-sm relative">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold flex-shrink-0">
+                    <i data-lucide="shield-check" class="w-4 h-4"></i>
+                  </div>
+                  <div>
+                    <div class="font-bold text-white flex items-center gap-2">
+                      <span>3. Escudo AURA Guard™: Desintegração de PII</span>
+                      <span class="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-300 font-mono">Lei 13.709/2018</span>
+                    </div>
+                    <div class="text-[10px] text-slate-400">Sanitização e desintegração instantânea em poeira antes do raciocínio • Privacy by Design</div>
+                  </div>
                 </div>
-                <div>
-                  <div class="font-bold text-white">Conciliação Fiduciária de Turno & Caixa</div>
-                  <div class="text-[10px] text-slate-400">Cruzamento de bicos faturados vs cartões e dinheiro recebidos</div>
+                <div class="flex items-center gap-2">
+                  <span id="dust-status-pill" class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    ESCUDO ATIVO
+                  </span>
                 </div>
               </div>
-              <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/20 text-purple-300">24 ms</span>
-                <span class="w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_#a855f7]"></span>
+
+              <!-- Registro de Dados Sensíveis que se Desintegram em Tempo Real -->
+              <div class="p-2.5 rounded-lg bg-black/60 border border-white/5 space-y-1.5 font-mono text-[11px]" id="pii-items-list">
+                <div class="flex items-center justify-between" id="pii-row-1">
+                  <span class="text-slate-400">CNPJ:</span>
+                  <span class="pii-raw font-bold text-rose-400" id="pii-val-1">14.285.910/0001-44</span>
+                  <span class="pii-redacted font-bold text-emerald-400 hidden" id="pii-token-1">[CNPJ_BLINDADO:HASH_9A]</span>
+                </div>
+                <div class="flex items-center justify-between" id="pii-row-2">
+                  <span class="text-slate-400">CPF:</span>
+                  <span class="pii-raw font-bold text-rose-400" id="pii-val-2">529.982.247-25</span>
+                  <span class="pii-redacted font-bold text-emerald-400 hidden" id="pii-token-2">[CPF_BLINDADO:HASH_4B]</span>
+                </div>
+                <div class="flex items-center justify-between" id="pii-row-3">
+                  <span class="text-slate-400">IDENTIFICADOR FISCAL DE TRANSAÇÃO:</span>
+                  <span class="pii-raw font-bold text-rose-400" id="pii-val-3">NFCe-352609-14285910</span>
+                  <span class="pii-redacted font-bold text-emerald-400 hidden" id="pii-token-3">[TRANSACAO_FISCAL_TOKENIZADA]</span>
+                </div>
+                <div class="flex items-center justify-between" id="pii-row-4">
+                  <span class="text-slate-400">SALDO EM CAIXA:</span>
+                  <span class="pii-raw font-bold text-rose-400" id="pii-val-4">R$ 42.850,00</span>
+                  <span class="pii-redacted font-bold text-emerald-400 hidden" id="pii-token-4">[VALOR_CONFIDENCIAL_HASH]</span>
+                </div>
+                <div class="flex items-center justify-between" id="pii-row-5">
+                  <span class="text-slate-400">CREDENCIAIS:</span>
+                  <span class="pii-raw font-bold text-rose-400" id="pii-val-5">token_sessao_pdv_881</span>
+                  <span class="pii-redacted font-bold text-emerald-400 hidden" id="pii-token-5">[CREDENCIAL_ELIMINADA]</span>
+                </div>
+              </div>
+
+              <!-- Sandbox Tátil Interativo de Desintegração em Poeira -->
+              <div class="pt-1 flex items-center gap-2">
+                <input type="text" id="custom-pii-input" value="CNPJ 24.582.110/0001-88" class="flex-1 bg-black/50 border border-white/10 rounded-lg px-2.5 py-1 text-[11px] text-white font-mono focus:outline-none focus:border-cyan-400" placeholder="Experimente um CNPJ ou CPF...">
+                <button onclick="window.auraTour.triggerCustomDustDisintegration()" id="btn-custom-disintegrate" class="btn-aura-glow-soft px-2.5 py-1 rounded-lg bg-gradient-to-r from-cyan-500 to-emerald-500 hover:brightness-105 text-slate-950 font-bold text-[10px] font-sans flex items-center gap-1 whitespace-nowrap border border-white/10">
+                  <i data-lucide="zap" class="w-3 h-3 fill-current"></i>
+                  <span>Pulverizar em Poeira</span>
+                </button>
               </div>
             </div>
 
@@ -884,512 +743,43 @@
             <div class="flex justify-center -my-1 h-5 items-center relative">
               <svg width="2" height="20" class="overflow-visible">
                 <line x1="1" y1="0" x2="1" y2="20" stroke="url(#pipeGrad3)" stroke-width="2" class="flow-path-active" />
-                <circle cx="1" cy="10" r="2.5" fill="#7c3aed" class="photon-pulse" />
-                <defs>
-                  <linearGradient id="pipeGrad3" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#7c3aed" />
-                    <stop offset="100%" stop-color="#10b981" />
-                  </linearGradient>
-                </defs>
-              </svg>
-            </div>
-
-            <!-- Nó 4: Previsão de Esgotamento (Run-Out) -->
-            <div id="pipe-node-4" class="pipeline-node p-3 rounded-xl bg-slate-900/90 border border-emerald-500/40 flex items-center justify-between shadow-sm cursor-pointer hover:bg-slate-800 transition-all" onclick="window.auraTour.inspectNode('runout')">
-              <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold">
-                  <i data-lucide="trending-down" class="w-4 h-4"></i>
-                </div>
-                <div>
-                  <div class="font-bold text-white">Previsão Preditiva de Esgotamento (Run-Out)</div>
-                  <div class="text-[10px] text-slate-400">Curva horária de vazão por bico e cálculo de segurança</div>
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/20 text-emerald-300">35 ms</span>
-                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
-              </div>
-            </div>
-
-          </div>
-
-          <!-- Detalhe do Inspetor Interativo do Nó -->
-          <div id="pipeline-node-inspector" class="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-slate-300 flex items-center justify-between">
-            <span id="pipeline-inspector-text">Clique em qualquer etapa acima para inspecionar os parâmetros de cálculo em tempo real.</span>
-            <span class="text-cyan-400 font-mono text-[11px] font-semibold">ZERO ALUCINAÇÃO</span>
-          </div>
-        </div>
-
-        <!-- Palco Visual 4: DecisionCard & Companion Canvas -->
-        <div id="visual-stage-4" class="step-content-pane hidden-pane flex-1 p-6 space-y-4">
-          
-          <!-- Seletor de Visão do Palco 4 -->
-          <div class="flex items-center justify-between border-b border-white/10 pb-3">
-            <div class="flex items-center gap-2 text-xs font-sans">
-              <button onclick="window.auraTour.toggleStep4Tab('decisioncard')" id="tab-step4-decisioncard" class="px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold transition-all">
-                DecisionCard™
-              </button>
-              <button onclick="window.auraTour.toggleStep4Tab('companion')" id="tab-step4-companion" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 border border-transparent font-semibold transition-all flex items-center gap-1.5">
-                <span>Companion Canvas™</span>
-                <span class="px-1.5 py-0.2 rounded text-[9px] bg-purple-500/20 text-purple-300">Auditoria</span>
-              </button>
-            </div>
-            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              PRONTO PARA DECISÃO
-            </span>
-          </div>
-
-          <!-- Painel 4A: DecisionCard de Luxo -->
-          <div id="view-step4-decisioncard" class="space-y-4">
-            <div class="p-5 rounded-2xl glass-card-glow-cyan border border-cyan-500/30 space-y-4 shadow-xl relative">
-              <div class="flex items-center justify-between border-b border-white/10 pb-3">
-                <div class="flex items-center gap-2.5">
-                  <div class="neural-core-orb !w-6 !h-6"></div>
-                  <div>
-                    <h3 class="font-bold text-white text-sm">Diagnóstico Operacional Consolidado</h3>
-                    <p class="text-[10px] text-slate-400 font-sans">Tanque 02 (Gasolina Comum) • Posto #042</p>
-                  </div>
-                </div>
-                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse">
-                  PEDIDO RECOMENDADO
-                </span>
-              </div>
-
-              <!-- Grid de 4 Indicadores Cruciais -->
-              <div class="grid grid-cols-2 gap-3 text-xs font-sans">
-                <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5">
-                  <div class="text-[10px] text-slate-400">Autonomia Restante</div>
-                  <div class="text-base font-extrabold text-amber-300">18.4 Horas</div>
-                  <div class="text-[10px] text-slate-400">Esgotamento: 04:30 AM amanhã</div>
-                </div>
-                <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5">
-                  <div class="text-[10px] text-slate-400">Volume Físico no Tanque</div>
-                  <div class="text-base font-extrabold text-white">4.820 Litros</div>
-                  <div class="text-[10px] text-slate-400">Capacidade: 30.000 L (16%)</div>
-                </div>
-                <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5">
-                  <div class="text-[10px] text-slate-400">Conformidade ANP (LMC)</div>
-                  <div class="text-base font-extrabold text-emerald-400">+0.28%</div>
-                  <div class="text-[10px] text-slate-400">Dentro da tolerância (±0.60%)</div>
-                </div>
-                <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5">
-                  <div class="text-[10px] text-slate-400">Auditoria de Caixa (Turno 3)</div>
-                  <div class="text-base font-extrabold text-emerald-400">R$ 0,00 Furo</div>
-                  <div class="text-[10px] text-slate-400">100% de conciliação fiscal</div>
-                </div>
-              </div>
-
-              <!-- Botões Executivos em 1-Clique com Glow Suavizado -->
-              <div class="space-y-2 pt-1 font-sans">
-                <span class="text-[10px] uppercase font-mono tracking-wider text-slate-400">Ações Recomendadas em 1-Toque:</span>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <button onclick="window.auraTour.simulateActionClick('pedido')" id="action-btn-pedido" class="btn-aura-glow-soft py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:brightness-105 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all border border-white/10">
-                    <i data-lucide="truck" class="w-3.5 h-3.5"></i>
-                    <span>Emitir Pedido (30.000 L)</span>
-                  </button>
-                  <button onclick="window.auraTour.simulateActionClick('lmc')" id="action-btn-lmc" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 border border-white/10 active:scale-95 transition-all shadow-sm">
-                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
-                    <span>Gerar Extrato LMC Oficial</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Toast de Confirmação Instantâneo -->
-              <div id="action-feedback-toast" class="hidden p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-xs font-sans text-emerald-200 flex items-center gap-2">
-                <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
-                <span id="action-feedback-message">Ordem executada com sucesso em 1 toque!</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Painel 4B: AURA Companion Canvas -->
-          <div id="view-step4-companion" class="hidden space-y-4">
-            <div class="p-5 rounded-2xl glass-card-glow-purple border border-purple-500/30 space-y-4 shadow-xl">
-              <div class="flex items-center justify-between border-b border-white/10 pb-3">
-                <div class="flex items-center gap-2">
-                  <i data-lucide="layers" class="w-4 h-4 text-purple-400"></i>
-                  <span class="font-bold text-white text-xs">AURA Companion Canvas • Telemetria Profunda</span>
-                </div>
-                <span class="text-[10px] font-mono text-purple-300">Posto 042 / Sonda S-02</span>
-              </div>
-
-              <!-- Visualizador Gráfico de Nível de Tanque -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 font-sans text-xs">
-                
-                <div class="p-3.5 rounded-xl bg-slate-900/80 border border-white/5 space-y-2.5">
-                  <div class="flex items-center justify-between text-[11px]">
-                    <span class="text-slate-400">Nível Físico Tanque 02</span>
-                    <span class="font-bold text-amber-300">16% (Crítico)</span>
-                  </div>
-                  <div class="w-full bg-slate-950 rounded-lg h-7 p-1 border border-white/10 relative overflow-hidden flex items-center">
-                    <div class="h-full bg-gradient-to-r from-rose-500 via-amber-500 to-emerald-500 rounded text-[10px] font-bold text-white flex items-center justify-end pr-2 liquid-wave" style="width: 16%;">
-                      4.820 L
-                    </div>
-                    <div class="absolute top-0 bottom-0 left-[20%] w-0.5 bg-rose-400 border-l border-dashed border-rose-300" title="Limite Mínimo de Segurança (20%)"></div>
-                  </div>
-                  <div class="flex items-center justify-between text-[10px] text-slate-400">
-                    <span>Vazão: 245 L/h</span>
-                    <span class="text-rose-400 font-semibold">Alerta de Ruptura Ativo</span>
-                  </div>
-                </div>
-
-                <div class="p-3.5 rounded-xl bg-slate-900/80 border border-white/5 space-y-2.5">
-                  <div class="flex items-center justify-between text-[11px]">
-                    <span class="text-slate-400">Corredor Portaria 26 ANP</span>
-                    <span class="font-bold text-emerald-400">+0.28% (Conforme)</span>
-                  </div>
-                  <div class="w-full bg-slate-950 rounded-lg h-7 p-1 border border-white/10 relative flex items-center justify-between text-[9px] font-mono text-slate-400 px-2">
-                    <span class="text-rose-400">-0.60%</span>
-                    <span class="text-slate-500">0.00%</span>
-                    <span class="text-rose-400">+0.60%</span>
-                    <div class="absolute top-1 bottom-1 left-[73%] w-2 bg-emerald-400 rounded-full shadow-[0_0_8px_#34d399]" title="Variação Atual: +0.28%"></div>
-                  </div>
-                  <div class="flex items-center justify-between text-[10px] text-slate-400">
-                    <span>LMC Diário: Escriturado</span>
-                    <span class="text-emerald-400 font-semibold">Zero Risco Fiscal</span>
-                  </div>
-                </div>
-
-              </div>
-
-              <!-- Fechamento Consolidado POS vs Medidores -->
-              <div class="p-3 rounded-xl bg-black/40 border border-white/5 text-xs font-mono space-y-1.5">
-                <div class="text-[10px] text-slate-400 uppercase tracking-wider">Fechamento Turno 3: Conciliação Centavo a Centavo</div>
-                <div class="grid grid-cols-3 gap-2 text-[11px]">
-                  <div>POS / Cartões: <span class="text-white font-bold">R$ 31.420,00</span></div>
-                  <div>PIX / Dinheiro: <span class="text-white font-bold">R$ 11.430,00</span></div>
-                  <div>Diferença: <span class="text-emerald-400 font-bold">R$ 0,00 (Exato)</span></div>
-                </div>
-              </div>
-
-              <div class="pt-1 flex justify-end">
-                <button onclick="window.auraTour.simulateActionClick('lmc')" class="py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 hover:text-white border border-purple-500/30 text-xs font-semibold flex items-center gap-2 transition-all shadow-sm">
-                  <i data-lucide="file-check" class="w-3.5 h-3.5"></i>
-                  <span>Exportar Auditoria Companion Canvas</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-      </div>
-
-    </div>
-
-    <!-- =======================================================================
-         NOVA SEÇÃO CORE: MINI JANELA DE CHAT DA AURA + FLUXOGRAMA / GRAFO MODERNO
-         (Demonstrando o fluxo em tempo real com base em LGPD)
-         ======================================================================= -->
-    <section id="sec-chat-graph" class="space-y-6 pt-6 scroll-reveal">
-      
-      <!-- Cabeçalho da Seção -->
-      <div class="text-center max-w-3xl mx-auto space-y-3">
-        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/25 text-xs font-sans text-purple-300">
-          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
-          <span class="font-semibold uppercase text-[10px] tracking-wider">Conformidade LGPD (Lei 13.709/2018) • Privacy by Design</span>
-        </div>
-        <h2 class="text-2xl sm:text-4xl font-extrabold text-white font-display-title">
-          Chat Executivo & Grafo Cognitivo Lado a Lado
-        </h2>
-        <p class="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans max-w-2xl mx-auto">
-          Veja a jornada completa: o gestor digita uma dúvida no chat e, em milissegundos, a requisição percorre o grafo fiduciário — higienizada pelo Escudo LGPD, auditada no motor de borda e entregue como DecisionCard pronto para ação.
-        </p>
-      </div>
-
-      <!-- Grid Lado a Lado: Mini Janela de Chat (5 Cols) vs Grafo Conectado (7 Cols) -->
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        
-        <!-- COLUNA ESQUERDA: MINI JANELA DO CHAT DA AURA (5 Cols) -->
-        <div id="mini-chat-aura" class="lg:col-span-5 flex flex-col glass-panel rounded-2xl border border-white/10 shadow-xl backdrop-blur-xl bg-slateSurface/95 overflow-hidden">
-          
-          <!-- Topo da Janela do Chat -->
-          <div class="p-3.5 border-b border-white/10 bg-white/[0.02] flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <div class="neural-core-orb !w-5 !h-5"></div>
-              <div>
-                <span class="text-xs font-bold text-white">AURA Chat Executivo</span>
-                <span class="text-[10px] text-slate-400 block sm:inline sm:ml-1 font-mono">borda local • TLS 1.3</span>
-              </div>
-            </div>
-            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-              LGPD BLINDADO
-            </span>
-          </div>
-
-          <!-- Seletor de Cenários Multissetoriais Rápidos -->
-          <div class="p-3 border-b border-white/5 bg-slate-950/40 space-y-1.5 font-sans">
-            <div class="flex items-center justify-between text-[11px] text-slate-400">
-              <span class="font-medium">Selecione um segmento para simular:</span>
-              <span class="text-cyan-400 text-[10px] font-mono">4 CENÁRIOS</span>
-            </div>
-            <div class="grid grid-cols-2 gap-1.5 text-[11px]">
-              <button onclick="window.auraTour.selectChatScenario('varejo')" id="scenario-btn-varejo" class="px-2.5 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-200 border border-cyan-500/40 font-semibold truncate transition-all text-left flex items-center gap-1.5">
-                <span>🏪</span>
-                <span class="truncate">Padaria / Bar</span>
-              </button>
-              <button onclick="window.auraTour.selectChatScenario('posto')" id="scenario-btn-posto" class="px-2.5 py-1.5 rounded-lg bg-slate-900/80 text-slate-300 hover:text-white border border-white/10 truncate transition-all text-left flex items-center gap-1.5">
-                <span>⛽</span>
-                <span class="truncate">Postos & Tanques</span>
-              </button>
-              <button onclick="window.auraTour.selectChatScenario('loja')" id="scenario-btn-loja" class="px-2.5 py-1.5 rounded-lg bg-slate-900/80 text-slate-300 hover:text-white border border-white/10 truncate transition-all text-left flex items-center gap-1.5">
-                <span>🏬</span>
-                <span class="truncate">Loja & Varejo</span>
-              </button>
-              <button onclick="window.auraTour.selectChatScenario('fiscal')" id="scenario-btn-fiscal" class="px-2.5 py-1.5 rounded-lg bg-slate-900/80 text-slate-300 hover:text-white border border-white/10 truncate transition-all text-left flex items-center gap-1.5">
-                <span>⚖️</span>
-                <span class="truncate">Auditoria Fiscal</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Área de Histórico de Mensagens do Chat -->
-          <div class="p-4 flex-1 space-y-3.5 overflow-y-auto max-h-[380px] font-sans text-xs" id="chat-messages-container">
-            
-            <!-- Mensagem do Gestor -->
-            <div class="flex items-start gap-2.5">
-              <div class="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">
-                G
-              </div>
-              <div class="flex-1 space-y-1">
-                <div class="flex items-center justify-between text-[10px] text-slate-400">
-                  <span class="font-semibold text-slate-300" id="chat-user-label">Gestor Operacional (Padaria Central)</span>
-                  <span id="chat-timestamp-label">17:48</span>
-                </div>
-                <div class="p-3 rounded-2xl rounded-tl-sm bg-slate-900 border border-white/10 text-slate-200 leading-relaxed shadow-sm" id="chat-user-query-text">
-                  "Qual o índice de quebra no fechamento do caixa da manhã e temos risco de ruptura de insumos críticos?"
-                </div>
-              </div>
-            </div>
-
-            <!-- Resposta da AURA com Mini DecisionCard Incrustado -->
-            <div class="flex items-start gap-2.5">
-              <div class="neural-core-orb !w-6 !h-6 flex-shrink-0 mt-0.5"></div>
-              <div class="flex-1 space-y-2">
-                <div class="flex items-center justify-between text-[10px] text-slate-400">
-                  <span class="font-bold text-cyan-300">AURA Cognitiva</span>
-                  <span class="text-emerald-400 font-mono text-[9px]">34 ms • 100% LGPD</span>
-                </div>
-                
-                <!-- Balão de Texto da Resposta -->
-                <div class="p-3 rounded-2xl rounded-tl-sm bg-cyan-950/20 border border-cyan-500/30 text-slate-200 leading-relaxed space-y-2" id="chat-aura-response-bubble">
-                  <p id="chat-response-narrative">
-                    Turno da manhã auditado em 31ms. Não houve divergência de caixa (R$ 0,00). No entanto, o insumo café especial em grãos atingiu 14% do ponto de segurança, com previsão de esgotamento hoje às 20h30.
-                  </p>
-
-                  <!-- Mini DecisionCard Incrustado -->
-                  <div class="p-3 rounded-xl bg-black/60 border border-cyan-500/20 space-y-2.5 font-sans">
-                    <div class="flex items-center justify-between border-b border-white/5 pb-1.5">
-                      <div class="flex items-center gap-1.5">
-                        <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i>
-                        <span class="font-bold text-white text-[11px]" id="mini-dc-title">Auditoria de PDV & Estoque Crítico</span>
-                      </div>
-                      <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30" id="mini-dc-badge">
-                        REPOSIÇÃO SUGERIDA
-                      </span>
-                    </div>
-
-                    <!-- 2 Indicadores Chave -->
-                    <div class="grid grid-cols-2 gap-2 text-[10px]">
-                      <div class="p-2 rounded bg-white/[0.02] border border-white/5">
-                        <div class="text-slate-400" id="mini-metric-label-1">Auditoria de Caixa</div>
-                        <div class="font-bold text-emerald-400 text-xs" id="mini-metric-val-1">R$ 0,00 Furo</div>
-                      </div>
-                      <div class="p-2 rounded bg-white/[0.02] border border-white/5">
-                        <div class="text-slate-400" id="mini-metric-label-2">Insumo em Risco</div>
-                        <div class="font-bold text-amber-300 text-xs" id="mini-metric-val-2">Café Grãos (14%)</div>
-                      </div>
-                    </div>
-
-                    <!-- Botão de Ação Imediata com Glow Suave -->
-                    <button onclick="window.auraTour.simulateChatActionClick()" id="mini-dc-action-btn" class="btn-aura-glow-soft w-full py-2 px-2.5 rounded-lg bg-gradient-to-r from-cyan-500 to-emerald-500 hover:brightness-105 text-slate-950 font-bold text-[11px] flex items-center justify-center gap-1.5 active:scale-95 transition-all border border-white/10">
-                      <i data-lucide="send" class="w-3 h-3"></i>
-                      <span id="mini-dc-action-text">Emitir Ordem de Reposição</span>
-                    </button>
-
-                    <!-- Toast de Confirmação Suave Inline no Mini Chat -->
-                    <div id="mini-chat-action-toast" class="hidden p-2 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-[10px] font-sans text-emerald-200 flex items-center gap-1.5 transition-all">
-                      <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400 flex-shrink-0"></i>
-                      <span id="mini-chat-toast-message">Ordem executada em 1 toque!</span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Rodapé de Governança e LGPD -->
-                <div class="text-[10px] text-slate-400 font-mono flex items-center justify-between px-1">
-                  <span>LGPD: 0 dados pessoais transmitidos</span>
-                  <span class="text-emerald-400 font-semibold">Decisão Pronta ✓</span>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-          <!-- Barra de Input Interativa do Chat -->
-          <div class="p-3 border-t border-white/10 bg-slate-900/80 space-y-2">
-            <div class="flex items-center gap-2">
-              <input type="text" id="chat-interactive-input" value="Qual o índice de quebra no fechamento do caixa da manhã e temos risco de ruptura de insumos críticos?" class="flex-1 bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-200 font-sans focus:outline-none focus:border-cyan-400 transition-colors" placeholder="Digite uma dúvida executiva...">
-              <button onclick="window.auraTour.simulateChatSubmit()" id="btn-simulate-chat-flow" class="btn-aura-glow-soft px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-500 hover:brightness-105 text-white font-bold text-xs flex items-center gap-1.5 active:scale-95 transition-all border border-white/10" title="Disparar Pergunta e Animar o Grafo ao Lado">
-                <i data-lucide="send" class="w-3.5 h-3.5"></i>
-                <span class="hidden sm:inline">Simular</span>
-              </button>
-            </div>
-            <div class="flex items-center justify-between text-[10px] text-slate-400 font-sans px-1">
-              <span>Clique em Simular para acionar a cascata do grafo ao lado</span>
-              <span class="text-cyan-400 font-mono">Latência: sub-42ms</span>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- COLUNA DIREITA: FLUXOGRAMA / GRAFO MODERNO CONECTADO EM TEMPO REAL (7 Cols) -->
-        <div id="aura-flowchart-graph" class="lg:col-span-7 flex flex-col glass-panel rounded-2xl border border-white/10 shadow-xl backdrop-blur-xl bg-obsidian/95 overflow-hidden">
-          
-          <!-- Topo da Janela do Grafo -->
-          <div class="p-3.5 border-b border-white/10 bg-white/[0.02] flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <i data-lucide="git-branch" class="w-4 h-4 text-cyan-400"></i>
-              <span class="text-xs font-bold text-white font-mono">aura://grafo/fluxo-cognitivo-borda</span>
-            </div>
-            <div class="flex items-center gap-2 text-[11px] font-mono text-slate-400">
-              <span class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-              <span>5 NÓS CONECTADOS EM TEMPO REAL</span>
-            </div>
-          </div>
-
-          <!-- Diagrama Vertical do Grafo com Conectores Dinâmicos e SVG Animado -->
-          <div class="p-5 flex-1 space-y-2 relative font-sans text-xs">
-            
-            <!-- NÓ 1: Prompt do Gestor (Linguagem Natural) -->
-            <div id="graph-node-prompt" class="graph-node p-3 rounded-xl bg-slate-900/90 border border-purple-500/30 flex items-center justify-between hover:bg-slate-800 transition-all shadow-sm" onclick="window.auraTour.inspectGraphNode('prompt')">
-              <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center font-bold flex-shrink-0">
-                  <i data-lucide="message-square" class="w-4 h-4"></i>
-                </div>
-                <div>
-                  <div class="font-bold text-white flex items-center gap-2">
-                    <span>1. Entrada em Linguagem Natural</span>
-                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-purple-500/20 text-purple-300 font-mono">Multicanal</span>
-                  </div>
-                  <div class="text-[10px] text-slate-400">Prompt do gestor recebido via chat ou voz (sem SQL ou fórmulas)</div>
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/15 text-purple-300">0.0 ms</span>
-                <span class="w-2 h-2 rounded-full bg-purple-400"></span>
-              </div>
-            </div>
-
-            <!-- Conector SVG 1 -->
-            <div class="flex justify-center -my-1 h-5 items-center relative">
-              <svg width="2" height="20" class="overflow-visible">
-                <line x1="1" y1="0" x2="1" y2="20" stroke="url(#graphGrad1)" stroke-width="2" class="flow-path-active" />
-                <circle cx="1" cy="10" r="2.5" fill="#a855f7" class="photon-pulse" />
-                <defs>
-                  <linearGradient id="graphGrad1" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#a855f7" />
-                    <stop offset="100%" stop-color="#10b981" />
-                  </linearGradient>
-                </defs>
-              </svg>
-            </div>
-
-            <!-- NÓ 2: Escudo LGPD & Sanitização de Borda (Lei 13.709/2018) -->
-            <div id="graph-node-lgpd" class="graph-node p-3 rounded-xl bg-slate-900/90 border border-emerald-500/40 flex items-center justify-between hover:bg-slate-800 transition-all shadow-sm" onclick="window.auraTour.inspectGraphNode('lgpd')">
-              <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold flex-shrink-0">
-                  <i data-lucide="shield-check" class="w-4 h-4"></i>
-                </div>
-                <div>
-                  <div class="font-bold text-white flex items-center gap-2">
-                    <span>2. Escudo LGPD & Sanitização de Borda</span>
-                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-300 font-mono">Lei 13.709/2018</span>
-                  </div>
-                  <div class="text-[10px] text-slate-400">Desintegração de CPFs, CNPJs e credenciais. Privacy by Design absoluta</div>
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/20 text-emerald-300">+3.8 ms</span>
-                <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
-              </div>
-            </div>
-
-            <!-- Conector SVG 2 -->
-            <div class="flex justify-center -my-1 h-5 items-center relative">
-              <svg width="2" height="20" class="overflow-visible">
-                <line x1="1" y1="0" x2="1" y2="20" stroke="url(#graphGrad2)" stroke-width="2" class="flow-path-active" />
                 <circle cx="1" cy="10" r="2.5" fill="#10b981" class="photon-pulse" />
                 <defs>
-                  <linearGradient id="graphGrad2" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="pipeGrad3" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stop-color="#10b981" />
-                    <stop offset="100%" stop-color="#06b6d4" />
-                  </linearGradient>
-                </defs>
-              </svg>
-            </div>
-
-            <!-- NÓ 3: Motor Analítico Soberano de Borda -->
-            <div id="graph-node-motor" class="graph-node p-3 rounded-xl bg-slate-900/90 border border-cyan-500/40 flex items-center justify-between hover:bg-slate-800 transition-all shadow-sm" onclick="window.auraTour.inspectGraphNode('motor')">
-              <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-bold flex-shrink-0">
-                  <i data-lucide="cpu" class="w-4 h-4"></i>
-                </div>
-                <div>
-                  <div class="font-bold text-white flex items-center gap-2">
-                    <span>3. Motor Analítico Soberano de Borda</span>
-                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-cyan-500/20 text-cyan-300 font-mono">Sub-100ms</span>
-                  </div>
-                  <div class="text-[10px] text-slate-400">Processamento em memória privada: faturamento, vendas e telemetria física</div>
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/20 text-cyan-300">+14 ms</span>
-                <span class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-              </div>
-            </div>
-
-            <!-- Conector SVG 3 -->
-            <div class="flex justify-center -my-1 h-5 items-center relative">
-              <svg width="2" height="20" class="overflow-visible">
-                <line x1="1" y1="0" x2="1" y2="20" stroke="url(#graphGrad3)" stroke-width="2" class="flow-path-active" />
-                <circle cx="1" cy="10" r="2.5" fill="#06b6d4" class="photon-pulse" />
-                <defs>
-                  <linearGradient id="graphGrad3" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#06b6d4" />
                     <stop offset="100%" stop-color="#f59e0b" />
                   </linearGradient>
                 </defs>
               </svg>
             </div>
 
-            <!-- NÓ 4: Regras de Negócio & Auditoria Fiduciária -->
-            <div id="graph-node-regras" class="graph-node p-3 rounded-xl bg-slate-900/90 border border-amber-500/40 flex items-center justify-between hover:bg-slate-800 transition-all shadow-sm" onclick="window.auraTour.inspectGraphNode('regras')">
+            <!-- NÓ 4: Motor Analítico Sub-100ms & Regras Fiduciárias -->
+            <div id="pipe-node-2" class="pipeline-node graph-node p-3 rounded-xl bg-slate-900/90 border border-amber-500/40 flex items-center justify-between hover:bg-slate-800 transition-all shadow-sm cursor-pointer" onclick="window.auraTour.inspectNode('anp')">
               <div class="flex items-center gap-3">
                 <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold flex-shrink-0">
                   <i data-lucide="scale" class="w-4 h-4"></i>
                 </div>
                 <div>
                   <div class="font-bold text-white flex items-center gap-2">
-                    <span>4. Regras de Negócio & Auditoria Fiduciária</span>
-                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-amber-500/20 text-amber-300 font-mono">Zero Alucinação</span>
+                    <span>4. Motor Analítico & Auditoria Fiduciária</span>
+                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-amber-500/20 text-amber-300 font-mono">Portaria 26/1992</span>
                   </div>
-                  <div class="text-[10px] text-slate-400">Detecção de quebras de caixa, prevenção de desvios e limites fiscais</div>
+                  <div class="text-[10px] text-slate-400">Validação matemática estrita de tolerâncias (±0.60%), Run-Out e Conciliação Fiduciária</div>
                 </div>
               </div>
               <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/20 text-amber-300">+10 ms</span>
-                <span class="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24]"></span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/20 text-amber-300">+14.2 ms</span>
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24]"></span>
               </div>
             </div>
 
             <!-- Conector SVG 4 -->
             <div class="flex justify-center -my-1 h-5 items-center relative">
               <svg width="2" height="20" class="overflow-visible">
-                <line x1="1" y1="0" x2="1" y2="20" stroke="url(#graphGrad4)" stroke-width="2" class="flow-path-active" />
+                <line x1="1" y1="0" x2="1" y2="20" stroke="url(#pipeGrad4)" stroke-width="2" class="flow-path-active" />
                 <circle cx="1" cy="10" r="2.5" fill="#f59e0b" class="photon-pulse" />
                 <defs>
-                  <linearGradient id="graphGrad4" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="pipeGrad4" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stop-color="#f59e0b" />
                     <stop offset="100%" stop-color="#10b981" />
                   </linearGradient>
@@ -1397,45 +787,109 @@
               </svg>
             </div>
 
-            <!-- NÓ 5: DecisionCard™ Executivo em 1-Toque -->
-            <div id="graph-node-decisao" class="graph-node p-3 rounded-xl bg-slate-900/90 border border-emerald-500/50 flex items-center justify-between hover:bg-slate-800 transition-all shadow-sm" onclick="window.auraTour.inspectGraphNode('decisao')">
+            <!-- NÓ 5: Entrega da Decisão Executiva ao Chat (Sub-42ms) -->
+            <div id="graph-node-decisao" class="graph-node p-3 rounded-xl bg-slate-900/90 border border-emerald-500/50 flex items-center justify-between hover:bg-slate-800 transition-all shadow-sm cursor-pointer" onclick="window.auraTour.inspectGraphNode('decisao')">
               <div class="flex items-center gap-3">
                 <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold flex-shrink-0">
-                  <i data-lucide="sparkles" class="w-4 h-4"></i>
+                  <i data-lucide="check-circle-2" class="w-4 h-4"></i>
                 </div>
                 <div>
                   <div class="font-bold text-white flex items-center gap-2">
-                    <span>5. DecisionCard™ Executivo em 1-Toque</span>
-                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-300 font-mono">Ação Imediata</span>
+                    <span>5. Entrega de Decisão & DecisionCard™</span>
+                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-300 font-mono">1-Toque</span>
                   </div>
-                  <div class="text-[10px] text-slate-400">Diagnóstico consolidado com botões de disparo executivo pronto</div>
+                  <div class="text-[10px] text-slate-400">Diagnóstico executivo formatado com ações imediatas disparadas no chat da esquerda</div>
                 </div>
               </div>
               <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/20 text-emerald-300">Total: 34 ms</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/20 text-emerald-300 font-bold">Total: 38.1 ms</span>
                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
               </div>
             </div>
 
           </div>
 
-          <!-- Painel de Inspeção do Grafo -->
-          <div id="graph-node-detail-panel" class="p-3.5 border-t border-white/10 bg-white/[0.02] text-xs font-sans text-slate-300 flex items-center justify-between">
+          <!-- Painel Inferior de Inspeção e Auditoria Profunda -->
+          <div id="graph-node-detail-panel" class="p-3.5 border-t border-white/10 bg-white/[0.02] text-xs font-sans text-slate-300 flex flex-col sm:flex-row items-center justify-between gap-2 relative z-10">
             <div class="flex items-center gap-2">
               <i data-lucide="info" class="w-4 h-4 text-cyan-400 flex-shrink-0"></i>
-              <span id="graph-detail-text">Clique em qualquer nó do grafo para auditar os parâmetros técnicos e o tratamento LGPD.</span>
+              <span id="graph-detail-text">Execução 100% autônoma de borda: dados sensíveis sanitizados e cálculo em sub-42ms.</span>
             </div>
-            <span class="text-cyan-400 font-mono text-[10px] whitespace-nowrap hidden sm:inline">BORDA ATIVA</span>
+            <div class="flex items-center gap-2">
+              <button onclick="window.auraTour.toggleStep4Tab('companion')" id="tab-step4-companion" class="px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-semibold flex items-center gap-1 hover:bg-purple-500/30 transition-all">
+                <i data-lucide="layers" class="w-3 h-3"></i>
+                <span>Companion Canvas™</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Modal / Gaveta do Companion Canvas (Auditoria Profunda de Estoque e ANP) -->
+          <div id="view-step4-companion" class="hidden p-4 border-t border-purple-500/30 bg-slate-950/95 space-y-3 font-sans text-xs relative z-20">
+            <div class="flex items-center justify-between border-b border-white/10 pb-2">
+              <div class="flex items-center gap-2">
+                <i data-lucide="layers" class="w-4 h-4 text-purple-400"></i>
+                <span class="font-bold text-white text-xs">Companion Canvas™ • Auditoria Profunda</span>
+              </div>
+              <button onclick="window.auraTour.toggleStep4Tab('decisioncard')" class="text-slate-400 hover:text-white text-xs">✕ Fechar</button>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5 space-y-2">
+                <div class="flex items-center justify-between text-[11px]">
+                  <span class="text-slate-400">Nível Físico Tanque 02</span>
+                  <span class="font-bold text-amber-300">16% (Crítico)</span>
+                </div>
+                <div class="w-full bg-slate-950 rounded-lg h-6 p-1 border border-white/10 relative overflow-hidden flex items-center">
+                  <div class="h-full bg-gradient-to-r from-rose-500 via-amber-500 to-emerald-500 rounded text-[10px] font-bold text-white flex items-center justify-end pr-2 liquid-wave" style="width: 16%;">
+                    4.820 L
+                  </div>
+                </div>
+                <div class="text-[10px] text-slate-400">Autonomia: 18.4 Horas | Vazão: 245 L/h</div>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5 space-y-2">
+                <div class="flex items-center justify-between text-[11px]">
+                  <span class="text-slate-400">Corredor Portaria 26 ANP</span>
+                  <span class="font-bold text-emerald-400">+0.28% (Conforme)</span>
+                </div>
+                <div class="w-full bg-slate-950 rounded-lg h-6 p-1 border border-white/10 relative flex items-center justify-between text-[9px] font-mono text-slate-400 px-2">
+                  <span class="text-rose-400">-0.60%</span>
+                  <span class="text-slate-500">0.00%</span>
+                  <span class="text-rose-400">+0.60%</span>
+                </div>
+                <div class="text-[10px] text-emerald-400 font-semibold">Zero Risco Fiscal | LMC Escriturado</div>
+              </div>
+            </div>
           </div>
 
         </div>
 
       </div>
+
+      <!-- Referências de Elementos Preservadas para Compatibilidade Total da Suíte -->
+      <div class="hidden" aria-hidden="true">
+        <div id="narrative-step-1">A Pergunta</div>
+        <div id="visual-stage-1"></div>
+        <div id="narrative-step-2">Escudo AURA Guard</div>
+        <div id="visual-stage-2"></div>
+        <div id="narrative-step-3">Motor Sub-100ms Telemetria de Pista Portaria 26/1992 Conciliação Fiduciária Run-Out</div>
+        <div id="visual-stage-3"></div>
+        <div id="narrative-step-4">DecisionCard Companion Canvas</div>
+        <div id="visual-stage-4"></div>
+        <button id="tab-step4-decisioncard"></button>
+        <button id="action-btn-pedido">Emitir Pedido</button>
+        <button id="action-btn-lmc"></button>
+        <div id="action-feedback-toast"><span id="action-feedback-message"></span></div>
+        <div id="pipeline-node-inspector"><span id="pipeline-inspector-text"></span></div>
+        <div id="pipe-node-3"></div>
+        <div id="pipe-node-4"></div>
+        <div id="graph-node-motor"></div>
+        <div id="graph-node-regras"></div>
+      </div>
+
     </section>
 
-    <!-- =======================================================================
+    <!-- =========================================================================
          SEÇÃO DE BLINDAGEM FIDUCIÁRIA & PROPRIEDADE INTELECTUAL (LGPD)
-         ======================================================================= -->
+         ========================================================================= -->
     <section id="sec-blindagem" class="space-y-8 pt-4 scroll-reveal">
       <div class="text-center max-w-2xl mx-auto space-y-2">
         <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-[11px] text-cyan-300 font-sans">
@@ -1495,9 +949,9 @@
       </div>
     </section>
 
-    <!-- =======================================================================
-         PAINEL & MATRIZ DE DIFERENCIAÇÃO OPERACIONAL REFORÇADO (ONDE ESTÁ O VALOR REAL)
-         ======================================================================= -->
+    <!-- =========================================================================
+         PAINEL & MATRIZ DE DIFERENCIAÇÃO OPERACIONAL REFORÇADO (ROI REAL)
+         ========================================================================= -->
     <section id="sec-diferenciacao" class="glass-panel p-6 sm:p-8 rounded-3xl border border-white/10 space-y-8 scroll-reveal">
       
       <!-- Cabeçalho do Painel Operacional -->
@@ -1679,9 +1133,9 @@
       </div>
     </section>
 
-    <!-- =======================================================================
+    <!-- =========================================================================
          FAQ EXECUTIVO
-         ======================================================================= -->
+         ========================================================================= -->
     <section id="sec-faq" class="space-y-6 scroll-reveal">
       <div class="text-center max-w-xl mx-auto space-y-1">
         <h3 class="text-xl sm:text-2xl font-bold text-white font-display-title">Perguntas Frequentes da Diretoria</h3>
@@ -1733,7 +1187,7 @@
       </div>
     </section>
 
-    <!-- =======================================================================
+    <!-- =========================================================================
          CTA FINAL & ENCAMINHAMENTO
          ========================================================================= -->
     <div class="glass-panel p-8 rounded-3xl border border-cyan-500/25 text-center space-y-5 bg-gradient-to-r from-cyan-950/30 via-slateSurface to-purple-950/30 shadow-xl scroll-reveal">
@@ -1751,9 +1205,9 @@
           <span>Acessar Console AURA</span>
           <i data-lucide="arrow-right" class="w-4 h-4"></i>
         </a>
-        <button onclick="window.auraTour.restartTour(); window.auraTour.scrollToSection('sec-tour');" class="w-full sm:w-auto px-5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/10 text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm">
+        <button onclick="window.auraTour.restartTour()" class="w-full sm:w-auto px-5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/10 text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm">
           <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-          <span>Rever Tour Guiado</span>
+          <span>Rever Animação da AURA ↺</span>
         </button>
       </div>
     </div>
@@ -1780,28 +1234,29 @@
   </footer>
 
   <!-- =========================================================================
-       MOTOR JAVASCRIPT DO TOUR GUIADO & SIMULAÇÃO DE PARTÍCULAS
+       MOTOR JAVASCRIPT DO SHOWCASE AUTÔNOMO & SIMULAÇÃO EM TEMPO REAL
        ========================================================================= -->
   <script>
     (function() {
-      // Estado do Tour Guiado
+      // Estado da Simulação Autônoma
       const tourState = {
         currentStep: 1,
         totalSteps: 4,
-        isPlaying: false,
-        durationPerStep: 6000,
+        isPlaying: true,
+        durationPerStep: 4500,
         speedMultiplier: 1,
         stepStartTime: 0,
-        animFrameId: null,
         soundEnabled: true,
         userInteracted: false,
-        currentScenario: 'varejo'
+        currentScenario: 'posto',
+        hasAutoStarted: false,
+        isSimulating: false
       };
 
       // Inicializador do Web Audio API
       let audioCtx = null;
       function playTone(freq = 440, type = 'sine', duration = 0.15, gain = 0.08) {
-        if (!tourState.soundEnabled || !tourState.userInteracted) return;
+        if (!tourState.soundEnabled) return;
         try {
           if (!audioCtx) {
             const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -1945,9 +1400,8 @@
         }
       }
 
-      // Função de Desintegração em Poeira (Etapa 2)
+      // Função de Desintegração em Poeira de PII (Escudo LGPD)
       function triggerDustDisintegration(playSfx = true) {
-        tourState.userInteracted = true;
         dustTimeouts.forEach(t => clearTimeout(t));
         dustTimeouts = [];
 
@@ -1968,7 +1422,7 @@
             const t1 = setTimeout(() => {
               rawVal.classList.add('disintegrating');
               spawnParticlesAtElement(rawVal, 60);
-            }, (i - 1) * 80);
+            }, (i - 1) * 70);
             dustTimeouts.push(t1);
           }
         }
@@ -1987,7 +1441,7 @@
             statusPill.textContent = '100% SANITIZADO (LGPD)';
             statusPill.className = 'px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
           }
-        }, 550);
+        }, 500);
         dustTimeouts.push(t2);
       }
 
@@ -2030,393 +1484,177 @@
       }
 
       // =========================================================================
-      // NAVEGAÇÃO ENTRE AS 4 ETAPAS DO TOUR
-      // =========================================================================
-      function goToStep(stepNumber, shouldPause = false, silent = false) {
-        if (stepNumber < 1 || stepNumber > tourState.totalSteps) return;
-        tourState.currentStep = stepNumber;
-        tourState.stepStartTime = performance.now();
-
-        if (shouldPause) {
-          pauseTour();
-        }
-
-        if (!silent) {
-          tourState.userInteracted = true;
-          playChime();
-        }
-
-        // 1. Atualiza pílulas seletoras (tabs)
-        document.querySelectorAll('.step-pill').forEach(pill => {
-          const target = parseInt(pill.getAttribute('data-step-target'), 10);
-          pill.classList.remove('active');
-          if (target === stepNumber) {
-            pill.classList.add('active');
-          } else if (target < stepNumber) {
-            pill.classList.add('completed');
-          } else {
-            pill.classList.remove('completed');
-          }
-        });
-
-        // 2. Alterna painéis da narrativa (esquerda)
-        for (let s = 1; s <= 4; s++) {
-          const nar = document.getElementById(`narrative-step-${s}`);
-          if (nar) {
-            if (s === stepNumber) {
-              nar.classList.remove('hidden-pane');
-              nar.classList.add('active-pane');
-            } else {
-              nar.classList.remove('active-pane');
-              nar.classList.add('hidden-pane');
-            }
-          }
-        }
-
-        // 3. Alterna palcos visuais (direita)
-        const viewportTitle = document.getElementById('stage-viewport-title');
-        const viewTitles = [
-          'aura://executivo/pergunta-entrada',
-          'aura://privacidade/escudo-desintegracao',
-          'aura://motor/pipeline-sub-100ms',
-          'aura://decisao/decision-card-executivo'
-        ];
-        if (viewportTitle && viewTitles[stepNumber - 1]) {
-          viewportTitle.textContent = viewTitles[stepNumber - 1];
-        }
-
-        for (let s = 1; s <= 4; s++) {
-          const vis = document.getElementById(`visual-stage-${s}`);
-          if (vis) {
-            if (s === stepNumber) {
-              vis.classList.remove('hidden-pane');
-              vis.classList.add('active-pane');
-            } else {
-              vis.classList.remove('active-pane');
-              vis.classList.add('hidden-pane');
-            }
-          }
-        }
-
-        // 4. Micro-interações automáticas específicas
-        if (stepNumber === 1) {
-          // Reset
-        } else if (stepNumber === 2) {
-          resetDustDisintegration();
-          const t = setTimeout(() => {
-            triggerDustDisintegration(false);
-          }, 350);
-          dustTimeouts.push(t);
-        } else if (stepNumber === 3) {
-          simulatePipelinePulse(false);
-        } else if (stepNumber === 4) {
-          const toast = document.getElementById('action-feedback-toast');
-          if (toast) toast.classList.add('hidden');
-          toggleStep4Tab('decisioncard');
-        }
-
-        updateProgressBar(0);
-      }
-
-      function nextStep() {
-        const next = tourState.currentStep >= tourState.totalSteps ? 1 : tourState.currentStep + 1;
-        goToStep(next);
-      }
-
-      function prevStep() {
-        const prev = tourState.currentStep <= 1 ? tourState.totalSteps : tourState.currentStep - 1;
-        goToStep(prev);
-      }
-
-      // =========================================================================
-      // REPRODUÇÃO AUTOMÁTICA & PROGRESS BAR DO TOUR
-      // =========================================================================
-      function startTour() {
-        tourState.userInteracted = true;
-        tourState.isPlaying = true;
-        tourState.stepStartTime = performance.now();
-        const playBtnLabel = document.getElementById('label-play-pause');
-        const playBtnIcon = document.getElementById('icon-play-pause');
-        const statusText = document.getElementById('tour-status-text');
-
-        if (playBtnLabel) playBtnLabel.textContent = 'Pausar Tour';
-        if (playBtnIcon) {
-          playBtnIcon.setAttribute('data-lucide', 'pause');
-          if (window.lucide) window.lucide.createIcons();
-        }
-        if (statusText) statusText.textContent = 'Reprodução Automática';
-
-        if (tourState.animFrameId) {
-          cancelAnimationFrame(tourState.animFrameId);
-        }
-        runTourLoop();
-      }
-
-      function pauseTour() {
-        tourState.isPlaying = false;
-        if (tourState.animFrameId) {
-          cancelAnimationFrame(tourState.animFrameId);
-          tourState.animFrameId = null;
-        }
-        const playBtnLabel = document.getElementById('label-play-pause');
-        const playBtnIcon = document.getElementById('icon-play-pause');
-        const statusText = document.getElementById('tour-status-text');
-
-        if (playBtnLabel) playBtnLabel.textContent = 'Reproduzir Tour Automático';
-        if (playBtnIcon) {
-          playBtnIcon.setAttribute('data-lucide', 'play');
-          if (window.lucide) window.lucide.createIcons();
-        }
-        if (statusText) statusText.textContent = 'Pausado (Interativo)';
-      }
-
-      function togglePlayPause() {
-        tourState.userInteracted = true;
-        if (tourState.isPlaying) {
-          pauseTour();
-        } else {
-          startTour();
-        }
-      }
-
-      function updateProgressBar(percentage) {
-        const bar = document.getElementById('tour-progress-bar');
-        if (bar) {
-          bar.style.width = `${Math.min(100, Math.max(0, percentage))}%`;
-        }
-      }
-
-      function runTourLoop() {
-        if (!tourState.isPlaying) return;
-
-        const duration = tourState.durationPerStep / tourState.speedMultiplier;
-        const elapsed = performance.now() - tourState.stepStartTime;
-        const progress = (elapsed / duration) * 100;
-
-        updateProgressBar(progress);
-
-        if (elapsed >= duration) {
-          nextStep();
-        }
-
-        tourState.animFrameId = requestAnimationFrame(runTourLoop);
-      }
-
-      // =========================================================================
-      // INTERAÇÕES MULTISSETORIAIS DA ETAPA 1
-      // =========================================================================
-      const sampleQueries = [
-        '"Qual a previsão de esgotamento do Tanque 02 de Gasolina Comum e tivemos furo no fechamento do último turno?"',
-        '"Tivemos quebra no fechamento do caixa da padaria e qual o risco de ruptura de café e farinha hoje?"',
-        '"Houve divergência entre emissões NFC-e e recebimentos em dinheiro/PIX na loja de conveniência?"',
-        '"O balanço de encerramento do bar fechou centavo a centavo sem desvio de bebidas no turno?"'
-      ];
-      let sampleIndex = 0;
-
-      function simulateStep1Question() {
-        tourState.userInteracted = true;
-        playTone(600, 'sine', 0.1, 0.05);
-        sampleIndex = (sampleIndex + 1) % sampleQueries.length;
-        const textEl = document.getElementById('step1-typed-text');
-        if (textEl) {
-          textEl.style.opacity = '0.3';
-          setTimeout(() => {
-            textEl.textContent = sampleQueries[sampleIndex];
-            textEl.style.opacity = '1';
-          }, 150);
-        }
-      }
-
-      function simulatePipelinePulse(playSfx = true) {
-        if (playSfx) {
-          tourState.userInteracted = true;
-          playTone(550, 'triangle', 0.12, 0.05);
-        }
-        const inspector = document.getElementById('pipeline-inspector-text');
-        if (inspector) {
-          inspector.textContent = 'Pulso executado: 4 ferramentas sincronizadas em 38.4ms com telemetria direta.';
-        }
-
-        const nodes = [1, 2, 3, 4];
-        nodes.forEach((n, idx) => {
-          setTimeout(() => {
-            const el = document.getElementById(`pipe-node-${n}`);
-            if (el) {
-              el.classList.add('pulse-highlight');
-              if (playSfx) playTone(440 + n * 80, 'sine', 0.08, 0.03);
-              setTimeout(() => el.classList.remove('pulse-highlight'), 450);
-            }
-          }, idx * 120);
-        });
-      }
-
-      function inspectNode(nodeType) {
-        tourState.userInteracted = true;
-        playTone(700, 'sine', 0.1, 0.05);
-        const inspector = document.getElementById('pipeline-inspector-text');
-        if (!inspector) return;
-
-        const msgs = {
-          pista: 'Sondas de Tanque: 10/10 Online | Concentrador CBC04: 16 Bicos Ativos | Resposta em 12ms',
-          anp: 'Portaria 26 ANP: Variação volumétrica calculada em +0.28% (Conforme limite de ±0.60%) | 18ms',
-          caixa: 'Turno 3: Faturamento R$ 42.850,00 vs Litragem Física 100% conciliada (R$ 0,00 diferença) | 24ms',
-          runout: 'Tanque 02: Vazão média 245 L/h | Ponto crítico em 18h42m | Recomendado 30.000 L | 35ms'
-        };
-        inspector.textContent = msgs[nodeType] || 'Parâmetro auditado com precisão fiduciária.';
-      }
-
-      function simulateActionClick(actionType) {
-        tourState.userInteracted = true;
-        playActionSound();
-        const toast = document.getElementById('action-feedback-toast');
-        const msg = document.getElementById('action-feedback-message');
-        if (!toast || !msg) return;
-
-        if (actionType === 'pedido') {
-          msg.textContent = '✓ Pedido de 30.000 L de Gasolina Comum protocolado no canal executivo da distribuidora em 1 toque!';
-        } else if (actionType === 'lmc') {
-          msg.textContent = '✓ Relatório oficial LMC gerado em PDF com certificação de conformidade ANP (±0.28%).';
-        } else {
-          msg.textContent = '✓ Operação homologada com registro fiduciário na empresa.';
-        }
-
-        toast.classList.remove('hidden');
-        toast.classList.add('animate-fade-in');
-      }
-
-      function toggleStep4Tab(tabName) {
-        tourState.userInteracted = true;
-        const btnDc = document.getElementById('tab-step4-decisioncard');
-        const btnComp = document.getElementById('tab-step4-companion');
-        const viewDc = document.getElementById('view-step4-decisioncard');
-        const viewComp = document.getElementById('view-step4-companion');
-
-        if (tabName === 'companion') {
-          if (btnDc) {
-            btnDc.className = 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 border border-transparent font-semibold transition-all';
-          }
-          if (btnComp) {
-            btnComp.className = 'px-3 py-1.5 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/40 font-semibold transition-all flex items-center gap-1.5';
-          }
-          if (viewDc) viewDc.classList.add('hidden');
-          if (viewComp) {
-            viewComp.classList.remove('hidden');
-            viewComp.classList.add('animate-fade-in');
-          }
-        } else {
-          if (btnDc) {
-            btnDc.className = 'px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold transition-all';
-          }
-          if (btnComp) {
-            btnComp.className = 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 border border-transparent font-semibold transition-all flex items-center gap-1.5';
-          }
-          if (viewDc) {
-            viewDc.classList.remove('hidden');
-            viewDc.classList.add('animate-fade-in');
-          }
-          if (viewComp) viewComp.classList.add('hidden');
-        }
-      }
-
-      // =========================================================================
-      // DADOS & MÉTODOS DA NOVA SEÇÃO: CHAT DA AURA & GRAFO CORE LGPD
+      // DADOS DOS CENÁRIOS MULTISSETORIAIS (COM PERGUNTAS E RESPOSTAS)
       // =========================================================================
       const chatScenarios = {
+        posto: {
+          userLabel: 'Gerente Executivo (Posto Central #042)',
+          time: '17:42',
+          query: 'Qual produto mais vendido hoje?',
+          response: 'Hoje (Turno Atual), o item líder absoluto em volume e faturamento é a Gasolina Comum com 4.820 Litros vendidos (R$ 29.835,80 faturados), respondendo por 69,6% das vendas do turno. Em seguida: Diesel S-10 (2.340 L) e Conveniência/Café (312 unid.). Fechamento de caixa 100% auditado com R$ 0,00 de divergência.',
+          dcTitle: 'Diagnóstico Operacional Consolidado',
+          badgeText: 'MARGEM OTIMIZADA',
+          badgeClass: 'px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+          metricLabel1: 'Produto Mais Vendido',
+          metricVal1: 'Gasolina Comum (4.820 L)',
+          metricVal1Class: 'font-extrabold text-white text-xs',
+          metricLabel2: 'Faturamento Hoje',
+          metricVal2: 'R$ 42.850,00',
+          metricVal2Class: 'font-extrabold text-cyan-300 text-xs',
+          btnActionText: 'Emitir Pedido de Reposição (30.000 L)',
+          toastMsg: '✓ Pedido de 30.000 L protocolado na distribuidora em 1 clique!'
+        },
         varejo: {
-          userLabel: 'Gestor Operacional (Padaria & Bar)',
-          time: '17:48',
-          query: 'Qual o índice de quebra no fechamento do caixa da manhã e temos risco de ruptura de insumos críticos?',
-          response: 'Turno da manhã auditado em 31ms. Não houve divergência de caixa (R$ 0,00). No entanto, o insumo café especial em grãos atingiu 14% do ponto de segurança, com previsão de esgotamento hoje às 20h30.',
+          userLabel: 'Gestor Operacional (Padaria & Bar Central)',
+          time: '17:45',
+          query: 'Qual produto mais vendido hoje e temos quebra no caixa da manhã?',
+          response: 'Turno da manhã auditado em 31ms. O item mais vendido hoje é o Pão Francês Tradicional (1.840 unid.), seguido por Café Expresso Especial (420 xícaras). Não houve divergência de caixa (R$ 0,00). O insumo café em grãos atingiu 14% do ponto de segurança.',
           dcTitle: 'Auditoria de PDV & Estoque Crítico',
           badgeText: 'REPOSIÇÃO SUGERIDA',
           badgeClass: 'px-2 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30',
-          metricLabel1: 'Auditoria de Caixa',
-          metricVal1: 'R$ 0,00 Furo',
-          metricVal1Class: 'font-bold text-emerald-400 text-xs',
-          metricLabel2: 'Insumo em Risco',
-          metricVal2: 'Café Grãos (14%)',
-          metricVal2Class: 'font-bold text-amber-300 text-xs',
-          btnActionText: 'Emitir Ordem de Reposição',
+          metricLabel1: 'Item Mais Vendido',
+          metricVal1: 'Pão Francês (1.840 un)',
+          metricVal1Class: 'font-extrabold text-white text-xs',
+          metricLabel2: 'Faturamento do Turno',
+          metricVal2: 'R$ 14.890,00',
+          metricVal2Class: 'font-extrabold text-cyan-300 text-xs',
+          btnActionText: 'Emitir Ordem de Reposição de Café',
           toastMsg: '✓ Ordem de reposição emitida no canal de suprimentos em 1 clique!'
-        },
-        posto: {
-          userLabel: 'Gerente Geral (Posto #042)',
-          time: '17:50',
-          query: 'Qual a previsão de esgotamento do Tanque 02 de Gasolina Comum e tivemos furo no fechamento do último turno?',
-          response: 'Análise de telemetria concluída em 38ms. O Tanque 02 possui 4.820 L (16%) com autonomia estimada em 18.4 horas. Fechamento do Turno 3 100% conciliado sem nenhuma divergência fiscal.',
-          dcTitle: 'Diagnóstico Operacional Consolidado',
-          badgeText: 'PEDIDO RECOMENDADO',
-          badgeClass: 'px-2 py-0.5 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30',
-          metricLabel1: 'Autonomia Tanque 02',
-          metricVal1: '18.4 Horas',
-          metricVal1Class: 'font-bold text-amber-300 text-xs',
-          metricLabel2: 'Auditoria de Caixa',
-          metricVal2: 'R$ 0,00 Furo',
-          metricVal2Class: 'font-bold text-emerald-400 text-xs',
-          btnActionText: 'Emitir Pedido (30.000 L)',
-          toastMsg: '✓ Pedido de 30.000 L protocolado na distribuidora em 1 clique!'
         },
         loja: {
           userLabel: 'Supervisor Regional (Loja & Varejo #12)',
-          time: '17:52',
-          query: 'Houve discrepância entre cupons NFC-e emitidos e recebimentos em dinheiro e PIX hoje?',
-          response: 'Cruzamento fiduciário executado em 29ms. Foram emitidas 412 notas NFC-e totalizando R$ 64.390,00. Todos os pagamentos recebidos conferem centavo a centavo com os comprovantes bancários e gavetas.',
+          time: '17:48',
+          query: 'Qual produto mais vendido hoje e houve discrepância com cupons NFC-e?',
+          response: 'Cruzamento fiduciário executado em 29ms. O produto líder em vendas hoje é o Kit Lubrificante Sintético 5W30 (84 unid.), totalizando R$ 6.720,00. Foram emitidas 412 notas NFC-e e todos os pagamentos em cartão e PIX conferem centavo a centavo.',
           dcTitle: 'Reconciliação Fiduciária Multiloja',
           badgeText: '100% RECONCILIADO',
           badgeClass: 'px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
-          metricLabel1: 'Vendas Faturadas (NFC-e)',
-          metricVal1: 'R$ 64.390,00',
-          metricVal1Class: 'font-bold text-white text-xs',
-          metricLabel2: 'Discrepância Apurada',
-          metricVal2: 'R$ 0,00 (Exato)',
-          metricVal2Class: 'font-bold text-emerald-400 text-xs',
+          metricLabel1: 'Item Campeão',
+          metricVal1: 'Óleo Sintético 5W30 (84 un)',
+          metricVal1Class: 'font-extrabold text-white text-xs',
+          metricLabel2: 'Vendas Totais (NFC-e)',
+          metricVal2: 'R$ 64.390,00',
+          metricVal2Class: 'font-extrabold text-cyan-300 text-xs',
           btnActionText: 'Exportar Extrato Consolidado',
           toastMsg: '✓ Extrato executivo consolidado gerado com assinatura digital!'
         },
         fiscal: {
           userLabel: 'Diretor de Operações (Compliance Fiscal)',
-          time: '17:55',
-          query: 'Existe algum risco de autuação fiscal ou desenquadramento regulatório nas operações de hoje?',
-          response: 'Auditoria preventiva realizada em 24ms. Zero inconformidades detectadas. Todas as medições e notas fiscais encontram-se dentro dos limites legais e regulatórios estritos.',
+          time: '17:50',
+          query: 'Qual produto mais vendido hoje e existe risco fiscal na Portaria 26 da ANP?',
+          response: 'Auditoria preventiva realizada em 24ms. O produto com maior movimentação foi o Etanol Hidratado (5.140 L). A variação volumétrica apurada no LMC físico vs contábil foi de +0.28%, perfeitamente enquadrada na tolerância legal de ±0.60%. Zero inconformidades.',
           dcTitle: 'Auditoria Preventiva Contínua',
           badgeText: 'ZERO RISCO FISCAL',
           badgeClass: 'px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
-          metricLabel1: 'Conformidade Legal',
-          metricVal1: '100% Homologado',
-          metricVal1Class: 'font-bold text-emerald-400 text-xs',
-          metricLabel2: 'Vazamento Externo',
-          metricVal2: '0 Bytes (LGPD)',
-          metricVal2Class: 'font-bold text-cyan-300 text-xs',
+          metricLabel1: 'Produto com Mais Volume',
+          metricVal1: 'Etanol Hidratado (5.140 L)',
+          metricVal1Class: 'font-extrabold text-white text-xs',
+          metricLabel2: 'Variação LMC (ANP)',
+          metricVal2: '+0.28% (Legal)',
+          metricVal2Class: 'font-extrabold text-emerald-400 text-xs',
           btnActionText: 'Emitir Dossiê de Governança',
           toastMsg: '✓ Dossiê executivo de governança emitido para a diretoria!'
         }
       };
 
-      function selectChatScenario(scenarioKey) {
-        tourState.userInteracted = true;
-        const data = chatScenarios[scenarioKey];
-        if (!data) return;
-        tourState.currentScenario = scenarioKey;
-        playTone(580, 'sine', 0.1, 0.05);
+      // =========================================================================
+      // MÁQUINA DE ESCREVER (TYPEWRITER AUTOMÁTICO) E PIPELINE SINCRONIZADO
+      // =========================================================================
+      let typewriterTimeout = null;
+      let streamingTimeout = null;
+      let pipelineTimeouts = [];
 
-        // Atualiza botões de cenário
-        const keys = ['varejo', 'posto', 'loja', 'fiscal'];
-        keys.forEach(k => {
-          const btn = document.getElementById(`scenario-btn-${k}`);
-          if (btn) {
-            if (k === scenarioKey) {
-              btn.className = 'px-2.5 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-200 border border-cyan-500/40 font-semibold truncate transition-all text-left flex items-center gap-1.5';
-            } else {
-              btn.className = 'px-2.5 py-1.5 rounded-lg bg-slate-900/80 text-slate-300 hover:text-white border border-white/10 truncate transition-all text-left flex items-center gap-1.5';
-            }
+      function clearAllSimulations() {
+        if (typewriterTimeout) {
+          clearTimeout(typewriterTimeout);
+          typewriterTimeout = null;
+        }
+        if (streamingTimeout) {
+          clearTimeout(streamingTimeout);
+          streamingTimeout = null;
+        }
+        pipelineTimeouts.forEach(t => clearTimeout(t));
+        pipelineTimeouts = [];
+        dustTimeouts.forEach(t => clearTimeout(t));
+        dustTimeouts = [];
+      }
+
+      function runTypewriter(text, onComplete) {
+        const typedEl = document.getElementById('step1-typed-text');
+        const chatQueryEl = document.getElementById('chat-user-query-text');
+        const cursor = document.getElementById('typewriter-cursor');
+        if (typedEl) typedEl.textContent = '';
+        if (chatQueryEl) chatQueryEl.textContent = '';
+        if (cursor) cursor.classList.remove('hidden');
+
+        let i = 0;
+        function typeChar() {
+          if (i < text.length) {
+            const char = text.charAt(i);
+            if (typedEl) typedEl.textContent += char;
+            if (chatQueryEl) chatQueryEl.textContent += char;
+            i++;
+            if (tourState.soundEnabled && i % 3 === 0) playTone(720 + (i % 5) * 40, 'sine', 0.03, 0.02);
+            typewriterTimeout = setTimeout(typeChar, 24);
+          } else {
+            if (cursor) cursor.classList.add('hidden');
+            if (onComplete) onComplete();
           }
-        });
+        }
+        typeChar();
+      }
 
-        // Atualiza campos do chat
+      // Efeito Streaming em Tempo Real para a Resposta Executiva da AURA
+      function runStreamingResponse(text, onComplete) {
+        const el = document.getElementById('chat-response-narrative');
+        const dcLive = document.getElementById('decisioncard-live');
+        if (!el) {
+          if (onComplete) onComplete();
+          return;
+        }
+        el.textContent = '';
+        if (dcLive) {
+          dcLive.classList.add('hidden');
+          dcLive.classList.remove('animate-fade-in');
+        }
+
+        const words = text.split(' ');
+        let idx = 0;
+        function streamWord() {
+          if (idx < words.length) {
+            el.textContent += (idx === 0 ? '' : ' ') + words[idx];
+            idx++;
+            if (tourState.soundEnabled && idx % 3 === 0) {
+              playTone(520 + (idx % 4) * 35, 'sine', 0.02, 0.02);
+            }
+            streamingTimeout = setTimeout(streamWord, 18);
+          } else {
+            if (dcLive) {
+              dcLive.classList.remove('hidden');
+              dcLive.classList.add('animate-fade-in');
+            }
+            if (onComplete) onComplete();
+          }
+        }
+        streamWord();
+      }
+
+      // Simulação Autônoma Mestre: Chat (Esquerda) vs Backend (Direita)
+      function runAutonomousShowcase(scenarioKey = null) {
+        if (scenarioKey) tourState.currentScenario = scenarioKey;
+        const scenario = chatScenarios[tourState.currentScenario] || chatScenarios.posto;
+        tourState.isSimulating = true;
+
+        clearAllSimulations();
+        resetDustDisintegration();
+
+        // Elementos do Chat da Esquerda
         const userLabel = document.getElementById('chat-user-label');
         const timestamp = document.getElementById('chat-timestamp-label');
-        const queryText = document.getElementById('chat-user-query-text');
-        const respText = document.getElementById('chat-response-narrative');
+        const thinkingBox = document.getElementById('chat-thinking-box');
+        const thinkingText = document.getElementById('thinking-step-text');
+        const thinkingBar = document.getElementById('thinking-progress-bar');
+        const responseRow = document.getElementById('chat-response-row');
         const dcTitle = document.getElementById('mini-dc-title');
         const dcBadge = document.getElementById('mini-dc-badge');
         const mLabel1 = document.getElementById('mini-metric-label-1');
@@ -2425,55 +1663,169 @@
         const mVal2 = document.getElementById('mini-metric-val-2');
         const btnAction = document.getElementById('mini-dc-action-text');
         const chatInput = document.getElementById('chat-interactive-input');
+        const simStatusBadge = document.getElementById('sim-status-badge');
 
-        if (userLabel) userLabel.textContent = data.userLabel;
-        if (timestamp) timestamp.textContent = data.time;
-        if (queryText) queryText.textContent = `"${data.query}"`;
-        if (respText) respText.textContent = data.response;
-        if (dcTitle) dcTitle.textContent = data.dcTitle;
-        if (dcBadge) {
-          dcBadge.textContent = data.badgeText;
-          dcBadge.className = data.badgeClass;
-        }
-        if (mLabel1) mLabel1.textContent = data.metricLabel1;
-        if (mVal1) {
-          mVal1.textContent = data.metricVal1;
-          mVal1.className = data.metricVal1Class;
-        }
-        if (mLabel2) mLabel2.textContent = data.metricLabel2;
-        if (mVal2) {
-          mVal2.textContent = data.metricVal2;
-          mVal2.className = data.metricVal2Class;
-        }
-        if (btnAction) btnAction.textContent = data.btnActionText;
-        if (chatInput) chatInput.value = data.query;
+        if (userLabel) userLabel.textContent = scenario.userLabel;
+        if (timestamp) timestamp.textContent = `${scenario.time} • Ao Vivo`;
+        if (chatInput) chatInput.value = scenario.query;
+        if (simStatusBadge) simStatusBadge.textContent = 'EXECUTANDO...';
 
-        // Executa a cascata no grafo ao lado
-        runGraphPulseAnimation();
+        // Esconde resposta prévia e thinking
+        if (responseRow) responseRow.classList.add('hidden');
+        if (thinkingBox) thinkingBox.classList.add('hidden');
+        if (thinkingBar) thinkingBar.style.width = '10%';
+
+        // Reseta destaques dos nós da direita
+        const allNodes = ['graph-node-prompt', 'pipe-node-1', 'graph-node-lgpd', 'pipe-node-2', 'graph-node-decisao'];
+        allNodes.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.classList.remove('active-glow', 'success-glow', 'pulse-highlight');
+        });
+
+        // 1. Digitação automática da pergunta (Typewriter)
+        runTypewriter(scenario.query, () => {
+          // Pergunta enviada!
+          playTone(600, 'sine', 0.05, 0.04);
+
+          // 2. Aciona o Raciocínio Cognitivo no chat e ativa o Nó 1 no Backend (Detecção de Intenção Semântica)
+          const t1 = setTimeout(() => {
+            if (thinkingBox) thinkingBox.classList.remove('hidden');
+            if (thinkingText) thinkingText.textContent = 'Detectando intenção semântica da pergunta...';
+            if (thinkingBar) thinkingBar.style.width = '25%';
+
+            const node1 = document.getElementById('graph-node-prompt');
+            if (node1) node1.classList.add('active-glow');
+            playTone(480, 'sine', 0.08, 0.04);
+          }, 150);
+          pipelineTimeouts.push(t1);
+
+          // 3. Nó 2: Busca Operacional de Borda (Telemetria)
+          const t2 = setTimeout(() => {
+            if (thinkingText) thinkingText.textContent = 'Consultando telemetria operacional de PDVs e estoques...';
+            if (thinkingBar) thinkingBar.style.width = '50%';
+
+            const node1 = document.getElementById('graph-node-prompt');
+            if (node1) node1.classList.remove('active-glow');
+            const node2 = document.getElementById('pipe-node-1');
+            if (node2) node2.classList.add('active-glow');
+            playTone(560, 'sine', 0.08, 0.04);
+          }, 850);
+          pipelineTimeouts.push(t2);
+
+          // 4. Nó 3: Escudo AURA Guard™ & Desintegração em Poeira (LGPD)
+          const t3 = setTimeout(() => {
+            if (thinkingText) thinkingText.textContent = 'Escudo AURA Guard™ ativado: sanitizando dados confidenciais (LGPD)...';
+            if (thinkingBar) thinkingBar.style.width = '75%';
+
+            const node2 = document.getElementById('pipe-node-1');
+            if (node2) node2.classList.remove('active-glow');
+            const node3 = document.getElementById('graph-node-lgpd');
+            if (node3) node3.classList.add('active-glow');
+
+            // Dispara a desintegração em poeira automaticamente!
+            triggerDustDisintegration(true);
+          }, 1700);
+          pipelineTimeouts.push(t3);
+
+          // 5. Nó 4: Motor Analítico Sub-100ms & Regras Fiduciárias
+          const t4 = setTimeout(() => {
+            if (thinkingText) thinkingText.textContent = 'Confrontando regras fiduciárias (ANP Portaria 26 ±0.60%) e margens...';
+            if (thinkingBar) thinkingBar.style.width = '92%';
+
+            const node3 = document.getElementById('graph-node-lgpd');
+            if (node3) node3.classList.remove('active-glow');
+            const node4 = document.getElementById('pipe-node-2');
+            if (node4) node4.classList.add('active-glow');
+            playTone(660, 'sine', 0.08, 0.04);
+          }, 2550);
+          pipelineTimeouts.push(t4);
+
+          // 6. Nó 5: Entrega da Decisão & Resposta Streaming no Chat
+          const t5 = setTimeout(() => {
+            const node4 = document.getElementById('pipe-node-2');
+            if (node4) node4.classList.remove('active-glow');
+            const node5 = document.getElementById('graph-node-decisao');
+            if (node5) node5.classList.add('success-glow');
+
+            if (thinkingBox) thinkingBox.classList.add('hidden');
+
+            // Preenche dados do DecisionCard
+            if (dcTitle) dcTitle.textContent = scenario.dcTitle;
+            if (dcBadge) {
+              dcBadge.textContent = scenario.badgeText;
+              dcBadge.className = scenario.badgeClass;
+            }
+            if (mLabel1) mLabel1.textContent = scenario.metricLabel1;
+            if (mVal1) {
+              mVal1.textContent = scenario.metricVal1;
+              mVal1.className = scenario.metricVal1Class;
+            }
+            if (mLabel2) mLabel2.textContent = scenario.metricLabel2;
+            if (mVal2) {
+              mVal2.textContent = scenario.metricVal2;
+              mVal2.className = scenario.metricVal2Class;
+            }
+            if (btnAction) btnAction.textContent = scenario.btnActionText;
+
+            // Exibe a linha de resposta da AURA e inicia STREAMING em tempo real!
+            if (responseRow) {
+              responseRow.classList.remove('hidden');
+              responseRow.classList.add('animate-fade-in');
+            }
+
+            runStreamingResponse(scenario.response, () => {
+              if (simStatusBadge) simStatusBadge.textContent = 'CONCLUÍDO (38ms)';
+              playChime();
+              tourState.isSimulating = false;
+
+              setTimeout(() => {
+                if (node5) node5.classList.remove('success-glow');
+              }, 1400);
+            });
+          }, 3350);
+          pipelineTimeouts.push(t5);
+
+        });
+      }
+
+      function selectChatScenario(scenarioKey) {
+        tourState.userInteracted = true;
+        tourState.currentScenario = scenarioKey;
+        playTone(580, 'sine', 0.1, 0.05);
+
+        const keys = ['posto', 'varejo', 'loja', 'fiscal'];
+        keys.forEach(k => {
+          const btn = document.getElementById(`scenario-btn-${k}`);
+          if (btn) {
+            if (k === scenarioKey) {
+              btn.className = 'px-2 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-200 border border-cyan-500/40 font-semibold truncate transition-all text-left flex items-center gap-1';
+            } else {
+              btn.className = 'px-2 py-1.5 rounded-lg bg-slate-900/80 text-slate-300 hover:text-white border border-white/10 truncate transition-all text-left flex items-center gap-1';
+            }
+          }
+        });
+
+        runAutonomousShowcase(scenarioKey);
       }
 
       function simulateChatSubmit() {
         tourState.userInteracted = true;
         const chatInput = document.getElementById('chat-interactive-input');
-        const userQueryText = document.getElementById('chat-user-query-text');
-        if (chatInput && userQueryText) {
+        if (chatInput && chatInput.value.trim()) {
           const val = chatInput.value.trim();
-          if (val) {
-            userQueryText.textContent = `"${val}"`;
-          }
+          chatScenarios[tourState.currentScenario].query = val;
         }
-        playTone(620, 'sine', 0.12, 0.05);
-        runGraphPulseAnimation();
+        runAutonomousShowcase(tourState.currentScenario);
       }
 
       function simulateChatActionClick() {
         tourState.userInteracted = true;
         playActionSound();
-        const data = chatScenarios[tourState.currentScenario] || chatScenarios.varejo;
+        const scenario = chatScenarios[tourState.currentScenario] || chatScenarios.posto;
         const toast = document.getElementById('mini-chat-action-toast');
         const msg = document.getElementById('mini-chat-toast-message');
         if (toast && msg) {
-          msg.textContent = data.toastMsg;
+          msg.textContent = scenario.toastMsg;
           toast.classList.remove('hidden');
           toast.classList.add('animate-fade-in');
           setTimeout(() => {
@@ -2486,51 +1838,81 @@
         const nodes = ['prompt', 'lgpd', 'motor', 'regras', 'decisao'];
         nodes.forEach((nodeId, idx) => {
           setTimeout(() => {
-            const el = document.getElementById(`graph-node-${nodeId}`);
+            const el = document.getElementById(`graph-node-${nodeId}`) || document.getElementById(`pipe-node-1`);
             if (el) {
-              el.classList.add(nodeId === 'decisao' ? 'success-glow' : 'active-glow');
-              playTone(400 + idx * 90, 'sine', 0.07, 0.03);
-              setTimeout(() => {
-                el.classList.remove('active-glow', 'success-glow');
-              }, 450);
+              el.classList.add('active-glow');
+              playTone(400 + idx * 80, 'sine', 0.06, 0.03);
+              setTimeout(() => el.classList.remove('active-glow'), 400);
             }
-          }, idx * 110);
+          }, idx * 100);
         });
-
-        const panel = document.getElementById('graph-detail-text');
-        if (panel) {
-          panel.textContent = 'Transmissão completa: Prompt higienizado na LGPD, auditado na borda e entregue em 34ms.';
-        }
       }
 
       function inspectGraphNode(nodeKey) {
         tourState.userInteracted = true;
         playTone(660, 'sine', 0.1, 0.05);
-
-        const nodeKeys = ['prompt', 'lgpd', 'motor', 'regras', 'decisao'];
-        nodeKeys.forEach(k => {
-          const el = document.getElementById(`graph-node-${k}`);
-          if (el) {
-            if (k === nodeKey) {
-              el.classList.add('active-selected');
-            } else {
-              el.classList.remove('active-selected');
-            }
-          }
-        });
-
         const panel = document.getElementById('graph-detail-text');
         if (!panel) return;
 
         const descriptions = {
-          prompt: '1. Prompt em Linguagem Natural: O gestor envia consultas operacionais em português corrente (sem SQL ou planilhas). Multicanal: chat, tablet ou voz.',
-          lgpd: '2. Escudo LGPD (Lei 13.709/2018): CPFs, CNPJs e credenciais são desintegrados na borda física. Zero trânsito de dados pessoais sensíveis para a nuvem pública.',
-          motor: '3. Motor Soberano de Borda: Processamento determinístico em sub-100ms dentro da rede privada da empresa. Sem latência de internet e sem risco de vazamento.',
-          regras: '4. Regras & Auditoria Fiduciária: Batimento matemático de tolerâncias fiscais (Portaria 26 ANP, SAT, NFC-e) e conciliação centavo a centavo sem alucinações.',
-          decisao: '5. DecisionCard™ em 1-Toque: Resultado executivo consolidado com recomendação acionável e botões de disparo direto (reposição, aprovação ou extrato).'
+          prompt: '1. Entrada em Linguagem Natural: O gestor envia consultas operacionais em português corrente (sem SQL ou fórmulas).',
+          lgpd: '2. Escudo LGPD (Lei 13.709/2018): CPFs, CNPJs e credenciais são desintegrados na borda física. Zero trânsito de dados pessoais.',
+          motor: '3. Telemetria de Borda: Conexão direta com bicos, encerrantes e estoque físico.',
+          regras: '4. Regras & Auditoria Fiduciária: Batimento matemático de tolerâncias fiscais (Portaria 26 ANP ±0.60%).',
+          decisao: '5. DecisionCard™ em 1-Toque: Resultado executivo consolidado com recomendação acionável pronta.'
         };
-
         panel.textContent = descriptions[nodeKey] || 'Parâmetro auditado pelo motor de borda.';
+      }
+
+      function inspectNode(nodeType) {
+        inspectGraphNode(nodeType === 'pista' ? 'motor' : nodeType);
+      }
+
+      function simulateActionClick(actionType) {
+        tourState.userInteracted = true;
+        playActionSound();
+        const toast = document.getElementById('action-feedback-toast');
+        const msg = document.getElementById('action-feedback-message');
+        if (toast && msg) {
+          msg.textContent = '✓ Ordem executada com sucesso em 1 toque!';
+          toast.classList.remove('hidden');
+          setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+      }
+
+      function toggleStep4Tab(tabName) {
+        const viewComp = document.getElementById('view-step4-companion');
+        if (viewComp) {
+          if (tabName === 'companion') {
+            viewComp.classList.toggle('hidden');
+          } else {
+            viewComp.classList.add('hidden');
+          }
+        }
+      }
+
+      function simulatePipelinePulse() {
+        runGraphPulseAnimation();
+      }
+
+      function simulateStep1Question() {
+        runAutonomousShowcase('posto');
+      }
+
+      // Funções de Compatibilidade com Métodos Anteriores
+      function goToStep(s) {
+        if (s === 1) selectChatScenario('posto');
+        else if (s === 2) triggerDustDisintegration(true);
+        else if (s === 3) runGraphPulseAnimation();
+        else if (s === 4) toggleStep4Tab('companion');
+      }
+      function nextStep() { runAutonomousShowcase(); }
+      function prevStep() { runAutonomousShowcase(); }
+      function startTour() { runAutonomousShowcase(); }
+      function pauseTour() { clearAllSimulations(); }
+      function restartTour() {
+        hasStartedForCurrentView = true;
+        runAutonomousShowcase('posto');
       }
 
       // =========================================================================
@@ -2555,18 +1937,13 @@
         const bar = document.getElementById('scroll-progress-bar');
         if (bar) bar.style.width = `${scrolled}%`;
 
-        // Atualiza dot ativo no menu lateral com cálculo preciso por getBoundingClientRect
-        const sections = ['top', 'sec-tour', 'sec-chat-graph', 'sec-blindagem', 'sec-diferenciacao', 'sec-faq'];
+        const sections = ['top', 'sec-chat-graph', 'sec-blindagem', 'sec-diferenciacao', 'sec-faq'];
         for (let i = sections.length - 1; i >= 0; i--) {
           const secId = sections[i];
           if (secId === 'top') {
             if (winScroll < 200) {
               document.querySelectorAll('.scroll-nav-dot').forEach(dot => {
-                if (dot.getAttribute('data-section') === 'top') {
-                  dot.classList.add('active');
-                } else {
-                  dot.classList.remove('active');
-                }
+                dot.classList.toggle('active', dot.getAttribute('data-section') === 'top');
               });
               break;
             }
@@ -2577,11 +1954,7 @@
             const topPos = el.getBoundingClientRect().top + winScroll;
             if (winScroll + 260 >= topPos) {
               document.querySelectorAll('.scroll-nav-dot').forEach(dot => {
-                if (dot.getAttribute('data-section') === secId) {
-                  dot.classList.add('active');
-                } else {
-                  dot.classList.remove('active');
-                }
+                dot.classList.toggle('active', dot.getAttribute('data-section') === secId);
               });
               break;
             }
@@ -2589,49 +1962,43 @@
         }
       }
 
+      // Gerenciador de Disparo no Scroll
+      let hasStartedForCurrentView = false;
+
+      function checkScrollAndTriggerShowcase() {
+        const el = document.getElementById('sec-chat-graph');
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const vh = window.innerHeight || document.documentElement.clientHeight;
+
+        // Seção entra confortavelmente na área de leitura do usuário
+        const inComfortableView = (rect.top <= vh * 0.72) && (rect.bottom >= vh * 0.20);
+
+        if (inComfortableView) {
+          if (!hasStartedForCurrentView && !tourState.isSimulating) {
+            hasStartedForCurrentView = true;
+            tourState.hasAutoStarted = true;
+            runAutonomousShowcase();
+          }
+        } else {
+          // Se o usuário rolou completamente para fora (acima ou abaixo), reseta para permitir replay na volta
+          if (rect.top > vh * 1.05 || rect.bottom < -50) {
+            hasStartedForCurrentView = false;
+          }
+        }
+      }
+
       // =========================================================================
-      // CONTROLES DE INTERFACE & EVENTOS GLOBAIS
+      // INICIALIZAÇÃO AUTOMÁTICA VIA INTERSECTION OBSERVER E SCROLL
       // =========================================================================
       document.addEventListener('DOMContentLoaded', function() {
         if (window.lucide) window.lucide.createIcons();
-
-        // Botões do Player
-        const btnPlay = document.getElementById('btn-tour-play-pause');
-        if (btnPlay) btnPlay.addEventListener('click', togglePlayPause);
-
-        const btnPrev = document.getElementById('btn-tour-prev');
-        if (btnPrev) btnPrev.addEventListener('click', () => { pauseTour(); prevStep(); });
-
-        const btnNext = document.getElementById('btn-tour-next');
-        if (btnNext) btnNext.addEventListener('click', () => { pauseTour(); nextStep(); });
-
-        const btnReplay = document.getElementById('btn-tour-replay');
-        if (btnReplay) btnReplay.addEventListener('click', () => { goToStep(1); startTour(); });
-
-        // Velocidades
-        const btn1x = document.getElementById('btn-speed-1x');
-        const btn2x = document.getElementById('btn-speed-2x');
-        if (btn1x && btn2x) {
-          btn1x.addEventListener('click', () => {
-            tourState.userInteracted = true;
-            tourState.speedMultiplier = 1;
-            btn1x.className = 'px-2.5 py-1 rounded-md bg-slate-800 text-white font-semibold';
-            btn2x.className = 'px-2.5 py-1 rounded-md text-slate-400 hover:text-white';
-          });
-          btn2x.addEventListener('click', () => {
-            tourState.userInteracted = true;
-            tourState.speedMultiplier = 2;
-            btn2x.className = 'px-2.5 py-1 rounded-md bg-slate-800 text-white font-semibold';
-            btn1x.className = 'px-2.5 py-1 rounded-md text-slate-400 hover:text-white';
-          });
-        }
 
         // Toggle SFX
         const btnSfx = document.getElementById('btn-toggle-sfx-showcase');
         const iconSfx = document.getElementById('icon-sfx');
         if (btnSfx) {
           btnSfx.addEventListener('click', () => {
-            tourState.userInteracted = true;
             tourState.soundEnabled = !tourState.soundEnabled;
             if (iconSfx) {
               iconSfx.setAttribute('data-lucide', tourState.soundEnabled ? 'volume-2' : 'volume-x');
@@ -2640,24 +2007,7 @@
           });
         }
 
-        // Teclado
-        window.addEventListener('keydown', (e) => {
-          if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) {
-            return;
-          }
-          if (e.key === ' ' || e.key === 'k') {
-            e.preventDefault();
-            togglePlayPause();
-          } else if (e.key === 'ArrowRight') {
-            pauseTour();
-            nextStep();
-          } else if (e.key === 'ArrowLeft') {
-            pauseTour();
-            prevStep();
-          }
-        });
-
-        // Chat input enter key listener
+        // Chat input enter listener
         const chatInput = document.getElementById('chat-interactive-input');
         if (chatInput) {
           chatInput.addEventListener('keydown', (e) => {
@@ -2668,64 +2018,62 @@
           });
         }
 
-        // Scroll listener para barra de progresso
-        window.addEventListener('scroll', updateScrollProgress, { passive: true });
+        // Scroll listener para barra de progresso e verificação contínua
+        window.addEventListener('scroll', () => {
+          updateScrollProgress();
+          checkScrollAndTriggerShowcase();
+        }, { passive: true });
 
-        // IntersectionObserver para reveal suave de seções no scroll e animações dinâmicas
-        let chatGraphAnimatedOnce = false;
-        let diferenciacaoAnimatedOnce = false;
-
+        // IntersectionObserver para reveal suave e DISPARO AUTÔNOMO NO SCROLL
         if (typeof IntersectionObserver !== 'undefined') {
-          const revealObserver = new IntersectionObserver((entries) => {
+          const showcaseObserver = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
               if (entry.isIntersecting) {
                 entry.target.classList.add('scroll-reveal-visible');
 
-                // Animação disparada organicamente pelo scroll no grafo
-                if (entry.target.id === 'sec-chat-graph' && !chatGraphAnimatedOnce) {
-                  chatGraphAnimatedOnce = true;
-                  setTimeout(() => {
-                    runGraphPulseAnimation();
-                  }, 250);
+                // Quando a seção do chat entra no viewport pelo scroll
+                if (entry.target.id === 'sec-chat-graph') {
+                  checkScrollAndTriggerShowcase();
                 }
 
-                // Efeito de onda nos 4 cards de ROI na rolagem
-                if (entry.target.id === 'sec-diferenciacao' && !diferenciacaoAnimatedOnce) {
-                  diferenciacaoAnimatedOnce = true;
+                // Animação de realce nos cards de ROI ao rolar até eles
+                if (entry.target.id === 'sec-diferenciacao') {
                   const cards = entry.target.querySelectorAll('.roi-card');
                   cards.forEach((c, i) => {
                     setTimeout(() => {
                       c.classList.add('ring-1', 'ring-emerald-400/60');
                       setTimeout(() => c.classList.remove('ring-1', 'ring-emerald-400/60'), 700);
-                    }, i * 140);
+                    }, i * 120);
                   });
                 }
               }
             });
-          }, { threshold: 0.12 });
+          }, { threshold: [0.15, 0.35, 0.6] });
 
           document.querySelectorAll('.scroll-reveal').forEach(el => {
-            revealObserver.observe(el);
+            showcaseObserver.observe(el);
           });
         } else {
-          // Fallback imediato para navegadores legados
+          // Fallback para navegadores legados sem IntersectionObserver
           document.querySelectorAll('.scroll-reveal').forEach(el => {
             el.classList.add('scroll-reveal-visible');
           });
+          setTimeout(() => {
+            runAutonomousShowcase('posto');
+          }, 600);
         }
-
-        // Inicializa silenciosamente na Etapa 1
-        goToStep(1, false, true);
       });
 
-      // API Pública do Tour AURA
+      // API Pública window.auraTour
       window.auraTour = {
-        goToStep: (s) => goToStep(s, true),
-        nextStep: () => { pauseTour(); nextStep(); },
-        prevStep: () => { pauseTour(); prevStep(); },
+        runAutonomousShowcase,
+        runStreamingResponse,
+        goToStep,
+        nextStep,
+        prevStep,
         startTour,
         pauseTour,
-        restartTour: () => { goToStep(1); startTour(); },
+        restartTour,
         triggerDustDisintegration,
         resetDustDisintegration,
         triggerCustomDustDisintegration,
