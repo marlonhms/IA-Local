@@ -936,9 +936,9 @@ def generate_showcase_html():
           <div class="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
             <i data-lucide="server" class="w-5 h-5"></i>
           </div>
-          <h3 class="font-bold text-white text-sm">Processamento Local e Privado</h3>
+          <h3 class="font-bold text-white text-sm">Processamento Local & Soberania dos Dados</h3>
           <p class="text-xs text-slate-400 leading-relaxed">
-            Funciona diretamente no servidor ou computador da sua empresa, garantindo respostas em milissegundos sem depender de internet externa e sem enviar dados confidenciais para fora.
+            Conecta direto na infraestrutura do banco da sua empresa. Sem faturas abusivas por milhões de tokens para processar seus próprios dados: cálculos determinísticos no seu ambiente e inteligência rápida e econômica.
           </p>
         </div>
 
@@ -978,7 +978,7 @@ def generate_showcase_html():
           </div>
           <h3 class="text-xl sm:text-2xl font-bold text-white font-display-title">Matriz de Diferenciação Operacional & ROI</h3>
           <p class="text-xs text-slate-400 font-sans max-w-2xl mt-1">
-            Enquanto ERPs convencionais são sistemas passivos que registram prejuízos ocorridos semanas atrás, e dashboards de BI apenas desenham gráficos sem ação, a AURA atua proativamente no presente — estancando quebras de caixa, prevenindo desvios de estoque e agilizando decisões em sub-100ms.
+            Enquanto ERPs convencionais são sistemas passivos que registram prejuízos ocorridos semanas atrás, e dashboards de BI apenas desenham gráficos sem ação, a AURA atua proativamente no presente — estancando quebras de caixa, prevenindo desvios de estoque e agilizando decisões em sub-100ms, conectando direto na infraestrutura do banco do cliente sem cobranças abusivas por milhões de tokens.
           </p>
         </div>
         <div class="text-right flex-shrink-0">
@@ -1018,14 +1018,14 @@ def generate_showcase_html():
 
         <div class="roi-card p-4 rounded-2xl bg-slate-900/90 border border-purple-500/30 space-y-2">
           <div class="flex items-center justify-between">
-            <span class="text-[10px] font-mono text-purple-400 uppercase">Continuidade de Negócio</span>
-            <i data-lucide="trending-down" class="w-4 h-4 text-purple-400"></i>
+            <span class="text-[10px] font-mono text-purple-400 uppercase">Eficiência & Soberania</span>
+            <i data-lucide="database" class="w-4 h-4 text-purple-400"></i>
           </div>
-          <div class="text-base font-extrabold text-white">Prevenção Preditiva (Run-Out)</div>
+          <div class="text-base font-extrabold text-white">Economia Brutal de Tokens</div>
           <p class="text-xs text-slate-400 leading-relaxed">
-            Cálculo dinâmico da curva horária de vazão por produto de alto giro. Dispara ordem de reposição antes de faltar produto ao cliente.
+            Conecta direto no banco do cliente: cálculos estruturados na máquina local e IA acionada só para conclusões complexas. Sem faturas abusivas.
           </p>
-          <div class="text-[10px] text-purple-300 font-semibold pt-1">✓ Ruptura zero com alerta antecipado em 48h</div>
+          <div class="text-[10px] text-purple-300 font-semibold pt-1">✓ Redução de 90% a 95% em consumo de tokens</div>
         </div>
 
         <div class="roi-card p-4 rounded-2xl bg-slate-900/90 border border-amber-500/30 space-y-2">
@@ -1033,16 +1033,70 @@ def generate_showcase_html():
             <span class="text-[10px] font-mono text-amber-400 uppercase">Produtividade Gerencial</span>
             <i data-lucide="clock" class="w-4 h-4 text-amber-400"></i>
           </div>
-          <div class="text-base font-extrabold text-white">De 3 Horas para 10 Segundos</div>
+          <div class="text-base font-extrabold text-white">De Horas para 10 Segundos</div>
           <p class="text-xs text-slate-400 leading-relaxed">
-            Elimina o preenchimento manual de planilhas e conferência de filipetas. Entrega DecisionCards prontos com ação em 1-toque.
+            Elimina o preenchimento manual de planilhas e conferência de filipetas. Entrega DecisionCards prontos com ação em 1-toque e Run-Out preditivo.
           </p>
           <div class="text-[10px] text-amber-300 font-semibold pt-1">✓ Mais de 60 horas/mês economizadas por gestor</div>
         </div>
 
       </div>
 
-      <!-- Tabela Comparativa Tripla Expandida -->
+      <!-- Bloco de Contraste Estratégico: Mercado Tradicional de IA vs Abordagem AURA -->
+      <div class="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-rose-950/20 via-slate-900/90 to-emerald-950/25 border border-white/10 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div>
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[10px] font-mono uppercase tracking-wider mb-1">
+              Soberania dos Dados & Arquitetura Inteligente
+            </div>
+            <h4 class="text-base sm:text-lg font-bold text-white font-display-title">
+              O Mercado Tradicional de IA vs A Abordagem Direta no Banco da AURA
+            </h4>
+          </div>
+          <span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 inline-flex items-center gap-1.5 w-fit">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+            Até 95% de Economia em Tokens
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 font-sans text-xs">
+          <!-- Coluna 1: O Mercado Tradicional de IA -->
+          <div class="p-4 rounded-xl bg-rose-950/20 border border-rose-500/30 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-rose-300 flex items-center gap-1.5">
+                <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-400"></i>
+                Como o Mercado Tradicional de IA Opera
+              </span>
+              <span class="px-2 py-0.5 rounded text-[9px] font-mono bg-rose-500/20 text-rose-300">Ineficiente & Caro</span>
+            </div>
+            <p class="text-slate-300 leading-relaxed">
+              Envia <span class="text-rose-200 font-semibold">JSONs gigantescos e sem estrutura</span> para servidores em nuvem de terceiros, sem guardrails e sem indexação. Espera que a IA faça cálculos matemáticos "no escuro", consumindo tokens de forma descontrolada e <strong class="text-white">cobrando dos clientes faturas caras por milhões de tokens para processar dados que já pertencem à sua própria empresa</strong>.
+            </p>
+            <div class="text-[11px] text-rose-300 font-mono pt-1">
+              ✕ O cliente paga caro para processar a sua própria informação.
+            </div>
+          </div>
+
+          <!-- Coluna 2: A Abordagem AURA -->
+          <div class="p-4 rounded-xl bg-emerald-950/25 border border-emerald-500/35 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+                Como a AURA Revoluciona a Entrega
+              </span>
+              <span class="px-2 py-0.5 rounded text-[9px] font-mono bg-emerald-500/20 text-emerald-300">Conexão Local Direta</span>
+            </div>
+            <p class="text-slate-300 leading-relaxed">
+              Conecta <span class="text-emerald-200 font-semibold">direto na infraestrutura do banco do cliente</span>. Realiza todos os cálculos e conciliações de forma estruturada e determinística no ambiente local. A IA só é acionada para <strong class="text-white">síntese estratégica e conclusões complexas</strong> — entregando fidelidade, segurança, velocidade sub-100ms e economia de até 90-95% em custos de tokens.
+            </p>
+            <div class="text-[11px] text-emerald-300 font-mono font-semibold pt-1">
+              ✓ Cálculos estruturados locais, respostas em milissegundos e zero surpresas no fim do mês.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela Comparativa Compactada (Dimensões Críticas de ROI) -->
       <div class="overflow-x-auto font-sans text-xs">
         <table class="w-full text-left border-collapse">
           <thead>
@@ -1055,7 +1109,7 @@ def generate_showcase_html():
           </thead>
           <tbody class="divide-y divide-white/5">
             <tr>
-              <td class="py-3.5 px-4 font-semibold text-slate-200">Auditoria de Fechamento de Turno & Caixa</td>
+              <td class="py-3.5 px-4 font-semibold text-slate-200">Auditoria de Caixa & Prevenção de Quebras</td>
               <td class="py-3.5 px-4 text-slate-400">
                 <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-400 mb-1">✕ Reativo / Manual</span>
                 <div>2 a 4 horas conferindo recibos e papel; erros e quebras descobertos semanas depois no balanço.</div>
@@ -1070,7 +1124,7 @@ def generate_showcase_html():
               </td>
             </tr>
             <tr>
-              <td class="py-3.5 px-4 font-semibold text-slate-200">Monitoramento de Estoque & Prevenção de Desvios</td>
+              <td class="py-3.5 px-4 font-semibold text-slate-200">Desvios de Estoque & Perdas Invisíveis</td>
               <td class="py-3.5 px-4 text-slate-400">
                 <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-400 mb-1">✕ Furos Ocultos</span>
                 <div>Estoque teórico descolado do físico; perda tratada como custo inevitável da operação.</div>
@@ -1081,59 +1135,29 @@ def generate_showcase_html():
               </td>
               <td class="py-3.5 px-4 bg-emerald-950/20 border-l border-r border-emerald-500/30">
                 <span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 mb-1">✓ Conciliação Contínua</span>
-                <div class="font-medium text-emerald-200">Cruzamento contínuo entre saídas fiscais e estoque físico em tempo real; alerta imediato de desvio.</div>
+                <div class="font-medium text-emerald-200">Cruzamento contínuo entre saídas fiscais e estoque físico real em tempo real; alerta imediato de desvio.</div>
               </td>
             </tr>
             <tr>
-              <td class="py-3.5 px-4 font-semibold text-slate-200">Prevenção de Falta de Mercadorias (Ruptura)</td>
+              <td class="py-3.5 px-4 font-semibold text-slate-200">Eficiência de Processamento & Custo de Tokens</td>
               <td class="py-3.5 px-4 text-slate-400">
-                <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-400 mb-1">✕ Perda de Clientes</span>
-                <div>Aviso tardio quando o produto já acabou na gôndola/tanque e vendas foram perdidas.</div>
+                <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-400 mb-1">✕ Sem Inteligência</span>
+                <div>Processamento manual e lento; sistemas rígidos sem capacidade de análise analítica ou previsão.</div>
               </td>
               <td class="py-3.5 px-4 text-slate-400">
-                <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-400 mb-1">⚠ Média Histórica</span>
-                <div>Médias históricas gerais que ignoram sazonalidade do dia ou horário de pico da loja.</div>
+                <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-400 mb-1">✕ Faturas Abusivas de Nuvem</span>
+                <div>IAs de mercado enviam JSONs gigantes sem guardrails para nuvens de terceiros, cobrando caro do cliente por milhões de tokens para ler seus próprios dados.</div>
               </td>
               <td class="py-3.5 px-4 bg-emerald-950/20 border-l border-r border-emerald-500/30">
-                <span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 mb-1">✓ Previsão Run-Out</span>
-                <div class="font-medium text-emerald-200">Cálculo preditivo de run-out por hora com sugestão de pedido protocolado em 1 clique.</div>
+                <span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 mb-1">✓ Conexão Direta ao Banco Local</span>
+                <div class="font-medium text-emerald-200">Conecta direto na infraestrutura do banco do cliente; contas executadas na máquina local e IA acionada só para síntese executiva — economia de até 95% em tokens com latência sub-100ms.</div>
               </td>
             </tr>
             <tr>
-              <td class="py-3.5 px-4 font-semibold text-slate-200">Conformidade Fiscal & Riscos Regulatórios (ANP / SAT / NFC-e)</td>
-              <td class="py-3.5 px-4 text-slate-400">
-                <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-400 mb-1">✕ Risco de Autuação</span>
-                <div>Escrituração manual sujeita a erros de digitação, multas fiscais surpresa e LMC incorreto.</div>
-              </td>
-              <td class="py-3.5 px-4 text-slate-400">
-                <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-400 mb-1">⚠ Sem Auditoria Fiscal</span>
-                <div>Não audita tolerâncias regulamentares volumétricas ou regras tributárias estritas.</div>
-              </td>
-              <td class="py-3.5 px-4 bg-emerald-950/20 border-l border-r border-emerald-500/30">
-                <span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 mb-1">✓ Conferência Matemática Real</span>
-                <div class="font-medium text-emerald-200">Conferência matemática direta de notas fiscais, cupons e caixas centavo por centavo, garantindo números 100% exatos e confiáveis.</div>
-              </td>
-            </tr>
-            <tr>
-              <td class="py-3.5 px-4 font-semibold text-slate-200">Proteção de Dados & LGPD (Lei 13.709/2018)</td>
-              <td class="py-3.5 px-4 text-slate-400">
-                <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-400 mb-1">✕ Vulnerabilidade Total</span>
-                <div>Planilhas com CPFs e dados fiscais expostas em cópias locais sem qualquer controle de acesso.</div>
-              </td>
-              <td class="py-3.5 px-4 text-slate-400">
-                <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-400 mb-1">⚠ Nuvem Desprotegida</span>
-                <div>Exportação de arquivos CSV com dados pessoais desprotegidos para servidores em nuvem.</div>
-              </td>
-              <td class="py-3.5 px-4 bg-emerald-950/20 border-l border-r border-emerald-500/30">
-                <span class="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-400 mb-1">✓ Dados 100% Protegidos</span>
-                <div class="font-medium text-cyan-200">Escudo AURA Guard™: os dados de clientes e funcionários são removidos na hora e nada de confidencial sai da sua empresa.</div>
-              </td>
-            </tr>
-            <tr>
-              <td class="py-3.5 px-4 font-semibold text-slate-200">Tempo para Decisão Executiva</td>
+              <td class="py-3.5 px-4 font-semibold text-slate-200">Tempo para Decisão & Ação</td>
               <td class="py-3.5 px-4 text-slate-400">
                 <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-400 mb-1">✕ Horas em Planilhas</span>
-                <div>Reuniões morosas com relatórios estáticos de papel sem apontar o que fazer.</div>
+                <div>Reuniões morosas com relatórios estáticos de papel e horas em planilhas sem apontar o que fazer.</div>
               </td>
               <td class="py-3.5 px-4 text-slate-400">
                 <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-400 mb-1">⚠ Telas Complexas</span>
@@ -1141,7 +1165,7 @@ def generate_showcase_html():
               </td>
               <td class="py-3.5 px-4 bg-emerald-950/20 border-l border-r border-emerald-500/30">
                 <span class="inline-flex items-center gap-1 text-[11px] font-bold text-purple-400 mb-1">✓ Resolução em 1 Clique</span>
-                <div class="font-medium text-purple-200">Cartões executivos autoexplicativos que permitem resolver pendências com apenas 1 clique em menos de 10 segundos.</div>
+                <div class="font-medium text-purple-200">Cartões executivos DecisionCards™ autoexplicativos que permitem resolver pendências com apenas 1 clique em menos de 10 segundos.</div>
               </td>
             </tr>
           </tbody>
@@ -1182,6 +1206,16 @@ def generate_showcase_html():
 
         <div class="glass-panel p-5 rounded-2xl border border-white/10 space-y-2">
           <h4 class="font-bold text-slate-100 flex items-center gap-2">
+            <i data-lucide="coins" class="w-4 h-4 text-emerald-400"></i>
+            Por que a AURA economiza até 95% em tokens comparada a outras soluções?
+          </h4>
+          <p class="text-slate-400 leading-relaxed">
+            Muitas empresas hoje enviam JSONs gigantescos e sem estrutura para nuvens de terceiros, cobrando dos clientes faturas caras por milhões de tokens para processar dados que já são deles. A AURA trabalha direto com a conexão de infraestrutura do banco do cliente, realizando os cálculos de forma estruturada no ambiente local. A IA só é acionada para síntese e conclusões executivas complexas — economizando até 95% em consumo de tokens, com velocidade sub-100ms e custo previsível.
+          </p>
+        </div>
+
+        <div class="glass-panel p-5 rounded-2xl border border-white/10 space-y-2">
+          <h4 class="font-bold text-slate-100 flex items-center gap-2">
             <i data-lucide="clock" class="w-4 h-4 text-purple-400"></i>
             Qual é a curva de aprendizado da equipe operacional?
           </h4>
@@ -1190,7 +1224,7 @@ def generate_showcase_html():
           </p>
         </div>
 
-        <div class="glass-panel p-5 rounded-2xl border border-white/10 space-y-2">
+        <div class="glass-panel p-5 rounded-2xl border border-white/10 space-y-2 md:col-span-2">
           <h4 class="font-bold text-slate-100 flex items-center gap-2">
             <i data-lucide="check" class="w-4 h-4 text-amber-400"></i>
             A inteligência pode errar contas ou inventar números?

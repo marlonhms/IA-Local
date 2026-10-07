@@ -184,7 +184,7 @@ def run_showcase_tests():
     print("   [OK] Mini Janela de Chat da AURA + Fluxograma / Grafo Moderno de 5 nós conectados validados.")
 
     # =========================================================================
-    # 2E. PAINEL & MATRIZ DE DIFERENCIAÇÃO OPERACIONAL REFORÇADO (ROI)
+    # 2E. PAINEL & MATRIZ DE DIFERENCIAÇÃO OPERACIONAL REFORÇADO (ROI & ECONOMIA DE TOKENS)
     # =========================================================================
     print("\n2E. Testando Painel & Matriz de Diferenciação Operacional Reforçado...")
     assert "sec-diferenciacao" in html_content, "Seção #sec-diferenciacao ausente"
@@ -194,7 +194,25 @@ def run_showcase_tests():
     assert "Dashboards de BI Passivos" in html_content, "Coluna comparativa de BI passivo ausente"
     assert "roi-card" in html_content, "Classe .roi-card ausente nos cards de ROI"
     assert "Prejuízo evitado:" in html_content, "Métrica de prejuízo evitado ausente na diferenciação"
-    print("   [OK] Painel & Matriz de Diferenciação Operacional (Quebras de Caixa, Desvios, ROI) validados.")
+
+    # Validação do Novo Diferencial de Economia de Tokens & Soberania dos Dados do Cliente
+    assert "Economia" in html_content and "Tokens" in html_content, "Destaque de economia de tokens ausente"
+    assert "banco do cliente" in content_lower, "Destaque de conexão direta ao banco do cliente ausente"
+    assert "milhões de tokens" in content_lower, "Alerta sobre cobrança abusiva de milhões de tokens ausente"
+    assert "cálculos estruturados" in content_lower, "Conceito de cálculos estruturados locais ausente"
+
+    # Validação da Tabela de ROI Compactada (Exatamente 4 dimensões críticas de valor de produto)
+    table_match = re.search(r'<tbody[^>]*>(.*?)</tbody>', html_content, re.DOTALL)
+    assert table_match, "Tabela de ROI não possui corpo tbody"
+    tbody_html = table_match.group(1)
+    tr_count = len(re.findall(r'<tr[^>]*>', tbody_html))
+    assert tr_count == 4, f"A tabela de ROI deve conter exatamente 4 dimensões críticas compactadas, encontrado: {tr_count}"
+    assert "Auditoria de Caixa & Prevenção de Quebras" in tbody_html, "Dimensão 1 (Auditoria de Caixa & Prevenção de Quebras) ausente na tabela"
+    assert "Desvios de Estoque & Perdas Invisíveis" in tbody_html, "Dimensão 2 (Desvios de Estoque & Perdas Invisíveis) ausente na tabela"
+    assert "Eficiência de Processamento & Custo de Tokens" in tbody_html, "Dimensão 3 (Eficiência de Processamento & Custo de Tokens) ausente na tabela"
+    assert "Tempo para Decisão & Ação" in tbody_html, "Dimensão 4 (Tempo para Decisão & Ação) ausente na tabela"
+
+    print("   [OK] Painel & Matriz de Diferenciação Operacional (Quebras de Caixa, Desvios, Economia de Tokens, ROI Compactado com 4 dimensões) validados.")
 
     # =========================================================================
     # 2F. SCROLLYTELLING E ANIMAÇÕES DINÂMICAS NO SCROLL
