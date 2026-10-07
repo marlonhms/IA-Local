@@ -4,9 +4,9 @@ Atualizado com Arquitetura Autônoma de Simulação em Tempo Real:
 1. Eliminação de Player Artificial (sem play/pause ou slides manuais forçados).
 2. Simulação Autônoma Conectada Esquerda vs Direita:
    - Lado Esquerdo: Chat da AURA com efeito typewriter automático ("Qual produto mais vendido hoje?"),
-     indicador cognitivo pulsando e streaming do DecisionCard executivo Precision Glass.
+     indicador de análise pulsando e streaming do DecisionCard executivo Precision Glass.
    - Lado Direito: Backend de Borda em tempo real com Detecção de Intenção Semântica, Busca Operacional,
-     Escudo AURA Guard™ com desintegração em poeira de PII (LGPD 13.709/2018), cálculo sub-100ms e entrega.
+     Escudo AURA Guard™ com desintegração em poeira de dados confidenciais (LGPD 13.709/2018), cálculo sub-100ms e entrega.
 3. Acionamento 100% Autônomo ao rolar a página (IntersectionObserver) + Botão elegante "Ver animação de novo ↺".
 4. Matriz de Diferenciação Operacional com ROI real preservada e integrada.
 """
@@ -301,7 +301,7 @@ def generate_showcase_html():
   <aside class="scroll-nav-rail hidden lg:flex" aria-label="Navegação Rápida">
     <button onclick="window.auraTour.scrollToSection('top')" class="scroll-nav-dot active" title="01. Início & Visão Executiva" data-section="top"></button>
     <button onclick="window.auraTour.scrollToSection('sec-chat-graph')" class="scroll-nav-dot" title="02. Demonstração Autônoma (Chat vs Backend)" data-section="sec-chat-graph"></button>
-    <button onclick="window.auraTour.scrollToSection('sec-blindagem')" class="scroll-nav-dot" title="03. Blindagem Fiduciária & LGPD" data-section="sec-blindagem"></button>
+    <button onclick="window.auraTour.scrollToSection('sec-blindagem')" class="scroll-nav-dot" title="03. Segurança de Dados & LGPD" data-section="sec-blindagem"></button>
     <button onclick="window.auraTour.scrollToSection('sec-diferenciacao')" class="scroll-nav-dot" title="04. Diferenciação Operacional & ROI" data-section="sec-diferenciacao"></button>
     <button onclick="window.auraTour.scrollToSection('sec-faq')" class="scroll-nav-dot" title="05. FAQ Executivo" data-section="sec-faq"></button>
   </aside>
@@ -378,11 +378,11 @@ def generate_showcase_html():
       <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight font-display-title">
         O Cérebro Operacional de Qualquer Comércio ou Ponto de Venda. <br>
         <span class="bg-gradient-to-r from-cyan-400 via-emerald-300 to-purple-400 bg-clip-text text-transparent">
-          Com Blindagem Fiduciária Total & LGPD Nativa.
+          Proteção Absoluta de Dados & 100% LGPD.
         </span>
       </h1>
       <p class="text-sm sm:text-base text-slate-300 leading-relaxed font-sans max-w-2xl mx-auto">
-        Role a página e assista à demonstração autônoma diante dos seus olhos: sem necessidade de clicar em botões de reprodução, veja o chat formulando a pergunta enquanto o backend intercepta dados sensíveis, desintegra em poeira e entrega a decisão executiva em tempo real.
+        Acompanhe como a AURA funciona na prática: role a página para ver a pergunta sendo analisada, os dados confidenciais protegidos na hora e a resposta executiva sendo gerada em segundos.
       </p>
 
       <!-- Indicador / Botão Convidativo de Rolagem -->
@@ -438,7 +438,7 @@ def generate_showcase_html():
               <div class="flex items-center gap-1.5 ml-2">
                 <div class="neural-core-orb !w-4 !h-4"></div>
                 <span class="text-xs font-bold text-white">AURA Chat Executivo</span>
-                <span class="text-[10px] text-slate-400 font-mono hidden sm:inline">• Borda Local</span>
+                <span class="text-[10px] text-slate-400 font-mono hidden sm:inline">• Processamento Local</span>
               </div>
             </div>
             <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
@@ -492,7 +492,7 @@ def generate_showcase_html():
               </div>
             </div>
 
-            <!-- Indicador de Raciocínio Cognitivo Pulsando (AURA Thinking) -->
+            <!-- Indicador de Análise em Tempo Real (AURA Thinking) -->
             <div id="chat-thinking-box" class="hidden flex items-start gap-2.5">
               <div class="neural-core-orb !w-6 !h-6 flex-shrink-0 mt-0.5"></div>
               <div class="flex-1 p-3 rounded-2xl rounded-tl-sm bg-white/[0.03] border border-white/5 space-y-1.5">
@@ -512,8 +512,8 @@ def generate_showcase_html():
               <div class="flex-1 space-y-3">
                 <div class="flex items-center justify-between text-[10px] text-slate-400">
                   <span class="font-bold text-cyan-300 flex items-center gap-1">
-                    <span>AURA Cognitiva</span>
-                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-cyan-500/20 text-cyan-300 font-mono">Borda</span>
+                    <span>AURA</span>
+                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-cyan-500/20 text-cyan-300 font-mono">Processamento Local</span>
                   </span>
                   <span class="text-emerald-400 font-mono text-[10px]">38 ms • 100% LGPD</span>
                 </div>
@@ -550,8 +550,8 @@ def generate_showcase_html():
                       </div>
                       <div class="p-2 rounded-lg bg-white/[0.03] border border-white/5">
                         <div class="text-[10px] text-slate-400">Auditoria de Caixa</div>
-                        <div class="font-extrabold text-emerald-400 text-xs">R$ 0,00 Furo</div>
-                        <div class="text-[9px] text-slate-400">Zero divergência fiscal</div>
+                        <div class="font-extrabold text-emerald-400 text-xs">R$ 0,00 Diferença</div>
+                        <div class="text-[9px] text-slate-400">Caixas 100% conferidos</div>
                       </div>
                       <div class="p-2 rounded-lg bg-white/[0.03] border border-white/5">
                         <div class="text-[10px] text-slate-400">Conformidade ANP (LMC)</div>
@@ -570,7 +570,7 @@ def generate_showcase_html():
                       <!-- Toast de Feedback de Ação -->
                       <div id="mini-chat-action-toast" class="hidden p-2 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-[10px] font-sans text-emerald-200 flex items-center gap-1.5 transition-all">
                         <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400 flex-shrink-0"></i>
-                        <span id="mini-chat-toast-message">Ordem executada em 1 toque com sucesso!</span>
+                        <span id="mini-chat-toast-message">Pedido gerado com sucesso em 1 clique!</span>
                       </div>
                     </div>
                   </div>
@@ -578,7 +578,7 @@ def generate_showcase_html():
 
                 <!-- Rodapé de Governança e LGPD -->
                 <div class="text-[10px] text-slate-400 font-mono flex items-center justify-between px-1">
-                  <span>LGPD (Lei 13.709/2018): 0 dados pessoais transmitidos • Privacy by Design</span>
+                  <span>LGPD (Lei 13.709/2018): Nenhum dado pessoal transmitido • Privacy by Design (Protegido na origem)</span>
                   <span class="text-emerald-400 font-semibold">Decisão Pronta ✓</span>
                 </div>
               </div>
@@ -634,10 +634,10 @@ def generate_showcase_html():
                 </div>
                 <div>
                   <div class="font-bold text-white flex items-center gap-2">
-                    <span>1. Detecção de Intenção Semântica</span>
+                    <span>1. Compreensão da Pergunta</span>
                     <span class="px-1.5 py-0.2 rounded text-[9px] bg-purple-500/20 text-purple-300 font-mono">vendas_analitico</span>
                   </div>
-                  <div class="text-[10px] text-slate-400">Compreensão direta em linguagem natural sem fórmulas ou SQL</div>
+                  <div class="text-[10px] text-slate-400">Entende linguagem natural direta, sem fórmulas, códigos ou relatórios manuais</div>
                 </div>
               </div>
               <div class="flex items-center gap-2">
@@ -703,10 +703,10 @@ def generate_showcase_html():
                   </div>
                   <div>
                     <div class="font-bold text-white flex items-center gap-2">
-                      <span>3. Escudo AURA Guard™: Desintegração de PII</span>
+                      <span>3. Escudo AURA Guard™: Proteção de Dados Pessoais</span>
                       <span class="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-300 font-mono">Lei 13.709/2018</span>
                     </div>
-                    <div class="text-[10px] text-slate-400">Sanitização e desintegração instantânea em poeira antes do raciocínio • Privacy by Design</div>
+                    <div class="text-[10px] text-slate-400">Identificação e remoção instantânea de dados pessoais em poeira antes da análise • 100% LGPD</div>
                   </div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -750,7 +750,7 @@ def generate_showcase_html():
                 <input type="text" id="custom-pii-input" value="CNPJ 24.582.110/0001-88" class="flex-1 bg-black/50 border border-white/10 rounded-lg px-2.5 py-1 text-[11px] text-white font-mono focus:outline-none focus:border-cyan-400" placeholder="Experimente um CNPJ ou CPF...">
                 <button onclick="window.auraTour.triggerCustomDustDisintegration()" id="btn-custom-disintegrate" class="btn-aura-glow-soft px-2.5 py-1 rounded-lg bg-gradient-to-r from-cyan-500 to-emerald-500 hover:brightness-105 text-slate-950 font-bold text-[10px] font-sans flex items-center gap-1 whitespace-nowrap border border-white/10">
                   <i data-lucide="zap" class="w-3 h-3 fill-current"></i>
-                  <span>Pulverizar em Poeira</span>
+                  <span>Testar Proteção em Poeira</span>
                 </button>
               </div>
             </div>
@@ -769,7 +769,7 @@ def generate_showcase_html():
               </svg>
             </div>
 
-            <!-- NÓ 4: Motor Analítico Sub-100ms & Regras Fiduciárias -->
+            <!-- NÓ 4: Motor Analítico Sub-100ms & Auditoria de Precisão -->
             <div id="pipe-node-2" class="pipeline-node graph-node p-3 rounded-xl bg-slate-900/90 border border-amber-500/40 flex items-center justify-between hover:bg-slate-800 transition-all shadow-sm cursor-pointer" onclick="window.auraTour.inspectNode('anp')">
               <div class="flex items-center gap-3">
                 <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold flex-shrink-0">
@@ -777,10 +777,10 @@ def generate_showcase_html():
                 </div>
                 <div>
                   <div class="font-bold text-white flex items-center gap-2">
-                    <span>4. Motor Analítico & Auditoria Fiduciária</span>
-                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-amber-500/20 text-amber-300 font-mono">Portaria 26/1992</span>
+                    <span>4. Motor de Auditoria & Conferência Exata</span>
+                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-amber-500/20 text-amber-300 font-mono">Auditoria Fiscal</span>
                   </div>
-                  <div class="text-[10px] text-slate-400">Validação matemática estrita de tolerâncias (±0.60%), Run-Out e Conciliação Fiduciária</div>
+                  <div class="text-[10px] text-slate-400">Conferência matemática direta de estoques, notas fiscais e fechamento de caixa sem erros</div>
                 </div>
               </div>
               <div class="flex items-center gap-2">
@@ -812,9 +812,9 @@ def generate_showcase_html():
                 <div>
                   <div class="font-bold text-white flex items-center gap-2">
                     <span>5. Entrega de Decisão & DecisionCard™</span>
-                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-300 font-mono">1-Toque</span>
+                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-300 font-mono">1 Clique</span>
                   </div>
-                  <div class="text-[10px] text-slate-400">Diagnóstico executivo formatado com ações imediatas disparadas no chat da esquerda</div>
+                  <div class="text-[10px] text-slate-400">Resumo executivo pronto com botões de ação imediata enviados para o chat</div>
                 </div>
               </div>
               <div class="flex items-center gap-2">
@@ -829,7 +829,7 @@ def generate_showcase_html():
           <div id="graph-node-detail-panel" class="p-3.5 border-t border-white/10 bg-white/[0.02] text-xs font-sans text-slate-300 flex flex-col sm:flex-row items-center justify-between gap-2 relative z-10">
             <div class="flex items-center gap-2">
               <i data-lucide="info" class="w-4 h-4 text-cyan-400 flex-shrink-0"></i>
-              <span id="graph-detail-text">Execução 100% autônoma de borda: dados sensíveis sanitizados e cálculo em sub-42ms.</span>
+              <span id="graph-detail-text">Processamento local instantâneo: dados pessoais protegidos e cálculo exato em menos de 42ms.</span>
             </div>
             <div class="flex items-center gap-2">
               <button onclick="window.auraTour.toggleStep4Tab('companion')" id="tab-step4-companion" class="px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-semibold flex items-center gap-1 hover:bg-purple-500/30 transition-all">
@@ -886,7 +886,7 @@ def generate_showcase_html():
         <div id="visual-stage-1"></div>
         <div id="narrative-step-2">Escudo AURA Guard</div>
         <div id="visual-stage-2"></div>
-        <div id="narrative-step-3">Motor Sub-100ms Telemetria de Pista Portaria 26/1992 Conciliação Fiduciária Run-Out</div>
+        <div id="narrative-step-3">Motor Sub-100ms Telemetria de Pista Portaria 26/1992 Conciliação de Caixa Run-Out</div>
         <div id="visual-stage-3"></div>
         <div id="narrative-step-4">DecisionCard Companion Canvas</div>
         <div id="visual-stage-4"></div>
@@ -904,19 +904,19 @@ def generate_showcase_html():
     </section>
 
     <!-- =========================================================================
-         SEÇÃO DE BLINDAGEM FIDUCIÁRIA & PROPRIEDADE INTELECTUAL (LGPD)
+         SEÇÃO DE SEGURANÇA DA INFORMAÇÃO & LGPD
          ========================================================================= -->
     <section id="sec-blindagem" class="space-y-8 pt-4 scroll-reveal">
       <div class="text-center max-w-2xl mx-auto space-y-2">
         <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-[11px] text-cyan-300 font-sans">
           <i data-lucide="shield" class="w-3.5 h-3.5"></i>
-          <span>Privacidade Nativa Conforme Lei 13.709/2018</span>
+          <span>Privacidade e Segurança Conforme Lei 13.709/2018</span>
         </div>
         <h2 class="text-2xl sm:text-3xl font-bold text-white font-display-title">
-          Pilares de Blindagem Fiduciária & LGPD da AURA
+          Como a AURA Protege os seus Dados e o seu Negócio
         </h2>
         <p class="text-xs sm:text-sm text-slate-400 font-sans">
-          Projetada para que dados estratégicos de estoque, vendas e clientes permaneçam sob controle soberano do proprietário da empresa.
+          Projetada para que números estratégicos de estoque, vendas e faturamento fiquem 100% seguros e sob controle total do dono da empresa.
         </p>
       </div>
 
@@ -926,9 +926,9 @@ def generate_showcase_html():
           <div class="w-10 h-10 rounded-xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center">
             <i data-lucide="shield" class="w-5 h-5"></i>
           </div>
-          <h3 class="font-bold text-white text-sm">Escudo Cognitivo AURA Guard™</h3>
+          <h3 class="font-bold text-white text-sm">Escudo de Privacidade AURA Guard™</h3>
           <p class="text-xs text-slate-400 leading-relaxed">
-            Sanitização e desintegração instantânea de qualquer dado pessoal (PII) ou fiscal identificável antes de qualquer processamento analítico, em conformidade com a LGPD.
+            Identificação e remoção instantânea de qualquer dado pessoal de clientes ou funcionários antes de qualquer análise, garantindo proteção total e conformidade com a LGPD.
           </p>
         </div>
 
@@ -936,9 +936,9 @@ def generate_showcase_html():
           <div class="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
             <i data-lucide="server" class="w-5 h-5"></i>
           </div>
-          <h3 class="font-bold text-white text-sm">Processamento Neural de Borda</h3>
+          <h3 class="font-bold text-white text-sm">Processamento Local e Privado</h3>
           <p class="text-xs text-slate-400 leading-relaxed">
-            Arquitetura soberana que opera no próprio servidor do estabelecimento ou infraestrutura privada, garantindo sub-100ms sem dependência de nuvem pública.
+            Funciona diretamente no servidor ou computador da sua empresa, garantindo respostas em milissegundos sem depender de internet externa e sem enviar dados confidenciais para fora.
           </p>
         </div>
 
@@ -946,9 +946,9 @@ def generate_showcase_html():
           <div class="w-10 h-10 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center">
             <i data-lucide="calculator" class="w-5 h-5"></i>
           </div>
-          <h3 class="font-bold text-white text-sm">Motor Matemático Fiduciário</h3>
+          <h3 class="font-bold text-white text-sm">Cálculos Exatos e Livres de Erros</h3>
           <p class="text-xs text-slate-400 leading-relaxed">
-            Cálculo estrito das tolerâncias regulamentares (Portaria 26 da ANP ±0.60%, regras de NFC-e e SAT) e batimento de caixa centavo a centavo. Zero alucinação em números contábeis.
+            Conferência matemática direta das vendas, notas fiscais e fechamento de caixa centavo a centavo. A inteligência nunca chuta nem inventa valores: calcula apenas números reais do seu sistema.
           </p>
         </div>
 
@@ -956,9 +956,9 @@ def generate_showcase_html():
           <div class="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center">
             <i data-lucide="zap" class="w-5 h-5"></i>
           </div>
-          <h3 class="font-bold text-white text-sm">Resolução Operacional em 1-Toque</h3>
+          <h3 class="font-bold text-white text-sm">Ação Imediata em 1 Clique</h3>
           <p class="text-xs text-slate-400 leading-relaxed">
-            Transforma diagnósticos da operação em ações executivas práticas imediatas, prevenindo rupturas de estoque e quebras antes da abertura do turno.
+            Transforma o diagnóstico do negócio em decisões práticas na hora: gere pedidos a fornecedores ou avise encarregados com um único clique antes que falte produto.
           </p>
         </div>
 
@@ -1110,8 +1110,8 @@ def generate_showcase_html():
                 <div>Não audita tolerâncias regulamentares volumétricas ou regras tributárias estritas.</div>
               </td>
               <td class="py-3.5 px-4 bg-emerald-950/20 border-l border-r border-emerald-500/30">
-                <span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 mb-1">✓ Fiduciário Determinístico</span>
-                <div class="font-medium text-emerald-200">Auditoria matemática determinística (tolerância ±0.60%), validação NFC-e/SAT e extrato oficial.</div>
+                <span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 mb-1">✓ Conferência Matemática Real</span>
+                <div class="font-medium text-emerald-200">Conferência matemática direta de notas fiscais, cupons e caixas centavo por centavo, garantindo números 100% exatos e confiáveis.</div>
               </td>
             </tr>
             <tr>
@@ -1125,8 +1125,8 @@ def generate_showcase_html():
                 <div>Exportação de arquivos CSV com dados pessoais desprotegidos para servidores em nuvem.</div>
               </td>
               <td class="py-3.5 px-4 bg-emerald-950/20 border-l border-r border-emerald-500/30">
-                <span class="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-400 mb-1">✓ Soberania de Borda</span>
-                <div class="font-medium text-cyan-200">Escudo AURA Guard™: pulverização de PII na borda física e zero trânsito de dados pessoais externos.</div>
+                <span class="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-400 mb-1">✓ Dados 100% Protegidos</span>
+                <div class="font-medium text-cyan-200">Escudo AURA Guard™: os dados de clientes e funcionários são removidos na hora e nada de confidencial sai da sua empresa.</div>
               </td>
             </tr>
             <tr>
@@ -1140,8 +1140,8 @@ def generate_showcase_html():
                 <div>Telas complexas com dezenas de filtros que exigem analistas dedicados para interpretar.</div>
               </td>
               <td class="py-3.5 px-4 bg-emerald-950/20 border-l border-r border-emerald-500/30">
-                <span class="inline-flex items-center gap-1 text-[11px] font-bold text-purple-400 mb-1">✓ 1-Toque Resolutivo</span>
-                <div class="font-medium text-purple-200">DecisionCard com diagnósticos autoexplicativos e disparo resolutivo em 1-toque em menos de 10 segundos.</div>
+                <span class="inline-flex items-center gap-1 text-[11px] font-bold text-purple-400 mb-1">✓ Resolução em 1 Clique</span>
+                <div class="font-medium text-purple-200">Cartões executivos autoexplicativos que permitem resolver pendências com apenas 1 clique em menos de 10 segundos.</div>
               </td>
             </tr>
           </tbody>
@@ -1176,7 +1176,7 @@ def generate_showcase_html():
             Meus dados de faturamento e clientes saem da minha empresa?
           </h4>
           <p class="text-slate-400 leading-relaxed">
-            Absolutamente não. Em total conformidade com a LGPD (Lei 13.709/2018), os identificadores sensíveis são pulverizados na borda pelo Escudo AURA Guard™ e o processamento neural opera de forma soberana na sua rede privada.
+            Absolutamente não. Em total conformidade com a LGPD (Lei 13.709/2018), qualquer dado de identificação pessoal (como CPF ou nomes) é removido automaticamente antes da análise. Todo o processamento funciona dentro da sua própria estrutura e nada de confidencial é enviado para servidores externos.
           </p>
         </div>
 
@@ -1193,10 +1193,10 @@ def generate_showcase_html():
         <div class="glass-panel p-5 rounded-2xl border border-white/10 space-y-2">
           <h4 class="font-bold text-slate-100 flex items-center gap-2">
             <i data-lucide="check" class="w-4 h-4 text-amber-400"></i>
-            Como a AURA previne alucinações matemáticas?
+            A inteligência pode errar contas ou inventar números?
           </h4>
           <p class="text-slate-400 leading-relaxed">
-            A AURA utiliza um motor fiduciário determinístico para cálculos de volume, regras fiscais e conciliação de caixa. Toda conta é auditada matematicamente antes de qualquer resposta ser gerada.
+            Não. A AURA não inventa nem faz suposições com valores financeiros ou de estoque. Toda conta de faturamento, volume e fechamento de caixa é calculada diretamente a partir dos cupons fiscais e leituras do seu sistema. Cada número é auditado matematicamente com exatidão antes de ser apresentado.
           </p>
         </div>
 
@@ -1436,7 +1436,7 @@ def generate_showcase_html():
           statusPill.className = 'px-2 py-0.5 rounded text-[10px] font-mono bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse';
         }
         if (thinkingText) {
-          thinkingText.textContent = 'Escudo AURA Guard™: dados confidenciais (PII) detectados no fluxo. Lendo e isolando...';
+          thinkingText.textContent = 'Escudo AURA Guard™: dados confidenciais detectados no fluxo. Lendo e isolando...';
         }
         if (piiList) {
           piiList.classList.add('border-rose-500/40', 'shadow-[0_0_15px_rgba(244,63,94,0.15)]');
@@ -1447,11 +1447,11 @@ def generate_showcase_html():
         // 2. FASE DE PULVERIZAÇÃO EM POEIRA (APÓS TEMPO DE LEITURA CONFORTÁVEL)
         const tStartDust = setTimeout(() => {
           if (statusPill) {
-            statusPill.textContent = 'PULVERIZANDO EM POEIRA (LGPD)...';
+            statusPill.textContent = 'DESINTEGRANDO EM POEIRA (LGPD)...';
             statusPill.className = 'px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 animate-pulse';
           }
           if (thinkingText) {
-            thinkingText.textContent = 'Pulverizando PII em partículas de poeira e tokenizando na borda...';
+            thinkingText.textContent = 'Desintegrando dados confidenciais em poeira (100% LGPD)...';
           }
           if (piiList) {
             piiList.classList.remove('border-rose-500/40', 'shadow-[0_0_15px_rgba(244,63,94,0.15)]');
@@ -1587,8 +1587,8 @@ def generate_showcase_html():
           userLabel: 'Supervisor Regional (Loja & Varejo #12)',
           time: '17:48',
           query: 'Qual produto mais vendido hoje e houve discrepância com cupons NFC-e?',
-          response: 'Cruzamento fiduciário executado em 29ms. O produto líder em vendas hoje é o Kit Lubrificante Sintético 5W30 (84 unid.), totalizando R$ 6.720,00. Foram emitidas 412 notas NFC-e e todos os pagamentos em cartão e PIX conferem centavo a centavo.',
-          dcTitle: 'Reconciliação Fiduciária Multiloja',
+          response: 'Conferência de vendas e cupons concluída em 29ms. O produto líder em vendas hoje é o Kit Lubrificante Sintético 5W30 (84 unid.), totalizando R$ 6.720,00. Foram emitidas 412 notas fiscais e todos os pagamentos em cartão e PIX conferem centavo a centavo.',
+          dcTitle: 'Conferência Geral de Vendas e Caixa',
           badgeText: '100% RECONCILIADO',
           badgeClass: 'px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
           metricLabel1: 'Item Campeão',
@@ -1749,7 +1749,7 @@ def generate_showcase_html():
           // Pergunta enviada!
           playTone(600, 'sine', 0.05, 0.04);
 
-          // 2. Aciona o Raciocínio Cognitivo no chat e ativa o Nó 1 no Backend (Detecção de Intenção Semântica)
+          // 2. Aciona o Indicador de Análise no chat e ativa o Nó 1 no Backend (Detecção de Intenção Semântica)
           const t1 = setTimeout(() => {
             if (thinkingBox) thinkingBox.classList.remove('hidden');
             if (thinkingText) thinkingText.textContent = 'Detectando intenção semântica da pergunta...';
@@ -1786,9 +1786,9 @@ def generate_showcase_html():
 
             // Dispara a desintegração com tempo confortável de leitura prévia dos dados pessoais (2.4s)!
             triggerDustDisintegration(true, 2400, () => {
-              // 5. Nó 4: Motor Analítico Sub-100ms & Regras Fiduciárias (inicia APÓS pulverização completa)
+              // 5. Nó 4: Motor Analítico Sub-100ms & Auditoria de Precisão (inicia APÓS pulverização completa)
               const t4 = setTimeout(() => {
-                if (thinkingText) thinkingText.textContent = 'Confrontando regras fiduciárias (ANP Portaria 26 ±0.60%) e margens...';
+                if (thinkingText) thinkingText.textContent = 'Conferindo notas fiscais, estoque e fechamento de caixa...';
                 if (thinkingBar) thinkingBar.style.width = '92%';
 
                 if (node3) node3.classList.remove('active-glow');
@@ -1919,8 +1919,8 @@ def generate_showcase_html():
           prompt: '1. Entrada em Linguagem Natural: O gestor envia consultas operacionais em português corrente (sem SQL ou fórmulas).',
           lgpd: '2. Escudo LGPD (Lei 13.709/2018): CPFs, CNPJs e credenciais são desintegrados na borda física. Zero trânsito de dados pessoais.',
           motor: '3. Telemetria de Borda: Conexão direta com bicos, encerrantes e estoque físico.',
-          regras: '4. Regras & Auditoria Fiduciária: Batimento matemático de tolerâncias fiscais (Portaria 26 ANP ±0.60%).',
-          decisao: '5. DecisionCard™ em 1-Toque: Resultado executivo consolidado com recomendação acionável pronta.'
+          regras: '4. Auditoria & Conferência Exata: Conferência matemática direta de notas fiscais, estoque e caixa.',
+          decisao: '5. DecisionCard™ em 1 Clique: Resultado claro e resumido com botão para resolver na hora.'
         };
         panel.textContent = descriptions[nodeKey] || 'Parâmetro auditado pelo motor de borda.';
       }

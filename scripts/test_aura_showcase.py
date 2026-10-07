@@ -103,7 +103,7 @@ def run_showcase_tests():
     assert "visual-stage-3" in html_content
     assert "Portaria 26/1992" in html_content
     assert "Telemetria de Pista" in html_content
-    assert "Conciliação Fiduciária" in html_content
+    assert "Conciliação de Caixa" in html_content
     assert "Run-Out" in html_content
     assert "flow-path-active" in html_content, "Conectores de pulso ativo SVG ausentes"
     assert "pipe-node-1" in html_content, "Nós reativos de pipeline ausentes"
@@ -247,6 +247,20 @@ def run_showcase_tests():
     leaks = [term for term in forbidden_terms if term in content_lower]
     assert len(leaks) == 0, f"VIOLAÇÃO DE BLINDAGEM! Termos internos vazados no showcase: {leaks}"
     print(f"   [OK] 0 termos de infraestrutura interna vazados (testados: {', '.join(forbidden_terms)}).")
+
+    # Jargões artificiais e rastros de IA expressamente proibidos (linguagem humanizada)
+    forbidden_ai_jargons = [
+        "fiduciário",
+        "fiduciaria",
+        "fiduciario",
+        "fiduciárias",
+        "alucinações matemáticas",
+        "alucinação em números",
+        "disparo resolutivo",
+    ]
+    jargon_leaks = [j for j in forbidden_ai_jargons if j in content_lower]
+    assert len(jargon_leaks) == 0, f"VIOLAÇÃO DE HUMANIZAÇÃO! Jargões de IA detectados: {jargon_leaks}"
+    print(f"   [OK] 0 jargões artificiais de IA detectados (humanização 100% validada).")
 
     # Termos proprietários de alto valor exigidos
     required_proprietary_terms = [
