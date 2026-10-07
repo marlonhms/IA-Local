@@ -407,7 +407,8 @@ def run_showcase_tests():
             assert len(typed_mid) > 0, "Typewriter deve iniciar automaticamente ao rolar"
 
             # Aguarda dinamicamente conclusão do ciclo autônomo, streaming e exibição do DecisionCard
-            page.locator("#decisioncard-live").wait_for(state="visible", timeout=8000)
+            # (tempo estendido para acomodar leitura confortável dos dados pessoais no Card 3)
+            page.locator("#decisioncard-live").wait_for(state="visible", timeout=12000)
             typed_done = page.locator("#step1-typed-text").text_content()
             resp_done = page.locator("#chat-response-row").is_visible()
             dc_done = page.locator("#decisioncard-live").is_visible()

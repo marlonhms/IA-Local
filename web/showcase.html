@@ -1401,48 +1401,90 @@
       }
 
       // Função de Desintegração em Poeira de PII (Escudo LGPD)
-      function triggerDustDisintegration(playSfx = true) {
+      function triggerDustDisintegration(playSfx = true, readDelayMs = 2400, onComplete = null) {
         dustTimeouts.forEach(t => clearTimeout(t));
         dustTimeouts = [];
 
         resetDustDisintegration();
         resizeDustCanvas();
 
-        if (playSfx) playDustSound();
-
         const statusPill = document.getElementById('dust-status-pill');
+        const thinkingText = document.getElementById('thinking-step-text');
+        const piiList = document.getElementById('pii-items-list');
+
+        // 1. FASE DE LEITURA DOS DADOS PESSOAIS
+        // Mantém os dados confidenciais (CNPJ, CPF, Transação Fiscal, Saldo, Credenciais)
+        // nitidamente visíveis em destaque para que o usuário leia antes de serem pulverizados!
         if (statusPill) {
-          statusPill.textContent = 'DESINTEGRANDO PII...';
-          statusPill.className = 'px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 animate-pulse';
+          statusPill.textContent = 'DADOS PESSOAIS IDENTIFICADOS';
+          statusPill.className = 'px-2 py-0.5 rounded text-[10px] font-mono bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse';
+        }
+        if (thinkingText) {
+          thinkingText.textContent = 'Escudo AURA Guard™: dados confidenciais (PII) detectados no fluxo. Lendo e isolando...';
+        }
+        if (piiList) {
+          piiList.classList.add('border-rose-500/40', 'shadow-[0_0_15px_rgba(244,63,94,0.15)]');
         }
 
-        for (let i = 1; i <= 5; i++) {
-          const rawVal = document.getElementById(`pii-val-${i}`);
-          if (rawVal) {
-            const t1 = setTimeout(() => {
-              rawVal.classList.add('disintegrating');
-              spawnParticlesAtElement(rawVal, 60);
-            }, (i - 1) * 70);
-            dustTimeouts.push(t1);
+        if (playSfx) playTone(480, 'sine', 0.12, 0.03);
+
+        // 2. FASE DE PULVERIZAÇÃO EM POEIRA (APÓS TEMPO DE LEITURA CONFORTÁVEL)
+        const tStartDust = setTimeout(() => {
+          if (statusPill) {
+            statusPill.textContent = 'PULVERIZANDO EM POEIRA (LGPD)...';
+            statusPill.className = 'px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 animate-pulse';
           }
-        }
+          if (thinkingText) {
+            thinkingText.textContent = 'Pulverizando PII em partículas de poeira e tokenizando na borda...';
+          }
+          if (piiList) {
+            piiList.classList.remove('border-rose-500/40', 'shadow-[0_0_15px_rgba(244,63,94,0.15)]');
+          }
+          if (playSfx) playDustSound();
 
-        const t2 = setTimeout(() => {
+          // Desintegração sequencial cadenciada (320ms entre cada item)
+          const itemStagger = 320;
           for (let i = 1; i <= 5; i++) {
             const rawVal = document.getElementById(`pii-val-${i}`);
             const redVal = document.getElementById(`pii-token-${i}`);
-            if (rawVal) rawVal.classList.add('hidden');
-            if (redVal) {
-              redVal.classList.remove('hidden');
-              redVal.classList.add('animate-fade-in');
+            if (rawVal) {
+              const tDisintegrate = setTimeout(() => {
+                rawVal.classList.add('disintegrating');
+                spawnParticlesAtElement(rawVal, 65);
+                if (playSfx && i % 2 === 0) playTone(640 + i * 40, 'triangle', 0.06, 0.02);
+
+                const tToken = setTimeout(() => {
+                  rawVal.classList.add('hidden');
+                  if (redVal) {
+                    redVal.classList.remove('hidden');
+                    redVal.classList.add('animate-fade-in');
+                  }
+                }, 220);
+                dustTimeouts.push(tToken);
+              }, (i - 1) * itemStagger);
+              dustTimeouts.push(tDisintegrate);
             }
           }
-          if (statusPill) {
-            statusPill.textContent = '100% SANITIZADO (LGPD)';
-            statusPill.className = 'px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
-          }
-        }, 500);
-        dustTimeouts.push(t2);
+
+          // Conclusão da sanitização (após todos os 5 itens desintegrarem)
+          const totalDustTime = 4 * itemStagger + 350; // ~1630ms
+          const tFinish = setTimeout(() => {
+            if (statusPill) {
+              statusPill.textContent = '100% SANITIZADO (LGPD)';
+              statusPill.className = 'px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+            }
+            if (playSfx) playTone(880, 'sine', 0.15, 0.04);
+
+            // Pausa de apreciação do resultado sanitizado antes de continuar o fluxo
+            const tAppreciation = setTimeout(() => {
+              if (typeof onComplete === 'function') onComplete();
+            }, 800);
+            dustTimeouts.push(tAppreciation);
+          }, totalDustTime);
+          dustTimeouts.push(tFinish);
+
+        }, readDelayMs);
+        dustTimeouts.push(tStartDust);
       }
 
       function resetDustDisintegration() {
@@ -1450,6 +1492,10 @@
         if (statusPill) {
           statusPill.textContent = 'ESCUDO ATIVO';
           statusPill.className = 'px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20';
+        }
+        const piiList = document.getElementById('pii-items-list');
+        if (piiList) {
+          piiList.classList.remove('border-rose-500/40', 'shadow-[0_0_15px_rgba(244,63,94,0.15)]');
         }
         for (let i = 1; i <= 5; i++) {
           const rawVal = document.getElementById(`pii-val-${i}`);
@@ -1714,7 +1760,7 @@
 
           // 4. Nó 3: Escudo AURA Guard™ & Desintegração em Poeira (LGPD)
           const t3 = setTimeout(() => {
-            if (thinkingText) thinkingText.textContent = 'Escudo AURA Guard™ ativado: sanitizando dados confidenciais (LGPD)...';
+            if (thinkingText) thinkingText.textContent = 'Escudo AURA Guard™: isolando dados confidenciais (LGPD)...';
             if (thinkingBar) thinkingBar.style.width = '75%';
 
             const node2 = document.getElementById('pipe-node-1');
@@ -1722,68 +1768,67 @@
             const node3 = document.getElementById('graph-node-lgpd');
             if (node3) node3.classList.add('active-glow');
 
-            // Dispara a desintegração em poeira automaticamente!
-            triggerDustDisintegration(true);
-          }, 1700);
-          pipelineTimeouts.push(t3);
+            // Dispara a desintegração com tempo confortável de leitura prévia dos dados pessoais (2.4s)!
+            triggerDustDisintegration(true, 2400, () => {
+              // 5. Nó 4: Motor Analítico Sub-100ms & Regras Fiduciárias (inicia APÓS pulverização completa)
+              const t4 = setTimeout(() => {
+                if (thinkingText) thinkingText.textContent = 'Confrontando regras fiduciárias (ANP Portaria 26 ±0.60%) e margens...';
+                if (thinkingBar) thinkingBar.style.width = '92%';
 
-          // 5. Nó 4: Motor Analítico Sub-100ms & Regras Fiduciárias
-          const t4 = setTimeout(() => {
-            if (thinkingText) thinkingText.textContent = 'Confrontando regras fiduciárias (ANP Portaria 26 ±0.60%) e margens...';
-            if (thinkingBar) thinkingBar.style.width = '92%';
+                if (node3) node3.classList.remove('active-glow');
+                const node4 = document.getElementById('pipe-node-2');
+                if (node4) node4.classList.add('active-glow');
+                playTone(660, 'sine', 0.08, 0.04);
 
-            const node3 = document.getElementById('graph-node-lgpd');
-            if (node3) node3.classList.remove('active-glow');
-            const node4 = document.getElementById('pipe-node-2');
-            if (node4) node4.classList.add('active-glow');
-            playTone(660, 'sine', 0.08, 0.04);
-          }, 2550);
-          pipelineTimeouts.push(t4);
+                // 6. Nó 5: Entrega da Decisão & Resposta Streaming no Chat
+                const t5 = setTimeout(() => {
+                  if (node4) node4.classList.remove('active-glow');
+                  const node5 = document.getElementById('graph-node-decisao');
+                  if (node5) node5.classList.add('success-glow');
 
-          // 6. Nó 5: Entrega da Decisão & Resposta Streaming no Chat
-          const t5 = setTimeout(() => {
-            const node4 = document.getElementById('pipe-node-2');
-            if (node4) node4.classList.remove('active-glow');
-            const node5 = document.getElementById('graph-node-decisao');
-            if (node5) node5.classList.add('success-glow');
+                  if (thinkingBox) thinkingBox.classList.add('hidden');
 
-            if (thinkingBox) thinkingBox.classList.add('hidden');
+                  // Preenche dados do DecisionCard
+                  if (dcTitle) dcTitle.textContent = scenario.dcTitle;
+                  if (dcBadge) {
+                    dcBadge.textContent = scenario.badgeText;
+                    dcBadge.className = scenario.badgeClass;
+                  }
+                  if (mLabel1) mLabel1.textContent = scenario.metricLabel1;
+                  if (mVal1) {
+                    mVal1.textContent = scenario.metricVal1;
+                    mVal1.className = scenario.metricVal1Class;
+                  }
+                  if (mLabel2) mLabel2.textContent = scenario.metricLabel2;
+                  if (mVal2) {
+                    mVal2.textContent = scenario.metricVal2;
+                    mVal2.className = scenario.metricVal2Class;
+                  }
+                  if (btnAction) btnAction.textContent = scenario.btnActionText;
 
-            // Preenche dados do DecisionCard
-            if (dcTitle) dcTitle.textContent = scenario.dcTitle;
-            if (dcBadge) {
-              dcBadge.textContent = scenario.badgeText;
-              dcBadge.className = scenario.badgeClass;
-            }
-            if (mLabel1) mLabel1.textContent = scenario.metricLabel1;
-            if (mVal1) {
-              mVal1.textContent = scenario.metricVal1;
-              mVal1.className = scenario.metricVal1Class;
-            }
-            if (mLabel2) mLabel2.textContent = scenario.metricLabel2;
-            if (mVal2) {
-              mVal2.textContent = scenario.metricVal2;
-              mVal2.className = scenario.metricVal2Class;
-            }
-            if (btnAction) btnAction.textContent = scenario.btnActionText;
+                  // Exibe a linha de resposta da AURA e inicia STREAMING em tempo real!
+                  if (responseRow) {
+                    responseRow.classList.remove('hidden');
+                    responseRow.classList.add('animate-fade-in');
+                  }
 
-            // Exibe a linha de resposta da AURA e inicia STREAMING em tempo real!
-            if (responseRow) {
-              responseRow.classList.remove('hidden');
-              responseRow.classList.add('animate-fade-in');
-            }
+                  runStreamingResponse(scenario.response, () => {
+                    if (simStatusBadge) simStatusBadge.textContent = 'CONCLUÍDO (38ms)';
+                    playChime();
+                    tourState.isSimulating = false;
 
-            runStreamingResponse(scenario.response, () => {
-              if (simStatusBadge) simStatusBadge.textContent = 'CONCLUÍDO (38ms)';
-              playChime();
-              tourState.isSimulating = false;
+                    setTimeout(() => {
+                      if (node5) node5.classList.remove('success-glow');
+                    }, 1400);
+                  });
+                }, 850);
+                pipelineTimeouts.push(t5);
 
-              setTimeout(() => {
-                if (node5) node5.classList.remove('success-glow');
-              }, 1400);
+              }, 100);
+              pipelineTimeouts.push(t4);
             });
-          }, 3350);
-          pipelineTimeouts.push(t5);
+          }, 1500);
+          pipelineTimeouts.push(t3);
 
         });
       }
