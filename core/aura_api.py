@@ -210,4 +210,15 @@ def create_aura_app(engine: Optional[AuraEngine] = None) -> FastAPI:
                 return FileResponse(str(index_file))
             return {"service": "AURA Core Engine API", "status": "online"}
 
+        @app.get("/showcase", include_in_schema=False)
+        @app.get("/apresentacao", include_in_schema=False)
+        async def serve_showcase():
+            showcase_file = web_dir / "showcase.html"
+            if showcase_file.exists():
+                return FileResponse(str(showcase_file))
+            index_file = web_dir / "index.html"
+            if index_file.exists():
+                return FileResponse(str(index_file))
+            return {"service": "AURA Showcase", "status": "online"}
+
     return app
