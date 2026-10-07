@@ -1,6 +1,7 @@
 @echo off
+setlocal
 chcp 65001 > nul
-title IA Posto & PDV (pgvector + Gemini)
+title "IA Posto e PDV (pgvector + Gemini)"
 
 echo ========================================================
 echo   Iniciando IA do Posto (pgvector + Gemini 3.1 Flash)
@@ -9,7 +10,7 @@ echo.
 
 cd /d "%~dp0"
 
-:: 1. Verificar e iniciar container pgvector se necessario
+REM 1. Verificar e iniciar container pgvector se necessario
 echo [*] Verificando banco vetorial pgvector (Docker porta 5434)...
 docker start pgvector-posto > nul 2>&1
 if %errorlevel% neq 0 (
@@ -18,31 +19,34 @@ if %errorlevel% neq 0 (
     echo [OK] Container pgvector-posto ativo na porta 5434.
 )
 
-:: 2. Verificar servico do PostgreSQL local (porta 5433)
+REM 2. Verificar servico do PostgreSQL local (porta 5433)
 echo [*] Verificando servico do PostgreSQL ERP (porta 5433)...
-sc query postgresql-x64-16 | find "RUNNING" > nul 2>&1
+sc query postgresql-x64-16 2>nul | find "RUNNING" > nul 2>&1
 if %errorlevel% equ 0 (
     echo [OK] Servico postgresql-x64-16 ativo na porta 5433.
 ) else (
     echo [!] Iniciando servico postgresql-x64-16...
     net start postgresql-x64-16 > nul 2>&1
-    sc query postgresql-x64-16 | find "RUNNING" > nul 2>&1
+    sc query postgresql-x64-16 2>nul | find "RUNNING" > nul 2>&1
     if %errorlevel% neq 0 (
-        echo [*] Iniciando PostgreSQL 16 via pg_ctl...
-        "C:\Program Files\PostgreSQL\16\bin\pg_ctl.exe" start -D "C:\Program Files\PostgreSQL\16\data" > nul 2>&1
+        if exist "C:\Program Files\PostgreSQL\16\bin\pg_ctl.exe" (
+            echo [*] Iniciando PostgreSQL 16 via pg_ctl...
+            "C:\Program Files\PostgreSQL\16\bin\pg_ctl.exe" start -D "C:\Program Files\PostgreSQL\16\data" > nul 2>&1
+        )
     )
 )
 
 echo.
-:: 3. Solicitar e validar a senha do dia do ERP (webPosto)
+REM 3. Solicitar e validar a senha do dia do ERP (webPosto)
 python scripts\solicitar_senha_erp.py
 if %errorlevel% neq 0 (
+    echo.
     echo [!] Inicializacao cancelada pelo usuario.
     pause
     exit /b %errorlevel%
 )
 
-:: Carrega no ambiente a senha atualizada
+REM Carrega no ambiente a senha atualizada
 if exist "backups\erp_password.txt" (
     set /p ERP_DB_PASSWORD=<"backups\erp_password.txt"
 )
