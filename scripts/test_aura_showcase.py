@@ -200,11 +200,11 @@ def run_showcase_tests():
     assert "banco do cliente" in content_lower, "Destaque de conexão direta ao banco do cliente ausente"
     assert "milhões de tokens" in content_lower, "Alerta sobre cobrança abusiva de milhões de tokens ausente"
     assert "cálculos estruturados" in content_lower, "Conceito de cálculos estruturados locais ausente"
-    assert "sem guardrails" in content_lower, "Contraste contra falta de guardrails do mercado tradicional ausente"
-    assert "rag" in content_lower, "Contraste contra falta de RAG de soluções genéricas ausente"
     assert "assertividade" in content_lower, "Pilar de assertividade e precisão ausente"
     assert "Como o Mercado Tradicional de IA Opera" in html_content, "Coluna de contraste do mercado tradicional ausente"
-    assert "Como a AURA Revoluciona a Entrega" in html_content, "Coluna de contraste da abordagem AURA ausente"
+    assert "A Abordagem Inteligente da AURA" in html_content, "Coluna de contraste da abordagem AURA ausente"
+    assert "—" not in html_content, "Uso proibido de travessão (—) detectado no showcase"
+    assert "–" not in html_content, "Uso proibido de meia-risca (–) detectado no showcase"
 
     # Validação da Tabela de ROI Compactada (Exatamente 4 dimensões críticas de valor de produto)
     table_match = re.search(r'<tbody[^>]*>(.*?)</tbody>', html_content, re.DOTALL)
@@ -281,6 +281,10 @@ def run_showcase_tests():
         "alucinações matemáticas",
         "alucinação em números",
         "disparo resolutivo",
+        "guardrail",
+        "guardrails",
+        "sem rag",
+        "revoluciona",
     ]
     jargon_leaks = [j for j in forbidden_ai_jargons if j in content_lower]
     assert len(jargon_leaks) == 0, f"VIOLAÇÃO DE HUMANIZAÇÃO! Jargões de IA detectados: {jargon_leaks}"
