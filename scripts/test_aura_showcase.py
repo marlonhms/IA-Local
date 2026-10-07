@@ -200,6 +200,11 @@ def run_showcase_tests():
     assert "banco do cliente" in content_lower, "Destaque de conexão direta ao banco do cliente ausente"
     assert "milhões de tokens" in content_lower, "Alerta sobre cobrança abusiva de milhões de tokens ausente"
     assert "cálculos estruturados" in content_lower, "Conceito de cálculos estruturados locais ausente"
+    assert "sem guardrails" in content_lower, "Contraste contra falta de guardrails do mercado tradicional ausente"
+    assert "rag" in content_lower, "Contraste contra falta de RAG de soluções genéricas ausente"
+    assert "assertividade" in content_lower, "Pilar de assertividade e precisão ausente"
+    assert "Como o Mercado Tradicional de IA Opera" in html_content, "Coluna de contraste do mercado tradicional ausente"
+    assert "Como a AURA Revoluciona a Entrega" in html_content, "Coluna de contraste da abordagem AURA ausente"
 
     # Validação da Tabela de ROI Compactada (Exatamente 4 dimensões críticas de valor de produto)
     table_match = re.search(r'<tbody[^>]*>(.*?)</tbody>', html_content, re.DOTALL)
@@ -211,6 +216,7 @@ def run_showcase_tests():
     assert "Desvios de Estoque & Perdas Invisíveis" in tbody_html, "Dimensão 2 (Desvios de Estoque & Perdas Invisíveis) ausente na tabela"
     assert "Eficiência de Processamento & Custo de Tokens" in tbody_html, "Dimensão 3 (Eficiência de Processamento & Custo de Tokens) ausente na tabela"
     assert "Tempo para Decisão & Ação" in tbody_html, "Dimensão 4 (Tempo para Decisão & Ação) ausente na tabela"
+    assert "Dashboards de BI Passivos & IAs de Nuvem" in html_content, "Cabeçalho comparativo unificado de BI & Nuvem ausente"
 
     print("   [OK] Painel & Matriz de Diferenciação Operacional (Quebras de Caixa, Desvios, Economia de Tokens, ROI Compactado com 4 dimensões) validados.")
 
@@ -457,8 +463,31 @@ def run_showcase_tests():
             replay_badge = page.locator("#sim-status-badge").text_content()
             assert "EXECUTANDO" in replay_badge, f"Replay deve reiniciar execução, obtido: {replay_badge}"
 
+            # 4. Rola até #sec-diferenciacao e valida cards de ROI e tabela compactada
+            page.locator("#sec-diferenciacao").scroll_into_view_if_needed()
+            time.sleep(0.4)
+            roi_cards = page.locator(".roi-card").all()
+            assert len(roi_cards) == 4, f"Esperado exatamente 4 cards de ROI, obtido: {len(roi_cards)}"
+            for card in roi_cards:
+                assert card.is_visible(), "Card de ROI deve estar visível no navegador"
+
+            table_rows = page.locator("#sec-diferenciacao table tbody tr").all()
+            assert len(table_rows) == 4, f"Esperado exatamente 4 linhas na tabela compactada, obtido: {len(table_rows)}"
+            for tr in table_rows:
+                assert tr.is_visible(), "Linha da tabela compactada deve estar visível"
+
+            # 5. Testa renderização responsiva em viewport ultracompacto (Mobile 375x667)
+            mobile_page = browser.new_page(viewport={"width": 375, "height": 667})
+            mobile_page.goto(file_url)
+            mobile_page.locator("#sec-diferenciacao").scroll_into_view_if_needed()
+            time.sleep(0.3)
+            assert mobile_page.locator("#sec-diferenciacao").is_visible(), "Seção de ROI deve estar visível em tela mobile"
+            m_cards = mobile_page.locator(".roi-card").all()
+            assert len(m_cards) == 4, "4 cards de ROI devem existir em mobile"
+            mobile_page.close()
+
             browser.close()
-            print("   [OK] Validação em navegador real Edge aprovada: aguardo no topo, disparo autônomo no scroll, streaming, DecisionCard e replay.")
+            print("   [OK] Validação em navegador real Edge aprovada: aguardo no topo, disparo autônomo no scroll, streaming, DecisionCard, replay, cards de ROI, tabela de 4 linhas e responsividade mobile.")
     except Exception as e:
         print(f"   [AVISO] Verificação em navegador real ignorada ou indisponível: {e}")
 
