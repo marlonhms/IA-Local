@@ -107,6 +107,10 @@ def testar_conexao_erp(host: str = None, port: int = None, timeout: int = 5) -> 
         ), lat
     except psycopg2.OperationalError as e:
         return False, f"Falha de autenticação/handshake Postgres: {e}", 0.0
+    except UnicodeDecodeError as ude:
+        raw_bytes = getattr(ude, "object", b"")
+        msg = raw_bytes.decode("latin1", errors="replace").strip() if isinstance(raw_bytes, (bytes, bytearray)) else str(ude)
+        return False, f"Falha de autenticação/handshake Postgres: {msg}", 0.0
     except Exception as e:
         return False, f"Erro inesperado no ERP: {e}", 0.0
 

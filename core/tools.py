@@ -11,7 +11,7 @@ from decimal import Decimal
 from typing import Dict, Any, Optional, Tuple, List, Set
 from datetime import datetime, date, time, timedelta
 
-from config.settings import DB_ERP_CONFIG
+from config.settings import DB_ERP_CONFIG, get_erp_password
 from core.rag_engine import HybridRAGEngine
 from core.sanitizer import sanitize_dict
 from core.schemas.reconciliation import (
@@ -75,6 +75,7 @@ def get_erp_connection(timeout: Optional[int] = None) -> psycopg2.extensions.con
     """
     global _last_working_erp_port
     config = dict(DB_ERP_CONFIG)
+    config["password"] = get_erp_password()
     configured_port = int(config.get("port", 5433))
     effective_timeout = timeout if timeout is not None else int(config.get("connect_timeout", 5))
 
@@ -100,6 +101,14 @@ def get_erp_connection(timeout: Optional[int] = None) -> psycopg2.extensions.con
                 pass
             _last_working_erp_port = port
             return conn
+        except UnicodeDecodeError as ude:
+            raw_bytes = getattr(ude, "object", b"")
+            if isinstance(raw_bytes, (bytes, bytearray)):
+                msg = raw_bytes.decode("latin1", errors="replace").strip()
+            else:
+                msg = str(ude)
+            errors_by_port[port] = psycopg2.OperationalError(msg)
+            continue
         except Exception as e:
             errors_by_port[port] = e
             continue

@@ -7,6 +7,8 @@ echo   Iniciando IA do Posto (pgvector + Gemini 3.1 Flash)
 echo ========================================================
 echo.
 
+cd /d "%~dp0"
+
 :: 1. Verificar e iniciar container pgvector se necessario
 echo [*] Verificando banco vetorial pgvector (Docker porta 5434)...
 docker start pgvector-posto > nul 2>&1
@@ -32,12 +34,25 @@ if %errorlevel% equ 0 (
 )
 
 echo.
+:: 3. Solicitar e validar a senha do dia do ERP (webPosto)
+python scripts\solicitar_senha_erp.py
+if %errorlevel% neq 0 (
+    echo [!] Inicializacao cancelada pelo usuario.
+    pause
+    exit /b %errorlevel%
+)
+
+:: Carrega no ambiente a senha atualizada
+if exist "backups\erp_password.txt" (
+    set /p ERP_DB_PASSWORD=<"backups\erp_password.txt"
+)
+
+echo.
 echo ========================================================
 echo   Iniciando Agente Inteligente...
 echo ========================================================
 echo.
 
-cd /d "%~dp0"
 python main.py
 
 pause

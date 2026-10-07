@@ -8,6 +8,8 @@ echo   Supervisão Inteligente de Pista, Tanques e Fechamento
 echo ===========================================================================
 echo.
 
+cd /d "%~dp0"
+
 :: 1. Verificar container pgvector se Docker estiver presente
 echo [*] Verificando banco vetorial pgvector (Docker porta 5434)...
 docker start pgvector-posto > nul 2>&1
@@ -33,12 +35,24 @@ if %errorlevel% equ 0 (
 )
 
 echo.
+:: 3. Solicitar e validar a senha do dia do ERP (webPosto)
+python scripts\solicitar_senha_erp.py
+if %errorlevel% neq 0 (
+    echo [!] Inicialização cancelada pelo usuário.
+    pause
+    exit /b %errorlevel%
+)
+
+:: Carrega no ambiente a senha atualizada
+if exist "backups\erp_password.txt" (
+    set /p ERP_DB_PASSWORD=<"backups\erp_password.txt"
+)
+
+echo.
 echo ===========================================================================
 echo   Iniciando Servidor Web e Abrindo Navegador em http://127.0.0.1:8000...
 echo ===========================================================================
 echo.
-
-cd /d "%~dp0"
 
 :: Inicia o servidor Python com FastAPI e Uvicorn (o navegador abrira automaticamente quando o servidor estiver pronto)
 python server.py
