@@ -221,6 +221,71 @@ def run_showcase_tests():
     print("   [OK] Painel & Matriz de Diferenciação Operacional (Quebras de Caixa, Desvios, Economia de Tokens, ROI Compactado com 4 dimensões) validados.")
 
     # =========================================================================
+    # 2G. HERO SPLIT COM COCKPIT HOLOGRÁFICO DA AURA & AUSÊNCIA DE EDGE GLOW DE IA
+    # =========================================================================
+    print("\n2G. Testando Hero Split com Cockpit Holográfico da AURA e Eliminação de Edge Glow...")
+    assert "hero-cockpit-split" in html_content, "Hero Split #hero-cockpit-split ausente"
+    assert "hero-cockpit-hud" in html_content, "Cockpit HUD #hero-cockpit-hud ausente"
+    assert "hero-telemetry-pill" in html_content, "Pill de telemetria do Hero ausente"
+    assert "NÚCLEO AURA // TELEMETRIA HUD" in html_content, "Título do Cockpit HUD ausente"
+    assert "obsidian-card" in html_content, "Classe .obsidian-card de acabamento executivo profundo ausente"
+    assert "box-shadow: 0 0 18px rgba(6, 182, 212, 0.35)" not in html_content, "Borda neon edge glow antiga de IA ainda presente!"
+    assert "orbit-ring-1" not in html_content, "Anéis giratórios artificiais de IA ainda presentes no HUD!"
+    assert "Total 261 checks" in html_content or "Total 261" in html_content, "Donut chart de integridade operacional ausente no HUD"
+    assert "Total 66 assets" in html_content or "Total 66" in html_content, "Donut chart de ativos operacionais ausente no HUD"
+    assert "Severidades & Integridade da Operação" in html_content, "Stacked bar horizontal de severidades ausente no HUD"
+    assert "Crítico: <strong class=\"text-white\">0</strong>" in html_content, "Métrica de severidade crítica ausente no HUD"
+    print("   [OK] Hero Cockpit Holográfico da AURA e acabamento Obsidian sóbrio (zero edge glow) validados.")
+
+    # =========================================================================
+    # 2H. MINI GRÁFICOS & DASHBOARDS ANIMADOS AO SCROLL NA SEÇÃO DE ROI
+    # =========================================================================
+    print("\n2H. Testando Mini Gráficos e Dashboards Animados ao Scroll em ROI...")
+    assert "roi-spark-bar" in html_content, "Mini gráfico sparkline de auditoria horária ausente no Card Quebras de Caixa"
+    assert "roi-gauge-fill" in html_content, "Mini barra de calibração volumétrica ausente no Card Desvios de Estoque"
+    assert "100.0% Match" in html_content, "Indicador de calibração 100% ausente no Card Desvios"
+    assert "1080x Mais Rápido" in html_content, "Indicador comparativo de velocidade ausente no Card Produtividade"
+    assert "roi-table-bar" in html_content, "Mini barras animadas na tabela de ROI ausentes"
+    assert "roi-table-metric" in html_content, "Micro dashboards nas 4 linhas da tabela de ROI ausentes"
+    print("   [OK] Mini gráficos e dashboards animados ao scroll nos 4 cards de ROI e nas linhas da tabela validados.")
+
+    # =========================================================================
+    # 2I. SEÇÃO DE CUSTO DE IA INSPIRADA NA HARNESS.IO
+    # =========================================================================
+    print("\n2I. Testando Seção de Custo de IA Inspirada na Harness.io...")
+    assert "sec-custo-ia" in html_content, "Seção #sec-custo-ia ausente"
+    assert "Cost and Unit Cost Trend" in html_content, "Card 'Cost and Unit Cost Trend' ausente"
+    assert "Prompt Executivo" in html_content, "Prompt executivo inspirado em Harness ausente no card de custos"
+    assert "Auditar custo unitário e desperdício de tokens" in html_content, "Texto do prompt executivo de custos ausente"
+    assert "cost-bar-item" in html_content, "Barras empilhadas de custos ausentes"
+    assert "cost-trend-chart" in html_content, "Gráfico vetorial de custos #cost-trend-chart ausente"
+    assert "Visibilidade de Custos de IA em Tempo Real" in html_content, "Pilar de visibilidade de custos ausente"
+    assert "Eliminação Total de Desperdício em Nuvem" in html_content, "Pilar de eliminação de desperdício ausente"
+    assert "Governança Orçamentária e Previsibilidade" in html_content, "Pilar de governança orçamentária ausente"
+    print("   [OK] Seção de Custo de IA (Cost Management Agent estilo Harness.io) validada.")
+
+    # =========================================================================
+    # 2J. SEÇÃO DO GRAFO DE CONHECIMENTO OPERACIONAL (KNOWLEDGE GRAPH DE 3 COLUNAS)
+    # =========================================================================
+    print("\n2J. Testando Seção do Grafo de Conhecimento (Knowledge Graph de 3 Colunas Estilo Harness.io)...")
+    assert "sec-knowledge-graph" in html_content, "Seção #sec-knowledge-graph ausente"
+    assert "Grafo de Conhecimento Operacional da AURA" in html_content, "Título do Knowledge Graph ausente"
+    assert "Contexto do Negócio" in html_content, "Coluna 1 (Contexto Operacional) ausente"
+    assert "kg-context-item" in html_content, "Classe .kg-context-item ausente nos itens de contexto"
+    assert "kg-item-vendas" in html_content, "Item de contexto Vendas ausente"
+    assert "kg-item-caixas" in html_content, "Item de contexto Caixas ausente"
+    assert "kg-node-vendas" in html_content, "Nó SVG de Vendas do Knowledge Graph ausente"
+    assert "kg-node-caixas" in html_content, "Nó SVG de Caixas do Knowledge Graph ausente"
+    assert "kg-node-estoque" in html_content, "Nó SVG de Estoque do Knowledge Graph ausente"
+    assert "kg-node-regras" in html_content, "Nó SVG de Regras do Knowledge Graph ausente"
+    assert "kg-node-tolerancias" in html_content, "Nó SVG de Tolerâncias do Knowledge Graph ausente"
+    assert "kg-node-core" in html_content, "Nó Central AURA Core do Knowledge Graph ausente"
+    assert "kg-node-selected" in html_content, "Classe de nó ativo .kg-node-selected ausente no SVG"
+    assert "Reasoning & Ação" in html_content, "Coluna 3 (Reasoning & Orquestração da AURA) ausente"
+    assert "highlightKnowledgeNode" in html_content, "Função de destaque do grafo ausente"
+    print("   [OK] Seção de Knowledge Graph (3 colunas, constelação SVG e orquestração estilo Harness.io) validada.")
+
+    # =========================================================================
     # 2F. SCROLLYTELLING E ANIMAÇÕES DINÂMICAS NO SCROLL
     # =========================================================================
     print("\n2F. Testando Recursos de Scrollytelling e Animações no Scroll...")
@@ -391,7 +456,8 @@ def run_showcase_tests():
       'simulateChatSubmit',
       'simulateChatActionClick',
       'inspectGraphNode',
-      'scrollToSection'
+      'scrollToSection',
+      'highlightKnowledgeNode'
     ];
 
     if (!window.auraTour) {{
@@ -480,7 +546,20 @@ def run_showcase_tests():
             for tr in table_rows:
                 assert tr.is_visible(), "Linha da tabela compactada deve estar visível"
 
-            # 5. Testa renderização responsiva em viewport ultracompacto (Mobile 375x667)
+            table_bars = page.locator(".roi-table-bar").all()
+            assert len(table_bars) == 4, f"Esperado 4 barras de progresso na tabela de ROI, obtido: {len(table_bars)}"
+
+            # 5. Testa interatividade do Knowledge Graph no navegador
+            page.locator("#sec-knowledge-graph").scroll_into_view_if_needed()
+            time.sleep(0.3)
+            page.locator("#kg-item-caixas").click()
+            time.sleep(0.2)
+            assert "active" in (page.locator("#kg-item-caixas").get_attribute("class") or "")
+            assert "kg-node-selected" in (page.locator("#kg-node-caixas").get_attribute("class") or "")
+            reasoning_title = page.locator("#kg-reasoning-title").text_content()
+            assert "Auditoria de Gaveta Zero Furo" in (reasoning_title or "")
+
+            # 6. Testa renderização responsiva em viewport ultracompacto (Mobile 375x667)
             mobile_page = browser.new_page(viewport={"width": 375, "height": 667})
             mobile_page.goto(file_url)
             mobile_page.locator("#sec-diferenciacao").scroll_into_view_if_needed()
@@ -491,7 +570,7 @@ def run_showcase_tests():
             mobile_page.close()
 
             browser.close()
-            print("   [OK] Validação em navegador real Edge aprovada: aguardo no topo, disparo autônomo no scroll, streaming, DecisionCard, replay, cards de ROI, tabela de 4 linhas e responsividade mobile.")
+            print("   [OK] Validação em navegador real Edge aprovada: aguardo no topo, disparo autônomo no scroll, streaming, DecisionCard, replay, cards de ROI, tabela de 4 linhas com medidores, clique interativo no Knowledge Graph e responsividade mobile.")
     except Exception as e:
         print(f"   [AVISO] Verificação em navegador real ignorada ou indisponível: {e}")
 
