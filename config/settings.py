@@ -79,6 +79,7 @@ DEFAULT_LLM_MODEL = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-3.5-flash-lite
 
 FALLBACK_MODELS = [
     DEFAULT_LLM_MODEL,
+    "models/gemini-3.5-flash-lite",
+    "models/gemini-3.1-flash-lite-preview",
     "models/gemini-3.1-flash-lite",
-    "models/gemini-flash-latest",
 ]

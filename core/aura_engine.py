@@ -1498,7 +1498,8 @@ Diretrizes Específicas por Assunto:
 
         status = str(resultado_bruto.get("status", "")).lower()
         if status in ("indisponivel", "error", "erro", "timeout"):
-            return None
+            motivo = resultado_bruto.get("motivo") or "Falha de conexão com a base de dados do posto."
+            return f"🚨 **Atenção**: Dados operacionais temporariamente [vermelho]indisponíveis[/vermelho].\n\n*Diagnóstico:* {motivo}"
 
         # 0. MENTORIA EXECUTIVA DE DECISÃO & BRIEFING ESTRATÉGICO (FASE 3 — P0)
         if intencao in ("mentoria_decisao", "executive_briefing", "comparativo_turnos", "analise_margem"):
@@ -1980,7 +1981,7 @@ Diretrizes Específicas por Assunto:
                 response_stream = await model.generate_content_async(
                     prompt_sistema,
                     stream=True,
-                    request_options={"timeout": 7},
+                    request_options={"timeout": 15},
                 )
 
                 async for chunk in response_stream:
