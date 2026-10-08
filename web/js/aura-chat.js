@@ -380,16 +380,54 @@ class AuraChatController {
     let fullResponseText = '';
     let currentIntent = null;
     let currentToolResult = null;
+    let currentToolName = null;
+    let uiCompleteReceived = false;
     let telemetryData = null;
     let hasStreamError = false;
 
     this.abortController = new AbortController();
 
+    const handleDoneReconciliation = () => {
+      if (hasStreamError) return;
+      if (!uiCompleteReceived && currentToolResult) {
+        // Fallback gracioso: o backend executou a ferramenta mas não emitiu GenUIEnvelope.
+        // Remove o slot de esqueleto e renderiza o card legado de ferramenta para não perder os dados.
+        this.cleanupSkeletonSlots(messageContainerId);
+        this.updateToolResultCard(messageContainerId, currentToolName || 'ferramenta', currentToolResult, true /* force */);
+      } else {
+        this.cleanupSkeletonSlots(messageContainerId);
+      }
+      this.updateAuraText(messageContainerId, fullResponseText, false);
+      this.finalizeCognitiveStep(messageContainerId, true);
+      this.setStreamingState(false);
+      this.scrollToBottom(false);
+    };
+
     try {
-      await window.auraApi.chatStream({
+      await window.auraApi.streamChat({
         query: query,
         sessionId: this.sessionId,
         signal: this.abortController.signal,
+        onDelta: (token) => {
+          if (!fullResponseText && token.trim()) {
+            this.updateCognitiveStep(messageContainerId, 'Gerando diagnóstico executivo...', 'purple');
+          }
+          fullResponseText += token;
+          this.updateAuraText(messageContainerId, fullResponseText, true);
+        },
+        onSkeleton: (skeletonData) => {
+          this.handleUISkeleton(messageContainerId, skeletonData);
+        },
+        onUIDelta: (deltaData) => {
+          this.handleUIDelta(messageContainerId, deltaData);
+        },
+        onUIComplete: (envelopeData) => {
+          uiCompleteReceived = true;
+          this.handleUIComplete(messageContainerId, envelopeData);
+        },
+        onActionFeedback: (feedbackData) => {
+          this.handleUIActionFeedback(messageContainerId, feedbackData);
+        },
         onChunk: (chunk) => {
           const type = chunk.chunk_type || chunk.eventType || 'delta';
 
@@ -420,17 +458,26 @@ class AuraChatController {
           } 
           else if (type === 'tool_result') {
             const toolName = chunk.data?.tool_name || chunk.data?.intent || chunk.tool_name || chunk.intent || 'ferramenta';
+            currentToolName = toolName;
             currentToolResult = chunk.data?.result || chunk.data || {};
             this.updateToolResultCard(messageContainerId, toolName, currentToolResult);
             this.updateCognitiveStep(messageContainerId, 'Confrontando dados e regras de negócio...', 'purple');
           } 
+          else if (
+            type === 'ui_skeleton' ||
+            type === 'ui_delta' ||
+            type === 'ui_complete' ||
+            type === 'ui_action_feedback' ||
+            type === 'ui_action_result'
+          ) {
+            // Já despachados pelos callbacks dedicados de ciclo de vida (onSkeleton, onUIDelta, onUIComplete, onActionFeedback)
+            // Não reprocessa para evitar chamadas duplicadas, jank de layout e duplo registro no Companion Canvas.
+            return;
+          }
           else if (type === 'delta') {
-            const token = chunk.text || chunk.data?.text || '';
-            if (!fullResponseText && token.trim()) {
+            if (!fullResponseText && (chunk.text || '').trim()) {
               this.updateCognitiveStep(messageContainerId, 'Gerando diagnóstico executivo...', 'purple');
             }
-            fullResponseText += token;
-            this.updateAuraText(messageContainerId, fullResponseText, true);
           } 
           else if (type === 'telemetry') {
             telemetryData = chunk.data || {};
@@ -439,6 +486,7 @@ class AuraChatController {
           else if (type === 'error') {
             hasStreamError = true;
             const errorMsg = chunk.data?.error || chunk.text || 'Erro no processamento da solicitação';
+            this.cleanupSkeletonSlots(messageContainerId);
             this.hideToolCardSkeleton(messageContainerId);
             this.renderStreamError(messageContainerId, errorMsg);
             this.finalizeCognitiveStep(messageContainerId, false);
@@ -448,24 +496,20 @@ class AuraChatController {
             if (hasStreamError) return;
             if (chunk.data?.error || chunk.data?.success === false) {
               hasStreamError = true;
+              this.cleanupSkeletonSlots(messageContainerId);
               this.finalizeCognitiveStep(messageContainerId, false);
               this.setStreamingState(false);
               return;
             }
-            this.updateAuraText(messageContainerId, fullResponseText, false);
-            this.finalizeCognitiveStep(messageContainerId, true);
-            this.setStreamingState(false);
+            handleDoneReconciliation();
           }
         },
         onDone: () => {
-          if (hasStreamError) return;
-          this.updateAuraText(messageContainerId, fullResponseText, false);
-          this.finalizeCognitiveStep(messageContainerId, true);
-          this.setStreamingState(false);
-          this.scrollToBottom(false);
+          handleDoneReconciliation();
         },
         onError: (err) => {
           hasStreamError = true;
+          this.cleanupSkeletonSlots(messageContainerId);
           if (err && (err.name === 'AbortError' || String(err.message || '').toLowerCase().includes('abort'))) {
             this.finalizeCognitiveStep(messageContainerId, false);
             this.hideToolCardSkeleton(messageContainerId);
@@ -480,6 +524,7 @@ class AuraChatController {
       });
     } catch (err) {
       hasStreamError = true;
+      this.cleanupSkeletonSlots(messageContainerId);
       if (err && (err.name === 'AbortError' || String(err.message || '').toLowerCase().includes('abort'))) {
         this.finalizeCognitiveStep(messageContainerId, false);
         this.hideToolCardSkeleton(messageContainerId);
@@ -493,7 +538,374 @@ class AuraChatController {
     }
   }
 
+  /**
+   * F2-03: Injeção de Skeleton UI Reativo (SkeletonPulse) no container da mensagem
+   * Aloca no DOM o slot genui-skeleton-slot com identificador genui-skeleton-[tool_call_id],
+   * micro-copy contextual da etapa e classes AURA Precision Glass.
+   */
+  handleUISkeleton(containerId, skeletonData) {
+    if (!skeletonData || typeof document === 'undefined') return;
+
+    const toolCallId = skeletonData.tool_call_id || ('call_' + Date.now());
+    const componentName = skeletonData.component_name || 'GenericGenUIWidget';
+    const rawTitle = skeletonData.title || 'Analisando indicadores executivos...';
+    
+    // Micro-copy contextual informando a etapa em execução
+    const microCopy = rawTitle.toLowerCase().startsWith('aura engine')
+      ? rawTitle
+      : `AURA Engine: ${rawTitle}`;
+
+    // Atualiza chip cognitivo no header da mensagem
+    this.updateCognitiveStep(containerId, rawTitle, 'cyan');
+
+    // Se já existir slot para este toolCallId, não duplica
+    const existingSlot = (typeof document.getElementById === 'function')
+      ? document.getElementById('genui-skeleton-' + toolCallId)
+      : null;
+    if (existingSlot) return;
+
+    let toolCard = (typeof document.getElementById === 'function')
+      ? document.getElementById(containerId + '-tool-card')
+      : null;
+    if (!toolCard && typeof document.getElementById === 'function') {
+      toolCard = document.getElementById(containerId);
+    }
+    if (!toolCard) return;
+
+    // Constrói o HTML do SkeletonPulse no padrão AURA Precision Glass
+    const skeletonHtml = `
+      <div id="genui-skeleton-${this.escapeHtml(toolCallId)}" 
+           class="genui-skeleton-slot p-4 rounded-xl border border-cyan-500/20 bg-slate-900/60 backdrop-blur-md animate-fade-in my-2"
+           data-tool-call-id="${this.escapeHtml(toolCallId)}"
+           data-component="${this.escapeHtml(componentName)}">
+        <div class="flex items-center gap-3">
+          <div class="w-3 h-3 rounded-full bg-cyan-400 animate-ping flex-shrink-0"></div>
+          <span class="text-xs font-mono text-cyan-300 tracking-wide uppercase font-semibold">
+            ${this.escapeHtml(microCopy)}
+          </span>
+        </div>
+        <div class="mt-3 space-y-2">
+          <div class="h-4 bg-slate-800/80 rounded w-3/4 animate-pulse"></div>
+          <div class="h-8 bg-slate-800/60 rounded w-full animate-pulse"></div>
+        </div>
+      </div>
+    `;
+
+    toolCard.innerHTML = skeletonHtml;
+    toolCard.classList.remove('hidden');
+
+    const splitCard = (typeof document.getElementById === 'function')
+      ? document.getElementById(containerId + '-split-tool-card')
+      : null;
+    if (splitCard) {
+      splitCard.innerHTML = skeletonHtml.replace(`id="genui-skeleton-${toolCallId}"`, `id="genui-skeleton-${toolCallId}-split"`);
+      splitCard.classList.remove('hidden');
+    }
+
+    this.scrollToBottom();
+  }
+
+  /**
+   * F2-02: Recepção de fragmento ui_delta com buffer volátil em memória
+   */
+  handleUIDelta(containerId, deltaData) {
+    if (!deltaData || typeof document === 'undefined') return;
+    const toolCallId = deltaData.tool_call_id;
+    const title = (deltaData.parsed && deltaData.parsed.title) || deltaData.title;
+    if (title) {
+      let slot = (toolCallId && typeof document.getElementById === 'function')
+        ? document.getElementById('genui-skeleton-' + toolCallId)
+        : null;
+      if (!slot && containerId && typeof document.querySelector === 'function') {
+        slot = document.querySelector(`#${containerId} .genui-skeleton-slot, #${containerId}-tool-card .genui-skeleton-slot`);
+      }
+      if (slot) {
+        const titleEl = (typeof slot.querySelector === 'function')
+          ? slot.querySelector('span.text-cyan-300')
+          : null;
+        if (titleEl) {
+          titleEl.textContent = `AURA Engine: ${title}`;
+        }
+      }
+      this.updateCognitiveStep(containerId, title, 'cyan');
+    }
+  }
+
+  /**
+   * F2-04: Hidratação Instantânea sem Layout Jank (Zero CLS)
+   * Substitui o slot genui-skeleton-[tool_call_id] pelo componente hidratado via
+   * SecureComponentRegistry com transição suave de 150ms fade-in.
+   */
+  handleUIComplete(containerId, envelopeData) {
+    if (!envelopeData || typeof document === 'undefined') return;
+
+    const toolCallId = envelopeData.tool_call_id;
+
+    // Idempotência: Se o card para este toolCallId já foi hidratado no DOM, não remonta
+    if (toolCallId && typeof document.getElementById === 'function') {
+      const alreadyMounted = document.getElementById('genui-card-' + toolCallId);
+      if (alreadyMounted) return;
+    }
+
+    let skeletonSlot = (toolCallId && typeof document.getElementById === 'function')
+      ? document.getElementById('genui-skeleton-' + toolCallId)
+      : null;
+    if (!skeletonSlot && containerId && typeof document.querySelector === 'function') {
+      skeletonSlot = document.querySelector(`#${containerId} .genui-skeleton-slot, #${containerId}-tool-card .genui-skeleton-slot`);
+    }
+
+    // 1. Resolve o componente no SecureComponentRegistry
+    const registry = (typeof window !== 'undefined' && window.SecureComponentRegistry) ||
+                     (typeof AuraGenUI !== 'undefined' && AuraGenUI.registry);
+    let ComponentDef = null;
+    if (registry && typeof registry.resolveComponent === 'function') {
+      try {
+        ComponentDef = registry.resolveComponent(envelopeData.component_name, { throwOnMissing: false });
+      } catch (_) {
+        ComponentDef = null;
+      }
+    }
+
+    let hydratedHtml = '';
+    let hydratedNode = null;
+
+    if (ComponentDef) {
+      if (typeof ComponentDef === 'function') {
+        try {
+          const instance = new ComponentDef(envelopeData);
+          if (instance && typeof instance.mount === 'function') {
+            const mounted = instance.mount();
+            if (typeof HTMLElement !== 'undefined' && mounted instanceof HTMLElement) {
+              hydratedNode = mounted;
+            } else if (typeof mounted === 'string') {
+              hydratedHtml = mounted;
+            }
+          } else if (typeof HTMLElement !== 'undefined' && instance instanceof HTMLElement) {
+            hydratedNode = instance;
+          }
+        } catch (e) {
+          console.warn('[GenUI] Erro ao instanciar componente registrado:', e);
+        }
+      } else if (typeof ComponentDef.render === 'function') {
+        try {
+          const rendered = ComponentDef.render(envelopeData);
+          if (typeof HTMLElement !== 'undefined' && rendered instanceof HTMLElement) {
+            hydratedNode = rendered;
+          } else if (typeof rendered === 'string') {
+            hydratedHtml = rendered;
+          }
+        } catch (e) {
+          console.warn('[GenUI] Erro ao renderizar componente registrado:', e);
+        }
+      }
+    }
+
+    // 2. Fallback seguro caso não haja construtor registrado ainda (preparando o terreno para Fase 3)
+    if (!hydratedNode && !hydratedHtml) {
+      const inlineWidget = this.renderToolInlineWidget(
+        envelopeData.intent || envelopeData.component_name,
+        envelopeData.props || envelopeData.data || envelopeData
+      );
+
+      if (inlineWidget) {
+        hydratedHtml = `
+          <div id="genui-card-${this.escapeHtml(toolCallId || 'default')}" 
+               class="genui-hydrated-card animate-fade-in my-2"
+               data-tool-call-id="${this.escapeHtml(toolCallId || '')}"
+               data-component="${this.escapeHtml(envelopeData.component_name || '')}">
+            ${inlineWidget}
+          </div>
+        `;
+      } else {
+        hydratedHtml = this.renderCanonicalFallbackCard(envelopeData);
+      }
+    }
+
+    if (!hydratedNode && hydratedHtml) {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = hydratedHtml.trim();
+      hydratedNode = tempDiv.firstElementChild || tempDiv;
+    }
+
+    if (hydratedNode) {
+      hydratedNode.classList.add('genui-fade-in');
+      hydratedNode.style.transition = 'opacity 150ms cubic-bezier(0.4, 0, 0.2, 1)';
+
+      if (skeletonSlot && skeletonSlot.parentNode) {
+        skeletonSlot.parentNode.replaceChild(hydratedNode, skeletonSlot);
+      } else {
+        const toolCard = (containerId && typeof document.getElementById === 'function')
+          ? (document.getElementById(containerId + '-tool-card') || document.getElementById(containerId))
+          : null;
+        if (toolCard) {
+          toolCard.innerHTML = '';
+          toolCard.appendChild(hydratedNode);
+          toolCard.classList.remove('hidden');
+        }
+      }
+
+      // Projeta no Companion Canvas se habilitado
+      if (typeof window !== 'undefined' && window.auraAuxPanel && typeof window.auraAuxPanel.projectArtifact === 'function') {
+        try {
+          window.auraAuxPanel.projectArtifact({
+            id: 'art_genui_' + (toolCallId || Date.now()),
+            containerId: containerId,
+            toolName: envelopeData.component_name,
+            intent: envelopeData.intent,
+            data: envelopeData.props,
+            html: hydratedHtml || (hydratedNode.outerHTML || ''),
+            autoOpen: true
+          });
+        } catch (_) {}
+      }
+
+      const splitCard = (containerId && typeof document.getElementById === 'function')
+        ? document.getElementById(containerId + '-split-tool-card')
+        : null;
+      if (splitCard) {
+        splitCard.innerHTML = hydratedHtml || (hydratedNode.outerHTML || '');
+        splitCard.classList.remove('hidden');
+      }
+
+      this.scrollToBottom();
+    }
+  }
+
+  /**
+   * Renderiza card canônico Precision Glass para fallback seguro (F2-04)
+   */
+  renderCanonicalFallbackCard(envelopeData) {
+    const toolCallId = envelopeData.tool_call_id || '';
+    const componentName = envelopeData.component_name || 'Componente GenUI';
+    const schemaVersion = envelopeData.schema_version || '1.0';
+    const summary = envelopeData.executive_summary || '';
+    const props = envelopeData.props || {};
+    const actions = envelopeData.actions || [];
+
+    const propKeys = Object.keys(props).slice(0, 6);
+    const propsHtml = propKeys.map(k => {
+      const val = props[k];
+      const displayVal = (typeof val === 'object' && val !== null) ? JSON.stringify(val) : String(val);
+      return `
+        <div class="p-2.5 rounded-lg bg-white/[0.03] border border-white/5 space-y-0.5">
+          <div class="text-[10px] font-mono text-slate-400 uppercase tracking-wider">${this.escapeHtml(k)}</div>
+          <div class="text-xs font-semibold text-slate-100 truncate" title="${this.escapeHtml(displayVal)}">${this.escapeHtml(displayVal)}</div>
+        </div>
+      `;
+    }).join('');
+
+    const actionsHtml = actions.map(act => {
+      const variantClass = act.variant === 'danger'
+        ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 hover:bg-rose-500/30'
+        : act.variant === 'secondary'
+        ? 'bg-slate-800 text-slate-200 border-white/10 hover:bg-slate-700'
+        : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/30';
+      return `
+        <button type="button" 
+                data-action-id="${this.escapeHtml(act.action_id || '')}"
+                class="px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${variantClass}">
+          ${this.escapeHtml(act.label || 'Ação')}
+        </button>
+      `;
+    }).join('');
+
+    return `
+      <div id="genui-card-${this.escapeHtml(toolCallId || 'default')}" 
+           class="genui-hydrated-card p-4 sm:p-5 space-y-3.5 rounded-2xl border border-cyan-500/30 bg-slate-900/80 backdrop-blur-xl animate-fade-in my-2"
+           data-tool-call-id="${this.escapeHtml(toolCallId)}"
+           data-component="${this.escapeHtml(componentName)}">
+        <div class="flex items-center justify-between border-b border-white/10 pb-3">
+          <div class="flex items-center gap-2.5">
+            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400"></div>
+            <span class="text-xs font-mono font-bold text-cyan-300 uppercase tracking-wide">
+              ${this.escapeHtml(componentName)}
+            </span>
+          </div>
+          <span class="px-2 py-0.5 rounded text-[10px] font-sans font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+            GenUI v${this.escapeHtml(schemaVersion)}
+          </span>
+        </div>
+
+        ${summary ? `<div class="text-xs text-slate-200 leading-relaxed font-sans">${this.escapeHtml(summary)}</div>` : ''}
+
+        ${propKeys.length > 0 ? `
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+            ${propsHtml}
+          </div>
+        ` : ''}
+
+        ${actions.length > 0 ? `
+          <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-white/5">
+            ${actionsHtml}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  /**
+   * F2-04: Remove graciosamente slots de esqueleto órfãos em caso de erro, done ou fallback
+   * Garante que nenhuma caixa vazia permaneça no DOM se ui_complete não for emitido.
+   */
+  cleanupSkeletonSlots(containerId = null) {
+    if (typeof document === 'undefined') return;
+
+    const selector = containerId
+      ? `#${containerId} .genui-skeleton-slot, #${containerId}-tool-card .genui-skeleton-slot`
+      : '.genui-skeleton-slot';
+
+    if (typeof document.querySelectorAll === 'function') {
+      const skeletons = document.querySelectorAll(selector);
+      skeletons.forEach(skel => {
+        const parent = skel.parentNode;
+        skel.remove();
+        if (parent && parent.children && parent.children.length === 0 && parent.classList) {
+          parent.classList.add('hidden');
+        }
+      });
+    }
+
+    if (containerId && typeof document.getElementById === 'function') {
+      const toolCard = document.getElementById(containerId + '-tool-card');
+      if (toolCard && (!toolCard.firstElementChild || (typeof toolCard.querySelector === 'function' && toolCard.querySelector('.genui-skeleton-slot')))) {
+        toolCard.innerHTML = '';
+        if (toolCard.classList) toolCard.classList.add('hidden');
+      }
+      const splitCard = document.getElementById(containerId + '-split-tool-card');
+      if (splitCard && (!splitCard.firstElementChild || (typeof splitCard.querySelector === 'function' && splitCard.querySelector('.genui-skeleton-slot')))) {
+        splitCard.innerHTML = '';
+        if (splitCard.classList) splitCard.classList.add('hidden');
+      }
+    }
+  }
+
+  /**
+   * Processa eventos de confirmação / voucher de ações transacionais (ui_action_feedback)
+   */
+  handleUIActionFeedback(containerId, feedbackData) {
+    if (!feedbackData || typeof document === 'undefined') return;
+    const actionId = feedbackData.action_id;
+    const status = feedbackData.status;
+    const voucherId = feedbackData.voucher_id;
+
+    if (actionId && typeof document.querySelector === 'function') {
+      const btn = document.querySelector(`button[data-action-id="${actionId}"]`);
+      if (btn) {
+        if (status === 'COMMITTED') {
+          btn.disabled = true;
+          btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 opacity-90 cursor-default';
+          btn.innerHTML = `✔ Confirmado (${this.escapeHtml(voucherId || 'Voucher emitido')})`;
+        } else if (status === 'FAILED') {
+          btn.disabled = false;
+          btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30';
+          btn.innerHTML = `✖ Falha ao executar (Tentar Novamente)`;
+        }
+      }
+    }
+  }
+
   hideToolCardSkeleton(containerId) {
+    this.cleanupSkeletonSlots(containerId);
     const cardIds = [containerId + '-tool-card', containerId + '-split-tool-card'];
     cardIds.forEach(id => {
       const cardEl = typeof document !== 'undefined' ? document.getElementById(id) : null;
@@ -507,6 +919,7 @@ class AuraChatController {
   abortStreaming() {
     if (this.currentMessageContainerId) {
       this.finalizeCognitiveStep(this.currentMessageContainerId, false);
+      this.cleanupSkeletonSlots(this.currentMessageContainerId);
       this.hideToolCardSkeleton(this.currentMessageContainerId);
     }
     if (this.abortController) {
@@ -518,6 +931,7 @@ class AuraChatController {
 
   clearSession() {
     this.abortStreaming();
+    this.cleanupSkeletonSlots();
     this.userScrolledUp = false;
     const scrollBtn = document.getElementById('btn-scroll-bottom');
     if (scrollBtn) scrollBtn.classList.add('hidden');
@@ -837,7 +1251,7 @@ class AuraChatController {
     });
   }
 
-  updateToolResultCard(containerId, toolName, resultData) {
+  updateToolResultCard(containerId, toolName, resultData, force = false) {
     const cardIds = [containerId + '-tool-card', containerId + '-split-tool-card'];
     const chipIds = [containerId + '-tool-chip', containerId + '-split-tool-chip'];
     const displayName = this.formatToolDisplayName(toolName);
@@ -855,6 +1269,21 @@ class AuraChatController {
         }
       }
     });
+
+    // Se houver um slot de GenUI Skeleton ativo e não for renderização forçada de fallback,
+    // preserva o skeleton pulsando até ui_complete!
+    if (!force) {
+      const activeGenUISkeleton = (typeof document !== 'undefined') && (
+        (typeof document.querySelector === 'function' && (
+          document.querySelector('#' + containerId + ' .genui-skeleton-slot') ||
+          document.querySelector('#' + containerId + '-tool-card .genui-skeleton-slot')
+        )) ||
+        (typeof document.getElementById === 'function' && document.getElementById('genui-skeleton-' + (resultData?.tool_call_id || '')))
+      );
+      if (activeGenUISkeleton) {
+        return;
+      }
+    }
 
     const widgetHtml = this.renderToolInlineWidget(toolName, resultData);
 

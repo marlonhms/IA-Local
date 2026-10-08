@@ -385,6 +385,91 @@
   }
 
   // =========================================================================
+  // 3.5 BUFFER DE FRAGMENTOS JSON & PARSING SEGURO (F2-02)
+  // =========================================================================
+
+  /**
+   * Gerencia buffer volátil em memória para fragmentos parciais de JSON emitidos via ui_delta.
+   * Aplica parsing com fallback gracioso em try/catch silencioso até o fechamento da estrutura.
+   */
+  class GenUIFragmentBuffer {
+    constructor() {
+      this._buffers = new Map();
+    }
+
+    /**
+     * Acumula fragmento para determinado tool_call_id e tenta parse seguro.
+     * @param {string} toolCallId - Identificador canônico da execução
+     * @param {string} deltaJson - Pedaço textual de JSON
+     * @returns {Object} { tool_call_id, delta, accumulated, parsed, isComplete }
+     */
+    append(toolCallId, deltaJson) {
+      if (!toolCallId) return null;
+      const prev = this._buffers.get(toolCallId) || '';
+      const fragmentStr = (typeof deltaJson === 'object' && deltaJson !== null)
+        ? JSON.stringify(deltaJson)
+        : (deltaJson !== undefined ? String(deltaJson) : '');
+      const accumulated = prev + fragmentStr;
+      this._buffers.set(toolCallId, accumulated);
+
+      let parsed = null;
+      try {
+        const candidate = JSON.parse(accumulated);
+        if (typeof candidate === 'object' && candidate !== null) {
+          parsed = candidate;
+        }
+      } catch (_) {
+        // Silencioso: fragmento parcial aguardando próximos chunks
+        parsed = null;
+      }
+
+      return {
+        tool_call_id: toolCallId,
+        delta: fragmentStr,
+        accumulated: accumulated,
+        parsed: parsed,
+        isComplete: parsed !== null
+      };
+    }
+
+    /**
+     * Retorna a string bruta acumulada no buffer.
+     * @param {string} toolCallId
+     * @returns {string}
+     */
+    get(toolCallId) {
+      return this._buffers.get(toolCallId) || '';
+    }
+
+    /**
+     * Retorna o JSON parseado se for válido, ou null se incompleto/inválido.
+     * @param {string} toolCallId
+     * @returns {Object|null}
+     */
+    getParsed(toolCallId) {
+      const raw = this._buffers.get(toolCallId);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    /**
+     * Limpa o buffer de um tool_call_id ou todos os buffers.
+     * @param {string} [toolCallId]
+     */
+    clear(toolCallId) {
+      if (toolCallId) {
+        this._buffers.delete(toolCallId);
+      } else {
+        this._buffers.clear();
+      }
+    }
+  }
+
+  // =========================================================================
   // 4. INSTÂNCIA SINGLETON & EXPORTAÇÃO DUAL (ZERO-BUNDLER & COMMONJS)
   // =========================================================================
 
@@ -394,6 +479,7 @@
     version: '1.0.0',
     SecureComponentRegistry,
     registry,
+    GenUIFragmentBuffer,
     escapeHtml,
     sanitizeProps,
     generateUUID,
@@ -423,6 +509,7 @@
       AuraGenUI,
       SecureComponentRegistry,
       registry,
+      GenUIFragmentBuffer,
       escapeHtml,
       sanitizeProps,
       generateUUID,

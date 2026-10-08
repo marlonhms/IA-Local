@@ -4,7 +4,7 @@
 
 - **Data de Criação:** 07/10/2026  
 - **Versão do Documento:** 2.1.0 (Evolução Estratégica: Mentor de Decisão & Inteligência Analítica)  
-- **Status:** Fases 0 e 1 Concluídas (P0 Homologado) | Fase 2 em Planejamento  
+- **Status:** Fases 0, 1 e 2 Concluídas (P0 Homologado) | Fase 3 em Planejamento  
 - **Documento de Referência Arquitetural:** [`docs/Arquitetura GenUI para Edge AI.md`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/Arquitetura%20GenUI%20para%20Edge%20AI.md)  
 - **Repositório:** `C:\Users\Marlon\Documents\Agent PC\ia-banco-local`  
 - **Público-alvo:** Diretoria Executiva, Engenharia de Software, Arquitetura de IA e Gestores de Negócio B2B  
@@ -379,21 +379,21 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 
 ---
 
-### Fase 2 — Frontend: Streaming Parser, Bufferização JSON & Skeleton UI (P0)
+### Fase 2 — Frontend: Streaming Parser, Bufferização JSON & Skeleton UI (P0) [CONCLUÍDA EM 07/10/2026]
 **Objetivo:** Evoluir `web/js/aura-api.js` e `web/js/aura-chat.js` para consumir o fluxo multiplexado, gerenciar buffer seguro de JSON e exibir skeletons com micro-copy contextual.
 
-- [ ] **F2-01 — Refatoração da Máquina de Estados de Streaming em `web/js/aura-api.js`:**  
-  Garantir que eventos SSE multiplexados (`event: ui_skeleton`, `event: ui_delta`, `event: ui_complete`) sejam despachados para callbacks específicos sem atrasar a renderização dos tokens textuais de Resumo Executivo (`event: delta`).
-- [ ] **F2-02 — Implementação do Buffer de Fragmentos JSON com Fallback Gracioso:**  
-  No cliente, caso a inferência transmita deltas fracionados de JSON (`ui_delta`), acumular em string buffer local em memória volátil com tratamento `try-catch` que silencia erros parciais de sintaxe até o evento `ui_complete` ou `[DONE]`.
-- [ ] **F2-03 — Injeção de Skeleton UI Reativo (`SkeletonPulse`):**  
-  No exato momento em que `ui_skeleton` é interceptado, alocar no DOM do chat um bloco visual com animação pulsante sutil (`animate-pulse`) e texto explicativo da etapa em execução:
+- [x] **F2-01 — Refatoração da Máquina de Estados de Streaming em `web/js/aura-api.js`:**  
+  Garantir que eventos SSE multiplexados (`event: ui_skeleton`, `event: ui_delta`, `event: ui_complete`, `event: ui_action_feedback`) sejam despachados para callbacks específicos sem atrasar a renderização dos tokens textuais de Resumo Executivo (`event: delta`). Compatibilidade dual com `streamChat()` e `chatStream()` e exportação CommonJS para Node.js.
+- [x] **F2-02 — Implementação do Buffer de Fragmentos JSON com Fallback Gracioso:**  
+  Módulo `GenUIFragmentBuffer` implementado em `web/js/aura-genui.js` e integrado em `web/js/aura-api.js`. Caso a inferência transmita deltas fracionados de JSON (`ui_delta`), acumula em string buffer volátil indexado por `tool_call_id` com tratamento `try-catch` que silencia erros parciais de sintaxe até o evento `ui_complete` ou `[DONE]`.
+- [x] **F2-03 — Injeção de Skeleton UI Reativo (`SkeletonPulse`) em `web/js/aura-chat.js`:**  
+  No exato momento em que `ui_skeleton` é interceptado, aloca no DOM do chat um bloco visual com animação pulsante sutil (`animate-pulse`), status dot (`animate-ping`), classes AURA Precision Glass (`web/css/aura.css`) e texto explicativo da etapa em execução:
   ```html
-  <div class="genui-skeleton-slot p-4 rounded-xl border border-cyan-500/20 bg-slate-900/60 backdrop-blur-md">
+  <div id="genui-skeleton-[tool_call_id]" class="genui-skeleton-slot p-4 rounded-xl border border-cyan-500/20 bg-slate-900/60 backdrop-blur-md">
     <div class="flex items-center gap-3">
       <div class="w-3 h-3 rounded-full bg-cyan-400 animate-ping"></div>
-      <span class="text-xs font-mono text-cyan-300 tracking-wide uppercase">
-        Aura Engine: Processando volumetria dos tanques...
+      <span class="text-xs font-mono text-cyan-300 tracking-wide uppercase font-semibold">
+        AURA Engine: Analisando indicadores executivos...
       </span>
     </div>
     <div class="mt-3 space-y-2">
@@ -402,13 +402,16 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
     </div>
   </div>
   ```
-- [ ] **F2-04 — Hidratação Instantânea sem Layout Jank:**  
-  Assim que `ui_complete` é recebido, validar as propriedades contra o contrato esperado, destruir o esqueleto do DOM e injetar o micro-widget com transição de opacidade suave (150ms).
+- [x] **F2-04 — Hidratação Instantânea sem Layout Jank (Zero CLS):**  
+  Assim que `ui_complete` é recebido, resolve o componente no `SecureComponentRegistry` (ou aplica fallback gracioso Precision Glass preparando o terreno para a Fase 3), substitui o esqueleto do DOM com transição de opacidade suave (150ms fade-in), e remove graciosamente slots órfãos (`cleanupSkeletonSlots`) se a resposta terminar em erro ou sem `ui_complete`.
+- [x] **F2-05 — Suíte de Testes Automatizada do Frontend (`scripts/test_genui_frontend_streaming.py`):**  
+  Suíte automatizada completa em Python e Node.js validando: (1) Contratos estáticos e exportações; (2) Parser SSE multiplexado de `aura-api.js`; (3) Buffer de fragmentos parciais de `aura-genui.js`; (4) Ciclo de vida no DOM de `aura-chat.js` (inserção, hidratação, substituição 150ms e limpeza graciosa); (5) Zero regressão em todas as 4 suítes analíticas existentes (`test_genui_baseline.py`, `test_genui_engine_sse.py`, `test_aura_aux_panel.py`, `test_phase6_quality_resilience.py`).
 
-**Critério de Aceite da Fase 2:**  
-- Transição visual contínua: Resumo Executivo datilografado -> Skeleton ativo -> Widget hidratado.
-- Zero quebra de layout (*Zero Cumulative Layout Shift* - CLS).
-- Teste em Node.js simulando chunks SSE com atraso artificial comprovando montagem correta.
+**Critério de Aceite da Fase 2 (100% Aprovado):**  
+- [x] Transição visual contínua: Resumo Executivo datilografado -> Skeleton ativo -> Widget hidratado.
+- [x] Zero quebra de layout (*Zero Cumulative Layout Shift* - CLS).
+- [x] Teste em Node.js simulando chunks SSE multiplexados comprovando montagem correta.
+- [x] Todas as suítes analíticas existentes e testes da Fase 2 passando com 100% de sucesso (`scripts/test_genui_frontend_streaming.py`).
 
 ---
 
