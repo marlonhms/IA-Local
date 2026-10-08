@@ -280,3 +280,57 @@ class GenUIActionResult(BaseModel):
         if not validate_action_id(v):
             raise ValueError(f"action_id inválido: '{v}'")
         return v
+
+
+class WidgetStateRecord(BaseModel):
+    """Modelo Pydantic que valida o contrato de estado do cliente (AuraStateManager)."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    tool_call_id: str = Field(..., description="UUID da invocação RFC 4122 v4")
+    status: Literal["proposed", "locked", "optimistic", "committed", "failed", "expired"] = Field(
+        default="proposed",
+        description="Estado do ciclo de vida do micro-widget"
+    )
+    is_locked: bool = Field(default=False, description="Indicador de bloqueio contra duplo clique")
+    locked_action_id: Optional[str] = Field(default=None, description="ID da ação atualmente em execução")
+    timestamp: int = Field(default_factory=lambda: int(datetime.now(timezone.utc).timestamp() * 1000), description="Timestamp em milissegundos")
+    ttl_seconds: int = Field(default=900, description="Tempo de vida útil em segundos")
+    props: Dict[str, Any] = Field(default_factory=dict, description="Propriedades do widget")
+    optimistic_data: Optional[Dict[str, Any]] = Field(default=None, description="Dados da mutação otimista")
+    result: Optional[Dict[str, Any]] = Field(default=None, description="Resultado da execução da ação")
+
+    @field_validator("tool_call_id")
+    @classmethod
+    def check_tool_call_id(cls, v: str) -> str:
+        if not validate_tool_call_id(v):
+            raise ValueError(f"tool_call_id inválido: '{v}'")
+        return v
+
+    def is_stale(self, current_ts_ms: Optional[int] = None) -> bool:
+        """Verifica se o estado está expirado pelo TTL."""
+        now_ms = current_ts_ms if current_ts_ms is not None else int(datetime.now(timezone.utc).timestamp() * 1000)
+        return (now_ms - self.timestamp) > (self.ttl_seconds * 1000)
+
+
+class WidgetActionExecution(BaseModel):
+    """Modelo para requisição e validação de ações transacionais."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    action_id: str = Field(..., description="UUID da ação RFC 4122 v4")
+    tool_call_id: str = Field(..., description="UUID da invocação do widget")
+    payload: Dict[str, Any] = Field(default_factory=dict, description="Payload de execução")
+
+    @field_validator("action_id")
+    @classmethod
+    def check_action_id(cls, v: str) -> str:
+        if not validate_action_id(v):
+            raise ValueError(f"action_id inválido: '{v}'")
+        return v
+
+    @field_validator("tool_call_id")
+    @classmethod
+    def check_tool_call_id(cls, v: str) -> str:
+        if not validate_tool_call_id(v):
+            raise ValueError(f"tool_call_id inválido: '{v}'")
+        return v
+

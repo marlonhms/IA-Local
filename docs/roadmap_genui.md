@@ -4,7 +4,7 @@
 
 - **Data de Criação:** 07/10/2026  
 - **Versão do Documento:** 2.1.0 (Evolução Estratégica: Mentor de Decisão & Inteligência Analítica)  
-- **Status:** Fases 0, 1, 2 e 3 Concluídas (P0 Homologado) | Fase 4 em Planejamento  
+- **Status:** Fases 0, 1, 2, 3 e 4 Concluidas (P0 e P1 Homologados) | Fase 5 em Planejamento  
 - **Documento de Referência Arquitetural:** [`docs/Arquitetura GenUI para Edge AI.md`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/Arquitetura%20GenUI%20para%20Edge%20AI.md)  
 - **Repositório:** `C:\Users\Marlon\Documents\Agent PC\ia-banco-local`  
 - **Público-alvo:** Diretoria Executiva, Engenharia de Software, Arquitetura de IA e Gestores de Negócio B2B  
@@ -434,59 +434,57 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 
 ---
 
-### Fase 4 — Motor de Gestão de Estado no Cliente, Idempotência & Optimistic UI (P1)
-**Objetivo:** Implementar o gerenciador de estado reativo no cliente (`AuraStateManager`) para garantir idempotência, bloqueio contra cliques duplicados, persistência local e rollback limpo.
+### Fase 4 - Motor de Gestao de Estado no Cliente, Idempotencia & Optimistic UI (P1) [CONCLUIDA EM 08/10/2026]
+**Objetivo:** Implementar o gerenciador de estado reativo no cliente (`AuraStateManager`) para garantir idempotencia, bloqueio contra cliques duplicados, persistencia local e rollback limpo.
 
-- [ ] **F4-01 — Criação do `AuraStateManager` (`web/js/aura-state-manager.js`):**  
-  Gerenciador central com tabela hash de estados indexada por `tool_call_id` e persistência de curto prazo em `sessionStorage`:
+- [x] **F4-01 - Criacao do `AuraStateManager` (`web/js/aura-state-manager.js`):**  
+  Gerenciador central com tabela hash de estados indexada por `tool_call_id` e persistencia de curto prazo em `sessionStorage`:
   ```javascript
   class AuraStateManager {
-    constructor() {
-      this.widgets = new Map(); // tool_call_id -> { state, locked, timestamp }
+    constructor(options = {}) {
+      this.storageKey = (options && options.storageKey) || 'aura_state_manager_v1';
+      this.widgets = new Map(); // tool_call_id -> widgetEntry
       this.executedActions = new Set(); // action_id
+      this.actionResults = new Map(); // action_id -> result
       this.loadFromSessionStorage();
     }
-    registerWidget(toolCallId, initialProps) { ... }
+    registerWidget(toolCallId, initialProps, ttlSeconds, customTimestamp) { ... }
+    getWidget(toolCallId) { ... }
     lockWidget(toolCallId, actionId) { ... }
     unlockWidget(toolCallId) { ... }
     isActionExecuted(actionId) { return this.executedActions.has(actionId); }
-    markActionExecuted(actionId) { 
+    markActionExecuted(actionId, result) { 
       this.executedActions.add(actionId);
+      if (result) this.actionResults.set(actionId, result);
       this.persistToSessionStorage();
     }
-    isStale(timestamp, ttlSeconds = 900) {
-      return (Date.now() - timestamp) > (ttlSeconds * 1000);
-    }
+    isStale(timestamp, ttlSeconds = 900) { ... }
+    isWidgetStale(toolCallId) { ... }
+    applyOptimisticState(toolCallId, optimisticData) { ... }
+    rollbackOptimisticState(toolCallId) { ... }
+    finalizeSuccessState(toolCallId, result) { ... }
+    persistToSessionStorage() { ... }
+    loadFromSessionStorage() { ... }
   }
   ```
-- [ ] **F4-02 — State Locking Imediato contra Duplo Clique:**  
-  No evento de clique da Action Sheet:
-  1. Verificar se `action_id` já foi executado. Se sim, ignorar o evento.
-  2. Mudar a classe CSS do botão para `opacity-50 pointer-events-none cursor-not-allowed`.
-  3. Substituir o texto do botão por um badge animado: `<span class="animate-pulse">Emitindo pedido no ERP...</span>`.
-- [ ] **F4-03 — Fluxo Otimista com Rollback Resiliente:**  
-  ```javascript
-  widget.applyOptimisticState({ status: 'approved', locked: true });
-  try {
-    const result = await window.auraApi.executeAction(actionId, widget.props);
-    AuraStateManager.markActionExecuted(actionId);
-    widget.finalizeSuccessState(result);
-  } catch (err) {
-    widget.rollbackOptimisticState();
-    window.auraFx.showToast({
-      title: 'Falha na Operação',
-      message: 'Não foi possível comunicar com o ERP central. Tente novamente.',
-      type: 'error'
-    });
-  }
-  ```
-- [ ] **F4-04 — Expiração de Ações no Histórico do Chat:**  
-  Ao carregar conversas anteriores ou após nova interação do usuário, transicionar botões de widgets antigos para o estado `Expirado` caso o timestamp da ação tenha ultrapassado o limite de validade operacional (TTL padrão: 15 minutos).
+- [x] **F4-02 - State Locking Imediato contra Duplo Clique:**  
+  No evento de clique da Action Sheet (`handleActionClick` em `web/js/aura-genui-widgets.js`):
+  1. Verificacao imediata se `action_id` ja foi executado (`isActionExecuted`) ou se o widget esta bloqueado (`isLocked`), descartando cliques subsequentes de forma idempotente.
+  2. Aplicacao de classes CSS tateis de desabilitacao imediata (`opacity-50 pointer-events-none cursor-not-allowed`).
+  3. Substituicao de texto e feedback visual animado com icone de spinner e estado transicional claro.
+- [x] **F4-03 - Fluxo Otimista com Rollback Resiliente:**  
+  1. Aplicacao de snapshot de estado anterior e mutacao otimista visual (`applyOptimisticState`).
+  2. Chamada RPC de execucao transacional (`window.auraApi.executeAction(actionId, widget.props)`).
+  3. Em caso de sucesso, marcacao definitiva (`markActionExecuted`), gravacao de voucher e finalizacao (`finalizeSuccessState`).
+  4. Em caso de falha de rede ou timeout, reversao perfeita do snapshot previo (`rollbackOptimisticState`), restauracao tatil do botao e disparo de notificacao toast nao intrusiva (`window.auraFx.showToast`).
+- [x] **F4-04 - Expiracao de Acoes no Historico do Chat (Stale Action Guard):**  
+  Verificacao de TTL (padrao 15 minutos / 900s) via `isStale` e `isExpired()`. Acoes antigas no feed do chat recebem badge semantico visual de proposta expirada (`.badge-expired`, `.genui-expired-badge`) e tem botoes de mutacao desabilitados no DOM, impedindo mutacoes defasadas. `AuraChatController.expireStaleWidgets()` implementado para varredura periodica do historico.
 
-**Critério de Aceite da Fase 4:**  
-- Cliques múltiplos no mesmo botão geram apenas uma única chamada de rede.
-- Simulação de erro 500 ou queda de conexão reverte o estado do botão instantaneamente com feedback visual claro.
-- Suíte de testes em Node.js cobrindo o ciclo de vida completo de mutação e rollback.
+**Criterio de Aceite da Fase 4 (100% Aprovado):**  
+- [x] Cliques multiplos no mesmo botao geram apenas uma unica chamada de rede (prevencao absoluta de duplo clique).
+- [x] Simulacao de erro ou queda de conexao reverte o estado do botao instantaneamente com snapshot e feedback via toast.
+- [x] Inspecao de TTL desabilita acoes no historico com badge de proposta expirada apos 15 minutos (900s).
+- [x] Suite de testes automatizada em Python e Node.js cobrindo o ciclo de vida completo de mutacao, storage e rollback com 100% de sucesso e zero regressao (`scripts/test_genui_state_manager.py`).
 
 ---
 

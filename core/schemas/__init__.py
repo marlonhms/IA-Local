@@ -75,6 +75,8 @@ from core.schemas.genui import (
     ExecutiveImpactProjection,
     ExecutiveEvidenceItem,
     ExecutiveDecisionProps,
+    WidgetStateRecord,
+    WidgetActionExecution,
 )
 
 __all__ = [
@@ -137,6 +139,8 @@ __all__ = [
     "ExecutiveImpactProjection",
     "ExecutiveEvidenceItem",
     "ExecutiveDecisionProps",
+    "WidgetStateRecord",
+    "WidgetActionExecution",
 ]
 
 

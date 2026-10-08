@@ -1,13 +1,16 @@
 /**
- * AURA Core Engine API Client (v2.0 — GenUI Streaming Multiplexed Protocol)
- * Comunicação direta com a API FastAPI local (/api/v1/aura)
+ * AURA Core Engine API Client (v2.0 - GenUI Streaming Multiplexed Protocol)
+ * Comunicacao direta com a API FastAPI local (/api/v1/aura)
  * Suporte a Server-Sent Events (SSE) multiplexados via POST stream,
- * bufferização volátil de deltas JSON, execução de intenções e suporte analítico sob demanda.
+ * bufferizacao volatil de deltas JSON, execucao de intencoes e suporte analitico sob demanda.
  */
 
 class AuraApiClient {
-  constructor(baseUrl = '') {
-    this.baseUrl = baseUrl.replace(/\/$/, '');
+  constructor(baseUrlOrOptions = '') {
+    const raw = (typeof baseUrlOrOptions === 'object' && baseUrlOrOptions !== null)
+      ? (baseUrlOrOptions.baseUrl || '')
+      : (baseUrlOrOptions || '');
+    this.baseUrl = String(raw).replace(/\/$/, '');
   }
 
   /**
@@ -319,6 +322,53 @@ class AuraApiClient {
    */
   async chatStream(options = {}) {
     return this.streamChat(options);
+  }
+
+  /**
+   * Executa uma acao transacional Human-in-the-Loop na rota /api/v1/aura/actions/execute
+   * @param {string} actionId - Identificador RFC 4122 v4 da acao
+   * @param {Object} [options={}] - Objeto contendo tool_call_id, payload e timeoutMs
+   * @returns {Promise<Object>} Resposta com Action Voucher ou status
+   */
+  async executeAction(actionId, options = {}) {
+    const toolCallId = options.tool_call_id || options.toolCallId || '';
+    const payload = options.payload || options.props || {};
+    const timeoutMs = Number(options.timeoutMs || 15000);
+
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutTimer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
+    try {
+      const fetchOpts = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action_id: actionId,
+          tool_call_id: toolCallId,
+          payload: payload,
+        }),
+      };
+      if (controller) {
+        fetchOpts.signal = controller.signal;
+      }
+
+      const res = await fetch(`${this.baseUrl}/api/v1/aura/actions/execute`, fetchOpts);
+
+      if (!res.ok) {
+        let errDetail = {};
+        try { errDetail = await res.json(); } catch (_) {}
+        throw new Error(errDetail.detail?.error || errDetail.error || `Erro HTTP ${res.status} ao executar acao ${actionId}`);
+      }
+
+      return await res.json();
+    } catch (err) {
+      if (err && (err.name === 'AbortError' || String(err.message || '').toLowerCase().includes('abort'))) {
+        throw new Error(`Timeout de conexao (${timeoutMs}ms) ao executar acao ${actionId}`);
+      }
+      throw err;
+    } finally {
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+    }
   }
 }
 

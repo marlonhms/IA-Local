@@ -37,8 +37,8 @@ from pathlib import Path
 # Protege stdout no terminal Windows contra problemas de codificação
 if hasattr(sys.stdout, "reconfigure"):
     try:
-        sys.stdout.reconfigure(encoding="utf-8")
-        sys.stderr.reconfigure(encoding="utf-8")
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
 
@@ -620,7 +620,8 @@ def run_regression_suites():
             cwd=str(BASE_DIR),
             capture_output=True,
             text=True,
-            encoding="utf-8"
+            encoding="utf-8",
+            errors="replace"
         )
         if res.returncode != 0:
             print(f"\n❌ REGRESSÃO DETECTADA EM {script_name}:")

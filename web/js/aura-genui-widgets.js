@@ -69,10 +69,53 @@
     }
 
     /**
-     * Monta o elemento DOM principal no padrão AURA Precision Glass Deluxe
-     * @returns {HTMLElement|string} Elemento DOM hidratado (ou representação de nó)
+     * Avalia se a proposta do widget expirou pelo TTL (padrao: 15 min / 900s)
+     * @returns {boolean}
+     */
+    isExpired() {
+      const stateMgr = (typeof window !== 'undefined' && window.auraStateManager) ||
+                       (typeof globalThis !== 'undefined' && globalThis.auraStateManager) ||
+                       null;
+      if (stateMgr && typeof stateMgr.isStale === 'function') {
+        return stateMgr.isStale(this.createdAt, this.ttlSeconds);
+      }
+      let ts = 0;
+      if (typeof this.createdAt === 'number') {
+        ts = this.createdAt;
+      } else if (typeof this.createdAt === 'string') {
+        const parsed = Date.parse(this.createdAt);
+        ts = isNaN(parsed) ? Number(this.createdAt) : parsed;
+      } else if (this.createdAt instanceof Date) {
+        ts = this.createdAt.getTime();
+      }
+      if (isNaN(ts) || ts <= 0) return false;
+      return (Date.now() - ts) > (this.ttlSeconds * 1000);
+    }
+
+    /**
+     * Monta o elemento DOM principal no padrao AURA Precision Glass Deluxe
+     * @returns {HTMLElement|string} Elemento DOM hidratado (ou representacao de no)
      */
     mount() {
+      // 0. Registra o widget no AuraStateManager se disponivel e sincroniza estado persistido
+      const stateMgr = (typeof window !== 'undefined' && window.auraStateManager) ||
+                       (typeof globalThis !== 'undefined' && globalThis.auraStateManager) ||
+                       null;
+      if (stateMgr && typeof stateMgr.registerWidget === 'function') {
+        const entry = stateMgr.registerWidget(
+          this.toolCallId,
+          Object.assign({ created_at: this.createdAt, timestamp: this.createdAt }, this.props),
+          this.ttlSeconds,
+          this.createdAt
+        );
+        if (entry && entry.state) {
+          this.state = Object.assign({}, this.state, entry.state);
+          if (entry.optimisticData && entry.optimisticData.feedback) {
+            this.state.optimisticFeedback = entry.optimisticData.feedback;
+          }
+        }
+      }
+
       // 1. Gera HTML canônico seguro das 3 camadas
       const htmlContent = this.renderHtml();
 
@@ -285,8 +328,26 @@
         ? this.actions
         : (this.props && Array.isArray(this.props.suggested_actions) ? this.props.suggested_actions : []);
 
-      const isLocked = this.state.isLocked;
+      const isLocked = !!this.state.isLocked;
       const feedback = this.state.optimisticFeedback;
+      const isExpired = this.isExpired() || this.state.status === 'expired';
+
+      const stateMgr = (typeof window !== 'undefined' && window.auraStateManager) ||
+                       (typeof globalThis !== 'undefined' && globalThis.auraStateManager) ||
+                       null;
+
+      let expiredBadge = '';
+      if (isExpired) {
+        expiredBadge = `
+          <div class="genui-expired-badge p-2.5 mb-2.5 rounded-xl bg-slate-950/70 border border-slate-700/60 text-slate-400 text-xs flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-slate-500"></span>
+              <span class="font-medium text-slate-300">Proposta Expirada (Dados de telemetria desatualizados)</span>
+            </div>
+            <span class="badge-expired text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-700">Expirado</span>
+          </div>
+        `;
+      }
 
       let feedbackBadge = '';
       if (feedback) {
@@ -317,6 +378,10 @@
           const variant = act.variant || 'primary';
           const actType = act.action_type || 'mutation';
 
+          const isActionDone = stateMgr && typeof stateMgr.isActionExecuted === 'function' && stateMgr.isActionExecuted(act.action_id);
+          const isCurrentActive = isLocked && this.state.lockedActionId === act.action_id;
+          const shouldDisable = isLocked || isActionDone || (isExpired && actType !== 'inspection');
+
           let btnClass = 'px-3 py-2 rounded-xl text-xs font-semibold font-sans transition-all flex items-center justify-center gap-1.5 shadow-sm ';
           if (variant === 'primary') {
             btnClass += 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold border border-cyan-400/30 ';
@@ -329,8 +394,15 @@
             btnClass += 'bg-slate-900/60 hover:bg-slate-800 text-slate-300 border border-white/10 ';
           }
 
-          if (isLocked) {
+          if (shouldDisable) {
             btnClass += 'opacity-50 pointer-events-none cursor-not-allowed ';
+          }
+
+          let displayLabel = label;
+          if (isActionDone) {
+            displayLabel = `✔ ${label}`;
+          } else if (isCurrentActive) {
+            displayLabel = `<span class="inline-flex items-center gap-1.5"><svg class="animate-spin -ml-0.5 mr-1 h-3.5 w-3.5 text-cyan-400 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg><span class="animate-pulse">Processando...</span></span>`;
           }
 
           return `
@@ -339,19 +411,21 @@
                     data-action-id="${actId}"
                     data-action-type="${escapeHtml(actType)}"
                     data-tool-call-id="${escapeHtml(this.toolCallId)}"
-                    ${isLocked ? 'disabled' : ''}>
-              <span>${label}</span>
+                    ${shouldDisable ? 'disabled' : ''}>
+              <span>${displayLabel}</span>
             </button>
           `;
         }).join('');
       } else {
         // Ação padrão caso nenhuma venha no payload
+        const shouldDisable = isLocked || isExpired;
         buttonsHtml = `
           <button type="button"
-                  class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold hover:brightness-110"
+                  class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold hover:brightness-110 ${shouldDisable ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
                   data-action-id="act_default_1"
                   data-action-type="inspection"
-                  data-tool-call-id="${escapeHtml(this.toolCallId)}">
+                  data-tool-call-id="${escapeHtml(this.toolCallId)}"
+                  ${shouldDisable ? 'disabled' : ''}>
             <span>⚡ Aplicar Recomendações Prioritárias</span>
           </button>
           <button type="button"
@@ -366,6 +440,7 @@
 
       return `
         <div class="genui-layer genui-layer-3 pt-3 border-t border-white/10">
+          ${expiredBadge}
           ${feedbackBadge}
           ${errorBadge}
           <div class="flex flex-wrap gap-2">
@@ -437,7 +512,14 @@
      * Processa clique em botão de ação da Camada 3 com State Locking e Optimistic UI
      */
     async handleActionClick(actionId, actionType, btnElement, event) {
+      const stateMgr = (typeof window !== 'undefined' && window.auraStateManager) ||
+                       (typeof globalThis !== 'undefined' && globalThis.auraStateManager) ||
+                       null;
+
       if (this.state.isLocked) return;
+      if (stateMgr && typeof stateMgr.getWidget === 'function' && stateMgr.getWidget(this.toolCallId)?.isLocked) return;
+      if (stateMgr && typeof stateMgr.isActionExecuted === 'function' && stateMgr.isActionExecuted(actionId)) return;
+      if (this.isExpired() && actionType !== 'inspection') return;
 
       // 1. Ações de inspeção no Companion Canvas com proteção de debounce
       if (actionType === 'inspection' || (btnElement && btnElement.textContent.includes('Canvas'))) {
@@ -457,8 +539,22 @@
         payload: { intent: this.intent, tool_call_id: this.toolCallId }
       };
 
-      // Aplica State Locking imediato e Optimistic UI (F4-02 & F4-03)
+      // Aplica State Locking imediato e Optimistic UI no AuraStateManager (F4-02 & F4-03)
+      if (stateMgr) {
+        stateMgr.lockWidget(this.toolCallId, actionId);
+        stateMgr.applyOptimisticState(this.toolCallId, {
+          actionId: actionId,
+          label: actionDef.label,
+          status: 'optimistic'
+        });
+      }
+
+      // Aplica State Locking e classes de desabilitação tátil no DOM
       this.applyOptimisticState(actionId, `Autorizando: ${actionDef.label}...`);
+      if (btnElement) {
+        btnElement.classList.add('opacity-50', 'pointer-events-none', 'cursor-not-allowed');
+        btnElement.disabled = true;
+      }
 
       // Dispara evento customizado auditado para controladores externos
       if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
@@ -487,11 +583,24 @@
             tool_call_id: this.toolCallId,
             payload: actionDef.payload
           });
-          this.state.status = 'committed';
-          this.state.optimisticFeedback = `✔ Ação Homologada com Sucesso (Voucher: ${res?.voucher_id || 'OK'})`;
-          this.refreshLayer3();
+          if (stateMgr) {
+            stateMgr.markActionExecuted(actionId, res);
+            stateMgr.finalizeSuccessState(this.toolCallId, res);
+          }
+          this.finalizeSuccessState(res);
         } catch (err) {
+          if (stateMgr) {
+            stateMgr.rollbackOptimisticState(this.toolCallId);
+          }
           this.rollbackOptimisticState(err?.message || 'Falha na comunicação com o ERP.');
+          const fx = (typeof window !== 'undefined' && window.auraFx) || null;
+          if (fx && typeof fx.showToast === 'function') {
+            fx.showToast({
+              title: 'Falha na Operação',
+              message: 'Não foi possível comunicar com o ERP central. Tente novamente.',
+              type: 'error'
+            });
+          }
         }
       }
     }
@@ -499,10 +608,19 @@
     /**
      * Aplica mutação otimista visual e trava botões contra cliques concorrentes
      */
-    applyOptimisticState(actionId, feedbackText = 'Processando autorização no ERP...') {
+    applyOptimisticState(actionIdOrData, feedbackText = 'Processando autorização no ERP...') {
+      let actId = null;
+      let feedback = feedbackText;
+      if (typeof actionIdOrData === 'object' && actionIdOrData !== null) {
+        actId = actionIdOrData.actionId || actionIdOrData.action_id || null;
+        feedback = actionIdOrData.feedback || actionIdOrData.label || feedbackText;
+        if (actionIdOrData.status) this.state.status = actionIdOrData.status;
+      } else {
+        actId = actionIdOrData;
+      }
       this.state.isLocked = true;
-      this.state.lockedActionId = actionId;
-      this.state.optimisticFeedback = feedbackText;
+      this.state.lockedActionId = actId;
+      this.state.optimisticFeedback = feedback;
       this.state.errorMessage = null;
       this.refreshLayer3();
     }
@@ -515,6 +633,21 @@
       this.state.lockedActionId = null;
       this.state.optimisticFeedback = null;
       this.state.errorMessage = errorMsg;
+      if (this.state.status === 'locked' || this.state.status === 'optimistic') {
+        this.state.status = 'failed';
+      }
+      this.refreshLayer3();
+    }
+
+    /**
+     * Consolida estado homologado com sucesso no backend (Voucher emitido)
+     */
+    finalizeSuccessState(result = {}) {
+      this.state.status = 'committed';
+      this.state.isLocked = false;
+      this.state.lockedActionId = null;
+      this.state.optimisticFeedback = `✔ Ação Homologada com Sucesso (Voucher: ${result?.voucher_id || 'OK'})`;
+      this.state.errorMessage = null;
       this.refreshLayer3();
     }
 
@@ -609,11 +742,13 @@
     window.AuraGenUI.ExecutiveBriefingWidget = ExecutiveBriefingWidget;
 
     // Escuta evento de inicialização deferida do registry
-    window.addEventListener('aura:genui-ready', (evt) => {
-      if (evt?.detail?.registry) {
-        registerWidgets(evt.detail.registry);
-      }
-    });
+    if (typeof window.addEventListener === 'function') {
+      window.addEventListener('aura:genui-ready', (evt) => {
+        if (evt?.detail?.registry) {
+          registerWidgets(evt.detail.registry);
+        }
+      });
+    }
   }
 
   // 2. Exportação CommonJS para testes automatizados headless (Node.js)

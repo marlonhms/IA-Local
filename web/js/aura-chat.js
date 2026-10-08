@@ -122,6 +122,12 @@ class AuraChatController {
     if (!feed || !feed.firstElementChild) {
       this.addWelcomeMessage();
     }
+    this.expireStaleWidgets();
+    if (typeof window !== 'undefined' && typeof window.setInterval === 'function') {
+      try {
+        window.setInterval(() => this.expireStaleWidgets(), 60000);
+      } catch (_) {}
+    }
   }
 
   bindEvents() {
@@ -401,6 +407,7 @@ class AuraChatController {
       this.finalizeCognitiveStep(messageContainerId, true);
       this.setStreamingState(false);
       this.scrollToBottom(false);
+      this.expireStaleWidgets();
     };
 
     try {
@@ -647,6 +654,21 @@ class AuraChatController {
       if (alreadyMounted) return;
     }
 
+    // Registra o widget no AuraStateManager para gestao de estado e idempotencia
+    const stateMgr = (typeof window !== 'undefined' && window.auraStateManager) ||
+                     (typeof globalThis !== 'undefined' && globalThis.auraStateManager) ||
+                     null;
+    if (stateMgr && toolCallId && typeof stateMgr.registerWidget === 'function') {
+      const createdAt = envelopeData.created_at || envelopeData.timestamp || Date.now();
+      const ttl = envelopeData.ttl_seconds || 900;
+      stateMgr.registerWidget(
+        toolCallId,
+        Object.assign({ created_at: createdAt, timestamp: createdAt }, envelopeData.props || {}),
+        ttl,
+        createdAt
+      );
+    }
+
     let skeletonSlot = (toolCallId && typeof document.getElementById === 'function')
       ? document.getElementById('genui-skeleton-' + toolCallId)
       : null;
@@ -801,6 +823,15 @@ class AuraChatController {
     const props = envelopeData.props || {};
     const actions = envelopeData.actions || [];
 
+    const stateMgr = (typeof window !== 'undefined' && window.auraStateManager) ||
+                     (typeof globalThis !== 'undefined' && globalThis.auraStateManager) ||
+                     null;
+    const createdAt = envelopeData.created_at || envelopeData.timestamp || Date.now();
+    const ttlSeconds = envelopeData.ttl_seconds || 900;
+    const isExpired = stateMgr && typeof stateMgr.isStale === 'function'
+      ? stateMgr.isStale(createdAt, ttlSeconds)
+      : false;
+
     const propKeys = Object.keys(props).slice(0, 6);
     const propsHtml = propKeys.map(k => {
       const val = props[k];
@@ -814,6 +845,11 @@ class AuraChatController {
     }).join('');
 
     const actionsHtml = actions.map(act => {
+      const isActionDone = stateMgr && typeof stateMgr.isActionExecuted === 'function' && stateMgr.isActionExecuted(act.action_id);
+      const shouldDisable = isActionDone || isExpired;
+      const displayLabel = isActionDone ? `✔ ${act.label || 'Ação'}` : (act.label || 'Ação');
+      const disabledClass = shouldDisable ? 'opacity-50 pointer-events-none cursor-not-allowed ' : '';
+
       const variantClass = act.variant === 'danger'
         ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 hover:bg-rose-500/30'
         : act.variant === 'secondary'
@@ -822,11 +858,20 @@ class AuraChatController {
       return `
         <button type="button" 
                 data-action-id="${this.escapeHtml(act.action_id || '')}"
-                class="px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${variantClass}">
-          ${this.escapeHtml(act.label || 'Ação')}
+                data-tool-call-id="${this.escapeHtml(toolCallId || '')}"
+                class="genui-action-btn px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${variantClass} ${disabledClass}"
+                ${shouldDisable ? 'disabled' : ''}>
+          ${this.escapeHtml(displayLabel)}
         </button>
       `;
     }).join('');
+
+    const expiredBadgeHtml = isExpired ? `
+      <div class="genui-expired-badge p-2 mb-2 rounded-xl bg-slate-950/70 border border-slate-700/60 text-slate-400 text-xs flex items-center justify-between gap-2">
+        <span class="text-slate-300">Proposta Expirada (Dados desatualizados)</span>
+        <span class="badge-expired text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-700">Expirado</span>
+      </div>
+    ` : '';
 
     return `
       <div id="genui-card-${this.escapeHtml(toolCallId || 'default')}" 
@@ -853,6 +898,8 @@ class AuraChatController {
           </div>
         ` : ''}
 
+        ${expiredBadgeHtml}
+
         ${actions.length > 0 ? `
           <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-white/5">
             ${actionsHtml}
@@ -863,8 +910,44 @@ class AuraChatController {
   }
 
   /**
-   * F2-04: Remove graciosamente slots de esqueleto órfãos em caso de erro, done ou fallback
-   * Garante que nenhuma caixa vazia permaneça no DOM se ui_complete não for emitido.
+   * F4-04: Escaneia o DOM do feed e desativa acoes de widgets cujo TTL foi excedido (> 15 min / 900s)
+   */
+  expireStaleWidgets() {
+    if (typeof document === 'undefined') return;
+    const stateMgr = (typeof window !== 'undefined' && window.auraStateManager) ||
+                     (typeof globalThis !== 'undefined' && globalThis.auraStateManager) ||
+                     null;
+    if (!stateMgr || typeof stateMgr.isStale !== 'function') return;
+
+    if (typeof document.querySelectorAll === 'function') {
+      const cards = document.querySelectorAll('.genui-hydrated-card[data-tool-call-id]');
+      cards.forEach(card => {
+        const toolCallId = card.getAttribute('data-tool-call-id');
+        const widget = stateMgr.getWidget(toolCallId);
+        if (widget && stateMgr.isStale(widget.timestamp, widget.ttlSeconds)) {
+          widget.state.status = 'expired';
+          const btns = card.querySelectorAll('.genui-action-btn:not([data-action-type="inspection"])');
+          btns.forEach(btn => {
+            btn.classList.add('opacity-50', 'pointer-events-none', 'cursor-not-allowed');
+            btn.setAttribute('disabled', 'true');
+          });
+          if (!card.querySelector('.genui-expired-badge') && !card.querySelector('.badge-expired')) {
+            const targetContainer = card.querySelector('.genui-layer-3') || card.querySelector('.border-t') || card;
+            if (targetContainer) {
+              const badge = document.createElement('div');
+              badge.className = 'genui-expired-badge p-2.5 mb-2.5 rounded-xl bg-slate-950/70 border border-slate-700/60 text-slate-400 text-xs flex items-center justify-between gap-2';
+              badge.innerHTML = '<div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-slate-500"></span><span class="font-medium text-slate-300">Proposta Expirada (Dados de telemetria desatualizados)</span></div><span class="badge-expired text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-700">Expirado</span>';
+              targetContainer.insertBefore(badge, targetContainer.firstChild);
+            }
+          }
+        }
+      });
+    }
+  }
+
+  /**
+   * F2-04: Remove graciosamente slots de esqueleto orfaos em caso de erro, done ou fallback
+   * Garante que nenhuma caixa vazia permaneca no DOM se ui_complete nao for emitido.
    */
   cleanupSkeletonSlots(containerId = null) {
     if (typeof document === 'undefined') return;
@@ -899,13 +982,17 @@ class AuraChatController {
   }
 
   /**
-   * Processa eventos de confirmação / voucher de ações transacionais (ui_action_feedback)
+   * Processa eventos de confirmacao / voucher de acoes transacionais (ui_action_feedback)
    */
   handleUIActionFeedback(containerId, feedbackData) {
     if (!feedbackData || typeof document === 'undefined') return;
     const actionId = feedbackData.action_id;
     const status = feedbackData.status;
     const voucherId = feedbackData.voucher_id;
+
+    const stateMgr = (typeof window !== 'undefined' && window.auraStateManager) ||
+                     (typeof globalThis !== 'undefined' && globalThis.auraStateManager) ||
+                     null;
 
     if (actionId && typeof document.querySelector === 'function') {
       const btn = document.querySelector(`button[data-action-id="${actionId}"]`);
@@ -918,6 +1005,21 @@ class AuraChatController {
           btn.disabled = false;
           btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30';
           btn.innerHTML = `✖ Falha ao executar (Tentar Novamente)`;
+        }
+      }
+
+      if (stateMgr) {
+        if (status === 'COMMITTED') {
+          stateMgr.markActionExecuted(actionId, feedbackData);
+          const toolCallId = feedbackData.tool_call_id || (btn ? btn.getAttribute('data-tool-call-id') : null);
+          if (toolCallId) {
+            stateMgr.finalizeSuccessState(toolCallId, feedbackData);
+          }
+        } else if (status === 'FAILED') {
+          const toolCallId = feedbackData.tool_call_id || (btn ? btn.getAttribute('data-tool-call-id') : null);
+          if (toolCallId) {
+            stateMgr.rollbackOptimisticState(toolCallId);
+          }
         }
       }
     }

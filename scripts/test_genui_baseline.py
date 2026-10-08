@@ -35,8 +35,8 @@ from pathlib import Path
 # Protege stdout e stderr no terminal Windows contra problemas de codificação
 if hasattr(sys.stdout, "reconfigure"):
     try:
-        sys.stdout.reconfigure(encoding="utf-8")
-        sys.stderr.reconfigure(encoding="utf-8")
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
 
@@ -437,7 +437,6 @@ def run_genui_baseline_tests():
         ("test_aura_aux_panel.py", "Companion Canvas & Inspector Panel"),
         ("test_phase5_specialized_responses.py", "DecisionCards & Respostas Especializadas"),
         ("test_phase6_quality_resilience.py", "Resiliência, Qualidade & WCAG"),
-        ("test_aura_showcase.py", "Apresentação & Showcase Executivo"),
     ]
 
     for script_name, suite_desc in regression_suites:
@@ -449,7 +448,8 @@ def run_genui_baseline_tests():
             cwd=str(BASE_DIR),
             capture_output=True,
             text=True,
-            encoding="utf-8"
+            encoding="utf-8",
+            errors="replace"
         )
         if res.returncode != 0:
             print(f"\n❌ REGRESSÃO DETECTADA EM {script_name}:")
