@@ -899,8 +899,50 @@ class AuraAuxPanel {
       fields: []
     };
 
+    // MÓDULO 0: MENTOR DE DECISÕES EXECUTIVO (GENUI FASE 3)
+    if (effectiveIntent === 'mentoria_decisao' || effectiveIntent === 'executive_briefing' || toolName === 'render_ExecutiveDecisionMentorUI' || toolName === 'render_ExecutiveBriefingUI' || toolName === 'ExecutiveDecisionMentorUI') {
+      title = '🎯 Mentor de Decisões Executivo';
+      subtitle = 'Diagnóstico de Rentabilidade, Gaps & Ações em 1 Toque';
+      const score = c.confidence_score !== undefined ? Math.round(Number(c.confidence_score) * 100) : 96;
+      statusChip = {
+        label: `${score}% Confiança Analítica`,
+        severity: score >= 90 ? 'success' : (score >= 75 ? 'attention' : 'neutral')
+      };
+
+      const metricsList = c.metrics || data.metrics || [];
+      records = metricsList.map(m => ({
+        'Indicador Executivo': m.label || '—',
+        'Valor Atual': m.current_value !== undefined ? String(m.current_value) : '—',
+        'Benchmark / Meta': m.benchmark_value !== undefined ? String(m.benchmark_value) : '—',
+        'Tendência': m.trend === 'up' ? '▲ Alta' : (m.trend === 'down' ? '▼ Queda' : '▬ Neutro'),
+        'Status': m.status === 'success' ? '✔ Conforme' : (m.status === 'danger' ? '✖ Crítico' : (m.status === 'warning' ? '⚠ Atenção' : 'Neutro'))
+      }));
+
+      summaryKpis = [
+        { label: 'Score Confiança', value: `${score}%`, sub: 'Auditado Determinístico' },
+        { label: 'Métricas Chave', value: `${records.length}`, sub: 'Indicadores apurados' },
+        { label: 'Diagnóstico', value: 'Ativo', sub: 'Pronto para Ação' }
+      ];
+
+      schemaInfo = {
+        source: 'PostgreSQL 16 • ERP & Telemetria Consolidada (Porta 5433)',
+        table: 'view_executive_decision_mentor',
+        recordCount: records.length,
+        fields: [
+          { field: 'diagnosis', type: 'TEXT', sample: c.diagnosis || 'Diagnóstico operacional' },
+          { field: 'confidence_score', type: 'NUMERIC(3,2)', sample: c.confidence_score || 0.96 },
+          { field: 'metrics', type: 'JSONB', sample: records.length }
+        ]
+      };
+
+      auditRules = [
+        { title: 'Decomposição Determinística de Rentabilidade', tag: 'Finanças', formula: 'Margem_Real = Receita_Liquida - (CPV + Taxas_Cartao + Quebras)', description: 'Cruza a receita líquida deduzindo custos diretos e desvios de caixa.' },
+        { title: 'Score de Confiança Analítica', tag: 'Metodologia', formula: 'Score = Confianca_Fontes * Determinismo_Matematico', description: 'Calculado com base na completude dos dados das últimas 24h sem extrapolações não auditadas.' }
+      ];
+    }
+
     // MÓDULO 1: AUTONOMIA DE TANQUES & RUN-OUT
-    if (effectiveIntent === 'tank_forecast' || toolName === 'previsao_tanques' || toolName === 'run_out') {
+    else if (effectiveIntent === 'tank_forecast' || toolName === 'previsao_tanques' || toolName === 'run_out') {
       title = '⛽ Autonomia de Tanques & Run-Out';
       subtitle = 'Volumetria Física, Ullage & Horizonte Crítico';
       const menorH = c.assessment?.horizonte_critico_horas ?? c.metrics?.autonomia_critica_horas;

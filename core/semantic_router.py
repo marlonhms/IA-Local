@@ -89,6 +89,21 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
             "relatório de fechamento de turno",
         ]
     },
+    "mentoria_decisao": {
+        "descricao": "Mentoria executiva de decisão, briefing estratégico, diagnóstico de rentabilidade e gaps do negócio",
+        "exemplos": [
+            "Qual o diagnóstico do meu negócio hoje?",
+            "Onde estou perdendo margem?",
+            "Briefing executivo do dia",
+            "Mentor de decisões executivo",
+            "Como está a saúde financeira e operacional do posto?",
+            "Diagnóstico de rentabilidade e pontos de atenção",
+            "Recomendações prioritárias para a gestão",
+            "Análise executiva de margem e perdas",
+            "O que preciso decidir hoje na operação?",
+            "Visão consolidada de decisões executivas",
+        ]
+    },
     "previsao_tanques": {
         "descricao": "Previsão de esgotamento de combustível (run-out), autonomia e sugestão de pedidos",
         "exemplos": [
@@ -336,6 +351,35 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
         "quebra", "ganho", "regulamentar"
     ]):
         return "lmc_anp"
+
+    # -0.5 Mentoria Executiva de Decisão & Briefing Estratégico (GenUI Fase 3 — P0)
+    termos_mentoria_exatos = [
+        "diagnóstico do meu negócio", "diagnostico do meu negócio", "diagnóstico de negócio", "diagnostico do negocio",
+        "diagnóstico do meu posto", "diagnostico do meu posto", "diagnóstico geral", "diagnostico geral",
+        "diagnóstico executivo", "diagnostico executivo", "briefing executivo", "briefing do dia",
+        "onde estou perdendo margem", "onde perco margem", "perda de margem", "perda de lucro",
+        "mentor de decisão", "mentor de decisões", "mentor de decisao", "mentoria executiva",
+        "mentor executivo", "decisão executiva", "decisao executiva", "decisões executivas",
+        "resumo executivo do dia", "briefing do negócio", "briefing da operação",
+        "como está a saúde do meu posto", "como esta a saude do meu posto", "saúde do negócio",
+        "saude do negocio", "análise de rentabilidade", "analise de rentabilidade",
+        "rentabilidade real", "margem real líquida", "margem real liquida",
+        "recomendações prioritárias", "recomendacoes prioritarias",
+    ]
+    if any(t in p for t in termos_mentoria_exatos):
+        return "mentoria_decisao"
+
+    if ("diagnóstico" in p or "diagnostico" in p) and any(w in p for w in ["negócio", "negocio", "posto", "operação", "operacao", "executivo", "geral", "hoje", "empresa"]):
+        return "mentoria_decisao"
+
+    if ("margem" in p or "lucro" in p) and any(w in p for w in ["perdendo", "perco", "onde", "vazando", "prejuízo", "prejuizo", "queda", "gap"]):
+        return "mentoria_decisao"
+
+    if ("saúde" in p or "saude" in p) and any(w in p for w in ["operação", "operacao", "posto", "negócio", "negocio", "empresa", "caixa", "minha"]):
+        return "mentoria_decisao"
+
+    if ("briefing" in p or "mentor" in p or "mentoria" in p):
+        return "mentoria_decisao"
 
     # 0. Conciliação de Turnos & Auditoria de Pista
     termos_auditoria_exatos = [
@@ -880,8 +924,12 @@ class SemanticRouter:
                 last_similarity = similarity
                 intencao_detectada = melhor_match["intencao"]
 
-                # Priorização de termos técnicos determinísticos do LMC ANP (exceto se for ajuda do sistema)
-                if intencao_detectada not in ("lmc_anp", "ajuda_sistema"):
+                # Priorização determinística de Mentoria Executiva (GenUI Fase 3) ou LMC ANP
+                intencao_h = classificar_intencao_heuristica(query_text)
+                if intencao_h == "mentoria_decisao":
+                    intencao_detectada = "mentoria_decisao"
+                    similarity = max(similarity, 0.95)
+                elif intencao_detectada not in ("lmc_anp", "ajuda_sistema"):
                     if any(t in query_norm for t in TERMOS_LMC_EXATOS) or re.search(r"\blmc\b", query_norm):
                         intencao_detectada = "lmc_anp"
                         similarity = max(similarity, 0.88)

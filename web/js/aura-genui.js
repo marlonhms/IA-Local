@@ -505,6 +505,18 @@
 
   // 2. Exportação CommonJS para testes headless e automação (Node.js)
   if (typeof module !== 'undefined' && module.exports) {
+    // Registra automaticamente os widgets canônicos no catálogo padrão
+    try {
+      const widgets = require('./aura-genui-widgets');
+      if (widgets && typeof widgets.registerWidgets === 'function') {
+        widgets.registerWidgets(registry);
+      }
+      if (widgets && widgets.ExecutiveDecisionMentorUI) {
+        AuraGenUI.ExecutiveDecisionMentorUI = widgets.ExecutiveDecisionMentorUI;
+        AuraGenUI.ExecutiveBriefingWidget = widgets.ExecutiveBriefingWidget;
+      }
+    } catch (_) {}
+
     module.exports = {
       AuraGenUI,
       SecureComponentRegistry,

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, Field, ConfigDict, field_validator, AliasChoices
 
 from core.schemas.idempotency import (
@@ -67,6 +67,104 @@ class GenUIActionOption(BaseModel):
         return v.strip()
 
 
+class ExecutiveMetric(BaseModel):
+    """Métrica executiva analítica individual com benchmark e tendência."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    label: str = Field(..., description="Rótulo da métrica (ex: Margem Líquida Real)")
+    current_value: Any = Field(..., description="Valor atual apurado")
+    benchmark_value: Optional[Any] = Field(default=None, description="Valor de benchmark ou meta histórica")
+    trend: Literal["up", "down", "neutral"] = Field(
+        default="neutral",
+        description="Tendência do indicador: up, down ou neutral"
+    )
+    status: Literal["success", "warning", "danger", "neutral"] = Field(
+        default="neutral",
+        description="Classificação semântica de status"
+    )
+    unit: Optional[str] = Field(default=None, description="Unidade de medida (%, R$, L, etc.)")
+    delta_percent: Optional[float] = Field(default=None, description="Variação percentual calculada")
+
+    @field_validator("label")
+    @classmethod
+    def check_label(cls, v: str) -> str:
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("label não pode ser vazio")
+        return v.strip()
+
+
+class ExecutiveImpactProjection(BaseModel):
+    """Projeção de impacto financeiro ou operacional estimado."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    summary: str = Field(..., description="Resumo descritivo da projeção")
+    estimated_financial_impact: Optional[float] = Field(
+        default=None,
+        description="Impacto financeiro estimado em R$ (positivo = ganho, negativo = perda)"
+    )
+    timeframe: Optional[str] = Field(default=None, description="Janela temporal estimada (ex: 24h, 7 dias, mensal)")
+    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Confiança na projeção (0.0 a 1.0)")
+
+
+class ExecutiveEvidenceItem(BaseModel):
+    """Item de evidência analítica para aprofundamento no Companion Canvas."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    title: str = Field(..., description="Título da evidência ou fonte")
+    detail: str = Field(..., description="Detalhamento técnico ou contábil")
+    value: Optional[Any] = Field(default=None, description="Valor apurado")
+    source: Optional[str] = Field(default=None, description="Tabela ou sensor de origem")
+
+
+class ExecutiveDecisionProps(BaseModel):
+    """Propriedades determinísticas do Micro-Widget Piloto ExecutiveDecisionMentorUI (Camada 2)."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    diagnosis: str = Field(..., description="Diagnóstico conciso e direto sem ruído gerativo")
+    confidence_score: float = Field(..., ge=0.0, le=1.0, description="Score de confiança na recomendação (0.0 a 1.0)")
+    metrics: List[ExecutiveMetric] = Field(default_factory=list, description="Lista de métricas executivas comparativas")
+    limitations: List[str] = Field(
+        default_factory=list,
+        description="Avisos sobre limitações dos dados (ex: dados sem conciliação bancária)"
+    )
+    impact_projection: Optional[Union[str, Dict[str, Any], ExecutiveImpactProjection]] = Field(
+        default=None,
+        description="Texto ou estrutura com projeção financeira ou operacional estimada"
+    )
+    evidence_items: List[Union[str, Dict[str, Any], ExecutiveEvidenceItem]] = Field(
+        default_factory=list,
+        description="Lista de evidências para aprofundamento analítico"
+    )
+    suggested_actions: List[GenUIActionOption] = Field(
+        default_factory=list,
+        description="Opções de ação imediata em 1 toque na interface"
+    )
+
+    @field_validator("diagnosis")
+    @classmethod
+    def check_diagnosis(cls, v: str) -> str:
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("diagnosis não pode ser vazio")
+        return v.strip()
+
+    @field_validator("limitations", mode="before")
+    @classmethod
+    def normalize_limitations(cls, v: Any) -> List[str]:
+        if v is None:
+            return []
+        if isinstance(v, str):
+            return [v.strip()] if v.strip() else []
+        if isinstance(v, (list, tuple)):
+            res = []
+            for item in v:
+                if isinstance(item, str) and item.strip():
+                    res.append(item.strip())
+                elif item is not None:
+                    res.append(str(item).strip())
+            return res
+        return [str(v)]
+
+
 class GenUIEnvelope(BaseModel):
     """Envelope canônico universal para componentes Server-Driven UI no AURA IntelligentUI."""
     model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
@@ -120,6 +218,15 @@ class GenUIEnvelope(BaseModel):
         if isinstance(v, str):
             return v.strip()
         return str(v).strip()
+
+    @field_validator("props", mode="before")
+    @classmethod
+    def check_props(cls, v: Any) -> Dict[str, Any]:
+        if isinstance(v, BaseModel):
+            return v.model_dump(mode="json")
+        if isinstance(v, dict):
+            return v
+        raise ValueError("props deve ser um dicionário ou modelo Pydantic")
 
     @field_validator("ttl_seconds")
     @classmethod

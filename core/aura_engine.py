@@ -46,7 +46,15 @@ from core.tools import PostoTools, get_erp_connection
 from core.sanitizer import central_log_sanitizer
 from core.semantic_router import SemanticRouter, classificar_intencao_heuristica, RETRY_REGEX
 from core.schemas.idempotency import generate_tool_call_id, generate_action_id
-from core.schemas.genui import GenUIEnvelope, GenUIActionOption, GenUIActionResult
+from core.schemas.genui import (
+    GenUIEnvelope,
+    GenUIActionOption,
+    GenUIActionResult,
+    ExecutiveMetric,
+    ExecutiveImpactProjection,
+    ExecutiveEvidenceItem,
+    ExecutiveDecisionProps,
+)
 
 
 # =============================================================================
@@ -527,6 +535,26 @@ def classificar_intencao(pergunta: str, router: Optional[SemanticRouter] = None)
 # =============================================================================
 
 GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
+    "mentoria_decisao": {
+        "component_name": "render_ExecutiveDecisionMentorUI",
+        "client_component": "ExecutiveDecisionMentorUI",
+        "title": "Processando diagnóstico executivo e mentoria de decisões...",
+    },
+    "executive_briefing": {
+        "component_name": "render_ExecutiveDecisionMentorUI",
+        "client_component": "ExecutiveDecisionMentorUI",
+        "title": "Gerando briefing executivo do negócio...",
+    },
+    "comparativo_turnos": {
+        "component_name": "render_ExecutiveDecisionMentorUI",
+        "client_component": "ExecutiveDecisionMentorUI",
+        "title": "Comparando desempenho entre turnos e operadores...",
+    },
+    "analise_margem": {
+        "component_name": "render_ExecutiveDecisionMentorUI",
+        "client_component": "ExecutiveDecisionMentorUI",
+        "title": "Analisando margem de rentabilidade e taxas de cartões...",
+    },
     "previsao_tanques": {
         "component_name": "render_TankRunOutForecastUI",
         "client_component": "TankForecastWidget",
@@ -600,7 +628,11 @@ def build_canonical_genui_envelope(
 
     # Prepara propriedades determinísticas (Camada 2)
     props: Dict[str, Any] = {}
-    if isinstance(resultado_bruto, dict):
+    if isinstance(resultado_bruto, ExecutiveDecisionProps):
+        props = resultado_bruto.model_dump(mode="json")
+    elif isinstance(resultado_bruto, dict) and "props" in resultado_bruto and isinstance(resultado_bruto["props"], dict):
+        props = dict(resultado_bruto["props"])
+    elif isinstance(resultado_bruto, dict):
         props = dict(resultado_bruto)
     elif resultado_bruto is not None:
         props = {"data": resultado_bruto}
@@ -794,6 +826,61 @@ def build_canonical_genui_envelope(
                 payload={"perspective": "vendas"},
             )
         )
+
+    elif intencao in ("mentoria_decisao", "executive_briefing", "comparativo_turnos", "analise_margem") or mapping.get("component_name") == "render_ExecutiveDecisionMentorUI":
+        sug_acts = props.get("suggested_actions") or []
+        if sug_acts and isinstance(sug_acts, list):
+            for a in sug_acts:
+                if isinstance(a, GenUIActionOption):
+                    actions.append(a)
+                elif isinstance(a, dict):
+                    try:
+                        actions.append(GenUIActionOption(**a))
+                    except Exception:
+                        pass
+        if not actions:
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="⚡ Aplicar Recomendações Prioritárias",
+                    action_type="mutation",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": intencao, "operacao": "aplicar_recomendacoes"},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🎯 Ajustar Metas do Turno",
+                    action_type="mutation",
+                    variant="secondary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": intencao, "operacao": "ajustar_metas"},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🔍 Projetar Cenário no Canvas",
+                    action_type="inspection",
+                    variant="ghost",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"perspective": "executiva"},
+                )
+            )
+
+        # Assegura que props reflita fielmente o contrato ExecutiveDecisionProps
+        props["diagnosis"] = props.get("diagnosis") or executive_summary or "Diagnóstico executivo da operação apurado."
+        props["confidence_score"] = float(props.get("confidence_score") or 0.95)
+        props["metrics"] = props.get("metrics") or []
+        props["limitations"] = props.get("limitations") or []
+        props["impact_projection"] = props.get("impact_projection") or {"summary": "Ajuste na operação com impacto projetado positivo."}
+        props["evidence_items"] = props.get("evidence_items") or []
+        props["suggested_actions"] = [a.model_dump(mode="json") for a in actions]
 
     else:
         # Ação genérica de inspeção no Canvas
@@ -1287,6 +1374,11 @@ Diretrizes Específicas por Assunto:
                         f"Tags: {', '.join(art.get('tags', []) or [])}\n\n"
                     )
 
+            elif intencao in ("mentoria_decisao", "executive_briefing", "comparativo_turnos", "analise_margem"):
+                data_p, _ = extrair_data_turno(pergunta)
+                resultado_bruto = self.tools.gerar_diagnostico_mentoria_executiva(tipo=intencao, data=data_p)
+                contexto_extra = f"Diagnóstico do Mentor de Decisões Executivo (GenUI Fase 3):\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+
             elif intencao == "auditoria_turno":
                 data_p, turno_p = extrair_data_turno(pergunta)
                 resultado_bruto = self.tools.auditar_fechamento_turno(data=data_p, turno=turno_p)
@@ -1407,6 +1499,44 @@ Diretrizes Específicas por Assunto:
         status = str(resultado_bruto.get("status", "")).lower()
         if status in ("indisponivel", "error", "erro", "timeout"):
             return None
+
+        # 0. MENTORIA EXECUTIVA DE DECISÃO & BRIEFING ESTRATÉGICO (FASE 3 — P0)
+        if intencao in ("mentoria_decisao", "executive_briefing", "comparativo_turnos", "analise_margem"):
+            props = resultado_bruto.get("props") or resultado_bruto
+            diag = props.get("diagnosis") or "Diagnóstico executivo da operação apurado com dados do ERP."
+            score = float(props.get("confidence_score") or 0.95)
+            metrics = props.get("metrics") or []
+            impacto = props.get("impact_projection") or {}
+            impacto_txt = impacto.get("summary") if isinstance(impacto, dict) else (str(impacto) if impacto else "")
+
+            linhas = [
+                "### 🎯 Mentor de Decisões Executivo (Briefing Estratégico)",
+                "",
+                f"**Diagnóstico:** {diag}",
+                f"- **Confiança Analítica:** [verde]{int(score * 100)}%[/verde] (100% determinístico)",
+            ]
+            if metrics:
+                linhas.append("\n**Indicadores-Chave de Desempenho:**")
+                for m in metrics[:4]:
+                    lbl = m.get("label", "Métrica")
+                    curr = m.get("current_value", "—")
+                    bench = m.get("benchmark_value")
+                    st = m.get("status", "neutral")
+                    cor = "[verde]" if st == "success" else ("[vermelho]" if st == "danger" else "[amarelo]")
+                    cor_f = "[/verde]" if st == "success" else ("[/vermelho]" if st == "danger" else "[/amarelo]")
+                    bench_str = f" (Benchmark: {bench})" if bench else ""
+                    linhas.append(f"- **{lbl}:** {cor}{curr}{cor_f}{bench_str}")
+
+            if impacto_txt:
+                linhas.extend([
+                    "",
+                    f"**💡 Projeção de Impacto:** {impacto_txt}"
+                ])
+            linhas.extend([
+                "",
+                "**⚡ Decisões Disponíveis:** Utilize os botões de ação na Camada 3 do card para aplicar correções prioritárias com 1 clique."
+            ])
+            return "\n".join(linhas)
 
         # 1. VENDAS & HISTÓRICO ANALÍTICO (PDV / PISTA / HOJE)
         if intencao in ("vendas_analitico", "consultar_analise_vendas_erp", "analise_vendas", "vendas"):

@@ -71,6 +71,10 @@ from core.schemas.genui import (
     GenUIActionOption,
     GenUIEnvelope,
     GenUIActionResult,
+    ExecutiveMetric,
+    ExecutiveImpactProjection,
+    ExecutiveEvidenceItem,
+    ExecutiveDecisionProps,
 )
 
 __all__ = [
@@ -129,6 +133,10 @@ __all__ = [
     "GenUIActionOption",
     "GenUIEnvelope",
     "GenUIActionResult",
+    "ExecutiveMetric",
+    "ExecutiveImpactProjection",
+    "ExecutiveEvidenceItem",
+    "ExecutiveDecisionProps",
 ]
 
 
