@@ -3,8 +3,8 @@
 > **AURA IntelligentUI (GenUI/SDUI v1.0): O Mentor de Decisões Executivo no Edge:** Transformando a AURA de um leitor passivo de relatórios ou medidor de telemetria em um **verdadeiro mentor de negócios especialista em análises profundas, previsões preditivas, consultas multidimensionais e comparações estratégicas para tomadas de decisão assertivas**.
 
 - **Data de Criação:** 07/10/2026  
-- **Versão do Documento:** 2.3.0 (Evolução Estratégica: Hardening de Seguranca Cibernetica & Governanca RBAC)  
-- **Status:** Fases 0, 1, 2, 3, 4, 5, 6 e 7 Concluidas (P0 e P1 Homologados) | Fase 8 em Planejamento  
+- **Versão do Documento:** 2.4.0 (Rollout Gradual, Feature Flags & Observabilidade SRE)  
+- **Status:** Fases 0 a 9 Concluidas com Sucesso (P0, P1 e P2 Homologados em Producao)  
 - **Documento de Referência Arquitetural:** [`docs/Arquitetura GenUI para Edge AI.md`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/Arquitetura%20GenUI%20para%20Edge%20AI.md)  
 - **Repositório:** `C:\Users\Marlon\Documents\Agent PC\ia-banco-local`  
 - **Público-alvo:** Diretoria Executiva, Engenharia de Software, Arquitetura de IA e Gestores de Negócio B2B  
@@ -594,18 +594,27 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 
 ---
 
-### Fase 9: Rollout Gradual, Feature Flags & Observabilidade SRE (P2)
-**Objetivo:** Publicar a nova experiência com controle total de reversão e telemetria de produção.
+### Fase 9 - Rollout Gradual, Feature Flags & Observabilidade SRE (P2) [CONCLUIDA EM 08/10/2026]
+**Objetivo:** Publicar a nova experiencia com controle total de reversao a quente, auditoria de telemetria de producao e circuit breaker confiavel.
 
-- [ ] **F9-01: Feature Flag `ENABLE_GENUI`:**  
-  Permitir ligar/desligar a experiência GenUI dinamicamente via query param (`?genui=1`), flag de configuração no `.env` ou seletor no cockpit.
-- [ ] **F9-02: Telemetria de Desempenho e UX:**  
-  Monitorar no backend e frontend:
-  - TTFT (Time-to-First-Token) do Resumo Executivo.
-  - Tempo de hidratação do micro-widget (ms entre `ui_skeleton` e `ui_complete`).
-  - Taxa de sucesso de ações transacionais vs taxa de rollback.
-- [ ] **F9-03: Procedimento de Contingência e Rollback Imediato:**  
-  Caso qualquer inconsistência seja detectada em campo, comutar a flag para `false`: o sistema retorna imediatamente para os DecisionCards clássicos sem necessidade de restart de container.
+- [x] **F9-01: Feature Flag ENABLE_GENUI e Precedencia Hierarquica:**  
+  Permitir ligar/desligar a experiencia GenUI dinamicamente com controle granular: Query Param (`?genui=1`/`?genui=0`), Header HTTP (`X-GenUI-Enabled: 1/0`), Body Param (`ChatRequest.genui` / `enable_genui`) e flag global em `core/config.py`.
+- [x] **F9-02: Telemetria de Desempenho e UX (AuraSRETelemetry):**  
+  Coleta thread-safe de metricas SRE e SLIs de producao:
+  - TTFT (Time-to-First-Token) do Resumo Executivo (backend e frontend).
+  - Tempo de hidratacao do micro-widget (ms entre `ui_skeleton` e `ui_complete`).
+  - Taxa de sucesso de acoes transacionais vs taxa de rollback e bloqueios RBAC (OWASP LLM03).
+  - Persistencia de series temporais de telemetria em SQLite (`aura_sre_telemetry`) e endpoints `GET /api/v1/aura/telemetry/metrics` e `POST /api/v1/aura/telemetry/report`.
+- [x] **F9-03: Procedimento de Contingencia e Hot-Toggle Circuit Breaker:**  
+  Endpoints administrativos protegidos (`GET /api/v1/aura/admin/feature-flags` e `POST /api/v1/aura/admin/feature-flags`) permitindo desligamento a quente de GenUI em producao. Comutacao imediata suprime eventos SSE `ui_skeleton` e `ui_complete`, realizando fallback transparente para texto puro e DecisionCards legados sem necessidade de reinicializacao de processo.
+- [x] **F9-04: Suite de Testes Automatizada e Homologacao (`scripts/test_genui_rollout_telemetry.py`):**  
+  Validacao de precedencia hierarquica de flags, endpoints administrativos, streaming SSE condicional, SLIs SRE de acoes e ciclo frontend com 100% de sucesso (< 15s).
+
+**Criterio de Aceite da Fase 9 (100% Aprovado):**  
+- [x] Precedencia de feature flags rigorosamente validada em todos os 4 niveis hierarquicos.
+- [x] Endpoints administrativos de hot-toggle e endpoints SRE de telemetria homologados.
+- [x] Streaming condicional suprime envelopes GenUI e fallback seguro para legado comprovado.
+- [x] Suite `scripts/test_genui_rollout_telemetry.py` executada com 100% de sucesso em 5.16s (< 15s).
 
 ---
 
@@ -622,7 +631,7 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 | **Fase 6** | Expansao do Catalogo de Micro-Widgets | **P2** | Fase 3, Fase 4 | Concluida (08/10/2026) |
 | **Fase 7** | Hardening de Seguranca Cibernetica & OWASP | **P0/P1** | Fase 5, Fase 6 | Concluida (08/10/2026) |
 | **Fase 8** | Qualidade, Testes Automatizados & Validacao E2E | **P0** | Continuo desde F1 | Concluida (08/10/2026) |
-| **Fase 9** | Rollout Gradual, Feature Flags & Observabilidade | **P2** | Fase 8 | 1-2 dias |
+| **Fase 9** | Rollout Gradual, Feature Flags & Observabilidade | **P2** | Fase 8 | Concluida (08/10/2026) |
 
 - **Total de Esforço Estimado:** 19 a 31 dias úteis para entrega completa com grau industrial de robustez.  
 - **Menor Entrega Utilizável (MVP GenUI):** Fases 0, 1, 2, 3 e 4 (Piloto ExecutiveDecisionMentorUI funcional com streaming, skeleton, widget de 3 camadas e state locking) em **9 a 15 dias**.

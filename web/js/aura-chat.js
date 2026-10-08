@@ -553,7 +553,19 @@ class AuraChatController {
   handleUISkeleton(containerId, skeletonData) {
     if (!skeletonData || typeof document === 'undefined') return;
 
+    // Feature Flag F9-01: Se GenUI desativado no cliente, ignora skeleton e faz fallback para cards legados
+    if (typeof window !== 'undefined' && window.AuraGenUI && typeof window.AuraGenUI.isEnabled === 'function') {
+      if (!window.AuraGenUI.isEnabled()) return;
+    }
+
     const toolCallId = skeletonData.tool_call_id || ('call_' + Date.now());
+
+    // Telemetria SRE (F9-02): Medir inicio da hidratacao (skeleton) com performance.now()
+    this._skeletonTimers = this._skeletonTimers || {};
+    this._skeletonTimers[toolCallId] = (typeof performance !== 'undefined' && typeof performance.now === 'function')
+      ? performance.now()
+      : Date.now();
+
     const componentName = skeletonData.component_name || 'GenericGenUIWidget';
     const rawTitle = skeletonData.title || 'Analisando indicadores executivos...';
     
@@ -645,6 +657,11 @@ class AuraChatController {
    */
   handleUIComplete(containerId, envelopeData) {
     if (!envelopeData || typeof document === 'undefined') return;
+
+    // Feature Flag F9-01: Se GenUI desativado no cliente, ignora envelope
+    if (typeof window !== 'undefined' && window.AuraGenUI && typeof window.AuraGenUI.isEnabled === 'function') {
+      if (!window.AuraGenUI.isEnabled()) return;
+    }
 
     const toolCallId = envelopeData.tool_call_id;
 
@@ -814,6 +831,24 @@ class AuraChatController {
       if (splitCard) {
         splitCard.innerHTML = portalBannerHtml;
         splitCard.classList.remove('hidden');
+      }
+
+      // Telemetria SRE (F9-02): Medir tempo real de hidratacao e reportar assincronamente ao backend
+      if (this._skeletonTimers && toolCallId && this._skeletonTimers[toolCallId]) {
+        const endTime = (typeof performance !== 'undefined' && typeof performance.now === 'function')
+          ? performance.now()
+          : Date.now();
+        const hydrationMs = Math.max(0, endTime - this._skeletonTimers[toolCallId]);
+        delete this._skeletonTimers[toolCallId];
+
+        if (typeof window !== 'undefined' && window.auraApi && typeof window.auraApi.reportTelemetry === 'function') {
+          window.auraApi.reportTelemetry({
+            hydration_ms: hydrationMs,
+            tool_call_id: toolCallId,
+            session_id: this.sessionId,
+            details: { component_name: envelopeData.component_name }
+          }).catch(() => {});
+        }
       }
 
       this.scrollToBottom();
@@ -1027,6 +1062,15 @@ class AuraChatController {
           const toolCallId = feedbackData.tool_call_id || (btn ? btn.getAttribute('data-tool-call-id') : null);
           if (toolCallId) {
             stateMgr.rollbackOptimisticState(toolCallId);
+          }
+          if (typeof window !== 'undefined' && window.auraApi && typeof window.auraApi.reportTelemetry === 'function') {
+            window.auraApi.reportTelemetry({
+              is_rollback: true,
+              action_status: 'rolled_back',
+              action_id: actionId,
+              tool_call_id: toolCallId,
+              session_id: this.sessionId,
+            }).catch(() => {});
           }
         }
       }
@@ -1761,7 +1805,7 @@ class AuraChatController {
             <span class="px-2 py-0.5 rounded text-[10px] font-sans font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">Indisponibilidade Temporária</span>
           </div>
           <div class="decision-hero-value text-slate-400">
-            —
+            -
           </div>
           <div class="decision-hero-sub text-rose-300/90">
             Não foi possível calcular indicadores oficiais. Fonte primária não respondeu dentro do tempo limite.
@@ -2016,10 +2060,10 @@ class AuraChatController {
     const menorAutonomiaEsgot = assessment.horizonte_runout_horas ?? metrics.autonomia_runout_horas ?? metrics.menor_autonomia_esgotamento_horas ?? assessment.menor_autonomia_esgotamento_horas ?? resumo.tanque_mais_critico?.autonomia_runout_horas;
     const codCritico = assessment.tanque_mais_critico_cod ?? resumo.tanque_mais_critico?.codtan ?? resumo.tanque_mais_critico?.tanque ?? (tanksList.length > 0 ? (tanksList[0]?.codtan || tanksList[0]?.tanque) : 'N/D');
 
-    let heroValFormatted = '—';
+    let heroValFormatted = '-';
     let heroColorClass = 'text-emerald';
     if (isUnavailable || tanksList.length === 0 || isNoMovement) {
-      heroValFormatted = '—';
+      heroValFormatted = '-';
       heroColorClass = 'text-slate-400';
     } else if (menorAutonomiaReserva !== null && menorAutonomiaReserva !== undefined && !isNaN(Number(menorAutonomiaReserva))) {
       const hVal = Number(menorAutonomiaReserva);
@@ -2363,7 +2407,7 @@ class AuraChatController {
 
     // Métrica Hero: Maior Desvio Volumétrico ANP
     const heroLabel = 'Maior Desvio Volumétrico ANP';
-    const heroVal = isNoMovement || isUnavailable ? '—' : needleText;
+    const heroVal = isNoMovement || isUnavailable ? '-' : needleText;
     const heroColorClass = isNoMovement || isUnavailable ? 'text-slate-400' : (dentroTolerancia ? 'text-emerald' : 'text-rose');
     const tanquesConformes = metrics.total_tanques_conformes ?? metrics.tanques_conformes_count ?? items.filter(it => Math.abs(parseFloat(it.variacao_pct ?? it.auditoria_anp?.variacao_pct ?? 0)) <= 0.6).length;
     let heroSub = `Portaria ANP 26/1992 • Tolerância legal: ±0.60% • ${tanquesConformes} de ${items.length} tanques em conformidade estrita.`;
@@ -2757,7 +2801,7 @@ class AuraChatController {
     }
 
     const diffFormatted = (isNoMovement || isUnavailable)
-      ? '—'
+      ? '-'
       : this.formatSignedBRL(diffVal);
 
     // Valores do Comparativo
@@ -2876,7 +2920,7 @@ class AuraChatController {
             <div class="decision-comp-item">
               <span class="decision-comp-label">Encerrantes Físicos</span>
               <strong class="decision-comp-val ${encState === 'not_reported' ? 'text-amber-400' : 'text-slate-100'}">
-                ${encState === 'not_reported' ? 'Pendente' : (encVol !== null ? this.formatLiters(encVol, 1) : '—')}
+                ${encState === 'not_reported' ? 'Pendente' : (encVol !== null ? this.formatLiters(encVol, 1) : '-')}
               </strong>
               <span class="decision-comp-sub">${encState === 'not_reported' ? 'Não digitado no ERP' : 'Lançado no fechabomba'}</span>
             </div>
@@ -3907,7 +3951,7 @@ class AuraChatController {
 
     // Hero Metric: Maior Lift
     const heroLabel = 'Maior Multiplicador de Sinergia (Lift)';
-    const heroVal = isNoMovement || isUnavailable ? '—' : `${parseFloat(maxLiftVal).toFixed(2)}x`;
+    const heroVal = isNoMovement || isUnavailable ? '-' : `${parseFloat(maxLiftVal).toFixed(2)}x`;
     const heroColorClass = isNoMovement || isUnavailable ? 'text-slate-400' : (parseFloat(maxLiftVal) >= 2.0 ? 'text-purple-300' : 'text-emerald');
     let heroSub = `${countForteSinergia} combo(s) com forte sinergia (Lift ≥ 2.0x) • ${totalTransacoes} cupons analisados (${parseFloat(pctMultiplas).toFixed(1)}% cestas múltiplas).`;
     if (isUnavailable) {
@@ -4223,7 +4267,7 @@ class AuraChatController {
     const liderAdit = parseFloat(liderObj.conversao_aditivada_pct ?? liderObj.percentual_aditivada ?? 0).toFixed(1);
 
     const heroLabel = 'Faturamento Total da Pista';
-    const heroVal = isNoMovement || isUnavailable ? '—' : this.formatBRL(fatPista);
+    const heroVal = isNoMovement || isUnavailable ? '-' : this.formatBRL(fatPista);
     const heroColorClass = isNoMovement || isUnavailable ? 'text-slate-400' : 'text-emerald';
     let heroSub = ranking.length > 0
       ? `Líder: ${liderNome} (${this.formatBRL(liderFat)}, Aditivada: ${liderAdit}%) • Ticket Médio da Pista: ${this.formatBRL(metrics.ticket_medio ?? metrics.ticket_medio_pista ?? resumo.ticket_medio_pista ?? 0)}.`
@@ -5237,13 +5281,13 @@ class AuraChatController {
   }
 
   formatBRL(val) {
-    if (val === null || val === undefined || isNaN(Number(val))) return '—';
+    if (val === null || val === undefined || isNaN(Number(val))) return '-';
     const num = Number(val);
     return 'R$ ' + num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   formatSignedBRL(val) {
-    if (val === null || val === undefined || isNaN(Number(val))) return '—';
+    if (val === null || val === undefined || isNaN(Number(val))) return '-';
     const num = Number(val);
     if (Math.abs(num) < 0.005) {
       return 'R$ 0,00';
@@ -5253,19 +5297,19 @@ class AuraChatController {
   }
 
   formatLiters(val, decimals = 1) {
-    if (val === null || val === undefined || isNaN(Number(val))) return '—';
+    if (val === null || val === undefined || isNaN(Number(val))) return '-';
     const num = Number(val);
     return `${num.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })} L`;
   }
 
   formatNumber(val, decimals = 0) {
-    if (val === null || val === undefined || isNaN(Number(val))) return '—';
+    if (val === null || val === undefined || isNaN(Number(val))) return '-';
     const num = Number(val);
     return num.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   }
 
   formatPercent(val, decimals = 1) {
-    if (val === null || val === undefined || isNaN(Number(val))) return '—';
+    if (val === null || val === undefined || isNaN(Number(val))) return '-';
     const num = Number(val);
     return `${num.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}%`;
   }

@@ -537,7 +537,48 @@
   }
 
   // =========================================================================
-  // 4. INSTÂNCIA SINGLETON & EXPORTAÇÃO DUAL (ZERO-BUNDLER & COMMONJS)
+  // 4. FEATURE FLAGS & GESTAO DE ROLLOUT GRADUAL (F9-01)
+  // =========================================================================
+
+  let _genuiEnabled = true;
+
+  /**
+   * Verifica se a experiencia GenUI esta ativa.
+   * Suporta override de query param na URL (?genui=0 ou ?genui=1)
+   * e controle programatico via setEnabled().
+   * @returns {boolean}
+   */
+  function isEnabled() {
+    if (typeof window !== 'undefined' && window.location && window.location.search) {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const flag = params.get('genui');
+        if (flag !== null) {
+          const flagLower = flag.trim().toLowerCase();
+          if (flagLower === '0' || flagLower === 'false' || flagLower === 'off' || flagLower === 'no') {
+            return false;
+          }
+          if (flagLower === '1' || flagLower === 'true' || flagLower === 'on' || flagLower === 'yes') {
+            return true;
+          }
+        }
+      } catch (_) {}
+    }
+    return _genuiEnabled;
+  }
+
+  /**
+   * Altera a quente o status da feature flag no cliente.
+   * @param {boolean} val
+   * @returns {boolean}
+   */
+  function setEnabled(val) {
+    _genuiEnabled = Boolean(val);
+    return _genuiEnabled;
+  }
+
+  // =========================================================================
+  // 5. INSTÂNCIA SINGLETON & EXPORTAÇÃO DUAL (ZERO-BUNDLER & COMMONJS)
   // =========================================================================
 
   const registry = new SecureComponentRegistry();
@@ -557,7 +598,9 @@
     generateActionId,
     isValidUUID,
     validateToolCallId,
-    validateActionId
+    validateActionId,
+    isEnabled,
+    setEnabled
   };
 
   // 1. Exportação Global no Navegador (Window)
@@ -602,7 +645,9 @@
       generateActionId,
       isValidUUID,
       validateToolCallId,
-      validateActionId
+      validateActionId,
+      isEnabled,
+      setEnabled
     };
   }
 

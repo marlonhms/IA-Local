@@ -25,6 +25,14 @@ from .aura_engine import (
     extrair_grupo,
     limpar_termo_produto,
 )
+from .telemetry import AuraSRETelemetry
+from .config import (
+    ENABLE_GENUI,
+    is_genui_enabled,
+    set_genui_enabled,
+    get_feature_flags,
+    update_feature_flags,
+)
 from .aura_api import create_aura_app, router as aura_router
 
 __all__ = [
@@ -52,4 +60,8 @@ __all__ = [
     "extrair_produto_cesta",
     "extrair_grupo",
     "limpar_termo_produto",
+    "AuraSRETelemetry",
+    "ENABLE_GENUI",
+    "is_genui_enabled",
+    "set_genui_enabled",
 ]

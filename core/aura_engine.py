@@ -73,8 +73,8 @@ from core.schemas.genui import (
     UpsellComboItem,
     BasketUpsellStrategyProps,
 )
-
-
+from core.config import is_genui_enabled
+from core.telemetry import AuraSRETelemetry
 
 # =============================================================================
 # CONTRATOS PYDANTIC & ENUMS DA AURA
@@ -328,6 +328,24 @@ class AuraSessionMemory:
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_aura_audit_status 
                 ON aura_action_audit_log(status);
+            """)
+
+            # Tabela duravel de telemetria e observabilidade SRE (F9-02)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS aura_sre_telemetry (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT NOT NULL,
+                    metric_type TEXT NOT NULL,
+                    metric_value REAL NOT NULL,
+                    session_id TEXT,
+                    tool_call_id TEXT,
+                    details TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_aura_sre_metric_type 
+                ON aura_sre_telemetry(metric_type);
             """)
             conn.commit()
 
@@ -663,6 +681,70 @@ class AuraSessionMemory:
                 "client_ip": r["client_ip"],
             })
         return logs
+
+    def save_telemetry_metric(
+        self,
+        metric_type: str,
+        metric_value: float,
+        session_id: Optional[str] = None,
+        tool_call_id: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+        timestamp: Optional[str] = None,
+    ):
+        """Salva um evento de telemetria SRE no SQLite de forma duravel e nao-bloqueante (F9-02)."""
+        ts = timestamp or datetime.now(timezone.utc).isoformat()
+        details_json = json.dumps(details, ensure_ascii=False, default=str) if details else "{}"
+        try:
+            with self._connection() as conn:
+                conn.execute("""
+                    INSERT INTO aura_sre_telemetry (
+                        timestamp, metric_type, metric_value, session_id, tool_call_id, details
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?);
+                """, (ts, str(metric_type), float(metric_value), session_id, tool_call_id, details_json))
+                conn.commit()
+        except Exception:
+            pass
+
+    def get_telemetry_metrics_records(
+        self,
+        metric_type: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Recupera registros duraveis de telemetria para auditoria e analise SRE."""
+        query = "SELECT id, timestamp, metric_type, metric_value, session_id, tool_call_id, details FROM aura_sre_telemetry"
+        params: List[Any] = []
+        if metric_type:
+            query += " WHERE metric_type = ?"
+            params.append(str(metric_type))
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(max(1, min(1000, int(limit))))
+
+        try:
+            with self._connection() as conn:
+                cur = conn.execute(query, tuple(params))
+                rows = cur.fetchall()
+        except Exception:
+            return []
+
+        records = []
+        for r in rows:
+            det = {}
+            if r["details"]:
+                try:
+                    det = json.loads(r["details"])
+                except Exception:
+                    det = {}
+            records.append({
+                "id": r["id"],
+                "timestamp": str(r["timestamp"]),
+                "metric_type": r["metric_type"],
+                "metric_value": float(r["metric_value"]),
+                "session_id": r["session_id"],
+                "tool_call_id": r["tool_call_id"],
+                "details": det,
+            })
+        return records
 
     def clear_session(self, session_id: str):
         """Limpa as mensagens de uma sessão específica."""
@@ -1542,6 +1624,7 @@ class AuraEngine:
         self._tools = tools
         self._router = router
         self._session_memory = session_memory or AuraSessionMemory()
+        self._telemetry = AuraSRETelemetry.get_instance(session_memory=self._session_memory)
         self._dados_filial: Optional[Dict[str, Any]] = None
 
     @property
@@ -1565,6 +1648,10 @@ class AuraEngine:
     @property
     def session_memory(self) -> AuraSessionMemory:
         return self._session_memory
+
+    @property
+    def telemetry(self) -> AuraSRETelemetry:
+        return self._telemetry
 
     def get_audit_logs(
         self,
@@ -2187,7 +2274,7 @@ Diretrizes Específicas por Assunto:
                 linhas.append("\n**Indicadores-Chave de Desempenho:**")
                 for m in metrics[:4]:
                     lbl = m.get("label", "Métrica")
-                    curr = m.get("current_value", "—")
+                    curr = m.get("current_value", "-")
                     bench = m.get("benchmark_value")
                     st = m.get("status", "neutral")
                     cor = "[verde]" if st == "success" else ("[vermelho]" if st == "danger" else "[amarelo]")
@@ -2254,7 +2341,7 @@ Diretrizes Específicas por Assunto:
                     p_nome = p.get("nompro", "Produto")
                     p_qtd = float(p.get("qtd_total", 0) or 0)
                     p_rec = float(p.get("receita_total", 0) or 0)
-                    linhas.append(f"{idx}. **{p_nome}** — {p_qtd:g} saídas ([verde]R$ {p_rec:,.2f}[/verde])")
+                    linhas.append(f"{idx}. **{p_nome}** - {p_qtd:g} saídas ([verde]R$ {p_rec:,.2f}[/verde])")
 
             # Projeção e recomendação prática
             linhas.extend([
@@ -2430,6 +2517,7 @@ Diretrizes Específicas por Assunto:
         session_id: Optional[str] = None,
         tenant_id: Optional[str] = None,
         filial_id: Optional[str] = None,
+        enable_genui: Optional[bool] = None,
     ) -> AsyncIterator[AuraChunk]:
         """
         Gera resposta em streaming assíncrono token a token via Server-Sent Events (SSE).
@@ -2439,6 +2527,8 @@ Diretrizes Específicas por Assunto:
         t_id = tenant_id or self.tenant_id
         f_id = filial_id or self.filial_id
         t_global_start = time.perf_counter()
+        genui_active = is_genui_enabled() if enable_genui is None else bool(enable_genui)
+        t_skeleton_emitted: Optional[float] = None
         q_limpa = (query or "").strip()
 
         if not q_limpa:
@@ -2500,9 +2590,10 @@ Diretrizes Específicas por Assunto:
             session_id=sess_id,
         )
 
-        # Se intenção mapeada no catálogo GenUI, emite ui_skeleton precursor (<100ms)
+        # Se intenção mapeada no catálogo GenUI e GenUI estiver ativo, emite ui_skeleton precursor (<100ms)
         genui_meta = GENUI_COMPONENT_REGISTRY_MAP.get(intencao)
-        if genui_meta:
+        if genui_meta and genui_active:
+            t_skeleton_emitted = time.perf_counter()
             yield AuraChunk(
                 chunk_type=AuraChunkType.UI_SKELETON,
                 tool_call_id=tool_call_id,
@@ -2661,7 +2752,8 @@ Diretrizes Específicas por Assunto:
                         continue
 
                     if ttft_ms is None:
-                        ttft_ms = (time.perf_counter() - t_llm_start) * 1000
+                        ttft_ms = (time.perf_counter() - t_global_start) * 1000
+                        self.telemetry.record_ttft(ttft_ms, session_id=sess_id)
 
                     texto_completo.append(chunk_text)
                     yield AuraChunk(
@@ -2692,6 +2784,9 @@ Diretrizes Específicas por Assunto:
             if sintese_contingencia:
                 resposta_final = sintese_contingencia
                 sucesso_llm = True
+                if ttft_ms is None:
+                    ttft_ms = (time.perf_counter() - t_global_start) * 1000
+                    self.telemetry.record_ttft(ttft_ms, session_id=sess_id)
                 yield AuraChunk(
                     chunk_type=AuraChunkType.DELTA,
                     text=resposta_final,
@@ -2706,7 +2801,7 @@ Diretrizes Específicas por Assunto:
                 )
 
         # 7.5. Emissão do Envelope Canônico GenUI (ui_complete) para a Camada 2 & 3
-        if genui_meta:
+        if genui_meta and genui_active:
             envelope = build_canonical_genui_envelope(
                 intencao=intencao,
                 tool_call_id=tool_call_id,
@@ -2715,6 +2810,14 @@ Diretrizes Específicas por Assunto:
             )
             if envelope:
                 envelope_payload = envelope.to_sse_payload()
+                if t_skeleton_emitted is not None:
+                    backend_hydration_ms = (time.perf_counter() - t_skeleton_emitted) * 1000
+                    self.telemetry.record_hydration(
+                        ms=backend_hydration_ms,
+                        session_id=sess_id,
+                        tool_call_id=tool_call_id,
+                        details={"source": "backend"}
+                    )
                 yield AuraChunk(
                     chunk_type=AuraChunkType.UI_COMPLETE,
                     tool_call_id=tool_call_id,
@@ -2800,6 +2903,7 @@ Diretrizes Específicas por Assunto:
         session_id: Optional[str] = None,
         tenant_id: Optional[str] = None,
         filial_id: Optional[str] = None,
+        enable_genui: Optional[bool] = None,
     ) -> AuraResponse:
         """
         Executa o pipeline completo da AURA de forma assíncrona,
@@ -2822,6 +2926,7 @@ Diretrizes Específicas por Assunto:
             session_id=sess_id,
             tenant_id=tenant_id,
             filial_id=filial_id,
+            enable_genui=enable_genui,
         ):
             if chunk.chunk_type == AuraChunkType.INTENT and chunk.data:
                 intencao_detectada = chunk.data.get("intent", intencao_detectada)

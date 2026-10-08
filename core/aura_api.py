@@ -28,6 +28,13 @@ from core.aura_engine import (
     AuraResponse,
     StationStatus,
 )
+from core.config import (
+    resolve_genui_flag,
+    is_genui_enabled,
+    set_genui_enabled,
+    get_feature_flags,
+    update_feature_flags,
+)
 from core.schemas.genui import (
     ActionExecuteRequest,
     ActionVoucher,
@@ -70,6 +77,30 @@ class ChatRequest(BaseModel):
     tenant_id: Optional[str] = Field(default=None, description="Identificador do cliente/rede")
     filial_id: Optional[str] = Field(default=None, description="Identificador da filial do posto")
     context: Optional[Dict[str, Any]] = Field(default=None, description="Contexto extra opcional injetado pelo chamador")
+    genui: Optional[bool] = Field(default=None, description="Feature flag GenUI override (True=ativa, False=desativa)")
+    enable_genui: Optional[bool] = Field(default=None, description="Alias para genui")
+
+
+class TelemetryReportRequest(BaseModel):
+    """Payload para envio de metricas de UX e hidratacao pelo frontend (F9-02)."""
+    metric_type: Optional[str] = Field(default=None, description="Tipo da metrica (ex: hydration, rollback, ttft)")
+    hydration_ms: Optional[float] = Field(default=None, description="Tempo de hidratacao em milissegundos")
+    ttft_ms: Optional[float] = Field(default=None, description="TTFT percebido no cliente")
+    action_status: Optional[str] = Field(default=None, description="Status da acao: requested, approved, rolled_back")
+    is_rollback: Optional[bool] = Field(default=False, description="Indica se a acao sofreu rollback")
+    is_security_block: Optional[bool] = Field(default=False, description="Indica se houve bloqueio de seguranca")
+    session_id: Optional[str] = None
+    tool_call_id: Optional[str] = None
+    action_id: Optional[str] = None
+    reason: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
+
+
+class FeatureFlagsUpdateRequest(BaseModel):
+    """Payload para comutacao a quente de feature flags no runtime (F9-03)."""
+    ENABLE_GENUI: Optional[bool] = None
+    enable_genui: Optional[bool] = None
+    flags: Optional[Dict[str, Any]] = None
 
 
 class ExecuteIntentRequest(BaseModel):
@@ -85,15 +116,27 @@ class ExecuteIntentRequest(BaseModel):
 # =============================================================================
 
 @router.post("/chat", summary="Chat Cognitivo com a AURA (SSE ou JSON)")
+@router.post("/chat/stream", summary="Chat Cognitivo com a AURA em Streaming SSE")
 async def chat_endpoint(
     req: ChatRequest,
+    request: Request = None,
+    genui: Optional[str] = Query(None, description="Feature flag GenUI override (1=ativa, 0=desativa)"),
     engine: AuraEngine = Depends(get_aura_engine),
 ):
     """
     Envia pergunta para a AURA.
-    - Se stream=true (padrão): Transmite resposta via Server-Sent Events (SSE).
+    - Se stream=true (padrao): Transmite resposta via Server-Sent Events (SSE).
     - Se stream=false: Retorna modelo estruturado consolidado AuraResponse.
+    - Suporta override dinamico de Feature Flag GenUI via query param ?genui=1/0, header X-GenUI-Enabled e body.
     """
+    header_genui = request.headers.get("x-genui-enabled") if request is not None else None
+    body_genui = req.genui if req.genui is not None else req.enable_genui
+    effective_genui = resolve_genui_flag(
+        query_param=genui,
+        header_val=header_genui,
+        body_val=body_genui,
+    )
+
     if req.stream:
         async def event_generator():
             async for chunk in engine.ask_stream(
@@ -102,6 +145,7 @@ async def chat_endpoint(
                 session_id=req.session_id,
                 tenant_id=req.tenant_id,
                 filial_id=req.filial_id,
+                enable_genui=effective_genui,
             ):
                 yield chunk.to_sse()
 
@@ -112,6 +156,7 @@ async def chat_endpoint(
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
                 "X-Accel-Buffering": "no",
+                "X-GenUI-Enabled": "1" if effective_genui else "0",
             },
         )
     else:
@@ -121,6 +166,7 @@ async def chat_endpoint(
             session_id=req.session_id,
             tenant_id=req.tenant_id,
             filial_id=req.filial_id,
+            enable_genui=effective_genui,
         )
         return response
 
@@ -442,6 +488,9 @@ async def execute_action_endpoint(
     op_role = req.operator_role or "gerente"
     act_type = (req.action_type or "mutation").strip().lower()
 
+    # Telemetria SRE (F9-02): Registrar solicitacao de acao transacional
+    engine.telemetry.record_action_requested(action_id=req.action_id, session_id=req.session_id)
+
     # 1. F7-03: Validacao de permissao e perfil de operador (RBAC) ANTES de qualquer processamento
     # Evita que um operador desautorizado obtenha vouchers ou contorne o bloqueio via replay de action_id
     is_authorized, min_level, reason = evaluate_action_permission(
@@ -451,6 +500,12 @@ async def execute_action_endpoint(
     )
 
     if not is_authorized:
+        # F9-02: Registrar bloqueio de seguranca na telemetria
+        engine.telemetry.record_security_block(
+            reason=reason,
+            session_id=req.session_id,
+            tool_call_id=req.tool_call_id,
+        )
         # F7-04: Registro imediato de tentativa rejeitada na trilha de auditoria
         mem.save_audit_log(
             session_id=req.session_id,
@@ -487,6 +542,12 @@ async def execute_action_endpoint(
             operator_id=operator,
         )
     except Exception as exc:
+        # F9-02: Registrar rollback transacional na telemetria
+        engine.telemetry.record_action_rolled_back(
+            action_id=req.action_id,
+            session_id=req.session_id,
+            reason=str(exc),
+        )
         mem.save_audit_log(
             session_id=req.session_id,
             tool_call_id=req.tool_call_id,
@@ -579,6 +640,9 @@ async def execute_action_endpoint(
         client_ip=client_ip,
     )
 
+    # F9-02: Registrar acao aprovada com sucesso na telemetria
+    engine.telemetry.record_action_approved(action_id=req.action_id, session_id=req.session_id)
+
     return voucher
 
 
@@ -609,7 +673,76 @@ async def get_audit_logs_endpoint(
     return logs
 
 
+# =============================================================================
+# TELEMETRIA SRE & OBSERVABILIDADE (F9-02)
+# =============================================================================
 
+@router.get("/telemetry/metrics", summary="Metricas Consolidadas de Observabilidade e SRE")
+async def get_telemetry_metrics_endpoint(
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """
+    Retorna consolidado de SLIs de SRE em JSON:
+    - ttft_ms (avg, min, max, last, count)
+    - hydration_ms (avg, min, max, last, count)
+    - total_actions_requested, total_actions_approved, total_actions_rolled_back
+    - security_blocks
+    - action_success_rate_pct
+    - feature_flags
+    """
+    return engine.telemetry.get_metrics_summary()
+
+
+@router.post("/telemetry/report", summary="Reporte de Metricas de UX pelo Cliente")
+async def report_telemetry_endpoint(
+    req: TelemetryReportRequest,
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """
+    Permite que o frontend reporte metricas percebidas (tempo de hidratacao real, latencia, rollbacks).
+    """
+    result = engine.telemetry.record_client_report(req.model_dump())
+    return {"status": "ok", **result}
+
+
+# =============================================================================
+# CONTINGENCIA & GESTAO DE FEATURE FLAGS (CIRCUIT BREAKER - F9-03)
+# =============================================================================
+
+@router.get("/admin/feature-flags", summary="Inspecao de Feature Flags Ativas (Circuit Breaker)")
+async def get_feature_flags_endpoint():
+    """
+    Retorna o status atual das feature flags ativas no runtime.
+    """
+    return {
+        "status": "ok",
+        "ENABLE_GENUI": is_genui_enabled(),
+        "flags": get_feature_flags(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.post("/admin/feature-flags", summary="Atualizacao a Quente de Feature Flags (Circuit Breaker)")
+async def update_feature_flags_endpoint(req: FeatureFlagsUpdateRequest):
+    """
+    Permite alterar a quente o valor de ENABLE_GENUI ou outras flags no runtime,
+    viabilizando rollback ou comutacao imediata para contingencia sem restart de servidor.
+    """
+    updates = {}
+    if req.ENABLE_GENUI is not None:
+        updates["ENABLE_GENUI"] = req.ENABLE_GENUI
+    if req.enable_genui is not None:
+        updates["ENABLE_GENUI"] = req.enable_genui
+    if req.flags and isinstance(req.flags, dict):
+        updates.update(req.flags)
+
+    updated_flags = update_feature_flags(updates)
+    return {
+        "status": "updated",
+        "ENABLE_GENUI": is_genui_enabled(),
+        "flags": updated_flags,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 @router.get("/stations", response_model=List[StationStatus], summary="Diagnóstico e Status das Estações")
 async def stations_endpoint(
     engine: AuraEngine = Depends(get_aura_engine),

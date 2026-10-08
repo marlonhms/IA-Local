@@ -124,12 +124,27 @@ class AuraApiClient {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/api/v1/aura/chat`, {
+      // Resolucao de Feature Flag GenUI (F9-01)
+      let genuiParam = options.genui;
+      if (genuiParam === undefined && typeof window !== 'undefined' && window.AuraGenUI && typeof window.AuraGenUI.isEnabled === 'function') {
+        genuiParam = window.AuraGenUI.isEnabled();
+      }
+
+      let chatUrl = `${this.baseUrl}/api/v1/aura/chat`;
+      const reqHeaders = {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+      };
+
+      if (genuiParam !== undefined) {
+        const flagVal = (genuiParam === false || genuiParam === 0 || genuiParam === '0') ? '0' : '1';
+        chatUrl += `?genui=${flagVal}`;
+        reqHeaders['X-GenUI-Enabled'] = flagVal;
+      }
+
+      const response = await fetch(chatUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream',
-        },
+        headers: reqHeaders,
         body: JSON.stringify({
           query: query,
           session_id: sessionId,
@@ -137,6 +152,7 @@ class AuraApiClient {
           context: context,
           tenant_id: tenantId,
           filial_id: filialId,
+          genui: genuiParam !== undefined ? (genuiParam !== false && genuiParam !== 0 && genuiParam !== '0') : undefined,
         }),
         signal: signal,
       });
@@ -401,6 +417,80 @@ class AuraApiClient {
       throw new Error(`Erro HTTP ${res.status} ao consultar logs de auditoria`);
     }
     return await res.json();
+  }
+
+  /**
+   * Reporta metricas de telemetria e UX (hidratacao, ttft, rollback) de forma assincrona e nao-bloqueante (F9-02).
+   * @param {Object} reportData
+   * @returns {Promise<Object>}
+   */
+  async reportTelemetry(reportData) {
+    if (!reportData || typeof reportData !== 'object') return { status: 'ignored' };
+    const payload = JSON.stringify(reportData);
+    const url = `${this.baseUrl}/api/v1/aura/telemetry/report`;
+
+    // 1. Tenta navigator.sendBeacon se disponivel no browser (zero overhead)
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      try {
+        const blob = new Blob([payload], { type: 'application/json' });
+        const queued = navigator.sendBeacon(url, blob);
+        if (queued) return { status: 'queued_beacon' };
+      } catch (_) {}
+    }
+
+    // 2. Fallback resiliente com fetch keepalive
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+        keepalive: true,
+      });
+      return await resp.json();
+    } catch (err) {
+      return { status: 'fallback_error', error: err && err.message };
+    }
+  }
+
+  /**
+   * Consulta os SLIs de observabilidade SRE da AURA (F9-02).
+   * @returns {Promise<Object>}
+   */
+  async getTelemetryMetrics() {
+    const resp = await fetch(`${this.baseUrl}/api/v1/aura/telemetry/metrics`);
+    if (!resp.ok) {
+      throw new Error(`Falha ao obter telemetria: HTTP ${resp.status}`);
+    }
+    return await resp.json();
+  }
+
+  /**
+   * Consulta as feature flags ativas no backend (F9-03).
+   * @returns {Promise<Object>}
+   */
+  async getFeatureFlags() {
+    const resp = await fetch(`${this.baseUrl}/api/v1/aura/admin/feature-flags`);
+    if (!resp.ok) {
+      throw new Error(`Falha ao consultar feature flags: HTTP ${resp.status}`);
+    }
+    return await resp.json();
+  }
+
+  /**
+   * Atualiza feature flags no backend em tempo de execucao a quente (F9-03).
+   * @param {Object} flags
+   * @returns {Promise<Object>}
+   */
+  async updateFeatureFlags(flags) {
+    const resp = await fetch(`${this.baseUrl}/api/v1/aura/admin/feature-flags`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(flags),
+    });
+    if (!resp.ok) {
+      throw new Error(`Falha ao atualizar feature flags: HTTP ${resp.status}`);
+    }
+    return await resp.json();
   }
 }
 
