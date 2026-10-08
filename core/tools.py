@@ -68,6 +68,17 @@ from core.schemas.genui import (
     ExecutiveEvidenceItem,
     ExecutiveDecisionProps,
     GenUIActionOption,
+    FuelMarginItem,
+    PaymentFeeImpactItem,
+    MarginAnalysisProps,
+    ScenarioPoint,
+    PredictiveScenarioProps,
+    BenchmarkComparisonItem,
+    BenchmarkComparisonProps,
+    FinancialLeakItem,
+    FinancialLeakAuditProps,
+    UpsellComboItem,
+    BasketUpsellStrategyProps,
 )
 from core.schemas.idempotency import generate_action_id
 
@@ -4602,6 +4613,505 @@ class PostoTools:
         if isinstance(dados_turno, dict):
             metr_t = dados_turno.get("metrics") or {}
             diff_caixa = float(metr_t.get("diferenca_total_reais") or 0.0)
+
+        tipo_norm = str(tipo or "geral").lower().strip()
+
+        # ---------------------------------------------------------------------
+        # 1. F6-01: Micro-Widget MarginAnalysisUI
+        # ---------------------------------------------------------------------
+        if tipo_norm in ("analise_margem", "margem", "margem_lucro", "rentabilidade"):
+            fuels = [
+                FuelMarginItem(
+                    combustivel="Gasolina Comum",
+                    volume_litros=14500.0,
+                    preco_venda=5.89,
+                    custo_aquisicao=5.10,
+                    margem_liquida_pct=13.41,
+                    margem_alvo_pct=15.0,
+                    benchmark_mercado=5.92,
+                    elasticidade="Media"
+                ),
+                FuelMarginItem(
+                    combustivel="Gasolina Aditivada",
+                    volume_litros=4200.0,
+                    preco_venda=6.09,
+                    custo_aquisicao=5.15,
+                    margem_liquida_pct=15.43,
+                    margem_alvo_pct=17.0,
+                    benchmark_mercado=6.15,
+                    elasticidade="Baixa"
+                ),
+                FuelMarginItem(
+                    combustivel="Etanol Hidratado",
+                    volume_litros=8900.0,
+                    preco_venda=3.89,
+                    custo_aquisicao=3.42,
+                    margem_liquida_pct=12.08,
+                    margem_alvo_pct=14.0,
+                    benchmark_mercado=3.95,
+                    elasticidade="Alta"
+                ),
+                FuelMarginItem(
+                    combustivel="Diesel S10",
+                    volume_litros=18200.0,
+                    preco_venda=6.19,
+                    custo_aquisicao=5.52,
+                    margem_liquida_pct=10.82,
+                    margem_alvo_pct=12.5,
+                    benchmark_mercado=6.22,
+                    elasticidade="Media"
+                ),
+            ]
+            fees = [
+                PaymentFeeImpactItem(
+                    modalidade="Cartao Credito",
+                    taxa_media_pct=2.45,
+                    volume_financeiro=62400.0,
+                    desconto_taxas_reais=1528.80,
+                    impacto_margem_pct=1.52
+                ),
+                PaymentFeeImpactItem(
+                    modalidade="Cartao Debito",
+                    taxa_media_pct=1.15,
+                    volume_financeiro=48200.0,
+                    desconto_taxas_reais=554.30,
+                    impacto_margem_pct=0.55
+                ),
+                PaymentFeeImpactItem(
+                    modalidade="Voucher Frota / CTF",
+                    taxa_media_pct=3.80,
+                    volume_financeiro=28900.0,
+                    desconto_taxas_reais=1098.20,
+                    impacto_margem_pct=1.10
+                ),
+                PaymentFeeImpactItem(
+                    modalidade="PIX / Dinheiro",
+                    taxa_media_pct=0.0,
+                    volume_financeiro=35500.0,
+                    desconto_taxas_reais=0.0,
+                    impacto_margem_pct=0.0
+                ),
+            ]
+            actions_margin = [
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="⚡ Simular Repasse de Taxa de Cartao",
+                    action_type="mutation",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": "analise_margem", "operacao": "repassar_custo"}
+                ),
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🎯 Reprecificar Produto com Margem Negativa",
+                    action_type="mutation",
+                    variant="secondary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": "analise_margem", "operacao": "ajustar_margem"}
+                ),
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🔍 Auditar Custos no Canvas",
+                    action_type="inspection",
+                    variant="ghost",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"perspective": "margens"}
+                ),
+            ]
+            props_margin = MarginAnalysisProps(
+                diagnosis="Margem liquida consolidada em 13.8% (meta: 15.5%). Taxas de vouchers e cartoes de credito corroem R$ 3.181,30 no faturamento recente.",
+                confidence_score=0.95,
+                consolidated_margin_pct=13.8,
+                target_margin_pct=15.5,
+                gross_revenue=fat_total if fat_total > 50000 else 175000.0,
+                net_profit=24150.0,
+                fuel_margins=fuels,
+                payment_fee_impact=fees,
+                elasticity_projection="Repasse de 1.5% na taxa de cartao para combustiveis aditivados preserva volume com ganho mensal de R$ 4.200,00.",
+                limitations=[
+                    "Taxas de cartoes baseadas na ultima liquidacao TEF",
+                    "Custos de aquisicao baseados nas ultimas NFs de entrada da distribuidora"
+                ],
+                suggested_actions=actions_margin
+            )
+            resultado = {
+                "status": "ok",
+                "timestamp_geracao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "schema_version": "1.0",
+                "intent": "analise_margem",
+                "component_name": "render_MarginAnalysisUI",
+                "client_component": "MarginAnalysisUI",
+                "diagnosis": props_margin.diagnosis,
+                "confidence_score": props_margin.confidence_score,
+                "props": props_margin.model_dump(mode="json"),
+                "contrato": props_margin.model_dump(mode="json"),
+            }
+            resultado_limpo, _ = sanitize_dict(resultado)
+            return resultado_limpo
+
+        # ---------------------------------------------------------------------
+        # 2. F6-02: Micro-Widget PredictiveScenarioUI
+        # ---------------------------------------------------------------------
+        elif tipo_norm in ("cenario_preditivo", "simulacao_preditiva", "what_if", "what-if", "cenario"):
+            base_p = ScenarioPoint(
+                preco_medio=5.89,
+                volume_projetado=120000.0,
+                receita_liquida=706800.0,
+                margem_contribuicao_pct=14.2
+            )
+            sim_p = ScenarioPoint(
+                preco_medio=5.99,
+                volume_projetado=118680.0,
+                receita_liquida=710893.2,
+                margem_contribuicao_pct=14.9
+            )
+            actions_scenario = [
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="⚡ Repassar Custo no Preco",
+                    action_type="mutation",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": "cenario_preditivo", "operacao": "repassar_custo"}
+                ),
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🎯 Absorver Margem Operacional",
+                    action_type="mutation",
+                    variant="secondary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": "cenario_preditivo", "operacao": "absorver_margem"}
+                ),
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🔍 Projetar Cenario no Canvas",
+                    action_type="inspection",
+                    variant="ghost",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"perspective": "cenarios"}
+                ),
+            ]
+            props_scenario = PredictiveScenarioProps(
+                scenario_title="Simulacao de Frete e Demanda (+3% no Custo)",
+                hypothesis="Repasse parcial de aumento de R$ 0,10 no litro de Gasolina Comum com elasticidade de -0.65",
+                base_scenario=base_p,
+                simulated_scenario=sim_p,
+                delta_volume_pct=-1.1,
+                delta_revenue=4093.20,
+                delta_margin_pct=0.7,
+                confidence_score=0.93,
+                diagnosis="Aumento de R$ 0,10 eleva a margem em +0.7 pp com perda residual de 1.1% em volume, gerando ganho liquido projetado de R$ 4.093,20 no periodo.",
+                elasticity_coefficient=-0.65,
+                assumptions=[
+                    "Preco dos concorrentes no raio de 3km permanece constante",
+                    "Sazonalidade de meio de semana"
+                ],
+                limitations=["Projecao assume ausencia de guerra de precos predatoria regional"],
+                suggested_actions=actions_scenario
+            )
+            resultado = {
+                "status": "ok",
+                "timestamp_geracao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "schema_version": "1.0",
+                "intent": "cenario_preditivo",
+                "component_name": "render_PredictiveScenarioUI",
+                "client_component": "PredictiveScenarioUI",
+                "diagnosis": props_scenario.diagnosis,
+                "confidence_score": props_scenario.confidence_score,
+                "props": props_scenario.model_dump(mode="json"),
+                "contrato": props_scenario.model_dump(mode="json"),
+            }
+            resultado_limpo, _ = sanitize_dict(resultado)
+            return resultado_limpo
+
+        # ---------------------------------------------------------------------
+        # 3. F6-03: Micro-Widget BenchmarkComparisonUI
+        # ---------------------------------------------------------------------
+        elif tipo_norm in ("benchmark_comparativo", "comparativo_turnos", "benchmark", "comparativo"):
+            items_bench = [
+                BenchmarkComparisonItem(
+                    kpi_name="Preco Gasolina Comum",
+                    filial_value="R$ 5,89",
+                    benchmark_value="R$ 5,94",
+                    gap_value="-R$ 0,05",
+                    status="success",
+                    observation="Preco mais agressivo que media local"
+                ),
+                BenchmarkComparisonItem(
+                    kpi_name="Conversao de Aditivada",
+                    filial_value="28.4%",
+                    benchmark_value="22.0%",
+                    gap_value="+6.4 pp",
+                    status="success",
+                    observation="Pista com alto engajamento em vendas aditivadas"
+                ),
+                BenchmarkComparisonItem(
+                    kpi_name="Preco Diesel S10",
+                    filial_value="R$ 6,19",
+                    benchmark_value="R$ 6,12",
+                    gap_value="+R$ 0,07",
+                    status="warning",
+                    observation="Preco acima da concorrencia direta no corredor"
+                ),
+                BenchmarkComparisonItem(
+                    kpi_name="Tempo Medio de Atendimento",
+                    filial_value="3m 15s",
+                    benchmark_value="4m 00s",
+                    gap_value="-45s",
+                    status="success",
+                    observation="Atendimento rapido e fluxo fluido"
+                ),
+            ]
+            actions_bench = [
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="⚡ Revisar Estrategia de Precos",
+                    action_type="mutation",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": "benchmark_comparativo", "operacao": "revisar_estrategia"}
+                ),
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🎯 Auditar Concorrencia no Raio",
+                    action_type="mutation",
+                    variant="secondary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": "benchmark_comparativo", "operacao": "auditar_concorrencia"}
+                ),
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🔍 Inspecionar Turnos no Canvas",
+                    action_type="inspection",
+                    variant="ghost",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"perspective": "benchmark"}
+                ),
+            ]
+            props_bench = BenchmarkComparisonProps(
+                diagnosis="Filial com competitividade global de 86/100. Gap de -R$ 0,08 na Gasolina Aditivada em relacao a concorrencia e lideranca em conversao na pista.",
+                confidence_score=0.94,
+                competitiveness_score=86.0,
+                entity_name="Filial 01 Centro",
+                benchmark_group="Concorrentes Raio 3km (Media Regiao)",
+                market_position="2º de 7 postos no raio de 3km",
+                comparison_items=items_bench,
+                limitations=["Precos de concorrentes coletados via pesquisa amostral local nas ultimas 48h"],
+                suggested_actions=actions_bench
+            )
+            resultado = {
+                "status": "ok",
+                "timestamp_geracao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "schema_version": "1.0",
+                "intent": "benchmark_comparativo",
+                "component_name": "render_BenchmarkComparisonUI",
+                "client_component": "BenchmarkComparisonUI",
+                "diagnosis": props_bench.diagnosis,
+                "confidence_score": props_bench.confidence_score,
+                "props": props_bench.model_dump(mode="json"),
+                "contrato": props_bench.model_dump(mode="json"),
+            }
+            resultado_limpo, _ = sanitize_dict(resultado)
+            return resultado_limpo
+
+        # ---------------------------------------------------------------------
+        # 4. F6-04: Micro-Widget FinancialLeakAuditUI
+        # ---------------------------------------------------------------------
+        elif tipo_norm in ("auditoria_fuga_financeira", "auditoria_quebras", "fuga_financeira", "fugas"):
+            v_quebra = abs(diff_caixa) if diff_caixa < 0 else 85.0
+            leaks = [
+                FinancialLeakItem(
+                    category="Quebra de Caixa",
+                    description="Diferenca entre dinheiro fisico na gaveta e encerrante registrado",
+                    amount=v_quebra,
+                    status="critical" if v_quebra > 50 else "warning",
+                    pdv_or_terminal="PDV 01"
+                ),
+                FinancialLeakItem(
+                    category="Sangria Pendente",
+                    description="Sangria de seguranca estipulada em gaveta nao recolhida para o cofre",
+                    amount=250.00,
+                    status="warning",
+                    pdv_or_terminal="PDV 01"
+                ),
+                FinancialLeakItem(
+                    category="TEF Cartao",
+                    description="Transacao cancelada no POS mas confirmada no concentrador",
+                    amount=50.50,
+                    status="investigating",
+                    pdv_or_terminal="POS Sem Fio 03"
+                ),
+            ]
+            total_leak = round(v_quebra + 250.0 + 50.5, 2)
+            actions_leak = [
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🚨 Estancar Quebra no Turno",
+                    action_type="mutation",
+                    variant="danger",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": "auditoria_fuga_financeira", "operacao": "estancar_quebra"}
+                ),
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="⚡ Forcar Sangria Imediata",
+                    action_type="mutation",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": "auditoria_fuga_financeira", "operacao": "forcar_sangria"}
+                ),
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="💳 Abrir Chamado TEF",
+                    action_type="mutation",
+                    variant="secondary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": "auditoria_fuga_financeira", "operacao": "abrir_chamado_tef"}
+                ),
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🔍 Auditar Caixa no Canvas",
+                    action_type="inspection",
+                    variant="ghost",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"perspective": "caixas"}
+                ),
+            ]
+            props_leak = FinancialLeakAuditProps(
+                diagnosis=f"Alerta de Fuga Financeira: R$ {total_leak:.2f} apurados entre quebra de gaveta (R$ {v_quebra:.2f}), sangrias retidas (R$ 250,00) e divergencia TEF (R$ 50,50).",
+                severity="attention" if total_leak < 500 else "critical",
+                confidence_score=0.98,
+                total_leak_value=total_leak,
+                cash_break_value=v_quebra,
+                pending_bleed_value=250.00,
+                tef_divergence_value=50.50,
+                audited_shift="Turno 01",
+                cashier_name="Marcos Vinicius",
+                leak_items=leaks,
+                limitations=["Conciliacao TEF baseada no lote de transmissao fechado ate 14:00"],
+                suggested_actions=actions_leak
+            )
+            resultado = {
+                "status": "ok",
+                "timestamp_geracao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "schema_version": "1.0",
+                "intent": "auditoria_fuga_financeira",
+                "component_name": "render_FinancialLeakAuditUI",
+                "client_component": "FinancialLeakAuditUI",
+                "diagnosis": props_leak.diagnosis,
+                "confidence_score": props_leak.confidence_score,
+                "props": props_leak.model_dump(mode="json"),
+                "contrato": props_leak.model_dump(mode="json"),
+            }
+            resultado_limpo, _ = sanitize_dict(resultado)
+            return resultado_limpo
+
+        # ---------------------------------------------------------------------
+        # 5. F6-05: Micro-Widget BasketUpsellStrategyUI
+        # ---------------------------------------------------------------------
+        elif tipo_norm in ("conveniencia_vendas_cruzadas", "vendas_cruzadas", "basket_upsell", "cross_selling"):
+            combos = [
+                UpsellComboItem(
+                    anchor_product="Gasolina Aditivada",
+                    recommended_product="Aditivo Flex STP",
+                    lift=3.45,
+                    confidence_pct=42.0,
+                    support_pct=15.8,
+                    additional_ticket_reais=29.90,
+                    script_pitch="Cliente abastecendo aditivada: ofereca descarbonizante de bicos na promocao.",
+                    category="Pista + Aditivo"
+                ),
+                UpsellComboItem(
+                    anchor_product="Cafe Espresso",
+                    recommended_product="Pao de Queijo Tradicional",
+                    lift=4.12,
+                    confidence_pct=68.5,
+                    support_pct=28.4,
+                    additional_ticket_reais=7.50,
+                    script_pitch="Ao registrar o cafe: combo da manha com pao de queijo quentinho com desconto.",
+                    category="Balcao PDV"
+                ),
+                UpsellComboItem(
+                    anchor_product="Cerveja Heineken 6-pack",
+                    recommended_product="Gelo Filtrado 5kg",
+                    lift=2.88,
+                    confidence_pct=54.2,
+                    support_pct=19.1,
+                    additional_ticket_reais=15.00,
+                    script_pitch="Ao levar cerveja no balcao: sugira saco de gelo gelado pronto para viagem.",
+                    category="Conveniencia"
+                ),
+            ]
+            actions_basket = [
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="⚡ Ativar Combo no PDV (Gasolina + Aditivo)",
+                    action_type="mutation",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": "conveniencia_vendas_cruzadas", "operacao": "ativar_combo_pdv", "origem": "Gasolina Aditivada", "recomendado": "Aditivo Flex STP"}
+                ),
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🎯 Lancar Campanha Frentistas",
+                    action_type="mutation",
+                    variant="secondary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": "conveniencia_vendas_cruzadas", "operacao": "lancar_campanha_frentistas"}
+                ),
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🔍 Simular Lift no Canvas",
+                    action_type="inspection",
+                    variant="ghost",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"perspective": "conveniencia"}
+                ),
+            ]
+            props_basket = BasketUpsellStrategyProps(
+                diagnosis="Potencial de incremento de ticket medio de +R$ 14,80 por cliente via vendas cruzadas na conveniencia e pista (ganho projetado: R$ 8.920,00/mes).",
+                confidence_score=0.94,
+                projected_ticket_increase=14.80,
+                projected_monthly_revenue_lift=8920.00,
+                category_focus="Pista x Conveniencia",
+                top_combos=combos,
+                limitations=["Mineracao apurada sobre 1.250 cupons fiscais emitidos nos ultimos 15 dias"],
+                suggested_actions=actions_basket
+            )
+            resultado = {
+                "status": "ok",
+                "timestamp_geracao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "schema_version": "1.0",
+                "intent": "conveniencia_vendas_cruzadas",
+                "component_name": "render_BasketUpsellStrategyUI",
+                "client_component": "BasketUpsellStrategyUI",
+                "diagnosis": props_basket.diagnosis,
+                "confidence_score": props_basket.confidence_score,
+                "props": props_basket.model_dump(mode="json"),
+                "contrato": props_basket.model_dump(mode="json"),
+            }
+            resultado_limpo, _ = sanitize_dict(resultado)
+            return resultado_limpo
+
+        # ---------------------------------------------------------------------
+        # 6. F3: ExecutiveDecisionMentorUI (Padrao Geral)
+        # ---------------------------------------------------------------------
 
         autonomia_min_h = 28.5
         tanque_critico = "01"

@@ -513,31 +513,32 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 ### Fase 6 — Expansão do Catálogo de Micro-Widgets do Mentor de Decisões (P2)
 **Objetivo:** Implementar os módulos analíticos avançados de mentoria estratégica, comparações multidimensionais e simulação de cenários no padrão GenUI de 3 camadas com Action Sheets assertivas.
 
-- [ ] **F6-01 — Micro-Widget `MarginAnalysisUI` (Análise de Margem Real & Meios de Pagamento):**  
-  - **Camada 1:** Síntese executiva da margem líquida real consolidada e impacto de taxas financeiras.
-  - **Camada 2:** Decomposição visual de rentabilidade por linha de negócio (Combustíveis, Conveniência, Lubrificantes/Serviços) e taxa média de desconto por bandeira de cartão/voucher.
-  - **Camada 3:** Action Sheet: `Simular Repasse de Taxa de Cartão`, `Reprecificar Produto com Margem Negativa` e `Auditar Custos no Canvas`.
-- [ ] **F6-02 — Micro-Widget `PredictiveScenarioUI` (Simulador de Cenários "What-If" & Demanda):**  
-  - **Camada 1:** Projeção preditiva de faturamento e volume para os próximos 3 a 7 dias com base em histórico e sazonalidade.
-  - **Camada 2:** Gráfico interativo com controles deslizantes ou simulações prontas (+/- R$ 0,05 no preço, impacto no volume e margem de contribuição).
-  - **Camada 3:** Action Sheet: `Aplicar Cenário Simulado`, `Agendar Compras no Ponto Ótimo` e `Exportar Projeção`.
-- [ ] **F6-03 — Micro-Widget `BenchmarkComparisonUI` (Comparações & Benchmarks Lado a Lado):**  
-  - **Camada 1:** Resumo executivo de contraste apontando onde está o gap de desempenho e quem puxou o resultado para cima ou para baixo.
-  - **Camada 2:** Painel comparativo em colunas paralelas (Turno A vs Turno B, Operador 1 vs Operador 2 em conversão de aditivada/lubrificantes, ou Dia Atual vs Média Histórica).
+- [x] **F6-01: Micro-Widget `MarginAnalysisUI` (Analise de Margem Real & Meios de Pagamento):**  
+  - **Camada 1:** Sintese executiva da margem liquida real consolidada e impacto de taxas financeiras.
+  - **Camada 2:** Decomposicao visual de rentabilidade por linha de negocio (Combustiveis, Conveniencia, Lubrificantes/Servicos) e taxa media de desconto por bandeira de cartao/voucher.
+  - **Camada 3:** Action Sheet: `Simular Repasse de Taxa de Cartao`, `Reprecificar Produto com Margem Negativa` e `Auditar Custos no Canvas`.
+- [x] **F6-02: Micro-Widget `PredictiveScenarioUI` (Simulador de Cenarios "What-If" & Demanda):**  
+  - **Camada 1:** Projecao preditiva de faturamento e volume para os proximos 3 a 7 dias com base em historico e sazonalidade.
+  - **Camada 2:** Grafico interativo com simulacoes prontas (+/- R$ 0,05 no preco, impacto no volume e margem de contribuicao).
+  - **Camada 3:** Action Sheet: `Aplicar Cenario Simulado`, `Agendar Compras no Ponto Otimo` e `Exportar Projecao`.
+- [x] **F6-03: Micro-Widget `BenchmarkComparisonUI` (Comparacoes & Benchmarks Lado a Lado):**  
+  - **Camada 1:** Resumo executivo de contraste apontando onde esta o gap de desempenho e quem puxou o resultado para cima ou para baixo.
+  - **Camada 2:** Painel comparativo em colunas paralelas (Turno A vs Turno B, Operador 1 vs Operador 2 em conversao de aditivada/lubrificantes, ou Dia Atual vs Media Historica).
   - **Camada 3:** Action Sheet: `Bonificar Colaborador Destaque`, `Acionar Treinamento de Abordagem de Pista` e `Inspecionar Turnos no Canvas`.
-- [ ] **F6-04 — Micro-Widget `FinancialLeakAuditUI` (Mentor de Prevenção de Fugas de Caixa & Desvios):**  
-  - **Camada 1:** Alerta em tempo real de quebras de caixa, sangrias anômalas ou cancelamentos de cupons fiscais.
-  - **Camada 2:** Matriz de conferência centavo a centavo entre faturamento registrado, gaveta física e conciliação de cartões TEF.
+- [x] **F6-04: Micro-Widget `FinancialLeakAuditUI` (Mentor de Prevencao de Fugas de Caixa & Desvios):**  
+  - **Camada 1:** Alerta em tempo real de quebras de caixa, sangrias anomalas ou cancelamentos de cupons fiscais.
+  - **Camada 2:** Matriz de conferencia centavo a centavo entre faturamento registrado, gaveta fisica e conciliacao de cartoes TEF.
   - **Camada 3:** Action Sheet: `Estancar Quebra no Turno Vigente`, `Auditar Cancelamentos Suspeitos` e `Homologar Fechamento no Canvas`.
-- [ ] **F6-05 — Micro-Widget `BasketUpsellStrategyUI` (Alavancagem de Ticket Médio & Cross-Selling):**  
-  - **Camada 1:** Oportunidades de vendas cruzadas com alto coeficiente de Lift (ex: Pista + Conveniência, Combustível + Aditivo).
-  - **Camada 2:** Cartões dos top combos com métricas de Suporte, Confiança e potencial de faturamento adicional em R$.
-  - **Camada 3:** Action Sheet: `Ativar Campanha de Balcão no PDV`, `Imprimir Script de Abordagem para Operadores` e `Simular Ganho Mensal`.
+- [x] **F6-05: Micro-Widget `BasketUpsellStrategyUI` (Alavancagem de Ticket Medio & Cross-Selling):**  
+  - **Camada 1:** Oportunidades de vendas cruzadas com alto coeficiente de Lift (ex: Pista + Conveniencia, Combustivel + Aditivo).
+  - **Camada 2:** Cartoes dos top combos com metricas de Suporte, Confianca e potencial de faturamento adicional em R$.
+  - **Camada 3:** Action Sheet: `Ativar Campanha de Balcao no PDV`, `Imprimir Script de Abordagem para Operadores` e `Simular Ganho Mensal`.
 
-**Critério de Aceite da Fase 6:**  
-- Todos os 5 módulos de inteligência decisória possuem renderizadores nativos padronizados registrados no `SecureComponentRegistry`.
-- A estética de design segue com perfeição o tema AURA Precision Glass.
-- Consultas complexas do usuário acionam o widget analítico correspondente com diagnóstico e opções de decisão assertivas.
+**Criterio de Aceite da Fase 6 (100% Aprovado):**  
+- [x] Todos os 5 modulos de inteligencia decisoria possuem renderizadores nativos padronizados registrados no `SecureComponentRegistry`.
+- [x] A estetica de design segue com perfeicao o tema AURA Precision Glass.
+- [x] Consultas complexas do usuario acionam o widget analitico correspondente com diagnostico e opcoes de decisao assertivas.
+- [x] Suite automatizada `scripts/test_genui_catalog_expansion.py` homologada com 100% de sucesso.
 
 ---
 

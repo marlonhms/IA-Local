@@ -352,7 +352,7 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     ]):
         return "lmc_anp"
 
-    # -0.5 Mentoria Executiva de Decisão & Briefing Estratégico (GenUI Fase 3 — P0)
+    # -0.5 Mentoria Executiva de Decisao & Briefing Estrategico (GenUI Fase 3 e Fase 6)
     termos_mentoria_exatos = [
         "diagnóstico do meu negócio", "diagnostico do meu negócio", "diagnóstico de negócio", "diagnostico do negocio",
         "diagnóstico do meu posto", "diagnostico do meu posto", "diagnóstico geral", "diagnostico geral",
@@ -368,6 +368,45 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     ]
     if any(t in p for t in termos_mentoria_exatos):
         return "mentoria_decisao"
+
+    # F6-02: Simulador de Cenarios "What-If" & Demanda
+    termos_cenario_exatos = [
+        "cenário preditivo", "cenario preditivo", "simulação preditiva", "simulacao preditiva",
+        "cenário what-if", "cenario what-if", "cenário what if", "cenario what if", "what if", "what-if",
+        "simular preço", "simular preco", "simular cenario", "simular cenário",
+        "elasticidade de preço", "elasticidade de preco", "elasticidade de demanda",
+        "se aumentar o preço", "se subir o preço", "se baixar o preço",
+        "simulação de preço", "simulacao de preco"
+    ]
+    if any(t in p for t in termos_cenario_exatos):
+        return "cenario_preditivo"
+
+    # F6-03: Micro-Widget BenchmarkComparisonUI
+    termos_benchmark_exatos = [
+        "benchmark comparativo", "comparativo de turnos", "comparar turnos", "comparação de turnos",
+        "comparacao de turnos", "turno a vs turno b", "comparativo de concorrentes", "comparar com a concorrência",
+        "comparar com concorrentes", "benchmark de mercado", "concorrentes no raio", "ranking de competitividade"
+    ]
+    if any(t in p for t in termos_benchmark_exatos):
+        return "benchmark_comparativo"
+
+    # F6-04: Micro-Widget FinancialLeakAuditUI
+    termos_fuga_exatos = [
+        "fuga financeira", "fugas financeiras", "auditoria de fuga financeira", "auditoria de quebras",
+        "auditar quebras de caixa", "sangria anômala", "sangria anomala", "sangrias pendentes",
+        "sangria pendente", "divergência tef", "divergencia tef", "desvio de caixa", "furo de gaveta"
+    ]
+    if any(t in p for t in termos_fuga_exatos):
+        return "auditoria_fuga_financeira"
+
+    # F6-01: Micro-Widget MarginAnalysisUI
+    termos_margem_analise = [
+        "análise de margem", "analise de margem", "taxas de cartão", "taxas de cartao",
+        "impacto de taxas", "taxa de maquininha", "repasse de taxas", "repassar taxa de cartão",
+        "rentabilidade por combustível", "margem dos combustíveis", "margem por combustível"
+    ]
+    if any(t in p for t in termos_margem_analise):
+        return "analise_margem"
 
     if ("diagnóstico" in p or "diagnostico" in p) and any(w in p for w in ["negócio", "negocio", "posto", "operação", "operacao", "executivo", "geral", "hoje", "empresa"]):
         return "mentoria_decisao"

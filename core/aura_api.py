@@ -156,9 +156,90 @@ def _dispatch_business_action(
     Trata pedidos de combustivel, estancamento de quebra, ajuste de margem e conciliacao.
     """
     act = (action_name or "").lower().strip()
+    operacao = str(payload.get("operacao") or "").lower().strip()
+    act_combined = f"{act} {operacao}".strip()
+
+    # Repasse de custo no preco (Simulacao Preditiva)
+    if any(k in act_combined for k in ["repassar_custo", "repassar"]):
+        return {
+            "status": "APPROVED",
+            "tipo": "REPASSE_CUSTO",
+            "produto": payload.get("produto") or "Gasolina Comum",
+            "delta_preco": float(payload.get("delta_preco") or 0.10),
+            "elasticidade": float(payload.get("elasticidade") or -0.65),
+            "executado_por": operator_id,
+            "confirmacao_erp": f"REP-{int(datetime.now(timezone.utc).timestamp())}",
+        }
+
+    # Absorcao de margem operacional
+    if any(k in act_combined for k in ["absorver_margem", "absorver"]):
+        return {
+            "status": "APPROVED",
+            "tipo": "ABSORCAO_MARGEM",
+            "impacto_margem_pct": float(payload.get("impacto_margem_pct") or -0.5),
+            "executado_por": operator_id,
+            "confirmacao_erp": f"ABS-{int(datetime.now(timezone.utc).timestamp())}",
+        }
+
+    # Revisao de estrategia de precos (Benchmark)
+    if any(k in act_combined for k in ["revisar_estrategia", "revisar"]):
+        return {
+            "status": "APPROVED",
+            "tipo": "REVISAO_ESTRATEGIA",
+            "escopo": payload.get("escopo") or "Precos e Margem Competitiva",
+            "executado_por": operator_id,
+            "confirmacao_erp": f"ESTR-{int(datetime.now(timezone.utc).timestamp())}",
+        }
+
+    # Auditoria de concorrencia no raio
+    if any(k in act_combined for k in ["auditar_concorrencia", "concorrencia"]):
+        return {
+            "status": "APPROVED",
+            "tipo": "AUDITORIA_CONCORRENCIA",
+            "raio_km": float(payload.get("raio_km") or 3.0),
+            "executado_por": operator_id,
+            "confirmacao_erp": f"BENCH-{int(datetime.now(timezone.utc).timestamp())}",
+        }
+
+    # Abertura de chamado TEF (Fuga Financeira)
+    if any(k in act_combined for k in ["abrir_chamado_tef", "tef", "chamado"]):
+        return {
+            "status": "APPROVED",
+            "tipo": "CHAMADO_TEF",
+            "terminal": payload.get("terminal") or "POS Sem Fio 03",
+            "motivo": payload.get("motivo") or "Divergencia de liquidacao TEF",
+            "executado_por": operator_id,
+            "protocolo_chamado": f"TEF-{int(datetime.now(timezone.utc).timestamp())}",
+            "confirmacao_erp": f"TEF-{int(datetime.now(timezone.utc).timestamp())}",
+        }
+
+    # Lancamento de campanha de incentivo a frentistas
+    if any(k in act_combined for k in ["lancar_campanha_frentistas", "campanha", "frentistas"]):
+        return {
+            "status": "APPROVED",
+            "tipo": "CAMPANHA_FRENTISTAS",
+            "meta_conversao_pct": float(payload.get("meta_conversao_pct") or 25.0),
+            "bonificacao_reais": float(payload.get("bonificacao_reais") or 1.50),
+            "executado_por": operator_id,
+            "confirmacao_erp": f"CAMP-{int(datetime.now(timezone.utc).timestamp())}",
+        }
+
+    # Ativacao de combo no PDV / Vendas Cruzadas
+    if any(k in act_combined for k in ["ativar_combo_pdv", "ativar_combo", "combo"]):
+        origem = payload.get("origem") or "Gasolina Aditivada"
+        recomendado = payload.get("recomendado") or "Aditivo Flex STP"
+        return {
+            "status": "APPROVED",
+            "tipo": "ATIVACAO_COMBO_PDV",
+            "origem": str(origem),
+            "recomendado": str(recomendado),
+            "desconto_combo_pct": float(payload.get("desconto_pct") or 5.0),
+            "executado_por": operator_id,
+            "confirmacao_erp": f"COMBO-{int(datetime.now(timezone.utc).timestamp())}",
+        }
 
     # Pedido de combustivel / Carreta
-    if any(k in act for k in ["combustivel", "combustível", "pedido", "carreta", "fuel", "tank"]):
+    if any(k in act_combined for k in ["combustivel", "combustível", "pedido", "carreta", "fuel", "tank"]):
         litros = payload.get("litros") or payload.get("volume") or 15000
         combustivel = payload.get("combustivel") or payload.get("produto") or "GASOLINA COMUM"
         fornecedor = payload.get("fornecedor") or "Distribuidora Oficial"

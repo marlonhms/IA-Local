@@ -81,6 +81,17 @@ from core.schemas.genui import (
     ActionVoucher,
     generate_action_voucher_signature,
     verify_action_voucher_signature,
+    FuelMarginItem,
+    PaymentFeeImpactItem,
+    MarginAnalysisProps,
+    ScenarioPoint,
+    PredictiveScenarioProps,
+    BenchmarkComparisonItem,
+    BenchmarkComparisonProps,
+    FinancialLeakItem,
+    FinancialLeakAuditProps,
+    UpsellComboItem,
+    BasketUpsellStrategyProps,
 )
 
 
@@ -150,6 +161,17 @@ __all__ = [
     "ActionVoucher",
     "generate_action_voucher_signature",
     "verify_action_voucher_signature",
+    "FuelMarginItem",
+    "PaymentFeeImpactItem",
+    "MarginAnalysisProps",
+    "ScenarioPoint",
+    "PredictiveScenarioProps",
+    "BenchmarkComparisonItem",
+    "BenchmarkComparisonProps",
+    "FinancialLeakItem",
+    "FinancialLeakAuditProps",
+    "UpsellComboItem",
+    "BasketUpsellStrategyProps",
 ]
 
 
