@@ -242,10 +242,14 @@
       if (!entry) return null;
 
       if (entry.snapshot) {
-        entry.state = Object.assign({}, entry.snapshot.state);
-        entry.isLocked = entry.snapshot.isLocked !== undefined ? entry.snapshot.isLocked : false;
-        entry.lockedActionId = entry.snapshot.lockedActionId || null;
-        entry.optimisticData = entry.snapshot.optimisticData || null;
+        entry.state = Object.assign({}, entry.snapshot.state, {
+          status: 'proposed',
+          isLocked: false,
+          lockedActionId: null
+        });
+        entry.isLocked = false;
+        entry.lockedActionId = null;
+        entry.optimisticData = null;
         entry.snapshot = null;
       } else {
         entry.isLocked = false;

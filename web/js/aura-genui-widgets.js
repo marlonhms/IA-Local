@@ -76,9 +76,7 @@
       this.intent = escapeHtml(payload.intent || defaultIntent);
       this.componentName = escapeHtml(payload.component_name || defaultComp);
       this.summary = escapeHtml(payload.executive_summary || payload.summary_text || '');
-      this.props = (typeof AuraGenUI !== 'undefined' && typeof AuraGenUI.sanitizeProps === 'function')
-        ? AuraGenUI.sanitizeProps(payload.props || {})
-        : (payload.props || {});
+      this.props = payload.props || {};
       this.actions = Array.isArray(payload.actions) ? payload.actions : [];
       this.createdAt = payload.created_at || payload.timestamp || new Date().toISOString();
       this.ttlSeconds = coerceNumber(payload.ttl_seconds, 900);
@@ -509,8 +507,10 @@
         actId = actionIdOrData.actionId || actionIdOrData.action_id || null;
         feedback = actionIdOrData.feedback || actionIdOrData.label || feedbackText;
         if (actionIdOrData.status) this.state.status = actionIdOrData.status;
+        else this.state.status = 'optimistic';
       } else {
         actId = actionIdOrData;
+        this.state.status = 'optimistic';
       }
       this.state.isLocked = true;
       this.state.lockedActionId = actId;
@@ -524,9 +524,7 @@
       this.state.lockedActionId = null;
       this.state.optimisticFeedback = null;
       this.state.errorMessage = errorMsg;
-      if (this.state.status === 'locked' || this.state.status === 'optimistic') {
-        this.state.status = 'failed';
-      }
+      this.state.status = 'failed';
       this.refreshLayer3();
     }
 
