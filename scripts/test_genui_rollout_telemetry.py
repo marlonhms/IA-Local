@@ -113,16 +113,20 @@ def run_all_rollout_telemetry_tests():
     # Precedencia 4: Global runtime
     set_genui_enabled(False)
     assert resolve_genui_flag(query_param=None, header_val=None, body_val=None) is False
+    import core.config
+    assert core.config.ENABLE_GENUI is False, "ENABLE_GENUI global no modulo deve sincronizar com runtime"
     set_genui_enabled(True)
     assert resolve_genui_flag(query_param=None, header_val=None, body_val=None) is True
+    assert core.config.ENABLE_GENUI is True, "ENABLE_GENUI global no modulo deve sincronizar com runtime"
     print("   [OK] Precedencia de flags (Query > Header > Body > Global) 100% validada.")
 
     # 2. TESTE DOS ENDPOINTS ADMINISTRATIVOS (CIRCUIT BREAKER - F9-03)
     print("\n2. Testando Endpoints Administrativos GET/POST /api/v1/aura/admin/feature-flags...")
     mem = AuraSessionMemory(db_path=":memory:")
-    engine = AuraEngine(session_memory=mem)
     telemetry = AuraSRETelemetry(session_memory=mem)
+    AuraSRETelemetry.set_instance(telemetry)
     telemetry.reset()
+    engine = AuraEngine(session_memory=mem)
     engine._telemetry = telemetry
     app = create_aura_app(engine)
     client = TestClient(app)
@@ -219,6 +223,12 @@ def run_all_rollout_telemetry_tests():
     assert "event: ui_complete" in body_ov_on
     assert resp_stream_override_on.headers.get("x-genui-enabled") == "1"
 
+    # 3.6 Requisicao GET para compatibilidade com EventSource do navegador
+    resp_get_stream = client.get("/api/v1/aura/chat/stream?query=Como estao os tanques hoje?&genui=0")
+    assert resp_get_stream.status_code == 200
+    assert "event: ui_skeleton" not in resp_get_stream.text
+    assert resp_get_stream.headers.get("x-genui-enabled") == "0"
+
     # Restaura flag global para True
     set_genui_enabled(True)
     print("   [OK] Comutacao a quente e supressao seletiva de envelopes SSE 100% validadas.")
@@ -268,7 +278,22 @@ def run_all_rollout_telemetry_tests():
     m_data2 = resp_metrics2.json()
     assert m_data2["hydration_ms"]["count"] >= 1
     assert m_data2["hydration_ms"]["avg"] == 38.5
+    assert "p50" in m_data2["hydration_ms"], "SLI hydration_ms deve conter percentil p50"
+    assert "p95" in m_data2["hydration_ms"], "SLI hydration_ms deve conter percentil p95"
+    assert "p99" in m_data2["hydration_ms"], "SLI hydration_ms deve conter percentil p99"
+    assert m_data2["hydration_ms"]["p50"] == 38.5
     assert m_data2["total_actions_rolled_back"] == 1
+
+    # Reporte generico via metric_type e metric_value
+    resp_rep3 = client.post(
+        "/api/v1/aura/telemetry/report",
+        json={
+            "metric_type": "hydration",
+            "metric_value": 45.0,
+            "session_id": "sess_test_gen",
+        }
+    )
+    assert resp_rep3.status_code == 200
     print("   [OK] Endpoints /telemetry/metrics e /telemetry/report 100% homologados.")
 
     # 5. TESTE DE INTEGRACAO TRANSACIONAL COM SLIs SRE (RBAC BLOCKS E APROVACOES)
@@ -319,7 +344,27 @@ def run_all_rollout_telemetry_tests():
     assert m_data3["total_actions_approved"] >= 1, "Deveria ter registrado 1 acao aprovada"
     assert m_data3["security_blocks"] >= 1, "Deveria ter registrado 1 bloqueio de seguranca"
     assert m_data3["action_success_rate_pct"] > 0, "Taxa de sucesso deve ser positiva"
-    print("   [OK] SLIs de acoes solicitadas, bloqueios de seguranca e aprovacoes validados.")
+
+    # 5.4 Validacao de Bloqueio OWASP LLM03 (Agencia Excessiva / Intencao nao catalogada)
+    from core.aura_engine import build_canonical_genui_envelope
+    sec_before = client.get("/api/v1/aura/telemetry/metrics").json()["security_blocks"]
+    blocked_env = build_canonical_genui_envelope(
+        intencao="intencao_inexistente_alucinada",
+        tool_call_id="call_sec_test",
+        resultado_bruto={"dados": 123},
+        executive_summary="Resumo de teste",
+    )
+    assert blocked_env is None, "Envelope alucinado deve ser bloqueado"
+    sec_after = client.get("/api/v1/aura/telemetry/metrics").json()["security_blocks"]
+    assert sec_after == sec_before + 1, "OWASP LLM03 deve incrementar security_blocks na telemetria"
+
+    # 5.5 Durabilidade e persistencia SQLite apos reinicializacao
+    telemetry_reloaded = AuraSRETelemetry(session_memory=mem)
+    m_reloaded = telemetry_reloaded.get_metrics_summary()
+    assert m_reloaded["total_actions_requested"] >= 2, "Deveria recuperar acoes solicitadas do SQLite"
+    assert m_reloaded["total_actions_approved"] >= 1, "Deveria recuperar acoes aprovadas do SQLite"
+    assert m_reloaded["security_blocks"] >= 2, "Deveria recuperar bloqueios de seguranca do SQLite"
+    print("   [OK] SLIs de acoes solicitadas, bloqueios de seguranca, OWASP LLM03 e durabilidade validados.")
 
     # 6. TESTE DE CICLO DE VIDA DO CLIENTE FRONTEND VIA NODE.JS HEADLESS
     print("\n6. Testando Modulos do Frontend Zero-Bundler via Node.js Headless...")
@@ -344,6 +389,15 @@ def run_all_rollout_telemetry_tests():
     assert.strictEqual(typeof client.getTelemetryMetrics, 'function', 'getTelemetryMetrics deve ser funcao');
     assert.strictEqual(typeof client.getFeatureFlags, 'function', 'getFeatureFlags deve ser funcao');
     assert.strictEqual(typeof client.updateFeatureFlags, 'function', 'updateFeatureFlags deve ser funcao');
+
+    // 3. Validacao de override dinamico via URLSearchParams (search e hash)
+    global.window = { location: { search: '?genui=0' } };
+    assert.strictEqual(genui.AuraGenUI.isEnabled(), false, 'Query param ?genui=0 deve forcar false');
+    global.window = { location: { search: '?genui=1' } };
+    assert.strictEqual(genui.AuraGenUI.isEnabled(), true, 'Query param ?genui=1 deve forcar true');
+    global.window = { location: { hash: '#/painel?genui=0' } };
+    assert.strictEqual(genui.AuraGenUI.isEnabled(), false, 'Hash query ?genui=0 deve forcar false');
+    delete global.window;
 
     console.log('NODE_GENUI_ROLLOUT_TELEMETRY_OK');
     """

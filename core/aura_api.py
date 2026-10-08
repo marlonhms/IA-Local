@@ -137,7 +137,9 @@ async def chat_endpoint(
         body_val=body_genui,
     )
 
-    if req.stream:
+    should_stream = req.stream or (request is not None and request.url.path.endswith("/stream"))
+
+    if should_stream:
         async def event_generator():
             async for chunk in engine.ask_stream(
                 query=req.query,
@@ -169,6 +171,48 @@ async def chat_endpoint(
             enable_genui=effective_genui,
         )
         return response
+
+
+@router.get("/chat/stream", summary="Chat Cognitivo com a AURA em Streaming SSE via GET (EventSource)")
+async def chat_stream_get_endpoint(
+    request: Request,
+    query: str = Query(..., min_length=1, description="Pergunta ou instrucao do usuario"),
+    session_id: Optional[str] = Query(None, description="Identificador da sessao"),
+    tenant_id: Optional[str] = Query(None, description="Identificador do cliente"),
+    filial_id: Optional[str] = Query(None, description="Identificador da filial"),
+    genui: Optional[str] = Query(None, description="Feature flag GenUI override (1=ativa, 0=desativa)"),
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """
+    Streaming SSE via requisicao GET para total compatibilidade com clientes EventSource padrao do navegador.
+    """
+    header_genui = request.headers.get("x-genui-enabled") if request is not None else None
+    effective_genui = resolve_genui_flag(
+        query_param=genui,
+        header_val=header_genui,
+        body_val=None,
+    )
+
+    async def event_generator():
+        async for chunk in engine.ask_stream(
+            query=query,
+            session_id=session_id,
+            tenant_id=tenant_id,
+            filial_id=filial_id,
+            enable_genui=effective_genui,
+        ):
+            yield chunk.to_sse()
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "X-GenUI-Enabled": "1" if effective_genui else "0",
+        },
+    )
 
 
 @router.post("/execute-intent", summary="Execução Direta de Ferramenta Analítica")

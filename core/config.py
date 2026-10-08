@@ -36,7 +36,9 @@ def set_genui_enabled(enabled: bool) -> bool:
     """
     Comuta a quente o valor de ENABLE_GENUI em tempo de execucao.
     """
-    _RUNTIME_FEATURE_FLAGS["ENABLE_GENUI"] = bool(enabled)
+    global ENABLE_GENUI
+    ENABLE_GENUI = bool(enabled)
+    _RUNTIME_FEATURE_FLAGS["ENABLE_GENUI"] = ENABLE_GENUI
     return _RUNTIME_FEATURE_FLAGS["ENABLE_GENUI"]
 
 
@@ -51,13 +53,15 @@ def update_feature_flags(flags: Dict[str, Any]) -> Dict[str, Any]:
     """
     Atualiza multiplas feature flags no runtime de forma segura.
     """
+    global ENABLE_GENUI
     if not isinstance(flags, dict):
         return dict(_RUNTIME_FEATURE_FLAGS)
 
     for k, v in flags.items():
         k_upper = str(k).strip().upper()
         if k_upper in ("ENABLE_GENUI", "GENUI"):
-            _RUNTIME_FEATURE_FLAGS["ENABLE_GENUI"] = bool(v)
+            ENABLE_GENUI = bool(v)
+            _RUNTIME_FEATURE_FLAGS["ENABLE_GENUI"] = ENABLE_GENUI
         else:
             _RUNTIME_FEATURE_FLAGS[k_upper] = v
 

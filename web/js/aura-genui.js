@@ -549,17 +549,20 @@
    * @returns {boolean}
    */
   function isEnabled() {
-    if (typeof window !== 'undefined' && window.location && window.location.search) {
+    if (typeof window !== 'undefined' && window.location) {
       try {
-        const params = new URLSearchParams(window.location.search);
-        const flag = params.get('genui');
-        if (flag !== null) {
-          const flagLower = flag.trim().toLowerCase();
-          if (flagLower === '0' || flagLower === 'false' || flagLower === 'off' || flagLower === 'no') {
-            return false;
-          }
-          if (flagLower === '1' || flagLower === 'true' || flagLower === 'on' || flagLower === 'yes') {
-            return true;
+        const searchStr = window.location.search || (window.location.hash && window.location.hash.includes('?') ? window.location.hash.substring(window.location.hash.indexOf('?')) : '');
+        if (searchStr) {
+          const params = new URLSearchParams(searchStr);
+          const flag = params.get('genui');
+          if (flag !== null) {
+            const flagLower = flag.trim().toLowerCase();
+            if (flagLower === '0' || flagLower === 'false' || flagLower === 'off' || flagLower === 'no') {
+              return false;
+            }
+            if (flagLower === '1' || flagLower === 'true' || flagLower === 'on' || flagLower === 'yes') {
+              return true;
+            }
           }
         }
       } catch (_) {}

@@ -746,6 +746,29 @@ class AuraSessionMemory:
             })
         return records
 
+    def get_telemetry_metric_counts(self) -> Dict[str, int]:
+        """Retorna contagem agregada de cada metric_type da tabela de telemetria duravel."""
+        try:
+            with self._connection() as conn:
+                cur = conn.execute("""
+                    SELECT metric_type, COUNT(*) as cnt
+                    FROM aura_sre_telemetry
+                    GROUP BY metric_type;
+                """)
+                rows = cur.fetchall()
+                return {str(r["metric_type"]): int(r["cnt"]) for r in rows}
+        except Exception:
+            return {}
+
+    def clear_telemetry(self) -> None:
+        """Limpa registros da tabela de telemetria SRE (util para testes ou manutencao)."""
+        try:
+            with self._connection() as conn:
+                conn.execute("DELETE FROM aura_sre_telemetry;")
+                conn.commit()
+        except Exception:
+            pass
+
     def clear_session(self, session_id: str):
         """Limpa as mensagens de uma sessão específica."""
         with self._connection() as conn:
@@ -1081,6 +1104,7 @@ def build_canonical_genui_envelope(
     tool_call_id: str,
     resultado_bruto: Any,
     executive_summary: str,
+    telemetry: Optional[AuraSRETelemetry] = None,
 ) -> Optional[GenUIEnvelope]:
     """
     Constrói um envelope canônico GenUIEnvelope a partir dos dados analíticos determinísticos
@@ -1094,6 +1118,15 @@ def build_canonical_genui_envelope(
             "não catalogado no SecureComponentRegistry. Fallback seguro acionado.",
             intencao,
         )
+        try:
+            tel = telemetry or AuraSRETelemetry.get_instance()
+            if tel:
+                tel.record_security_block(
+                    reason=f"OWASP LLM03: Intencao '{intencao}' nao catalogada no SecureComponentRegistry",
+                    tool_call_id=tool_call_id,
+                )
+        except Exception:
+            pass
         return None
 
     if not resultado_bruto:
@@ -2628,6 +2661,8 @@ Diretrizes Específicas por Assunto:
         if cache_hit:
             resposta_cache = contexto_extra
             total_e2e_ms = (time.perf_counter() - t_global_start) * 1000
+            cache_ttft_ms = total_e2e_ms
+            self.telemetry.record_ttft(cache_ttft_ms, session_id=sess_id)
 
             yield AuraChunk(
                 chunk_type=AuraChunkType.CACHE_HIT,
@@ -2669,6 +2704,7 @@ Diretrizes Específicas por Assunto:
                 data={
                     "intent": intencao,
                     "cache_hit": True,
+                    "ttft_ms": round(cache_ttft_ms, 2),
                     "tool_latency_ms": round(tool_latency_ms, 2),
                     "total_e2e_ms": round(total_e2e_ms, 2),
                 },
@@ -2807,6 +2843,7 @@ Diretrizes Específicas por Assunto:
                 tool_call_id=tool_call_id,
                 resultado_bruto=resultado_bruto,
                 executive_summary=resposta_final,
+                telemetry=self.telemetry,
             )
             if envelope:
                 envelope_payload = envelope.to_sse_payload()

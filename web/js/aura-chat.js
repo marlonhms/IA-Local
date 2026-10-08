@@ -429,6 +429,15 @@ class AuraChatController {
           this.handleUIDelta(messageContainerId, deltaData);
         },
         onUIComplete: (envelopeData) => {
+          if (typeof window !== 'undefined' && window.AuraGenUI && typeof window.AuraGenUI.isEnabled === 'function') {
+            if (!window.AuraGenUI.isEnabled()) {
+              // GenUI desativado no cliente: fallback transparente para DecisionCards legados
+              if (currentToolResult) {
+                this.updateToolResultCard(messageContainerId, currentToolName || envelopeData.component_name || 'ferramenta', currentToolResult, true);
+              }
+              return;
+            }
+          }
           uiCompleteReceived = true;
           this.handleUIComplete(messageContainerId, envelopeData);
         },
