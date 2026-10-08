@@ -448,7 +448,38 @@ def test_operator_rbac_governance():
     assert resp_dup.status_code == 200
     assert resp_dup.json()["voucher_id"] == voucher_gerente["voucher_id"]
 
-    print("   [OK] Governanca RBAC (Frentista 403, Caixa 200/403, Gerente 200) homologada com sucesso.")
+    # Caso F: Bloqueio estrito de ataque de replay por operador nao autorizado
+    # Frentista tenta contornar RBAC reutilizando action_id ja homologado por gerente
+    resp_replay_frentista = client.post("/api/v1/aura/actions/execute", json={
+        "session_id": sess_id,
+        "tool_call_id": tid_gerente,
+        "action_id": aid_gerente,
+        "action_name": "pedido_combustivel",
+        "action_type": "mutation",
+        "operator_id": "frentista_replay",
+        "operator_role": "frentista",
+        "payload": {"litros": 15000}
+    })
+    assert resp_replay_frentista.status_code == 403, (
+        f"Ataque de replay deveria ser bloqueado com 403 Forbidden, obteve {resp_replay_frentista.status_code}"
+    )
+
+    # Caso G: Robustez insensivel a caixa em action_type (INSPECTION permitida para frentista)
+    aid_insp_upper = generate_action_id()
+    tid_insp_upper = generate_tool_call_id()
+    resp_insp_upper = client.post("/api/v1/aura/actions/execute", json={
+        "session_id": sess_id,
+        "tool_call_id": tid_insp_upper,
+        "action_id": aid_insp_upper,
+        "action_name": "visualizar_tanques",
+        "action_type": "INSPECTION",
+        "operator_id": "frentista_joao",
+        "operator_role": "frentista",
+        "payload": {}
+    })
+    assert resp_insp_upper.status_code == 200, f"INSPECTION insensivel a caixa falhou: {resp_insp_upper.text}"
+
+    print("   [OK] Governanca RBAC (Frentista 403, Caixa 200/403, Gerente 200, Replay bloqueado) homologada com sucesso.")
 
 
 # =============================================================================
@@ -521,12 +552,37 @@ def test_durable_audit_log_trail():
     assert parsed_record.audit_id != ""
     assert parsed_record.timestamp != ""
 
-    # Teste de filtro por status REJECTED_FORBIDDEN
+    # Teste de filtro por status REJECTED_FORBIDDEN (e validacao de case-insensitivity: lowercase query)
     resp_rej = client.get(f"/api/v1/aura/audit/logs?session_id={sess_id}&status=REJECTED_FORBIDDEN")
     assert resp_rej.status_code == 200
     rej_items = resp_rej.json()
     assert len(rej_items) == 1
     assert rej_items[0]["status"] == "REJECTED_FORBIDDEN"
+
+    # Teste de filtro com status em letras minusculas (case-insensitive query)
+    resp_rej_lower = client.get(f"/api/v1/aura/audit/logs?session_id={sess_id}&status=rejected_forbidden")
+    assert resp_rej_lower.status_code == 200
+    assert len(resp_rej_lower.json()) == 1
+
+    resp_app_lower = client.get(f"/api/v1/aura/audit/logs?session_id={sess_id}&status=approved")
+    assert resp_app_lower.status_code == 200
+    assert len(resp_app_lower.json()) >= 1
+
+    # 5.5 Teste de serializacao robusta com objetos nao-primitivos em details
+    aid_robust = generate_action_id()
+    tid_robust = generate_tool_call_id()
+    saved_id = mem.save_audit_log(
+        session_id=sess_id,
+        tool_call_id=tid_robust,
+        action_id=aid_robust,
+        action_name="teste_serializacao_robusta",
+        details={"erro": Exception("falha_simulada"), "data": datetime.now(timezone.utc)},
+        status="APPROVED"
+    )
+    assert saved_id != ""
+    robust_logs = mem.get_audit_logs(action_id=aid_robust)
+    assert len(robust_logs) == 1
+    assert "falha_simulada" in str(robust_logs[0]["details"])
 
     # Teste de filtro por limite
     resp_lim = client.get(f"/api/v1/aura/audit/logs?limit=1")

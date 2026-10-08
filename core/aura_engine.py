@@ -569,7 +569,8 @@ class AuraSessionMemory:
         """Registra uma tentativa de execucao de acao na trilha de auditoria duravel (F7-04)."""
         eff_audit_id = audit_id or str(uuid.uuid4())
         ts = timestamp or datetime.now(timezone.utc).isoformat()
-        details_json = json.dumps(details, ensure_ascii=False) if details else "{}"
+        details_json = json.dumps(details, ensure_ascii=False, default=str) if details else "{}"
+        norm_status = str(status).strip().upper() if status else "APPROVED"
         auth_int = 1 if authorized else 0
 
         with self._connection() as conn:
@@ -594,7 +595,7 @@ class AuraSessionMemory:
                 operator_id,
                 operator_role,
                 auth_int,
-                status,
+                norm_status,
                 details_json,
                 client_ip,
             ))
@@ -629,7 +630,7 @@ class AuraSessionMemory:
             params.append(operator_id)
         if status:
             query += " AND status = ?"
-            params.append(status)
+            params.append(str(status).strip().upper())
 
         query += " ORDER BY rowid DESC LIMIT ?"
         params.append(max(1, min(500, int(limit))))

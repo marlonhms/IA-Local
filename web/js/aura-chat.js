@@ -723,24 +723,31 @@ class AuraChatController {
       }
     }
 
-    // 2. Fallback seguro caso não haja construtor registrado ainda (preparando o terreno para Fase 3)
+    // 2. Fallback seguro caso nao haja componente registrado no catalogo fechado (OWASP LLM03 - F7-01)
     if (!hydratedNode && !hydratedHtml) {
-      const inlineWidget = this.renderToolInlineWidget(
-        envelopeData.intent || envelopeData.component_name,
-        envelopeData.props || envelopeData.data || envelopeData
-      );
-
-      if (inlineWidget) {
-        hydratedHtml = `
-          <div id="genui-card-${this.escapeHtml(toolCallId || 'default')}" 
-               class="genui-hydrated-card animate-fade-in my-2"
-               data-tool-call-id="${this.escapeHtml(toolCallId || '')}"
-               data-component="${this.escapeHtml(envelopeData.component_name || '')}">
-            ${inlineWidget}
-          </div>
-        `;
+      if (typeof AuraGenUI !== 'undefined' && typeof AuraGenUI.renderSafeFallback === 'function') {
+        hydratedHtml = AuraGenUI.renderSafeFallback(
+          envelopeData.component_name || envelopeData.intent,
+          envelopeData.props || envelopeData.raw_output || envelopeData.data || envelopeData.executive_summary
+        );
       } else {
-        hydratedHtml = this.renderCanonicalFallbackCard(envelopeData);
+        const inlineWidget = this.renderToolInlineWidget(
+          envelopeData.intent || envelopeData.component_name,
+          envelopeData.props || envelopeData.data || envelopeData
+        );
+
+        if (inlineWidget) {
+          hydratedHtml = `
+            <div id="genui-card-${this.escapeHtml(toolCallId || 'default')}" 
+                 class="genui-hydrated-card animate-fade-in my-2"
+                 data-tool-call-id="${this.escapeHtml(toolCallId || '')}"
+                 data-component="${this.escapeHtml(envelopeData.component_name || '')}">
+              ${inlineWidget}
+            </div>
+          `;
+        } else {
+          hydratedHtml = this.renderCanonicalFallbackCard(envelopeData);
+        }
       }
     }
 

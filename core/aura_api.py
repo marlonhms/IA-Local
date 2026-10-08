@@ -376,8 +376,10 @@ def evaluate_action_permission(
             f"Autorizacao negada: perfil de operador '{operator_role}' desconhecido. Perfis permitidos: {', '.join(sorted(VALID_OPERATOR_ROLES))}."
         )
 
+    act_type = (action_type or "mutation").strip().lower()
+
     # Acoes de inspecao e navegacao sao permitidas para qualquer role (nivel >= 1)
-    if action_type in ("inspection", "navigation"):
+    if act_type in ("inspection", "navigation"):
         return (True, 1, "Acao de inspecao autorizada para todos os perfis.")
 
     # Acoes de mutacao transacional
@@ -425,34 +427,37 @@ async def execute_action_endpoint(
     """
     mem = engine.session_memory
     client_ip = None
-    if request is not None and getattr(request, "client", None) is not None:
-        client_ip = request.client.host
-
-    # 1. Validacao estrita de idempotencia: se action_id ja existe, retorna voucher sem reprocessar
-    existing_voucher = mem.get_action_voucher(req.action_id)
-    if existing_voucher is not None:
-        return existing_voucher
+    if request is not None:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            client_ip = forwarded.split(",")[0].strip()
+        elif request.headers.get("x-real-ip"):
+            client_ip = request.headers.get("x-real-ip").strip()
+        elif getattr(request, "client", None) is not None:
+            client_ip = request.client.host
 
     action_name = req.action_name or "acao_executiva"
     payload = req.payload or {}
     operator = req.operator_id or "operador_01"
     op_role = req.operator_role or "gerente"
+    act_type = (req.action_type or "mutation").strip().lower()
 
-    # 2. F7-03: Validacao de permissao e perfil de operador (RBAC)
+    # 1. F7-03: Validacao de permissao e perfil de operador (RBAC) ANTES de qualquer processamento
+    # Evita que um operador desautorizado obtenha vouchers ou contorne o bloqueio via replay de action_id
     is_authorized, min_level, reason = evaluate_action_permission(
         action_name=action_name,
-        action_type=req.action_type,
+        action_type=act_type,
         operator_role=op_role,
     )
 
     if not is_authorized:
-        # F7-04: Registro de tentativa rejeitada na trilha de auditoria
+        # F7-04: Registro imediato de tentativa rejeitada na trilha de auditoria
         mem.save_audit_log(
             session_id=req.session_id,
             tool_call_id=req.tool_call_id,
             action_id=req.action_id,
             action_name=action_name,
-            action_type=req.action_type,
+            action_type=act_type,
             operator_id=operator,
             operator_role=op_role,
             authorized=False,
@@ -467,6 +472,11 @@ async def execute_action_endpoint(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=reason,
         )
+
+    # 2. Validacao estrita de idempotencia: se action_id ja existe e operador esta autorizado, retorna voucher sem reprocessar
+    existing_voucher = mem.get_action_voucher(req.action_id)
+    if existing_voucher is not None:
+        return existing_voucher
 
     # 3. Execucao da rotina de negocio autorizada
     try:
@@ -588,11 +598,12 @@ async def get_audit_logs_endpoint(
     """
     Consulta os registros duraveis de auditoria de acoes executadas ou rejeitadas pelo RBAC (F7-04).
     """
+    norm_status = status.strip().upper() if status else None
     logs = engine.get_audit_logs(
         session_id=session_id,
         action_id=action_id,
         operator_id=operator_id,
-        status=status,
+        status=norm_status,
         limit=limit,
     )
     return logs

@@ -372,6 +372,13 @@ class ActionExecuteRequest(BaseModel):
             return ""
         return str(v).strip()
 
+    @field_validator("action_type", mode="before")
+    @classmethod
+    def check_action_type(cls, v: Any) -> str:
+        if v is None:
+            return "mutation"
+        return str(v).strip().lower()
+
     @field_validator("operator_role", mode="before")
     @classmethod
     def check_operator_role(cls, v: Any) -> str:

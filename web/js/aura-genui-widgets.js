@@ -461,13 +461,21 @@
       // Se houver cliente de API disponivel no browser, despacha RPC
       if (typeof window !== 'undefined' && window.auraApi && typeof window.auraApi.executeAction === 'function') {
         try {
+          const operatorRole = this.operatorRole ||
+            (typeof window !== 'undefined' && (window.currentOperatorRole || (window.currentUser && window.currentUser.role))) ||
+            'gerente';
+          const operatorId = this.operatorId ||
+            (typeof window !== 'undefined' && (window.currentOperatorId || (window.currentUser && window.currentUser.id))) ||
+            'operador_01';
+
           const res = await window.auraApi.executeAction(actionId, {
             tool_call_id: this.toolCallId,
             session_id: this.sessionId || (typeof window !== 'undefined' && window.auraChat && window.auraChat.sessionId) || '',
             action_name: actionDef.label || actionDef.name || actionDef.action_name || 'acao_executiva',
             action_type: actionDef.action_type || actionType || 'mutation',
             payload: actionDef.payload,
-            operator_id: 'operador_01'
+            operator_id: operatorId,
+            operator_role: operatorRole
           });
           if (stateMgr) {
             stateMgr.markActionExecuted(actionId, res);
