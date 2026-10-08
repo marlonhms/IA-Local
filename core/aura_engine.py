@@ -21,8 +21,11 @@ import re
 import uuid
 import sqlite3
 import asyncio
+import logging
 from contextlib import contextmanager
-from datetime import datetime
+
+logger = logging.getLogger("aura.engine")
+from datetime import datetime, timezone
 from pathlib import Path
 from enum import Enum
 from typing import AsyncIterator, Optional, Dict, Any, List, Tuple, Union
@@ -294,6 +297,38 @@ class AuraSessionMemory:
                 CREATE INDEX IF NOT EXISTS idx_aura_vouchers_session 
                 ON aura_action_vouchers(session_id);
             """)
+
+            # Tabela duravel da trilha de auditoria transacional (F7-04)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS aura_action_audit_log (
+                    audit_id TEXT PRIMARY KEY,
+                    timestamp TEXT NOT NULL,
+                    session_id TEXT,
+                    tool_call_id TEXT NOT NULL,
+                    action_id TEXT NOT NULL,
+                    action_name TEXT NOT NULL,
+                    action_type TEXT NOT NULL,
+                    operator_id TEXT,
+                    operator_role TEXT,
+                    authorized INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    details TEXT,
+                    client_ip TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_aura_audit_action 
+                ON aura_action_audit_log(action_id);
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_aura_audit_session 
+                ON aura_action_audit_log(session_id);
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_aura_audit_status 
+                ON aura_action_audit_log(status);
+            """)
             conn.commit()
 
     def save_message(
@@ -514,6 +549,119 @@ class AuraSessionMemory:
                 signature=row["signature"],
             ))
         return vouchers
+
+    def save_audit_log(
+        self,
+        audit_id: Optional[str] = None,
+        session_id: str = "",
+        tool_call_id: str = "",
+        action_id: str = "",
+        action_name: str = "",
+        action_type: str = "mutation",
+        operator_id: str = "",
+        operator_role: str = "gerente",
+        authorized: bool = True,
+        status: str = "APPROVED",
+        details: Optional[Dict[str, Any]] = None,
+        client_ip: Optional[str] = None,
+        timestamp: Optional[str] = None,
+    ) -> str:
+        """Registra uma tentativa de execucao de acao na trilha de auditoria duravel (F7-04)."""
+        eff_audit_id = audit_id or str(uuid.uuid4())
+        ts = timestamp or datetime.now(timezone.utc).isoformat()
+        details_json = json.dumps(details, ensure_ascii=False) if details else "{}"
+        auth_int = 1 if authorized else 0
+
+        with self._connection() as conn:
+            conn.execute("""
+                INSERT INTO aura_action_audit_log (
+                    audit_id, timestamp, session_id, tool_call_id, action_id,
+                    action_name, action_type, operator_id, operator_role,
+                    authorized, status, details, client_ip
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(audit_id) DO UPDATE SET
+                    status = excluded.status,
+                    details = excluded.details;
+            """, (
+                eff_audit_id,
+                ts,
+                session_id,
+                tool_call_id,
+                action_id,
+                action_name,
+                action_type,
+                operator_id,
+                operator_role,
+                auth_int,
+                status,
+                details_json,
+                client_ip,
+            ))
+            conn.commit()
+        return eff_audit_id
+
+    def get_audit_logs(
+        self,
+        session_id: Optional[str] = None,
+        action_id: Optional[str] = None,
+        operator_id: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Recupera registros da trilha de auditoria duravel com filtros opcionais (F7-04)."""
+        query = """
+            SELECT audit_id, timestamp, session_id, tool_call_id, action_id,
+                   action_name, action_type, operator_id, operator_role,
+                   authorized, status, details, client_ip, created_at
+            FROM aura_action_audit_log
+            WHERE 1=1
+        """
+        params: List[Any] = []
+        if session_id:
+            query += " AND session_id = ?"
+            params.append(session_id)
+        if action_id:
+            query += " AND action_id = ?"
+            params.append(action_id)
+        if operator_id:
+            query += " AND operator_id = ?"
+            params.append(operator_id)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+
+        query += " ORDER BY rowid DESC LIMIT ?"
+        params.append(max(1, min(500, int(limit))))
+
+        with self._connection() as conn:
+            cur = conn.execute(query, tuple(params))
+            rows = cur.fetchall()
+
+        logs = []
+        for r in rows:
+            det = {}
+            if r["details"]:
+                try:
+                    det = json.loads(r["details"])
+                except Exception:
+                    det = {}
+            logs.append({
+                "audit_id": r["audit_id"],
+                "timestamp": str(r["timestamp"]),
+                "session_id": r["session_id"],
+                "tool_call_id": r["tool_call_id"],
+                "action_id": r["action_id"],
+                "action_name": r["action_name"],
+                "action_type": r["action_type"],
+                "operator_id": r["operator_id"],
+                "operator_role": r["operator_role"],
+                "authorized": bool(r["authorized"]),
+                "status": r["status"],
+                "details": det,
+                "client_ip": r["client_ip"],
+            })
+        return logs
 
     def clear_session(self, session_id: str):
         """Limpa as mensagens de uma sessão específica."""
@@ -858,6 +1006,11 @@ def build_canonical_genui_envelope(
     """
     mapping = GENUI_COMPONENT_REGISTRY_MAP.get(intencao)
     if not mapping:
+        logger.warning(
+            "[AURA-SEC-003] Agência Excessiva bloqueada (OWASP LLM03): Intenção ou componente '%s' "
+            "não catalogado no SecureComponentRegistry. Fallback seguro acionado.",
+            intencao,
+        )
         return None
 
     if not resultado_bruto:
@@ -1411,6 +1564,23 @@ class AuraEngine:
     @property
     def session_memory(self) -> AuraSessionMemory:
         return self._session_memory
+
+    def get_audit_logs(
+        self,
+        session_id: Optional[str] = None,
+        action_id: Optional[str] = None,
+        operator_id: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Recupera registros duraveis da trilha de auditoria (F7-04)."""
+        return self._session_memory.get_audit_logs(
+            session_id=session_id,
+            action_id=action_id,
+            operator_id=operator_id,
+            status=status,
+            limit=limit,
+        )
 
     def get_dados_filial(self, force_reload: bool = False) -> Dict[str, Any]:
         """Obtém dados cadastrais da filial conectada com cache em memória."""

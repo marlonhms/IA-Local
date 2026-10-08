@@ -14,8 +14,8 @@ from __future__ import annotations
 import json
 import asyncio
 from pathlib import Path
-from typing import Optional, Dict, Any, List
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query, status
+from typing import Optional, Dict, Any, List, Tuple
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query, Request, status
 from fastapi.responses import StreamingResponse, FileResponse, Response
 from datetime import datetime, timezone
 from fastapi.staticfiles import StaticFiles
@@ -31,6 +31,7 @@ from core.aura_engine import (
 from core.schemas.genui import (
     ActionExecuteRequest,
     ActionVoucher,
+    ActionAuditLogRecord,
     generate_action_voucher_signature,
 )
 from core.schemas.idempotency import generate_uuid4
@@ -305,6 +306,107 @@ def _dispatch_business_action(
     }
 
 
+# =============================================================================
+# GOVERNANCA RBAC DE OPERADORES & HUMAN-IN-THE-LOOP (F7-03)
+# =============================================================================
+
+VALID_OPERATOR_ROLES = {"frentista", "caixa", "gerente", "administrador"}
+
+ROLE_HIERARCHY_LEVELS = {
+    "frentista": 1,
+    "caixa": 2,
+    "gerente": 3,
+    "administrador": 4,
+}
+
+# Acoes de mutacao de alto impacto (exigem perfil 'gerente' ou 'administrador' - nivel >= 3)
+HIGH_IMPACT_MUTATION_KEYWORDS = [
+    "pedido_combustivel",
+    "pedido",
+    "combustivel",
+    "combustível",
+    "carreta",
+    "ajustar_margem",
+    "ajuste_margem",
+    "margem",
+    "travar_preco",
+    "preco",
+    "preço",
+    "reprecificar",
+    "homologar_cenario",
+    "aplicar_cenario",
+    "cenario",
+    "bonificar",
+    "campanha_frentistas",
+]
+
+# Acoes de caixa (exigem ao menos 'caixa', 'gerente' ou 'administrador' - nivel >= 2)
+CASHIER_MUTATION_KEYWORDS = [
+    "estancar_quebra",
+    "estancar",
+    "quebra",
+    "forcar_sangria",
+    "sangria",
+    "caixa",
+    "furo",
+    "conciliar",
+    "conciliacao",
+    "conciliação",
+    "homologar_turno",
+    "fechamento",
+    "homologar_fechamento",
+    "auditar_cancelamentos",
+]
+
+
+def evaluate_action_permission(
+    action_name: str,
+    action_type: str,
+    operator_role: Optional[str] = "gerente"
+) -> Tuple[bool, int, str]:
+    """
+    Avalia a autorizacao do operador com base no perfil RBAC (F7-03).
+    Retorna (autorizado: bool, nivel_minimo: int, mensagem: str).
+    """
+    role = (operator_role or "gerente").strip().lower()
+    if role not in VALID_OPERATOR_ROLES:
+        return (
+            False,
+            99,
+            f"Autorizacao negada: perfil de operador '{operator_role}' desconhecido. Perfis permitidos: {', '.join(sorted(VALID_OPERATOR_ROLES))}."
+        )
+
+    # Acoes de inspecao e navegacao sao permitidas para qualquer role (nivel >= 1)
+    if action_type in ("inspection", "navigation"):
+        return (True, 1, "Acao de inspecao autorizada para todos os perfis.")
+
+    # Acoes de mutacao transacional
+    act_clean = (action_name or "").lower().replace("-", "_").strip()
+    is_high_impact = any(k in act_clean for k in HIGH_IMPACT_MUTATION_KEYWORDS)
+    is_cashier = any(k in act_clean for k in CASHIER_MUTATION_KEYWORDS)
+
+    if is_high_impact:
+        required_level = 3  # gerente ou administrador
+        required_role_name = "gerente"
+    elif is_cashier:
+        required_level = 2  # caixa, gerente ou administrador
+        required_role_name = "caixa"
+    else:
+        # Por padrao, mutacoes nao classificadas exigem nivel gerente para seguranca estrita
+        required_level = 3
+        required_role_name = "gerente"
+
+    op_level = ROLE_HIERARCHY_LEVELS.get(role, 1)
+    if op_level < required_level:
+        return (
+            False,
+            required_level,
+            f"Autorizacao negada: operador com perfil '{role}' nao possui permissao para executar a acao '{action_name}'. Perfil minimo exigido: '{required_role_name}'."
+        )
+
+    return (True, required_level, "Acao autorizada com sucesso.")
+
+
 @router.post(
     "/actions/execute",
     response_model=ActionVoucher,
@@ -312,33 +414,88 @@ def _dispatch_business_action(
 )
 async def execute_action_endpoint(
     req: ActionExecuteRequest,
+    request: Request,
     engine: AuraEngine = Depends(get_aura_engine),
 ):
     """
     Executa acoes transacionais autorizadas pelo operador (Camada 3 de micro-widgets GenUI).
-    Garante idempotencia estrita via action_id, registra o voucher auditavel assinado
-    criptograficamente com HMAC-SHA256 e injeta a confirmacao (role: 'tool') na memoria de sessao.
+    Garante idempotencia estrita via action_id, valida RBAC do operador (F7-03),
+    registra o voucher auditavel assinado com HMAC-SHA256, persiste a trilha de
+    auditoria duravel no SQLite (F7-04) e injeta a confirmacao na memoria de sessao.
     """
     mem = engine.session_memory
+    client_ip = None
+    if request is not None and getattr(request, "client", None) is not None:
+        client_ip = request.client.host
 
     # 1. Validacao estrita de idempotencia: se action_id ja existe, retorna voucher sem reprocessar
     existing_voucher = mem.get_action_voucher(req.action_id)
     if existing_voucher is not None:
         return existing_voucher
 
-    # 2. Execucao da rotina de negocio autorizada
     action_name = req.action_name or "acao_executiva"
     payload = req.payload or {}
     operator = req.operator_id or "operador_01"
+    op_role = req.operator_role or "gerente"
 
-    details = _dispatch_business_action(
+    # 2. F7-03: Validacao de permissao e perfil de operador (RBAC)
+    is_authorized, min_level, reason = evaluate_action_permission(
         action_name=action_name,
         action_type=req.action_type,
-        payload=payload,
-        operator_id=operator,
+        operator_role=op_role,
     )
 
-    # 3. Geracao do Comprovante (Action Voucher)
+    if not is_authorized:
+        # F7-04: Registro de tentativa rejeitada na trilha de auditoria
+        mem.save_audit_log(
+            session_id=req.session_id,
+            tool_call_id=req.tool_call_id,
+            action_id=req.action_id,
+            action_name=action_name,
+            action_type=req.action_type,
+            operator_id=operator,
+            operator_role=op_role,
+            authorized=False,
+            status="REJECTED_FORBIDDEN",
+            details={
+                "motivo": reason,
+                "payload": payload,
+            },
+            client_ip=client_ip,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=reason,
+        )
+
+    # 3. Execucao da rotina de negocio autorizada
+    try:
+        details = _dispatch_business_action(
+            action_name=action_name,
+            action_type=req.action_type,
+            payload=payload,
+            operator_id=operator,
+        )
+    except Exception as exc:
+        mem.save_audit_log(
+            session_id=req.session_id,
+            tool_call_id=req.tool_call_id,
+            action_id=req.action_id,
+            action_name=action_name,
+            action_type=req.action_type,
+            operator_id=operator,
+            operator_role=op_role,
+            authorized=True,
+            status="FAILED",
+            details={"error": str(exc), "payload": payload},
+            client_ip=client_ip,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Falha na execucao da rotina transacional: {exc}",
+        )
+
+    # 4. Geracao do Comprovante (Action Voucher)
     voucher_id = generate_uuid4()
     ts_now = datetime.now(timezone.utc).isoformat()
     signature = generate_action_voucher_signature(
@@ -360,7 +517,7 @@ async def execute_action_endpoint(
         signature=signature,
     )
 
-    # 4. Persistencia do Voucher no SQLite (garantia de idempotencia duravel)
+    # 5. Persistencia do Voucher no SQLite (garantia de idempotencia duravel)
     mem.save_action_voucher(
         voucher=voucher,
         session_id=req.session_id,
@@ -369,7 +526,7 @@ async def execute_action_endpoint(
         payload=payload,
     )
 
-    # 5. F5-02: Injecao direta de mensagem canonica com role: 'tool' no historico da sessao
+    # 6. F5-02: Injecao direta de mensagem canonica com role: 'tool' no historico da sessao
     if req.session_id:
         tool_payload = {
             "status": "APPROVED",
@@ -387,12 +544,58 @@ async def execute_action_endpoint(
             metadata={
                 "voucher_id": voucher.voucher_id,
                 "operator_id": operator,
+                "operator_role": op_role,
                 "signature": signature,
                 "action_type": req.action_type,
             }
         )
 
+    # 7. F7-04: Persistencia da execucao homologada na trilha de auditoria
+    mem.save_audit_log(
+        session_id=req.session_id,
+        tool_call_id=req.tool_call_id,
+        action_id=req.action_id,
+        action_name=action_name,
+        action_type=req.action_type,
+        operator_id=operator,
+        operator_role=op_role,
+        authorized=True,
+        status="APPROVED",
+        details={
+            "voucher_id": voucher.voucher_id,
+            "business_details": details,
+            "payload": payload,
+        },
+        client_ip=client_ip,
+    )
+
     return voucher
+
+
+@router.get(
+    "/audit/logs",
+    response_model=List[ActionAuditLogRecord],
+    summary="Consulta da Trilha de Auditoria Transacional (OWASP LLM & Governanca)"
+)
+async def get_audit_logs_endpoint(
+    session_id: Optional[str] = Query(None, description="Filtrar por session_id"),
+    action_id: Optional[str] = Query(None, description="Filtrar por action_id"),
+    operator_id: Optional[str] = Query(None, description="Filtrar por operator_id"),
+    status: Optional[str] = Query(None, description="Filtrar por status (APPROVED, REJECTED_FORBIDDEN, FAILED)"),
+    limit: int = Query(50, ge=1, le=500, description="Limite maximo de registros retornados"),
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """
+    Consulta os registros duraveis de auditoria de acoes executadas ou rejeitadas pelo RBAC (F7-04).
+    """
+    logs = engine.get_audit_logs(
+        session_id=session_id,
+        action_id=action_id,
+        operator_id=operator_id,
+        status=status,
+        limit=limit,
+    )
+    return logs
 
 
 

@@ -48,21 +48,41 @@
     });
   }
 
+  function coerceNumber(val, fallback = 0) {
+    if (val === null || val === undefined) return fallback;
+    const n = Number(val);
+    return isNaN(n) ? fallback : n;
+  }
+
+  function coerceBoolean(val, fallback = false) {
+    if (val === null || val === undefined) return fallback;
+    if (typeof val === 'boolean') return val;
+    if (typeof val === 'number') return val !== 0;
+    if (typeof val === 'string') {
+      const s = val.trim().toLowerCase();
+      if (s === 'true' || s === '1' || s === 'yes' || s === 'sim') return true;
+      if (s === 'false' || s === '0' || s === 'no' || s === 'nao' || s === 'não') return false;
+    }
+    return Boolean(val);
+  }
+
   // =========================================================================
   // 2. CLASSE BASE: BaseGenUIWidget
   // =========================================================================
 
   class BaseGenUIWidget {
     constructor(payload = {}, defaultIntent = 'mentoria_decisao', defaultComp = 'render_BaseGenUIWidget') {
-      this.toolCallId = payload.tool_call_id || ('call_' + Date.now());
-      this.intent = payload.intent || defaultIntent;
-      this.componentName = payload.component_name || defaultComp;
-      this.summary = payload.executive_summary || payload.summary_text || '';
-      this.props = payload.props || {};
-      this.actions = payload.actions || [];
+      this.toolCallId = escapeHtml(payload.tool_call_id || ('call_' + Date.now()));
+      this.intent = escapeHtml(payload.intent || defaultIntent);
+      this.componentName = escapeHtml(payload.component_name || defaultComp);
+      this.summary = escapeHtml(payload.executive_summary || payload.summary_text || '');
+      this.props = (typeof AuraGenUI !== 'undefined' && typeof AuraGenUI.sanitizeProps === 'function')
+        ? AuraGenUI.sanitizeProps(payload.props || {})
+        : (payload.props || {});
+      this.actions = Array.isArray(payload.actions) ? payload.actions : [];
       this.createdAt = payload.created_at || payload.timestamp || new Date().toISOString();
-      this.ttlSeconds = Number(payload.ttl_seconds || 900);
-      this.sessionId = payload.session_id || payload.sessionId || '';
+      this.ttlSeconds = coerceNumber(payload.ttl_seconds, 900);
+      this.sessionId = escapeHtml(payload.session_id || payload.sessionId || '');
 
       this.cardClass = 'genui-decision-mentor-card';
       this.ariaLabel = 'Micro-Widget AURA IntelligentUI';

@@ -73,6 +73,73 @@
     return sanitized;
   }
 
+  /**
+   * Converte e valida coercao estrita para tipo Number (OWASP LLM01).
+   * Impede injecoes de atributos maliciosos via strings corrompidas.
+   * @param {any} val - Valor bruto
+   * @param {number} [fallback=0] - Valor padrao se invalido
+   * @returns {number}
+   */
+  function coerceNumber(val, fallback = 0) {
+    if (val === null || val === undefined) return fallback;
+    const n = Number(val);
+    return isNaN(n) ? fallback : n;
+  }
+
+  /**
+   * Converte e valida coercao estrita para tipo Boolean (OWASP LLM01).
+   * Impede injecoes de expressoes booleanas maliciosas.
+   * @param {any} val - Valor bruto
+   * @param {boolean} [fallback=false] - Valor padrao se invalido
+   * @returns {boolean}
+   */
+  function coerceBoolean(val, fallback = false) {
+    if (val === null || val === undefined) return fallback;
+    if (typeof val === 'boolean') return val;
+    if (typeof val === 'number') return val !== 0;
+    if (typeof val === 'string') {
+      const s = val.trim().toLowerCase();
+      if (s === 'true' || s === '1' || s === 'yes' || s === 'sim') return true;
+      if (s === 'false' || s === '0' || s === 'no' || s === 'nao' || s === 'não') return false;
+    }
+    return Boolean(val);
+  }
+
+  /**
+   * Renderiza HTML seguro em modo fallback para componentes alucinados ou nao autorizados (OWASP LLM03).
+   * Nao executa qualquer codigo dinamico (sem eval, sem new Function, sem scripts).
+   * @param {string} componentName - Nome do componente nao registrado
+   * @param {any} rawContent - Conteudo em texto ou props a exibir sanitizado
+   * @returns {string} HTML sanitizado do card de fallback
+   */
+  function renderSafeFallback(componentName, rawContent) {
+    const safeComp = escapeHtml(componentName || 'Componente Não Catalogado');
+    let displayText = '';
+    if (rawContent !== null && rawContent !== undefined) {
+      if (typeof rawContent === 'object') {
+        try {
+          displayText = JSON.stringify(rawContent, null, 2);
+        } catch (_) {
+          displayText = String(rawContent);
+        }
+      } else {
+        displayText = String(rawContent);
+      }
+    }
+    const safeText = escapeHtml(displayText);
+    return `
+      <div class="genui-safe-fallback-card p-4 rounded-2xl border border-amber-500/30 bg-slate-900/90 text-slate-200 shadow-xl my-3">
+        <div class="flex items-center gap-2 text-xs font-mono text-amber-400 mb-2 font-semibold">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+          <span>[AURA-SEC-003] Fallback Seguro: Componente '${safeComp}' não autorizado no catálogo fechado.</span>
+        </div>
+        <div class="text-xs sm:text-sm font-mono text-slate-100 whitespace-pre-wrap bg-slate-950/70 p-3 rounded-xl border border-white/5 max-h-80 overflow-y-auto">
+          ${safeText}
+        </div>
+      </div>
+    `.trim();
+  }
+
   // =========================================================================
   // 2. IDEMPOTÊNCIA CRIPTOGRÁFICA & UUID v4
   // =========================================================================
@@ -482,6 +549,9 @@
     GenUIFragmentBuffer,
     escapeHtml,
     sanitizeProps,
+    coerceNumber,
+    coerceBoolean,
+    renderSafeFallback,
     generateUUID,
     generateToolCallId,
     generateActionId,
@@ -524,6 +594,9 @@
       GenUIFragmentBuffer,
       escapeHtml,
       sanitizeProps,
+      coerceNumber,
+      coerceBoolean,
+      renderSafeFallback,
       generateUUID,
       generateToolCallId,
       generateActionId,

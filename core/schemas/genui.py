@@ -336,7 +336,7 @@ class WidgetActionExecution(BaseModel):
 
 
 class ActionExecuteRequest(BaseModel):
-    """Modelo de requisicao para execucao de acoes transacionais (F5-01)."""
+    """Modelo de requisicao para execucao de acoes transacionais (F5-01 / F7-03)."""
     model_config = ConfigDict(frozen=True, extra="ignore")
 
     session_id: str = Field(default="", description="Identificador da sessao conversacional")
@@ -349,6 +349,7 @@ class ActionExecuteRequest(BaseModel):
     )
     payload: Dict[str, Any] = Field(default_factory=dict, description="Carga util da acao transacional")
     operator_id: Optional[str] = Field(default="operador_01", description="Identificador do operador humano")
+    operator_role: Optional[str] = Field(default="gerente", description="Perfil ou permissao do operador (frentista, caixa, gerente, administrador)")
 
     @field_validator("tool_call_id")
     @classmethod
@@ -370,6 +371,14 @@ class ActionExecuteRequest(BaseModel):
         if v is None:
             return ""
         return str(v).strip()
+
+    @field_validator("operator_role", mode="before")
+    @classmethod
+    def check_operator_role(cls, v: Any) -> str:
+        if v is None:
+            return "gerente"
+        val = str(v).strip().lower()
+        return val if val else "gerente"
 
 
 class ActionVoucher(BaseModel):
@@ -404,6 +413,28 @@ class ActionVoucher(BaseModel):
         if not validate_tool_call_id(v):
             raise ValueError(f"tool_call_id invalido: '{v}'")
         return v
+
+
+class ActionAuditLogRecord(BaseModel):
+    """Registro duravel da trilha de auditoria transacional no SQLite (F7-04)."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    audit_id: str = Field(..., description="UUID v4 unico do registro de auditoria")
+    timestamp: str = Field(..., description="Timestamp ISO UTC do evento")
+    session_id: Optional[str] = Field(default=None, description="Sessao conversacional")
+    tool_call_id: str = Field(..., description="UUID v4 da invocacao da ferramenta")
+    action_id: str = Field(..., description="UUID v4 da acao transacional")
+    action_name: str = Field(..., description="Nome da acao executada ou tentada")
+    action_type: str = Field(default="mutation", description="Tipo da acao transacional")
+    operator_id: Optional[str] = Field(default="operador_01", description="Identificador do operador humano")
+    operator_role: Optional[str] = Field(default="gerente", description="Perfil ou role do operador")
+    authorized: bool = Field(default=True, description="Indicador se a acao foi autorizada pelo RBAC")
+    status: Literal["APPROVED", "REJECTED_FORBIDDEN", "FAILED"] = Field(
+        default="APPROVED",
+        description="Status oficial da auditoria"
+    )
+    details: Dict[str, Any] = Field(default_factory=dict, description="Detalhes complementares ou justificativa")
+    client_ip: Optional[str] = Field(default=None, description="Endereco IP do cliente")
 
 
 def generate_action_voucher_signature(

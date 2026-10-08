@@ -336,6 +336,7 @@ class AuraApiClient {
     const actionName = options.action_name || options.actionName || options.label || options.name || '';
     const actionType = options.action_type || options.actionType || 'mutation';
     const operatorId = options.operator_id || options.operatorId || 'operador_01';
+    const operatorRole = options.operator_role || options.operatorRole || options.role || 'gerente';
     const payload = options.payload || options.props || {};
     const timeoutMs = Number(options.timeoutMs || 15000);
 
@@ -354,6 +355,7 @@ class AuraApiClient {
           action_type: actionType,
           payload: payload,
           operator_id: operatorId,
+          operator_role: operatorRole,
         }),
       };
       if (controller) {
@@ -378,6 +380,27 @@ class AuraApiClient {
     } finally {
       if (timeoutTimer) clearTimeout(timeoutTimer);
     }
+  }
+
+  /**
+   * Consulta a trilha duravel de auditoria transacional (F7-04)
+   * @param {Object} [filters={}] - Filtros opcionais (session_id, action_id, operator_id, status, limit)
+   * @returns {Promise<Array<Object>>} Registros da trilha de auditoria
+   */
+  async getAuditLogs(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.session_id) params.append('session_id', filters.session_id);
+    if (filters.action_id) params.append('action_id', filters.action_id);
+    if (filters.operator_id) params.append('operator_id', filters.operator_id);
+    if (filters.status) params.append('status', filters.status);
+    if (filters.limit) params.append('limit', String(filters.limit));
+
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`${this.baseUrl}/api/v1/aura/audit/logs${qs}`);
+    if (!res.ok) {
+      throw new Error(`Erro HTTP ${res.status} ao consultar logs de auditoria`);
+    }
+    return await res.json();
   }
 }
 
