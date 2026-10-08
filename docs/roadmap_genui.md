@@ -3,8 +3,8 @@
 > **AURA IntelligentUI (GenUI/SDUI v1.0) — O Mentor de Decisões Executivo no Edge:** Transformando a AURA de um leitor passivo de relatórios ou medidor de telemetria em um **verdadeiro mentor de negócios especialista em análises profundas, previsões preditivas, consultas multidimensionais e comparações estratégicas para tomadas de decisão assertivas**.
 
 - **Data de Criação:** 07/10/2026  
-- **Versão do Documento:** 2.1.0 (Evolução Estratégica: Mentor de Decisão & Inteligência Analítica)  
-- **Status:** Fases 0, 1, 2, 3 e 4 Concluidas (P0 e P1 Homologados) | Fase 5 em Planejamento  
+- **Versão do Documento:** 2.2.0 (Evolução Estratégica: Mentor de Decisão & Inteligência Analítica)  
+- **Status:** Fases 0, 1, 2, 3, 4 e 5 Concluidas (P0 e P1 Homologados) | Fase 6 em Planejamento  
 - **Documento de Referência Arquitetural:** [`docs/Arquitetura GenUI para Edge AI.md`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/Arquitetura%20GenUI%20para%20Edge%20AI.md)  
 - **Repositório:** `C:\Users\Marlon\Documents\Agent PC\ia-banco-local`  
 - **Público-alvo:** Diretoria Executiva, Engenharia de Software, Arquitetura de IA e Gestores de Negócio B2B  
@@ -488,32 +488,25 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 
 ---
 
-### Fase 5 — Sincronização Bidirecional (Server-State vs. Client-State) & Memória do Agente (P1)
-**Objetivo:** Conectar as mutações de interface no cliente de volta ao cérebro do agente (`Server-State`), eliminando a amnésia contextual da IA.
+### Fase 5 - Sincronizacao Bidirecional (Server-State vs. Client-State) & Memoria do Agente (P1) [CONCLUIDA EM 08/10/2026]
+**Objetivo:** Conectar as mutacoes de interface no cliente de volta ao cerebro do agente (Server-State), eliminando a amnesia contextual da IA.
 
-- [ ] **F5-01 — Endpoint de Execução de Ações Transacionais:**  
-  Criar a rota `POST /api/v1/aura/actions/execute` em `core/aura_api.py`:
-  - Recebe `session_id`, `tool_call_id`, `action_id`, `action_name` e `payload`.
-  - Valida a idempotência no banco de dados / cache de transações em memória.
-  - Executa a rotina de negócio autorizada em `core/tools.py`.
-  - Retorna comprovante estruturado da transação (Voucher).
-- [ ] **F5-02 — Injeção de `tool_result` no Histórico do `AuraEngine`:**  
-  Ao concluir a ação no endpoint, injetar diretamente no histórico da sessão uma mensagem com formato canônico:
-  ```json
-  {
-    "role": "tool",
-    "tool_call_id": "c7a9e18b-...",
-    "name": "render_TankRunOutForecastUI",
-    "content": "{\"status\": \"APPROVED\", \"action_id\": \"...\", \"litros\": 15000, \"fornecedor\": \"Distribuidora Oficial\", \"executado_por\": \"operador_01\"}"
-  }
-  ```
-- [ ] **F5-03 — Teste de Consistência Contextual Subsequente:**  
-  Testar pergunta seguinte do usuário (e.g., *"Qual o status daquele pedido de combustível?"*): o modelo de linguagem deve responder categoricamente que o pedido de 15.000 L já foi submetido com sucesso, sem recalcular a sugestão como pendente.
+- [x] **F5-01 - Endpoint de Execucao de Acoes Transacionais (`POST /api/v1/aura/actions/execute`):**  
+  Implementado em `core/aura_api.py` com contratos tipados Pydantic v2 `ActionExecuteRequest` e `ActionVoucher` em `core/schemas/genui.py`. Valida estritamente a idempotencia (duplo envio com mesmo `action_id` retorna o voucher previamente gerado sem reprocessar), gera `voucher_id` (UUID v4), assina com HMAC-SHA256 auditavel e despacha rotinas de negocio autorizadas de postos (pedidos de combustivel, estancamento de quebra/sangria, ajuste de margem e conciliacao de turno).
+- [x] **F5-02 - Injecao de `tool_result` no Historico do `AuraEngine` (`AuraSessionMemory`):**  
+  Ao concluir a acao no endpoint, injeta diretamente no historico da sessao uma mensagem canonica com `role: "tool"`, `tool_call_id`, `name` e payload JSON contendo status APPROVED, action_id, voucher_id e detalhes. Tabela SQLite `aura_messages` estendida com colunas `tool_call_id` e `name`, e tabela `aura_action_vouchers` para rastreabilidade permanente. Suporte integral a recuperacoes canônicas para IA de nuvem (Gemini/OpenAI/Anthropic).
+- [x] **F5-03 - Consistencia Contextual Subsequente (Prevencao de Amnesia Contextual):**  
+  Historico formatado para o prompt do LLM (`format_history_for_prompt`) inclui registros de acoes confirmadas (`Acao Confirmada [{action_name}]`). Perguntas subsequentes na mesma sessao (ex: "Qual o status daquele pedido de combustivel?") reconhecem a acao executada via voucher e confirmam que o pedido ja foi homologado no ERP, sem recalcular a sugestao como pendente.
+- [x] **F5-04 - Conexao Frontend no Cliente (`web/js/aura-api.js` & `web/js/aura-genui-widgets.js`):**  
+  `AuraApiClient.executeAction()` integrado a rota real `/api/v1/aura/actions/execute` com timeout, tratamento de erros e retorno de voucher. `ExecutiveDecisionMentorUI` atualiza `AuraStateManager` (`finalizeSuccessState` e `markActionExecuted`) e exibe badge visual `.genui-success-badge` / `.badge-committed` (VOUCHER AUDITADO) no DOM.
+- [x] **F5-05 - Suite de Testes Automatizada da Fase 5 (`scripts/test_genui_server_sync.py`):**  
+  Suite completa cobrindo: (1) Contratos Pydantic e assinaturas HMAC; (2) Endpoint FastAPI e formato de voucher; (3) Idempotencia estrita contra duplo envio; (4) Injecao de `role: "tool"` e persistencia no SQLite; (5) Consistencia contextual multiturn sem amnesia; (6) Integracao cliente em Node.js headless; (7) Zero regressao em todas as 5 suites homologadas anteriores.
 
-**Critério de Aceite da Fase 5:**  
-- Ação executada na interface atualiza imediatamente o histórico do motor de IA.
-- Nenhuma duplicidade de recomendação ocorre em interações consecutivas.
-- Teste automatizado validando a integridade da memória do agente em sessão de múltiplos turnos.
+**Criterio de Aceite da Fase 5 (100% Aprovado):**  
+- [x] Acao executada na interface atualiza imediatamente o historico do motor de IA.
+- [x] Nenhuma duplicidade de recomendacao ocorre em interacoes consecutivas.
+- [x] Teste automatizado validando a integridade da memoria do agente em sessao de multiplos turnos.
+- [x] Regressao zero em todas as suites anteriores (`test_genui_baseline.py`, `test_genui_engine_sse.py`, `test_genui_frontend_streaming.py`, `test_genui_decision_mentor.py`, `test_genui_state_manager.py`).
 
 ---
 

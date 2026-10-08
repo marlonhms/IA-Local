@@ -77,7 +77,12 @@ from core.schemas.genui import (
     ExecutiveDecisionProps,
     WidgetStateRecord,
     WidgetActionExecution,
+    ActionExecuteRequest,
+    ActionVoucher,
+    generate_action_voucher_signature,
+    verify_action_voucher_signature,
 )
+
 
 __all__ = [
     "BranchStatus",
@@ -141,6 +146,11 @@ __all__ = [
     "ExecutiveDecisionProps",
     "WidgetStateRecord",
     "WidgetActionExecution",
+    "ActionExecuteRequest",
+    "ActionVoucher",
+    "generate_action_voucher_signature",
+    "verify_action_voucher_signature",
 ]
+
 
 

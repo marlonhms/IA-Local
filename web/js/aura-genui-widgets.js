@@ -54,6 +54,7 @@
       this.actions = payload.actions || [];
       this.createdAt = payload.created_at || payload.timestamp || new Date().toISOString();
       this.ttlSeconds = Number(payload.ttl_seconds || 900);
+      this.sessionId = payload.session_id || payload.sessionId || '';
 
       this.state = {
         status: 'proposed', // 'proposed' | 'locked' | 'committed' | 'failed' | 'expired'
@@ -61,7 +62,8 @@
         lockedActionId: null,
         optimisticFeedback: null,
         errorMessage: null,
-        expandedEvidences: false
+        expandedEvidences: false,
+        voucher: null
       };
 
       this.element = null;
@@ -350,7 +352,17 @@
       }
 
       let feedbackBadge = '';
-      if (feedback) {
+      if (this.state.status === 'committed' || this.state.voucher) {
+        feedbackBadge = `
+          <div class="genui-success-badge genui-voucher-badge p-2.5 mb-2.5 rounded-xl bg-emerald-500/20 border border-emerald-400/50 text-emerald-200 text-xs flex items-center justify-between gap-2 shadow-sm animate-fade-in">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="font-bold text-white">${escapeHtml(feedback || 'Ação Homologada no ERP')}</span>
+            </div>
+            <span class="badge-committed text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-900/60 text-emerald-300 border border-emerald-500/30">VOUCHER AUDITADO</span>
+          </div>
+        `;
+      } else if (feedback) {
         feedbackBadge = `
           <div class="genui-optimistic-badge p-2.5 mb-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-200 text-xs flex items-center gap-2 animate-fade-in">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
@@ -581,7 +593,11 @@
         try {
           const res = await window.auraApi.executeAction(actionId, {
             tool_call_id: this.toolCallId,
-            payload: actionDef.payload
+            session_id: this.sessionId || (typeof window !== 'undefined' && window.auraChat && window.auraChat.sessionId) || '',
+            action_name: actionDef.label || actionDef.name || actionDef.action_name || 'acao_executiva',
+            action_type: actionDef.action_type || actionType || 'mutation',
+            payload: actionDef.payload,
+            operator_id: 'operador_01'
           });
           if (stateMgr) {
             stateMgr.markActionExecuted(actionId, res);
@@ -646,6 +662,7 @@
       this.state.status = 'committed';
       this.state.isLocked = false;
       this.state.lockedActionId = null;
+      this.state.voucher = result;
       this.state.optimisticFeedback = `✔ Ação Homologada com Sucesso (Voucher: ${result?.voucher_id || 'OK'})`;
       this.state.errorMessage = null;
       this.refreshLayer3();

@@ -694,7 +694,8 @@ class AuraChatController {
     if (ComponentDef) {
       if (typeof ComponentDef === 'function') {
         try {
-          const instance = new ComponentDef(envelopeData);
+          const enrichedData = Object.assign({ session_id: this.sessionId }, envelopeData);
+          const instance = new ComponentDef(enrichedData);
           if (instance && typeof instance.mount === 'function') {
             const mounted = instance.mount();
             if (typeof HTMLElement !== 'undefined' && mounted instanceof HTMLElement) {

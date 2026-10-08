@@ -277,6 +277,7 @@
       entry.lockedActionId = null;
       entry.snapshot = null;
       entry.result = result;
+      entry.status = 'committed';
       entry.state = Object.assign({}, entry.state, {
         status: 'committed',
         isLocked: false,

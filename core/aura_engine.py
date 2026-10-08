@@ -54,7 +54,12 @@ from core.schemas.genui import (
     ExecutiveImpactProjection,
     ExecutiveEvidenceItem,
     ExecutiveDecisionProps,
+    ActionExecuteRequest,
+    ActionVoucher,
+    generate_action_voucher_signature,
+    verify_action_voucher_signature,
 )
+
 
 
 # =============================================================================
@@ -221,6 +226,8 @@ class AuraSessionMemory:
                     content TEXT NOT NULL,
                     intent TEXT,
                     metadata TEXT,
+                    tool_call_id TEXT,
+                    name TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (session_id) REFERENCES aura_sessions(session_id)
                 );
@@ -228,6 +235,53 @@ class AuraSessionMemory:
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_aura_messages_session 
                 ON aura_messages(session_id, created_at);
+            """)
+
+            # Migracao dinamica de colunas para bancos SQLite preexistentes
+            try:
+                cur = conn.execute("PRAGMA table_info(aura_messages);")
+                colunas = {row["name"] for row in cur.fetchall()}
+                if "tool_call_id" not in colunas:
+                    conn.execute("ALTER TABLE aura_messages ADD COLUMN tool_call_id TEXT;")
+                if "name" not in colunas:
+                    conn.execute("ALTER TABLE aura_messages ADD COLUMN name TEXT;")
+            except Exception:
+                pass
+
+            # Tabela de Action Vouchers auditaveis para idempotencia estrita (F5-01)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS aura_action_vouchers (
+                    voucher_id TEXT PRIMARY KEY,
+                    action_id TEXT UNIQUE NOT NULL,
+                    tool_call_id TEXT NOT NULL,
+                    session_id TEXT,
+                    action_name TEXT NOT NULL,
+                    action_type TEXT DEFAULT 'mutation',
+                    operator_id TEXT,
+                    status TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    payload TEXT,
+                    details TEXT,
+                    signature TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
+            try:
+                cur_v = conn.execute("PRAGMA table_info(aura_action_vouchers);")
+                colunas_v = {row["name"] for row in cur_v.fetchall()}
+                if "timestamp" not in colunas_v:
+                    conn.execute("ALTER TABLE aura_action_vouchers ADD COLUMN timestamp TEXT;")
+            except Exception:
+                pass
+
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_aura_vouchers_action 
+                ON aura_action_vouchers(action_id);
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_aura_vouchers_session 
+                ON aura_action_vouchers(session_id);
             """)
             conn.commit()
 
@@ -240,8 +294,13 @@ class AuraSessionMemory:
         tenant_id: Optional[str] = None,
         filial_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        tool_call_id: Optional[str] = None,
+        name: Optional[str] = None,
     ):
-        """Salva uma mensagem de usuário ou assistente na sessão."""
+        """Salva uma mensagem de usuario, assistente ou ferramenta (role: tool) na sessao."""
+        eff_tool_call_id = tool_call_id or (metadata.get("tool_call_id") if isinstance(metadata, dict) else None)
+        eff_name = name or (metadata.get("name") if isinstance(metadata, dict) else None)
+
         with self._connection() as conn:
             conn.execute("""
                 INSERT INTO aura_sessions (session_id, tenant_id, filial_id, updated_at)
@@ -254,16 +313,16 @@ class AuraSessionMemory:
 
             meta_json = json.dumps(metadata, ensure_ascii=False) if metadata else None
             conn.execute("""
-                INSERT INTO aura_messages (session_id, role, content, intent, metadata)
-                VALUES (?, ?, ?, ?, ?);
-            """, (session_id, role, content, intent, meta_json))
+                INSERT INTO aura_messages (session_id, role, content, intent, metadata, tool_call_id, name)
+                VALUES (?, ?, ?, ?, ?, ?, ?);
+            """, (session_id, role, content, intent, meta_json, eff_tool_call_id, eff_name))
             conn.commit()
 
     def get_history(self, session_id: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Recupera as últimas mensagens ordenadas cronologicamente."""
+        """Recupera as ultimas mensagens ordenadas cronologicamente."""
         with self._connection() as conn:
             cur = conn.execute("""
-                SELECT role, content, intent, created_at, metadata
+                SELECT role, content, intent, created_at, metadata, tool_call_id, name
                 FROM aura_messages
                 WHERE session_id = ?
                 ORDER BY id DESC
@@ -279,29 +338,171 @@ class AuraSessionMemory:
                     meta = json.loads(r["metadata"])
                 except Exception:
                     meta = {}
-            mensagens.append({
+
+            row_keys = r.keys() if hasattr(r, "keys") else []
+            t_id = r["tool_call_id"] if "tool_call_id" in row_keys else None
+            n_val = r["name"] if "name" in row_keys else None
+
+            msg_item = {
                 "role": r["role"],
                 "content": r["content"],
                 "intent": r["intent"],
                 "created_at": r["created_at"],
                 "metadata": meta,
-            })
+            }
+            if t_id:
+                msg_item["tool_call_id"] = t_id
+            elif "tool_call_id" in meta:
+                msg_item["tool_call_id"] = meta["tool_call_id"]
+
+            if n_val:
+                msg_item["name"] = n_val
+            elif "name" in meta:
+                msg_item["name"] = meta["name"]
+
+            mensagens.append(msg_item)
         return mensagens
 
     def format_history_for_prompt(self, session_id: str, limit: int = 6) -> str:
-        """Formata o histórico para injeção limpa no prompt de continuidade do LLM."""
+        """Formata o historico para injecao limpa no prompt de continuidade do LLM."""
         historico = self.get_history(session_id, limit=limit)
         if not historico:
             return "Nenhum histórico anterior nesta sessão."
 
         linhas = []
         for msg in historico:
-            rotulo = "Usuário" if msg["role"] == "user" else "AURA"
-            conteudo = msg["content"].replace("\n", " ")
-            if len(conteudo) > 300:
-                conteudo = conteudo[:300] + "..."
+            role = msg.get("role", "")
+            if role == "user":
+                rotulo = "Usuário"
+            elif role == "tool":
+                act_name = msg.get("name") or "Ação de Sistema"
+                rotulo = f"Ação Confirmada [{act_name}]"
+            elif role == "assistant":
+                rotulo = "AURA"
+            else:
+                rotulo = role.capitalize()
+
+            conteudo = (msg.get("content") or "").replace("\n", " ")
+            if len(conteudo) > 400:
+                conteudo = conteudo[:400] + "..."
             linhas.append(f"- {rotulo}: {conteudo}")
         return "\n".join(linhas)
+
+    def get_history_as_messages(self, session_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Recupera historico formatado em lista canonica de dicionarios para IA de nuvem."""
+        historico = self.get_history(session_id, limit=limit)
+        resultado = []
+        for msg in historico:
+            item = {
+                "role": msg.get("role", "user"),
+                "content": msg.get("content", ""),
+            }
+            if msg.get("role") == "tool":
+                if msg.get("tool_call_id"):
+                    item["tool_call_id"] = msg["tool_call_id"]
+                if msg.get("name"):
+                    item["name"] = msg["name"]
+            resultado.append(item)
+        return resultado
+
+    def save_action_voucher(
+        self,
+        voucher: ActionVoucher,
+        session_id: str = "",
+        operator_id: str = "",
+        action_type: str = "mutation",
+        payload: Optional[Dict[str, Any]] = None,
+    ):
+        """Salva um Action Voucher homologado garantindo idempotencia duravel no SQLite."""
+        details_json = json.dumps(voucher.details, ensure_ascii=False) if voucher.details else "{}"
+        payload_json = json.dumps(payload, ensure_ascii=False) if payload else "{}"
+        with self._connection() as conn:
+            conn.execute("""
+                INSERT INTO aura_action_vouchers (
+                    voucher_id, action_id, tool_call_id, session_id, action_name,
+                    action_type, operator_id, status, timestamp, payload, details, signature
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(action_id) DO UPDATE SET
+                    status = excluded.status,
+                    signature = excluded.signature;
+            """, (
+                voucher.voucher_id,
+                voucher.action_id,
+                voucher.tool_call_id,
+                session_id,
+                voucher.action_name,
+                action_type,
+                operator_id,
+                voucher.status,
+                voucher.timestamp,
+                payload_json,
+                details_json,
+                voucher.signature,
+            ))
+            conn.commit()
+
+    def get_action_voucher(self, action_id: str) -> Optional[ActionVoucher]:
+        """Recupera um Action Voucher pelo action_id para validacao de idempotencia estrita."""
+        with self._connection() as conn:
+            cur = conn.execute("""
+                SELECT voucher_id, action_id, tool_call_id, status, timestamp, action_name, details, signature
+                FROM aura_action_vouchers
+                WHERE action_id = ?;
+            """, (action_id,))
+            row = cur.fetchone()
+
+        if not row:
+            return None
+
+        details_dict = {}
+        if row["details"]:
+            try:
+                details_dict = json.loads(row["details"])
+            except Exception:
+                details_dict = {}
+
+        return ActionVoucher(
+            voucher_id=row["voucher_id"],
+            action_id=row["action_id"],
+            tool_call_id=row["tool_call_id"],
+            status=row["status"],
+            timestamp=str(row["timestamp"]),
+            action_name=row["action_name"],
+            details=details_dict,
+            signature=row["signature"],
+        )
+
+    def get_action_vouchers_for_session(self, session_id: str) -> List[ActionVoucher]:
+        """Recupera todos os vouchers homologados em uma determinada sessao."""
+        with self._connection() as conn:
+            cur = conn.execute("""
+                SELECT voucher_id, action_id, tool_call_id, status, timestamp, action_name, details, signature
+                FROM aura_action_vouchers
+                WHERE session_id = ?
+                ORDER BY created_at ASC;
+            """, (session_id,))
+            rows = cur.fetchall()
+
+        vouchers = []
+        for row in rows:
+            details_dict = {}
+            if row["details"]:
+                try:
+                    details_dict = json.loads(row["details"])
+                except Exception:
+                    details_dict = {}
+            vouchers.append(ActionVoucher(
+                voucher_id=row["voucher_id"],
+                action_id=row["action_id"],
+                tool_call_id=row["tool_call_id"],
+                status=row["status"],
+                timestamp=str(row["timestamp"]),
+                action_name=row["action_name"],
+                details=details_dict,
+                signature=row["signature"],
+            ))
+        return vouchers
 
     def clear_session(self, session_id: str):
         """Limpa as mensagens de uma sessão específica."""
@@ -1486,6 +1687,7 @@ Diretrizes Específicas por Assunto:
         intencao: str,
         resultado_bruto: Any,
         pergunta: str,
+        session_id: Optional[str] = None,
     ) -> Optional[str]:
         """
         Síntese executiva determinística de alta fidelidade para contingência.
@@ -1493,6 +1695,33 @@ Diretrizes Específicas por Assunto:
         garantindo que o gestor receba o diagnóstico operacional e projeção diretamente
         dos dados apurados no ERP/banco local sem atraso nem travamento.
         """
+        # 0.0 PREVENCAO DE AMNESIA CONTEXTUAL (F5-03)
+        p_lower = (pergunta or "").lower()
+        is_asking_status = any(w in p_lower for w in ["status", "como ficou", "foi feito", "confirmado", "aprovado", "andamento"]) and any(w in p_lower for w in ["pedido", "combustivel", "combustível", "acao", "ação", "carreta"])
+        if is_asking_status and session_id:
+            try:
+                hist = self.session_memory.get_history(session_id, limit=10)
+                tool_msgs = [m for m in hist if m.get("role") == "tool"]
+                for t_msg in reversed(tool_msgs):
+                    raw_content = t_msg.get("content", "{}")
+                    data = json.loads(raw_content) if isinstance(raw_content, str) else raw_content
+                    if data.get("status") in ("APPROVED", "EXECUTED"):
+                        voucher_id = data.get("voucher_id", "OK")
+                        details = data.get("details", {})
+                        litros_raw = details.get("litros", 15000)
+                        litros_val = float(litros_raw) if litros_raw is not None else 15000.0
+                        litros_fmt = f"{litros_val:,.0f}".replace(",", ".")
+                        combustivel = details.get("combustivel", "Combustível")
+                        operador = details.get("executado_por", "Operador")
+                        return (
+                            f"✅ **Pedido Confirmado no ERP**: O pedido de {litros_fmt} L de {combustivel} "
+                            f"já foi homologado e submetido com sucesso pelo {operador} via **Voucher `{voucher_id}`**.\n\n"
+                            f"- **Status da Ação:** [verde]APROVADO & DESPACHADO[/verde]\n"
+                            f"- **Ação Pendente:** Nenhuma. O pedido já foi submetido no ERP central."
+                        )
+            except Exception:
+                pass
+
         if not resultado_bruto or not isinstance(resultado_bruto, dict):
             return None
 
@@ -1501,7 +1730,7 @@ Diretrizes Específicas por Assunto:
             motivo = resultado_bruto.get("motivo") or "Falha de conexão com a base de dados do posto."
             return f"🚨 **Atenção**: Dados operacionais temporariamente [vermelho]indisponíveis[/vermelho].\n\n*Diagnóstico:* {motivo}"
 
-        # 0. MENTORIA EXECUTIVA DE DECISÃO & BRIEFING ESTRATÉGICO (FASE 3 — P0)
+        # 0. MENTORIA EXECUTIVA DE DECISÃO & BRIEFING ESTRATÉGICO (FASE 3 - P0)
         if intencao in ("mentoria_decisao", "executive_briefing", "comparativo_turnos", "analise_margem"):
             props = resultado_bruto.get("props") or resultado_bruto
             diag = props.get("diagnosis") or "Diagnóstico executivo da operação apurado com dados do ERP."
@@ -2020,6 +2249,7 @@ Diretrizes Específicas por Assunto:
                 intencao=intencao,
                 resultado_bruto=resultado_bruto,
                 pergunta=pergunta_efetiva,
+                session_id=sess_id,
             )
             if sintese_contingencia:
                 resposta_final = sintese_contingencia

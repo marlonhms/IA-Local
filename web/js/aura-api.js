@@ -325,13 +325,17 @@ class AuraApiClient {
   }
 
   /**
-   * Executa uma acao transacional Human-in-the-Loop na rota /api/v1/aura/actions/execute
+   * Executa uma acao transacional Human-in-the-Loop na rota /api/v1/aura/actions/execute (F5-01 / F5-04)
    * @param {string} actionId - Identificador RFC 4122 v4 da acao
-   * @param {Object} [options={}] - Objeto contendo tool_call_id, payload e timeoutMs
-   * @returns {Promise<Object>} Resposta com Action Voucher ou status
+   * @param {Object} [options={}] - Objeto contendo tool_call_id, session_id, action_name, action_type, payload e timeoutMs
+   * @returns {Promise<Object>} Resposta contendo Action Voucher homologado
    */
   async executeAction(actionId, options = {}) {
     const toolCallId = options.tool_call_id || options.toolCallId || '';
+    const sessionId = options.session_id || options.sessionId || '';
+    const actionName = options.action_name || options.actionName || options.label || options.name || '';
+    const actionType = options.action_type || options.actionType || 'mutation';
+    const operatorId = options.operator_id || options.operatorId || 'operador_01';
     const payload = options.payload || options.props || {};
     const timeoutMs = Number(options.timeoutMs || 15000);
 
@@ -343,9 +347,13 @@ class AuraApiClient {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action_id: actionId,
+          session_id: sessionId,
           tool_call_id: toolCallId,
+          action_id: actionId,
+          action_name: actionName,
+          action_type: actionType,
           payload: payload,
+          operator_id: operatorId,
         }),
       };
       if (controller) {
@@ -357,7 +365,8 @@ class AuraApiClient {
       if (!res.ok) {
         let errDetail = {};
         try { errDetail = await res.json(); } catch (_) {}
-        throw new Error(errDetail.detail?.error || errDetail.error || `Erro HTTP ${res.status} ao executar acao ${actionId}`);
+        const errorMsg = (typeof errDetail.detail === 'string' ? errDetail.detail : errDetail.detail?.error) || errDetail.error || `Erro HTTP ${res.status} ao executar acao ${actionId}`;
+        throw new Error(errorMsg);
       }
 
       return await res.json();

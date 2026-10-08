@@ -334,3 +334,107 @@ class WidgetActionExecution(BaseModel):
             raise ValueError(f"tool_call_id inválido: '{v}'")
         return v
 
+
+class ActionExecuteRequest(BaseModel):
+    """Modelo de requisicao para execucao de acoes transacionais (F5-01)."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    session_id: str = Field(default="", description="Identificador da sessao conversacional")
+    tool_call_id: str = Field(..., description="UUID v4 da invocacao da ferramenta")
+    action_id: str = Field(..., description="UUID v4 da acao transacional a executar")
+    action_name: str = Field(default="", description="Nome ou rotulo da acao transacional")
+    action_type: Literal["mutation", "inspection", "navigation"] = Field(
+        default="mutation",
+        description="Tipo da acao transacional"
+    )
+    payload: Dict[str, Any] = Field(default_factory=dict, description="Carga util da acao transacional")
+    operator_id: Optional[str] = Field(default="operador_01", description="Identificador do operador humano")
+
+    @field_validator("tool_call_id")
+    @classmethod
+    def check_tool_call_id(cls, v: str) -> str:
+        if not validate_tool_call_id(v):
+            raise ValueError(f"tool_call_id invalido: '{v}'")
+        return v
+
+    @field_validator("action_id")
+    @classmethod
+    def check_action_id(cls, v: str) -> str:
+        if not validate_action_id(v):
+            raise ValueError(f"action_id invalido: '{v}'")
+        return v
+
+    @field_validator("action_name", mode="before")
+    @classmethod
+    def check_action_name(cls, v: Any) -> str:
+        if v is None:
+            return ""
+        return str(v).strip()
+
+
+class ActionVoucher(BaseModel):
+    """Comprovante auditavel de acao transacional homologada no ERP (F5-01)."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    voucher_id: str = Field(..., description="UUID v4 do voucher gerado")
+    action_id: str = Field(..., description="UUID v4 da acao transacional executada")
+    tool_call_id: str = Field(..., description="UUID v4 da invocacao original")
+    status: Literal["APPROVED", "EXECUTED"] = Field(
+        default="APPROVED",
+        description="Status oficial da transacao homologada"
+    )
+    timestamp: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        description="Timestamp ISO UTC da homologacao"
+    )
+    action_name: str = Field(..., description="Nome da acao executada")
+    details: Dict[str, Any] = Field(default_factory=dict, description="Detalhes e parametros confirmados")
+    signature: str = Field(..., description="Assinatura HMAC-SHA256 auditavel")
+
+    @field_validator("action_id")
+    @classmethod
+    def check_action_id(cls, v: str) -> str:
+        if not validate_action_id(v):
+            raise ValueError(f"action_id invalido: '{v}'")
+        return v
+
+    @field_validator("tool_call_id")
+    @classmethod
+    def check_tool_call_id(cls, v: str) -> str:
+        if not validate_tool_call_id(v):
+            raise ValueError(f"tool_call_id invalido: '{v}'")
+        return v
+
+
+def generate_action_voucher_signature(
+    voucher_id: str,
+    action_id: str,
+    tool_call_id: str,
+    status: str,
+    timestamp: str,
+    secret: str = "aura_voucher_hmac_secret_v1"
+) -> str:
+    """Gera assinatura HMAC-SHA256 para integridade auditavel do Action Voucher."""
+    import hmac
+    import hashlib
+    raw = f"{voucher_id}:{action_id}:{tool_call_id}:{status}:{timestamp}".encode("utf-8")
+    return hmac.new(secret.encode("utf-8"), raw, hashlib.sha256).hexdigest()
+
+
+def verify_action_voucher_signature(
+    voucher: ActionVoucher,
+    secret: str = "aura_voucher_hmac_secret_v1"
+) -> bool:
+    """Verifica a integridade criptografica da assinatura de um Action Voucher."""
+    import hmac
+    expected = generate_action_voucher_signature(
+        voucher_id=voucher.voucher_id,
+        action_id=voucher.action_id,
+        tool_call_id=voucher.tool_call_id,
+        status=voucher.status,
+        timestamp=voucher.timestamp,
+        secret=secret,
+    )
+    return hmac.compare_digest(voucher.signature, expected)
+
+
