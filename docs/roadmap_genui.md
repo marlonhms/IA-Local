@@ -1,6 +1,6 @@
 # Roadmap Executivo & Técnico: Implementação de GenUI & Server-Driven UI no AURA Edge AI
 
-> **AURA IntelligentUI (GenUI/SDUI v1.0) — O Mentor de Decisões Executivo no Edge:** Transformando a AURA de um leitor passivo de relatórios ou medidor de telemetria em um **verdadeiro mentor de negócios especialista em análises profundas, previsões preditivas, consultas multidimensionais e comparações estratégicas para tomadas de decisão assertivas**.
+> **AURA IntelligentUI (GenUI/SDUI v1.0): O Mentor de Decisões Executivo no Edge:** Transformando a AURA de um leitor passivo de relatórios ou medidor de telemetria em um **verdadeiro mentor de negócios especialista em análises profundas, previsões preditivas, consultas multidimensionais e comparações estratégicas para tomadas de decisão assertivas**.
 
 - **Data de Criação:** 07/10/2026  
 - **Versão do Documento:** 2.3.0 (Evolução Estratégica: Hardening de Seguranca Cibernetica & Governanca RBAC)  
@@ -127,17 +127,17 @@ Todo componente interativo injetado no feed do chat da AURA respeita a arquitetu
 
 ### Detalhamento das 3 Camadas:
 
-#### Camada 1 — Resumo Executivo Textual (Âncora Cognitiva)
+#### Camada 1: Resumo Executivo Textual (Âncora Cognitiva)
 - **Mecanismo:** Emitido via streaming contínuo nos primeiros tokens (`AuraChunkType.DELTA`).
 - **Objetivo:** Fornecer clareza situacional instantânea ao gestor antes que o widget visual pesado termine a renderização.
 - **Copy Pattern:** `[Status/Alerta] + [Métrica-Chave com Unidade] + [Projeção Temporal / Impacto Imediato]`.
 
-#### Camada 2 — Visualização Rica (Hidratação Nativa Determinística)
+#### Camada 2: Visualização Rica (Hidratação Nativa Determinística)
 - **Mecanismo:** O frontend busca o construtor registrado no `SecureComponentRegistry` e injeta as propriedades estruturadas recebidas no evento `ui_complete`.
 - **Independência Visual do LLM:** O LLM não envia tags HTML, CSS ou código Chart.js. Ele envia apenas o objeto de dados. O widget nativo aplica os gradientes da AURA (ciano neon `#00f2fe`, violeta `#9d4edd`, esmeralda `#10b981`, rubi `#ef4444`), fontes semânticas e acessibilidade WCAG 2.1 AA.
 - **Economia Computacional no Edge:** Redução drástica de tokens de saída na GPU (economizando até 80% do tempo de geração).
 
-#### Camada 3 — Action Sheets Transacionais (Affordances Idempotentes)
+#### Camada 3: Action Sheets Transacionais (Affordances Idempotentes)
 - **Mecanismo:** Controles interativos acoplados à decisão sugerida.
 - **Classificação de Ações:**
   - **Ações Reversíveis (Baixo Risco):** `[Ver no Canvas ↗]`, `[Abrir Evidências 🔍]`, `[Exportar CSV 📄]`. Executadas localmente no cliente sem mutação de banco.
@@ -303,16 +303,16 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 
 ---
 
-### Fase 0 — Inventário, Baseline & Arquitetura do Protocolo GenUI (P0) [CONCLUÍDA EM 07/10/2026]
+### Fase 0: Inventário, Baseline & Arquitetura do Protocolo GenUI (P0) [CONCLUÍDA EM 07/10/2026]
 **Objetivo:** Estabelecer o contrato formal do protocolo GenUI, configurar os identificadores de rastreabilidade e isolar o ambiente sem tocar nas rotas ativas de produção.
 
-- [x] **F0-01 — Especificação Formal do Protocolo de Streaming GenUI:**  
+- [x] **F0-01: Especificação Formal do Protocolo de Streaming GenUI:**  
   Documentação formal homologada em [`docs/protocolo_streaming_genui.md`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/protocolo_streaming_genui.md). Mapeados e especificados os tipos canônicos de chunks SSE: `delta` (Resumo Executivo), `ui_skeleton` (placeholder sub-100ms), `ui_delta` (streaming de props), `ui_complete` (envelope canônico validado) e `ui_action_feedback` (confirmação com Action Voucher assinado).
-- [x] **F0-02 — Criação do Registro Centralizado de Componentes no Frontend (`web/js/aura-genui.js`):**  
+- [x] **F0-02: Criação do Registro Centralizado de Componentes no Frontend (`web/js/aura-genui.js`):**  
   Implementado `window.AuraGenUI` e `window.SecureComponentRegistry` com arquitetura Zero-Bundler (nativa para navegador e `module.exports` para Node.js). Inclui `registerComponent`, `resolveComponent` (mitigação estrita de OWASP LLM03 - Agência Excessiva), `escapeHtml` (mitigação de OWASP LLM01 - XSS) e integração no shell `web/index.html` com atributo `defer` e cache-buster.
-- [x] **F0-03 — Padronização de IDs de Idempotência Criptográfica:**  
+- [x] **F0-03: Padronização de IDs de Idempotência Criptográfica:**  
   Módulo `core/schemas/idempotency.py` criado e exportado em `core/schemas/__init__.py`. Geradores e validadores RFC 4122 UUID v4 padronizados para `tool_call_id` e `action_id` em Python e JavaScript (`web/js/aura-genui.js`), acompanhados do modelo Pydantic `IdempotencyKey`.
-- [x] **F0-04 — Criação do Módulo de Testes de Linha de Base (`scripts/test_genui_baseline.py`):**  
+- [x] **F0-04: Criação do Módulo de Testes de Linha de Base (`scripts/test_genui_baseline.py`):**  
   Suíte automatizada completa criada e executada com 100% de sucesso validando: (1) Idempotência Python; (2) Shell e rotas estáticas; (3) SecureComponentRegistry, bloqueio LLM03 e XSS no Node.js; (4) Zero regressão com 100% de aprovação nas 4 suítes analíticas existentes (`test_aura_aux_panel.py`, `test_phase5_specialized_responses.py`, `test_phase6_quality_resilience.py`, `test_aura_showcase.py`).
 
 **Critério de Aceite da Fase 0 (100% Aprovado):**  
@@ -322,10 +322,10 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 
 ---
 
-### Fase 1 — Backend: Protocolo SSE Multiplexado & Envelopes Tipados (P0) [CONCLUÍDA EM 07/10/2026]
+### Fase 1: Backend: Protocolo SSE Multiplexado & Envelopes Tipados (P0) [CONCLUÍDA EM 07/10/2026]
 **Objetivo:** Evoluir `core/aura_api.py` e `core/aura_engine.py` para emitir o fluxo de streaming em duas etapas bem demarcadas (Resumo Executivo inicial seguido de Structured Output encapsulado em envelope GenUI).
 
-- [x] **F1-01 — Extensão do Modelo `AuraChunkType` em `core/aura_engine.py`:**  
+- [x] **F1-01: Extensão do Modelo `AuraChunkType` em `core/aura_engine.py`:**  
   Adicionados os novos tipos de chunks no Enum:
   ```python
   class AuraChunkType(str, Enum):
@@ -340,7 +340,7 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
       ERROR = "error"                      # Notificação de falha
       DONE = "done"                        # Finalização do stream
   ```
-- [x] **F1-02 — Envelope Pydantic Canônico para Componentes GenUI (`core/schemas/genui.py`):**  
+- [x] **F1-02: Envelope Pydantic Canônico para Componentes GenUI (`core/schemas/genui.py`):**  
   Criado schema unificado com metadados de ciclo de vida e idempotência:
   ```python
   class GenUIActionOption(BaseModel):
@@ -363,13 +363,13 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
       props: Dict[str, Any] = Field(..., description="Camada 2: Propriedades puras do widget")
       actions: List[GenUIActionOption] = Field(default_factory=list, description="Camada 3: Action Sheets")
   ```
-- [x] **F1-03 — Ajuste do Gerador de Streaming no `AuraEngine.ask_stream()`:**  
+- [x] **F1-03: Ajuste do Gerador de Streaming no `AuraEngine.ask_stream()`:**  
   Ao processar uma pergunta com intenção analítica identificada:
   1. Emitir `ui_skeleton` com o nome do componente a ser renderizado e o texto contextual ("Consultando volumetria dos tanques...").
   2. Emitir tokens textuais do Resumo Executivo (`DELTA`) enquanto a ferramenta finaliza os cálculos.
   3. Emitir o evento `ui_complete` contendo a serialização do `GenUIEnvelope`.
   4. Finalizar com `DONE`.
-- [x] **F1-04 — Suíte de Testes Automatizada do Backend (`scripts/test_genui_engine_sse.py`):**  
+- [x] **F1-04: Suíte de Testes Automatizada do Backend (`scripts/test_genui_engine_sse.py`):**  
   Validação estrita da ordem cronológica de emissão (`intent` -> `ui_skeleton` -> `delta` -> `ui_complete` -> `done`), isolamento de JSON bruto e zero regressões.
 
 **Critério de Aceite da Fase 1 (100% Aprovado):**  
@@ -379,14 +379,14 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 
 ---
 
-### Fase 2 — Frontend: Streaming Parser, Bufferização JSON & Skeleton UI (P0) [CONCLUÍDA EM 07/10/2026]
+### Fase 2: Frontend: Streaming Parser, Bufferização JSON & Skeleton UI (P0) [CONCLUÍDA EM 07/10/2026]
 **Objetivo:** Evoluir `web/js/aura-api.js` e `web/js/aura-chat.js` para consumir o fluxo multiplexado, gerenciar buffer seguro de JSON e exibir skeletons com micro-copy contextual.
 
-- [x] **F2-01 — Refatoração da Máquina de Estados de Streaming em `web/js/aura-api.js`:**  
+- [x] **F2-01: Refatoração da Máquina de Estados de Streaming em `web/js/aura-api.js`:**  
   Garantir que eventos SSE multiplexados (`event: ui_skeleton`, `event: ui_delta`, `event: ui_complete`, `event: ui_action_feedback`) sejam despachados para callbacks específicos sem atrasar a renderização dos tokens textuais de Resumo Executivo (`event: delta`). Compatibilidade dual com `streamChat()` e `chatStream()` e exportação CommonJS para Node.js.
-- [x] **F2-02 — Implementação do Buffer de Fragmentos JSON com Fallback Gracioso:**  
+- [x] **F2-02: Implementação do Buffer de Fragmentos JSON com Fallback Gracioso:**  
   Módulo `GenUIFragmentBuffer` implementado em `web/js/aura-genui.js` e integrado em `web/js/aura-api.js`. Caso a inferência transmita deltas fracionados de JSON (`ui_delta`), acumula em string buffer volátil indexado por `tool_call_id` com tratamento `try-catch` que silencia erros parciais de sintaxe até o evento `ui_complete` ou `[DONE]`.
-- [x] **F2-03 — Injeção de Skeleton UI Reativo (`SkeletonPulse`) em `web/js/aura-chat.js`:**  
+- [x] **F2-03: Injeção de Skeleton UI Reativo (`SkeletonPulse`) em `web/js/aura-chat.js`:**  
   No exato momento em que `ui_skeleton` é interceptado, aloca no DOM do chat um bloco visual com animação pulsante sutil (`animate-pulse`), status dot (`animate-ping`), classes AURA Precision Glass (`web/css/aura.css`) e texto explicativo da etapa em execução:
   ```html
   <div id="genui-skeleton-[tool_call_id]" class="genui-skeleton-slot p-4 rounded-xl border border-cyan-500/20 bg-slate-900/60 backdrop-blur-md">
@@ -402,9 +402,9 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
     </div>
   </div>
   ```
-- [x] **F2-04 — Hidratação Instantânea sem Layout Jank (Zero CLS):**  
+- [x] **F2-04: Hidratação Instantânea sem Layout Jank (Zero CLS):**  
   Assim que `ui_complete` é recebido, resolve o componente no `SecureComponentRegistry` (ou aplica fallback gracioso Precision Glass preparando o terreno para a Fase 3), substitui o esqueleto do DOM com transição de opacidade suave (150ms fade-in), e remove graciosamente slots órfãos (`cleanupSkeletonSlots`) se a resposta terminar em erro ou sem `ui_complete`.
-- [x] **F2-05 — Suíte de Testes Automatizada do Frontend (`scripts/test_genui_frontend_streaming.py`):**  
+- [x] **F2-05: Suíte de Testes Automatizada do Frontend (`scripts/test_genui_frontend_streaming.py`):**  
   Suíte automatizada completa em Python e Node.js validando: (1) Contratos estáticos e exportações; (2) Parser SSE multiplexado de `aura-api.js`; (3) Buffer de fragmentos parciais de `aura-genui.js`; (4) Ciclo de vida no DOM de `aura-chat.js` (inserção, hidratação, substituição 150ms e limpeza graciosa); (5) Zero regressão em todas as 4 suítes analíticas existentes (`test_genui_baseline.py`, `test_genui_engine_sse.py`, `test_aura_aux_panel.py`, `test_phase6_quality_resilience.py`).
 
 **Critério de Aceite da Fase 2 (100% Aprovado):**  
@@ -510,7 +510,7 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 
 ---
 
-### Fase 6 — Expansão do Catálogo de Micro-Widgets do Mentor de Decisões (P2)
+### Fase 6: Expansão do Catálogo de Micro-Widgets do Mentor de Decisões (P2)
 **Objetivo:** Implementar os módulos analíticos avançados de mentoria estratégica, comparações multidimensionais e simulação de cenários no padrão GenUI de 3 camadas com Action Sheets assertivas.
 
 - [x] **F6-01: Micro-Widget `MarginAnalysisUI` (Analise de Margem Real & Meios de Pagamento):**  
@@ -594,17 +594,17 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 
 ---
 
-### Fase 9 — Rollout Gradual, Feature Flags & Observabilidade SRE (P2)
+### Fase 9: Rollout Gradual, Feature Flags & Observabilidade SRE (P2)
 **Objetivo:** Publicar a nova experiência com controle total de reversão e telemetria de produção.
 
-- [ ] **F9-01 — Feature Flag `ENABLE_GENUI`:**  
+- [ ] **F9-01: Feature Flag `ENABLE_GENUI`:**  
   Permitir ligar/desligar a experiência GenUI dinamicamente via query param (`?genui=1`), flag de configuração no `.env` ou seletor no cockpit.
-- [ ] **F9-02 — Telemetria de Desempenho e UX:**  
+- [ ] **F9-02: Telemetria de Desempenho e UX:**  
   Monitorar no backend e frontend:
   - TTFT (Time-to-First-Token) do Resumo Executivo.
   - Tempo de hidratação do micro-widget (ms entre `ui_skeleton` e `ui_complete`).
   - Taxa de sucesso de ações transacionais vs taxa de rollback.
-- [ ] **F9-03 — Procedimento de Contingência e Rollback Imediato:**  
+- [ ] **F9-03: Procedimento de Contingência e Rollback Imediato:**  
   Caso qualquer inconsistência seja detectada em campo, comutar a flag para `false`: o sistema retorna imediatamente para os DecisionCards clássicos sem necessidade de restart de container.
 
 ---

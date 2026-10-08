@@ -66,6 +66,24 @@
     return Boolean(val);
   }
 
+  function sanitizePropsSafe(data, seen = new WeakSet()) {
+    if (data === null || data === undefined) return data;
+    if (typeof data !== 'object') return data;
+    if (seen.has(data)) return '[Circular]';
+    seen.add(data);
+    if (Array.isArray(data)) {
+      return data.map(item => sanitizePropsSafe(item, seen));
+    }
+    const safe = {};
+    for (const key of Object.keys(data)) {
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+        continue;
+      }
+      safe[key] = sanitizePropsSafe(data[key], seen);
+    }
+    return safe;
+  }
+
   // =========================================================================
   // 2. CLASSE BASE: BaseGenUIWidget
   // =========================================================================
@@ -76,7 +94,7 @@
       this.intent = escapeHtml(payload.intent || defaultIntent);
       this.componentName = escapeHtml(payload.component_name || defaultComp);
       this.summary = escapeHtml(payload.executive_summary || payload.summary_text || '');
-      this.props = payload.props || {};
+      this.props = sanitizePropsSafe(payload.props || {});
       this.actions = Array.isArray(payload.actions) ? payload.actions : [];
       this.createdAt = payload.created_at || payload.timestamp || new Date().toISOString();
       this.ttlSeconds = coerceNumber(payload.ttl_seconds, 900);

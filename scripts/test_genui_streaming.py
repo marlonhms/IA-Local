@@ -28,6 +28,7 @@ if hasattr(sys.stdout, "reconfigure"):
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
+from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 from core.aura_engine import (
@@ -39,6 +40,42 @@ from core.aura_engine import (
 )
 from core.aura_api import create_aura_app
 from core.schemas.idempotency import validate_tool_call_id, generate_tool_call_id
+from core.semantic_router import SemanticRouter
+from core.rag_engine import HybridRAGEngine
+
+
+class MockGeminiStream:
+    """Simulador de stream assincrono do modelo de IA para teste rapido sem latencia WAN."""
+    def __init__(self, texts: List[str]):
+        self.texts = texts
+
+    def __aiter__(self):
+        self._iter = iter(self.texts)
+        return self
+
+    async def __anext__(self):
+        try:
+            val = next(self._iter)
+            mock_chunk = MagicMock()
+            mock_chunk.text = val
+            return mock_chunk
+        except StopIteration:
+            raise StopAsyncIteration
+
+
+async def mock_gemini_generate_content_async(prompt, stream=True, **kwargs):
+    """Gera tokens conversacionais sinteticos sem blocos de JSON cru."""
+    tokens = [
+        "Diagnostico executivo apurado. ",
+        "Margem operacional sob controle no periodo, ",
+        "indicadores estaveis e em conformidade."
+    ]
+    return MockGeminiStream(tokens)
+
+
+def fast_no_pgvector_conn(self, *args, **kwargs):
+    """Previne delay de timeout TCP em testes automatizados locais sem banco Postgres."""
+    raise ConnectionRefusedError("Modo de teste rapido local (pgvector offline)")
 
 
 # =============================================================================
@@ -310,12 +347,16 @@ def run_all_streaming_tests():
     print("SUITE DE TESTES: STREAMING E BUFFERIZACAO GENUI (FASE 8: F8-02)")
     print("=" * 78)
 
-    engine = AuraEngine()
+    with patch.object(SemanticRouter, "_get_connection", fast_no_pgvector_conn), \
+         patch.object(HybridRAGEngine, "_get_connection", fast_no_pgvector_conn), \
+         patch("google.generativeai.GenerativeModel.generate_content_async", side_effect=mock_gemini_generate_content_async):
 
-    asyncio.run(test_backend_multiplexed_streaming(engine))
-    asyncio.run(test_zero_json_leakage_and_fragment_buffer(engine))
-    asyncio.run(test_early_disconnect_and_error_resilience(engine))
-    test_fastapi_sse_stream_with_tcp_fragmentation(engine)
+        engine = AuraEngine()
+
+        asyncio.run(test_backend_multiplexed_streaming(engine))
+        asyncio.run(test_zero_json_leakage_and_fragment_buffer(engine))
+        asyncio.run(test_early_disconnect_and_error_resilience(engine))
+        test_fastapi_sse_stream_with_tcp_fragmentation(engine)
 
     print("\n" + "=" * 78)
     print("SUITE F8-02 (STREAMING E BUFFERIZACAO) CONCLUIDA COM 100% DE SUCESSO!")

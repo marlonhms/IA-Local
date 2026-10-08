@@ -751,6 +751,13 @@ def run_nodejs_frontend_lifecycle_tests():
       assert(rawHtml.includes('&lt;script&gt;') || rawHtml.includes('&amp;lt;script&amp;gt;'), 'Entidade script escapada ausente');
       assert(rawHtml.includes('&lt;img') || rawHtml.includes('&amp;lt;img'), 'Entidade img escapada ausente');
       assert(rawHtml.includes('&lt;svg onload') || rawHtml.includes('&amp;lt;svg onload'), 'Entidade svg onload escapada ausente');
+
+      // Validacao estrita contra Prototype Pollution em props (OWASP LLM01)
+      const pollutedPayload = JSON.parse('{{"__proto__":{{"pollutedKey":true}},"diagnosis":"Seguro"}}');
+      const widgetPolluted = new ExecutiveDecisionMentorUI({{ props: pollutedPayload }});
+      assert.strictEqual(Object.prototype.pollutedKey, undefined, 'Prototype Pollution contaminou Object.prototype');
+      assert.strictEqual(widgetPolluted.props.diagnosis, 'Seguro');
+
       console.log('   [OK] OWASP LLM01: XSS neutralizado em todas as camadas de renderizacao.');
 
       // =======================================================================

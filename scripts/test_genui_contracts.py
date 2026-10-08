@@ -513,7 +513,39 @@ def test_micro_widgets_props_contracts():
     assert len(basket_props.top_combos) == 1
     assert basket_props.top_combos[0].lift == 3.42
 
-    print("   [OK] Todos os 6 Props Models de micro-widgets validados com integridade tipada.")
+    # 4.7 Validacao dos 6 Micro-Widgets empacotados em GenUIEnvelope e to_sse_payload()
+    catalog_envelopes = [
+        ("render_ExecutiveDecisionMentorUI", "mentoria_decisao", exec_props),
+        ("render_MarginAnalysisUI", "analise_margem", margin_props),
+        ("render_PredictiveScenarioUI", "cenario_preditivo", pred_props),
+        ("render_BenchmarkComparisonUI", "benchmark_comparativo", bench_props),
+        ("render_FinancialLeakAuditUI", "auditoria_fuga_financeira", leak_props),
+        ("render_BasketUpsellStrategyUI", "conveniencia_vendas_cruzadas", basket_props),
+    ]
+
+    for comp_name, intent_name, props_obj in catalog_envelopes:
+        t_id = generate_tool_call_id()
+        env_cat = GenUIEnvelope(
+            tool_call_id=t_id,
+            component_name=comp_name,
+            intent=intent_name,
+            executive_summary=f"Resumo executivo de {comp_name}",
+            props=props_obj,
+            actions=[action],
+        )
+        assert env_cat.tool_call_id == t_id
+        payload_sse = env_cat.to_sse_payload()
+        assert payload_sse["tool_call_id"] == t_id
+        assert payload_sse["component_name"] == comp_name
+        assert payload_sse["intent"] == intent_name
+        assert "props" in payload_sse
+        assert isinstance(payload_sse["props"], dict)
+        assert len(payload_sse["actions"]) == 1
+        # Verifica serializabilidade JSON estrita
+        json_output = json.dumps(payload_sse)
+        assert comp_name in json_output
+
+    print("   [OK] Todos os 6 Props Models de micro-widgets validados com integridade tipada e to_sse_payload().")
 
 
 def test_action_execute_request_and_voucher_contracts():
