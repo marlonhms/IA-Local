@@ -274,14 +274,14 @@ class AuraChatController {
           Sugestões executivas para iniciar:
         </span>
         <div class="welcome-suggestions-grid grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-          <button onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" class="quick-prompt-chip" aria-label="Consultar Autonomia de Tanques">
-            <svg class="w-3.5 h-3.5 text-emerald-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="11" height="18" rx="2" stroke-width="1.75"/><line x1="2" y1="21" x2="15" y2="21" stroke-width="1.75"/><path d="M14 8h2.5a2 2 0 0 1 2 2v6.5a1.5 1.5 0 0 0 3 0V9l-2-2" stroke-width="1.5"/></svg> <span>Autonomia dos Tanques</span>
+          <button onclick="window.auraChat.sendUserPrompt('Qual o diagnóstico executivo do meu negócio hoje?')" class="quick-prompt-chip !border-cyan-500/40 text-cyan-200 hover:text-white" aria-label="Consultar Mentor de Decisões Executivo">
+            <svg class="w-3.5 h-3.5 text-cyan-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg> <span>Mentor de Decisões</span>
           </button>
           <button onclick="window.auraChat.sendUserPrompt('Como fechou o último turno? Teve furo de caixa?')" class="quick-prompt-chip" aria-label="Consultar Fechamento de Turno e Caixa">
             <svg class="w-3.5 h-3.5 text-cyan-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="6" width="20" height="12" rx="2" stroke-width="1.75"/><circle cx="12" cy="12" r="3" stroke-width="1.75"/><path d="M6 12h.01M18 12h.01" stroke-width="2"/></svg> <span>Fechamento & Caixa</span>
           </button>
-          <button onclick="window.auraChat.sendUserPrompt('O LMC de ontem fechou dentro da tolerância oficial da ANP?')" class="quick-prompt-chip" aria-label="Consultar LMC Fiscal ANP">
-            <svg class="w-3.5 h-3.5 text-purple-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" stroke-width="1.75"/><rect x="8" y="2" width="8" height="4" rx="1" stroke-width="1.75"/></svg> <span>LMC Fiscal ANP (±0.6%)</span>
+          <button onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" class="quick-prompt-chip" aria-label="Consultar Autonomia de Tanques">
+            <svg class="w-3.5 h-3.5 text-emerald-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="11" height="18" rx="2" stroke-width="1.75"/><line x1="2" y1="21" x2="15" y2="21" stroke-width="1.75"/><path d="M14 8h2.5a2 2 0 0 1 2 2v6.5a1.5 1.5 0 0 0 3 0V9l-2-2" stroke-width="1.5"/></svg> <span>Autonomia dos Tanques</span>
           </button>
           <button onclick="window.auraGlance ? window.auraGlance.openCommandPalette() : document.getElementById('btn-open-palette').click()" class="quick-prompt-chip !border-purple-500/30 text-purple-300 hover:text-purple-200" aria-label="Abrir mais consultas rápidas">
             <svg class="w-3.5 h-3.5 text-purple-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><polygon points="12,6.5 16.5,9.5 16.5,14.5 12,17.5 7.5,14.5 7.5,9.5" stroke-width="1.25" fill="rgba(168,85,247,0.25)"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg> <span>Mais consultas (Ctrl+K)</span>
@@ -727,43 +727,62 @@ class AuraChatController {
       hydratedNode = tempDiv.firstElementChild || tempDiv;
     }
 
-    if (hydratedNode) {
-      hydratedNode.classList.add('genui-fade-in');
-      hydratedNode.style.transition = 'opacity 150ms cubic-bezier(0.4, 0, 0.2, 1)';
+    if (hydratedNode || hydratedHtml) {
+      const widgetContentHtml = hydratedHtml || (hydratedNode ? (hydratedNode.outerHTML || '') : '');
+      const artifactId = 'art_genui_' + (toolCallId || Date.now());
+      const artifactTitle = this.formatToolDisplayName(envelopeData.component_name || envelopeData.intent);
+      const artifactSubtitle = envelopeData.executive_summary || 'Resultado estruturado e auditável gerado pela AURA';
 
-      if (skeletonSlot && skeletonSlot.parentNode) {
-        skeletonSlot.parentNode.replaceChild(hydratedNode, skeletonSlot);
-      } else {
-        const toolCard = (containerId && typeof document.getElementById === 'function')
-          ? (document.getElementById(containerId + '-tool-card') || document.getElementById(containerId))
-          : null;
-        if (toolCard) {
-          toolCard.innerHTML = '';
-          toolCard.appendChild(hydratedNode);
-          toolCard.classList.remove('hidden');
-        }
-      }
+      // No Desktop, o widget inline no chat inicia recolhido para não duplicar com o Companion Canvas aberto.
+      // No Mobile, inicia expandido para leitura natural no feed sem depender de split canvas.
+      const isMobile = this.isMobileDevice();
+      const startExpanded = isMobile;
 
-      // Projeta no Companion Canvas se habilitado
+      // 1. Projeta no Companion Canvas se habilitado (abre no Desktop, não abre no mobile)
       if (typeof window !== 'undefined' && window.auraAuxPanel && typeof window.auraAuxPanel.projectArtifact === 'function') {
         try {
           window.auraAuxPanel.projectArtifact({
-            id: 'art_genui_' + (toolCallId || Date.now()),
+            id: artifactId,
             containerId: containerId,
             toolName: envelopeData.component_name,
             intent: envelopeData.intent,
             data: envelopeData.props,
-            html: hydratedHtml || (hydratedNode.outerHTML || ''),
-            autoOpen: true
+            html: widgetContentHtml,
+            autoOpen: !isMobile
           });
         } catch (_) {}
+      }
+
+      // 2. Renderiza o portal card com banner e contêiner desdobrável / recolhível
+      const portalBannerHtml = this.renderCompanionPortalCard({
+        artifactId,
+        artifactTitle,
+        artifactSubtitle,
+        containerId,
+        widgetHtml: widgetContentHtml,
+        startExpanded: startExpanded
+      });
+
+      const toolCard = (containerId && typeof document.getElementById === 'function')
+        ? (document.getElementById(containerId + '-tool-card') || document.getElementById(containerId))
+        : null;
+
+      if (toolCard) {
+        toolCard.innerHTML = portalBannerHtml;
+        toolCard.classList.remove('hidden');
+      } else if (skeletonSlot && skeletonSlot.parentNode) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = portalBannerHtml.trim();
+        const portalNode = tempDiv.firstElementChild || tempDiv;
+        portalNode.classList.add('genui-fade-in');
+        skeletonSlot.parentNode.replaceChild(portalNode, skeletonSlot);
       }
 
       const splitCard = (containerId && typeof document.getElementById === 'function')
         ? document.getElementById(containerId + '-split-tool-card')
         : null;
       if (splitCard) {
-        splitCard.innerHTML = hydratedHtml || (hydratedNode.outerHTML || '');
+        splitCard.innerHTML = portalBannerHtml;
         splitCard.classList.remove('hidden');
       }
 
@@ -1382,7 +1401,11 @@ class AuraChatController {
    * - Mobile (<768px): Exibe SOMENTE "Ver no Chat ▾" (card desdobra inline no chat)
    * - PC / Desktop (>=768px): Exibe SOMENTE "Ver no Painel" (destaca o canvas lateral)
    */
-  renderCompanionPortalCard({ artifactId, artifactTitle, artifactSubtitle, containerId, widgetHtml }) {
+  renderCompanionPortalCard({ artifactId, artifactTitle, artifactSubtitle, containerId, widgetHtml, startExpanded = false }) {
+    const isHiddenClass = startExpanded ? '' : 'hidden';
+    const labelText = startExpanded ? 'Esconder Widget ▴' : 'Ver no Chat ▾';
+    const ariaExpanded = startExpanded ? 'true' : 'false';
+
     return `
       <div class="aux-companion-portal-banner aux-artifact-portal-card mb-3 p-3.5 rounded-2xl bg-slate-900/90 border border-cyan-500/30 flex flex-col gap-2.5 shadow-lg backdrop-blur-md">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
@@ -1403,14 +1426,18 @@ class AuraChatController {
             </div>
           </div>
 
-          <!-- Ações Inteligentes: Ver no Chat (Mobile <768px) vs Ver no Painel (PC >=768px) -->
+          <!-- Ações Inteligentes: Alternar no Chat e Ver no Painel (PC >=768px) -->
           <div class="flex items-center gap-2 self-end sm:self-auto flex-shrink-0 font-sans">
-            <!-- Mobile: Somente Ver no Chat inline -->
-            <button type="button" onclick="window.auraChat && window.auraChat.toggleInlineArtifact('${containerId}')" id="${containerId}-btn-toggle-inline" aria-expanded="false" aria-controls="${containerId}-inline-widget" class="aux-btn-view-chat inline-flex md:hidden px-2.5 py-1.5 min-h-[36px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-medium transition-all items-center gap-1 active:scale-95" title="Alternar visualização deste card no chat">
-              <span id="${containerId}-btn-toggle-label">Ver no Chat ▾</span>
+            <!-- Mobile: Somente Ver/Esconder no Chat inline -->
+            <button type="button" onclick="window.auraChat && window.auraChat.toggleInlineArtifact('${containerId}')" id="${containerId}-btn-toggle-inline" aria-expanded="${ariaExpanded}" aria-controls="${containerId}-inline-widget" class="aux-btn-view-chat inline-flex md:hidden px-2.5 py-1.5 min-h-[36px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-medium transition-all items-center gap-1 active:scale-95 cursor-pointer" title="Alternar visualização deste card no chat">
+              <span id="${containerId}-btn-toggle-label">${labelText}</span>
+            </button>
+            <!-- PC / Desktop: Botão de alternar/esconder no Chat para total controle sem duplicar tela -->
+            <button type="button" onclick="window.auraChat && window.auraChat.toggleInlineArtifact('${containerId}')" id="${containerId}-btn-toggle-pc" aria-expanded="${ariaExpanded}" aria-controls="${containerId}-inline-widget" class="aux-btn-toggle-pc hidden md:inline-flex px-2.5 py-1.5 min-h-[36px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-medium transition-all items-center gap-1 active:scale-95 cursor-pointer" title="Mostrar ou esconder este card no feed de mensagens">
+              <span id="${containerId}-btn-toggle-pc-label">${labelText}</span>
             </button>
             <!-- PC / Desktop: Somente Ver no Painel lateral -->
-            <button type="button" onclick="window.auraAuxPanel && window.auraAuxPanel.open('${artifactId}')" id="${containerId}-btn-open-panel" class="aux-btn-view-panel hidden md:inline-flex px-3 py-1.5 min-h-[36px] rounded-xl bg-gradient-to-r from-cyan-500/20 to-purple-500/20 hover:from-cyan-500/30 hover:to-purple-500/30 text-cyan-200 hover:text-white border border-cyan-500/40 text-xs font-semibold items-center gap-1.5 transition-all active:scale-95 shadow-sm" title="Abrir no Painel Auxiliar">
+            <button type="button" onclick="window.auraAuxPanel && window.auraAuxPanel.open('${artifactId}')" id="${containerId}-btn-open-panel" class="aux-btn-view-panel hidden md:inline-flex px-3 py-1.5 min-h-[36px] rounded-xl bg-gradient-to-r from-cyan-500/20 to-purple-500/20 hover:from-cyan-500/30 hover:to-purple-500/30 text-cyan-200 hover:text-white border border-cyan-500/40 text-xs font-semibold items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer" title="Abrir no Painel Auxiliar">
               <span>Ver no Painel</span>
               <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
@@ -1418,8 +1445,17 @@ class AuraChatController {
         </div>
 
         <!-- Contêiner do Widget Inline Desdobrável (fica recolhido para não poluir o feed quando o painel auxiliar estiver ativo) -->
-        <div id="${containerId}-inline-widget" class="hidden pt-2 border-t border-white/10 animate-fade-in">
+        <div id="${containerId}-inline-widget" class="${isHiddenClass} pt-2 border-t border-white/10 animate-fade-in space-y-2">
           ${widgetHtml}
+          <!-- Barra rápida para esconder o widget no chat -->
+          <div class="flex justify-end pt-1">
+            <button type="button" 
+                    onclick="window.auraChat && window.auraChat.toggleInlineArtifact('${containerId}')" 
+                    class="text-[11px] text-slate-400 hover:text-cyan-300 transition-colors flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-white/10 cursor-pointer"
+                    title="Recolher visualização deste card no chat">
+              <span>Esconder este widget ▴</span>
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -1429,16 +1465,23 @@ class AuraChatController {
     if (typeof document === 'undefined') return;
     const widgetEl = document.getElementById(containerId + '-inline-widget');
     const labelEl = document.getElementById(containerId + '-btn-toggle-label');
+    const labelPcEl = document.getElementById(containerId + '-btn-toggle-pc-label');
     const toggleBtn = document.getElementById(containerId + '-btn-toggle-inline');
+    const togglePcBtn = document.getElementById(containerId + '-btn-toggle-pc');
     if (!widgetEl) return;
 
     const isHidden = widgetEl.classList.contains('hidden');
     if (isHidden) {
       widgetEl.classList.remove('hidden');
-      if (labelEl) labelEl.textContent = 'Recolher no Chat ▴';
+      if (labelEl) labelEl.textContent = 'Esconder Widget ▴';
+      if (labelPcEl) labelPcEl.textContent = 'Esconder Widget ▴';
       if (toggleBtn) {
         toggleBtn.setAttribute('aria-expanded', 'true');
         toggleBtn.classList.add('bg-white/15', 'text-white', 'border-white/20');
+      }
+      if (togglePcBtn) {
+        togglePcBtn.setAttribute('aria-expanded', 'true');
+        togglePcBtn.classList.add('bg-white/15', 'text-white', 'border-white/20');
       }
       if (typeof this.scrollToBottom === 'function') {
         setTimeout(() => this.scrollToBottom(), 50);
@@ -1446,9 +1489,14 @@ class AuraChatController {
     } else {
       widgetEl.classList.add('hidden');
       if (labelEl) labelEl.textContent = 'Ver no Chat ▾';
+      if (labelPcEl) labelPcEl.textContent = 'Ver no Chat ▾';
       if (toggleBtn) {
         toggleBtn.setAttribute('aria-expanded', 'false');
         toggleBtn.classList.remove('bg-white/15', 'text-white', 'border-white/20');
+      }
+      if (togglePcBtn) {
+        togglePcBtn.setAttribute('aria-expanded', 'false');
+        togglePcBtn.classList.remove('bg-white/15', 'text-white', 'border-white/20');
       }
     }
   }

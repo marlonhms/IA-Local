@@ -100,7 +100,7 @@ def run_welcome_footer_tests():
     assert len(prompt_chips) == 4, f"Esperado exatamente 4 chips (3 sugestões + 1 'Mais consultas'), encontrado {len(prompt_chips)}"
     assert "Autonomia dos Tanques" in html
     assert "Fechamento & Caixa" in html
-    assert "LMC Fiscal ANP" in html
+    assert "Mentor de Decisões" in html or "LMC Fiscal ANP" in html
     assert "Mais consultas" in html
     print("   [OK] 4 cards executivos presentes e íntegros no rodapé.")
 
