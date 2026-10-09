@@ -385,13 +385,33 @@ class AuraApiClient {
     const timeoutTimer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
     try {
+      let wireActionId = actionId;
+      const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
+      let isUuidValid = false;
+      if (wireActionId && typeof wireActionId === 'string') {
+        const lastUnderscore = wireActionId.lastIndexOf('_');
+        const candidate = lastUnderscore !== -1 ? wireActionId.slice(lastUnderscore + 1) : wireActionId;
+        isUuidValid = uuidRegex.test(candidate);
+      }
+      if (!isUuidValid) {
+        if (!this._actionUuidMap) this._actionUuidMap = new Map();
+        if (!this._actionUuidMap.has(actionId)) {
+          const genUuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+            const r = Math.random() * 16 | 0;
+            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+          });
+          this._actionUuidMap.set(actionId, 'act_' + genUuid);
+        }
+        wireActionId = this._actionUuidMap.get(actionId);
+      }
+
       const fetchOpts = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           session_id: sessionId,
           tool_call_id: toolCallId,
-          action_id: actionId,
+          action_id: wireActionId,
           action_name: actionName,
           action_type: actionType,
           payload: payload,
@@ -412,7 +432,11 @@ class AuraApiClient {
         throw new Error(errorMsg);
       }
 
-      return await res.json();
+      const data = await res.json();
+      if (data && typeof data === 'object') {
+        data.action_id = actionId;
+      }
+      return data;
     } catch (err) {
       if (err && (err.name === 'AbortError' || String(err.message || '').toLowerCase().includes('abort'))) {
         throw new Error(`Timeout de conexao (${timeoutMs}ms) ao executar acao ${actionId}`);

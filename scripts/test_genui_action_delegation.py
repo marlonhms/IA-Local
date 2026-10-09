@@ -499,6 +499,7 @@ def run_action_delegation_tests():
       const layer3Html = widgetMut.renderLayer3();
       assert(layer3Html.includes('VOUCHER AUDITADO'), 'Badge VOUCHER AUDITADO ausente');
       assert(layer3Html.includes('vch_delegation_success_7788'), 'ID do voucher ausente no badge');
+      assert(layer3Html.includes('Ação Homologada no ERP'), 'Acao Homologada no ERP ausente no badge');
       console.log('   [OK] Mutacao: State Lock, RPC executeAction, Voucher Auditado, toast de sucesso e som 880Hz validados.');
 
       // =======================================================================
@@ -593,6 +594,41 @@ def run_action_delegation_tests():
       await Promise.all([p1, p2]);
       assert.strictEqual(rpcExecuteCount, 1, 'RPC deve ser disparado exatamente 1 vez descartando duplo clique');
       console.log('   [OK] Anti-Duplo Clique: Invocacao concorrente bloqueada.');
+
+      // =======================================================================
+      // 6. TESTE DE SINCRONIZACAO NO COMPANION CANVAS E SPINNER PADRAO
+      // =======================================================================
+      console.log('\\n6. Testando Sincronizacao de Card no Companion Canvas e Spinner...');
+      const toolIdSync = 'call_sync_505';
+      const widgetSync = new ExecutiveDecisionMentorUI({{
+        tool_call_id: toolIdSync,
+        intent: 'mentoria_decisao',
+        props: {{ diagnosis: 'Cenario projetado para teste.', confidence_score: 0.99 }}
+      }});
+      const cardMain = widgetSync.mount();
+      mockDocument.registerElement(cardMain);
+      AuraGenUI.registerWidget(toolIdSync, widgetSync);
+
+      // Simula card projetado no visualView do Canvas
+      const canvasCard = new MockNode('div', 'genui-canvas-card-' + toolIdSync);
+      canvasCard.setAttribute('class', 'genui-hydrated-card genui-decision-mentor-card');
+      canvasCard.setAttribute('data-tool-call-id', toolIdSync);
+      canvasCard.setAttribute('data-component', 'render_ExecutiveDecisionMentorUI');
+      const canvasL3 = new MockNode('div');
+      canvasL3.setAttribute('class', 'genui-layer genui-layer-3');
+      canvasCard.appendChild(canvasL3);
+      mockDocument.registerElement(canvasCard);
+
+      // Aplica estado otimista no widget e verifica propagacao de spinner e sincronizacao no canvas
+      widgetSync.applyOptimisticState('act_default_apply', 'Processando autorizacao no ERP...');
+      const defaultL3Html = widgetSync.renderLayer3();
+      assert(defaultL3Html.includes('Processando...'), 'Spinner Processando ausente em acao padrao ativa');
+
+      // Finaliza sucesso e verifica propagacao
+      widgetSync.finalizeSuccessState({{ voucher_id: 'vch_sync_9999', signature: 'sig_ok' }});
+      const committedL3Html = widgetSync.renderLayer3();
+      assert(committedL3Html.includes('Ação Homologada no ERP'), 'Acao Homologada no ERP ausente no card sincronizado');
+      console.log('   [OK] Companion Canvas: Sincronizacao de estado e spinner validados.');
 
       console.log('\\nACTION_DELEGATION_ALL_OK');
     }})().catch(err => {{

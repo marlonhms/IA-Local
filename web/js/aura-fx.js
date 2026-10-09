@@ -144,7 +144,8 @@
         toastContainer = document.createElement('div');
         toastContainer.id = 'aura-fx-toast-container';
         toastContainer.className = 'fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full px-4 sm:px-0';
-        document.body.appendChild(toastContainer);
+        const target = document.body || document.documentElement;
+        if (target) target.appendChild(toastContainer);
       }
 
       const toast = document.createElement('div');

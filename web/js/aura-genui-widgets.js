@@ -95,7 +95,9 @@
       this.componentName = escapeHtml(payload.component_name || defaultComp);
       this.summary = escapeHtml(payload.executive_summary || payload.summary_text || '');
       this.props = sanitizePropsSafe(payload.props || {});
-      this.actions = Array.isArray(payload.actions) ? payload.actions : [];
+      this.actions = (Array.isArray(payload.actions) && payload.actions.length > 0)
+        ? payload.actions
+        : (this.props && Array.isArray(this.props.suggested_actions) ? this.props.suggested_actions : []);
       this.createdAt = payload.created_at || payload.timestamp || new Date().toISOString();
       this.ttlSeconds = coerceNumber(payload.ttl_seconds, 900);
       this.sessionId = escapeHtml(payload.session_id || payload.sessionId || '');
@@ -234,8 +236,29 @@
       const stateMgr = (typeof window !== 'undefined' && window.auraStateManager) ||
                        (typeof globalThis !== 'undefined' && globalThis.auraStateManager) ||
                        null;
-      const isDone1 = (stateMgr && typeof stateMgr.isActionExecuted === 'function' && stateMgr.isActionExecuted('act_default_apply')) || (this.state.voucher && (this.state.voucher.action_id === 'act_default_apply'));
+      const isDone1 = (stateMgr && typeof stateMgr.isActionExecuted === 'function' && stateMgr.isActionExecuted('act_default_apply')) || (this.state.voucher && (this.state.voucher.action_id === 'act_default_apply' || this.state.status === 'committed'));
       const isDone2 = (stateMgr && typeof stateMgr.isActionExecuted === 'function' && stateMgr.isActionExecuted('act_default_goals')) || (this.state.voucher && (this.state.voucher.action_id === 'act_default_goals'));
+
+      const isCurrentActive1 = this.state.isLocked && this.state.lockedActionId === 'act_default_apply';
+      const isCurrentActive2 = this.state.isLocked && this.state.lockedActionId === 'act_default_goals';
+
+      let displayLabel1 = isDone1 ? '✔ Recomendações Aplicadas' : '⚡ Aplicar Recomendações Prioritárias';
+      if (isCurrentActive1) {
+        displayLabel1 = '<span class="inline-flex items-center gap-1.5"><svg class="animate-spin -ml-0.5 mr-1 h-3.5 w-3.5 text-cyan-400 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg><span class="animate-pulse">Processando...</span></span>';
+      }
+
+      let displayLabel2 = isDone2 ? '✔ Metas Ajustadas' : '🎯 Ajustar Metas do Turno';
+      if (isCurrentActive2) {
+        displayLabel2 = '<span class="inline-flex items-center gap-1.5"><svg class="animate-spin -ml-0.5 mr-1 h-3.5 w-3.5 text-cyan-400 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg><span class="animate-pulse">Processando...</span></span>';
+      }
+
+      if (!this.actions || this.actions.length === 0) {
+        this.actions = [
+          { action_id: 'act_default_apply', label: '⚡ Aplicar Recomendações Prioritárias', action_type: 'mutation', variant: 'primary' },
+          { action_id: 'act_default_goals', label: '🎯 Ajustar Metas do Turno', action_type: 'mutation', variant: 'secondary' },
+          { action_id: 'act_default_canvas', label: '🔍 Projetar Cenário no Canvas', action_type: 'inspection', variant: 'ghost' }
+        ];
+      }
 
       return `
         <button type="button"
@@ -244,7 +267,7 @@
                 data-action-type="mutation"
                 data-tool-call-id="${escapeHtml(this.toolCallId)}"
                 ${(shouldDisable || isDone1) ? 'disabled' : ''}>
-          <span>${isDone1 ? '✔ Recomendações Aplicadas' : '⚡ Aplicar Recomendações Prioritárias'}</span>
+          <span>${displayLabel1}</span>
         </button>
         <button type="button"
                 class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-cyan-200 border border-cyan-500/30 hover:bg-slate-700 ${(shouldDisable || isDone2) ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
@@ -252,7 +275,7 @@
                 data-action-type="mutation"
                 data-tool-call-id="${escapeHtml(this.toolCallId)}"
                 ${(shouldDisable || isDone2) ? 'disabled' : ''}>
-          <span>${isDone2 ? '✔ Metas Ajustadas' : '🎯 Ajustar Metas do Turno'}</span>
+          <span>${displayLabel2}</span>
         </button>
         <button type="button"
                 class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 text-slate-300 border border-white/10 hover:bg-slate-800"
@@ -299,10 +322,13 @@
           <div class="genui-success-badge genui-voucher-badge p-2.5 mb-2.5 rounded-xl bg-emerald-500/20 border border-emerald-400/50 text-emerald-200 text-xs flex items-center justify-between gap-2 shadow-sm animate-fade-in">
             <div class="flex items-center gap-2">
               <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span class="font-bold text-white">${escapeHtml(feedback || 'Acao Homologada no ERP')}</span>
+              <span class="font-bold text-white">${escapeHtml(feedback || 'Ação Homologada no ERP')}</span>
               ${this.state.voucher?.voucher_id ? `<span class="text-[10px] font-mono text-emerald-300/80">(${escapeHtml(this.state.voucher.voucher_id)})</span>` : ''}
             </div>
-            <span class="badge-committed text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-900/60 text-emerald-300 border border-emerald-500/30">VOUCHER AUDITADO</span>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-medium text-emerald-200">Ação Homologada no ERP</span>
+              <span class="badge-committed text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-900/60 text-emerald-300 border border-emerald-500/30">VOUCHER AUDITADO</span>
+            </div>
           </div>
         `;
       } else if (feedback) {
@@ -354,10 +380,10 @@
           }
 
           let displayLabel = label;
-          if (isActionDone) {
-            displayLabel = `✔ ${label}`;
-          } else if (isCurrentActive) {
+          if (isCurrentActive) {
             displayLabel = `<span class="inline-flex items-center gap-1.5"><svg class="animate-spin -ml-0.5 mr-1 h-3.5 w-3.5 text-cyan-400 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg><span class="animate-pulse">Processando...</span></span>`;
+          } else if (isActionDone) {
+            displayLabel = `✔ ${label}`;
           }
 
           return `
@@ -522,7 +548,11 @@
       }
 
       // Se houver cliente de API disponivel no browser, despacha RPC
+      let res = null;
+      let rpcExecuted = false;
+
       if (typeof window !== 'undefined' && window.auraApi && typeof window.auraApi.executeAction === 'function') {
+        rpcExecuted = true;
         try {
           const operatorRole = this.operatorRole ||
             (typeof window !== 'undefined' && (window.currentOperatorRole || (window.currentUser && window.currentUser.role))) ||
@@ -531,7 +561,7 @@
             (typeof window !== 'undefined' && (window.currentOperatorId || (window.currentUser && window.currentUser.id))) ||
             'operador_01';
 
-          const res = await window.auraApi.executeAction(actionId, {
+          res = await window.auraApi.executeAction(actionId, {
             tool_call_id: this.toolCallId,
             session_id: this.sessionId || (typeof window !== 'undefined' && window.auraChat && window.auraChat.sessionId) || '',
             action_name: actionDef.label || actionDef.name || actionDef.action_name || 'acao_executiva',
@@ -540,25 +570,6 @@
             operator_id: operatorId,
             operator_role: operatorRole
           });
-          if (stateMgr) {
-            stateMgr.markActionExecuted(actionId, res);
-            stateMgr.finalizeSuccessState(this.toolCallId, res);
-          }
-          this.finalizeSuccessState(res);
-
-          const fx = (typeof window !== 'undefined' && window.auraFx) || null;
-          if (fx && typeof fx.showToast === 'function') {
-            fx.showToast({
-              title: 'Ação Homologada',
-              message: 'Decisão registrada e auditada com sucesso.',
-              type: 'success'
-            });
-          }
-
-          if (typeof window !== 'undefined' && window.auraAudio && typeof window.auraAudio.playChime === 'function') {
-            window.auraAudio.playChime(880, 0.08);
-          }
-          return true;
         } catch (err) {
           if (stateMgr) {
             stateMgr.rollbackOptimisticState(this.toolCallId);
@@ -573,6 +584,65 @@
             });
           }
           return false;
+        }
+      } else if (typeof fetch === 'function' && typeof window !== 'undefined' && window.location) {
+        rpcExecuted = true;
+        try {
+          const operatorRole = this.operatorRole || (window.currentUser && window.currentUser.role) || 'gerente';
+          const operatorId = this.operatorId || (window.currentUser && window.currentUser.id) || 'operador_01';
+          const fetchResp = await fetch('/api/v1/aura/actions/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              session_id: this.sessionId || (window.auraChat && window.auraChat.sessionId) || '',
+              tool_call_id: this.toolCallId,
+              action_id: actionId,
+              action_name: actionDef.label || 'acao_executiva',
+              action_type: actionDef.action_type || actionType || 'mutation',
+              payload: actionDef.payload || {},
+              operator_id: operatorId,
+              operator_role: operatorRole
+            })
+          });
+          if (!fetchResp.ok) {
+            throw new Error(`HTTP ${fetchResp.status}`);
+          }
+          res = await fetchResp.json();
+        } catch (err) {
+          if (stateMgr) {
+            stateMgr.rollbackOptimisticState(this.toolCallId);
+          }
+          this.rollbackOptimisticState(err?.message || 'Falha na comunicacao com o ERP.');
+          const fx = (typeof window !== 'undefined' && window.auraFx) || null;
+          if (fx && typeof fx.showToast === 'function') {
+            fx.showToast({
+              title: 'Falha na Operacao',
+              message: 'Nao foi possivel comunicar com o ERP central. Tente novamente.',
+              type: 'error'
+            });
+          }
+          return false;
+        }
+      }
+
+      if (rpcExecuted && res) {
+        if (stateMgr) {
+          stateMgr.markActionExecuted(actionId, res);
+          stateMgr.finalizeSuccessState(this.toolCallId, res);
+        }
+        this.finalizeSuccessState(res);
+
+        const fx = (typeof window !== 'undefined' && window.auraFx) || null;
+        if (fx && typeof fx.showToast === 'function') {
+          fx.showToast({
+            title: 'Ação Homologada',
+            message: 'Decisão registrada e auditada com sucesso.',
+            type: 'success'
+          });
+        }
+
+        if (typeof window !== 'undefined' && window.auraAudio && typeof window.auraAudio.playChime === 'function') {
+          window.auraAudio.playChime(880, 0.08);
         }
       }
       return true;
@@ -611,7 +681,7 @@
       this.state.isLocked = false;
       this.state.lockedActionId = null;
       this.state.voucher = result;
-      this.state.optimisticFeedback = 'Acao Homologada no ERP';
+      this.state.optimisticFeedback = 'Ação Homologada no ERP';
       this.state.errorMessage = null;
       this.refreshLayer3();
     }
@@ -641,10 +711,18 @@
       // Sincroniza todas as instancias duplicadas do card no DOM (chat, portais desdobraveis e Companion Canvas)
       if (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function') {
         try {
-          const matchingCards = document.querySelectorAll(`.genui-hydrated-card[data-tool-call-id="${this.toolCallId}"]`);
+          const matchingCards = new Set();
+          const cards1 = document.querySelectorAll(`.genui-hydrated-card[data-tool-call-id="${this.toolCallId}"]`);
+          const cards2 = document.querySelectorAll(`[data-tool-call-id="${this.toolCallId}"]`);
+          const canvasEl = (typeof document.getElementById === 'function') ? document.getElementById('aux-view-visual') : null;
+
+          if (cards1) Array.from(cards1).forEach(c => matchingCards.add(c));
+          if (cards2) Array.from(cards2).forEach(c => matchingCards.add(c));
+          if (canvasEl) matchingCards.add(canvasEl);
+
           matchingCards.forEach(card => {
             if (card === this.element) return;
-            const l3 = card.querySelector('.genui-layer-3');
+            const l3 = card.querySelector ? card.querySelector('.genui-layer-3') : null;
             if (l3 && l3.parentNode && typeof l3.parentNode.replaceChild === 'function') {
               const temp = document.createElement('div');
               temp.innerHTML = this.renderLayer3().trim();
@@ -664,13 +742,14 @@
     projectToCanvas() {
       if (typeof window !== 'undefined' && window.auraAuxPanel && typeof window.auraAuxPanel.projectArtifact === 'function') {
         try {
+          const cardHtml = `<div id="genui-canvas-card-${this.toolCallId}" class="genui-hydrated-card ${this.cardClass || 'genui-decision-mentor-card'}" data-tool-call-id="${this.toolCallId}" data-component="${this.componentName}">${this.renderHtml()}</div>`;
           window.auraAuxPanel.projectArtifact({
             id: 'art_genui_' + this.toolCallId,
             containerId: null,
             toolName: this.componentName,
             intent: this.intent,
             data: this.props,
-            html: this.renderHtml(),
+            html: cardHtml,
             autoOpen: true
           });
         } catch (e) {
@@ -1755,8 +1834,8 @@
       let widget = (genui && typeof genui.getWidget === 'function') ? genui.getWidget(toolCallId) : null;
 
       if (!widget) {
-        const card = (typeof btn.closest === 'function') ? btn.closest('.genui-hydrated-card') : null;
-        const compName = card ? card.getAttribute('data-component') : 'render_ExecutiveDecisionMentorUI';
+        const card = (typeof btn.closest === 'function') ? btn.closest('.genui-hydrated-card, [data-tool-call-id]') : null;
+        const compName = card ? (card.getAttribute('data-component') || 'render_ExecutiveDecisionMentorUI') : 'render_ExecutiveDecisionMentorUI';
         const registry = (typeof window !== 'undefined' && window.SecureComponentRegistry) ||
                          (genui && genui.registry);
         let CompDef = null;
@@ -1782,6 +1861,11 @@
             genui.registerWidget(toolCallId, widget);
           }
         } catch (_) {}
+      } else {
+        const card = (typeof btn.closest === 'function') ? btn.closest('.genui-hydrated-card, [data-tool-call-id]') : null;
+        if (card && (!widget.element || (typeof document !== 'undefined' && !document.contains(widget.element)))) {
+          widget.element = card;
+        }
       }
 
       if (widget && typeof widget.handleActionClick === 'function') {

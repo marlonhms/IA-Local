@@ -590,10 +590,16 @@ class AuraAuxPanel {
       `;
     }
 
+    let artifactHtml = artifact.html || '';
+    if (artifactHtml && !artifactHtml.includes('genui-hydrated-card') && artifact.id && artifact.id.startsWith('art_genui_')) {
+      const toolCallId = artifact.id.replace('art_genui_', '');
+      artifactHtml = `<div id="genui-canvas-card-${toolCallId}" class="genui-hydrated-card genui-decision-mentor-card" data-tool-call-id="${toolCallId}" data-component="${artifact.toolName || 'render_ExecutiveDecisionMentorUI'}">${artifactHtml}</div>`;
+    }
+
     visualView.innerHTML = `
       ${kpisHtml}
       <div class="aux-visual-container">
-        ${artifact.html}
+        ${artifactHtml}
       </div>
     `;
 
@@ -606,14 +612,44 @@ class AuraAuxPanel {
    */
   bindGenUIEvents(container) {
     if (!container || typeof container.querySelectorAll !== 'function') return;
-    const cards = container.querySelectorAll('.genui-hydrated-card[data-tool-call-id]');
+    const cards = container.querySelectorAll('.genui-hydrated-card[data-tool-call-id], [data-tool-call-id]');
+    const seen = new Set();
     cards.forEach(card => {
       const toolCallId = card.getAttribute('data-tool-call-id');
+      if (!toolCallId || seen.has(toolCallId)) return;
+      seen.add(toolCallId);
       const genui = (typeof window !== 'undefined' && window.AuraGenUI) ||
                     (typeof AuraGenUI !== 'undefined' ? AuraGenUI : null);
-      const widget = (genui && typeof genui.getWidget === 'function')
+      let widget = (genui && typeof genui.getWidget === 'function')
         ? genui.getWidget(toolCallId)
         : null;
+
+      if (!widget) {
+        const compName = card.getAttribute('data-component') || 'render_ExecutiveDecisionMentorUI';
+        const registry = (typeof window !== 'undefined' && window.SecureComponentRegistry) ||
+                         (genui && genui.registry);
+        let CompDef = null;
+        if (registry && typeof registry.resolveComponent === 'function') {
+          try {
+            CompDef = registry.resolveComponent(compName, { throwOnMissing: false });
+          } catch (_) {}
+        }
+        if (!CompDef && typeof ExecutiveDecisionMentorUI !== 'undefined') {
+          CompDef = ExecutiveDecisionMentorUI;
+        }
+        if (CompDef) {
+          try {
+            widget = new CompDef({
+              tool_call_id: toolCallId,
+              component_name: compName
+            });
+            widget.element = card;
+            if (genui && typeof genui.registerWidget === 'function') {
+              genui.registerWidget(toolCallId, widget);
+            }
+          } catch (_) {}
+        }
+      }
 
       if (widget && typeof widget.bindEvents === 'function') {
         widget.bindEvents(card);
