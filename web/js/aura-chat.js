@@ -4786,7 +4786,7 @@ class AuraChatController {
    * ou vazamento de estilos durante a digitação token-a-token.
    * Utiliza pilha unificada LIFO para garantir aninhamento sem cruzamento de tags.
    */
-  balanceStreamingText(text) {
+  balanceStreamingText(text, isStillStreaming = true) {
     if (!text) return '';
     let balanced = text;
 
@@ -4817,7 +4817,7 @@ class AuraChatController {
     // Normaliza fechamentos quebrados de BBCode antes de empilhar LIFO:
     // Ex: [vermelho]crítico /vermelho -> [vermelho]crítico[/vermelho]
     workText = workText.replace(
-      new RegExp('\\[(' + bbTagNames + ')\\]([\\s\\S]*?)(?:\\[\\s*\\/\\s*\\1\\s*\\]|\\s*(?:\\[\\s*)?[\\/\\\\]\\s*\\1\\b(?:\\])?)', 'gi'),
+      new RegExp('\\[(' + bbTagNames + ')\\]((?:(?!\\[(?:' + bbTagNames + ')\\])[\\s\\S])*?)(?:\\[\\s*\\/\\s*\\1\\s*\\]|\\s*(?:\\[\\s*)?[\\/\\\\]\\s*\\1\\b(?:\\])?)', 'gi'),
       '[$1]$2[/$1]'
     );
 
@@ -4853,7 +4853,17 @@ class AuraChatController {
         const tag = match[3].toLowerCase();
         if (bbTags.has(tag)) {
           if (!isClosing) {
-            stack.push({ type: 'bb', tag, close: `[/${tag}]` });
+            // Em renderizacao final (isStillStreaming === false), deixa o fechamento e higienizacao
+            // para sanitizeAndTransformTags para evitar envolver texto arbitrario ate o fim da mensagem.
+            // Em streaming ativo, so empilha se a tag nao for orfa (possui termo colado).
+            if (isStillStreaming) {
+              const afterTagIdx = match.index + full.length;
+              const remaining = workText.slice(afterTagIdx);
+              const isOrphan = /^(?:\s|$|\[)/.test(remaining);
+              if (!isOrphan) {
+                stack.push({ type: 'bb', tag, close: `[/${tag}]` });
+              }
+            }
           } else {
             const idx = stack.map(s => s.tag).lastIndexOf(tag);
             if (idx !== -1) stack.splice(idx, 1);
@@ -4983,34 +4993,47 @@ class AuraChatController {
 
     // 4.1. Normaliza fechamentos quebrados e tolerantes de BBCode (ex: [cor]texto /cor ou [cor]texto[/ cor])
     text = text.replace(
-      new RegExp('\\[(' + allTags + ')\\]([\\s\\S]*?)(?:\\[\\s*\\/\\s*\\1\\s*\\]|\\s*(?:\\[\\s*)?[\\/\\\\]\\s*\\1\\b(?:\\])?)', 'gi'),
+      new RegExp('\\[(' + allTags + ')\\]((?:(?!\\[(?:' + allTags + ')\\])[\\s\\S])*?)(?:\\[\\s*\\/\\s*\\1\\s*\\]|\\s*(?:\\[\\s*)?[\\/\\\\]\\s*\\1\\b(?:\\])?)', 'gi'),
       '[$1]$2[/$1]'
     );
 
     // 4.2. Auto-fecha tags abertas sem fechamento antes de quebra de linha, proxima tag ou fim da string
     // Ex: [ciano]15.000 L -> [ciano]15.000 L[/ciano]
+    // Requer termo nao-espaco colado (evita capturar tags orfas com espaco como [ciano] na pista ou [ciano])
     text = text.replace(
-      new RegExp('\\[(' + allTags + ')\\]([^\\r\\n\\[<]+?)(?=(?:\\[\\/?(?:' + allTags + ')\\]|\\r?\\n|$))', 'gi'),
+      new RegExp('\\[(' + allTags + ')\\](?!\\[|\\s)([^\r\n\\[<]+?)(?=(?:\\[\\/?(?:' + allTags + ')\\]|\r?\n|$))', 'gi'),
       (match, tag, content) => {
-        if (!content.trim()) return content;
-        return `[${tag}]${content}[/${tag}]`;
+        const trimmed = content.trim();
+        if (!trimmed) return content;
+        const rightTrimmed = content.replace(/\s+$/, '');
+        const trailing = content.slice(rightTrimmed.length);
+        return `[${tag}]${rightTrimmed}[/${tag}]${trailing}`;
       }
     );
 
     // 4.3. Transforma BBCode de badges: [badge-cor]...[/badge-cor]
     Object.keys(colorMap).forEach(key => {
       const badgeRegex = new RegExp('\\[badge-' + key + '\\]([\\s\\S]*?)\\[\\/badge-' + key + '\\]', 'gi');
-      text = text.replace(badgeRegex, `<span class="${colorMap[key].badge}">$1</span>`);
+      text = text.replace(badgeRegex, (match, content) => {
+        if (!content.trim()) return '';
+        return `<span class="${colorMap[key].badge}">${content}</span>`;
+      });
     });
 
     // 4.4. Transforma BBCode de realces coloridos: [cor]...[/cor]
     Object.keys(colorMap).forEach(key => {
       const hlRegex = new RegExp('\\[' + key + '\\]([\\s\\S]*?)\\[\\/' + key + '\\]', 'gi');
-      text = text.replace(hlRegex, `<span class="${colorMap[key].hl}">$1</span>`);
+      text = text.replace(hlRegex, (match, content) => {
+        if (!content.trim()) return '';
+        return `<span class="${colorMap[key].hl}">${content}</span>`;
+      });
     });
 
     // 4.5. Transforma BBCode de sublinhado: [u]...[/u]
-    text = text.replace(/\[u\]([\s\S]*?)\[\/u\]/gi, '<u class="aura-underline">$1</u>');
+    text = text.replace(/\[u\]([\s\S]*?)\[\/u\]/gi, (match, content) => {
+      if (!content.trim()) return '';
+      return `<u class="aura-underline">${content}</u>`;
+    });
 
     // 4.6. Transforma Markdown de sublinhado: __texto__ (permite underlines no meio de palavras compostas)
     text = text.replace(/(^|[^\w])__(?!_)([^\r\n]+?)(?<!_)__([^\w]|$)/g, '$1<u class="aura-underline">$2</u>$3');
@@ -5022,8 +5045,9 @@ class AuraChatController {
     // Remove barras soltas com nome de cor: /vermelho, /ciano, \vermelho, etc.
     text = text.replace(new RegExp('(^|\\s)[\\/\\\\](?:' + allTags + ')\\b(?:\\s|$)?', 'gi'), ' ');
 
-    // Remove tags de abertura orfas soltas vazias: [vermelho], [ciano], etc.
-    text = text.replace(new RegExp('\\s*\\[\\s*(?:' + allTags + ')\\s*\\]\\s*(?=\\s|$|\\[)', 'gi'), ' ');
+    // Remove tags de abertura orfas soltas vazias ou isoladas: [vermelho], [ciano], etc.
+    text = text.replace(new RegExp('(^|\\s)\\[\\s*(?:' + allTags + ')\\s*\\](?=\\s|$|\\[)', 'gi'), ' ');
+    text = text.replace(new RegExp('\\[\\s*(?:' + allTags + ')\\s*\\]', 'gi'), ' ');
 
     // Normaliza espacamento multiplo preservando quebras de linha
     text = text.replace(/[^\S\r\n]{2,}/g, ' ');

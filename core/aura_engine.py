@@ -806,34 +806,41 @@ def normalize_aura_color_markup(text: str) -> str:
 
     # 2. Normaliza fechamentos quebrados de BBCode (ex: [vermelho]crítico /vermelho -> [vermelho]crítico[/vermelho])
     tolerant_pattern = re.compile(
-        rf"\[({tag_names})\]([\s\S]*?)(?:\[\s*\/\s*\1\s*\]|\s*(?:\[\s*)?[\/\\]\s*\1\b(?:\])?)",
+        rf"\[({tag_names})\]((?:(?!\[(?:{tag_names})\])[\s\S])*?)(?:\[\s*\/\s*\1\s*\]|\s*(?:\[\s*)?[\/\\]\s*\1\b(?:\])?)",
         re.IGNORECASE,
     )
     protected = tolerant_pattern.sub(r"[\1]\2[/\1]", protected)
 
     # 3. Auto-fecha tags abertas sem fechamento antes de quebra de linha, próxima tag ou fim da string
+    # Requer termo não-espaço colado (evita capturar tags órfãs com espaço como [ciano] na pista ou [ciano])
     def _fix_unclosed(m: re.Match) -> str:
         tag = m.group(1)
         content = m.group(2)
-        if not content.strip():
+        trimmed = content.strip()
+        if not trimmed:
             return content
-        return f"[{tag}]{content}[/{tag}]"
+        right_trimmed = content.rstrip()
+        trailing = content[len(right_trimmed):]
+        return f"[{tag}]{right_trimmed}[/{tag}]{trailing}"
 
     unclosed_pattern = re.compile(
-        rf"\[({tag_names})\]([^\\r\\n\[<]+?)(?=(?:\[\/?(?:{tag_names})\]|\r?\n|$))",
+        rf"\[({tag_names})\](?!\s|\[)([^\r\n[<]+?)(?=(?:\[\/?(?:{tag_names})\]|\r?\n|$))",
         re.IGNORECASE,
     )
     protected = unclosed_pattern.sub(_fix_unclosed, protected)
 
-    # 4. Protege pares válidos [tag]...[/tag] para higienizar apenas tags órfãs
+    # 4. Protege pares válidos não-vazios [tag]...[/tag] para higienizar apenas tags órfãs
     valid_tags: List[str] = []
     def _stash_valid(m: re.Match) -> str:
+        content = m.group(2)
+        if not content.strip():
+            return " "
         token = f"XAURAVALID{len(valid_tags)}END"
         valid_tags.append(m.group(0))
         return token
 
     protected = re.sub(
-        rf"\[({tag_names})\][\s\S]*?\[\/\1\]",
+        rf"\[({tag_names})\]([\s\S]*?)\[\/\1\]",
         _stash_valid,
         protected,
         flags=re.IGNORECASE,
@@ -844,8 +851,9 @@ def normalize_aura_color_markup(text: str) -> str:
     protected = re.sub(rf"\s*\[\s*\/\s*(?:{tag_names})\s*\]\s*", " ", protected, flags=re.IGNORECASE)
     # 5b. Barras soltas com nome de cor: /vermelho, /ciano, \vermelho, etc.
     protected = re.sub(rf"(?:^|\s)[\/\\](?:{tag_names})\b(?:\s|$)?", " ", protected, flags=re.IGNORECASE)
-    # 5c. Tags de abertura órfãs soltas vazias: [vermelho], [ciano], etc.
-    protected = re.sub(rf"\s*\[\s*(?:{tag_names})\s*\]\s*(?=\s|$|\[)", " ", protected, flags=re.IGNORECASE)
+    # 5c. Tags de abertura órfãs soltas vazias ou isoladas: [vermelho], [ciano], etc.
+    protected = re.sub(rf"(?:^|\s)\[\s*(?:{tag_names})\s*\](?=\s|$|\[)", " ", protected, flags=re.IGNORECASE)
+    protected = re.sub(rf"\[\s*(?:{tag_names})\s*\]", " ", protected, flags=re.IGNORECASE)
 
     # Normaliza espaçamento residual
     protected = re.sub(r"[^\S\r\n]{2,}", " ", protected)

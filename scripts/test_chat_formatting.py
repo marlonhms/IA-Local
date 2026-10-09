@@ -209,6 +209,10 @@ def test_frontend_js_parser():
     results.broken_orphan_slash = chat.formatMarkdown('🚨 Alerta /vermelho na pista', false);
     results.broken_orphan_close = chat.formatMarkdown('Divergência de caixa [/vermelho]', false);
     results.broken_mixed_colors = chat.formatMarkdown('[verde]R$ 50,00[/verde] e [ciano]14h', false);
+    results.broken_orphan_open = chat.formatMarkdown('🚨 Alerta [ciano] na pista', false);
+    results.broken_orphan_combined = chat.formatMarkdown('🚨 Alerta /vermelho [ciano] na pista', false);
+    results.broken_orphan_end = chat.formatMarkdown('Status: [ciano]', false);
+    results.broken_rn_words = chat.formatMarkdown('[ciano]nível 10 e [verde]retorno', false);
 
     console.log(JSON.stringify(results));
     """
@@ -312,6 +316,22 @@ def test_frontend_js_parser():
     # 5. Múltiplas cores misturadas: [verde]R$ 50,00[/verde] e [ciano]14h -> ambas devem receber cores sem quebras
     assert "text-emerald" in data["broken_mixed_colors"] and "text-cyan" in data["broken_mixed_colors"], "Falha em cores misturadas"
     assert "[verde]" not in data["broken_mixed_colors"] and "[ciano]" not in data["broken_mixed_colors"], "Tags cruas em cores misturadas"
+
+    # 6. Tags órfãs soltas [ciano] e combinadas com /vermelho no frontend
+    assert "[ciano]" not in data["broken_orphan_open"], "Tag órfã [ciano] não foi higienizada no frontend"
+    assert "text-cyan" not in data["broken_orphan_open"], "Tag órfã [ciano] indevidamente coloriu texto no frontend"
+    assert "Alerta" in data["broken_orphan_open"] and "na pista" in data["broken_orphan_open"], "Texto limpo corrompido em [ciano] órfão"
+
+    assert "/vermelho" not in data["broken_orphan_combined"] and "[ciano]" not in data["broken_orphan_combined"]
+    assert "text-cyan" not in data["broken_orphan_combined"] and "text-rose" not in data["broken_orphan_combined"]
+    assert "Alerta" in data["broken_orphan_combined"] and "na pista" in data["broken_orphan_combined"]
+
+    assert "[ciano]" not in data["broken_orphan_end"] and "<span" not in data["broken_orphan_end"]
+    assert "Status:" in data["broken_orphan_end"]
+
+    # 7. Palavras com r e n em tags abertas no frontend
+    assert "text-cyan" in data["broken_rn_words"] and "nível 10" in data["broken_rn_words"], "Falha na cor ciano para palavra com n"
+    assert "text-emerald" in data["broken_rn_words"] and "retorno" in data["broken_rn_words"], "Falha na cor verde para palavra com r"
     print(" [OK] Variações Quebradas: Tags não fechadas, barras quebradas, tags órfãs e múltiplas cores 100% resolvidas.")
 
 
@@ -344,7 +364,28 @@ def test_backend_color_markup_normalization():
     norm_code = normalize_aura_color_markup(code_input)
     assert norm_code == code_input, "Código dentro de bloco foi indevidamente alterado"
 
-    print(" [OK] Backend Markup Normalizer: Todas as 5 variações e proteção de código validadas com sucesso.")
+    # 7. Palavras com r e n em tags não fechadas no backend
+    norm7_n = normalize_aura_color_markup("[ciano]nível 10")
+    assert norm7_n == "[ciano]nível 10[/ciano]", f"Falha na normalização com 'n': {norm7_n}"
+
+    norm7_r = normalize_aura_color_markup("[verde]retorno")
+    assert norm7_r == "[verde]retorno[/verde]", f"Falha na normalização com 'r': {norm7_r}"
+
+    # 8. Tags órfãs soltas [ciano] e combinadas com /vermelho no backend
+    norm8_open = normalize_aura_color_markup("🚨 Alerta [ciano] na pista")
+    assert "[ciano]" not in norm8_open and "Alerta na pista" in norm8_open, f"Falha na higienização de [ciano] órfão: {norm8_open}"
+
+    norm8_comb = normalize_aura_color_markup("🚨 Alerta /vermelho [ciano] na pista")
+    assert "/vermelho" not in norm8_comb and "[ciano]" not in norm8_comb and "Alerta na pista" in norm8_comb, f"Falha combinada: {norm8_comb}"
+
+    norm8_end = normalize_aura_color_markup("Status: [ciano]")
+    assert norm8_end == "Status:", f"Falha na tag órfã final: {norm8_end}"
+
+    # 9. Duas tags do mesmo tipo
+    norm9 = normalize_aura_color_markup("[ciano]15.000 L e [ciano]20.000 L[/ciano]")
+    assert "[ciano]15.000 L" in norm9 and "[ciano]20.000 L[/ciano]" in norm9, f"Falha em duas tags: {norm9}"
+
+    print(" [OK] Backend Markup Normalizer: Todas as 9 variações e proteção de código validadas com sucesso.")
 
 
 def run_all_formatting_tests():
