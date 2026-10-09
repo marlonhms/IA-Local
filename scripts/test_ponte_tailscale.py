@@ -125,7 +125,7 @@ def testar_conexao_vector(host: str = None, port: int = None, timeout: int = 5) 
     config["connect_timeout"] = timeout
 
     target_host = config.get("host", "localhost")
-    target_port = int(config.get("port", 5434))
+    target_port = int(config.get("port", 5433))
 
     # 1. Teste de Socket TCP
     ok_sock, lat_sock, err_sock = testar_porta_socket(target_host, target_port, timeout=float(timeout))
@@ -208,7 +208,7 @@ def main():
     )
     parser.add_argument("--host", default=None, help="Host alvo (sinônimo do argumento posicional)")
     parser.add_argument("--erp-port", type=int, default=None, help="Porta do ERP (padrão: 5433)")
-    parser.add_argument("--vec-port", type=int, default=None, help="Porta do pgvector (padrão: 5434)")
+    parser.add_argument("--vec-port", type=int, default=None, help="Porta do pgvector (padrão: 5433)")
     parser.add_argument("--timeout", type=int, default=5, help="Timeout de conexão em segundos (padrão: 5)")
     args = parser.parse_args()
 
@@ -217,7 +217,7 @@ def main():
     erp_host = target_host or DB_ERP_CONFIG.get("host", "localhost")
     erp_port = args.erp_port or DB_ERP_CONFIG.get("port", 5433)
     vec_host = target_host or DB_VECTOR_CONFIG.get("host", "localhost")
-    vec_port = args.vec_port or DB_VECTOR_CONFIG.get("port", 5434)
+    vec_port = args.vec_port or DB_VECTOR_CONFIG.get("port", 5433)
 
     print("=" * 76)
     print(" 🔍 DIAGNÓSTICO DA PONTE TAILSCALE - AI.LA (BANCO LOCAL & REMOTO)")

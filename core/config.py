@@ -104,3 +104,14 @@ def resolve_genui_flag(
 
     # 4. Fallback: Estado global da flag no runtime
     return is_genui_enabled()
+
+
+# =============================================================================
+# CONFIGURACOES DO BANCO VETORIAL & POSTGRESQL NATIVO LOCAL (PORTA 5433)
+# =============================================================================
+PGVECTOR_LOCAL_PORT: int = int(os.getenv("VECTOR_DB_PORT", "5433"))
+PGVECTOR_LOCAL_HOST: str = os.getenv("VECTOR_DB_HOST", "localhost")
+PGVECTOR_LOCAL_DBNAME: str = os.getenv("VECTOR_DB_NAME", "posto_ai")
+PGVECTOR_LOCAL_USER: str = os.getenv("VECTOR_DB_USER", "postgres")
+PGVECTOR_LOCAL_PASS: str = os.getenv("VECTOR_DB_PASSWORD", "123456")
+

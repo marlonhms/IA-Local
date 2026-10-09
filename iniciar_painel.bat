@@ -11,14 +11,9 @@ echo.
 
 cd /d "%~dp0"
 
-REM 1. Verificar container pgvector se Docker estiver presente
-echo [*] Verificando banco vetorial pgvector (Docker porta 5434)...
-docker start pgvector-posto > nul 2>&1
-if %errorlevel% neq 0 (
-    echo [!] Docker container pgvector-posto nao detectado ou Docker fechado.
-) else (
-    echo [OK] pgvector ativo na porta 5434.
-)
+REM 1. Banco Vetorial e ERP 100% Nativo no Windows (PostgreSQL 16 porta 5433)
+echo [*] Modo 100%% Nativo Windows: PostgreSQL 16 com pgvector (sem Docker/WSL).
+
 
 REM 2. Verificar servico PostgreSQL local (porta 5433)
 echo [*] Verificando servico PostgreSQL ERP (porta 5433)...

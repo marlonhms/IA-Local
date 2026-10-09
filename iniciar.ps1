@@ -5,14 +5,9 @@ Write-Host "========================================================" -Foregroun
 Write-Host "  Iniciando IA do Posto (pgvector + Gemini)" -ForegroundColor Cyan
 Write-Host "========================================================" -ForegroundColor Cyan
 
-# 1. Garantir que o container pgvector esta rodando
-Write-Host "[*] Verificando container pgvector-posto no Docker..." -ForegroundColor Yellow
-try {
-    $res = docker start pgvector-posto 2>&1
-    Write-Host "[OK] Container pgvector ativo na porta 5434." -ForegroundColor Green
-} catch {
-    Write-Host "[!] Nao foi possivel iniciar o container automaticamente. Verifique se o Docker Desktop esta aberto." -ForegroundColor Red
-}
+# 1. Banco Vetorial e ERP 100% Nativo no Windows (PostgreSQL 16 porta 5433)
+Write-Host "[*] Modo 100% Nativo Windows: PostgreSQL 16 com pgvector (sem Docker/WSL)." -ForegroundColor Cyan
+
 
 # 2. Garantir que o servico PostgreSQL local esta rodando
 Write-Host "[*] Verificando servico postgresql-x64-16 (ERP porta 5433)..." -ForegroundColor Yellow

@@ -1853,7 +1853,7 @@ class AuraEngine:
             erp_port=DB_ERP_CONFIG.get("port", 5433),
             vector_db_online=vector_online,
             vector_db_host=DB_VECTOR_CONFIG.get("host", "localhost"),
-            vector_db_port=DB_VECTOR_CONFIG.get("port", 5434),
+            vector_db_port=DB_VECTOR_CONFIG.get("port", 5433),
             latency_erp_ms=round(lat_erp, 2) if lat_erp else None,
             total_products_indexed=t_stats.get("total_rows"),
             cache_hit_ratio_percent=db_stats.get("cache_hit_ratio_percent"),

@@ -138,31 +138,13 @@ if ($pgService) {
     Write-Host "   [AVISO] Servico PostgreSQL nao encontrado na lista de servicos Windows." -ForegroundColor DarkYellow
 }
 
-# 5. Verificar e Iniciar Container Docker pgvector (Porta 5434)
-Write-Host "`n[4/5] Verificando Container Docker pgvector-posto..." -ForegroundColor Yellow
-$dockerReady = $false
-try {
-    $dockerInfo = docker info 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        $dockerReady = $true
-    }
-} catch {}
-
-if ($dockerReady) {
-    try {
-        $dockerCheck = docker ps --filter "name=pgvector-posto" --format "{{.Status}}" 2>$null
-        if ($dockerCheck -match "Up") {
-            Write-Host "   [OK] Container pgvector-posto ativo: $dockerCheck" -ForegroundColor Green
-        } else {
-            Write-Host "   [*] Iniciando container pgvector-posto..." -ForegroundColor Yellow
-            docker start pgvector-posto 2>$null | Out-Null
-            Write-Host "   [OK] Container pgvector-posto iniciado com sucesso." -ForegroundColor Green
-        }
-    } catch {
-        Write-Host "   [!] Erro ao checar status do container pgvector-posto." -ForegroundColor Red
-    }
+# 5. Banco Vetorial pgvector Nativo (Porta 5433)
+Write-Host "`n[4/5] Verificando PostgreSQL 16 Nativo (ERP e pgvector na Porta 5433)..." -ForegroundColor Yellow
+$pgService = Get-Service -Name "postgresql-x64-16" -ErrorAction SilentlyContinue
+if ($pgService -and $pgService.Status -eq "Running") {
+    Write-Host "   [OK] Servico postgresql-x64-16 ativo na porta 5433 (ERP e pgvector nativos)." -ForegroundColor Green
 } else {
-    Write-Host "   [!] Docker daemon nao acessivel. Certifique-se de que o Docker Desktop esta aberto." -ForegroundColor Red
+    Write-Host "   [!] Servico postgresql-x64-16 nao esta em execucao." -ForegroundColor Yellow
 }
 
 # 6. Resumo de Uso no Computador de Casa
@@ -173,7 +155,7 @@ if ($tailscaleIP) {
     Write-Host "   ERP_DB_HOST=$tailscaleIP  (ou use o MagicDNS: marlonh-supwp)" -ForegroundColor Green
     Write-Host "   ERP_DB_PORT=5433" -ForegroundColor Green
     Write-Host "   VECTOR_DB_HOST=$tailscaleIP  (ou use o MagicDNS: marlonh-supwp)" -ForegroundColor Green
-    Write-Host "   VECTOR_DB_PORT=5434" -ForegroundColor Green
+    Write-Host "   VECTOR_DB_PORT=5433" -ForegroundColor Green
 } else {
     Write-Host " Configure ERP_DB_HOST e VECTOR_DB_HOST com o IP Tailscale deste notebook (ou marlonh-supwp)." -ForegroundColor Yellow
 }

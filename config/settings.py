@@ -63,10 +63,10 @@ DB_ERP_CONFIG = {
     "connect_timeout": int(os.getenv("ERP_DB_CONNECT_TIMEOUT", "5")),
 }
 
-# Configuração do Banco Vetorial (PostgreSQL 16 Docker pgvector - Porta 5434)
+# Configuração do Banco Vetorial (PostgreSQL 16 Windows pgvector - Porta 5433)
 DB_VECTOR_CONFIG = {
     "host": os.getenv("VECTOR_DB_HOST", "localhost"),
-    "port": int(os.getenv("VECTOR_DB_PORT", "5434")),
+    "port": int(os.getenv("VECTOR_DB_PORT", "5433")),
     "dbname": os.getenv("VECTOR_DB_NAME", "posto_ai"),
     "user": os.getenv("VECTOR_DB_USER", "postgres"),
     "password": os.getenv("VECTOR_DB_PASSWORD", "123456"),

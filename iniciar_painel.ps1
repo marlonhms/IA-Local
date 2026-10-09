@@ -8,13 +8,9 @@ Write-Host "  Painel Operacional da Pista & Console Cognitivo" -ForegroundColor 
 Write-Host "===========================================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# 1. Verifica container pgvector
-try {
-    docker start pgvector-posto 2>$null | Out-Null
-    Write-Host "  [OK] pgvector ativo na porta 5434." -ForegroundColor Green
-} catch {
-    Write-Host "  [!] Docker nao ativo ou pgvector ausente." -ForegroundColor Yellow
-}
+# 1. Banco Vetorial e ERP 100% Nativo no Windows (PostgreSQL 16 porta 5433)
+Write-Host "  [*] Modo 100% Nativo Windows: PostgreSQL 16 com pgvector (sem Docker/WSL)." -ForegroundColor Cyan
+
 
 # 2. Verifica servico PostgreSQL ERP local
 try {

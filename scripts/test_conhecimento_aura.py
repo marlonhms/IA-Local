@@ -1,7 +1,7 @@
 """
 Suíte de Testes Automatizada: Auto-Conhecimento & Meta-RAG da AURA via pgvector.
 Valida:
-1. Tabela `aura_conhecimento_vetores` no posto_ai (porta 5434), índices HNSW/GIN e delta hashing.
+1. Tabela `aura_conhecimento_vetores` no posto_ai (porta 5433 local), índices HNSW/GIN e delta hashing.
 2. Indexação completa dos 15 chunks atômicos oficiais da AURA.
 3. Busca híbrida HNSW + GIN FTS + RRF calibrado (sub-5ms SLA).
 4. Roteamento semântico vetorial e heurístico da 12ª intenção `ajuda_sistema`.
@@ -51,7 +51,7 @@ def run_tests():
     # -------------------------------------------------------------------------
     # 1. Validação da Infraestrutura da Tabela e Índices
     # -------------------------------------------------------------------------
-    print("\n1. Testando Tabela 'aura_conhecimento_vetores' e Índices no posto_ai (porta 5434)...")
+    print("\n1. Testando Tabela 'aura_conhecimento_vetores' e Índices no posto_ai (porta 5433 local)...")
     with psycopg2.connect(**DB_VECTOR_CONFIG) as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             # Verifica existência da tabela

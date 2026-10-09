@@ -1,6 +1,6 @@
 """
 Ferramentas de Negócio e Integração da IA (Tools).
-Conecta o Agente às bases relacionais (ERP na porta 5433) e vetoriais (pgvector na porta 5434).
+Conecta o Agente às bases relacionais (ERP na porta 5433) e vetoriais (pgvector nativo na porta 5433).
 """
 
 import re

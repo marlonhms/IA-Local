@@ -793,7 +793,7 @@ async def stations_endpoint(
 ):
     """
     Lista postos/filiais homologados e verifica o status da conexão do banco ERP (5433)
-    e banco vetorial pgvector (5434), além de latência e saúde de observabilidade.
+    e banco vetorial pgvector (5433), além de latência e saúde de observabilidade.
     """
     station_info = await asyncio.to_thread(engine.get_stations_status)
     return [station_info]

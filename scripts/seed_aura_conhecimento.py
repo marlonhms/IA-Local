@@ -1,6 +1,6 @@
 """
 Script de Indexação & Seeding da Base de Auto-Conhecimento e Meta-RAG da AURA
-(PostgreSQL 16 + pgvector no Docker na porta 5434).
+(PostgreSQL 16 + pgvector nativo Windows na porta 5433).
 
 Funcionalidades:
 - Criação e manutenção idempotente da tabela `public.aura_conhecimento_vetores`.
@@ -623,9 +623,9 @@ def main():
 
     try:
         conn_vec = psycopg2.connect(**DB_VECTOR_CONFIG)
-        print(f"   [OK] Conectado ao banco Vetorial (posto_ai na porta {DB_VECTOR_CONFIG.get('port', 5434)})")
+        print(f"   [OK] Conectado ao banco Vetorial (posto_ai na porta {DB_VECTOR_CONFIG.get('port', 5433)})")
     except Exception as e:
-        print(f"   [ERRO FATAL] Não foi possível conectar ao banco Vetorial (5434): {e}")
+        print(f"   [ERRO FATAL] Não foi possível conectar ao banco Vetorial ({DB_VECTOR_CONFIG.get('port', 5433)}): {e}")
         sys.exit(1)
 
     try:
