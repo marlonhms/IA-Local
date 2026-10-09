@@ -72,22 +72,29 @@ class AuraApiClient {
    * - onDone: finalização do stream
    * - onError: tratamento de erros e abortos
    */
-  async streamChat({
-    query,
-    sessionId = null,
-    context = null,
-    tenantId = null,
-    filialId = null,
-    onDelta = () => {},
-    onSkeleton = () => {},
-    onUIDelta = () => {},
-    onUIComplete = () => {},
-    onActionFeedback = () => {},
-    onChunk = () => {},
-    onDone = () => {},
-    onError = () => {},
-    signal = null,
-  } = {}) {
+  async streamChat(optionsOrQuery = {}, legacyOptions = {}) {
+    const opts = (typeof optionsOrQuery === 'string')
+      ? { query: optionsOrQuery, ...(legacyOptions && typeof legacyOptions === 'object' ? legacyOptions : {}) }
+      : ((optionsOrQuery && typeof optionsOrQuery === 'object') ? optionsOrQuery : {});
+    const options = opts;
+
+    const {
+      query,
+      sessionId = null,
+      context = null,
+      tenantId = null,
+      filialId = null,
+      genui = undefined,
+      onDelta = () => {},
+      onSkeleton = () => {},
+      onUIDelta = () => {},
+      onUIComplete = () => {},
+      onActionFeedback = () => {},
+      onChunk = () => {},
+      onDone = () => {},
+      onError = () => {},
+      signal = null,
+    } = opts;
     // F2-02: Buffer volátil de fragmentos JSON indexado por tool_call_id
     let fragmentBuffer = null;
     const FragmentBufferClass = (typeof AuraGenUI !== 'undefined' && AuraGenUI.GenUIFragmentBuffer) ||
@@ -125,7 +132,7 @@ class AuraApiClient {
 
     try {
       // Resolucao de Feature Flag GenUI (F9-01)
-      let genuiParam = options.genui;
+      let genuiParam = genui !== undefined ? genui : options.genui;
       if (genuiParam === undefined && typeof window !== 'undefined' && window.AuraGenUI && typeof window.AuraGenUI.isEnabled === 'function') {
         genuiParam = window.AuraGenUI.isEnabled();
       }

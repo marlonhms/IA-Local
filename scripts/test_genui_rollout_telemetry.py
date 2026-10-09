@@ -373,33 +373,89 @@ def run_all_rollout_telemetry_tests():
     const apiModule = require('./web/js/aura-api');
     const assert = require('assert');
 
-    // 1. Validacao de Feature Flag no AuraGenUI
-    assert.strictEqual(typeof genui.AuraGenUI.isEnabled, 'function', 'isEnabled deve ser funcao');
-    assert.strictEqual(typeof genui.AuraGenUI.setEnabled, 'function', 'setEnabled deve ser funcao');
+    (async () => {
+      // 1. Validacao de Feature Flag no AuraGenUI
+      assert.strictEqual(typeof genui.AuraGenUI.isEnabled, 'function', 'isEnabled deve ser funcao');
+      assert.strictEqual(typeof genui.AuraGenUI.setEnabled, 'function', 'setEnabled deve ser funcao');
 
-    assert.strictEqual(genui.AuraGenUI.isEnabled(), true, 'Deveria iniciar como true');
-    genui.AuraGenUI.setEnabled(false);
-    assert.strictEqual(genui.AuraGenUI.isEnabled(), false, 'Deveria refletir false');
-    genui.AuraGenUI.setEnabled(true);
-    assert.strictEqual(genui.AuraGenUI.isEnabled(), true, 'Deveria refletir true');
+      assert.strictEqual(genui.AuraGenUI.isEnabled(), true, 'Deveria iniciar como true');
+      genui.AuraGenUI.setEnabled(false);
+      assert.strictEqual(genui.AuraGenUI.isEnabled(), false, 'Deveria refletir false');
+      genui.AuraGenUI.setEnabled(true);
+      assert.strictEqual(genui.AuraGenUI.isEnabled(), true, 'Deveria refletir true');
 
-    // 2. Validacao dos novos metodos no AuraApiClient
-    const client = new apiModule.AuraApiClient({ baseUrl: 'http://127.0.0.1:8000' });
-    assert.strictEqual(typeof client.reportTelemetry, 'function', 'reportTelemetry deve ser funcao');
-    assert.strictEqual(typeof client.getTelemetryMetrics, 'function', 'getTelemetryMetrics deve ser funcao');
-    assert.strictEqual(typeof client.getFeatureFlags, 'function', 'getFeatureFlags deve ser funcao');
-    assert.strictEqual(typeof client.updateFeatureFlags, 'function', 'updateFeatureFlags deve ser funcao');
+      // 2. Validacao dos novos metodos no AuraApiClient
+      const client = new apiModule.AuraApiClient({ baseUrl: 'http://127.0.0.1:8000' });
+      assert.strictEqual(typeof client.reportTelemetry, 'function', 'reportTelemetry deve ser funcao');
+      assert.strictEqual(typeof client.getTelemetryMetrics, 'function', 'getTelemetryMetrics deve ser funcao');
+      assert.strictEqual(typeof client.getFeatureFlags, 'function', 'getFeatureFlags deve ser funcao');
+      assert.strictEqual(typeof client.updateFeatureFlags, 'function', 'updateFeatureFlags deve ser funcao');
 
-    // 3. Validacao de override dinamico via URLSearchParams (search e hash)
-    global.window = { location: { search: '?genui=0' } };
-    assert.strictEqual(genui.AuraGenUI.isEnabled(), false, 'Query param ?genui=0 deve forcar false');
-    global.window = { location: { search: '?genui=1' } };
-    assert.strictEqual(genui.AuraGenUI.isEnabled(), true, 'Query param ?genui=1 deve forcar true');
-    global.window = { location: { hash: '#/painel?genui=0' } };
-    assert.strictEqual(genui.AuraGenUI.isEnabled(), false, 'Hash query ?genui=0 deve forcar false');
-    delete global.window;
+      // 3. Validacao de override dinamico via URLSearchParams (search e hash)
+      global.window = { location: { search: '?genui=0' } };
+      assert.strictEqual(genui.AuraGenUI.isEnabled(), false, 'Query param ?genui=0 deve forcar false');
+      global.window = { location: { search: '?genui=1' } };
+      assert.strictEqual(genui.AuraGenUI.isEnabled(), true, 'Query param ?genui=1 deve forcar true');
+      global.window = { location: { hash: '#/painel?genui=0' } };
+      assert.strictEqual(genui.AuraGenUI.isEnabled(), false, 'Hash query ?genui=0 deve forcar false');
 
-    console.log('NODE_GENUI_ROLLOUT_TELEMETRY_OK');
+      // 4. Validacao de streamChat e Feature Flags (evitar regressao ReferenceError: options is not defined)
+      let fetchCalledWith = null;
+      global.fetch = async (url, opts) => {
+        fetchCalledWith = { url, opts };
+        return {
+          ok: true,
+          status: 200,
+          body: {
+            getReader: () => ({
+              read: async () => ({ done: true, value: undefined }),
+            }),
+          },
+        };
+      };
+
+      global.window = {
+        location: { search: '' },
+        AuraGenUI: genui.AuraGenUI,
+      };
+      genui.AuraGenUI.setEnabled(true);
+
+      // Caso 4.1: Pergunta do usuario com window.AuraGenUI ativo
+      let streamDone = false;
+      await client.streamChat({
+        query: 'Qual o diagnóstico do meu negócio hoje?',
+        sessionId: 'sess_test_1',
+        onDone: () => { streamDone = true; },
+      });
+      assert(fetchCalledWith !== null, 'fetch deve ser invocado em streamChat');
+      assert(fetchCalledWith.url.includes('genui=1'), 'URL deve conter ?genui=1');
+      assert.strictEqual(fetchCalledWith.opts.headers['X-GenUI-Enabled'], '1', 'Header X-GenUI-Enabled deve ser 1');
+      assert.strictEqual(streamDone, true, 'onDone deve ser invocado');
+
+      // Caso 4.2: Chamada com genui: false explicito
+      await client.streamChat({
+        query: 'Teste sem genui',
+        genui: false,
+      });
+      assert(fetchCalledWith.url.includes('genui=0'), 'URL deve conter ?genui=0 quando genui for false');
+      assert.strictEqual(fetchCalledWith.opts.headers['X-GenUI-Enabled'], '0', 'Header X-GenUI-Enabled deve ser 0');
+
+      // Caso 4.3: Chamada com assinatura legada string
+      await client.streamChat('Diagnostico rapido');
+      assert(fetchCalledWith !== null, 'fetch deve funcionar com argumento string');
+
+      // Caso 4.4: Chamada sem parametros (vazio)
+      await client.streamChat();
+      assert(fetchCalledWith !== null, 'fetch deve funcionar sem parametros');
+
+      delete global.window;
+      delete global.fetch;
+
+      console.log('NODE_GENUI_ROLLOUT_TELEMETRY_OK');
+    })().catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
     """
 
     res = subprocess.run(
