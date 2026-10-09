@@ -3,8 +3,8 @@
 > **AURA IntelligentUI (GenUI/SDUI v1.0): O Mentor de Decisões Executivo no Edge:** Transformando a AURA de um leitor passivo de relatórios ou medidor de telemetria em um **verdadeiro mentor de negócios especialista em análises profundas, previsões preditivas, consultas multidimensionais e comparações estratégicas para tomadas de decisão assertivas**.
 
 - **Data de Criação:** 07/10/2026  
-- **Versão do Documento:** 2.4.0 (Rollout Gradual, Feature Flags & Observabilidade SRE)  
-- **Status:** Fases 0 a 9 Concluidas com Sucesso (P0, P1 e P2 Homologados em Producao)  
+- **Versão do Documento:** 2.5.0 (Automação de Gatilhos Externos, n8n, Evolution API & Visão Executiva Limpa)  
+- **Status:** Fases 0 a 9 Concluídas com Sucesso; Fases 10 e 11 Especificadas no Roadmap Operacional  
 - **Documento de Referência Arquitetural:** [`docs/Arquitetura GenUI para Edge AI.md`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/Arquitetura%20GenUI%20para%20Edge%20AI.md)  
 - **Repositório:** `C:\Users\Marlon\Documents\Agent PC\ia-banco-local`  
 - **Público-alvo:** Diretoria Executiva, Engenharia de Software, Arquitetura de IA e Gestores de Negócio B2B  
@@ -618,6 +618,124 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 
 ---
 
+### Fase 10: Esteira de Integrações Externas, Webhooks & Automação de Gatilhos (n8n + Evolution API) (P0/P1)
+**Objetivo:** Conectar as decisões homologadas na Camada 3 da AURA diretamente à rotina operacional do posto, acionando fornecedores via WhatsApp (Evolution API) e orquestrando pedidos no ERP e sistemas de pista através de fluxos de integração no n8n.
+
+#### 10.1 Mapeamento Operacional dos Botões de Ação da AURA
+Para o dono, gerente e supervisor do posto, cada botão possui um papel operacional direto:
+
+1. **"⚡ Aplicar Recomendações Prioritárias" / "Aprovar Pedido de Carreta":**
+   - **Gatilho Operacional:** Autonomia volumétrica crítica (inferior a 24-48h) calculada na matriz determinística de run-out ou oportunidade de compra de lote fechado (ex: 15.000 L de Gasolina Comum) com desconto de distribuidora.
+   - **O que aciona na prática:**
+     * Validação RBAC exigindo perfil mínimo de gerente ou administrador.
+     * Assinatura criptográfica do `ActionVoucher` (HMAC-SHA256) garantindo autenticidade e auditoria.
+     * Despacho assíncrono de evento de saída (`POST /webhook/aura/fuel-order`) para o **n8n**.
+     * O **n8n** consulta dados do fornecedor no ERP local e formata a requisição de compra.
+     * O **n8n** invoca a **Evolution API** (`POST /message/sendText`) para enviar mensagem direta no WhatsApp do representante comercial da distribuidora:
+       *"📢 [PEDIDO DE COMBUSTÍVEL AURA] O Posto [Nome da Unidade] solicita com urgência 15.000 L de GASOLINA COMUM para entrega programada no Turno 1. Voucher de autorização: [voucher_id]. Por favor, responda com a confirmação de agendamento e previsão de entrega."*
+     * Resposta do Fornecedor: Quando a distribuidora responde no WhatsApp, a Evolution API captura o webhook inbound e entrega ao n8n, que atualiza a previsão no ERP e envia aviso de confirmação para a AURA.
+
+2. **"🎯 Ajustar Metas do Turno":**
+   - **Gatilho Operacional:** Turno ou operadores com baixa conversão em produtos de alta margem (aditivados, lubrificantes, conveniência) ou margem bruta abaixo do ponto de equilíbrio.
+   - **O que aciona na prática:**
+     * Despacho de Webhook para o **n8n** (`POST /webhook/aura/shift-targets`).
+     * O **n8n** executa chamada de integração com a API do sistema de pista/PDV do posto para atualizar as metas nos terminais de atendimento.
+     * Paralelamente, o **n8n** aciona a **Evolution API** para disparar comunicado imediato no grupo de WhatsApp dos Gerentes e Líderes de Pista:
+       *"🎯 [METAS DE TURNO HOMOLOGADAS] O gestor repactuou as metas do Turno [X]: Meta de Gasolina Aditivada elevada para 28%. Foco em abordagem ativa nas Ilhas 01 e 02."*
+
+3. **"🚨 Estancar Quebra de Caixa / Sangria Forçada":**
+   - **Gatilho Operacional:** Identificação de divergência contábil entre conferência de bicos e valores em espécie no caixa do turno.
+   - **O que aciona na prática:**
+     * Webhook despachado para o **n8n** com solicitação de bloqueio de novos cancelamentos manuais no PDV.
+     * Alerta prioritário via **Evolution API** no WhatsApp do Supervisor e Tesoureiro de plantão exigindo recolhimento imediato de cédulas para o cofre seguro com registro biométrico.
+
+4. **"🏷️ Ajustar Margem / Reprecificar Bombas":**
+   - **Gatilho Operacional:** Reajuste na tabela da distribuidora ou defasagem de margem em relação aos concorrentes da região.
+   - **O que aciona na prática:**
+     * Webhook despachado para o **n8n** conectando ao Concentrador de Bombas (Companytec/EzTech).
+     * Geração de solicitação pendente de troca de preço na pista, exigindo confirmação de dois fatores no totem de preços.
+
+5. **"🔍 Projetar Cenário no Canvas":**
+   - **Gatilho:** Ação estritamente analítica e de inspeção no frontend, projetando a simulação preditiva no painel lateral sem impacto financeiro no ERP.
+
+#### 10.2 Arquitetura Tecnológica da Esteira (n8n + Evolution API)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Gestor as Dono / Gerente do Posto
+    participant UI as AURA Web Cockpit (Camada 3)
+    participant Engine as AURA Backend (FastAPI + RBAC)
+    participant Outbox as Webhook Dispatcher (Assíncrono)
+    participant N8N as n8n Workflow Hub
+    participant Evo as Evolution API (WhatsApp)
+    actor Fornecedor as Distribuidora / WhatsApp
+    participant ERP as ERP do Posto / PDV Pista
+
+    Gestor->>UI: Clica em "⚡ Aplicar Recomendações"
+    UI->>UI: State Lock imediato + Optimistic UI
+    UI->>Engine: POST /api/v1/aura/actions/execute (RBAC + Idempotência)
+    Engine->>Engine: Valida Permissão e Assina ActionVoucher (HMAC-SHA256)
+    Engine->>Engine: Grava Trilha em aura_action_audit_log (SQLite)
+    Engine-->>UI: Retorna ActionVoucher (status: APPROVED)
+    UI->>UI: Exibe Badge "VOUCHER AUDITADO" + Som de Sucesso
+    
+    Engine->>Outbox: Enfileira Webhook de Saída
+    Outbox->>N8N: POST /webhook/aura/fuel-order (voucher_id, dados_pedido)
+    N8N->>ERP: Cria Pedido de Compra Pendente no ERP
+    N8N->>Evo: POST /message/sendText (Mensagem Estruturada)
+    Evo->>Fornecedor: Envia Pedido de Carreta no WhatsApp Oficial
+    
+    Fornecedor-->>Evo: Responde "Confirmado entrega amanhã 08h"
+    Evo->>N8N: Webhook Inbound (Mensagem Recebida)
+    N8N->>ERP: Atualiza Pedido para "Agendado"
+    N8N->>Engine: Callback de Notificação do Status da Ordem
+```
+
+- **F10-01: Contrato do Webhook Dispatcher de Saída (`AuraWebhookDispatcher`):**
+  * Mecanismo assíncrono em segundo plano no `AuraEngine` com fila em memória/banco que despacha eventos transacionais para o endpoint do n8n sem travar o tempo de resposta da rota FastAPI.
+  * Cabeçalho de autenticação: `X-AURA-Signature: sha256=<hmac>` e `X-AURA-Timestamp`.
+  * Política de retentativa automática (exponential backoff) em caso de instabilidade na conexão do posto.
+- **F10-02: Hub de Workflows no n8n (On-Premise / Edge):**
+  * Workflows modulares dedicados:
+    - `wf_pedido_combustivel.json`: Trata compra de combustível, consulta cotas de distribuidora e despacha WhatsApp.
+    - `wf_repactuacao_metas.json`: Sincroniza parâmetros de turno no PDV e envia alerta no grupo de líderes.
+    - `wf_auditoria_caixa.json`: Dispara avisos de quebra e solicita sangria imediata.
+- **F10-03: Gateway WhatsApp via Evolution API:**
+  * Instâncias isoladas:
+    - Instância 1 (`aura_compras`): Comunicação B2B com distribuidoras e fornecedores homologados.
+    - Instância 2 (`aura_operacao`): Comunicação interna com donos, gerentes e supervisores de pista.
+  * Tratamento de recibos de entrega e leitura (`status: delivery_ack`).
+
+---
+
+### Fase 11: Governança de Acesso Administrativo & RBAC Granular (Admin Master Marlon) (P1)
+**Objetivo:** Proteger a simplicidade operacional do posto, garantindo que donos e supervisores tenham uma visão 100% executiva e limpa, enquanto o Administrador do Sistema possui controle absoluto sobre o Modo Técnico e parametrizações sensíveis.
+
+#### 11.1 Política do Modo Executivo vs Modo Técnico
+- **Visão Padrão (Dono, Gerente, Supervisor):**
+  * 100% Executiva e orientada a resultados de negócio (KPIs em Reais, Litros, Autonomia de Tanques, Alertas de Margem e Botões de Decisão).
+  * Informações técnicas (banco PostgreSQL 16, estruturas DDL de tabelas, tipos SQL como VARCHAR/NUMERIC e blocos JSON brutos) permanecem **estritamente ocultas por padrão**.
+  * Abas "Banco & Esquema" e "Regras & Auditoria" ficam ocultas na interface do Companion Canvas.
+- **Modo Técnico Oculto (Desenvolvimento e Suporte Avançado):**
+  * Ativação discreta por chave oculta:
+    - Atalho de teclado: `Ctrl+Shift+D` ou `Ctrl+Alt+T`.
+    - Query param na URL: `?tech=1` ou `?dev=1`.
+    - Clique secreto triplo no rodapé do Companion Canvas.
+  * Exibe abas técnicas de inspeção profunda de banco, esquema e linhagem de dados sem afetar a experiência dos usuários comuns.
+
+#### 11.2 Painel de Controle de Usuários (RBAC Futuro Administrado por Marlon)
+- **F11-01: Papel de Administrador Master (Marlon):**
+  * Apenas o administrador do sistema pode liberar ou restringir quais usuários têm acesso à chave de Modo Técnico.
+  * Parametrização centralizada de endpoints de webhooks (n8n), chaves da Evolution API e regras de automação de pedidos.
+- **F11-02: Matriz Granular de Acesso por Perfil:**
+  * **Administrador Master (Marlon):** Acesso irrestrito a configurações de infraestrutura, comutação de Modo Técnico, auditoria completa e parametrização de webhooks.
+  * **Dono / Supervisor Geral:** Acesso a todas as visões executivas e financeiras, autorização de compras de combustível e reprecificação de bombas. Sem poluição de termos técnicos de TI.
+  * **Gerente de Turno:** Acesso a visão executiva e tabela operacional de dados, ajuste de metas e confirmação de sangrias de caixa.
+  * **Caixa / Frentista:** Acesso somente leitura a consultas operacionais autorizadas. Bloqueio estrito (HTTP 403) em ações de mutação financeira.
+
+---
+
 ## 10. Matriz de Esforço, Dependências e Cronograma Sugerido
 
 | Fase | Título | Prioridade | Dependências | Esforço Estimado |
@@ -632,9 +750,11 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 | **Fase 7** | Hardening de Seguranca Cibernetica & OWASP | **P0/P1** | Fase 5, Fase 6 | Concluida (08/10/2026) |
 | **Fase 8** | Qualidade, Testes Automatizados & Validacao E2E | **P0** | Continuo desde F1 | Concluida (08/10/2026) |
 | **Fase 9** | Rollout Gradual, Feature Flags & Observabilidade | **P2** | Fase 8 | Concluida (08/10/2026) |
+| **Fase 10** | Esteira de Integracoes, Webhooks & Gatilhos (n8n + Evolution API) | **P0/P1** | Fase 7, Fase 9 | 4 a 6 dias uteis |
+| **Fase 11** | Governanca de Usuarios & RBAC Administrativo (Admin Marlon) | **P1** | Fase 10 | 3 a 5 dias uteis |
 
-- **Total de Esforço Estimado:** 19 a 31 dias úteis para entrega completa com grau industrial de robustez.  
-- **Menor Entrega Utilizável (MVP GenUI):** Fases 0, 1, 2, 3 e 4 (Piloto ExecutiveDecisionMentorUI funcional com streaming, skeleton, widget de 3 camadas e state locking) em **9 a 15 dias**.
+- **Total de Esforço Estimado:** 26 a 42 dias úteis para entrega completa com grau industrial de robustez.  
+- **Menor Entrega Utilizável (MVP GenUI):** Fases 0 a 4 concluídas e operacionais em produção.
 
 ---
 

@@ -241,7 +241,7 @@
   </aside>
 
   <!-- =========================================================================
-       HEADER EXECUTIVO AURA (STREAMLINED & ULTRA-CLEAN — F4-01 & F4-02)
+       HEADER EXECUTIVO AURA (STREAMLINED & ULTRA-CLEAN - F4-01 & F4-02)
        ========================================================================= -->
   <header class="sticky top-0 z-40 glass-panel border-b border-white/10 px-4 py-2 backdrop-blur-xl bg-obsidian/90">
     <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
@@ -838,11 +838,11 @@
               <svg class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="3" x2="12" y2="21" stroke-width="1.75"/><rect x="3" y="3" width="18" height="18" rx="2" stroke-width="1.75"/><line x1="3" y1="9" x2="21" y2="9" stroke-width="1.5"/><line x1="3" y1="15" x2="21" y2="15" stroke-width="1.5"/></svg>
               <span>Tabela de Dados</span>
             </button>
-            <button role="tab" id="aux-tab-schema" aria-selected="false" class="aux-tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white border border-transparent flex items-center gap-1.5 transition-colors" data-aux-tab="schema">
+            <button role="tab" id="aux-tab-schema" aria-selected="false" class="aux-tab-btn hidden px-3 py-1.5 rounded-lg text-slate-400 hover:text-white border border-transparent flex items-center gap-1.5 transition-colors" data-aux-tab="schema" title="Banco & Esquema SQL (Modo Técnico)">
               <svg class="w-3.5 h-3.5 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><ellipse cx="12" cy="5" rx="9" ry="3" stroke-width="1.75"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" stroke-width="1.75"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" stroke-width="1.75"/></svg>
               <span>Banco & Esquema</span>
             </button>
-            <button role="tab" id="aux-tab-audit" aria-selected="false" class="aux-tab-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white border border-transparent flex items-center gap-1.5 transition-colors" data-aux-tab="audit">
+            <button role="tab" id="aux-tab-audit" aria-selected="false" class="aux-tab-btn hidden px-3 py-1.5 rounded-lg text-slate-400 hover:text-white border border-transparent flex items-center gap-1.5 transition-colors" data-aux-tab="audit" title="Regras & Auditoria de Infraestrutura (Modo Técnico)">
               <svg class="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-width="1.75"/><polyline points="14 2 14 8 20 8" stroke-width="1.75"/><line x1="16" y1="13" x2="8" y2="13" stroke-width="1.5"/><line x1="16" y1="17" x2="8" y2="17" stroke-width="1.5"/></svg>
               <span>Regras & Auditoria</span>
             </button>
@@ -857,10 +857,10 @@
           </div>
 
           <!-- Rodapé do Painel Auxiliar -->
-          <div class="aux-panel-footer p-3 border-t border-white/10 bg-slate-950/80 flex items-center justify-between text-[11px] text-slate-400 font-sans">
+          <div class="aux-panel-footer p-3 border-t border-white/10 bg-slate-950/80 flex items-center justify-between text-[11px] text-slate-400 font-sans" title="Clique 3 vezes para comutar Modo Técnico (Admin)">
             <div class="flex items-center gap-2">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span id="aux-footer-provenance">PostgreSQL 16 • Integridade Transacional</span>
+              <span id="aux-footer-provenance">AURA Inteligência de Posto • Dados Homologados</span>
             </div>
             <span class="text-cyan-400 font-medium">AURA Precision Canvas</span>
           </div>
@@ -1051,15 +1051,15 @@
   <!-- =========================================================================
        SCRIPTS JAVASCRIPT MODULARES DA AURA
        ========================================================================= -->
-  <script src="/static/js/aura-genui.js?v=2.9.8" defer></script>
-  <script src="/static/js/aura-state-manager.js?v=2.9.8" defer></script>
-  <script src="/static/js/aura-genui-widgets.js?v=2.9.8" defer></script>
-  <script src="/static/js/aura-api.js?v=2.9.8"></script>
-  <script src="/static/js/aura-cockpit.js?v=2.9.8"></script>
-  <script src="/static/js/aura-triggers.js?v=2.9.8"></script>
-  <script src="/static/js/aura-aux-panel.js?v=2.9.8"></script>
-  <script src="/static/js/aura-chat.js?v=2.9.8"></script>
-  <script src="/static/js/aura-app.js?v=2.9.8"></script>
-  <script src="/static/js/aura-fx.js?v=2.9.8"></script>
+  <script src="/static/js/aura-genui.js?v=2.9.9" defer></script>
+  <script src="/static/js/aura-state-manager.js?v=2.9.9" defer></script>
+  <script src="/static/js/aura-genui-widgets.js?v=2.9.9" defer></script>
+  <script src="/static/js/aura-api.js?v=2.9.9"></script>
+  <script src="/static/js/aura-cockpit.js?v=2.9.9"></script>
+  <script src="/static/js/aura-triggers.js?v=2.9.9"></script>
+  <script src="/static/js/aura-aux-panel.js?v=2.9.9"></script>
+  <script src="/static/js/aura-chat.js?v=2.9.9"></script>
+  <script src="/static/js/aura-app.js?v=2.9.9"></script>
+  <script src="/static/js/aura-fx.js?v=2.9.9"></script>
 </body>
 </html>

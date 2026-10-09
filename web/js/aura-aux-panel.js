@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AURA Dynamic Inspector Panel / Companion Canvas Controller (v1.0.0)
  * 
  * Gerencia o Painel Auxiliar Interativo acoplado ao chat da AURA:
@@ -24,6 +24,7 @@ class AuraAuxPanel {
     this.filterQuery = '';
     this.lastDataGridArtifactId = null;
     this.previousFocusedElement = null;
+    this.techMode = false;
   }
 
   /**
@@ -70,8 +71,95 @@ class AuraAuxPanel {
     return !this.isMobileDevice(win);
   }
 
+  /**
+   * Avalia se o Modo Tecnico de TI / Infraestrutura esta ativo.
+   * Padrao de producao: FALSE (Visao 100% Executiva para Donos, Gerentes e Supervisores).
+   * Liberacao temporaria via query param ?tech=1/?dev=1 ou localStorage.getItem('aura_tech_mode') === 'true'.
+   */
+  isTechModeActive(win = (typeof window !== 'undefined' ? window : null)) {
+    if (!win) return false;
+    try {
+      if (win.location && win.location.search) {
+        const urlParams = new URLSearchParams(win.location.search);
+        if (urlParams.get('tech') === '1' || urlParams.get('dev') === '1') return true;
+        if (urlParams.get('tech') === '0' || urlParams.get('dev') === '0') return false;
+      }
+      if (typeof win.localStorage !== 'undefined' && win.localStorage) {
+        return win.localStorage.getItem('aura_tech_mode') === 'true';
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  /**
+   * Altera o Modo Tecnico e persiste no storage local.
+   */
+  setTechMode(enabled, notify = true) {
+    this.techMode = !!enabled;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('aura_tech_mode', this.techMode ? 'true' : 'false');
+      }
+    } catch (_) {}
+
+    this.updateTechModeVisibility();
+
+    if (notify && typeof window !== 'undefined') {
+      const fx = window.auraFx;
+      if (fx && typeof fx.showToast === 'function') {
+        fx.showToast({
+          title: this.techMode ? 'Modo Técnico Ativado (Admin)' : 'Modo Executivo Padrão',
+          message: this.techMode 
+            ? 'Abas de Banco, Esquema SQL e Auditoria liberadas para desenvolvimento.' 
+            : 'Interface limpa para Donos e Gerentes. Detalhes técnicos ocultados.',
+          type: this.techMode ? 'warning' : 'info'
+        });
+      }
+      if (window.auraAudio && typeof window.auraAudio.playChime === 'function') {
+        window.auraAudio.playChime(this.techMode ? 880 : 540, 0.06);
+      }
+    }
+  }
+
+  toggleTechMode() {
+    this.setTechMode(!this.techMode, true);
+  }
+
+  /**
+   * Atualiza a visibilidade das abas e legendas de acordo com o Modo Tecnico
+   */
+  updateTechModeVisibility() {
+    if (typeof document === 'undefined') return;
+
+    const tabSchema = document.getElementById('aux-tab-schema');
+    const tabAudit = document.getElementById('aux-tab-audit');
+    const footerProvenance = document.getElementById('aux-footer-provenance');
+
+    if (this.techMode) {
+      if (tabSchema) tabSchema.classList.remove('hidden');
+      if (tabAudit) tabAudit.classList.remove('hidden');
+      if (footerProvenance) {
+        footerProvenance.textContent = 'PostgreSQL 16 (Local) • Modo Técnico Ativo';
+        footerProvenance.classList.add('text-amber-300');
+      }
+    } else {
+      if (tabSchema) tabSchema.classList.add('hidden');
+      if (tabAudit) tabAudit.classList.add('hidden');
+      if (footerProvenance) {
+        footerProvenance.textContent = 'AURA Inteligência de Posto • Dados Homologados';
+        footerProvenance.classList.remove('text-amber-300');
+      }
+      // Se o usuario estiver atualmente na aba de esquema ou auditoria, redireciona para a visao executiva
+      if (this.activeTab === 'schema' || this.activeTab === 'audit') {
+        this.switchTab('visual');
+      }
+    }
+  }
+
   init() {
+    this.techMode = this.isTechModeActive();
     this.bindEvents();
+    this.updateTechModeVisibility();
     this.updateToggleState();
     this.renderActiveArtifact();
   }
@@ -128,12 +216,20 @@ class AuraAuxPanel {
       });
     }
 
-    // Atalhos de Teclado Globais: Alt+P (Toggle) e Escape (Fechar)
+    // Atalhos de Teclado Globais: Alt+P (Toggle), Ctrl+Shift+D / Ctrl+Alt+T (Modo Tecnico) e Escape (Fechar)
     if (typeof window !== 'undefined') {
       window.addEventListener('keydown', (e) => {
         if (e.altKey && (e.key === 'p' || e.key === 'P')) {
           e.preventDefault();
           this.toggle();
+          return;
+        }
+
+        // Atalho Oculto para Administrador / Modo Tecnico (Ctrl+Shift+D ou Ctrl+Alt+T)
+        if ((e.ctrlKey && e.shiftKey && (e.key === 'd' || e.key === 'D')) ||
+            (e.ctrlKey && e.altKey && (e.key === 't' || e.key === 'T'))) {
+          e.preventDefault();
+          this.toggleTechMode();
           return;
         }
 
@@ -144,6 +240,23 @@ class AuraAuxPanel {
 
           e.preventDefault();
           this.close();
+        }
+      });
+    }
+
+    // Clique secreto no rodape do painel auxiliar para alternar o modo tecnico (3 cliques rapidos)
+    const footerEl = document.querySelector('.aux-panel-footer');
+    if (footerEl) {
+      let clickCount = 0;
+      let clickTimeout = null;
+      footerEl.addEventListener('click', () => {
+        clickCount++;
+        clearTimeout(clickTimeout);
+        if (clickCount >= 3) {
+          clickCount = 0;
+          this.toggleTechMode();
+        } else {
+          clickTimeout = setTimeout(() => { clickCount = 0; }, 600);
         }
       });
     }
@@ -497,7 +610,11 @@ class AuraAuxPanel {
     }
 
     if (footerProvEl) {
-      footerProvEl.textContent = `${artifact.schemaInfo?.source || 'PostgreSQL Local'} • Verificado às ${artifact.timeFormatted}`;
+      if (this.techMode) {
+        footerProvEl.textContent = `${artifact.schemaInfo?.source || 'PostgreSQL Local'} • Modo Técnico • ${artifact.timeFormatted}`;
+      } else {
+        footerProvEl.textContent = `AURA Inteligência de Posto • Dados Homologados • ${artifact.timeFormatted}`;
+      }
     }
 
     // Renderiza Carrossel de Múltiplos Artefatos
@@ -809,7 +926,7 @@ class AuraAuxPanel {
         if (typeof sampleVal === 'number') type = 'NUMERIC';
         else if (typeof sampleVal === 'boolean') type = 'BOOLEAN';
         else if (sampleVal instanceof Date || (typeof sampleVal === 'string' && /^\d{4}-\d{2}-\d{2}/.test(sampleVal))) type = 'TIMESTAMP';
-        return { field: k, type, sample: sampleVal ?? '—' };
+        return { field: k, type, sample: sampleVal ?? '-' };
       });
       schema.fields = fields;
     }
@@ -822,7 +939,7 @@ class AuraAuxPanel {
             ${this.escapeHtml(f.type)}
           </span>
         </td>
-        <td class="px-3 py-2 text-slate-400 text-[11px] truncate max-w-xs">${this.escapeHtml(String(f.sample ?? '—'))}</td>
+        <td class="px-3 py-2 text-slate-400 text-[11px] truncate max-w-xs">${this.escapeHtml(String(f.sample ?? '-'))}</td>
       </tr>
     `).join('') : `
       <tr>
@@ -970,9 +1087,9 @@ class AuraAuxPanel {
 
       const metricsList = c.metrics || data.metrics || [];
       records = metricsList.map(m => ({
-        'Indicador Executivo': m.label || '—',
-        'Valor Atual': m.current_value !== undefined ? String(m.current_value) : '—',
-        'Benchmark / Meta': m.benchmark_value !== undefined ? String(m.benchmark_value) : '—',
+        'Indicador Executivo': m.label || '-',
+        'Valor Atual': m.current_value !== undefined ? String(m.current_value) : '-',
+        'Benchmark / Meta': m.benchmark_value !== undefined ? String(m.benchmark_value) : '-',
         'Tendência': m.trend === 'up' ? '▲ Alta' : (m.trend === 'down' ? '▼ Queda' : '▬ Neutro'),
         'Status': m.status === 'success' ? '✔ Conforme' : (m.status === 'danger' ? '✖ Crítico' : (m.status === 'warning' ? '⚠ Atenção' : 'Neutro'))
       }));
@@ -1013,19 +1130,19 @@ class AuraAuxPanel {
 
       const rawTanks = c.tanks || data.detalhamento_tanques || data.tanques || [];
       records = rawTanks.map(t => ({
-        'Tanque': t.tanque || t.codtan || '—',
-        'Combustível': t.combustivel || '—',
-        'Saldo Físico (L)': t.saldo_litros !== undefined ? Number(t.saldo_litros).toLocaleString('pt-BR') : '—',
-        'Capacidade (L)': t.capacidade_litros !== undefined ? Number(t.capacidade_litros).toLocaleString('pt-BR') : '—',
-        'Espaço Livre Ullage (L)': (t.espaco_livre_litros ?? t.espaco_livre_ullage_litros) !== undefined ? Number(t.espaco_livre_litros ?? t.espaco_livre_ullage_litros).toLocaleString('pt-BR') : '—',
-        'Autonomia 15% (h)': t.autonomia_critica_horas !== null && t.autonomia_critica_horas !== undefined ? `${Number(t.autonomia_critica_horas).toFixed(1)}h` : '—',
-        'Esgotamento 0% (h)': t.autonomia_runout_horas !== null && t.autonomia_runout_horas !== undefined ? `${Number(t.autonomia_runout_horas).toFixed(1)}h` : '—',
+        'Tanque': t.tanque || t.codtan || '-',
+        'Combustível': t.combustivel || '-',
+        'Saldo Físico (L)': t.saldo_litros !== undefined ? Number(t.saldo_litros).toLocaleString('pt-BR') : '-',
+        'Capacidade (L)': t.capacidade_litros !== undefined ? Number(t.capacidade_litros).toLocaleString('pt-BR') : '-',
+        'Espaço Livre Ullage (L)': (t.espaco_livre_litros ?? t.espaco_livre_ullage_litros) !== undefined ? Number(t.espaco_livre_litros ?? t.espaco_livre_ullage_litros).toLocaleString('pt-BR') : '-',
+        'Autonomia 15% (h)': t.autonomia_critica_horas !== null && t.autonomia_critica_horas !== undefined ? `${Number(t.autonomia_critica_horas).toFixed(1)}h` : '-',
+        'Esgotamento 0% (h)': t.autonomia_runout_horas !== null && t.autonomia_runout_horas !== undefined ? `${Number(t.autonomia_runout_horas).toFixed(1)}h` : '-',
         'Status': t.status || (t.autonomia_critica_horas < 12 ? 'CRÍTICO' : 'NORMAL')
       }));
 
       summaryKpis = [
-        { label: 'Menor Autonomia (15%)', value: menorH !== undefined ? `${Number(menorH).toFixed(1)}h` : '—', sub: 'Até reserva técnica' },
-        { label: 'Ullage Total Livre', value: c.metrics?.espaco_livre_ullage_total_litros ? `${Number(c.metrics.espaco_livre_ullage_total_litros).toLocaleString('pt-BR')} L` : '—', sub: 'Capacidade de descarga' },
+        { label: 'Menor Autonomia (15%)', value: menorH !== undefined ? `${Number(menorH).toFixed(1)}h` : '-', sub: 'Até reserva técnica' },
+        { label: 'Ullage Total Livre', value: c.metrics?.espaco_livre_ullage_total_litros ? `${Number(c.metrics.espaco_livre_ullage_total_litros).toLocaleString('pt-BR')} L` : '-', sub: 'Capacidade de descarga' },
         { label: 'Tanques Monitorados', value: `${records.length}`, sub: 'Revenda ativa' }
       ];
 
@@ -1061,15 +1178,15 @@ class AuraAuxPanel {
 
       const rawLmc = c.tanks || data.tanques || [];
       records = rawLmc.map(t => ({
-        'Tanque': t.tanque || t.codtan || '—',
-        'Combustível': t.combustivel || '—',
-        'Abertura (L)': t.estoque_abertura_litros !== undefined ? Number(t.estoque_abertura_litros).toLocaleString('pt-BR') : '—',
-        'Entradas (L)': t.entradas_litros !== undefined ? Number(t.entradas_litros).toLocaleString('pt-BR') : '—',
-        'Vendas (L)': t.vendas_litros !== undefined ? Number(t.vendas_litros).toLocaleString('pt-BR') : '—',
-        'Fechamento Escriturado (L)': t.estoque_fechamento_escriturado_litros !== undefined ? Number(t.estoque_fechamento_escriturado_litros).toLocaleString('pt-BR') : '—',
-        'Fechamento Físico (L)': t.estoque_fechamento_fisico_litros !== undefined ? Number(t.estoque_fechamento_fisico_litros).toLocaleString('pt-BR') : '—',
-        'Variação (L)': t.variacao_litros !== undefined ? Number(t.variacao_litros).toLocaleString('pt-BR') : '—',
-        'Variação (%)': t.variacao_pct !== undefined ? `${Number(t.variacao_pct).toFixed(2)}%` : '—',
+        'Tanque': t.tanque || t.codtan || '-',
+        'Combustível': t.combustivel || '-',
+        'Abertura (L)': t.estoque_abertura_litros !== undefined ? Number(t.estoque_abertura_litros).toLocaleString('pt-BR') : '-',
+        'Entradas (L)': t.entradas_litros !== undefined ? Number(t.entradas_litros).toLocaleString('pt-BR') : '-',
+        'Vendas (L)': t.vendas_litros !== undefined ? Number(t.vendas_litros).toLocaleString('pt-BR') : '-',
+        'Fechamento Escriturado (L)': t.estoque_fechamento_escriturado_litros !== undefined ? Number(t.estoque_fechamento_escriturado_litros).toLocaleString('pt-BR') : '-',
+        'Fechamento Físico (L)': t.estoque_fechamento_fisico_litros !== undefined ? Number(t.estoque_fechamento_fisico_litros).toLocaleString('pt-BR') : '-',
+        'Variação (L)': t.variacao_litros !== undefined ? Number(t.variacao_litros).toLocaleString('pt-BR') : '-',
+        'Variação (%)': t.variacao_pct !== undefined ? `${Number(t.variacao_pct).toFixed(2)}%` : '-',
         'Status ANP': t.status_anp || (Math.abs(t.variacao_pct || 0) <= 0.6 ? 'CONFORME_ANP' : 'ALERTA')
       }));
 
@@ -1111,11 +1228,11 @@ class AuraAuxPanel {
       const rawRanking = c.ranking || data.ranking_frentistas || [];
       records = rawRanking.map((r, i) => ({
         'Posição': r.posicao || (i + 1),
-        'Frentista': r.frentista || '—',
-        'Volume Total (L)': r.total_litros !== undefined ? Number(r.total_litros).toLocaleString('pt-BR') : '—',
-        'Faturamento (R$)': r.faturamento !== undefined ? `R$ ${Number(r.faturamento).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—',
-        'Conversão Aditivada (%)': r.vendas_aditivada_pct !== undefined ? `${Number(r.vendas_aditivada_pct).toFixed(1)}%` : '—',
-        'Vazão Média (L/min)': r.vazao_media_l_min !== undefined ? `${Number(r.vazao_media_l_min).toFixed(1)} L/min` : '—'
+        'Frentista': r.frentista || '-',
+        'Volume Total (L)': r.total_litros !== undefined ? Number(r.total_litros).toLocaleString('pt-BR') : '-',
+        'Faturamento (R$)': r.faturamento !== undefined ? `R$ ${Number(r.faturamento).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-',
+        'Conversão Aditivada (%)': r.vendas_aditivada_pct !== undefined ? `${Number(r.vendas_aditivada_pct).toFixed(1)}%` : '-',
+        'Vazão Média (L/min)': r.vazao_media_l_min !== undefined ? `${Number(r.vazao_media_l_min).toFixed(1)} L/min` : '-'
       }));
 
       summaryKpis = [
@@ -1152,13 +1269,13 @@ class AuraAuxPanel {
 
       const rawCombos = c.top_combos || data.top_combos_cross_selling || [];
       records = rawCombos.map(item => ({
-        'Produto Base': item.antecedente || '—',
-        'Oferta Cruzada': item.consequente || '—',
-        'Lift': item.lift !== undefined ? `${Number(item.lift).toFixed(2)}x` : '—',
-        'Confiança (%)': item.confianca_pct !== undefined ? `${Number(item.confianca_pct).toFixed(1)}%` : '—',
-        'Suporte (%)': item.suporte_pct !== undefined ? `${Number(item.suporte_pct).toFixed(1)}%` : '—',
+        'Produto Base': item.antecedente || '-',
+        'Oferta Cruzada': item.consequente || '-',
+        'Lift': item.lift !== undefined ? `${Number(item.lift).toFixed(2)}x` : '-',
+        'Confiança (%)': item.confianca_pct !== undefined ? `${Number(item.confianca_pct).toFixed(1)}%` : '-',
+        'Suporte (%)': item.suporte_pct !== undefined ? `${Number(item.suporte_pct).toFixed(1)}%` : '-',
         'Relevância': item.relevancia || (item.lift >= 2.0 ? 'MUITO ALTA' : 'ALTA'),
-        'Script Balcão': item.script_sugerido_caixa || '—'
+        'Script Balcão': item.script_sugerido_caixa || '-'
       }));
 
       summaryKpis = [
@@ -1239,20 +1356,20 @@ class AuraAuxPanel {
       if (rawProds.length > 0) {
         records = rawProds.map((p, idx) => ({
           'Posição': idx + 1,
-          'Código SKU': p.codpro || p.codigo_sku || '—',
-          'Produto': p.nompro || p.produto || '—',
-          'Qtd Saídas': p.total_saidas !== undefined ? Number(p.total_saidas).toLocaleString('pt-BR') : '—',
-          'Volume / Qtd': p.qtd_total !== undefined ? Number(p.qtd_total).toLocaleString('pt-BR') : '—',
-          'Receita (R$)': p.receita_total !== undefined ? `R$ ${Number(p.receita_total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'
+          'Código SKU': p.codpro || p.codigo_sku || '-',
+          'Produto': p.nompro || p.produto || '-',
+          'Qtd Saídas': p.total_saidas !== undefined ? Number(p.total_saidas).toLocaleString('pt-BR') : '-',
+          'Volume / Qtd': p.qtd_total !== undefined ? Number(p.qtd_total).toLocaleString('pt-BR') : '-',
+          'Receita (R$)': p.receita_total !== undefined ? `R$ ${Number(p.receita_total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'
         }));
       } else if (ultProd) {
         records = [{
           'Operação': ultProd.origem || 'PDV Conveniência',
-          'Produto': ultProd.produto || '—',
+          'Produto': ultProd.produto || '-',
           'Quantidade': Number(ultProd.quantidade || 1).toLocaleString('pt-BR'),
           'Total (R$)': `R$ ${Number(ultProd.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-          'Data/Hora': ultProd.data_hora || '—',
-          'Cupom / PDV': `${ultProd.cupom || '—'} / ${ultProd.pdv || '—'}`
+          'Data/Hora': ultProd.data_hora || '-',
+          'Cupom / PDV': `${ultProd.cupom || '-'} / ${ultProd.pdv || '-'}`
         }];
       }
 
@@ -1312,7 +1429,7 @@ class AuraAuxPanel {
           .filter(([k, v]) => typeof v !== 'function' && typeof v !== 'object' && k !== 'contrato')
           .map(([k, v]) => ({
             'Propriedade / Métrica': this.formatColumnHeader(k),
-            'Valor': String(v ?? '—')
+            'Valor': String(v ?? '-')
           }));
       }
 
@@ -1503,7 +1620,7 @@ class AuraAuxPanel {
   }
 
   formatTableCell(col, val) {
-    if (val === null || val === undefined) return '<span class="text-slate-500">—</span>';
+    if (val === null || val === undefined) return '<span class="text-slate-500">-</span>';
     const str = String(val);
     if (str === 'CRÍTICO' || str.includes('ALERTA')) {
       return `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">${this.escapeHtml(str)}</span>`;

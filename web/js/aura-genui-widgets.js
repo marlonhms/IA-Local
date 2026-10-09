@@ -266,6 +266,7 @@
                 data-action-id="act_default_apply"
                 data-action-type="mutation"
                 data-tool-call-id="${escapeHtml(this.toolCallId)}"
+                title="Gera requisição formal e aciona o fornecedor para reposição de combustível via WhatsApp/ERP"
                 ${(shouldDisable || isDone1) ? 'disabled' : ''}>
           <span>${displayLabel1}</span>
         </button>
@@ -274,6 +275,7 @@
                 data-action-id="act_default_goals"
                 data-action-type="mutation"
                 data-tool-call-id="${escapeHtml(this.toolCallId)}"
+                title="Repactua metas de volume e margem no PDV e alerta os líderes de pista via WhatsApp"
                 ${(shouldDisable || isDone2) ? 'disabled' : ''}>
           <span>${displayLabel2}</span>
         </button>
@@ -281,7 +283,8 @@
                 class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 text-slate-300 border border-white/10 hover:bg-slate-800"
                 data-action-id="act_default_canvas"
                 data-action-type="inspection"
-                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+                data-tool-call-id="${escapeHtml(this.toolCallId)}"
+                title="Projeta o diagnóstico e gráficos preditivos no painel lateral de alta fidelidade">
           <span>🔍 Projetar Cenário no Canvas</span>
         </button>
       `;
@@ -326,7 +329,7 @@
               ${this.state.voucher?.voucher_id ? `<span class="text-[10px] font-mono text-emerald-300/80">(${escapeHtml(this.state.voucher.voucher_id)})</span>` : ''}
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-[11px] font-medium text-emerald-200">Ação Homologada no ERP</span>
+              <span class="text-[11px] font-medium text-emerald-200">Integrado no ERP & Mensageria</span>
               <span class="badge-committed text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-900/60 text-emerald-300 border border-emerald-500/30">VOUCHER AUDITADO</span>
             </div>
           </div>
@@ -358,6 +361,19 @@
           const label = escapeHtml(act.label || 'Acao Recomendada');
           const variant = act.variant || 'primary';
           const actType = act.action_type || 'mutation';
+
+          let btnTitle = label;
+          if (actType === 'inspection' || label.includes('Canvas')) {
+            btnTitle = 'Projeta o diagnóstico e gráficos preditivos no painel lateral de alta fidelidade';
+          } else if (label.includes('Combustível') || label.includes('Recomendações') || label.includes('Carreta')) {
+            btnTitle = 'Gera requisição formal e aciona o fornecedor para reposição de combustível via WhatsApp/ERP';
+          } else if (label.includes('Meta') || label.includes('Turno')) {
+            btnTitle = 'Repactua metas de volume e margem no PDV e alerta os líderes de pista via WhatsApp';
+          } else if (label.includes('Quebra') || label.includes('Sangria') || label.includes('Caixa')) {
+            btnTitle = 'Exige sangria preventiva de valores para o cofre e aciona o supervisor';
+          } else if (label.includes('Margem') || label.includes('Preço')) {
+            btnTitle = 'Gera pendência de atualização de preços nas bombas e totem';
+          }
 
           const isActionDone = (stateMgr && typeof stateMgr.isActionExecuted === 'function' && stateMgr.isActionExecuted(act.action_id)) || (this.state.voucher && (this.state.voucher.action_id === act.action_id || !this.state.voucher.action_id));
           const isCurrentActive = isLocked && this.state.lockedActionId === act.action_id;
@@ -392,6 +408,7 @@
                     data-action-id="${actId}"
                     data-action-type="${escapeHtml(actType)}"
                     data-tool-call-id="${escapeHtml(this.toolCallId)}"
+                    title="${escapeHtml(btnTitle)}"
                     ${shouldDisable ? 'disabled' : ''}>
               <span>${displayLabel}</span>
             </button>
@@ -408,6 +425,10 @@
           ${errorBadge}
           <div class="flex flex-wrap gap-2">
             ${buttonsHtml}
+          </div>
+          <div class="genui-action-hint text-[11px] text-slate-400 mt-2 font-sans flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+            <span>Clique em uma ação para homologar no ERP e disparar esteiras de fornecedores ou equipe.</span>
           </div>
         </div>
       `;
