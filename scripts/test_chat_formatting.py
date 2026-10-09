@@ -92,6 +92,9 @@ def test_system_prompt_rules():
     assert "text-purple" in prompt_op or "[roxo]" in prompt_op, "Faltou tag text-purple ou [roxo]"
     assert "combos" in prompt_op.lower() or "conveniência" in prompt_op.lower() or "ações" in prompt_op.lower(), "Faltou contexto de combos/ações no Roxo"
 
+    assert "JAMAIS gere /vermelho ou [ciano] soltos" in prompt_op, "Faltou diretriz de integridade de sintaxe no prompt operacional"
+    assert "SEMPRE feche as tags" in prompt_op, "Faltou diretriz de fechamento obrigatório no prompt operacional"
+
     print(" [OK] System Prompt Operacional: Todas as 5 cores, negrito, itálico e sublinhado validados com sucesso.")
 
     # 2. Prompt de Ajuda do Sistema (ajuda_sistema)
@@ -102,7 +105,16 @@ def test_system_prompt_rules():
         intencao="ajuda_sistema",
     )
     assert "[ciano]" in prompt_ajuda and "[roxo]" in prompt_ajuda and "[verde]" in prompt_ajuda, "Faltaram cores no prompt de ajuda_sistema"
-    print(" [OK] System Prompt de Ajuda do Sistema: Diretrizes semânticas validadas.")
+    assert "JAMAIS gere /vermelho ou [ciano] soltos" in prompt_ajuda, "Faltou diretriz de integridade de sintaxe no prompt de ajuda_sistema"
+
+    # 3. Teste do método dedicado _build_prompt_ajuda
+    prompt_ajuda_metodo = engine._build_prompt_ajuda(
+        pergunta_sanitizada="Como funciona o cockpit?",
+        contexto_sanitizado="Módulo Cockpit Operacional.",
+        historico_formatado="",
+    )
+    assert prompt_ajuda_metodo == prompt_ajuda, "Divergência entre _build_prompt_ajuda e _build_prompt_sistema"
+    print(" [OK] System Prompt de Ajuda do Sistema: Diretrizes semânticas e integridade de sintaxe validadas.")
 
 
 def test_css_classes():
@@ -191,6 +203,13 @@ def test_frontend_js_parser():
     results.fallback_ordered = chat.formatMarkdown('1. Passo um\n2. Passo dois');
     results.fallback_blockquote = chat.formatMarkdown('> Alerta operacional ANP');
 
+    // 10. Variações Quebradas de Formatação
+    results.broken_unclosed = chat.formatMarkdown('[ciano]15.000 L', false);
+    results.broken_slash_close = chat.formatMarkdown('[vermelho]crítico /vermelho', false);
+    results.broken_orphan_slash = chat.formatMarkdown('🚨 Alerta /vermelho na pista', false);
+    results.broken_orphan_close = chat.formatMarkdown('Divergência de caixa [/vermelho]', false);
+    results.broken_mixed_colors = chat.formatMarkdown('[verde]R$ 50,00[/verde] e [ciano]14h', false);
+
     console.log(JSON.stringify(results));
     """
 
@@ -273,6 +292,60 @@ def test_frontend_js_parser():
     assert "<blockquote" in data["fallback_blockquote"] and "Alerta operacional ANP" in data["fallback_blockquote"], "Falha em blockquotes no fallback"
     print(" [OK] Fallback Autônomo: Tabelas, listas ordenadas, blockquotes e blocos com linguagem renderizados sem dependências.")
 
+    # 10. Validação das Variações Quebradas de Formatação
+    # 1. Tag aberta não fechada no render final: [ciano]15.000 L -> deve aplicar cor ciano (text-cyan) e não conter [ciano]
+    assert "text-cyan" in data["broken_unclosed"] and "aura-hl-cyan" in data["broken_unclosed"], "Falha na cor ciano para tag aberta não fechada"
+    assert "[ciano]" not in data["broken_unclosed"] and "[/ciano]" not in data["broken_unclosed"], "Tag [ciano] crua permaneceu no texto final"
+
+    # 2. Tag com fechamento quebrado por barra: [vermelho]crítico /vermelho -> deve aplicar cor vermelha (text-rose) e não conter /vermelho
+    assert "text-rose" in data["broken_slash_close"] and "aura-hl-rose" in data["broken_slash_close"], "Falha na cor vermelha para fechamento quebrado por barra"
+    assert "/vermelho" not in data["broken_slash_close"] and "[vermelho]" not in data["broken_slash_close"], "Tag /vermelho crua permaneceu no texto"
+
+    # 3. Tag órfã solta no texto: 🚨 Alerta /vermelho na pista -> deve higienizar /vermelho e exibir texto limpo
+    assert "/vermelho" not in data["broken_orphan_slash"], "Tag órfã /vermelho não foi higienizada"
+    assert "Alerta" in data["broken_orphan_slash"] and "na pista" in data["broken_orphan_slash"], "Texto limpo corrompido na higienização de barra solta"
+
+    # 4. Tag de fechamento órfã: Divergência de caixa [/vermelho] -> deve higienizar [/vermelho]
+    assert "[/vermelho]" not in data["broken_orphan_close"], "Tag órfã [/vermelho] não foi higienizada"
+    assert "Divergência de caixa" in data["broken_orphan_close"], "Texto limpo corrompido na remoção de [/vermelho]"
+
+    # 5. Múltiplas cores misturadas: [verde]R$ 50,00[/verde] e [ciano]14h -> ambas devem receber cores sem quebras
+    assert "text-emerald" in data["broken_mixed_colors"] and "text-cyan" in data["broken_mixed_colors"], "Falha em cores misturadas"
+    assert "[verde]" not in data["broken_mixed_colors"] and "[ciano]" not in data["broken_mixed_colors"], "Tags cruas em cores misturadas"
+    print(" [OK] Variações Quebradas: Tags não fechadas, barras quebradas, tags órfãs e múltiplas cores 100% resolvidas.")
+
+
+def test_backend_color_markup_normalization():
+    print("\n--- 4. Validando Normalização de Markup no Backend (normalize_aura_color_markup) ---")
+    from core.aura_engine import normalize_aura_color_markup
+
+    # 1. Tag aberta não fechada
+    norm1 = normalize_aura_color_markup("[ciano]15.000 L")
+    assert norm1 == "[ciano]15.000 L[/ciano]", f"Falha na normalização 1: {norm1}"
+
+    # 2. Tag com fechamento quebrado por barra
+    norm2 = normalize_aura_color_markup("[vermelho]crítico /vermelho")
+    assert norm2 == "[vermelho]crítico[/vermelho]", f"Falha na normalização 2: {norm2}"
+
+    # 3. Tag órfã solta no texto
+    norm3 = normalize_aura_color_markup("🚨 Alerta /vermelho na pista")
+    assert "/vermelho" not in norm3 and "Alerta" in norm3 and "na pista" in norm3, f"Falha na normalização 3: {norm3}"
+
+    # 4. Tag de fechamento órfã
+    norm4 = normalize_aura_color_markup("Divergência de caixa [/vermelho]")
+    assert norm4 == "Divergência de caixa", f"Falha na normalização 4: {norm4}"
+
+    # 5. Múltiplas cores misturadas
+    norm5 = normalize_aura_color_markup("[verde]R$ 50,00[/verde] e [ciano]14h")
+    assert norm5 == "[verde]R$ 50,00[/verde] e [ciano]14h[/ciano]", f"Falha na normalização 5: {norm5}"
+
+    # 6. Preservação de blocos de código
+    code_input = "```python\ndef run():\n    return '/vermelho'\n```"
+    norm_code = normalize_aura_color_markup(code_input)
+    assert norm_code == code_input, "Código dentro de bloco foi indevidamente alterado"
+
+    print(" [OK] Backend Markup Normalizer: Todas as 5 variações e proteção de código validadas com sucesso.")
+
 
 def run_all_formatting_tests():
     print("=" * 75)
@@ -281,6 +354,7 @@ def run_all_formatting_tests():
     print("=" * 75)
 
     test_system_prompt_rules()
+    test_backend_color_markup_normalization()
     test_css_classes()
     test_frontend_js_parser()
 

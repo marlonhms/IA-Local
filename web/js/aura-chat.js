@@ -4807,9 +4807,23 @@ class AuraChatController {
       balanced += '`';
     }
 
+    // Protege blocos de código já fechados para não mutar código dentro de ``` ou `
+    const { protectedText, codeSnippets } = this.extractCodeBlocks(balanced);
+    let workText = protectedText;
+
+    const colorKeys = 'verde|emerald|green|amarelo|amber|yellow|vermelho|rose|red|ciano|cyan|roxo|purple';
+    const bbTagNames = `(?:badge-)?(?:${colorKeys})|u`;
+
+    // Normaliza fechamentos quebrados de BBCode antes de empilhar LIFO:
+    // Ex: [vermelho]crítico /vermelho -> [vermelho]crítico[/vermelho]
+    workText = workText.replace(
+      new RegExp('\\[(' + bbTagNames + ')\\]([\\s\\S]*?)(?:\\[\\s*\\/\\s*\\1\\s*\\]|\\s*(?:\\[\\s*)?[\\/\\\\]\\s*\\1\\b(?:\\])?)', 'gi'),
+      '[$1]$2[/$1]'
+    );
+
     // Pilha unificada LIFO para garantir aninhamento perfeito
     const stack = [];
-    const tokenRegex = /(\*\*|__(?!\w)|(?<!\*)\*(?!\*)|\[(\/?)([a-zA-Z0-9_\-]+)\]|<(\/?)([a-zA-Z0-9]+)(?:\s+[^>]*)?>)/g;
+    const tokenRegex = /(\*\*|__|(?<!\*)\*(?!\*)|\[(\/?)([a-zA-Z0-9_\-]+)\]|<(\/?)([a-zA-Z0-9]+)(?:\s+[^>]*)?>)/g;
     const bbTags = new Set([
       'verde', 'emerald', 'green', 'amarelo', 'amber', 'yellow', 'vermelho', 'rose', 'red', 'ciano', 'cyan', 'roxo', 'purple',
       'badge-verde', 'badge-emerald', 'badge-green', 'badge-amarelo', 'badge-amber', 'badge-yellow',
@@ -4818,14 +4832,14 @@ class AuraChatController {
     const htmlTags = new Set(['span', 'u', 'strong', 'em', 'b', 'i', 'mark']);
 
     let match;
-    while ((match = tokenRegex.exec(balanced)) !== null) {
+    while ((match = tokenRegex.exec(workText)) !== null) {
       const full = match[0];
 
       if (full === '**') {
         const idx = stack.map(s => s.close).lastIndexOf('**');
         if (idx !== -1) stack.splice(idx, 1);
         else stack.push({ type: 'bold', close: '**' });
-      } else if (full.startsWith('__')) {
+      } else if (full === '__') {
         const idx = stack.map(s => s.close).lastIndexOf('__');
         if (idx !== -1) stack.splice(idx, 1);
         else stack.push({ type: 'underline', close: '__' });
@@ -4862,10 +4876,10 @@ class AuraChatController {
 
     // Fecha tags na ordem inversa de abertura
     while (stack.length > 0) {
-      balanced += stack.pop().close;
+      workText += stack.pop().close;
     }
 
-    return balanced;
+    return this.restoreCodeBlocks(workText, codeSnippets);
   }
 
   /**
@@ -4964,23 +4978,57 @@ class AuraChatController {
       'purple': { hl: 'text-purple aura-hl-purple', badge: 'badge-purple aura-badge-purple' },
     };
 
-    // Transforma BBCode de badges: [badge-cor]...[/badge-cor]
+    const allColors = Object.keys(colorMap).join('|');
+    const allTags = `(?:badge-)?(?:${allColors})|u`;
+
+    // 4.1. Normaliza fechamentos quebrados e tolerantes de BBCode (ex: [cor]texto /cor ou [cor]texto[/ cor])
+    text = text.replace(
+      new RegExp('\\[(' + allTags + ')\\]([\\s\\S]*?)(?:\\[\\s*\\/\\s*\\1\\s*\\]|\\s*(?:\\[\\s*)?[\\/\\\\]\\s*\\1\\b(?:\\])?)', 'gi'),
+      '[$1]$2[/$1]'
+    );
+
+    // 4.2. Auto-fecha tags abertas sem fechamento antes de quebra de linha, proxima tag ou fim da string
+    // Ex: [ciano]15.000 L -> [ciano]15.000 L[/ciano]
+    text = text.replace(
+      new RegExp('\\[(' + allTags + ')\\]([^\\r\\n\\[<]+?)(?=(?:\\[\\/?(?:' + allTags + ')\\]|\\r?\\n|$))', 'gi'),
+      (match, tag, content) => {
+        if (!content.trim()) return content;
+        return `[${tag}]${content}[/${tag}]`;
+      }
+    );
+
+    // 4.3. Transforma BBCode de badges: [badge-cor]...[/badge-cor]
     Object.keys(colorMap).forEach(key => {
       const badgeRegex = new RegExp('\\[badge-' + key + '\\]([\\s\\S]*?)\\[\\/badge-' + key + '\\]', 'gi');
       text = text.replace(badgeRegex, `<span class="${colorMap[key].badge}">$1</span>`);
     });
 
-    // Transforma BBCode de realces coloridos: [cor]...[/cor]
+    // 4.4. Transforma BBCode de realces coloridos: [cor]...[/cor]
     Object.keys(colorMap).forEach(key => {
       const hlRegex = new RegExp('\\[' + key + '\\]([\\s\\S]*?)\\[\\/' + key + '\\]', 'gi');
       text = text.replace(hlRegex, `<span class="${colorMap[key].hl}">$1</span>`);
     });
 
-    // Transforma BBCode de sublinhado: [u]...[/u]
+    // 4.5. Transforma BBCode de sublinhado: [u]...[/u]
     text = text.replace(/\[u\]([\s\S]*?)\[\/u\]/gi, '<u class="aura-underline">$1</u>');
 
-    // Transforma Markdown de sublinhado: __texto__ (permite underlines no meio de palavras compostas)
+    // 4.6. Transforma Markdown de sublinhado: __texto__ (permite underlines no meio de palavras compostas)
     text = text.replace(/(^|[^\w])__(?!_)([^\r\n]+?)(?<!_)__([^\w]|$)/g, '$1<u class="aura-underline">$2</u>$3');
+
+    // 4.7. Higienizacao estrita de tags orfas restantes (nunca deixando /vermelho, [ciano], [/vermelho] soltos)
+    // Remove tags de fechamento orfas: [/vermelho], [/ciano], etc.
+    text = text.replace(new RegExp('\\s*\\[\\s*\\/\\s*(?:' + allTags + ')\\s*\\]\\s*', 'gi'), ' ');
+
+    // Remove barras soltas com nome de cor: /vermelho, /ciano, \vermelho, etc.
+    text = text.replace(new RegExp('(^|\\s)[\\/\\\\](?:' + allTags + ')\\b(?:\\s|$)?', 'gi'), ' ');
+
+    // Remove tags de abertura orfas soltas vazias: [vermelho], [ciano], etc.
+    text = text.replace(new RegExp('\\s*\\[\\s*(?:' + allTags + ')\\s*\\]\\s*(?=\\s|$|\\[)', 'gi'), ' ');
+
+    // Normaliza espacamento multiplo preservando quebras de linha
+    text = text.replace(/[^\S\r\n]{2,}/g, ' ');
+    text = text.replace(/\s+([,.:;!?])/g, '$1');
+    text = text.trim();
 
     return text;
   }
@@ -5187,10 +5235,8 @@ class AuraChatController {
   formatMarkdown(rawMarkdown, isStillStreaming = false) {
     if (!rawMarkdown || typeof rawMarkdown !== 'string') return '';
 
-    // 1. Em streaming ativo, balanceia tags abertas temporariamente
-    let preparedText = isStillStreaming
-      ? this.balanceStreamingText(rawMarkdown)
-      : rawMarkdown;
+    // 1. Auto-balanceia tags abertas SEMPRE (inclusive na renderização final isStillStreaming === false)
+    let preparedText = this.balanceStreamingText(rawMarkdown, isStillStreaming);
 
     // 2. Protege blocos de código e inline code antes de transformar BBCode e tags
     const { protectedText, codeSnippets } = this.extractCodeBlocks(preparedText);

@@ -781,6 +781,88 @@ class AuraSessionMemory:
 # EXTRATORES DE PARÂMETROS E CLASSIFICAÇÃO (COMPATIBILIDADE PLENA)
 # =============================================================================
 
+def normalize_aura_color_markup(text: str) -> str:
+    """
+    Normaliza formatações e destaques semânticos de cores da AURA:
+    1. Normaliza fechamentos quebrados (ex: [vermelho]crítico /vermelho -> [vermelho]crítico[/vermelho]).
+    2. Auto-fecha tags abertas sem fechamento antes de quebras de linha ou fim da string (ex: [ciano]15.000 L -> [ciano]15.000 L[/ciano]).
+    3. Higieniza e remove tags órfãs soltas (ex: /vermelho, [/vermelho], [ciano] órfão).
+    4. Protege blocos de código (``` e `) contra mutações acidentais.
+    """
+    if not text or not isinstance(text, str):
+        return "" if text is None else str(text)
+
+    # 1. Protege blocos de código e inline code
+    code_snippets: List[str] = []
+    def _stash_code(m: re.Match) -> str:
+        token = f"XAURACODE{len(code_snippets)}END"
+        code_snippets.append(m.group(0))
+        return token
+
+    protected = re.sub(r"(```[\s\S]*?```|`[^`\r\n]+`)", _stash_code, text)
+
+    color_names = "verde|emerald|green|amarelo|amber|yellow|vermelho|rose|red|ciano|cyan|roxo|purple"
+    tag_names = rf"(?:badge-)?(?:{color_names})|u"
+
+    # 2. Normaliza fechamentos quebrados de BBCode (ex: [vermelho]crítico /vermelho -> [vermelho]crítico[/vermelho])
+    tolerant_pattern = re.compile(
+        rf"\[({tag_names})\]([\s\S]*?)(?:\[\s*\/\s*\1\s*\]|\s*(?:\[\s*)?[\/\\]\s*\1\b(?:\])?)",
+        re.IGNORECASE,
+    )
+    protected = tolerant_pattern.sub(r"[\1]\2[/\1]", protected)
+
+    # 3. Auto-fecha tags abertas sem fechamento antes de quebra de linha, próxima tag ou fim da string
+    def _fix_unclosed(m: re.Match) -> str:
+        tag = m.group(1)
+        content = m.group(2)
+        if not content.strip():
+            return content
+        return f"[{tag}]{content}[/{tag}]"
+
+    unclosed_pattern = re.compile(
+        rf"\[({tag_names})\]([^\\r\\n\[<]+?)(?=(?:\[\/?(?:{tag_names})\]|\r?\n|$))",
+        re.IGNORECASE,
+    )
+    protected = unclosed_pattern.sub(_fix_unclosed, protected)
+
+    # 4. Protege pares válidos [tag]...[/tag] para higienizar apenas tags órfãs
+    valid_tags: List[str] = []
+    def _stash_valid(m: re.Match) -> str:
+        token = f"XAURAVALID{len(valid_tags)}END"
+        valid_tags.append(m.group(0))
+        return token
+
+    protected = re.sub(
+        rf"\[({tag_names})\][\s\S]*?\[\/\1\]",
+        _stash_valid,
+        protected,
+        flags=re.IGNORECASE,
+    )
+
+    # 5. Higienização estrita de tags órfãs restantes (qualquer resquício não pareado)
+    # 5a. Tags de fechamento órfãs: [/vermelho], [/ciano], etc.
+    protected = re.sub(rf"\s*\[\s*\/\s*(?:{tag_names})\s*\]\s*", " ", protected, flags=re.IGNORECASE)
+    # 5b. Barras soltas com nome de cor: /vermelho, /ciano, \vermelho, etc.
+    protected = re.sub(rf"(?:^|\s)[\/\\](?:{tag_names})\b(?:\s|$)?", " ", protected, flags=re.IGNORECASE)
+    # 5c. Tags de abertura órfãs soltas vazias: [vermelho], [ciano], etc.
+    protected = re.sub(rf"\s*\[\s*(?:{tag_names})\s*\]\s*(?=\s|$|\[)", " ", protected, flags=re.IGNORECASE)
+
+    # Normaliza espaçamento residual
+    protected = re.sub(r"[^\S\r\n]{2,}", " ", protected)
+    protected = re.sub(r"\s+([,.:;!?])", r"\1", protected)
+    protected = protected.strip()
+
+    # 6. Restaura pares válidos
+    for idx, tag_str in enumerate(valid_tags):
+        protected = protected.replace(f"XAURAVALID{idx}END", tag_str)
+
+    # 7. Restaura blocos de código
+    for idx, snippet in enumerate(code_snippets):
+        protected = protected.replace(f"XAURACODE{idx}END", snippet)
+
+    return protected
+
+
 def extrair_grupo(pergunta: str) -> Optional[str]:
     """Extrai intenção de grupo (Metadata Filter) via palavras-chave."""
     p = pergunta.lower()
@@ -1927,6 +2009,20 @@ class AuraEngine:
     # CONSTRUÇÃO DO PROMPT SISTÊMICO ORIENTADO A POSTO
     # -------------------------------------------------------------------------
 
+    def _build_prompt_ajuda(
+        self,
+        pergunta_sanitizada: str,
+        contexto_sanitizado: str,
+        historico_formatado: str,
+    ) -> str:
+        """Constrói o prompt especializado para a intenção de ajuda_sistema."""
+        return self._build_prompt_sistema(
+            pergunta_sanitizada=pergunta_sanitizada,
+            contexto_sanitizado=contexto_sanitizado,
+            historico_formatado=historico_formatado,
+            intencao="ajuda_sistema",
+        )
+
     def _build_prompt_sistema(
         self,
         pergunta_sanitizada: str,
@@ -1960,6 +2056,7 @@ Diretrizes de Formatação Visual e Destaques:
   * 🟢 `[verde]...[/verde]` ou `<span class="text-emerald">...</span>` para status normais, filtros seguros e conformidades;
   * 🟡 `[amarelo]...[/amarelo]` ou `<span class="text-amber">...</span>` para dicas preventivas e cuidados operacionais;
   * 🔴 `[vermelho]...[/vermelho]` ou `<span class="text-rose">...</span>` para situações de erro ou alertas de pista.
+- Regra de Integridade de Sintaxe: SEMPRE feche as tags que abrir: se usar [ciano], feche obrigatoriamente com [/ciano]. JAMAIS gere /vermelho ou [ciano] soltos sem fechamento ou sem colchetes.
 
 Dados Cadastrais da Unidade:
 - Filial: {dados_filial.get('idempresa')} - {dados_filial.get('nome')}
@@ -2002,8 +2099,9 @@ O chat da AURA possui suporte nativo a destaques visuais modernos e elegantes. U
   * 🔵 **Ciano (`[ciano]...[/ciano]` ou `[badge-ciano]...[/badge-ciano]` ou `<span class="text-cyan">...</span>`):** Métricas técnicas, volume em litros (L), vazão de bicos L/min, encerrantes físicos, números de tanques, scores de conciliação e dados de telemetria.
   * 🟣 **Roxo (`[roxo]...[/roxo]` ou `[badge-roxo]...[/badge-roxo]` ou `<span class="text-purple">...</span>`):** Insights estratégicos, recomendações de combos e cross-selling na conveniência, Lift de vendas, planos de ação gerenciais e decisões recomendadas.
 
-Regra de Equilíbrio Visual:
-Destaque cirurgicamente apenas termos-chave, números e status (ex: "[vermelho]Tanque 1 Crítico (11%)[/vermelho]", "[ciano]14.200 L[/ciano]", "[verde]CONFORME ANP[/verde]", "[roxo]Combo Cerveja + Carvão (Lift 3.2x)[/roxo]"). Não pinte frases inteiras ou parágrafos completos para preservar a elegância executiva.
+Regra de Equilíbrio Visual e Integridade de Sintaxe:
+- Destaque cirurgicamente apenas termos-chave, números e status (ex: "[vermelho]Tanque 1 Crítico (11%)[/vermelho]", "[ciano]14.200 L[/ciano]", "[verde]CONFORME ANP[/verde]", "[roxo]Combo Cerveja + Carvão (Lift 3.2x)[/roxo]"). Não pinte frases inteiras ou parágrafos completos para preservar a elegância executiva.
+- SEMPRE feche as tags que abrir: se usar [ciano], feche obrigatoriamente com [/ciano]. JAMAIS gere /vermelho ou [ciano] soltos sem fechamento ou sem colchetes.
 
 Dados Cadastrais da Unidade:
 - Filial: {dados_filial.get('idempresa')} - {dados_filial.get('nome')}
@@ -2807,7 +2905,7 @@ Diretrizes Específicas por Assunto:
                 continue
 
         total_llm_ms = (time.perf_counter() - t_llm_start) * 1000
-        resposta_final = "".join(texto_completo)
+        resposta_final = normalize_aura_color_markup("".join(texto_completo))
 
         if not sucesso_llm or not resposta_final:
             # Contingência determinística de alta fidelidade a partir dos dados apurados no ERP
@@ -2818,7 +2916,7 @@ Diretrizes Específicas por Assunto:
                 session_id=sess_id,
             )
             if sintese_contingencia:
-                resposta_final = sintese_contingencia
+                resposta_final = normalize_aura_color_markup(sintese_contingencia)
                 sucesso_llm = True
                 if ttft_ms is None:
                     ttft_ms = (time.perf_counter() - t_global_start) * 1000
@@ -2992,7 +3090,7 @@ Diretrizes Específicas por Assunto:
             elif chunk.chunk_type == AuraChunkType.TELEMETRY and chunk.data:
                 telemetria = chunk.data
 
-        texto_final = "".join(texto_chunks)
+        texto_final = normalize_aura_color_markup("".join(texto_chunks))
 
         return AuraResponse(
             session_id=sess_id,
