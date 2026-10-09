@@ -75,26 +75,36 @@ class AuraApiClient {
   async streamChat(optionsOrQuery = {}, legacyOptions = {}) {
     const opts = (typeof optionsOrQuery === 'string')
       ? { query: optionsOrQuery, ...(legacyOptions && typeof legacyOptions === 'object' ? legacyOptions : {}) }
-      : ((optionsOrQuery && typeof optionsOrQuery === 'object') ? optionsOrQuery : {});
+      : ((optionsOrQuery && typeof optionsOrQuery === 'object')
+          ? { ...optionsOrQuery, ...(legacyOptions && typeof legacyOptions === 'object' ? legacyOptions : {}) }
+          : {});
     const options = opts;
 
-    const {
-      query,
-      sessionId = null,
-      context = null,
-      tenantId = null,
-      filialId = null,
-      genui = undefined,
-      onDelta = () => {},
-      onSkeleton = () => {},
-      onUIDelta = () => {},
-      onUIComplete = () => {},
-      onActionFeedback = () => {},
-      onChunk = () => {},
-      onDone = () => {},
-      onError = () => {},
-      signal = null,
-    } = opts;
+    const activeQuery = opts.query !== undefined
+      ? opts.query
+      : (opts.prompt !== undefined ? opts.prompt : (opts.message !== undefined ? opts.message : ''));
+    const activeSessionId = (opts.sessionId !== undefined && opts.sessionId !== null)
+      ? opts.sessionId
+      : (opts.session_id !== undefined ? opts.session_id : null);
+    const activeContext = opts.context || null;
+    const activeTenantId = (opts.tenantId !== undefined && opts.tenantId !== null)
+      ? opts.tenantId
+      : (opts.tenant_id !== undefined ? opts.tenant_id : null);
+    const activeFilialId = (opts.filialId !== undefined && opts.filialId !== null)
+      ? opts.filialId
+      : (opts.filial_id !== undefined ? opts.filial_id : null);
+    const genuiFlag = opts.genui !== undefined ? opts.genui : opts.enable_genui;
+
+    const onDelta = typeof opts.onDelta === 'function' ? opts.onDelta : () => {};
+    const onSkeleton = typeof opts.onSkeleton === 'function' ? opts.onSkeleton : () => {};
+    const onUIDelta = typeof opts.onUIDelta === 'function' ? opts.onUIDelta : () => {};
+    const onUIComplete = typeof opts.onUIComplete === 'function' ? opts.onUIComplete : () => {};
+    const onActionFeedback = typeof opts.onActionFeedback === 'function' ? opts.onActionFeedback : () => {};
+    const onChunk = typeof opts.onChunk === 'function' ? opts.onChunk : () => {};
+    const onDone = typeof opts.onDone === 'function' ? opts.onDone : () => {};
+    const onError = typeof opts.onError === 'function' ? opts.onError : () => {};
+    const signal = opts.signal || null;
+
     // F2-02: Buffer volátil de fragmentos JSON indexado por tool_call_id
     let fragmentBuffer = null;
     const FragmentBufferClass = (typeof AuraGenUI !== 'undefined' && AuraGenUI.GenUIFragmentBuffer) ||
@@ -132,7 +142,7 @@ class AuraApiClient {
 
     try {
       // Resolucao de Feature Flag GenUI (F9-01)
-      let genuiParam = genui !== undefined ? genui : options.genui;
+      let genuiParam = genuiFlag !== undefined ? genuiFlag : options.genui;
       if (genuiParam === undefined && typeof window !== 'undefined' && window.AuraGenUI && typeof window.AuraGenUI.isEnabled === 'function') {
         genuiParam = window.AuraGenUI.isEnabled();
       }
@@ -153,12 +163,12 @@ class AuraApiClient {
         method: 'POST',
         headers: reqHeaders,
         body: JSON.stringify({
-          query: query,
-          session_id: sessionId,
+          query: activeQuery,
+          session_id: activeSessionId,
           stream: true,
-          context: context,
-          tenant_id: tenantId,
-          filial_id: filialId,
+          context: activeContext,
+          tenant_id: activeTenantId,
+          filial_id: activeFilialId,
           genui: genuiParam !== undefined ? (genuiParam !== false && genuiParam !== 0 && genuiParam !== '0') : undefined,
         }),
         signal: signal,
@@ -178,7 +188,11 @@ class AuraApiClient {
         if (!doneNotified) {
           doneNotified = true;
           if (fragmentBuffer) fragmentBuffer.clear();
-          onDone();
+          try {
+            onDone();
+          } catch (e) {
+            console.error('[AuraAPI] Erro ao executar callback onDone:', e);
+          }
         }
       };
 
@@ -331,20 +345,24 @@ class AuraApiClient {
       triggerDone();
     } catch (err) {
       if (fragmentBuffer) fragmentBuffer.clear();
-      if (err.name === 'AbortError') {
+      if (err && err.name === 'AbortError') {
         console.log('[AuraAPI] Streaming abortado pelo usuário.');
       } else {
         console.error('[AuraAPI] Erro no stream SSE:', err);
       }
-      onError(err);
+      try {
+        onError(err);
+      } catch (e) {
+        console.error('[AuraAPI] Erro ao executar callback onError:', e);
+      }
     }
   }
 
   /**
    * Alias canônico para retrocompatibilidade com chamadas chatStream()
    */
-  async chatStream(options = {}) {
-    return this.streamChat(options);
+  async chatStream(optionsOrQuery = {}, legacyOptions = {}) {
+    return this.streamChat(optionsOrQuery, legacyOptions);
   }
 
   /**

@@ -448,6 +448,41 @@ def run_all_rollout_telemetry_tests():
       await client.streamChat();
       assert(fetchCalledWith !== null, 'fetch deve funcionar sem parametros');
 
+      // Caso 4.5: Chamada via chatStream preservando legacyOptions e onDone
+      let chatStreamDone = false;
+      await client.chatStream('Pergunta via chatStream', {
+        onDone: () => { chatStreamDone = true; }
+      });
+      assert.strictEqual(chatStreamDone, true, 'chatStream deve propagar legacyOptions e disparar onDone');
+
+      // Caso 4.6: Mapeamento defensivo de snake_case (session_id, tenant_id, filial_id)
+      await client.streamChat({
+        query: 'Diagnostico com snake_case',
+        session_id: 'sess_snake_123',
+        tenant_id: 'ten_matriz',
+        filial_id: 'fil_posto_01',
+      });
+      const parsedSnakeBody = JSON.parse(fetchCalledWith.opts.body);
+      assert.strictEqual(parsedSnakeBody.session_id, 'sess_snake_123', 'session_id deve ser mapeado');
+      assert.strictEqual(parsedSnakeBody.tenant_id, 'ten_matriz', 'tenant_id deve ser mapeado');
+      assert.strictEqual(parsedSnakeBody.filial_id, 'fil_posto_01', 'filial_id deve ser mapeado');
+
+      // Caso 4.7: Resiliencia a callbacks nulos (sem TypeError)
+      await client.streamChat({
+        query: 'Teste callbacks nulos',
+        onDelta: null,
+        onDone: null,
+        onError: null,
+      });
+      assert(fetchCalledWith !== null, 'fetch deve ser concluido mesmo com callbacks nulos');
+
+      // Caso 4.8: Suporte ao alias prompt para query
+      await client.streamChat({
+        prompt: 'Pergunta enviada via alias prompt',
+      });
+      const parsedPromptBody = JSON.parse(fetchCalledWith.opts.body);
+      assert.strictEqual(parsedPromptBody.query, 'Pergunta enviada via alias prompt', 'prompt deve ser mapeado para query');
+
       delete global.window;
       delete global.fetch;
 
