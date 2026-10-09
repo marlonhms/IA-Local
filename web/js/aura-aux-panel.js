@@ -596,6 +596,29 @@ class AuraAuxPanel {
         ${artifact.html}
       </div>
     `;
+
+    // Vincula listeners aos micro-widgets GenUI projetados no Canvas
+    this.bindGenUIEvents(visualView);
+  }
+
+  /**
+   * Vincula listeners de interacao aos micro-widgets GenUI presentes no contêiner
+   */
+  bindGenUIEvents(container) {
+    if (!container || typeof container.querySelectorAll !== 'function') return;
+    const cards = container.querySelectorAll('.genui-hydrated-card[data-tool-call-id]');
+    cards.forEach(card => {
+      const toolCallId = card.getAttribute('data-tool-call-id');
+      const genui = (typeof window !== 'undefined' && window.AuraGenUI) ||
+                    (typeof AuraGenUI !== 'undefined' ? AuraGenUI : null);
+      const widget = (genui && typeof genui.getWidget === 'function')
+        ? genui.getWidget(toolCallId)
+        : null;
+
+      if (widget && typeof widget.bindEvents === 'function') {
+        widget.bindEvents(card);
+      }
+    });
   }
 
   /**

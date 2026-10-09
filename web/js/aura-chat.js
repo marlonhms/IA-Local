@@ -722,6 +722,11 @@ class AuraChatController {
         try {
           const enrichedData = Object.assign({ session_id: this.sessionId }, envelopeData);
           const instance = new ComponentDef(enrichedData);
+          if (typeof AuraGenUI !== 'undefined' && typeof AuraGenUI.registerWidget === 'function') {
+            AuraGenUI.registerWidget(toolCallId, instance);
+          } else if (typeof window !== 'undefined' && window.AuraGenUI && typeof window.AuraGenUI.registerWidget === 'function') {
+            window.AuraGenUI.registerWidget(toolCallId, instance);
+          }
           if (instance && typeof instance.mount === 'function') {
             const mounted = instance.mount();
             if (typeof HTMLElement !== 'undefined' && mounted instanceof HTMLElement) {
@@ -840,6 +845,11 @@ class AuraChatController {
       if (splitCard) {
         splitCard.innerHTML = portalBannerHtml;
         splitCard.classList.remove('hidden');
+      }
+
+      if (instance && typeof instance.bindEvents === 'function') {
+        if (toolCard) instance.bindEvents(toolCard);
+        if (splitCard) instance.bindEvents(splitCard);
       }
 
       // Telemetria SRE (F9-02): Medir tempo real de hidratacao e reportar assincronamente ao backend
@@ -1645,6 +1655,16 @@ class AuraChatController {
       if (togglePcBtn) {
         togglePcBtn.setAttribute('aria-expanded', 'true');
         togglePcBtn.classList.add('bg-white/15', 'text-white', 'border-white/20');
+      }
+      const card = widgetEl.querySelector('.genui-hydrated-card[data-tool-call-id]');
+      if (card) {
+        const tid = card.getAttribute('data-tool-call-id');
+        const genui = (typeof window !== 'undefined' && window.AuraGenUI) ||
+                      (typeof AuraGenUI !== 'undefined' ? AuraGenUI : null);
+        const w = (genui && typeof genui.getWidget === 'function') ? genui.getWidget(tid) : null;
+        if (w && typeof w.bindEvents === 'function') {
+          w.bindEvents(card);
+        }
       }
       if (typeof this.scrollToBottom === 'function') {
         setTimeout(() => this.scrollToBottom(), 50);

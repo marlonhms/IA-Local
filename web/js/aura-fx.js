@@ -114,6 +114,88 @@
       });
     }
 
+    showToast(optionsOrMessage) {
+      if (typeof document === 'undefined') return;
+
+      let title = '';
+      let message = '';
+      let type = 'info';
+
+      if (typeof optionsOrMessage === 'string') {
+        message = optionsOrMessage;
+      } else if (typeof optionsOrMessage === 'object' && optionsOrMessage !== null) {
+        title = optionsOrMessage.title || '';
+        message = optionsOrMessage.message || optionsOrMessage.msg || '';
+        type = optionsOrMessage.type || 'info';
+      }
+
+      function safeEscape(str) {
+        if (!str) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      let toastContainer = document.getElementById('aura-fx-toast-container');
+      if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'aura-fx-toast-container';
+        toastContainer.className = 'fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full px-4 sm:px-0';
+        document.body.appendChild(toastContainer);
+      }
+
+      const toast = document.createElement('div');
+      const borderMap = {
+        success: 'border-emerald-500/50 bg-slate-900/95 text-emerald-200 shadow-emerald-950/40',
+        error: 'border-rose-500/50 bg-slate-900/95 text-rose-200 shadow-rose-950/40',
+        attention: 'border-amber-500/50 bg-slate-900/95 text-amber-200 shadow-amber-950/40',
+        warning: 'border-amber-500/50 bg-slate-900/95 text-amber-200 shadow-amber-950/40',
+        info: 'border-cyan-500/50 bg-slate-900/95 text-cyan-200 shadow-cyan-950/40'
+      };
+      const dotMap = {
+        success: 'bg-emerald-400',
+        error: 'bg-rose-400',
+        attention: 'bg-amber-400',
+        warning: 'bg-amber-400',
+        info: 'bg-cyan-400'
+      };
+
+      const colorClass = borderMap[type] || borderMap.info;
+      const dotClass = dotMap[type] || dotMap.info;
+
+      toast.className = `p-3.5 rounded-2xl border shadow-2xl backdrop-blur-md transition-all duration-300 opacity-0 transform translate-y-2 pointer-events-auto flex items-start gap-2.5 ${colorClass}`;
+      toast.innerHTML = `
+        <span class="w-2.5 h-2.5 rounded-full ${dotClass} animate-pulse flex-shrink-0 mt-0.5"></span>
+        <div class="min-w-0 flex-1 space-y-0.5 font-sans">
+          ${title ? `<div class="text-xs font-bold text-white tracking-wide">${safeEscape(title)}</div>` : ''}
+          <div class="text-[11px] leading-relaxed">${safeEscape(message)}</div>
+        </div>
+      `;
+
+      toastContainer.appendChild(toast);
+
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => {
+          toast.classList.remove('opacity-0', 'translate-y-2');
+          toast.classList.add('opacity-100', 'translate-y-0');
+        });
+      } else {
+        toast.classList.remove('opacity-0', 'translate-y-2');
+        toast.classList.add('opacity-100', 'translate-y-0');
+      }
+
+      setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => {
+          if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 300);
+      }, 3500);
+    }
+
     isDesktop() {
       return this.mode === 'desktop';
     }

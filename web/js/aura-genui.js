@@ -581,7 +581,37 @@
   }
 
   // =========================================================================
-  // 5. INSTÂNCIA SINGLETON & EXPORTAÇÃO DUAL (ZERO-BUNDLER & COMMONJS)
+  // 5. REGISTRO VOLATIL DE INSTANCIAS DE WIDGETS
+  // =========================================================================
+
+  const _widgetInstances = new Map();
+
+  function registerWidget(toolCallId, instance) {
+    if (!toolCallId || !instance) return instance;
+    _widgetInstances.set(String(toolCallId).trim(), instance);
+    return instance;
+  }
+
+  function getWidget(toolCallId) {
+    if (!toolCallId) return null;
+    return _widgetInstances.get(String(toolCallId).trim()) || null;
+  }
+
+  function unregisterWidget(toolCallId) {
+    if (!toolCallId) return false;
+    return _widgetInstances.delete(String(toolCallId).trim());
+  }
+
+  function listWidgets() {
+    return Array.from(_widgetInstances.values());
+  }
+
+  function clearWidgets() {
+    _widgetInstances.clear();
+  }
+
+  // =========================================================================
+  // 6. INSTÂNCIA SINGLETON & EXPORTAÇÃO DUAL (ZERO-BUNDLER & COMMONJS)
   // =========================================================================
 
   const registry = new SecureComponentRegistry();
@@ -591,6 +621,11 @@
     SecureComponentRegistry,
     registry,
     GenUIFragmentBuffer,
+    registerWidget,
+    getWidget,
+    unregisterWidget,
+    listWidgets,
+    clearWidgets,
     escapeHtml,
     sanitizeProps,
     coerceNumber,
@@ -638,6 +673,11 @@
       SecureComponentRegistry,
       registry,
       GenUIFragmentBuffer,
+      registerWidget,
+      getWidget,
+      unregisterWidget,
+      listWidgets,
+      clearWidgets,
       escapeHtml,
       sanitizeProps,
       coerceNumber,

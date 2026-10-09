@@ -115,6 +115,12 @@
 
       this.element = null;
       this.eventListeners = {};
+
+      const genui = (typeof window !== 'undefined' && window.AuraGenUI) ||
+                    (typeof AuraGenUI !== 'undefined' ? AuraGenUI : null);
+      if (genui && typeof genui.registerWidget === 'function') {
+        genui.registerWidget(this.toolCallId, this);
+      }
     }
 
     get isLocked() {
@@ -154,6 +160,12 @@
      * @returns {HTMLElement|string} Elemento DOM hidratado (ou representacao de no)
      */
     mount() {
+      const genui = (typeof window !== 'undefined' && window.AuraGenUI) ||
+                    (typeof AuraGenUI !== 'undefined' ? AuraGenUI : null);
+      if (genui && typeof genui.registerWidget === 'function') {
+        genui.registerWidget(this.toolCallId, this);
+      }
+
       // 0. Registra o widget no AuraStateManager se disponivel e sincroniza estado persistido
       const stateMgr = (typeof window !== 'undefined' && window.auraStateManager) ||
                        (typeof globalThis !== 'undefined' && globalThis.auraStateManager) ||
@@ -219,21 +231,35 @@
 
     getDefaultActionsHtml() {
       const shouldDisable = this.state.isLocked || this.isExpired();
+      const stateMgr = (typeof window !== 'undefined' && window.auraStateManager) ||
+                       (typeof globalThis !== 'undefined' && globalThis.auraStateManager) ||
+                       null;
+      const isDone1 = (stateMgr && typeof stateMgr.isActionExecuted === 'function' && stateMgr.isActionExecuted('act_default_apply')) || (this.state.voucher && (this.state.voucher.action_id === 'act_default_apply'));
+      const isDone2 = (stateMgr && typeof stateMgr.isActionExecuted === 'function' && stateMgr.isActionExecuted('act_default_goals')) || (this.state.voucher && (this.state.voucher.action_id === 'act_default_goals'));
+
       return `
         <button type="button"
-                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold hover:brightness-110 ${shouldDisable ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
-                data-action-id="act_default_1"
-                data-action-type="inspection"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold hover:brightness-110 ${(shouldDisable || isDone1) ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
+                data-action-id="act_default_apply"
+                data-action-type="mutation"
                 data-tool-call-id="${escapeHtml(this.toolCallId)}"
-                ${shouldDisable ? 'disabled' : ''}>
-          <span>⚡ Aplicar Recomendacoes Prioritarias</span>
+                ${(shouldDisable || isDone1) ? 'disabled' : ''}>
+          <span>${isDone1 ? '✔ Recomendações Aplicadas' : '⚡ Aplicar Recomendações Prioritárias'}</span>
         </button>
         <button type="button"
-                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-cyan-200 border border-cyan-500/30 hover:bg-slate-700"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-cyan-200 border border-cyan-500/30 hover:bg-slate-700 ${(shouldDisable || isDone2) ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
+                data-action-id="act_default_goals"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}"
+                ${(shouldDisable || isDone2) ? 'disabled' : ''}>
+          <span>${isDone2 ? '✔ Metas Ajustadas' : '🎯 Ajustar Metas do Turno'}</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 text-slate-300 border border-white/10 hover:bg-slate-800"
                 data-action-id="act_default_canvas"
                 data-action-type="inspection"
                 data-tool-call-id="${escapeHtml(this.toolCallId)}">
-          <span>🔍 Projetar no Companion Canvas</span>
+          <span>🔍 Projetar Cenário no Canvas</span>
         </button>
       `;
     }
@@ -274,6 +300,7 @@
             <div class="flex items-center gap-2">
               <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
               <span class="font-bold text-white">${escapeHtml(feedback || 'Acao Homologada no ERP')}</span>
+              ${this.state.voucher?.voucher_id ? `<span class="text-[10px] font-mono text-emerald-300/80">(${escapeHtml(this.state.voucher.voucher_id)})</span>` : ''}
             </div>
             <span class="badge-committed text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-900/60 text-emerald-300 border border-emerald-500/30">VOUCHER AUDITADO</span>
           </div>
@@ -306,7 +333,7 @@
           const variant = act.variant || 'primary';
           const actType = act.action_type || 'mutation';
 
-          const isActionDone = stateMgr && typeof stateMgr.isActionExecuted === 'function' && stateMgr.isActionExecuted(act.action_id);
+          const isActionDone = (stateMgr && typeof stateMgr.isActionExecuted === 'function' && stateMgr.isActionExecuted(act.action_id)) || (this.state.voucher && (this.state.voucher.action_id === act.action_id || !this.state.voucher.action_id));
           const isCurrentActive = isLocked && this.state.lockedActionId === act.action_id;
           const shouldDisable = isLocked || isActionDone || (isExpired && actType !== 'inspection');
 
@@ -397,6 +424,8 @@
         if (!btn._hasBoundClick) {
           btn._hasBoundClick = true;
           btn.addEventListener('click', (e) => {
+            if (e && e._genuiActionHandled) return;
+            if (e) e._genuiActionHandled = true;
             const actionId = btn.getAttribute('data-action-id');
             const actionType = btn.getAttribute('data-action-type');
             this.handleActionClick(actionId, actionType, btn, e);
@@ -420,13 +449,31 @@
 
       // 1. Acoes de inspecao no Companion Canvas com protecao de debounce
       const btnText = (btnElement && typeof btnElement.textContent === 'string') ? btnElement.textContent : '';
-      if (actionType === 'inspection' || btnText.includes('Canvas')) {
+      const isInspection = actionType === 'inspection' || btnText.includes('Canvas') || btnText.includes('Projetar');
+      if (isInspection) {
         const now = Date.now();
         if (now - (this._canvasDebounce || 0) < 800) {
           return false;
         }
         this._canvasDebounce = now;
         this.projectToCanvas();
+
+        if (typeof window !== 'undefined' && window.auraAuxPanel && typeof window.auraAuxPanel.open === 'function') {
+          window.auraAuxPanel.open('art_genui_' + this.toolCallId);
+        }
+
+        const fx = (typeof window !== 'undefined' && window.auraFx) || null;
+        if (fx && typeof fx.showToast === 'function') {
+          fx.showToast({
+            title: 'Cenário Projetado',
+            message: 'O diagnóstico executivo foi projetado no Companion Canvas.',
+            type: 'info'
+          });
+        }
+
+        if (typeof window !== 'undefined' && window.auraAudio && typeof window.auraAudio.playChime === 'function') {
+          window.auraAudio.playChime(680, 0.05);
+        }
         return true;
       }
 
@@ -498,6 +545,19 @@
             stateMgr.finalizeSuccessState(this.toolCallId, res);
           }
           this.finalizeSuccessState(res);
+
+          const fx = (typeof window !== 'undefined' && window.auraFx) || null;
+          if (fx && typeof fx.showToast === 'function') {
+            fx.showToast({
+              title: 'Ação Homologada',
+              message: 'Decisão registrada e auditada com sucesso.',
+              type: 'success'
+            });
+          }
+
+          if (typeof window !== 'undefined' && window.auraAudio && typeof window.auraAudio.playChime === 'function') {
+            window.auraAudio.playChime(880, 0.08);
+          }
           return true;
         } catch (err) {
           if (stateMgr) {
@@ -551,14 +611,14 @@
       this.state.isLocked = false;
       this.state.lockedActionId = null;
       this.state.voucher = result;
-      this.state.optimisticFeedback = `✔ Acao Homologada com Sucesso (Voucher: ${result?.voucher_id || 'OK'})`;
+      this.state.optimisticFeedback = 'Acao Homologada no ERP';
       this.state.errorMessage = null;
       this.refreshLayer3();
     }
 
     refreshLayer3() {
-      if (!this.element) return;
-      if (typeof this.element.querySelector === 'function') {
+      let updatedSelf = false;
+      if (this.element && typeof this.element.querySelector === 'function') {
         const layer3El = this.element.querySelector('.genui-layer-3');
         if (layer3El && layer3El.parentNode && typeof layer3El.parentNode.replaceChild === 'function') {
           const temp = document.createElement('div');
@@ -568,14 +628,36 @@
             try {
               layer3El.parentNode.replaceChild(newLayer3, layer3El);
               this.bindEvents(this.element);
-              return;
+              updatedSelf = true;
             } catch (_) {}
           }
         }
       }
-      if (typeof this.element === 'object') {
+      if (!updatedSelf && this.element && typeof this.element === 'object') {
         this.element.innerHTML = this.renderHtml();
         this.bindEvents(this.element);
+      }
+
+      // Sincroniza todas as instancias duplicadas do card no DOM (chat, portais desdobraveis e Companion Canvas)
+      if (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function') {
+        try {
+          const matchingCards = document.querySelectorAll(`.genui-hydrated-card[data-tool-call-id="${this.toolCallId}"]`);
+          matchingCards.forEach(card => {
+            if (card === this.element) return;
+            const l3 = card.querySelector('.genui-layer-3');
+            if (l3 && l3.parentNode && typeof l3.parentNode.replaceChild === 'function') {
+              const temp = document.createElement('div');
+              temp.innerHTML = this.renderLayer3().trim();
+              const newL3 = temp.firstElementChild;
+              if (newL3) {
+                try {
+                  l3.parentNode.replaceChild(newL3, l3);
+                  this.bindEvents(card);
+                } catch (_) {}
+              }
+            }
+          });
+        } catch (_) {}
       }
     }
 
@@ -1636,6 +1718,86 @@
     });
   }
 
+  // =========================================================================
+  // 10. DELEGACAO GLOBAL CENTRALIZADA DE ACOES GENUI
+  // =========================================================================
+
+  function initGlobalGenUIActionDelegation() {
+    if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+    if (document._auraGenUIActionDelegationInitialized) return;
+    document._auraGenUIActionDelegationInitialized = true;
+
+    document.addEventListener('click', async (e) => {
+      const btn = (e.target && typeof e.target.closest === 'function')
+        ? e.target.closest('.genui-action-btn')
+        : null;
+      if (!btn) return;
+
+      if (btn.disabled || btn.getAttribute('disabled') === 'true' || btn.classList.contains('pointer-events-none')) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      if (e._genuiActionHandled) return;
+      e._genuiActionHandled = true;
+
+      const actionId = btn.getAttribute('data-action-id');
+      const actionType = btn.getAttribute('data-action-type') || 'mutation';
+      const toolCallId = btn.getAttribute('data-tool-call-id');
+
+      const genui = (typeof window !== 'undefined' && window.AuraGenUI) ||
+                    (typeof AuraGenUI !== 'undefined' ? AuraGenUI : null);
+      const stateMgr = (typeof window !== 'undefined' && window.auraStateManager) ||
+                       (typeof globalThis !== 'undefined' && globalThis.auraStateManager) ||
+                       null;
+
+      let widget = (genui && typeof genui.getWidget === 'function') ? genui.getWidget(toolCallId) : null;
+
+      if (!widget) {
+        const card = (typeof btn.closest === 'function') ? btn.closest('.genui-hydrated-card') : null;
+        const compName = card ? card.getAttribute('data-component') : 'render_ExecutiveDecisionMentorUI';
+        const registry = (typeof window !== 'undefined' && window.SecureComponentRegistry) ||
+                         (genui && genui.registry);
+        let CompDef = null;
+        if (registry && typeof registry.resolveComponent === 'function') {
+          try {
+            CompDef = registry.resolveComponent(compName, { throwOnMissing: false });
+          } catch (_) {}
+        }
+        if (!CompDef) {
+          CompDef = ExecutiveDecisionMentorUI;
+        }
+
+        const stateEntry = stateMgr ? stateMgr.getWidget(toolCallId) : null;
+        const props = (stateEntry && stateEntry.props) ? stateEntry.props : {};
+        try {
+          widget = new CompDef({
+            tool_call_id: toolCallId,
+            component_name: compName,
+            props: props
+          });
+          if (card) widget.element = card;
+          if (genui && typeof genui.registerWidget === 'function') {
+            genui.registerWidget(toolCallId, widget);
+          }
+        } catch (_) {}
+      }
+
+      if (widget && typeof widget.handleActionClick === 'function') {
+        await widget.handleActionClick(actionId, actionType, btn, e);
+      }
+    }, false);
+  }
+
+  // Inicializa delegacao global imediatamente se documento disponivel
+  initGlobalGenUIActionDelegation();
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('DOMContentLoaded', () => {
+      initGlobalGenUIActionDelegation();
+    });
+  }
+
   // 1. Registro automatico no catalogo global do navegador
   if (typeof window !== 'undefined') {
     if (window.SecureComponentRegistry) {
@@ -1661,6 +1823,8 @@
     window.AuraGenUI.FinancialLeakAuditWidget = FinancialLeakAuditWidget;
     window.AuraGenUI.BasketUpsellStrategyUI = BasketUpsellStrategyUI;
     window.AuraGenUI.BasketUpsellWidget = BasketUpsellWidget;
+    window.AuraGenUI.initGlobalActionDelegation = initGlobalGenUIActionDelegation;
+    window.initGlobalGenUIActionDelegation = initGlobalGenUIActionDelegation;
 
     if (typeof window.addEventListener === 'function') {
       window.addEventListener('aura:genui-ready', (evt) => {
@@ -1688,6 +1852,7 @@
       BasketUpsellStrategyUI,
       BasketUpsellWidget,
       registerWidgets,
+      initGlobalGenUIActionDelegation,
       escapeHtml,
       formatNumber
     };
