@@ -1,6 +1,6 @@
-# 🌉 Guia Completo: Ponte Tailscale para Desenvolvimento Remoto (Notebook ↔ PC de Casa)
+﻿# 🌉 Guia Completo: Ponte Tailscale para Desenvolvimento Remoto (Notebook ↔ PC de Casa)
 
-> **Projeto**: Ai.la — IA Especialista do Posto de Combustíveis & PDV  
+> **Projeto**: Ai.la - IA Especialista do Posto de Combustíveis & PDV  
 > **Repositório GitHub**: [https://github.com/marlonhms/IA-Local](https://github.com/marlonhms/IA-Local)  
 > **Topologia**: Notebook (Servidor de Banco de Dados) ↔ PC de Casa (Estação de Desenvolvimento)  
 > **Data de Atualização**: Março/2026  
@@ -33,8 +33,8 @@ Essa evolução representa o primeiro passo concreto no desacoplamento do projet
 │                 Hostname Tailscale: marlonh-supwp           │
 │                                                             │
 │   • PostgreSQL 16 ERP (Windows Service)  ───► Porta 5433    │
-│   • Docker pgvector-posto                ───► Porta 5434    │
-│   • Instância Dev Fallback (se ativa)    ───► Porta 5435    │
+│   • pgvector Nativo (Base posto_ai)      ───► Porta 5433    │
+│   • AURA Web Cockpit & API               ───► Porta 8000    │
 │   • Firewall do Windows restrito a Tailscale e 100.64.0.0/10│
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -78,7 +78,7 @@ Todas as configurações de escuta e segurança foram implementadas e validadas 
 
 ### 2.5. Liberação do Firewall do Windows no Notebook
 Para garantir que o Firewall do Windows não descarte pacotes vindos do PC de casa, criamos scripts automatizados de liberação no repositório:
-- **`liberar_firewall_tailscale.bat`** (no diretório raiz do projeto — com auto-elevação UAC)
+- **`liberar_firewall_tailscale.bat`** (no diretório raiz do projeto - com auto-elevação UAC)
 - **`scripts\configurar_ponte_tailscale.ps1`**
 
 #### O que o script faz:
@@ -157,9 +157,9 @@ ERP_DB_USER=suporte
 ERP_DB_PASSWORD=899007
 ERP_DB_CONNECT_TIMEOUT=5
 
-# Banco Vetorial Semântico (Apontando para o Docker do Notebook via Tailscale)
+# Banco Vetorial Semântico (PostgreSQL 16 Nativo do Notebook via Tailscale)
 VECTOR_DB_HOST=100.77.164.17
-VECTOR_DB_PORT=5434
+VECTOR_DB_PORT=5433
 VECTOR_DB_NAME=posto_ai
 VECTOR_DB_USER=postgres
 VECTOR_DB_PASSWORD=123456
@@ -173,7 +173,7 @@ DEFAULT_LLM_MODEL=models/gemini-3.1-flash-lite
 *(Nota: Você pode substituir `100.77.164.17` por `marlonh-supwp` caso o MagicDNS esteja ativo).*
 
 ### Passo 5: Testar a Conexão com o Diagnóstico Automático
-Execute o script de teste de conectividade criado no projeto. Você pode testar sem argumentos (usando o `.env`) ou passando o host diretamente pela linha de comando:
+Execute o script de teste de conectividade no PC de Casa. Você pode testar sem argumentos (usando o `.env`) ou passando o host diretamente pela linha de comando:
 ```powershell
 # Opção A: Usando valores do .env
 python scripts/test_ponte_tailscale.py
@@ -189,22 +189,32 @@ python scripts/test_ponte_tailscale.py marlonh-supwp
  🔍 DIAGNÓSTICO DA PONTE TAILSCALE - AI.LA (BANCO LOCAL & REMOTO)
 ============================================================================
 [1/2] Testando Conexão com Banco ERP (100.77.164.17:5433)...
-  [OK] Conectado com sucesso em 51.2ms [SLA EXCELENTE - Ideal para desenvolvimento interativo]
+  [OK] Conectado com sucesso em 48.0ms [SLA EXCELENTE - Ideal para desenvolvimento interativo]
    - Database: posto | User: suporte | Porta Server: 5433
    - Tabela 'produtos': 250 registros encontrados no ERP
 
-[2/2] Testando Conexão com Banco Vetorial (100.77.164.17:5434)...
-  [OK] Conectado com sucesso em 32.4ms [SLA EXCELENTE - Ideal para desenvolvimento interativo]
-   - Database: posto_ai | User: postgres | Porta Server: 5432
+[2/2] Testando Conexão com Banco Vetorial (100.77.164.17:5433)...
+  [OK] Conectado com sucesso em 40.5ms [SLA EXCELENTE - Ideal para desenvolvimento interativo]
+   - Database: posto_ai | User: postgres | Porta Server: 5433
    - Extensão pgvector: v0.8.6
    - Tabela 'produtos_vetores': 250 embeddings indexados
 
+============================================================================
 🎉 SUCESSO TOTAL: A ponte de rede está 100% operacional!
+   Você pode executar e codar o projeto normalmente nesta máquina.
+============================================================================
 ```
 
-### Passo 6: Executar o Ai.la
+### Passo 6: Acessar o Painel Web da AURA no PC de Casa
+Se você iniciar o painel no notebook via `iniciar_painel.bat`, você pode abrir diretamente o navegador no PC de Casa e acessar:
+- **Painel Executivo da AURA**: `http://100.77.164.17:8000` (ou `http://marlonh-supwp:8000`)
+- **Documentação Swagger/OpenAPI**: `http://100.77.164.17:8000/docs`
+
+### Passo 7: Executar a AURA / Ai.la no PC de Casa
 ```powershell
 python main.py
+# ou para abrir o servidor web da AURA localmente:
+python server.py
 ```
 O agente iniciará normalmente, autenticando no ERP do Notebook e carregando a telemetria SRE e filial remota.
 

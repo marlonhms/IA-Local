@@ -86,6 +86,12 @@ $rules = @(
         DisplayName = "Ai.la - PostgreSQL Dev Fallback (Tailscale Porta 5435)"
         Port = 5435
         Desc = "Permite conexao de entrada a instancia dev fallback restrita a rede Tailscale"
+    },
+    @{
+        Name = "Aura-Web-Cockpit-8000"
+        DisplayName = "AURA - Web Cockpit & API (Tailscale Porta 8000)"
+        Port = 8000
+        Desc = "Permite conexao de entrada ao Painel Web da AURA restrita a rede Tailscale"
     }
 )
 
@@ -155,7 +161,9 @@ if ($tailscaleIP) {
     Write-Host "   ERP_DB_HOST=$tailscaleIP  (ou use o MagicDNS: marlonh-supwp)" -ForegroundColor Green
     Write-Host "   ERP_DB_PORT=5433" -ForegroundColor Green
     Write-Host "   VECTOR_DB_HOST=$tailscaleIP  (ou use o MagicDNS: marlonh-supwp)" -ForegroundColor Green
-    Write-Host "   VECTOR_DB_PORT=5433" -ForegroundColor Green
+    Write-Host "   VECTOR_DB_PORT=5433  (pgvector nativo migrado, sem Docker)" -ForegroundColor Green
+    Write-Host "`n Para abrir o Painel Web da AURA no navegador do PC de Casa:" -ForegroundColor White
+    Write-Host "   http://$tailscaleIP`:8000  (ou http://marlonh-supwp:8000)" -ForegroundColor Cyan
 } else {
     Write-Host " Configure ERP_DB_HOST e VECTOR_DB_HOST com o IP Tailscale deste notebook (ou marlonh-supwp)." -ForegroundColor Yellow
 }

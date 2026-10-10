@@ -141,8 +141,11 @@ def testar_conexao_vector(host: str = None, port: int = None, timeout: int = 5) 
         row = cur.fetchone()
 
         # Verifica extensão pgvector
-        cur.execute("SELECT installed_version FROM pg_available_extensions WHERE name = 'vector';")
+        cur.execute("SELECT extversion FROM pg_extension WHERE extname = 'vector';")
         ext = cur.fetchone()
+        if not ext or not ext[0]:
+            cur.execute("SELECT installed_version FROM pg_available_extensions WHERE name = 'vector';")
+            ext = cur.fetchone()
         ext_version = ext[0] if (ext and ext[0]) else "NÃO INSTALADA"
 
         # Verifica existência da tabela de vetores de forma segura
