@@ -1,0 +1,49 @@
+# ==============================================================================
+# CONFIGURACAO DE PROXY REVERSO TLS/HTTPS DE BORDA CADDY (P1-5)
+# Projeto: AURA (Autonomous Unified Retail Assistant)
+# Porta de Borda: 443 / 8443 com terminacao TLS
+# Backend Local: 127.0.0.1:8000 (FastAPI ASGI Uvicorn)
+# ==============================================================================
+
+:8443, :443 {
+    # Certificado TLS local automatico gerado pela CA interna do Caddy
+    tls internal
+
+    # Compressao transparente de respostas HTTP
+    encode zstd gzip
+
+    # Cabecalhos de Seguranca Corporativa OWASP
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        X-XSS-Protection "1; mode=block"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:;"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Server "AURA-Edge-Proxy"
+        -Server
+    }
+
+    # Desativa buffering de SSE para streaming em tempo real sem latencia
+    @sse_paths {
+        path /api/v1/aura/chat*
+    }
+    header @sse_paths {
+        Cache-Control "no-cache"
+        X-Accel-Buffering "no"
+    }
+
+    # Proxy Reverso para a API Uvicorn local
+    reverse_proxy 127.0.0.1:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+
+        # Timeouts estendidos para transmissao de SSE de longa duracao
+        transport http {
+            read_buffer 8192
+            keepalive 120s
+        }
+    }
+}

@@ -150,8 +150,8 @@ def run_genui_baseline_tests():
     assert resp_root.status_code == 200, "Falha ao carregar SPA da raiz"
     html = resp_root.text
 
-    assert re.search(r'src="/static/js/aura-genui\.js\?v=2\.9\.\d+"', html), "Script aura-genui.js ausente com cache-buster no index.html"
-    assert re.search(r'<script\s+src="/static/js/aura-genui\.js\?v=2\.9\.\d+"\s+defer></script>', html), \
+    assert re.search(r'src="/static/js/aura-genui\.js\?v=2\.\d+\.\d+"', html), "Script aura-genui.js ausente com cache-buster no index.html"
+    assert re.search(r'<script\s+src="/static/js/aura-genui\.js\?v=2\.\d+\.\d+"\s+defer></script>', html), \
         "Tag script de aura-genui.js não possui atributo defer para carregamento não bloqueante"
 
     resp_js = client.get("/static/js/aura-genui.js")

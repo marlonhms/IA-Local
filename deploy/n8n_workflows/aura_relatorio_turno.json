@@ -1,0 +1,98 @@
+{
+  "name": "AURA - Relatorio Executivo de Turno para WhatsApp (Evolution API)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aura-relatorio-turno",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "name": "Webhook AURA",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Formata mensagem executiva para o WhatsApp\nconst item = items[0].json;\nconst data = item.data || item;\n\nconst statusIcon = data.status_conciliacao === 'CONCILIADO' ? '✅' : '⚠️';\nconst faturamento = Number(data.faturamento_total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });\nconst litros = Number(data.litros_vendidos || 0).toLocaleString('pt-BR', { minimumFractionDigits: 1 });\nconst quebra = Number(data.quebra_caixa || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });\n\nconst text = `${statusIcon} *AURA // FECHAMENTO DE TURNO EXECUTIVO*\\n` +\n  `📅 Data: ${data.data || new Date().toISOString().slice(0,10)} | Turno: ${data.turno_id}\\n` +\n  `⛽ Filial: ${data.filial_id || 'posto_01'}\\n` +\n  `----------------------------------------\\n` +\n  `💰 Faturamento: ${faturamento}\\n` +\n  `📊 Litros Vendidos: ${litros} L\\n` +\n  `⚖️ Quebra/Divergência: ${quebra}\\n` +\n  `🎯 Status: ${data.status_conciliacao || 'CONCILIADO'}\\n` +\n  `🔌 Bicos Auditados: ${data.bicos_analisados || 0}\\n` +\n  (data.observacoes ? `\\n📝 Obs: ${data.observacoes}` : '');\n\nreturn [{\n  json: {\n    number: '{{ $env.WHATSAPP_MANAGER_PHONE }}',\n    text: text,\n    raw_event: item.event || 'turno_fechamento'\n  }\n}];"
+      },
+      "name": "Formatar Card WhatsApp",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.EVOLUTION_API_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE || 'posto_aura' }}",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $json.number }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Evolution API (Disparo WhatsApp)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        720,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook AURA": {
+      "main": [
+        [
+          {
+            "node": "Formatar Card WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatar Card WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Evolution API (Disparo WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {}
+}

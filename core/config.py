@@ -8,7 +8,8 @@ Zero travessoes em todo o arquivo.
 from __future__ import annotations
 
 import os
-from typing import Dict, Any, Optional
+from typing import Any
+
 from dotenv import load_dotenv
 
 # Carrega variaveis de ambiente
@@ -24,7 +25,7 @@ ENABLE_GENUI: bool = _RAW_GENUI_ENV in ("1", "true", "yes", "on", "t")
 
 # Estado mutavel em tempo de execucao (Runtime Feature Flags)
 # Permite acionamento imediato de Circuit Breaker sem reiniciar o servidor
-_RUNTIME_FEATURE_FLAGS: Dict[str, Any] = {
+_RUNTIME_FEATURE_FLAGS: dict[str, Any] = {
     "ENABLE_GENUI": ENABLE_GENUI,
 }
 
@@ -46,14 +47,14 @@ def set_genui_enabled(enabled: bool) -> bool:
     return _RUNTIME_FEATURE_FLAGS["ENABLE_GENUI"]
 
 
-def get_feature_flags() -> Dict[str, Any]:
+def get_feature_flags() -> dict[str, Any]:
     """
     Retorna copia do dicionario de feature flags ativas no runtime.
     """
     return dict(_RUNTIME_FEATURE_FLAGS)
 
 
-def update_feature_flags(flags: Dict[str, Any]) -> Dict[str, Any]:
+def update_feature_flags(flags: dict[str, Any]) -> dict[str, Any]:
     """
     Atualiza multiplas feature flags no runtime de forma segura.
     """
@@ -73,9 +74,9 @@ def update_feature_flags(flags: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def resolve_genui_flag(
-    query_param: Optional[Any] = None,
-    header_val: Optional[str] = None,
-    body_val: Optional[bool] = None,
+    query_param: Any | None = None,
+    header_val: str | None = None,
+    body_val: bool | None = None,
 ) -> bool:
     """
     Resolve a precedencia estrita para habilitacao da experiencia GenUI:
@@ -118,4 +119,12 @@ PGVECTOR_LOCAL_HOST: str = os.getenv("VECTOR_DB_HOST", "localhost")
 PGVECTOR_LOCAL_DBNAME: str = os.getenv("VECTOR_DB_NAME", "posto_ai")
 PGVECTOR_LOCAL_USER: str = os.getenv("VECTOR_DB_USER", "postgres")
 PGVECTOR_LOCAL_PASS: str = os.getenv("VECTOR_DB_PASSWORD", "")
+
+# =============================================================================
+# CONFIGURACOES DO BANCO ERP & ROLE TECNICA DEDICADA (P1-1, P1-4)
+# =============================================================================
+ERP_SERVICE_USER: str = os.getenv("ERP_SERVICE_USER") or os.getenv("ERP_DB_USER", "aura_service_ro")
+ERP_SERVICE_PASS: str = os.getenv("ERP_SERVICE_PASS") or os.getenv("ERP_DB_PASSWORD", "")
+AURA_API_KEY: str = os.getenv("AURA_API_KEY", "aura_secret_admin_key_2026")
+
 

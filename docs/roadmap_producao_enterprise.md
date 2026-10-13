@@ -446,13 +446,13 @@ A Fase P2 viabiliza a expansão em escala corporativa para redes com dezenas ou 
 - [x] O arquivo pesado `bloco hero.txt` foi completamente removido do Git na branch `main`.
 
 ### 📋 Checklist Fase P1 (Consolidação Corporativa)
-- [ ] A role técnica `aura_service_ro` está provisionada no PostgreSQL do ERP e o acesso de escrita é rejeitado no nível de engine.
-- [ ] A suíte de testes é executada com sucesso através do comando nativo `pytest`.
-- [ ] O workflow do GitHub Actions em [`.github/workflows/ci.yml`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/.github/workflows/ci.yml) executa com sucesso em pull requests.
-- [ ] Endpoints de vouchers e configurações administrativas retornam HTTP 401 sem autenticação prévia.
-- [ ] O proxy reverso Caddy ou Nginx intercepta requisições HTTP e serve conexões seguras HTTPS.
-- [ ] Logs emitidos no console e em arquivo apresentam formato JSON com `request_id` válido.
-- [ ] Webhook do n8n dispara relatórios de turno formatados diretamente para o WhatsApp do gestor.
+- [x] A role técnica `aura_service_ro` está provisionada no PostgreSQL do ERP e o acesso de escrita é rejeitado no nível de engine.
+- [x] A suíte de testes é executada com sucesso através do comando nativo `pytest`.
+- [x] O workflow do GitHub Actions em [`.github/workflows/ci.yml`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/.github/workflows/ci.yml) executa com sucesso em pull requests.
+- [x] Endpoints de vouchers e configurações administrativas retornam HTTP 401 sem autenticação prévia.
+- [x] O proxy reverso Caddy ou Nginx intercepta requisições HTTP e serve conexões seguras HTTPS.
+- [x] Logs emitidos no console e em arquivo apresentam formato JSON com `request_id` válido.
+- [x] Webhook do n8n dispara relatórios de turno formatados diretamente para o WhatsApp do gestor.
 
 ### 📋 Checklist Fase P2 (Escala SaaS Multi-Postos)
 - [ ] As tabelas do banco vetorial são atualizadas exclusivamente via migrações declarativas do Alembic.

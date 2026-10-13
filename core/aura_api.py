@@ -11,44 +11,52 @@ Conectores:
 
 from __future__ import annotations
 
-import json
 import asyncio
+import json
+import os
+import time
+import uuid
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Tuple
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query, Request, status
-from fastapi.responses import StreamingResponse, FileResponse, Response
-from datetime import datetime, timezone
-from fastapi.staticfiles import StaticFiles
+from typing import Any
+
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from config.settings import AURA_API_KEY, get_cors_origins
 from core.aura_engine import (
     AuraEngine,
-    AuraChunk,
-    AuraResponse,
     StationStatus,
 )
 from core.config import (
-    resolve_genui_flag,
-    is_genui_enabled,
-    set_genui_enabled,
     get_feature_flags,
+    is_genui_enabled,
+    resolve_genui_flag,
     update_feature_flags,
 )
+from core.logger import current_client_ip, current_request_id, logger
 from core.schemas.genui import (
+    ActionAuditLogRecord,
     ActionExecuteRequest,
     ActionVoucher,
-    ActionAuditLogRecord,
     generate_action_voucher_signature,
 )
 from core.schemas.idempotency import generate_uuid4
-
+from core.webhooks import (
+    AlertaTanquePayload,
+    TurnoResumoPayload,
+    notify_alerta_tanque,
+    notify_fechamento_turno,
+)
 
 # Router oficial da AURA
 router = APIRouter(prefix="/api/v1/aura", tags=["AURA Core Engine"])
 
 # Instância Singleton do Motor (pode ser injetada externamente)
-_engine_instance: Optional[AuraEngine] = None
+_engine_instance: AuraEngine | None = None
 
 
 def get_aura_engine() -> AuraEngine:
@@ -65,6 +73,41 @@ def set_aura_engine(engine: AuraEngine):
     _engine_instance = engine
 
 
+def verify_admin_auth(request: Request = None) -> bool:
+    """
+    Valida autenticacao por API Key (header X-API-Key) ou Bearer Token (Authorization)
+    para endpoints administrativos e operacoes transacionais (P1-4).
+    """
+    configured_key = os.getenv("AURA_API_KEY") or AURA_API_KEY
+    enforce_auth = os.getenv("AURA_ENFORCE_ADMIN_AUTH", "0").lower() in ("1", "true", "yes")
+
+    provided_key = None
+    if request is not None:
+        header_key = request.headers.get("x-api-key")
+        if header_key:
+            provided_key = header_key.strip()
+        else:
+            auth_header = request.headers.get("authorization", "")
+            if auth_header.lower().startswith("bearer "):
+                provided_key = auth_header[7:].strip()
+
+    if provided_key is not None:
+        if provided_key == configured_key:
+            return True
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Autenticacao invalida: X-API-Key ou Bearer Token incorreto.",
+        )
+
+    if enforce_auth and configured_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Autenticacao necessaria: cabecalho X-API-Key ou Bearer Token ausente.",
+        )
+
+    return True
+
+
 # =============================================================================
 # PAYLOADS DE REQUISIÇÃO
 # =============================================================================
@@ -72,43 +115,43 @@ def set_aura_engine(engine: AuraEngine):
 class ChatRequest(BaseModel):
     """Contrato de entrada para conversação com a AURA."""
     query: str = Field(..., min_length=1, description="Pergunta ou instrução do usuário")
-    session_id: Optional[str] = Field(default=None, description="Identificador da sessão para continuidade")
+    session_id: str | None = Field(default=None, description="Identificador da sessão para continuidade")
     stream: bool = Field(default=True, description="Se true, retorna Server-Sent Events (SSE)")
-    tenant_id: Optional[str] = Field(default=None, description="Identificador do cliente/rede")
-    filial_id: Optional[str] = Field(default=None, description="Identificador da filial do posto")
-    context: Optional[Dict[str, Any]] = Field(default=None, description="Contexto extra opcional injetado pelo chamador")
-    genui: Optional[bool] = Field(default=None, description="Feature flag GenUI override (True=ativa, False=desativa)")
-    enable_genui: Optional[bool] = Field(default=None, description="Alias para genui")
+    tenant_id: str | None = Field(default=None, description="Identificador do cliente/rede")
+    filial_id: str | None = Field(default=None, description="Identificador da filial do posto")
+    context: dict[str, Any] | None = Field(default=None, description="Contexto extra opcional injetado pelo chamador")
+    genui: bool | None = Field(default=None, description="Feature flag GenUI override (True=ativa, False=desativa)")
+    enable_genui: bool | None = Field(default=None, description="Alias para genui")
 
 
 class TelemetryReportRequest(BaseModel):
     """Payload para envio de metricas de UX e hidratacao pelo frontend (F9-02)."""
-    metric_type: Optional[str] = Field(default=None, description="Tipo da metrica (ex: hydration, rollback, ttft)")
-    hydration_ms: Optional[float] = Field(default=None, description="Tempo de hidratacao em milissegundos")
-    ttft_ms: Optional[float] = Field(default=None, description="TTFT percebido no cliente")
-    action_status: Optional[str] = Field(default=None, description="Status da acao: requested, approved, rolled_back")
-    is_rollback: Optional[bool] = Field(default=False, description="Indica se a acao sofreu rollback")
-    is_security_block: Optional[bool] = Field(default=False, description="Indica se houve bloqueio de seguranca")
-    session_id: Optional[str] = None
-    tool_call_id: Optional[str] = None
-    action_id: Optional[str] = None
-    reason: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
+    metric_type: str | None = Field(default=None, description="Tipo da metrica (ex: hydration, rollback, ttft)")
+    hydration_ms: float | None = Field(default=None, description="Tempo de hidratacao em milissegundos")
+    ttft_ms: float | None = Field(default=None, description="TTFT percebido no cliente")
+    action_status: str | None = Field(default=None, description="Status da acao: requested, approved, rolled_back")
+    is_rollback: bool | None = Field(default=False, description="Indica se a acao sofreu rollback")
+    is_security_block: bool | None = Field(default=False, description="Indica se houve bloqueio de seguranca")
+    session_id: str | None = None
+    tool_call_id: str | None = None
+    action_id: str | None = None
+    reason: str | None = None
+    details: dict[str, Any] | None = None
 
 
 class FeatureFlagsUpdateRequest(BaseModel):
     """Payload para comutacao a quente de feature flags no runtime (F9-03)."""
-    ENABLE_GENUI: Optional[bool] = None
-    enable_genui: Optional[bool] = None
-    flags: Optional[Dict[str, Any]] = None
+    ENABLE_GENUI: bool | None = None
+    enable_genui: bool | None = None
+    flags: dict[str, Any] | None = None
 
 
 class ExecuteIntentRequest(BaseModel):
     """Contrato de invocação direta de ferramenta analítica sem prompt de LLM."""
     tool_name: str = Field(..., description="Nome da ferramenta (ex: previsao_tanques, lmc_anp, auditoria_turno)")
-    params: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Parâmetros específicos da ferramenta")
-    tenant_id: Optional[str] = Field(default=None, description="Identificador do cliente")
-    filial_id: Optional[str] = Field(default=None, description="Identificador da filial")
+    params: dict[str, Any] | None = Field(default_factory=dict, description="Parâmetros específicos da ferramenta")
+    tenant_id: str | None = Field(default=None, description="Identificador do cliente")
+    filial_id: str | None = Field(default=None, description="Identificador da filial")
 
 
 # =============================================================================
@@ -120,7 +163,7 @@ class ExecuteIntentRequest(BaseModel):
 async def chat_endpoint(
     req: ChatRequest,
     request: Request = None,
-    genui: Optional[str] = Query(None, description="Feature flag GenUI override (1=ativa, 0=desativa)"),
+    genui: str | None = Query(None, description="Feature flag GenUI override (1=ativa, 0=desativa)"),
     engine: AuraEngine = Depends(get_aura_engine),
 ):
     """
@@ -177,10 +220,10 @@ async def chat_endpoint(
 async def chat_stream_get_endpoint(
     request: Request,
     query: str = Query(..., min_length=1, description="Pergunta ou instrucao do usuario"),
-    session_id: Optional[str] = Query(None, description="Identificador da sessao"),
-    tenant_id: Optional[str] = Query(None, description="Identificador do cliente"),
-    filial_id: Optional[str] = Query(None, description="Identificador da filial"),
-    genui: Optional[str] = Query(None, description="Feature flag GenUI override (1=ativa, 0=desativa)"),
+    session_id: str | None = Query(None, description="Identificador da sessao"),
+    tenant_id: str | None = Query(None, description="Identificador do cliente"),
+    filial_id: str | None = Query(None, description="Identificador da filial"),
+    genui: str | None = Query(None, description="Feature flag GenUI override (1=ativa, 0=desativa)"),
     engine: AuraEngine = Depends(get_aura_engine),
 ):
     """
@@ -239,9 +282,9 @@ async def execute_intent_endpoint(
 def _dispatch_business_action(
     action_name: str,
     action_type: str,
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     operator_id: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Executa as rotinas de negocio autorizadas para a operacao do posto e conveniencia.
     Trata pedidos de combustivel, estancamento de quebra, ajuste de margem e conciliacao.
@@ -259,7 +302,7 @@ def _dispatch_business_action(
             "delta_preco": float(payload.get("delta_preco") or 0.10),
             "elasticidade": float(payload.get("elasticidade") or -0.65),
             "executado_por": operator_id,
-            "confirmacao_erp": f"REP-{int(datetime.now(timezone.utc).timestamp())}",
+            "confirmacao_erp": f"REP-{int(datetime.now(UTC).timestamp())}",
         }
 
     # Absorcao de margem operacional
@@ -269,7 +312,7 @@ def _dispatch_business_action(
             "tipo": "ABSORCAO_MARGEM",
             "impacto_margem_pct": float(payload.get("impacto_margem_pct") or -0.5),
             "executado_por": operator_id,
-            "confirmacao_erp": f"ABS-{int(datetime.now(timezone.utc).timestamp())}",
+            "confirmacao_erp": f"ABS-{int(datetime.now(UTC).timestamp())}",
         }
 
     # Revisao de estrategia de precos (Benchmark)
@@ -279,7 +322,7 @@ def _dispatch_business_action(
             "tipo": "REVISAO_ESTRATEGIA",
             "escopo": payload.get("escopo") or "Precos e Margem Competitiva",
             "executado_por": operator_id,
-            "confirmacao_erp": f"ESTR-{int(datetime.now(timezone.utc).timestamp())}",
+            "confirmacao_erp": f"ESTR-{int(datetime.now(UTC).timestamp())}",
         }
 
     # Auditoria de concorrencia no raio
@@ -289,7 +332,7 @@ def _dispatch_business_action(
             "tipo": "AUDITORIA_CONCORRENCIA",
             "raio_km": float(payload.get("raio_km") or 3.0),
             "executado_por": operator_id,
-            "confirmacao_erp": f"BENCH-{int(datetime.now(timezone.utc).timestamp())}",
+            "confirmacao_erp": f"BENCH-{int(datetime.now(UTC).timestamp())}",
         }
 
     # Abertura de chamado TEF (Fuga Financeira)
@@ -300,8 +343,8 @@ def _dispatch_business_action(
             "terminal": payload.get("terminal") or "POS Sem Fio 03",
             "motivo": payload.get("motivo") or "Divergencia de liquidacao TEF",
             "executado_por": operator_id,
-            "protocolo_chamado": f"TEF-{int(datetime.now(timezone.utc).timestamp())}",
-            "confirmacao_erp": f"TEF-{int(datetime.now(timezone.utc).timestamp())}",
+            "protocolo_chamado": f"TEF-{int(datetime.now(UTC).timestamp())}",
+            "confirmacao_erp": f"TEF-{int(datetime.now(UTC).timestamp())}",
         }
 
     # Lancamento de campanha de incentivo a frentistas
@@ -312,7 +355,7 @@ def _dispatch_business_action(
             "meta_conversao_pct": float(payload.get("meta_conversao_pct") or 25.0),
             "bonificacao_reais": float(payload.get("bonificacao_reais") or 1.50),
             "executado_por": operator_id,
-            "confirmacao_erp": f"CAMP-{int(datetime.now(timezone.utc).timestamp())}",
+            "confirmacao_erp": f"CAMP-{int(datetime.now(UTC).timestamp())}",
         }
 
     # Ativacao de combo no PDV / Vendas Cruzadas
@@ -326,7 +369,7 @@ def _dispatch_business_action(
             "recomendado": str(recomendado),
             "desconto_combo_pct": float(payload.get("desconto_pct") or 5.0),
             "executado_por": operator_id,
-            "confirmacao_erp": f"COMBO-{int(datetime.now(timezone.utc).timestamp())}",
+            "confirmacao_erp": f"COMBO-{int(datetime.now(UTC).timestamp())}",
         }
 
     # Pedido de combustivel / Carreta
@@ -341,8 +384,8 @@ def _dispatch_business_action(
             "combustivel": str(combustivel).upper(),
             "fornecedor": str(fornecedor),
             "executado_por": operator_id,
-            "data_programada": payload.get("data_programada") or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-            "confirmacao_erp": f"PED-{int(datetime.now(timezone.utc).timestamp())}",
+            "data_programada": payload.get("data_programada") or datetime.now(UTC).strftime("%Y-%m-%d"),
+            "confirmacao_erp": f"PED-{int(datetime.now(UTC).timestamp())}",
         }
 
     # Estancamento de quebra / Sangria de caixa
@@ -356,7 +399,7 @@ def _dispatch_business_action(
             "turno": int(turno),
             "operador_notificado": payload.get("operador") or operator_id,
             "motivo": payload.get("motivo") or "Quebra divergente estancada preventivamente",
-            "confirmacao_erp": f"SANGRIA-{int(datetime.now(timezone.utc).timestamp())}",
+            "confirmacao_erp": f"SANGRIA-{int(datetime.now(UTC).timestamp())}",
         }
 
     # Ajuste de margem / Reprecificacao
@@ -369,7 +412,7 @@ def _dispatch_business_action(
             "produto": str(produto),
             "novo_preco": float(novo_preco),
             "margem_alvo_pct": float(payload.get("margem_alvo_pct") or 18.0),
-            "confirmacao_erp": f"PREC-{int(datetime.now(timezone.utc).timestamp())}",
+            "confirmacao_erp": f"PREC-{int(datetime.now(UTC).timestamp())}",
         }
 
     # Reconciliacao / Homologacao de turno
@@ -379,10 +422,10 @@ def _dispatch_business_action(
             "status": "APPROVED",
             "tipo": "CONCILIACAO_TURNO",
             "turno": int(turno),
-            "data": payload.get("data") or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "data": payload.get("data") or datetime.now(UTC).strftime("%Y-%m-%d"),
             "score": float(payload.get("score") or 98.5),
             "status_fiscal": "HOMOLOGADO",
-            "confirmacao_erp": f"HOMOL-{int(datetime.now(timezone.utc).timestamp())}",
+            "confirmacao_erp": f"HOMOL-{int(datetime.now(UTC).timestamp())}",
         }
 
     # Padrao / Generico
@@ -392,7 +435,7 @@ def _dispatch_business_action(
         "action_type": action_type,
         "executado_por": operator_id,
         "payload": payload,
-        "confirmacao_erp": f"TX-{int(datetime.now(timezone.utc).timestamp())}",
+        "confirmacao_erp": f"TX-{int(datetime.now(UTC).timestamp())}",
     }
 
 
@@ -452,8 +495,8 @@ CASHIER_MUTATION_KEYWORDS = [
 def evaluate_action_permission(
     action_name: str,
     action_type: str,
-    operator_role: Optional[str] = "gerente"
-) -> Tuple[bool, int, str]:
+    operator_role: str | None = "gerente"
+) -> tuple[bool, int, str]:
     """
     Avalia a autorizacao do operador com base no perfil RBAC (F7-03).
     Retorna (autorizado: bool, nivel_minimo: int, mensagem: str).
@@ -502,7 +545,8 @@ def evaluate_action_permission(
 @router.post(
     "/actions/execute",
     response_model=ActionVoucher,
-    summary="Execucao Transacional de Acoes GenUI (Human-in-the-Loop Gateway)"
+    summary="Execucao Transacional de Acoes GenUI (Human-in-the-Loop Gateway)",
+    dependencies=[Depends(verify_admin_auth)],
 )
 async def execute_action_endpoint(
     req: ActionExecuteRequest,
@@ -612,7 +656,7 @@ async def execute_action_endpoint(
 
     # 4. Geracao do Comprovante (Action Voucher)
     voucher_id = generate_uuid4()
-    ts_now = datetime.now(timezone.utc).isoformat()
+    ts_now = datetime.now(UTC).isoformat()
     signature = generate_action_voucher_signature(
         voucher_id=voucher_id,
         action_id=req.action_id,
@@ -692,14 +736,15 @@ async def execute_action_endpoint(
 
 @router.get(
     "/audit/logs",
-    response_model=List[ActionAuditLogRecord],
-    summary="Consulta da Trilha de Auditoria Transacional (OWASP LLM & Governanca)"
+    response_model=list[ActionAuditLogRecord],
+    summary="Consulta da Trilha de Auditoria Transacional (OWASP LLM & Governanca)",
+    dependencies=[Depends(verify_admin_auth)],
 )
 async def get_audit_logs_endpoint(
-    session_id: Optional[str] = Query(None, description="Filtrar por session_id"),
-    action_id: Optional[str] = Query(None, description="Filtrar por action_id"),
-    operator_id: Optional[str] = Query(None, description="Filtrar por operator_id"),
-    status: Optional[str] = Query(None, description="Filtrar por status (APPROVED, REJECTED_FORBIDDEN, FAILED)"),
+    session_id: str | None = Query(None, description="Filtrar por session_id"),
+    action_id: str | None = Query(None, description="Filtrar por action_id"),
+    operator_id: str | None = Query(None, description="Filtrar por operator_id"),
+    status: str | None = Query(None, description="Filtrar por status (APPROVED, REJECTED_FORBIDDEN, FAILED)"),
     limit: int = Query(50, ge=1, le=500, description="Limite maximo de registros retornados"),
     engine: AuraEngine = Depends(get_aura_engine),
 ):
@@ -753,7 +798,11 @@ async def report_telemetry_endpoint(
 # CONTINGENCIA & GESTAO DE FEATURE FLAGS (CIRCUIT BREAKER - F9-03)
 # =============================================================================
 
-@router.get("/admin/feature-flags", summary="Inspecao de Feature Flags Ativas (Circuit Breaker)")
+@router.get(
+    "/admin/feature-flags",
+    summary="Inspecao de Feature Flags Ativas (Circuit Breaker)",
+    dependencies=[Depends(verify_admin_auth)],
+)
 async def get_feature_flags_endpoint():
     """
     Retorna o status atual das feature flags ativas no runtime.
@@ -762,11 +811,15 @@ async def get_feature_flags_endpoint():
         "status": "ok",
         "ENABLE_GENUI": is_genui_enabled(),
         "flags": get_feature_flags(),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
-@router.post("/admin/feature-flags", summary="Atualizacao a Quente de Feature Flags (Circuit Breaker)")
+@router.post(
+    "/admin/feature-flags",
+    summary="Atualizacao a Quente de Feature Flags (Circuit Breaker)",
+    dependencies=[Depends(verify_admin_auth)],
+)
 async def update_feature_flags_endpoint(req: FeatureFlagsUpdateRequest):
     """
     Permite alterar a quente o valor de ENABLE_GENUI ou outras flags no runtime,
@@ -785,9 +838,48 @@ async def update_feature_flags_endpoint(req: FeatureFlagsUpdateRequest):
         "status": "updated",
         "ENABLE_GENUI": is_genui_enabled(),
         "flags": updated_flags,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
-@router.get("/stations", response_model=List[StationStatus], summary="Diagnóstico e Status das Estações")
+
+
+# =============================================================================
+# ESTEIRA DE WEBHOOKS ASSINCRONOS (WHATSAPP, N8N, EVOLUTION API - P1-7)
+# =============================================================================
+
+@router.post(
+    "/webhooks/turno-fechamento",
+    summary="Despacho de Resumo de Turno para Webhooks n8n e WhatsApp",
+    dependencies=[Depends(verify_admin_auth)],
+)
+async def dispatch_turno_fechamento_endpoint(
+    req: TurnoResumoPayload,
+    phone: str | None = Query(None, description="Telefone WhatsApp de destino opcional"),
+    webhook_url: str | None = Query(None, description="URL do webhook n8n opcional"),
+):
+    """
+    Dispara o resumo consolidado de fechamento de turno para o n8n e Evolution API.
+    """
+    res = await notify_fechamento_turno(payload=req, phone=phone, webhook_url=webhook_url)
+    return {"status": "dispatched", "details": res}
+
+
+@router.post(
+    "/webhooks/alerta-tanque",
+    summary="Despacho de Alerta de Ruptura de Tanque para n8n e WhatsApp",
+    dependencies=[Depends(verify_admin_auth)],
+)
+async def dispatch_alerta_tanque_endpoint(
+    req: AlertaTanquePayload,
+    phone: str | None = Query(None, description="Telefone WhatsApp de destino opcional"),
+    webhook_url: str | None = Query(None, description="URL do webhook n8n opcional"),
+):
+    """
+    Dispara alerta urgente de nivel critico de combustivel para o n8n e Evolution API.
+    """
+    res = await notify_alerta_tanque(payload=req, phone=phone, webhook_url=webhook_url)
+    return {"status": "dispatched", "details": res}
+
+@router.get("/stations", response_model=list[StationStatus], summary="Diagnóstico e Status das Estações")
 async def stations_endpoint(
     engine: AuraEngine = Depends(get_aura_engine),
 ):
@@ -813,7 +905,7 @@ async def health_endpoint():
 # FACTORY DA APLICAÇÃO STANDALONE
 # =============================================================================
 
-def create_aura_app(engine: Optional[AuraEngine] = None) -> FastAPI:
+def create_aura_app(engine: AuraEngine | None = None) -> FastAPI:
     """Cria e configura uma instância completa da aplicação FastAPI para a AURA."""
     if engine is not None:
         set_aura_engine(engine)
@@ -824,10 +916,65 @@ def create_aura_app(engine: Optional[AuraEngine] = None) -> FastAPI:
         version="1.0.0",
     )
 
-    # Middleware CORS para integração local fluida
+    # Middleware de Correlacao X-Request-ID e Logging Estruturado JSON (P1-6)
+    @app.middleware("http")
+    async def request_correlation_logging_middleware(request: Request, call_next):
+        req_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+        token_req = current_request_id.set(req_id)
+
+        client_ip = request.headers.get("x-forwarded-for")
+        if client_ip:
+            client_ip = client_ip.split(",")[0].strip()
+        elif request.headers.get("x-real-ip"):
+            client_ip = request.headers.get("x-real-ip").strip()
+        elif request.client:
+            client_ip = request.client.host
+        else:
+            client_ip = "127.0.0.1"
+        token_ip = current_client_ip.set(client_ip)
+
+        t0 = time.perf_counter()
+        try:
+            response = await call_next(request)
+            elapsed_ms = (time.perf_counter() - t0) * 1000
+            response.headers["X-Request-ID"] = req_id
+
+            if request.url.path.startswith("/api/"):
+                logger.info(
+                    f"{request.method} {request.url.path} - status {response.status_code} ({elapsed_ms:.1f}ms)",
+                    extra={
+                        "request_id": req_id,
+                        "client_ip": client_ip,
+                        "route": request.url.path,
+                        "method": request.method,
+                        "status_code": response.status_code,
+                        "elapsed_ms": elapsed_ms,
+                    }
+                )
+            return response
+        except Exception as exc:
+            elapsed_ms = (time.perf_counter() - t0) * 1000
+            logger.error(
+                f"Erro nao tratado em {request.method} {request.url.path}: {exc}",
+                extra={
+                    "request_id": req_id,
+                    "client_ip": client_ip,
+                    "route": request.url.path,
+                    "method": request.method,
+                    "elapsed_ms": elapsed_ms,
+                },
+                exc_info=True,
+            )
+            raise exc
+        finally:
+            current_request_id.reset(token_req)
+            current_client_ip.reset(token_ip)
+
+    # Middleware CORS com Origens Restritas Parametrizadas (P1-4)
+    cors_origins = get_cors_origins()
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
