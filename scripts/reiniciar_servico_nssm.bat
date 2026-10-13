@@ -24,8 +24,20 @@ if %errorlevel% neq 0 (
 
 :: 2. Reinicio do Servico
 if exist "%NSSM_EXE%" (
-    echo [INFO] Reiniciando servico %SERVICE_NAME% via NSSM...
-    "%NSSM_EXE%" restart %SERVICE_NAME%
+    echo [INFO] Interrompendo servico %SERVICE_NAME% via NSSM...
+    "%NSSM_EXE%" stop %SERVICE_NAME% >nul 2>&1
+    
+    :: Se estiver preso em STOP_PENDING, forca o encerramento do processo pendente
+    for /f "tokens=3" %%a in ('sc queryex %SERVICE_NAME% ^| findstr /i "PID"') do (
+        if "%%a" neq "0" (
+            echo [INFO] Limpando processo pendente (PID %%a)...
+            taskkill /f /pid %%a >nul 2>&1
+        )
+    )
+    
+    timeout /t 2 /nobreak >nul
+    echo [INFO] Iniciando servico %SERVICE_NAME% via NSSM...
+    "%NSSM_EXE%" start %SERVICE_NAME%
 ) else (
     echo [INFO] Reiniciando via comandos net stop / net start...
     net stop %SERVICE_NAME% >nul 2>&1
