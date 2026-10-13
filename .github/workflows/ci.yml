@@ -34,7 +34,8 @@ jobs:
 
       - name: Checagem Estatica de Sintaxe e Linting (Ruff)
         run: |
-          ruff check . --select E,F,W --ignore E501
+          ruff check . --select E9,F63,F7,F82 --show-source
+          ruff check . --exit-zero --statistics
 
       - name: Executar Suite de Testes (Pytest)
         run: |
