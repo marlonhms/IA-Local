@@ -30,6 +30,7 @@ backups/*
 *.bak
 *.dump
 *.sql
+!scripts/*.sql
 *.db
 *.sqlite
 *.sqlite3
