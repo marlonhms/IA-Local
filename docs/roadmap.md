@@ -614,4 +614,12 @@ Uma tarefa só pode ser marcada como concluída quando houver evidência corresp
 |---|---|---|
 | 05/10/2026 | 1.0 | Roadmap inicial baseado no README e na revisão UI/UX da conversa |
 | 06/10/2026 | 1.1 | Conclusão da Fase 6 — Qualidade, Resiliência a Falhas & Auditoria de Lançamento (17 cenários da Seção 11 validados com 100% de sucesso) |
+| 13/10/2026 | 1.2 | Vinculação com o Roadmap de Produção Enterprise cobrindo prontidão operacional de campo (Fases P0, P1 e P2) |
+
+---
+
+### Relação com os Demais Roadmaps Técnicos
+
+- **Roadmap de Produção Enterprise (Missão Crítica & Infraestrutura):** Para diretrizes de segurança, pool de conexões, resiliência offline, serviço Windows nativo (NSSM) e observabilidade SRE, consulte [`docs/roadmap_producao_enterprise.md`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/docs/roadmap_producao_enterprise.md).
+- **Roadmap Estratégico & Engenharia de Execução:** Para arquitetura do motor cognitivo, RAG híbrido e ferramentas de inteligência analítica, consulte [`docs/roadmap_aila.md`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/docs/roadmap_aila.md).
 

@@ -55,3 +55,6 @@ local.properties
 **/build/
 *.apk
 *.aab
+
+# Dumps e textos brutos de desenvolvimento
+bloco hero.txt
