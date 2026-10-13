@@ -1606,6 +1606,163 @@
   }
 
   // =========================================================================
+  // 7b. MICRO-WIDGET: ShiftReconciliationUI (Conciliação de Turno & Caixa)
+  // =========================================================================
+
+  class ShiftReconciliationUI extends BaseGenUIWidget {
+    constructor(payload = {}) {
+      super(payload, 'auditoria_turno', 'render_ShiftReconciliationUI');
+      this.cardClass = 'genui-shift-reconciliation-card';
+      this.ariaLabel = 'Auditoria de Fechamento de Turno e Caixa AURA';
+    }
+
+    renderLayer1() {
+      const p = this.props || {};
+      const severity = p.severity || 'attention';
+      const diff = Number(p.difference ?? p.dif_val ?? 0);
+      const isProv = Boolean(p.is_provisional);
+      const diagnosisText = p.diagnosis || p.explanation || this.summary || 'Auditoria de conciliação de turno e conferência de caixa.';
+      const shiftName = p.turno_auditado || p.audited_shift || 'TODOS OS TURNOS';
+      const dateAudit = p.data_auditada || '';
+
+      const sevBadge = severity === 'critical'
+        ? '<span class="text-rose-300 border-rose-500/40 bg-rose-500/10 px-2 py-0.5 rounded-full font-mono text-[11px] font-bold">DIVERGÊNCIA CRÍTICA</span>'
+        : (severity === 'attention' || isProv
+          ? '<span class="text-amber-300 border-amber-500/40 bg-amber-500/10 px-2 py-0.5 rounded-full font-mono text-[11px] font-bold">CONFERÊNCIA PENDENTE</span>'
+          : '<span class="text-emerald-300 border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono text-[11px] font-bold">FECHAMENTO CONFORME</span>');
+
+      const diffColor = diff < 0
+        ? 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+        : (diff > 0 ? 'text-cyan-300 bg-cyan-500/10 border-cyan-500/20' : 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20');
+
+      const diffLabel = diff < 0
+        ? `Quebra: -R$ ${formatNumber(Math.abs(diff))}`
+        : (diff > 0 ? `Sobra: +R$ ${formatNumber(diff)}` : 'Diferença: R$ 0,00');
+
+      return `
+        <div class="genui-layer genui-layer-1 mb-4 pb-3 border-b border-white/10">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full ${diff !== 0 ? 'bg-amber-400' : 'bg-emerald-400'} animate-pulse flex-shrink-0"></span>
+              <h4 class="text-xs font-mono font-bold tracking-wider text-cyan-300 uppercase">
+                AURA Shift &amp; Cash Reconciliation
+              </h4>
+              <span class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">
+                ${escapeHtml(shiftName)}${dateAudit ? ' • ' + escapeHtml(dateAudit) : ''}
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              ${sevBadge}
+              <span class="text-xs font-mono font-bold ${diffColor} px-2 py-0.5 rounded border">
+                ${diffLabel}
+              </span>
+            </div>
+          </div>
+          ${p.aviso_data ? `
+            <div class="mb-2.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 flex items-center gap-2">
+              <span class="text-amber-400">ℹ️</span>
+              <span>${escapeHtml(p.aviso_data)}</span>
+            </div>
+          ` : ''}
+          <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Diagnóstico do Fechamento</span>
+            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+              ${escapeHtml(diagnosisText)}
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const p = this.props || {};
+      const autoRev = Number(p.automation_revenue ?? 0);
+      const posRev = Number(p.pos_revenue ?? 0);
+      const diff = Number(p.difference ?? 0);
+      const pendingItems = Array.isArray(p.pending_items) ? p.pending_items : [];
+
+      const diffClass = diff < 0 ? 'text-rose-400' : (diff > 0 ? 'text-cyan-300' : 'text-emerald-300');
+
+      return `
+        <div class="genui-layer genui-layer-2 mb-4 space-y-3">
+          <div class="grid grid-cols-3 gap-2">
+            <div class="p-2.5 rounded-xl bg-slate-950/40 border border-cyan-500/20 text-center">
+              <span class="text-[10px] text-slate-400">Pista (Automação)</span>
+              <div class="text-sm sm:text-base font-mono font-bold text-cyan-300">
+                R$ ${formatNumber(autoRev)}
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-950/40 border border-indigo-500/20 text-center">
+              <span class="text-[10px] text-slate-400">Caixa (PDV)</span>
+              <div class="text-sm sm:text-base font-mono font-bold text-indigo-300">
+                R$ ${formatNumber(posRev)}
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-950/40 border ${diff < 0 ? 'border-rose-500/20' : 'border-emerald-500/20'} text-center">
+              <span class="text-[10px] text-slate-400">Diferença Apurada</span>
+              <div class="text-sm sm:text-base font-mono font-bold ${diffClass}">
+                ${diff >= 0 ? '+R$ ' : '-R$ '}${formatNumber(Math.abs(diff))}
+              </div>
+            </div>
+          </div>
+
+          ${pendingItems.length > 0 ? `
+            <div class="space-y-1.5">
+              <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 font-mono">Pendências Operacionais</span>
+              ${pendingItems.map(it => {
+                const desc = escapeHtml(it.description || it.title || 'Item pendente');
+                const val = Number(it.value ?? it.amount ?? 0);
+                const terminal = it.terminal || it.pdv_or_terminal || 'Caixa';
+                return `
+                  <div class="p-2.5 rounded-xl bg-slate-950/40 border border-white/5 flex items-center justify-between text-xs">
+                    <div>
+                      <span class="font-mono font-semibold text-slate-200">${desc}</span>
+                      <span class="text-[10px] text-slate-400 ml-2 font-mono">(${escapeHtml(terminal)})</span>
+                    </div>
+                    <div class="font-mono font-bold ${val > 0 ? 'text-amber-300' : 'text-slate-400'}">
+                      ${val > 0 ? 'R$ ' + formatNumber(val) : 'Aberto'}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    getDefaultActionsHtml() {
+      const shouldDisable = this.state.isLocked || this.isExpired();
+      return `
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold hover:brightness-110 ${shouldDisable ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
+                data-action-id="act_shift_homologar"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}"
+                ${shouldDisable ? 'disabled' : ''}>
+          <span>⚡ Homologar Fechamento de Turno</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-rose-300 border border-rose-500/30 hover:bg-slate-700"
+                data-action-id="act_shift_sangria"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>🚨 Forçar Sangria / Regularizar Caixa</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 text-slate-300 border border-white/10 hover:bg-slate-800"
+                data-action-id="act_shift_canvas"
+                data-action-type="inspection"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>🔍 Auditar Caixa no Canvas</span>
+        </button>
+      `;
+    }
+  }
+
+  const ShiftReconciliationWidget = ShiftReconciliationUI;
+
+  // =========================================================================
   // 8. MICRO-WIDGET 5: BasketUpsellStrategyUI (Fase 6: F6-02)
   // =========================================================================
 
@@ -1797,6 +1954,12 @@
         cls: BasketUpsellStrategyUI,
         aliases: ['BasketUpsellStrategyUI', 'BasketUpsellWidget'],
         intent: 'conveniencia_vendas_cruzadas'
+      },
+      {
+        name: 'render_ShiftReconciliationUI',
+        cls: ShiftReconciliationUI,
+        aliases: ['ShiftReconciliationUI', 'ShiftReconciliationWidget'],
+        intent: 'auditoria_turno'
       }
     ];
 
@@ -1928,6 +2091,8 @@
     window.AuraGenUI.FinancialLeakAuditWidget = FinancialLeakAuditWidget;
     window.AuraGenUI.BasketUpsellStrategyUI = BasketUpsellStrategyUI;
     window.AuraGenUI.BasketUpsellWidget = BasketUpsellWidget;
+    window.AuraGenUI.ShiftReconciliationUI = ShiftReconciliationUI;
+    window.AuraGenUI.ShiftReconciliationWidget = ShiftReconciliationWidget;
     window.AuraGenUI.initGlobalActionDelegation = initGlobalGenUIActionDelegation;
     window.initGlobalGenUIActionDelegation = initGlobalGenUIActionDelegation;
 
@@ -1954,6 +2119,8 @@
       ComparativeBenchmarkWidget,
       FinancialLeakAuditUI,
       FinancialLeakAuditWidget,
+      ShiftReconciliationUI,
+      ShiftReconciliationWidget,
       BasketUpsellStrategyUI,
       BasketUpsellWidget,
       registerWidgets,

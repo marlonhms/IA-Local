@@ -1569,12 +1569,12 @@ def build_canonical_genui_envelope(
                 )
             )
 
-    elif intencao == "auditoria_turno":
+    elif intencao == "auditoria_turno" or comp_name == "render_ShiftReconciliationUI":
         if not actions:
             actions.append(
                 GenUIActionOption(
                     action_id=generate_action_id(),
-                    label="Homologar Fechamento de Turno",
+                    label="⚡ Homologar Fechamento de Turno",
                     action_type="mutation",
                     variant="primary",
                     is_destructive=False,
@@ -1585,14 +1585,44 @@ def build_canonical_genui_envelope(
             actions.append(
                 GenUIActionOption(
                     action_id=generate_action_id(),
-                    label="Auditar Caixa no Canvas",
-                    action_type="inspection",
+                    label="🚨 Forçar Sangria / Regularizar Caixa",
+                    action_type="mutation",
                     variant="secondary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": intencao, "operacao": "forcar_sangria"},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🔍 Auditar Caixa no Canvas",
+                    action_type="inspection",
+                    variant="ghost",
                     is_destructive=False,
                     requires_confirmation=False,
                     payload={"perspective": "caixas"},
                 )
             )
+
+        # Popula props determinísticas para ShiftReconciliationUI
+        metrics_dict = props.get("metrics") or {}
+        assessment_dict = props.get("assessment") or {}
+        explanation_dict = props.get("explanation") or {}
+
+        diff_val = float(metrics_dict.get("difference", props.get("difference", 0.0)) or 0.0)
+        props["difference"] = diff_val
+        props["automation_revenue"] = float(metrics_dict.get("automation_revenue", props.get("automation_revenue", 0.0)) or 0.0)
+        props["pos_revenue"] = float(metrics_dict.get("pos_revenue", props.get("pos_revenue", 0.0)) or 0.0)
+        props["is_provisional"] = bool(metrics_dict.get("is_provisional", props.get("is_provisional", False)))
+        props["severity"] = assessment_dict.get("severity", props.get("severity", "attention" if diff_val != 0 else "normal"))
+        props["diagnosis"] = explanation_dict.get("text") or assessment_dict.get("title") or props.get("diagnosis") or executive_summary or "Auditoria de conciliação de turno apurada."
+        props["confidence_score"] = float(props.get("confidence_score") or 0.95)
+        props["turno_auditado"] = props.get("turno_auditado") or props.get("audited_shift") or "TODOS OS TURNOS"
+        props["data_auditada"] = props.get("data_auditada") or ""
+        props["aviso_data"] = props.get("aviso_data") or ""
+        props["pending_items"] = props.get("pending_items") or []
+        props["suggested_actions"] = [a.model_dump(mode="json") for a in actions]
 
     elif intencao == "lmc_anp":
         if not actions:
