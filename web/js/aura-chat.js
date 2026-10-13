@@ -5432,6 +5432,9 @@ class AuraChatController {
 
   escapeHtml(str) {
     if (str === null || str === undefined) return '';
+    if (typeof str === 'object') {
+      str = str.text || str.summary || str.title || str.diagnostico_caixa || str.message || JSON.stringify(str);
+    }
     return String(str)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')

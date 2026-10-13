@@ -29,6 +29,9 @@
 
   function escapeHtml(str) {
     if (str === null || str === undefined) return '';
+    if (typeof str === 'object') {
+      str = str.text || str.summary || str.title || str.diagnostico_caixa || str.message || JSON.stringify(str);
+    }
     return String(str)
       .replace(/\0/g, '')
       .replace(/&/g, '&amp;')
@@ -1619,9 +1622,15 @@
     renderLayer1() {
       const p = this.props || {};
       const severity = p.severity || 'attention';
-      const diff = Number(p.difference ?? p.dif_val ?? 0);
+      const diff = Number(p.difference ?? p.dif_val ?? p.diferenca_financeira_caixa ?? 0);
       const isProv = Boolean(p.is_provisional);
-      const diagnosisText = p.diagnosis || p.explanation || this.summary || 'Auditoria de conciliação de turno e conferência de caixa.';
+      let diagnosisText = p.diagnosis || p.diagnostico_caixa || p.explanation || this.summary || '';
+      if (typeof diagnosisText === 'object' && diagnosisText !== null) {
+        diagnosisText = diagnosisText.text || diagnosisText.summary || diagnosisText.title || diagnosisText.diagnostico_caixa || JSON.stringify(diagnosisText);
+      }
+      if (!diagnosisText || typeof diagnosisText !== 'string') {
+        diagnosisText = 'Auditoria de conciliação de turno e conferência de caixa.';
+      }
       const shiftName = p.turno_auditado || p.audited_shift || 'TODOS OS TURNOS';
       const dateAudit = p.data_auditada || '';
 
@@ -1676,9 +1685,9 @@
 
     renderLayer2() {
       const p = this.props || {};
-      const autoRev = Number(p.automation_revenue ?? 0);
-      const posRev = Number(p.pos_revenue ?? 0);
-      const diff = Number(p.difference ?? 0);
+      const autoRev = Number(p.automation_revenue ?? p.faturamento_pista_total ?? (p.metrics && p.metrics.automation_revenue) ?? 0);
+      const posRev = Number(p.pos_revenue ?? p.faturamento_caixa_total ?? (p.metrics && p.metrics.pos_revenue) ?? 0);
+      const diff = Number(p.difference ?? p.diferenca_financeira_caixa ?? (p.metrics && p.metrics.difference) ?? (posRev - autoRev));
       const pendingItems = Array.isArray(p.pending_items) ? p.pending_items : [];
 
       const diffClass = diff < 0 ? 'text-rose-400' : (diff > 0 ? 'text-cyan-300' : 'text-emerald-300');

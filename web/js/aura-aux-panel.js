@@ -1,4 +1,4 @@
-﻿/**
+/**
  * AURA Dynamic Inspector Panel / Companion Canvas Controller (v1.0.0)
  * 
  * Gerencia o Painel Auxiliar Interativo acoplado ao chat da AURA:
@@ -1301,27 +1301,34 @@ class AuraAuxPanel {
     }
 
     // MÓDULO 5: CONCILIAÇÃO DE TURNO & CAIXA
-    else if (effectiveIntent === 'shift_reconciliation' || toolName === 'conciliacao_turno' || toolName === 'auditoria_turno') {
+    else if (effectiveIntent === 'shift_reconciliation' || toolName === 'conciliacao_turno' || toolName === 'auditoria_turno' || toolName === 'render_ShiftReconciliationUI' || toolName === 'ShiftReconciliationUI') {
       title = '💰 Conciliação de Turno & Caixa';
       subtitle = 'Triangulação Encerrantes vs PDV Financeiro';
-      const diff = c.metrics?.difference ?? 0.0;
-      const isProv = c.assessment?.finality === 'partial' || c.metrics?.is_provisional;
+      const propsObj = c.props || {};
+      const metricsObj = c.metrics || (c.contrato && c.contrato.metrics) || propsObj.metrics || {};
+      const resumoObj = c.resumo_executivo || propsObj.resumo_executivo || {};
+      const autoRev = Number(metricsObj.automation_revenue ?? c.automation_revenue ?? propsObj.automation_revenue ?? resumoObj.faturamento_pista_total ?? 0.0);
+      const posRev = Number(metricsObj.pos_revenue ?? c.pos_revenue ?? propsObj.pos_revenue ?? resumoObj.faturamento_caixa_total ?? 0.0);
+      const diff = Number(metricsObj.difference ?? c.difference ?? propsObj.difference ?? resumoObj.diferenca_financeira_caixa ?? (posRev - autoRev));
+      const isProv = Boolean(c.assessment?.finality === 'partial' || propsObj.is_provisional || metricsObj.is_provisional || c.is_provisional || (resumoObj.status_conciliacao && String(resumoObj.status_conciliacao).includes('ANDAMENTO')));
+      const physVol = metricsObj.physical_volume_liters ?? c.physical_volume_liters ?? propsObj.physical_volume_liters ?? null;
+
       statusChip = {
         label: isProv ? 'Análise Provisória' : (Math.abs(diff) < 0.05 ? 'Caixa Zerado' : (diff < 0 ? `Quebra R$ ${Math.abs(diff).toFixed(2)}` : `Sobra R$ ${diff.toFixed(2)}`)),
         severity: isProv ? 'attention' : (Math.abs(diff) < 0.05 ? 'success' : 'critical')
       };
 
       records = [
-        { 'Métrica': 'Receita Automação (Pista)', 'Valor': `R$ ${Number(c.metrics?.automation_revenue ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Observação': 'Medição de encerrantes das bombas' },
-        { 'Métrica': 'Receita Registrada (PDV)', 'Valor': `R$ ${Number(c.metrics?.pos_revenue ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Observação': 'Cupons fiscais e sangrias do caixa' },
-        { 'Métrica': 'Diferença Contábil', 'Valor': `${diff >= 0 ? '+' : ''}R$ ${Number(diff).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Observação': c.metrics?.difference_definition || 'PDV menos Automação' },
-        { 'Métrica': 'Volume Físico Medido', 'Valor': c.metrics?.physical_volume_liters !== null && c.metrics?.physical_volume_liters !== undefined ? `${Number(c.metrics.physical_volume_liters).toLocaleString('pt-BR')} L` : 'Pendente de digitação', 'Observação': 'Módulo fechabomba' }
+        { 'Métrica': 'Receita Automação (Pista)', 'Valor': `R$ ${autoRev.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Observação': 'Medição de encerrantes das bombas' },
+        { 'Métrica': 'Receita Registrada (PDV)', 'Valor': `R$ ${posRev.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Observação': 'Cupons fiscais e sangrias do caixa' },
+        { 'Métrica': 'Diferença Contábil', 'Valor': `${diff >= 0 ? '+' : ''}R$ ${diff.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Observação': metricsObj.difference_definition || 'PDV menos Automação' },
+        { 'Métrica': 'Volume Físico Medido', 'Valor': physVol !== null && physVol !== undefined ? `${Number(physVol).toLocaleString('pt-BR')} L` : 'Pendente de digitação', 'Observação': 'Módulo fechabomba' }
       ];
 
       summaryKpis = [
-        { label: 'Diferença de Caixa', value: `R$ ${Number(diff).toFixed(2)}`, sub: isProv ? 'Provisório' : 'Validado' },
-        { label: 'Receita Pista', value: `R$ ${Number(c.metrics?.automation_revenue ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, sub: 'Automação' },
-        { label: 'Receita Caixa PDV', value: `R$ ${Number(c.metrics?.pos_revenue ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, sub: 'ERP' }
+        { label: 'Diferença de Caixa', value: `R$ ${diff.toFixed(2)}`, sub: isProv ? 'Provisório' : 'Validado' },
+        { label: 'Receita Pista', value: `R$ ${autoRev.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, sub: 'Automação' },
+        { label: 'Receita Caixa PDV', value: `R$ ${posRev.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, sub: 'ERP' }
       ];
 
       schemaInfo = {
@@ -1633,6 +1640,9 @@ class AuraAuxPanel {
 
   escapeHtml(str) {
     if (str === null || str === undefined) return '';
+    if (typeof str === 'object') {
+      str = str.text || str.summary || str.title || str.diagnostico_caixa || str.message || JSON.stringify(str);
+    }
     return String(str)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')

@@ -1605,18 +1605,51 @@ def build_canonical_genui_envelope(
                 )
             )
 
-        # Popula props determinísticas para ShiftReconciliationUI
+        # Popula props deterministicas para ShiftReconciliationUI
         metrics_dict = props.get("metrics") or {}
         assessment_dict = props.get("assessment") or {}
         explanation_dict = props.get("explanation") or {}
+        resumo_exec = props.get("resumo_executivo") or {}
 
-        diff_val = float(metrics_dict.get("difference", props.get("difference", 0.0)) or 0.0)
+        props["automation_revenue"] = float(
+            metrics_dict.get("automation_revenue",
+                props.get("automation_revenue",
+                    resumo_exec.get("faturamento_pista_total", 0.0)
+                )
+            ) or 0.0
+        )
+        props["pos_revenue"] = float(
+            metrics_dict.get("pos_revenue",
+                props.get("pos_revenue",
+                    resumo_exec.get("faturamento_caixa_total", 0.0)
+                )
+            ) or 0.0
+        )
+        diff_val = float(
+            metrics_dict.get("difference",
+                props.get("difference",
+                    resumo_exec.get("diferenca_financeira_caixa",
+                        props["pos_revenue"] - props["automation_revenue"]
+                    )
+                )
+            ) or 0.0
+        )
         props["difference"] = diff_val
-        props["automation_revenue"] = float(metrics_dict.get("automation_revenue", props.get("automation_revenue", 0.0)) or 0.0)
-        props["pos_revenue"] = float(metrics_dict.get("pos_revenue", props.get("pos_revenue", 0.0)) or 0.0)
-        props["is_provisional"] = bool(metrics_dict.get("is_provisional", props.get("is_provisional", False)))
+        props["is_provisional"] = bool(
+            metrics_dict.get("is_provisional",
+                props.get("is_provisional",
+                    "ANDAMENTO" in str(resumo_exec.get("status_conciliacao", ""))
+                )
+            )
+        )
         props["severity"] = assessment_dict.get("severity", props.get("severity", "attention" if diff_val != 0 else "normal"))
-        props["diagnosis"] = explanation_dict.get("text") or assessment_dict.get("title") or props.get("diagnosis") or executive_summary or "Auditoria de conciliação de turno apurada."
+
+        diag_raw = props.get("diagnosis") or explanation_dict.get("text") or assessment_dict.get("title") or resumo_exec.get("diagnostico_caixa") or executive_summary
+        if isinstance(diag_raw, dict):
+            props["diagnosis"] = str(diag_raw.get("text") or diag_raw.get("summary") or diag_raw.get("title") or diag_raw.get("diagnostico_caixa") or "Auditoria de conciliacao de turno apurada.")
+        else:
+            props["diagnosis"] = str(diag_raw or "Auditoria de conciliacao de turno apurada.")
+
         props["confidence_score"] = float(props.get("confidence_score") or 0.95)
         props["turno_auditado"] = props.get("turno_auditado") or props.get("audited_shift") or "TODOS OS TURNOS"
         props["data_auditada"] = props.get("data_auditada") or ""
@@ -1732,6 +1765,14 @@ def build_canonical_genui_envelope(
                     payload={"intent": intencao},
                 )
             )
+
+    # Garante sanitizacao universal de props["diagnosis"] para qualquer componente
+    if "diagnosis" in props:
+        d_val = props["diagnosis"]
+        if isinstance(d_val, dict):
+            props["diagnosis"] = str(d_val.get("text") or d_val.get("summary") or d_val.get("title") or d_val.get("diagnostico_caixa") or str(d_val))
+        elif d_val is not None:
+            props["diagnosis"] = str(d_val)
 
     return GenUIEnvelope(
         schema_version="1.0",
