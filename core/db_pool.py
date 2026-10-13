@@ -51,6 +51,10 @@ class PooledConnectionWrapper:
                     if self._real_conn.closed:
                         self._pool.putconn(self._real_conn, close=True)
                     else:
+                        try:
+                            self._real_conn.rollback()
+                        except Exception:
+                            pass
                         self._pool.putconn(self._real_conn)
                 except Exception:
                     pass

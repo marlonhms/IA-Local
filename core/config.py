@@ -9,6 +9,10 @@ from __future__ import annotations
 
 import os
 from typing import Dict, Any, Optional
+from dotenv import load_dotenv
+
+# Carrega variaveis de ambiente
+load_dotenv()
 
 # =============================================================================
 # FEATURE FLAGS GLOBAIS

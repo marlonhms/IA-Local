@@ -83,8 +83,8 @@ def test_backend_deterministic_synthesis():
     # Teste de fonte indisponível
     mock_indisponivel = {"status": "indisponivel", "motivo": "ERP offline"}
     sintese_indisp = engine._gerar_sintese_contingencia_ferramenta("vendas_analitico", mock_indisponivel, "vendas")
-    assert sintese_indisp is None, "Síntese deve retornar None para status indisponível"
-    print("   [OK] Retorno None validado para fontes indisponíveis.")
+    assert sintese_indisp is not None and "indisponíveis" in sintese_indisp, "Síntese deve retornar alerta de contingência para status indisponível"
+    print("   [OK] Alerta executivo de contingência validado para fontes indisponíveis.")
 
 
 def test_frontend_node_validation():

@@ -716,12 +716,14 @@ class AuraChatController {
 
     let hydratedHtml = '';
     let hydratedNode = null;
+    let widgetInstance = null;
 
     if (ComponentDef) {
       if (typeof ComponentDef === 'function') {
         try {
           const enrichedData = Object.assign({ session_id: this.sessionId }, envelopeData);
-          const instance = new ComponentDef(enrichedData);
+          widgetInstance = new ComponentDef(enrichedData);
+          const instance = widgetInstance;
           if (typeof AuraGenUI !== 'undefined' && typeof AuraGenUI.registerWidget === 'function') {
             AuraGenUI.registerWidget(toolCallId, instance);
           } else if (typeof window !== 'undefined' && window.AuraGenUI && typeof window.AuraGenUI.registerWidget === 'function') {
@@ -847,9 +849,9 @@ class AuraChatController {
         splitCard.classList.remove('hidden');
       }
 
-      if (instance && typeof instance.bindEvents === 'function') {
-        if (toolCard) instance.bindEvents(toolCard);
-        if (splitCard) instance.bindEvents(splitCard);
+      if (widgetInstance && typeof widgetInstance.bindEvents === 'function') {
+        if (toolCard) widgetInstance.bindEvents(toolCard);
+        if (splitCard) widgetInstance.bindEvents(splitCard);
       }
 
       // Telemetria SRE (F9-02): Medir tempo real de hidratacao e reportar assincronamente ao backend

@@ -222,7 +222,6 @@ class HybridRAGEngine:
         if grupo_filter:
             grupo_condition = "AND grupo ILIKE %s"
             iterative_scan_sql = """
-        LOAD 'vector';
         SET LOCAL hnsw.iterative_scan = 'relaxed_order';
         SET LOCAL hnsw.max_scan_tuples = 20000;
             """
@@ -692,7 +691,6 @@ class HybridRAGEngine:
         if grupo_filter:
             grupo_condition = "AND grupo ILIKE %s"
             iterative_scan_sql = """
-            LOAD 'vector';
             SET LOCAL hnsw.iterative_scan = 'relaxed_order';
             SET LOCAL hnsw.max_scan_tuples = 20000;
             """

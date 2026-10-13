@@ -876,3 +876,8 @@ def create_aura_app(engine: Optional[AuraEngine] = None) -> FastAPI:
             return {"service": "AURA Showcase", "status": "online"}
 
     return app
+
+
+# Instancia padrao da aplicacao ASGI para execucao direta via uvicorn (ex: uvicorn core.aura_api:app)
+app = create_aura_app()
+

@@ -825,16 +825,15 @@ class SemanticRouter:
         total_inseridos = 0
         exemplos_lote = []
 
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                if force:
-                    cur.execute("TRUNCATE TABLE intencoes_vetores RESTART IDENTITY;")
-                    conn.commit()
-                    intents_to_seed = INTENT_EXEMPLARS
-                else:
-                    cur.execute("SELECT DISTINCT intencao FROM intencoes_vetores WHERE embedding IS NOT NULL;")
-                    existing_intents = {r[0] for r in cur.fetchall()}
-                    intents_to_seed = {k: v for k, v in INTENT_EXEMPLARS.items() if k not in existing_intents}
+        with self._db_lock, self._get_connection() as conn, conn.cursor() as cur:
+            if force:
+                cur.execute("TRUNCATE TABLE intencoes_vetores RESTART IDENTITY;")
+                conn.commit()
+                intents_to_seed = INTENT_EXEMPLARS
+            else:
+                cur.execute("SELECT DISTINCT intencao FROM intencoes_vetores WHERE embedding IS NOT NULL;")
+                existing_intents = {r[0] for r in cur.fetchall()}
+                intents_to_seed = {k: v for k, v in INTENT_EXEMPLARS.items() if k not in existing_intents}
 
         if not intents_to_seed:
             return current_count
@@ -848,33 +847,32 @@ class SemanticRouter:
 
         # Gera embeddings em lotes para respeitar limites da API
         batch_size = 20
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                for i in range(0, len(exemplos_lote), batch_size):
-                    chunk = exemplos_lote[i:i + batch_size]
-                    textos = [f"Intenção: {item[0]} | Pergunta Típica: {item[2]}" for item in chunk]
+        with self._db_lock, self._get_connection() as conn, conn.cursor() as cur:
+            for i in range(0, len(exemplos_lote), batch_size):
+                chunk = exemplos_lote[i:i + batch_size]
+                textos = [f"Intenção: {item[0]} | Pergunta Típica: {item[2]}" for item in chunk]
 
-                    try:
-                        import google.generativeai as genai
-                        res = genai.embed_content(
-                            model=DEFAULT_EMBEDDING_MODEL,
-                            content=textos,
-                            output_dimensionality=768,
-                            task_type="retrieval_document"
-                        )
-                        embeddings = res["embedding"]
+                try:
+                    import google.generativeai as genai
+                    res = genai.embed_content(
+                        model=DEFAULT_EMBEDDING_MODEL,
+                        content=textos,
+                        output_dimensionality=768,
+                        task_type="retrieval_document"
+                    )
+                    embeddings = res["embedding"]
 
-                        for (intencao, desc, frase), emb in zip(chunk, embeddings):
-                            cur.execute("""
-                                INSERT INTO intencoes_vetores (intencao, descricao, exemplo_frase, embedding)
-                                VALUES (%s, %s, %s, %s::halfvec);
-                            """, (intencao, desc, frase, str(emb)))
-                            total_inseridos += 1
+                    for (intencao, desc, frase), emb in zip(chunk, embeddings):
+                        cur.execute("""
+                            INSERT INTO intencoes_vetores (intencao, descricao, exemplo_frase, embedding)
+                            VALUES (%s, %s, %s, %s::halfvec);
+                        """, (intencao, desc, frase, str(emb)))
+                        total_inseridos += 1
 
-                        conn.commit()
-                        time.sleep(0.5)
-                    except Exception as e:
-                        logger.error(f"Erro ao gerar embeddings do lote {i}: {e}")
+                    conn.commit()
+                    time.sleep(0.5)
+                except Exception as e:
+                    logger.error(f"Erro ao gerar embeddings do lote {i}: {e}")
 
         logger.info(f"Seeding concluído: {total_inseridos} intenções indexadas em intencoes_vetores.")
         return total_inseridos
@@ -1003,10 +1001,17 @@ class SemanticRouter:
                 last_similarity = similarity
                 intencao_detectada = melhor_match["intencao"]
 
-                # Priorizacao deterministica de Mentoria Executiva (GenUI Fase 3) ou LMC ANP
+                # Priorizacao deterministica de Micro-Widgets GenUI e Mentoria Executiva (Fase 3 e Fase 6)
                 intencao_h = classificar_intencao_heuristica(query_text)
-                if intencao_h == "mentoria_decisao":
-                    intencao_detectada = "mentoria_decisao"
+                if intencao_h in (
+                    "mentoria_decisao",
+                    "cenario_preditivo",
+                    "simulacao_preditiva",
+                    "benchmark_comparativo",
+                    "auditoria_fuga_financeira",
+                    "analise_margem",
+                ):
+                    intencao_detectada = intencao_h
                     similarity = max(similarity, 0.95)
                 elif intencao_detectada not in ("lmc_anp", "ajuda_sistema"):
                     if any(t in query_norm for t in TERMOS_LMC_EXATOS) or re.search(r"\blmc\b", query_norm):
