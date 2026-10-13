@@ -8,6 +8,7 @@ Define contratos Pydantic v2 para micro-widgets de 3 camadas:
 
 from __future__ import annotations
 
+import os
 import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional, Union
@@ -444,34 +445,39 @@ class ActionAuditLogRecord(BaseModel):
     client_ip: Optional[str] = Field(default=None, description="Endereco IP do cliente")
 
 
+AURA_VOUCHER_SECRET = os.getenv("AURA_VOUCHER_SECRET", "aura_voucher_hmac_secret_v1")
+
+
 def generate_action_voucher_signature(
     voucher_id: str,
     action_id: str,
     tool_call_id: str,
     status: str,
     timestamp: str,
-    secret: str = "aura_voucher_hmac_secret_v1"
+    secret: Optional[str] = None,
 ) -> str:
     """Gera assinatura HMAC-SHA256 para integridade auditavel do Action Voucher."""
     import hmac
     import hashlib
+    effective_secret = secret if secret is not None else os.getenv("AURA_VOUCHER_SECRET", AURA_VOUCHER_SECRET)
     raw = f"{voucher_id}:{action_id}:{tool_call_id}:{status}:{timestamp}".encode("utf-8")
-    return hmac.new(secret.encode("utf-8"), raw, hashlib.sha256).hexdigest()
+    return hmac.new(effective_secret.encode("utf-8"), raw, hashlib.sha256).hexdigest()
 
 
 def verify_action_voucher_signature(
     voucher: ActionVoucher,
-    secret: str = "aura_voucher_hmac_secret_v1"
+    secret: Optional[str] = None,
 ) -> bool:
     """Verifica a integridade criptografica da assinatura de um Action Voucher."""
     import hmac
+    effective_secret = secret if secret is not None else os.getenv("AURA_VOUCHER_SECRET", AURA_VOUCHER_SECRET)
     expected = generate_action_voucher_signature(
         voucher_id=voucher.voucher_id,
         action_id=voucher.action_id,
         tool_call_id=voucher.tool_call_id,
         status=voucher.status,
         timestamp=voucher.timestamp,
-        secret=secret,
+        secret=effective_secret,
     )
     return hmac.compare_digest(voucher.signature, expected)
 

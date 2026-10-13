@@ -436,14 +436,14 @@ A Fase P2 viabiliza a expansão em escala corporativa para redes com dezenas ou 
 ## ✅ 4. Critérios de Aceite e Checklist de Homologação
 
 ### 📋 Checklist Fase P0 (Go-Live Piloto)
-- [ ] Execução de varredura estática no código confirma zero senhas hardcoded em [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/config/settings.py) e [`core/config.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/config.py).
-- [ ] O arquivo [`.env.example`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/.env.example) contém a variável `AURA_VOUCHER_SECRET` com instruções claras de preenchimento.
-- [ ] Teste de carga com chamadas paralelas ao `SemanticRouter` conclui com 100% de sucesso sem travar ou emitir erros de cursor.
-- [ ] Consultas analíticas utilizam o pool centralizado em [`core/db_pool.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/db_pool.py), sem novas conexões abertas manualmente por query.
-- [ ] Todos os assets de Tailwind, Lucide e Marked estão hospedados localmente em [`web/static/vendor/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/static/vendor/) e a interface carrega sem conexão à internet.
-- [ ] O serviço nativo do Windows `AURA_Core_Engine` é instalado com sucesso via script NSSM e reinicia automaticamente após falha.
-- [ ] O arquivo [`requirements.txt`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/requirements.txt) permite instalação limpa de todas as dependências sem erros de importação.
-- [ ] O arquivo pesado `bloco hero.txt` foi completamente removido do Git na branch `main`.
+- [x] Execução de varredura estática no código confirma zero senhas hardcoded em [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/config/settings.py) e [`core/config.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/config.py).
+- [x] O arquivo [`.env.example`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/.env.example) contém a variável `AURA_VOUCHER_SECRET` com instruções claras de preenchimento.
+- [x] Teste de carga com chamadas paralelas ao `SemanticRouter` conclui com 100% de sucesso sem travar ou emitir erros de cursor.
+- [x] Consultas analíticas utilizam o pool centralizado em [`core/db_pool.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/db_pool.py), sem novas conexões abertas manualmente por query.
+- [x] Todos os assets de Tailwind, Lucide e Marked estão hospedados localmente em [`web/static/vendor/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/static/vendor/) e a interface carrega sem conexão à internet.
+- [x] O serviço nativo do Windows `AURA_Core_Engine` é instalado com sucesso via script NSSM e reinicia automaticamente após falha.
+- [x] O arquivo [`requirements.txt`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/requirements.txt) permite instalação limpa de todas as dependências sem erros de importação.
+- [x] O arquivo pesado `bloco hero.txt` foi completamente removido do Git na branch `main`.
 
 ### 📋 Checklist Fase P1 (Consolidação Corporativa)
 - [ ] A role técnica `aura_service_ro` está provisionada no PostgreSQL do ERP e o acesso de escrita é rejeitado no nível de engine.

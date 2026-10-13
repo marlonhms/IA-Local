@@ -839,6 +839,10 @@ def create_aura_app(engine: Optional[AuraEngine] = None) -> FastAPI:
     # Montagem do Painel Web SPA Local da AURA
     web_dir = Path(__file__).resolve().parent.parent / "web"
     if web_dir.exists():
+        vendor_dir = web_dir / "static" / "vendor"
+        if vendor_dir.exists():
+            app.mount("/static/vendor", StaticFiles(directory=str(vendor_dir)), name="static_vendor")
+            app.mount("/vendor", StaticFiles(directory=str(vendor_dir)), name="vendor")
         app.mount("/static", StaticFiles(directory=str(web_dir)), name="static")
 
         @app.get("/favicon.ico", include_in_schema=False)

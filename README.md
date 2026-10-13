@@ -855,9 +855,10 @@ O desenvolvimento do **Ai.la** segue um cronograma rigoroso de engenharia focado
 | **Fase 5** | **Dashboard Web & PWA Mobile** | 💻 Planejada | Painel gerencial responsivo, visão gráfica dos tanques, monitor de frentistas em tempo real. |
 | **Fase 6.5+** | **Módulo Fiscal Avançado (Agent SEFAZ)** | 📈 Planejada | Auditoria contínua de NFC-e com Reforma Tributária (IBS/CBS) e conformidade NCM/CEST. |
 
-> *Para o plano detalhado de prontidão industrial e engenharia de missão crítica (Fases P0, P1 e P2), consulte o [`docs/roadmap_producao_enterprise.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap_producao_enterprise.md).*  
-> *Para o detalhamento arquitetural dos motores cognitivos e fases de inteligência analítica, consulte o [`docs/roadmap_aila.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap_aila.md).*  
-> *Para a evolução de UI/UX e design system conversacional, consulte o [`docs/roadmap.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap.md).*
+> *Para o plano detalhado de prontidao industrial e engenharia de missao critica (Fases P0, P1 e P2), consulte o [`docs/roadmap_producao_enterprise.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap_producao_enterprise.md).*  
+> *Fase P0 (Go-Live Piloto) homologada: expurgo de segredos hardcoded, vouchers HMAC parametrizados, thread-safety no SemanticRouter, connection pool gerenciado (core/db_pool.py), frontend 100% offline-first e servico nativo Windows via NSSM (`scripts/iniciar_servico_nssm.bat`).*  
+> *Para o detalhamento arquitetural dos motores cognitivos e fases de inteligencia analitica, consulte o [`docs/roadmap_aila.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap_aila.md).*  
+> *Para a evolucao de UI/UX e design system conversacional, consulte o [`docs/roadmap.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap.md).*
 
 ---
 

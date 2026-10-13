@@ -16,6 +16,7 @@ import re
 import sys
 import time
 import logging
+import threading
 from typing import Dict, List, Tuple, Optional, Any
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -662,7 +663,11 @@ class SemanticRouter:
         self.confidence_threshold = confidence_threshold
         self.cache_max_size = cache_max_size
 
-        # Conexão reutilizável com PostgreSQL
+        # Locks de seguranca contra condicoes de corrida (P0-3)
+        self._db_lock = threading.RLock()
+        self._cache_lock = threading.Lock()
+
+        # Conexao reutilizavel com PostgreSQL protegida por _db_lock
         self._conn = None
 
         if GEMINI_API_KEY:
@@ -672,10 +677,10 @@ class SemanticRouter:
             except Exception:
                 pass
 
-        # Cache em memória para consultas idênticas ou normalizadas (latência < 0.1ms)
+        # Cache em memoria para consultas identicas ou normalizadas (latencia < 0.1ms)
         self._memory_cache: Dict[str, Tuple[str, float, Dict[str, Any]]] = {}
 
-        # Métricas internas SRE
+        # Metricas internas SRE
         self._metrics = {
             "total_routes": 0,
             "cache_hits": 0,
@@ -686,89 +691,120 @@ class SemanticRouter:
         }
 
     def _get_connection(self):
-        """Retorna conexão ativa com o PostgreSQL do pgvector, reconectando se necessário."""
-        if self._conn is None or self._conn.closed:
-            self._conn = psycopg2.connect(**self.db_config)
-            try:
-                self._conn.set_client_encoding('UTF8')
-            except Exception:
-                pass
-        return self._conn
+        """
+        Retorna conexao ativa com o PostgreSQL do pgvector de forma thread-safe.
+        Aplica reconexao resiliente com retry caso o servico PostgreSQL seja reiniciado.
+        """
+        with self._db_lock:
+            if self._conn is not None and not self._conn.closed:
+                try:
+                    with self._conn.cursor() as cur:
+                        cur.execute("SELECT 1;")
+                    return self._conn
+                except Exception:
+                    try:
+                        self._conn.close()
+                    except Exception:
+                        pass
+                    self._conn = None
+
+            max_retries = 3
+            last_err = None
+            for attempt in range(1, max_retries + 1):
+                try:
+                    self._conn = psycopg2.connect(**self.db_config)
+                    try:
+                        self._conn.set_client_encoding('UTF8')
+                    except Exception:
+                        pass
+                    return self._conn
+                except Exception as exc:
+                    last_err = exc
+                    if attempt < max_retries:
+                        time.sleep(0.15 * attempt)
+            raise psycopg2.OperationalError(
+                f"Falha de conexao com PostgreSQL pgvector apos {max_retries} tentativas: {last_err}"
+            )
 
     def close(self):
-        """Fecha conexão com o banco de dados se aberta."""
-        if self._conn and not self._conn.closed:
-            try:
-                self._conn.close()
-            except Exception:
-                pass
-            self._conn = None
+        """Fecha conexao com o banco de dados de forma thread-safe."""
+        with self._db_lock:
+            if self._conn and not self._conn.closed:
+                try:
+                    self._conn.close()
+                except Exception:
+                    pass
+                self._conn = None
 
     def init_table(self):
-        """Garante a existência da tabela intencoes_vetores e índice HNSW otimizado (m=32, ef_construction=256) no posto_ai."""
-        conn = self._get_connection()
-        with conn.cursor() as cur:
-            cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS intencoes_vetores (
-                    id SERIAL PRIMARY KEY,
-                    intencao VARCHAR(50) NOT NULL,
-                    descricao TEXT NOT NULL,
-                    exemplo_frase TEXT NOT NULL,
-                    embedding halfvec(768),
-                    criado_em TIMESTAMP DEFAULT NOW()
-                );
-            """)
+        """Garante a existencia da tabela intencoes_vetores e indice HNSW otimizado no posto_ai."""
+        with self._db_lock:
+            conn = self._get_connection()
+            with conn.cursor() as cur:
+                cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS intencoes_vetores (
+                        id SERIAL PRIMARY KEY,
+                        intencao VARCHAR(50) NOT NULL,
+                        descricao TEXT NOT NULL,
+                        exemplo_frase TEXT NOT NULL,
+                        embedding halfvec(768),
+                        criado_em TIMESTAMP DEFAULT NOW()
+                    );
+                """)
 
-            # Verifica se o índice já existe com m=32 e ef_construction=256; caso contrário, recompila
-            cur.execute("SELECT indexdef FROM pg_indexes WHERE indexname = 'idx_intencoes_vetores_hnsw';")
-            idx_row = cur.fetchone()
-            idx_def = idx_row[0] if idx_row else ""
-            m_ok = bool(re.search(r"\bm\s*=\s*'?32'?", idx_def))
-            ef_ok = bool(re.search(r"\bef_construction\s*=\s*'?256'?", idx_def))
-            if not idx_row or not m_ok or not ef_ok:
+                # Verifica se o indice ja existe com m=32 e ef_construction=256; caso contrario, recompila
+                cur.execute("SELECT indexdef FROM pg_indexes WHERE indexname = 'idx_intencoes_vetores_hnsw';")
+                idx_row = cur.fetchone()
+                idx_def = idx_row[0] if idx_row else ""
+                m_ok = bool(re.search(r"\bm\s*=\s*'?32'?", idx_def))
+                ef_ok = bool(re.search(r"\bef_construction\s*=\s*'?256'?", idx_def))
+                if not idx_row or not m_ok or not ef_ok:
+                    cur.execute("DROP INDEX IF EXISTS idx_intencoes_vetores_hnsw;")
+                    cur.execute("""
+                        CREATE INDEX idx_intencoes_vetores_hnsw 
+                        ON intencoes_vetores USING hnsw (embedding halfvec_cosine_ops)
+                        WITH (m = 32, ef_construction = 256);
+                    """)
+                conn.commit()
+
+    def recompile_hnsw_index(self):
+        """Recompila explicitamente o indice HNSW de intencoes com m=32 e ef_construction=256."""
+        with self._db_lock:
+            conn = self._get_connection()
+            with conn.cursor() as cur:
                 cur.execute("DROP INDEX IF EXISTS idx_intencoes_vetores_hnsw;")
                 cur.execute("""
                     CREATE INDEX idx_intencoes_vetores_hnsw 
                     ON intencoes_vetores USING hnsw (embedding halfvec_cosine_ops)
                     WITH (m = 32, ef_construction = 256);
                 """)
-            conn.commit()
-
-    def recompile_hnsw_index(self):
-        """Recompila explicitamente o índice HNSW de intenções com m=32 e ef_construction=256."""
-        conn = self._get_connection()
-        with conn.cursor() as cur:
-            cur.execute("DROP INDEX IF EXISTS idx_intencoes_vetores_hnsw;")
-            cur.execute("""
-                CREATE INDEX idx_intencoes_vetores_hnsw 
-                ON intencoes_vetores USING hnsw (embedding halfvec_cosine_ops)
-                WITH (m = 32, ef_construction = 256);
-            """)
-            conn.commit()
-        logger.info("Índice 'idx_intencoes_vetores_hnsw' recompilado com m=32, ef_construction=256.")
+                conn.commit()
+            logger.info("Indice 'idx_intencoes_vetores_hnsw' recompilado com m=32, ef_construction=256.")
 
     def count_intents(self) -> int:
-        """Retorna o número de exemplos de intenções indexados."""
-        try:
-            conn = self._get_connection()
-            with conn.cursor() as cur:
-                cur.execute("SELECT count(*) FROM intencoes_vetores WHERE embedding IS NOT NULL;")
-                row = cur.fetchone()
-                return row[0] if row else 0
-        except Exception:
-            return 0
+        """Retorna o numero de exemplos de intencoes indexados de forma thread-safe."""
+        with self._db_lock:
+            try:
+                conn = self._get_connection()
+                with conn.cursor() as cur:
+                    cur.execute("SELECT count(*) FROM intencoes_vetores WHERE embedding IS NOT NULL;")
+                    row = cur.fetchone()
+                    return row[0] if row else 0
+            except Exception:
+                return 0
 
     def count_distinct_intents(self) -> int:
-        """Retorna o número de intenções canônicas distintas indexadas."""
-        try:
-            conn = self._get_connection()
-            with conn.cursor() as cur:
-                cur.execute("SELECT count(DISTINCT intencao) FROM intencoes_vetores WHERE embedding IS NOT NULL;")
-                row = cur.fetchone()
-                return row[0] if row else 0
-        except Exception:
-            return 0
+        """Retorna o numero de intencoes canonicas distintas indexadas de forma thread-safe."""
+        with self._db_lock:
+            try:
+                conn = self._get_connection()
+                with conn.cursor() as cur:
+                    cur.execute("SELECT count(DISTINCT intencao) FROM intencoes_vetores WHERE embedding IS NOT NULL;")
+                    row = cur.fetchone()
+                    return row[0] if row else 0
+            except Exception:
+                return 0
 
     def seed_intents(self, force: bool = False) -> int:
         """
@@ -856,10 +892,11 @@ class SemanticRouter:
         3. Fallback gracioso para heurísticas determinísticas se similaridade < threshold ou falha
         """
         t0 = time.perf_counter()
-        self._metrics["total_routes"] += 1
+        with self._cache_lock:
+            self._metrics["total_routes"] += 1
         query_norm = (query_text or "").strip().lower()
 
-        # 0. Consulta vazia ou somente espaços - retorno imediato sem chamada externa
+        # 0. Consulta vazia ou somente espacos - retorno imediato sem chamada externa
         if not query_norm:
             telemetry = {
                 "intent": "catalogo_produtos",
@@ -892,10 +929,11 @@ class SemanticRouter:
                 "query_vector": None,
             }
             if use_cache:
-                self._memory_cache[query_norm] = ("ajuda_sistema", 1.0, telemetry)
+                with self._cache_lock:
+                    self._memory_cache[query_norm] = ("ajuda_sistema", 1.0, telemetry)
             return "ajuda_sistema", 1.0, telemetry
 
-        # 0.1 Comandos de repetição / saudações genéricas - neutralização de falsos positivos operacionais
+        # 0.1 Comandos de repeticao / saudacoes genericas - neutralizacao de falsos positivos operacionais
         if RETRY_REGEX.match(query_norm) or query_norm in CONVERSATIONAL_WORDS:
             total_ms = (time.perf_counter() - t0) * 1000
             method_desc = "retry_command_heuristics" if RETRY_REGEX.match(query_norm) else "conversational_greeting_fallback"
@@ -903,7 +941,7 @@ class SemanticRouter:
                 "intent": "catalogo_produtos",
                 "confidence": 0.50,
                 "method": method_desc,
-                "matched_phrase": "Comando de repetição ou conversa geral",
+                "matched_phrase": "Comando de repeticao ou conversa geral",
                 "pgvector_latency_ms": 0.0,
                 "embedding_latency_ms": 0.0,
                 "total_routing_latency_ms": round(total_ms, 3),
@@ -912,15 +950,17 @@ class SemanticRouter:
             }
             return "catalogo_produtos", 0.50, telemetry
 
-        # 1. Checa cache em memória
-        if use_cache and query_norm in self._memory_cache:
-            self._metrics["cache_hits"] += 1
-            intencao, conf, cached_telemetry = self._memory_cache[query_norm]
-            latency_ms = (time.perf_counter() - t0) * 1000
-            telemetry = dict(cached_telemetry)
-            telemetry["method"] = "memory_cache"
-            telemetry["total_routing_latency_ms"] = round(latency_ms, 3)
-            return intencao, conf, telemetry
+        # 1. Checa cache em memoria
+        if use_cache:
+            with self._cache_lock:
+                if query_norm in self._memory_cache:
+                    self._metrics["cache_hits"] += 1
+                    intencao, conf, cached_telemetry = self._memory_cache[query_norm]
+                    latency_ms = (time.perf_counter() - t0) * 1000
+                    telemetry = dict(cached_telemetry)
+                    telemetry["method"] = "memory_cache"
+                    telemetry["total_routing_latency_ms"] = round(latency_ms, 3)
+                    return intencao, conf, telemetry
 
         # 2. Roteamento Vetorial via pgvector
         pg_latency_ms = 0.0
@@ -950,20 +990,20 @@ class SemanticRouter:
                 LIMIT 1;
             """
             vec_str = str(emb_gerado)
-            conn = self._get_connection()
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(sql, (vec_str, vec_str))
-                melhor_match = cur.fetchone()
+            with self._db_lock:
+                conn = self._get_connection()
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute(sql, (vec_str, vec_str))
+                    melhor_match = cur.fetchone()
 
             pg_latency_ms = (time.perf_counter() - t_pg) * 1000
-            self._metrics["total_pgvector_latency_ms"] += pg_latency_ms
 
             if melhor_match:
                 similarity = float(melhor_match["similarity"])
                 last_similarity = similarity
                 intencao_detectada = melhor_match["intencao"]
 
-                # Priorização determinística de Mentoria Executiva (GenUI Fase 3) ou LMC ANP
+                # Priorizacao deterministica de Mentoria Executiva (GenUI Fase 3) ou LMC ANP
                 intencao_h = classificar_intencao_heuristica(query_text)
                 if intencao_h == "mentoria_decisao":
                     intencao_detectada = "mentoria_decisao"
@@ -973,11 +1013,13 @@ class SemanticRouter:
                         intencao_detectada = "lmc_anp"
                         similarity = max(similarity, 0.88)
 
-                # Verifica se atinge o threshold de confiança
+                # Verifica se atinge o threshold de confianca
                 if similarity >= self.confidence_threshold:
-                    self._metrics["vector_pgvector_hits"] += 1
                     total_ms = (time.perf_counter() - t0) * 1000
-                    self._metrics["total_routing_latency_ms"] += total_ms
+                    with self._cache_lock:
+                        self._metrics["vector_pgvector_hits"] += 1
+                        self._metrics["total_pgvector_latency_ms"] += pg_latency_ms
+                        self._metrics["total_routing_latency_ms"] += total_ms
 
                     telemetry = {
                         "intent": intencao_detectada,
@@ -992,27 +1034,30 @@ class SemanticRouter:
                         "query_vector": emb_gerado,
                     }
 
-                    if len(self._memory_cache) < self.cache_max_size:
-                        self._memory_cache[query_norm] = (intencao_detectada, similarity, telemetry)
+                    if use_cache:
+                        with self._cache_lock:
+                            if len(self._memory_cache) < self.cache_max_size:
+                                self._memory_cache[query_norm] = (intencao_detectada, similarity, telemetry)
 
                     return intencao_detectada, similarity, telemetry
 
         except Exception as e:
-            logger.warning(f"Roteamento vetorial falhou ({e}). Acionando fallback heurístico.")
+            logger.warning(f"Roteamento vetorial falhou ({e}). Acionando fallback heuristico.")
             self.close()
 
-        # 3. Fallback Gracioso para Heurísticas Determinísticas
-        self._metrics["heuristic_fallbacks"] += 1
-        intencao_heuristica = classificar_intencao_heuristica(query_text)
+        # 3. Fallback Gracioso para Heuristicas Deterministicas
         total_ms = (time.perf_counter() - t0) * 1000
-        self._metrics["total_routing_latency_ms"] += total_ms
+        with self._cache_lock:
+            self._metrics["heuristic_fallbacks"] += 1
+            self._metrics["total_routing_latency_ms"] += total_ms
+        intencao_heuristica = classificar_intencao_heuristica(query_text)
 
         telemetry = {
             "intent": intencao_heuristica,
             "confidence": 0.50,
             "low_vector_similarity": round(last_similarity, 4) if last_similarity > 0 else None,
             "method": "heuristic_fallback",
-            "matched_phrase": "Heurística regex/keywords",
+            "matched_phrase": "Heuristica regex/keywords",
             "pgvector_latency_ms": round(pg_latency_ms, 2),
             "embedding_latency_ms": round(emb_latency_ms, 2),
             "total_routing_latency_ms": round(total_ms, 2),
@@ -1020,26 +1065,32 @@ class SemanticRouter:
             "query_vector": emb_gerado,
         }
 
-        if len(self._memory_cache) < self.cache_max_size:
-            self._memory_cache[query_norm] = (intencao_heuristica, 0.50, telemetry)
+        if use_cache:
+            with self._cache_lock:
+                if len(self._memory_cache) < self.cache_max_size:
+                    self._memory_cache[query_norm] = (intencao_heuristica, 0.50, telemetry)
 
         return intencao_heuristica, 0.50, telemetry
 
     def get_sre_telemetry(self) -> Dict[str, Any]:
-        """Retorna telemetria operacional de SRE do roteador semântico."""
-        tot = max(self._metrics["total_routes"], 1)
-        avg_pg = self._metrics["total_pgvector_latency_ms"] / max(self._metrics["vector_pgvector_hits"], 1)
-        avg_tot = self._metrics["total_routing_latency_ms"] / tot
+        """Retorna telemetria operacional de SRE do roteador semantico de forma thread-safe."""
+        with self._cache_lock:
+            metrics_copy = dict(self._metrics)
+            cache_count = len(self._memory_cache)
+
+        tot = max(metrics_copy["total_routes"], 1)
+        avg_pg = metrics_copy["total_pgvector_latency_ms"] / max(metrics_copy["vector_pgvector_hits"], 1)
+        avg_tot = metrics_copy["total_routing_latency_ms"] / tot
 
         return {
-            "total_routes": self._metrics["total_routes"],
-            "cache_hits": self._metrics["cache_hits"],
-            "cache_hit_ratio_percent": round(100.0 * self._metrics["cache_hits"] / tot, 2),
-            "vector_pgvector_hits": self._metrics["vector_pgvector_hits"],
-            "vector_hit_ratio_percent": round(100.0 * self._metrics["vector_pgvector_hits"] / tot, 2),
-            "heuristic_fallbacks": self._metrics["heuristic_fallbacks"],
-            "fallback_ratio_percent": round(100.0 * self._metrics["heuristic_fallbacks"] / tot, 2),
+            "total_routes": metrics_copy["total_routes"],
+            "cache_hits": metrics_copy["cache_hits"],
+            "cache_hit_ratio_percent": round(100.0 * metrics_copy["cache_hits"] / tot, 2),
+            "vector_pgvector_hits": metrics_copy["vector_pgvector_hits"],
+            "vector_hit_ratio_percent": round(100.0 * metrics_copy["vector_pgvector_hits"] / tot, 2),
+            "heuristic_fallbacks": metrics_copy["heuristic_fallbacks"],
+            "fallback_ratio_percent": round(100.0 * metrics_copy["heuristic_fallbacks"] / tot, 2),
             "avg_pgvector_latency_ms": round(avg_pg, 2),
             "avg_total_routing_latency_ms": round(avg_tot, 2),
-            "cached_entries_in_memory": len(self._memory_cache),
+            "cached_entries_in_memory": cache_count,
         }

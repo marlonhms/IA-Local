@@ -6,8 +6,8 @@
   <title>AURA // Assistente de Prontidão (Gerente Supervisora do Posto)</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.ico">
   
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind CSS Local (Offline-First) -->
+  <script src="/static/vendor/tailwind.min.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -38,10 +38,10 @@
     }
   </script>
 
-  <!-- Marked.js para renderização de Markdown no streaming -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Marked.js Local para renderizacao de Markdown no streaming -->
+  <script src="/static/vendor/marked.min.js"></script>
+  <!-- Lucide Icons Local -->
+  <script src="/static/vendor/lucide.min.js"></script>
 
   <!-- Folha de Estilos Customizada do Design System AURA -->
   <link rel="stylesheet" href="/static/css/aura.css?v=2.9.6">

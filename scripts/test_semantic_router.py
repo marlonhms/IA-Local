@@ -243,8 +243,56 @@ def run_tests():
     print(f"   [OK] Índices de HNSW e CDC confirmados na telemetria SRE: {nomes_indices}")
     print(f"   [OK] Métricas do SemanticRouter ativas: {router_sre['total_routes']} rotas registradas.")
 
+    # -------------------------------------------------------------------------
+    # 8. Testando Concorrencia e Thread-Safety (P0-3: 20 Chamadas Simultaneas)
+    # -------------------------------------------------------------------------
+    print("\n8. Testando Concorrencia e Thread-Safety com 20 Chamadas Simultaneas...")
+    import concurrent.futures
+    perguntas_concorrentes = [
+        "como fechou o 1º turno hoje?",
+        "quando vai acabar a gasolina comum?",
+        "qual frentista vendeu mais gasolina aditivada?",
+        "qual o produto mais vendido hoje?",
+        "qual o saldo do tanque 1?",
+        "quem e o cliente que mais comprou?",
+        "qual a saude do banco de dados?",
+        "qual o cnpj da filial?",
+        "qual o preco da cerveja heineken?",
+        "o que vende junto com cerveja?",
+        "como funciona a conciliação de turno?",
+        "teve furo de caixa hoje?",
+        "quando seca o diesel s10?",
+        "tem bico com vazao lenta?",
+        "quanto faturou o posto ontem?",
+        "saldo atual de mercadorias no estoque",
+        "ranking de clientes por faturamento",
+        "metricas de sre do postgres",
+        "dados cadastrais do posto",
+        "o que sai junto com energetico?",
+    ]
+
+    erros_concorrentes = []
+    resultados_concorrentes = []
+
+    def _worker(q):
+        try:
+            res = router.route(q)
+            return (q, res[0], res[1])
+        except Exception as exc:
+            erros_concorrentes.append((q, str(exc)))
+            return (q, None, 0.0)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(_worker, p) for p in perguntas_concorrentes]
+        for f in concurrent.futures.as_completed(futures):
+            resultados_concorrentes.append(f.result())
+
+    assert len(erros_concorrentes) == 0, f"Erros em chamadas concorrentes: {erros_concorrentes}"
+    assert len(resultados_concorrentes) == len(perguntas_concorrentes)
+    print(f"   [OK] 20 requisicoes paralelas executadas com 100% de sucesso sem colisoes ou locks.")
+
     print("\n" + "=" * 75)
-    print("🎉 TODOS OS TESTES DAS SUGESTÕES 1 E 2 PASSARAM COM 100% DE SUCESSO!")
+    print("🎉 TODOS OS TESTES PASSARAM COM 100% DE SUCESSO!")
     print("=" * 75)
 
 

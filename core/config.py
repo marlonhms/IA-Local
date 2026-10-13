@@ -113,5 +113,5 @@ PGVECTOR_LOCAL_PORT: int = int(os.getenv("VECTOR_DB_PORT", "5433"))
 PGVECTOR_LOCAL_HOST: str = os.getenv("VECTOR_DB_HOST", "localhost")
 PGVECTOR_LOCAL_DBNAME: str = os.getenv("VECTOR_DB_NAME", "posto_ai")
 PGVECTOR_LOCAL_USER: str = os.getenv("VECTOR_DB_USER", "postgres")
-PGVECTOR_LOCAL_PASS: str = os.getenv("VECTOR_DB_PASSWORD", "123456")
+PGVECTOR_LOCAL_PASS: str = os.getenv("VECTOR_DB_PASSWORD", "")
 

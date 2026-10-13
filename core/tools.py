@@ -12,6 +12,10 @@ from typing import Dict, Any, Optional, Tuple, List, Set
 from datetime import datetime, date, time, timedelta
 
 from config.settings import DB_ERP_CONFIG, get_erp_password
+from core.db_pool import (
+    get_erp_db_connection,
+    get_erp_connection as pool_get_erp_connection,
+)
 from core.rag_engine import HybridRAGEngine
 from core.sanitizer import sanitize_dict
 from core.schemas.reconciliation import (
@@ -82,60 +86,32 @@ from core.schemas.genui import (
 )
 from core.schemas.idempotency import generate_action_id
 
-_last_working_erp_port: Optional[int] = None
-
-
-def get_erp_connection(timeout: Optional[int] = None) -> psycopg2.extensions.connection:
+def get_erp_connection(timeout: Optional[int] = None):
     """
-    Obtém conexão com o banco de dados ERP do posto.
-    Tenta primeiramente a última porta funcional ou a configurada no .env (5433).
-    Se a conexão for recusada ou falhar (ex: serviço parado no Windows),
-    realiza fallback automático para a porta 5435 (ou vice-versa), garantindo resiliência.
+    Obtem conexao com o banco de dados ERP do posto via ThreadedConnectionPool gerenciado (P0-4).
+    Retorna conexao encapsulada em PooledConnectionWrapper que devolve ao pool em .close().
     """
-    global _last_working_erp_port
-    config = dict(DB_ERP_CONFIG)
-    config["password"] = get_erp_password()
-    configured_port = int(config.get("port", 5433))
-    effective_timeout = timeout if timeout is not None else int(config.get("connect_timeout", 5))
-
-    ports_to_try = []
-    if _last_working_erp_port:
-        ports_to_try.append(_last_working_erp_port)
-    if configured_port not in ports_to_try:
-        ports_to_try.append(configured_port)
-    for alt in (5435, 5433):
-        if alt not in ports_to_try:
-            ports_to_try.append(alt)
-
-    errors_by_port = {}
-    for port in ports_to_try:
-        try_config = dict(config)
-        try_config["port"] = port
-        try_config["connect_timeout"] = effective_timeout
-        try:
-            conn = psycopg2.connect(**try_config)
+    try:
+        return pool_get_erp_connection(timeout=timeout)
+    except Exception as pool_err:
+        # Fallback direto caso o pool esteja temporariamente indisponivel
+        config = dict(DB_ERP_CONFIG)
+        config["password"] = get_erp_password()
+        effective_timeout = timeout if timeout is not None else int(config.get("connect_timeout", 5))
+        for port in (int(config.get("port", 5433)), 5435, 5433):
             try:
-                conn.set_client_encoding('UTF8')
+                try_cfg = dict(config)
+                try_cfg["port"] = port
+                try_cfg["connect_timeout"] = effective_timeout
+                c = psycopg2.connect(**try_cfg)
+                try:
+                    c.set_client_encoding('UTF8')
+                except Exception:
+                    pass
+                return c
             except Exception:
-                pass
-            _last_working_erp_port = port
-            return conn
-        except UnicodeDecodeError as ude:
-            raw_bytes = getattr(ude, "object", b"")
-            if isinstance(raw_bytes, (bytes, bytearray)):
-                msg = raw_bytes.decode("latin1", errors="replace").strip()
-            else:
-                msg = str(ude)
-            errors_by_port[port] = psycopg2.OperationalError(msg)
-            continue
-        except Exception as e:
-            errors_by_port[port] = e
-            continue
-
-    primary_err = errors_by_port.get(configured_port) or list(errors_by_port.values())[0]
-    raise psycopg2.OperationalError(
-        f"Falha de conexão com o banco ERP na porta {configured_port} ({config.get('host')}): {primary_err}"
-    )
+                continue
+        raise pool_err
 
 
 class PostoTools:

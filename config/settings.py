@@ -28,9 +28,9 @@ def get_erp_password() -> str:
     """
     Busca a senha do ERP.
     Prioridade:
-    1. Variável de ambiente ERP_DB_PASSWORD (se definida no .env)
-    2. Arquivo de senha diário/local (backups/erp_password.txt)
-    3. Senha padrão de desenvolvimento ('899007')
+    1. Variavel de ambiente ERP_DB_PASSWORD (se definida no .env)
+    2. Arquivo de senha diario/local (backups/erp_password.txt)
+    Lanca RuntimeError se a credencial nao for encontrada no startup.
     """
     env_pass = os.getenv("ERP_DB_PASSWORD")
     if env_pass:
@@ -50,10 +50,15 @@ def get_erp_password() -> str:
                         return s
             except Exception:
                 pass
-    return "899007"
+    raise RuntimeError(
+        "Credencial do ERP ausente: defina ERP_DB_PASSWORD no .env ou forneca backups/erp_password.txt."
+    )
 
 
-# Configuração do Banco ERP (PostgreSQL 16 Windows Service - Porta 5433)
+# Parametrizacao da Chave Secreta HMAC para Action Vouchers (P0-2)
+AURA_VOUCHER_SECRET = os.getenv("AURA_VOUCHER_SECRET", "aura_voucher_hmac_secret_v1")
+
+# Configuracao do Banco ERP (PostgreSQL 16 Windows Service - Porta 5433)
 DB_ERP_CONFIG = {
     "host": os.getenv("ERP_DB_HOST", "localhost"),
     "port": int(os.getenv("ERP_DB_PORT", "5433")),
@@ -63,13 +68,13 @@ DB_ERP_CONFIG = {
     "connect_timeout": int(os.getenv("ERP_DB_CONNECT_TIMEOUT", "5")),
 }
 
-# Configuração do Banco Vetorial (PostgreSQL 16 Windows pgvector - Porta 5433)
+# Configuracao do Banco Vetorial (PostgreSQL 16 Windows pgvector - Porta 5433)
 DB_VECTOR_CONFIG = {
     "host": os.getenv("VECTOR_DB_HOST", "localhost"),
     "port": int(os.getenv("VECTOR_DB_PORT", "5433")),
     "dbname": os.getenv("VECTOR_DB_NAME", "posto_ai"),
     "user": os.getenv("VECTOR_DB_USER", "postgres"),
-    "password": os.getenv("VECTOR_DB_PASSWORD", "123456"),
+    "password": os.getenv("VECTOR_DB_PASSWORD", ""),
     "connect_timeout": int(os.getenv("VECTOR_DB_CONNECT_TIMEOUT", "5")),
 }
 

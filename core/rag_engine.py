@@ -27,6 +27,10 @@ from config.settings import (
     DEFAULT_LLM_MODEL,
     GEMINI_API_KEY,
 )
+from core.db_pool import (
+    get_vector_connection,
+    get_vector_db_connection,
+)
 
 logger = logging.getLogger("HybridRAG")
 
@@ -83,7 +87,12 @@ class HybridRAGEngine:
             genai.configure(api_key=self.api_key)
 
     def _get_connection(self):
-        """Abre conexão com o PostgreSQL do pgvector."""
+        """Abre conexao com o PostgreSQL do pgvector a partir do pool gerenciado (P0-4)."""
+        if self.db_config == DB_VECTOR_CONFIG:
+            try:
+                return get_vector_connection()
+            except Exception:
+                pass
         conn = psycopg2.connect(**self.db_config)
         try:
             conn.set_client_encoding('UTF8')

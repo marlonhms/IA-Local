@@ -58,3 +58,7 @@ local.properties
 
 # Dumps e textos brutos de desenvolvimento
 /bloco hero.txt
+
+# Binarios e servicos locais
+bin/*.exe
+!bin/.gitkeep
