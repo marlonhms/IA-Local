@@ -58,51 +58,51 @@ O plano de engenharia está estruturado em três horizontes de entrega orientado
 Esta fase reúne correções indispensáveis para que o primeiro posto piloto opere em produção sem riscos de vazamento de credenciais, travamento sob concorrência de múltiplos caixas ou falha de renderização por ausência de internet.
 
 ### 🔴 P0-1: Eliminação de Segredos e Credenciais Hardcoded
-- **Diagnóstico Atual:** O arquivo [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/config/settings.py) possui um fallback estático `return "899007"` na função `get_erp_password()`. Caso o arquivo de senha não seja localizado ou a variável de ambiente não esteja preenchida, o sistema assume uma senha padrão hardcoded em texto claro no código fonte, violando as melhores práticas do OWASP Top 10 e da ISO 27001.
+- **Diagnóstico Atual:** O arquivo [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/config/settings.py) possui um fallback estático `return "899007"` na função `get_erp_password()`. Caso o arquivo de senha não seja localizado ou a variável de ambiente não esteja preenchida, o sistema assume uma senha padrão hardcoded em texto claro no código fonte, violando as melhores práticas do OWASP Top 10 e da ISO 27001.
 - **Solução Técnica:**
-  - Remover integralmente o retorno estático de credenciais em [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/config/settings.py).
-  - Implementar verificação rigorosa `fail-fast`: se `ERP_DB_PASSWORD` não for encontrada no arquivo [`.env`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/.env) nem no arquivo seguro local, a aplicação deve interromper o startup com uma exceção clara de configuração (`ConfigurationError: Credencial do ERP ausente. Defina ERP_DB_PASSWORD no .env`).
-  - Atualizar o arquivo de modelo [`.env.example`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/.env.example) com todas as variáveis obrigatórias documentadas.
+  - Remover integralmente o retorno estático de credenciais em [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/config/settings.py).
+  - Implementar verificação rigorosa `fail-fast`: se `ERP_DB_PASSWORD` não for encontrada no arquivo [`.env`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/.env) nem no arquivo seguro local, a aplicação deve interromper o startup com uma exceção clara de configuração (`ConfigurationError: Credencial do ERP ausente. Defina ERP_DB_PASSWORD no .env`).
+  - Atualizar o arquivo de modelo [`.env.example`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/.env.example) com todas as variáveis obrigatórias documentadas.
 - **Arquivos Afetados:**
-  - [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/config/settings.py)
-  - [`core/config.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/config.py)
-  - [`.env.example`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/.env.example)
+  - [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/config/settings.py)
+  - [`core/config.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/config.py)
+  - [`.env.example`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/.env.example)
 - **Critério de Aceite:** A inicialização do sistema sem a variável de ambiente ou arquivo de senha gera encerramento imediato com log de advertência estruturado; zero senhas ou tokens presentes no código rastreado pelo Git.
 
 ---
 
 ### 🔴 P0-2: Parametrização da Chave Secreta HMAC dos Action Vouchers (`AURA_VOUCHER_SECRET`)
-- **Diagnóstico Atual:** No arquivo [`core/schemas/genui.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/schemas/genui.py), as funções `generate_action_voucher_signature()` e `verify_action_voucher_signature()` utilizam a assinatura `secret: str = "aura_voucher_hmac_secret_v1"`. Esse segredo padrão exposto no código fonte anula o benefício de não-repúdio e integridade criptográfica dos comprovantes de ações aprovadas em pista (ex: liberação de compras e validação de vouchers).
+- **Diagnóstico Atual:** No arquivo [`core/schemas/genui.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/schemas/genui.py), as funções `generate_action_voucher_signature()` e `verify_action_voucher_signature()` utilizam a assinatura `secret: str = "aura_voucher_hmac_secret_v1"`. Esse segredo padrão exposto no código fonte anula o benefício de não-repúdio e integridade criptográfica dos comprovantes de ações aprovadas em pista (ex: liberação de compras e validação de vouchers).
 - **Solução Técnica:**
-  - Carregar `AURA_VOUCHER_SECRET` exclusivamente a partir do ambiente através de [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/config/settings.py).
-  - Repassar essa chave de forma injetada aos módulos [`core/aura_api.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/aura_api.py) e [`core/aura_engine.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/aura_engine.py).
+  - Carregar `AURA_VOUCHER_SECRET` exclusivamente a partir do ambiente através de [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/config/settings.py).
+  - Repassar essa chave de forma injetada aos módulos [`core/aura_api.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/aura_api.py) e [`core/aura_engine.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/aura_engine.py).
   - Incluir rotina de geração de chave forte aleatória (32 bytes hexadecimais via `secrets.token_hex(32)`) nos scripts de setup do posto caso ainda não esteja definida no `.env`.
 - **Arquivos Afetados:**
-  - [`core/schemas/genui.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/schemas/genui.py)
-  - [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/config/settings.py)
-  - [`core/aura_api.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/aura_api.py)
-  - [`core/aura_engine.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/aura_engine.py)
+  - [`core/schemas/genui.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/schemas/genui.py)
+  - [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/config/settings.py)
+  - [`core/aura_api.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/aura_api.py)
+  - [`core/aura_engine.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/aura_engine.py)
 - **Critério de Aceite:** O cálculo e a validação de assinaturas HMAC-SHA256 utilizam estritamente o segredo parametrizado no `.env`; vouchers gerados com segredo inválido ou ausente são categoricamente rejeitados com HTTP 403.
 
 ---
 
 ### 🔴 P0-3: Correção de Thread-Safety e Concorrência no `SemanticRouter`
-- **Diagnóstico Atual:** O roteador semântico vetorial ([`core/semantic_router.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/semantic_router.py)) instancia uma única conexão `psycopg2` via `self._conn` compartilhada por todas as chamadas de classificação (`route()`). Quando o servidor FastAPI recebe múltiplas requisições paralelas (por exemplo, dois operadores de caixa acionando o chat simultaneamente), o driver `psycopg2` não garante segurança de concorrência em uma única conexão compartilhada. Isso desencadeia erros esporádicos como `InterfaceError: connection already in use`, cursores corrompidos ou desconexões súbitas.
+- **Diagnóstico Atual:** O roteador semântico vetorial ([`core/semantic_router.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/semantic_router.py)) instancia uma única conexão `psycopg2` via `self._conn` compartilhada por todas as chamadas de classificação (`route()`). Quando o servidor FastAPI recebe múltiplas requisições paralelas (por exemplo, dois operadores de caixa acionando o chat simultaneamente), o driver `psycopg2` não garante segurança de concorrência em uma única conexão compartilhada. Isso desencadeia erros esporádicos como `InterfaceError: connection already in use`, cursores corrompidos ou desconexões súbitas.
 - **Solução Técnica:**
   - Implementar proteção com `threading.Lock` para a conexão do roteador ou substituir a conexão única por requisições de conexão pontual com context manager protegido.
   - Implementar reconexão com backoff exponencial se a conexão for perdida (ex: reinicialização do serviço PostgreSQL).
   - Proteger a mutação do cache LRU em memória (`self._cache`) com lock para evitar race conditions em acessos concorrentes multithreaded.
 - **Arquivos Afetados:**
-  - [`core/semantic_router.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/semantic_router.py)
-  - [`scripts/test_semantic_router.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/scripts/test_semantic_router.py)
+  - [`core/semantic_router.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/semantic_router.py)
+  - [`scripts/test_semantic_router.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/test_semantic_router.py)
 - **Critério de Aceite:** Teste de estresse com 20 requisições simultâneas assíncronas ao `SemanticRouter` executa com 100% de sucesso sem nenhum erro de conexão, concorrência ou cursor fechado.
 
 ---
 
 ### 🔴 P0-4: Connection Pool Gerenciado para PostgreSQL ERP e Vetorial
-- **Diagnóstico Atual:** Nos módulos analíticos ([`core/tools.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/tools.py) e [`core/rag_engine.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/rag_engine.py)), cada consulta executada realiza um novo handshake TCP através de `conn = psycopg2.connect(**config)` e fecha a conexão em seguida. Em horários de pico (virada de turno), a constante criação e destruição de conexões gera sobrecarga de CPU no PostgreSQL legado e pode esgotar o limite `max_connections` do ERP do posto.
+- **Diagnóstico Atual:** Nos módulos analíticos ([`core/tools.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py) e [`core/rag_engine.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/rag_engine.py)), cada consulta executada realiza um novo handshake TCP através de `conn = psycopg2.connect(**config)` e fecha a conexão em seguida. Em horários de pico (virada de turno), a constante criação e destruição de conexões gera sobrecarga de CPU no PostgreSQL legado e pode esgotar o limite `max_connections` do ERP do posto.
 - **Solução Técnica:**
-  - Criar um módulo centralizado de gerenciamento de pool de conexões [`core/db_pool.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/db_pool.py) utilizando `psycopg2.pool.ThreadedConnectionPool`.
+  - Criar um módulo centralizado de gerenciamento de pool de conexões [`core/db_pool.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/db_pool.py) utilizando `psycopg2.pool.ThreadedConnectionPool`.
   - Configurar dois pools independentes:
     1. Pool ERP (Read-Only): `minconn=2`, `maxconn=10`, `timeout=10s`.
     2. Pool Vetorial (`posto_ai`): `minconn=2`, `maxconn=8`, `timeout=5s`.
@@ -116,42 +116,42 @@ Esta fase reúne correções indispensáveis para que o primeiro posto piloto op
         finally:
             erp_pool.putconn(conn)
     ```
-  - Refatorar as chamadas em [`core/tools.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/tools.py) e [`core/rag_engine.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/rag_engine.py) para utilizarem exclusivamente o pool.
+  - Refatorar as chamadas em [`core/tools.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py) e [`core/rag_engine.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/rag_engine.py) para utilizarem exclusivamente o pool.
 - **Arquivos Afetados:**
-  - [`core/db_pool.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/db_pool.py) (novo)
-  - [`core/tools.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/tools.py)
-  - [`core/rag_engine.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/rag_engine.py)
-  - [`core/aura_engine.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/aura_engine.py)
+  - [`core/db_pool.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/db_pool.py) (novo)
+  - [`core/tools.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py)
+  - [`core/rag_engine.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/rag_engine.py)
+  - [`core/aura_engine.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/aura_engine.py)
 - **Critério de Aceite:** Redução da latência de execução de ferramentas analíticas em pelo menos 40% devido à eliminação do handshake TCP repetitivo; conexões sempre devolvidas ao pool mesmo em caso de erro na query.
 
 ---
 
 ### 🔴 P0-5: Frontend 100% Offline-First (Embarque de Assets Locais)
-- **Diagnóstico Atual:** A interface gráfica em [`web/index.html`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/web/index.html) e [`web/showcase.html`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/web/showcase.html) carrega dependências essenciais de CDNs públicas:
+- **Diagnóstico Atual:** A interface gráfica em [`web/index.html`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/index.html) e [`web/showcase.html`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/showcase.html) carrega dependências essenciais de CDNs públicas:
   - Tailwind CSS via `https://cdn.tailwindcss.com` (gerando avisos explícitos no console do navegador contra o uso de Play CDN em produção).
   - Ícones Lucide via `https://unpkg.com/lucide@latest`.
   - Renderizador Markdown via `https://cdn.jsdelivr.net/npm/marked/marked.min.js`.
   Se a internet do posto oscilar ou for bloqueada por firewall, a interface do chat quebra completamente.
 - **Solução Técnica:**
-  - Criar o diretório de assets estáticos locais [`web/static/vendor/`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/web/static/vendor/).
+  - Criar o diretório de assets estáticos locais [`web/static/vendor/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/static/vendor/).
   - Baixar e versionar localmente:
-    - [`web/static/vendor/tailwind.min.js`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/web/static/vendor/tailwind.min.js) (versão autônoma compilada ou CSS estático otimizado).
-    - [`web/static/vendor/lucide.min.js`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/web/static/vendor/lucide.min.js).
-    - [`web/static/vendor/marked.min.js`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/web/static/vendor/marked.min.js).
-  - Atualizar os links `<script src="...">` em [`web/index.html`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/web/index.html) e [`web/showcase.html`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/web/showcase.html) para os caminhos relativos locais (`/static/vendor/...`).
+    - [`web/static/vendor/tailwind.min.js`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/static/vendor/tailwind.min.js) (versão autônoma compilada ou CSS estático otimizado).
+    - [`web/static/vendor/lucide.min.js`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/static/vendor/lucide.min.js).
+    - [`web/static/vendor/marked.min.js`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/static/vendor/marked.min.js).
+  - Atualizar os links `<script src="...">` em [`web/index.html`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/index.html) e [`web/showcase.html`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/showcase.html) para os caminhos relativos locais (`/static/vendor/...`).
 - **Arquivos Afetados:**
-  - [`web/static/vendor/`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/web/static/vendor/)
-  - [`web/index.html`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/web/index.html)
-  - [`web/showcase.html`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/web/showcase.html)
+  - [`web/static/vendor/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/static/vendor/)
+  - [`web/index.html`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/index.html)
+  - [`web/showcase.html`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/showcase.html)
 - **Critério de Aceite:** O frontend renderiza 100% idêntico, com ícones, estilos dark glass e formatação markdown funcionando mesmo com a placa de rede externa desabilitada (modo avião / offline completo). Zero chamadas a domínios externos no DevTools Network tab.
 
 ---
 
 ### 🔴 P0-6: Execução em Serviço Nativo do Windows via NSSM
-- **Diagnóstico Atual:** A AURA é inicializada atualmente por meio de janelas de prompt de comando (`cmd.exe` / `powershell.exe`) abertas manualmente via [`iniciar.bat`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/iniciar.bat). Em ambiente de posto, caixas e frentistas rotineiramente fecham janelas pretas abertas na barra de tarefas para liberar espaço, derrubando o motor da IA. Adicionalmente, quando o computador reinicia após oscilação de energia elétrica, o sistema permanece inativo até que alguém faça login manual e execute o script.
+- **Diagnóstico Atual:** A AURA é inicializada atualmente por meio de janelas de prompt de comando (`cmd.exe` / `powershell.exe`) abertas manualmente via [`iniciar.bat`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/iniciar.bat). Em ambiente de posto, caixas e frentistas rotineiramente fecham janelas pretas abertas na barra de tarefas para liberar espaço, derrubando o motor da IA. Adicionalmente, quando o computador reinicia após oscilação de energia elétrica, o sistema permanece inativo até que alguém faça login manual e execute o script.
 - **Solução Técnica:**
   - Adotar o **NSSM (Non-Sucking Service Manager)** para encapsular a aplicação como um serviço nativo do Windows de segundo plano (`AURA_Core_Engine`).
-  - Desenvolver o script de automação de instalação [`scripts/iniciar_servico_nssm.bat`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/scripts/iniciar_servico_nssm.bat) e [`scripts/desinstalar_servico_nssm.bat`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/scripts/desinstalar_servico_nssm.bat).
+  - Desenvolver o script de automação de instalação [`scripts/iniciar_servico_nssm.bat`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/iniciar_servico_nssm.bat) e [`scripts/desinstalar_servico_nssm.bat`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/desinstalar_servico_nssm.bat).
   - Configurar parâmetros essenciais no serviço do Windows:
     - `AppDirectory`: Raiz do projeto AURA.
     - `AppParameters`: `-m uvicorn core.aura_api:app --host 0.0.0.0 --port 8000 --workers 2`.
@@ -159,18 +159,18 @@ Esta fase reúne correções indispensáveis para que o primeiro posto piloto op
     - `AppStdout` e `AppStderr`: Redirecionamento com rotação automática para `logs/aura_service.log`.
     - `StartType`: `SERVICE_AUTO_START` (inicia com o Windows antes do login do usuário).
 - **Arquivos Afetados:**
-  - [`scripts/iniciar_servico_nssm.bat`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/scripts/iniciar_servico_nssm.bat) (novo)
-  - [`scripts/desinstalar_servico_nssm.bat`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/scripts/desinstalar_servico_nssm.bat) (novo)
-  - [`README.md`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/README.md)
+  - [`scripts/iniciar_servico_nssm.bat`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/iniciar_servico_nssm.bat) (novo)
+  - [`scripts/desinstalar_servico_nssm.bat`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/desinstalar_servico_nssm.bat) (novo)
+  - [`README.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/README.md)
 - **Critério de Aceite:** O serviço `AURA_Core_Engine` é iniciado com status `RUNNING` no Gerenciador de Serviços do Windows (`services.msc`), responde na porta 8000 sem qualquer janela gráfica visível, e recupera a execução automaticamente após reinicialização do sistema operacional.
 
 ---
 
 ### 🔴 P0-7: Trava e Completude do `requirements.txt`
-- **Diagnóstico Atual:** O arquivo [`requirements.txt`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/requirements.txt) atual possui apenas 6 dependências declaradas, não incluindo pacotes fundamentais importados ativamente no código, como `fastapi`, `uvicorn`, `requests`, `pytest`, `pytest-asyncio`, `sse-starlette` e `httpx`. Uma instalação em uma nova máquina a partir do arquivo existente falha imediatamente com erros de módulos não encontrados (`ModuleNotFoundError`).
+- **Diagnóstico Atual:** O arquivo [`requirements.txt`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/requirements.txt) atual possui apenas 6 dependências declaradas, não incluindo pacotes fundamentais importados ativamente no código, como `fastapi`, `uvicorn`, `requests`, `pytest`, `pytest-asyncio`, `sse-starlette` e `httpx`. Uma instalação em uma nova máquina a partir do arquivo existente falha imediatamente com erros de módulos não encontrados (`ModuleNotFoundError`).
 - **Solução Técnica:**
   - Auditar todas as importações presentes no repositório.
-  - Atualizar [`requirements.txt`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/requirements.txt) fixando faixas de versão compatíveis e testadas em produção com Python 3.11 e 3.12:
+  - Atualizar [`requirements.txt`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/requirements.txt) fixando faixas de versão compatíveis e testadas em produção com Python 3.11 e 3.12:
     ```text
     fastapi>=0.110.0,<0.116.0
     uvicorn[standard]>=0.28.0,<0.33.0
@@ -185,10 +185,10 @@ Esta fase reúne correções indispensáveis para que o primeiro posto piloto op
     pytest>=8.0.0,<9.0.0
     pytest-asyncio>=0.23.0,<1.0.0
     ```
-  - Criar [`requirements-dev.txt`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/requirements-dev.txt) para linters e checadores estáticos (`ruff`, `mypy`, `black`).
+  - Criar [`requirements-dev.txt`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/requirements-dev.txt) para linters e checadores estáticos (`ruff`, `mypy`, `black`).
 - **Arquivos Afetados:**
-  - [`requirements.txt`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/requirements.txt)
-  - [`requirements-dev.txt`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/requirements-dev.txt) (novo)
+  - [`requirements.txt`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/requirements.txt)
+  - [`requirements-dev.txt`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/requirements-dev.txt) (novo)
 - **Critério de Aceite:** Execução de `pip install -r requirements.txt` em ambiente virtual Python limpo instala com sucesso todas as bibliotecas necessárias para executar a API FastAPI e a suíte de testes sem falhas de importação.
 
 ---
@@ -197,10 +197,10 @@ Esta fase reúne correções indispensáveis para que o primeiro posto piloto op
 - **Diagnóstico Atual:** O arquivo `bloco hero.txt`, com tamanho de 2,44 MB (2.441.350 bytes), estava rastreado no Git na raiz da branch `main`. Arquivos de despejo de texto ou logs volumosos degradam a agilidade de clones em campo e violam políticas de versionamento limpo.
 - **Solução Técnica:**
   - Remover o arquivo do versionamento com `git rm "bloco hero.txt"`.
-  - Garantir que [`.gitignore`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/.gitignore) contenha regras contra inclusão acidental de dumps e textos pesados.
+  - Garantir que [`.gitignore`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/.gitignore) contenha regras contra inclusão acidental de dumps e textos pesados.
   - Manter o histórico da branch `main` enxuto e profissional.
 - **Arquivos Afetados:**
-  - [`.gitignore`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/.gitignore)
+  - [`.gitignore`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/.gitignore)
 - **Critério de Aceite:** O arquivo de 2.44 MB não consta mais na árvore rastreada do Git da branch `main` e novos clones do repositório são mais rápidos e leves.
 
 ---
@@ -222,24 +222,24 @@ A Fase P1 estrutura a governança de software, automação de testes e proteçõ
     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO aura_service_ro;
     REVOKE CREATE, INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA public FROM aura_service_ro;
     ```
-  - Configurar [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/config/settings.py) para utilizar `ERP_DB_USER=aura_service_ro` como padrão de produção.
+  - Configurar [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/config/settings.py) para utilizar `ERP_DB_USER=aura_service_ro` como padrão de produção.
 - **Arquivos Afetados:**
-  - [`scripts/provisionar_usuario_leitura_erp.sql`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/scripts/provisionar_usuario_leitura_erp.sql) (novo)
-  - [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/config/settings.py)
-  - [`README.md`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/README.md)
+  - [`scripts/provisionar_usuario_leitura_erp.sql`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/provisionar_usuario_leitura_erp.sql) (novo)
+  - [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/config/settings.py)
+  - [`README.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/README.md)
 - **Critério de Aceite:** Tentativas de executar `INSERT`, `UPDATE` ou `DROP` com o usuário `aura_service_ro` geram erro imediato `permission denied for table ...` retornado pelo PostgreSQL, garantindo blindagem 100% matemática contra escritas acidentais no ERP.
 
 ---
 
 ### 🟡 P1-2: Reorganização da Suíte de Testes para Padrão Nativo `pytest`
-- **Diagnóstico Atual:** O diretório [`scripts/`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/scripts/) abriga dezenas de testes excelentes (`test_conciliacao_turno.py`, `test_sanitizer.py`, `test_genui_engine_sse.py`, etc.), porém a maioria adota métodos manuais `run_tests()` e blocos `if __name__ == "__main__":`. Esse formato impede que os testes sejam descobertos automaticamente por ferramentas de CI/CD ou executados em lote de forma parametrizada com relatório de cobertura.
+- **Diagnóstico Atual:** O diretório [`scripts/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/) abriga dezenas de testes excelentes (`test_conciliacao_turno.py`, `test_sanitizer.py`, `test_genui_engine_sse.py`, etc.), porém a maioria adota métodos manuais `run_tests()` e blocos `if __name__ == "__main__":`. Esse formato impede que os testes sejam descobertos automaticamente por ferramentas de CI/CD ou executados em lote de forma parametrizada com relatório de cobertura.
 - **Solução Técnica:**
-  - Criar o diretório de testes padronizado [`tests/`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/tests/) com subpastas `unit/`, `integration/` e `e2e/`.
+  - Criar o diretório de testes padronizado [`tests/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/) com subpastas `unit/`, `integration/` e `e2e/`.
   - Converter funções de validação para o padrão oficial `def test_*():` utilizando asserções nativas `assert`.
-  - Criar o arquivo de configuração [`pytest.ini`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/pytest.ini) definindo discovery patterns, marcadores (`unit`, `integration`, `slow`) e flags de relatório.
+  - Criar o arquivo de configuração [`pytest.ini`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/pytest.ini) definindo discovery patterns, marcadores (`unit`, `integration`, `slow`) e flags de relatório.
 - **Arquivos Afetados:**
-  - [`pytest.ini`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/pytest.ini) (novo)
-  - [`tests/`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/tests/) (novo)
+  - [`pytest.ini`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/pytest.ini) (novo)
+  - [`tests/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/) (novo)
 - **Critério de Aceite:** O comando `pytest` executado na raiz do projeto descobre e executa 100% dos testes automatizados, gerando relatório de aprovação unificado.
 
 ---
@@ -247,27 +247,27 @@ A Fase P1 estrutura a governança de software, automação de testes e proteçõ
 ### 🟡 P1-3: Pipeline de Integração Contínua (CI/CD) no GitHub Actions
 - **Diagnóstico Atual:** Não há pipeline automatizada de validação a cada commit ou pull request. Regressões em modelos Pydantic ou erros de digitação sintática só são detectados quando executados manualmente no posto.
 - **Solução Técnica:**
-  - Criar o workflow [`.github/workflows/ci.yml`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/.github/workflows/ci.yml).
+  - Criar o workflow [`.github/workflows/ci.yml`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/.github/workflows/ci.yml).
   - Configurar etapas de verificação:
     1. Checkout do código e cache de dependências Python.
     2. Linting e formatação rápida com Ruff (`ruff check .` e `ruff format --check .`).
     3. Análise estática de tipos com Mypy em módulos centrais (`mypy core/schemas`).
     4. Execução da suíte de testes automatizados com `pytest -m unit`.
 - **Arquivos Afetados:**
-  - [`.github/workflows/ci.yml`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/.github/workflows/ci.yml) (novo)
+  - [`.github/workflows/ci.yml`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/.github/workflows/ci.yml) (novo)
 - **Critério de Aceite:** Todo push ou pull request na branch `main` executa as checagens no GitHub Actions e bloqueia mesclagens caso ocorram falhas nos testes ou violações críticas de linting.
 
 ---
 
 ### 🟡 P1-4: Restrição Rigorosa de CORS e Autenticação de Endpoints Críticos
-- **Diagnóstico Atual:** Em [`core/aura_api.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/aura_api.py), a política de CORS está definida com `allow_origins=["*"]`. Adicionalmente, rotas de controle administrativo e mutações (como aprovação de Action Vouchers em `/api/v1/aura/action-vouchers` e alternância de feature flags em `/api/v1/aura/flags`) estão abertas sem exigência de autenticação por token ou chave de API.
+- **Diagnóstico Atual:** Em [`core/aura_api.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/aura_api.py), a política de CORS está definida com `allow_origins=["*"]`. Adicionalmente, rotas de controle administrativo e mutações (como aprovação de Action Vouchers em `/api/v1/aura/action-vouchers` e alternância de feature flags em `/api/v1/aura/flags`) estão abertas sem exigência de autenticação por token ou chave de API.
 - **Solução Técnica:**
   - Restringir as origens CORS via variável de ambiente `CORS_ALLOWED_ORIGINS` (padrão restrito a `localhost`, `127.0.0.1` e endereços autorizados da rede local).
   - Implementar middleware de autenticação baseado em cabeçalho `X-API-Key` ou Bearer Token (`AURA_API_KEY`) para proteger endpoints de auditoria, feature flags e ações delegadas.
   - Manter endpoints de leitura de status e streaming do chat devidamente autenticados por token de sessão ou chave de máquina.
 - **Arquivos Afetados:**
-  - [`core/aura_api.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/aura_api.py)
-  - [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/config/settings.py)
+  - [`core/aura_api.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/aura_api.py)
+  - [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/config/settings.py)
 - **Critério de Aceite:** Requisições a rotas administrativas sem o cabeçalho de autorização válido retornam HTTP 401 Unauthorized; requisições originadas de domínios web não listados são bloqueadas pelo navegador via política CORS.
 
 ---
@@ -280,8 +280,8 @@ A Fase P1 estrutura a governança de software, automação de testes e proteçõ
   - Implementar rate limiting de segurança (ex: máximo 30 requisições por minuto por IP para rotas de chat e 5 requisições por minuto para endpoints de vouchers).
   - Ativar compressão gzip/brotli para os assets estáticos do frontend.
 - **Arquivos Afetados:**
-  - [`deploy/Caddyfile`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/deploy/Caddyfile) (novo)
-  - [`deploy/nginx.conf`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/deploy/nginx.conf) (novo)
+  - [`deploy/Caddyfile`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/deploy/Caddyfile) (novo)
+  - [`deploy/nginx.conf`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/deploy/nginx.conf) (novo)
 - **Critério de Aceite:** Todo o tráfego com o chat AURA ocorre em canal HTTPS criptografado; ataques de força bruta ou disparos em excesso recebem HTTP 429 Too Many Requests.
 
 ---
@@ -289,12 +289,12 @@ A Fase P1 estrutura a governança de software, automação de testes e proteçõ
 ### 🟡 P1-6: Logging Estruturado em Formato JSON e Correlação de Traces
 - **Diagnóstico Atual:** Os logs emitidos pelos módulos do sistema utilizam formatação de texto livre (`logging.basicConfig(format="...")`), o que dificulta o parseamento automático por ferramentas de observabilidade e a correlação de uma mensagem de erro com a requisição original.
 - **Solução Técnica:**
-  - Criar um formatador de log estruturado JSON em [`core/logger.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/logger.py).
+  - Criar um formatador de log estruturado JSON em [`core/logger.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/logger.py).
   - Adicionar um middleware FastAPI que injeta um cabeçalho único `X-Request-ID` (UUIDv4) em cada requisição recebida e o propaga por todo o fluxo de processamento (roteamento semântico, consultas SQL, resposta SSE).
   - Incluir campos obrigatórios no JSON: `timestamp`, `level`, `request_id`, `client_ip`, `route`, `latency_ms`, `status_code` e `module`.
 - **Arquivos Afetados:**
-  - [`core/logger.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/logger.py) (novo)
-  - [`core/aura_api.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/aura_api.py)
+  - [`core/logger.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/logger.py) (novo)
+  - [`core/aura_api.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/aura_api.py)
 - **Critério de Aceite:** Logs gravados em disco possuem formato JSON válido por linha (JSONL), contendo `request_id` correlacionado permitindo rastrear o ciclo completo de qualquer requisição.
 
 ---
@@ -307,8 +307,8 @@ A Fase P1 estrutura a governança de software, automação de testes e proteçõ
   - O fluxo n8n formata um card executivo padronizado e utiliza a **Evolution API** para disparar o resumo no WhatsApp oficial do proprietário e gerente do posto.
   - Alertas de ruptura iminente de tanque (autonomia < 8 horas) disparam notificações prioritárias no canal do responsável por suprimentos.
 - **Arquivos Afetados:**
-  - [`core/webhooks.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/webhooks.py) (novo)
-  - [`deploy/n8n_workflows/aura_relatorio_turno.json`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/deploy/n8n_workflows/aura_relatorio_turno.json) (novo)
+  - [`core/webhooks.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/webhooks.py) (novo)
+  - [`deploy/n8n_workflows/aura_relatorio_turno.json`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/deploy/n8n_workflows/aura_relatorio_turno.json) (novo)
 - **Critério de Aceite:** No encerramento do turno, a mensagem consolidada com quebras de caixa, faturamento e litros vendidos chega no WhatsApp cadastrado em menos de 15 segundos, com dados 100% coincidentes com a auditoria interna do ERP.
 
 ---
@@ -318,27 +318,27 @@ A Fase P1 estrutura a governança de software, automação de testes e proteçõ
 A Fase P2 viabiliza a expansão em escala corporativa para redes com dezenas ou centenas de filiais, adotando arquiteturas de dados modernas, observabilidade centralizada SRE e infraestrutura declarativa.
 
 ### 🔵 P2-1: Versionamento Declarativo de Esquemas de Banco com Alembic
-- **Diagnóstico Atual:** O esquema do banco vetorial (`posto_ai`) e as tabelas SQLite locais (`aura_local_memory.db`) são mantidos através de comandos dispersos `CREATE TABLE IF NOT EXISTS` ou scripts pontuais de migração em [`scripts/`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/scripts/). Quando uma nova coluna é necessária (como a coluna `timestamp` em `aura_action_vouchers`), a migração é feita via `ALTER TABLE` em runtime com checagens manuais de `PRAGMA`.
+- **Diagnóstico Atual:** O esquema do banco vetorial (`posto_ai`) e as tabelas SQLite locais (`aura_local_memory.db`) são mantidos através de comandos dispersos `CREATE TABLE IF NOT EXISTS` ou scripts pontuais de migração em [`scripts/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/). Quando uma nova coluna é necessária (como a coluna `timestamp` em `aura_action_vouchers`), a migração é feita via `ALTER TABLE` em runtime com checagens manuais de `PRAGMA`.
 - **Solução Técnica:**
   - Adotar o **Alembic** para versionamento declarativo das tabelas gerenciadas pela AURA.
-  - Criar o diretório de migrações [`alembic/`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/alembic/) com histórico versionado de scripts de upgrade e downgrade.
+  - Criar o diretório de migrações [`alembic/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/alembic/) com histórico versionado de scripts de upgrade e downgrade.
   - Integrar a aplicação automática de migrações pendentes durante a rotina de inicialização do serviço.
 - **Arquivos Afetados:**
-  - [`alembic/`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/alembic/) (novo)
-  - [`alembic.ini`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/alembic.ini) (novo)
+  - [`alembic/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/alembic/) (novo)
+  - [`alembic.ini`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/alembic.ini) (novo)
 - **Critério de Aceite:** O comando `alembic upgrade head` aplica todas as migrações estruturais de forma idempotente, registrando o histórico de revisões na tabela `alembic_version`.
 
 ---
 
 ### 🔵 P2-2: Change Data Capture (CDC) Orientado a Eventos (`LISTEN/NOTIFY` ou Triggers)
-- **Diagnóstico Atual:** O daemon de sincronização ([`scripts/sync_daemon.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/scripts/sync_daemon.py)) executa polling periódico no banco ERP gerando hashes MD5 para detectar se produtos, faturamento ou preços foram alterados. Esse polling consome I/O desnecessário de disco no PostgreSQL do ERP legado.
+- **Diagnóstico Atual:** O daemon de sincronização ([`scripts/sync_daemon.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/sync_daemon.py)) executa polling periódico no banco ERP gerando hashes MD5 para detectar se produtos, faturamento ou preços foram alterados. Esse polling consome I/O desnecessário de disco no PostgreSQL do ERP legado.
 - **Solução Técnica:**
   - Substituir a estratégia de polling periódico por gatilhos leves (`AFTER INSERT OR UPDATE`) no ERP disparando comandos nativos `PERFORM pg_notify('aura_cdc_channel', row_data)`.
   - O `sync_daemon.py` permanece em escuta assíncrona com `conn.poll()` e acorda instantaneamente apenas quando ocorrem mutações reais de dados.
   - Fallback gracioso para polling de intervalo longo (a cada 4 horas) caso a base de dados não permita a criação de triggers por restrição do fornecedor do ERP.
 - **Arquivos Afetados:**
-  - [`scripts/sync_daemon.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/scripts/sync_daemon.py)
-  - [`scripts/cdc_triggers.sql`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/scripts/cdc_triggers.sql) (novo)
+  - [`scripts/sync_daemon.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/sync_daemon.py)
+  - [`scripts/cdc_triggers.sql`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/cdc_triggers.sql) (novo)
 - **Critério de Aceite:** O tempo de sincronização de novos produtos ou notas fiscais reduz de 60 segundos (intervalo de polling) para sub-segundo (< 500 ms), com redução de 90% no I/O de consultas em repouso no banco ERP.
 
 ---
@@ -353,13 +353,13 @@ A Fase P2 viabiliza a expansão em escala corporativa para redes com dezenas ou 
     4. Envia o backup criptografado diretamente para um bucket seguro na nuvem (Amazon S3 ou Cloudflare R2 com retenção configurada de 30 dias).
   - Incluir política de Point-in-Time Recovery (PITR) para recuperação rápida em caso de desastre.
 - **Arquivos Afetados:**
-  - [`scripts/backup_cloud_sync.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/scripts/backup_cloud_sync.py) (novo)
+  - [`scripts/backup_cloud_sync.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/backup_cloud_sync.py) (novo)
 - **Critério de Aceite:** Execução de rotina de teste de restauração em ambiente vazio recupera o banco de dados completo e o estado dos vouchers a partir do backup em nuvem em menos de 10 minutos.
 
 ---
 
 ### 🔵 P2-4: Exportador Prometheus (`/metrics`) e Observabilidade SRE Grafana
-- **Diagnóstico Atual:** A telemetria atual ([`core/telemetry.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/telemetry.py)) é mantida apenas em memória na instância ativa e consultada por endpoints JSON pontuais. Não existe retenção histórica de métricas nem suporte a alertas proativos em caso de degradação de SLA.
+- **Diagnóstico Atual:** A telemetria atual ([`core/telemetry.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/telemetry.py)) é mantida apenas em memória na instância ativa e consultada por endpoints JSON pontuais. Não existe retenção histórica de métricas nem suporte a alertas proativos em caso de degradação de SLA.
 - **Solução Técnica:**
   - Expor o endpoint `/metrics` no padrão oficial Prometheus através da biblioteca `prometheus-fastapi-instrumentator` ou métricas customizadas.
   - Coletar métricas operacionais chave:
@@ -369,8 +369,8 @@ A Fase P2 viabiliza a expansão em escala corporativa para redes com dezenas ou 
     - Contagem de chamadas a ferramentas analíticas com status de sucesso/falha.
   - Integrar com o dashboard Grafana do hub corporativo central para monitoramento de frotas de postos.
 - **Arquivos Afetados:**
-  - [`core/telemetry.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/telemetry.py)
-  - [`core/aura_api.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/aura_api.py)
+  - [`core/telemetry.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/telemetry.py)
+  - [`core/aura_api.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/aura_api.py)
 - **Critério de Aceite:** O scraper do Prometheus coleta métricas sem erros a cada 15 segundos na porta 8000; painéis do Grafana exibem latência de consultas e saúde das conexões em tempo real.
 
 ---
@@ -388,21 +388,21 @@ A Fase P2 viabiliza a expansão em escala corporativa para redes com dezenas ou 
     ```
   - Injetar dinamicamente a filial no contexto da conexão do pool antes da execução de queries.
 - **Arquivos Afetados:**
-  - [`core/tools.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/tools.py)
-  - [`core/rag_engine.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/rag_engine.py)
+  - [`core/tools.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py)
+  - [`core/rag_engine.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/rag_engine.py)
 - **Critério de Aceite:** Impossibilidade matemática de uma requisição referente à Filial 1 acessar dados ou resumos da Filial 2, mesmo sob injeção de parâmetros deliberadamente forçados.
 
 ---
 
 ### 🔵 P2-6: Migração Progressiva do Frontend para TypeScript e Bundler Vite
-- **Diagnóstico Atual:** O frontend da AURA é composto por uma dezena de scripts Vanilla JavaScript modulares ([`web/js/`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/web/js/)) vinculados diretamente ao escopo global `window`. Embora funcione bem para pilotos locais, à medida que a interface ganha novos componentes, a ausência de tipagem estática e empacotamento dificulta refatorações seguras e impede tree-shaking de código não utilizado.
+- **Diagnóstico Atual:** O frontend da AURA é composto por uma dezena de scripts Vanilla JavaScript modulares ([`web/js/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/js/)) vinculados diretamente ao escopo global `window`. Embora funcione bem para pilotos locais, à medida que a interface ganha novos componentes, a ausência de tipagem estática e empacotamento dificulta refatorações seguras e impede tree-shaking de código não utilizado.
 - **Solução Técnica:**
-  - Configurar estrutura de build com **Vite** e **TypeScript** em [`web-frontend/`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/web-frontend/).
+  - Configurar estrutura de build com **Vite** e **TypeScript** em [`web-frontend/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web-frontend/).
   - Mapear os contratos Pydantic da API diretamente para interfaces TypeScript (`AuraMessage`, `GenUIEvent`, `ActionVoucher`).
-  - Compilar o frontend em assets únicos minificados para produção, gerando a saída em [`web/dist/`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/web/dist/) servida estaticamente pelo FastAPI.
+  - Compilar o frontend em assets únicos minificados para produção, gerando a saída em [`web/dist/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/dist/) servida estaticamente pelo FastAPI.
 - **Arquivos Afetados:**
-  - [`web-frontend/package.json`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/web-frontend/package.json) (novo)
-  - [`web-frontend/tsconfig.json`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/web-frontend/tsconfig.json) (novo)
+  - [`web-frontend/package.json`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web-frontend/package.json) (novo)
+  - [`web-frontend/tsconfig.json`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web-frontend/tsconfig.json) (novo)
 - **Critério de Aceite:** O processo de build (`npm run build`) conclui sem erros de tipagem estática; o tamanho total dos bundles transferidos na inicialização da página é reduzido em mais de 35%.
 
 ---
@@ -436,19 +436,19 @@ A Fase P2 viabiliza a expansão em escala corporativa para redes com dezenas ou 
 ## ✅ 4. Critérios de Aceite e Checklist de Homologação
 
 ### 📋 Checklist Fase P0 (Go-Live Piloto)
-- [ ] Execução de varredura estática no código confirma zero senhas hardcoded em [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/config/settings.py) e [`core/config.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/config.py).
-- [ ] O arquivo [`.env.example`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/.env.example) contém a variável `AURA_VOUCHER_SECRET` com instruções claras de preenchimento.
+- [ ] Execução de varredura estática no código confirma zero senhas hardcoded em [`config/settings.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/config/settings.py) e [`core/config.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/config.py).
+- [ ] O arquivo [`.env.example`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/.env.example) contém a variável `AURA_VOUCHER_SECRET` com instruções claras de preenchimento.
 - [ ] Teste de carga com chamadas paralelas ao `SemanticRouter` conclui com 100% de sucesso sem travar ou emitir erros de cursor.
-- [ ] Consultas analíticas utilizam o pool centralizado em [`core/db_pool.py`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/core/db_pool.py), sem novas conexões abertas manualmente por query.
-- [ ] Todos os assets de Tailwind, Lucide e Marked estão hospedados localmente em [`web/static/vendor/`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/web/static/vendor/) e a interface carrega sem conexão à internet.
+- [ ] Consultas analíticas utilizam o pool centralizado em [`core/db_pool.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/db_pool.py), sem novas conexões abertas manualmente por query.
+- [ ] Todos os assets de Tailwind, Lucide e Marked estão hospedados localmente em [`web/static/vendor/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/static/vendor/) e a interface carrega sem conexão à internet.
 - [ ] O serviço nativo do Windows `AURA_Core_Engine` é instalado com sucesso via script NSSM e reinicia automaticamente após falha.
-- [ ] O arquivo [`requirements.txt`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/requirements.txt) permite instalação limpa de todas as dependências sem erros de importação.
+- [ ] O arquivo [`requirements.txt`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/requirements.txt) permite instalação limpa de todas as dependências sem erros de importação.
 - [ ] O arquivo pesado `bloco hero.txt` foi completamente removido do Git na branch `main`.
 
 ### 📋 Checklist Fase P1 (Consolidação Corporativa)
 - [ ] A role técnica `aura_service_ro` está provisionada no PostgreSQL do ERP e o acesso de escrita é rejeitado no nível de engine.
 - [ ] A suíte de testes é executada com sucesso através do comando nativo `pytest`.
-- [ ] O workflow do GitHub Actions em [`.github/workflows/ci.yml`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/.github/workflows/ci.yml) executa com sucesso em pull requests.
+- [ ] O workflow do GitHub Actions em [`.github/workflows/ci.yml`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/.github/workflows/ci.yml) executa com sucesso em pull requests.
 - [ ] Endpoints de vouchers e configurações administrativas retornam HTTP 401 sem autenticação prévia.
 - [ ] O proxy reverso Caddy ou Nginx intercepta requisições HTTP e serve conexões seguras HTTPS.
 - [ ] Logs emitidos no console e em arquivo apresentam formato JSON com `request_id` válido.
@@ -496,9 +496,9 @@ flowchart LR
 ## 🔗 6. Documentos Correlatos e Referências do Repositório
 
 Para aprofundar aspectos específicos do ecossistema AURA, consulte a documentação técnica existente:
-- [`README.md`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/README.md): Visão geral do produto, módulos de negócio e guia rápido de inicialização.
-- [`docs/roadmap.md`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/docs/roadmap.md): Roadmap de experiência de usuário e interface conversacional (AURA Precision Glass UI/UX).
-- [`docs/roadmap_aila.md`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/docs/roadmap_aila.md): Arquitetura dos motores analíticos de inteligência, RAG híbrido e conciliação de turnos.
-- [`docs/dossie_tecnico.md`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/docs/dossie_tecnico.md): Dossiê técnico de auditoria e conformidade com requisitos da ANP e LGPD.
-- [`docs/protocolo_streaming_genui.md`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/docs/protocolo_streaming_genui.md): Especificação dos contratos SSE e micro-widgets GenUI.
-- [`docs/guia_ponte_desenvolvimento_remoto_tailscale.md`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/docs/guia_ponte_desenvolvimento_remoto_tailscale.md): Configuração de conexões seguras de desenvolvimento via rede mesh Tailscale.
+- [`README.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/README.md): Visão geral do produto, módulos de negócio e guia rápido de inicialização.
+- [`docs/roadmap.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap.md): Roadmap de experiência de usuário e interface conversacional (AURA Precision Glass UI/UX).
+- [`docs/roadmap_aila.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap_aila.md): Arquitetura dos motores analíticos de inteligência, RAG híbrido e conciliação de turnos.
+- [`docs/dossie_tecnico.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/dossie_tecnico.md): Dossiê técnico de auditoria e conformidade com requisitos da ANP e LGPD.
+- [`docs/protocolo_streaming_genui.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/protocolo_streaming_genui.md): Especificação dos contratos SSE e micro-widgets GenUI.
+- [`docs/guia_ponte_desenvolvimento_remoto_tailscale.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/guia_ponte_desenvolvimento_remoto_tailscale.md): Configuração de conexões seguras de desenvolvimento via rede mesh Tailscale.

@@ -620,6 +620,6 @@ Uma tarefa só pode ser marcada como concluída quando houver evidência corresp
 
 ### Relação com os Demais Roadmaps Técnicos
 
-- **Roadmap de Produção Enterprise (Missão Crítica & Infraestrutura):** Para diretrizes de segurança, pool de conexões, resiliência offline, serviço Windows nativo (NSSM) e observabilidade SRE, consulte [`docs/roadmap_producao_enterprise.md`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/docs/roadmap_producao_enterprise.md).
-- **Roadmap Estratégico & Engenharia de Execução:** Para arquitetura do motor cognitivo, RAG híbrido e ferramentas de inteligência analítica, consulte [`docs/roadmap_aila.md`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/docs/roadmap_aila.md).
+- **Roadmap de Produção Enterprise (Missão Crítica & Infraestrutura):** Para diretrizes de segurança, pool de conexões, resiliência offline, serviço Windows nativo (NSSM) e observabilidade SRE, consulte [`docs/roadmap_producao_enterprise.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap_producao_enterprise.md).
+- **Roadmap Estratégico & Engenharia de Execução:** Para arquitetura do motor cognitivo, RAG híbrido e ferramentas de inteligência analítica, consulte [`docs/roadmap_aila.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap_aila.md).
 

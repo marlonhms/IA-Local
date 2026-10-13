@@ -744,9 +744,10 @@ ia-banco-local/
 │   ├── seed_conveniencia_vendas.py # Carga controlada de transações de conveniência no ERP
 │   └── test_conveniencia_vendas_cruzadas.py # Suíte de testes de Market Basket Analysis e vendas cruzadas
 │
-├── docs/                     # Documentação de arquitetura e roadmap
-│   ├── dossie_tecnico.md     # Dossiê técnico completo de infraestrutura e SRE
-│   └── roadmap_aila.md       # Roadmap estratégico e planejamento das fases de evolução
+├── docs/                               # Documentação de arquitetura e roadmap
+│   ├── dossie_tecnico.md               # Dossiê técnico completo de infraestrutura e SRE
+│   ├── roadmap_aila.md                 # Roadmap estratégico e planejamento das fases de evolução
+│   └── roadmap_producao_enterprise.md  # Roadmap de produção enterprise e prontidão operacional
 │
 └── backups/                  # Diretório protegido para rotinas de backup locais
     └── .gitkeep              # Estrutura mantida no Git (dumps .backup são ignorados)
@@ -854,9 +855,9 @@ O desenvolvimento do **Ai.la** segue um cronograma rigoroso de engenharia focado
 | **Fase 5** | **Dashboard Web & PWA Mobile** | 💻 Planejada | Painel gerencial responsivo, visão gráfica dos tanques, monitor de frentistas em tempo real. |
 | **Fase 6.5+** | **Módulo Fiscal Avançado (Agent SEFAZ)** | 📈 Planejada | Auditoria contínua de NFC-e com Reforma Tributária (IBS/CBS) e conformidade NCM/CEST. |
 
-> *Para o plano detalhado de prontidão industrial e engenharia de missão crítica (Fases P0, P1 e P2), consulte o [`docs/roadmap_producao_enterprise.md`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/docs/roadmap_producao_enterprise.md).*  
-> *Para o detalhamento arquitetural dos motores cognitivos e fases de inteligência analítica, consulte o [`docs/roadmap_aila.md`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/docs/roadmap_aila.md).*  
-> *Para a evolução de UI/UX e design system conversacional, consulte o [`docs/roadmap.md`](file:///C:/Users/Marlon/Documents/Agent PC/ia-banco-local/docs/roadmap.md).*
+> *Para o plano detalhado de prontidão industrial e engenharia de missão crítica (Fases P0, P1 e P2), consulte o [`docs/roadmap_producao_enterprise.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap_producao_enterprise.md).*  
+> *Para o detalhamento arquitetural dos motores cognitivos e fases de inteligência analítica, consulte o [`docs/roadmap_aila.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap_aila.md).*  
+> *Para a evolução de UI/UX e design system conversacional, consulte o [`docs/roadmap.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap.md).*
 
 ---
 
