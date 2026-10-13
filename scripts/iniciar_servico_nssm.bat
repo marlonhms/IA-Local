@@ -67,7 +67,7 @@ echo [INFO] Interrompendo versao anterior do servico se estiver ativa...
 "%NSSM_EXE%" stop %SERVICE_NAME% >nul 2>&1
 
 echo [INFO] Configurando servico %SERVICE_NAME%...
-"%NSSM_EXE%" install %SERVICE_NAME% "%PYTHON_EXE%" "-m uvicorn core.aura_api:app --host 0.0.0.0 --port 8000 --workers 2" >nul 2>&1
+"%NSSM_EXE%" install %SERVICE_NAME% "%PYTHON_EXE%" "-m uvicorn core.aura_api:app --host 0.0.0.0 --port 8000" >nul 2>&1
 "%NSSM_EXE%" set %SERVICE_NAME% AppDirectory "%PROJECT_ROOT%"
 "%NSSM_EXE%" set %SERVICE_NAME% Description "AURA - Motor Cognitivo e IntelligentUI para Postos de Combustiveis"
 "%NSSM_EXE%" set %SERVICE_NAME% Start SERVICE_AUTO_START
