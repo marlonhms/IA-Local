@@ -1258,30 +1258,53 @@ class AuraAuxPanel {
     }
 
     // MÓDULO 4: COMBOS DE CONVENIÊNCIA & BASKET
-    else if (effectiveIntent === 'market_basket' || toolName === 'conveniencia_vendas_cruzadas') {
+    else if (
+      effectiveIntent === 'market_basket' ||
+      effectiveIntent === 'conveniencia_vendas_cruzadas' ||
+      effectiveIntent === 'vendas_cruzadas' ||
+      toolName === 'conveniencia_vendas_cruzadas' ||
+      toolName === 'render_BasketUpsellStrategyUI' ||
+      toolName === 'BasketUpsellStrategyUI'
+    ) {
       title = '🛒 Combos & Vendas Cruzadas (Loja)';
       subtitle = 'Mineração de Regras de Associação & Lift PDV';
-      const maxLift = c.metrics?.maior_lift ?? 1.0;
+      const propsObj = c.props || {};
+      const metricsObj = c.metrics || (c.contrato && c.contrato.metrics) || propsObj.metrics || {};
+      const resumoObj = c.resumo_executivo || propsObj.resumo_executivo || {};
+      const maxLift = metricsObj.maior_lift ?? resumoObj.maior_lift_encontrado ?? (propsObj.top_combos && propsObj.top_combos[0]?.lift) ?? 1.0;
       statusChip = {
         label: `Max Lift ${Number(maxLift).toFixed(1)}x`,
         severity: maxLift >= 2.0 ? 'success' : 'neutral'
       };
 
-      const rawCombos = c.top_combos || data.top_combos_cross_selling || [];
-      records = rawCombos.map(item => ({
-        'Produto Base': item.antecedente || '-',
-        'Oferta Cruzada': item.consequente || '-',
-        'Lift': item.lift !== undefined ? `${Number(item.lift).toFixed(2)}x` : '-',
-        'Confiança (%)': item.confianca_pct !== undefined ? `${Number(item.confianca_pct).toFixed(1)}%` : '-',
-        'Suporte (%)': item.suporte_pct !== undefined ? `${Number(item.suporte_pct).toFixed(1)}%` : '-',
-        'Relevância': item.relevancia || (item.lift >= 2.0 ? 'MUITO ALTA' : 'ALTA'),
-        'Script Balcão': item.script_sugerido_caixa || '-'
-      }));
+      const rawCombos = c.top_combos || data.top_combos_cross_selling || propsObj.top_combos || [];
+      records = rawCombos.map(item => {
+        const orig = item.anchor_product || item.origem || (typeof item.produto_origem === 'object' ? item.produto_origem?.nompro : item.produto_origem) || item.antecedente || '-';
+        const rec = item.recommended_product || item.recomendado || (typeof item.produto_recomendado === 'object' ? item.produto_recomendado?.nompro : item.produto_recomendado) || item.consequente || '-';
+        const liftVal = item.lift ?? item.metricas?.lift ?? 1.0;
+        const confVal = item.confidence_pct ?? item.confianca_pct ?? (item.metricas?.confianca ? item.metricas.confianca * 100 : undefined);
+        const supVal = item.support_pct ?? item.suporte_pct ?? (item.metricas?.suporte ? item.metricas.suporte * 100 : undefined);
+        const pitch = item.script_pitch || item.script_sugerido_caixa || '-';
+        const ticketAdd = item.additional_ticket_reais ?? item.ticket_recomendado_reais ?? item.impacto_financeiro?.incremento_ticket_reais ?? item.impacto_financeiro?.preco_recomendado;
+        return {
+          'Produto Base': orig,
+          'Oferta Cruzada': rec,
+          'Lift': `${Number(liftVal).toFixed(2)}x`,
+          'Confiança (%)': confVal !== undefined ? `${Number(confVal).toFixed(1)}%` : '-',
+          'Suporte (%)': supVal !== undefined ? `${Number(supVal).toFixed(1)}%` : '-',
+          'Ticket Adic. (R$)': ticketAdd !== undefined ? `R$ ${Number(ticketAdd).toFixed(2)}` : '-',
+          'Relevância': item.relevancia || (Number(liftVal) >= 2.0 ? 'MUITO ALTA' : 'ALTA'),
+          'Script Balcão': pitch
+        };
+      });
+
+      const totalAudited = metricsObj.total_transacoes_analisadas ?? resumoObj.total_transacoes_analisadas ?? 0;
+      const combosFortes = c.assessment?.regras_com_forte_sinergia_lift_2 ?? resumoObj.regras_com_forte_sinergia_lift_2 ?? records.filter(r => parseFloat(r.Lift) >= 2.0).length;
 
       summaryKpis = [
         { label: 'Maior Multiplicador (Lift)', value: `${Number(maxLift).toFixed(1)}x`, sub: 'Probabilidade cruzada' },
-        { label: 'Combos Fortes (>= 2.0x)', value: `${c.assessment?.regras_com_forte_sinergia_lift_2 ?? records.length}`, sub: 'Prontos para oferta no caixa' },
-        { label: 'Transações Auditadas', value: `${c.metrics?.total_transacoes_analisadas ?? 0}`, sub: 'Cupons fiscais loja' }
+        { label: 'Combos Fortes (>= 2.0x)', value: `${combosFortes}`, sub: 'Prontos para oferta no caixa' },
+        { label: 'Transações Auditadas', value: `${totalAudited}`, sub: 'Cupons fiscais loja' }
       ];
 
       schemaInfo = {
@@ -1289,9 +1312,9 @@ class AuraAuxPanel {
         table: 'public.tb_vendas_itens_cesta',
         recordCount: records.length,
         fields: [
-          { field: 'antecedente', type: 'VARCHAR(100)', sample: 'Gasolina Aditivada' },
-          { field: 'consequente', type: 'VARCHAR(100)', sample: 'Aditivo Flex STP' },
-          { field: 'lift', type: 'NUMERIC(6,2)', sample: 3.4 }
+          { field: 'anchor_product', type: 'VARCHAR(100)', sample: 'Café Expresso' },
+          { field: 'recommended_product', type: 'VARCHAR(100)', sample: 'Pão de Queijo' },
+          { field: 'lift', type: 'NUMERIC(6,2)', sample: 3.45 }
         ]
       };
 
