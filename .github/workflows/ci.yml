@@ -12,6 +12,11 @@ jobs:
   test:
     name: Testes Automatizados e QA (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    env:
+      ERP_DB_PASSWORD: "ci_test_password"
+      ERP_SERVICE_PASS: "ci_test_password"
+      AURA_API_KEY: "aura_secret_admin_key_2026"
+      AURA_VOUCHER_SECRET: "aura_voucher_hmac_secret_v1"
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
