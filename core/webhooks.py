@@ -211,39 +211,56 @@ def _format_litros(val: float) -> str:
     return s.replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def _format_date(d_str: str) -> str:
+    if not d_str:
+        return ""
+    try:
+        parts = d_str.strip().split("-")
+        if len(parts) == 3 and len(parts[0]) == 4:
+            return f"{parts[2]}/{parts[1]}/{parts[0]}"
+    except Exception:
+        pass
+    return d_str
+
+
 def format_turno_whatsapp_message(payload: TurnoResumoPayload) -> str:
-    """Formata card executivo em texto para envio via WhatsApp."""
-    status_icon = "✅" if payload.status_conciliacao == "CONCILIADO" else "⚠️"
-    msg = (
-        f"{status_icon} *AURA // FECHAMENTO DE TURNO EXECUTIVO*\n"
-        f"📅 Data: {payload.data} | Turno: {payload.turno_id}\n"
-        f"⛽ Filial: {payload.filial_id}\n"
-        f"----------------------------------------\n"
-        f"💰 Faturamento: R$ {_format_brl(payload.faturamento_total)}\n"
-        f"📊 Litros Vendidos: {_format_litros(payload.litros_vendidos)} L\n"
-        f"⚖️ Quebra/Divergência: R$ {_format_brl(payload.quebra_caixa)}\n"
-        f"🎯 Status: {payload.status_conciliacao}\n"
-        f"🔌 Bicos Auditados: {payload.bicos_analisados}\n"
-    )
+    """Formata card executivo em texto profissional e limpo para envio via WhatsApp."""
+    data_br = _format_date(payload.data)
+    quebra_str = _format_brl(payload.quebra_caixa)
+    diff_prefix = "+" if payload.quebra_caixa > 0 else ""
+
+    lines = [
+        "*AURA | FECHAMENTO DE TURNO*",
+        f"{payload.filial_id} • {payload.turno_id}",
+        f"Data: {data_br}",
+        "",
+        f"• Faturamento Total: R$ {_format_brl(payload.faturamento_total)}",
+        f"• Volume Vendido: {_format_litros(payload.litros_vendidos)} L",
+        f"• Quebra / Diferença Caixa: {diff_prefix}R$ {quebra_str}",
+        f"• Bicos Auditados: {payload.bicos_analisados}",
+        f"• Status da Conciliação: {payload.status_conciliacao}",
+    ]
     if payload.observacoes:
-        msg += f"\n📝 Obs: {payload.observacoes}"
-    return msg
+        lines.append(f"\nObservação: {payload.observacoes.strip()}")
+    return "\n".join(lines)
 
 
 def format_alerta_tanque_whatsapp_message(payload: AlertaTanquePayload) -> str:
-    """Formata alerta de risco de esgotamento de combustível."""
-    urg_icon = "🚨" if payload.urgencia in ("ALTA", "CRITICA") else "⚠️"
-    return (
-        f"{urg_icon} *AURA // ALERTA DE RUPTURA DE COMBUSTÍVEL*\n"
-        f"⛽ Combustível: {payload.combustivel}\n"
-        f"🏷️ Tanque: {payload.tanque_id} (Filial {payload.filial_id})\n"
-        f"----------------------------------------\n"
-        f"📦 Nível Atual: {payload.volume_atual_litros:,.0f} L / {payload.capacidade_total_litros:,.0f} L\n"
-        f"⏳ Autonomia Estimada: {payload.autonomia_horas:.1f} horas\n"
-        f"⏰ Esgotamento Previsto: {payload.previsao_esgotamento}\n"
-        f"🚨 Prioridade: {payload.urgencia}\n"
-        f"\n💡 Ação sugerida: Autorizar pedido de carreta no painel da AURA."
-    )
+    """Formata alerta operacional de tanques em texto limpo e executivo."""
+    pct = (payload.volume_atual_litros / payload.capacidade_total_litros * 100) if payload.capacidade_total_litros > 0 else 0.0
+    lines = [
+        "*AURA | ALERTA OPERACIONAL DE TANQUES*",
+        f"Filial: {payload.filial_id} • Tanque: {payload.tanque_id}",
+        "",
+        f"• Combustível: {payload.combustivel}",
+        f"• Saldo Atual: {_format_litros(payload.volume_atual_litros)} L / {_format_litros(payload.capacidade_total_litros)} L ({pct:.1f}%)",
+        f"• Autonomia Estimada: {payload.autonomia_horas:.1f} horas",
+        f"• Previsão de Esgotamento: {payload.previsao_esgotamento}",
+        f"• Urgência: {payload.urgencia}",
+        "",
+        "Ação Recomendada: Autorizar pedido de carreta no painel de controle.",
+    ]
+    return "\n".join(lines)
 
 
 # =============================================================================
