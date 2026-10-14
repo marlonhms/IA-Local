@@ -914,6 +914,70 @@ def extrair_combustivel(pergunta: str) -> Optional[str]:
     return None
 
 
+def extrair_parametros_simulacao(pergunta: str) -> Dict[str, Any]:
+    """
+    Extrai parametros para a simulacao preditiva What-If e precificacao dinamica:
+    - produto (combustivel alvo)
+    - delta_preco (variacao de preco em R$, ex: +0.10, -0.05)
+    - periodo_dias (janela temporal em dias, ex: 30)
+    - custo_novo (novo custo unitario se informado)
+    """
+    p = pergunta.lower()
+
+    # 1. Combustivel
+    comb = extrair_combustivel(pergunta) or "GASOLINA COMUM"
+
+    # 2. Custo novo (ex: "custo de 6.10", "custo foi para 6.20", "custo for para 6.15")
+    custo_novo = None
+    p_sem_custo = p
+    m_custo = re.search(r"\bcusto\s*(?:de|para|foi\s*para|for\s*para|subiu\s*para|em|a)?\s*(?:r\$\s*)?(\d+[.,]\d{1,3})\b", p)
+    if m_custo:
+        try:
+            custo_novo = float(m_custo.group(1).replace(",", "."))
+            p_sem_custo = p[:m_custo.start()] + " " + p[m_custo.end():]
+        except ValueError:
+            pass
+
+    # 3. Variacao de preco (delta_preco)
+    delta_preco = 0.10
+    is_reduc = bool(re.search(r"\b(baixar|reduzir|diminuir|cortar|queda|desconto|corte|descontar)\b", p_sem_custo))
+
+    # A. Padrao "X centavos" (ex: 10 centavos, 15 cents, 5 centavos)
+    m_cents = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:centavos|cents|centavo)\b", p_sem_custo)
+    if m_cents:
+        val = float(m_cents.group(1).replace(",", "."))
+        delta_preco = -(val / 100.0) if is_reduc else (val / 100.0)
+    else:
+        # B. Padrao "R$ 0,10" ou "+0.10" ou "-0.15" ou "0.10 no preco"
+        m_reais = re.search(r"(?:[+\-]?\s*r\$\s*|\b)([+\-]?\d+[.,]\d{1,3})\b", p_sem_custo)
+        if m_reais:
+            val_txt = m_reais.group(1).replace(",", ".").replace(" ", "")
+            try:
+                val = float(val_txt)
+                delta_preco = -abs(val) if is_reduc else val
+            except ValueError:
+                pass
+
+    # 3. Periodo em dias
+    periodo_dias = 30
+    m_dias = re.search(r"(\d+)\s*dias\b", p)
+    if m_dias:
+        periodo_dias = int(m_dias.group(1))
+    elif "semana" in p or "7 dias" in p:
+        periodo_dias = 7
+    elif "quinzena" in p or "15 dias" in p:
+        periodo_dias = 15
+    elif "ano" in p or "anual" in p:
+        periodo_dias = 365
+
+    return {
+        "produto": comb,
+        "delta_preco": round(delta_preco, 3),
+        "periodo_dias": periodo_dias,
+        "custo_novo": custo_novo,
+    }
+
+
 def extrair_data_turno(pergunta: str) -> Tuple[Optional[str], Optional[str]]:
     """Extrai parâmetros de data e turno a partir da pergunta em linguagem natural."""
     p = pergunta.lower()
@@ -1371,9 +1435,9 @@ def build_canonical_genui_envelope(
             "receita_liquida": 713832.0,
             "margem_contribuicao_pct": 14.6,
         }
-        props["delta_volume_pct"] = float(props.get("delta_volume_pct") or -2.0)
-        props["delta_revenue"] = float(props.get("delta_revenue") or 7032.0)
-        props["delta_margin_pct"] = float(props.get("delta_margin_pct") or 0.4)
+        props["delta_volume_pct"] = float(props["delta_volume_pct"]) if props.get("delta_volume_pct") is not None else -2.0
+        props["delta_revenue"] = float(props["delta_revenue"]) if props.get("delta_revenue") is not None else 7032.0
+        props["delta_margin_pct"] = float(props["delta_margin_pct"]) if props.get("delta_margin_pct") is not None else 0.4
         props["suggested_actions"] = [a.model_dump(mode="json") for a in actions]
 
     elif comp_name == "render_BenchmarkComparisonUI" or intencao in ("benchmark_comparativo", "comparativo_turnos"):
@@ -2216,6 +2280,18 @@ class AuraEngine:
                 return self.tools.consultar_clientes_erp(termo=p.get("termo", ""))
 
             elif norm_name in (
+                "cenario_preditivo", "simulacao_preditiva", "simular_cenario_precificacao",
+                "simular_cenario", "simular_preco", "what_if", "what-if", "precificacao_dinamica"
+            ):
+                return self.tools.simular_cenario_precificacao(
+                    produto=p.get("produto") or "GASOLINA COMUM",
+                    delta_preco=float(p.get("delta_preco") if p.get("delta_preco") is not None else 0.10),
+                    periodo_dias=int(p.get("periodo_dias") if p.get("periodo_dias") is not None else 30),
+                    custo_novo=float(p["custo_novo"]) if p.get("custo_novo") is not None else None,
+                    preco_base_override=float(p["preco_base_override"]) if p.get("preco_base_override") is not None else None,
+                )
+
+            elif norm_name in (
                 "catalogo_produtos", "buscar_produtos_catalogo", "catalogo",
                 "produtos", "busca_produtos"
             ):
@@ -2463,13 +2539,21 @@ Diretrizes Específicas por Assunto:
                         f"Tags: {', '.join(art.get('tags', []) or [])}\n\n"
                     )
 
+            elif intencao in ("cenario_preditivo", "simulacao_preditiva"):
+                params_sim = extrair_parametros_simulacao(pergunta)
+                resultado_bruto = self.tools.simular_cenario_precificacao(
+                    produto=params_sim.get("produto") or "GASOLINA COMUM",
+                    delta_preco=params_sim.get("delta_preco", 0.10),
+                    periodo_dias=params_sim.get("periodo_dias", 30),
+                    custo_novo=params_sim.get("custo_novo"),
+                )
+                contexto_extra = f"Simulação Preditiva What-If & Elasticidade de Preço no ERP:\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+
             elif intencao in (
                 "mentoria_decisao",
                 "executive_briefing",
                 "comparativo_turnos",
                 "analise_margem",
-                "cenario_preditivo",
-                "simulacao_preditiva",
                 "benchmark_comparativo",
                 "auditoria_fuga_financeira",
                 "auditoria_quebras",
@@ -2633,14 +2717,54 @@ Diretrizes Específicas por Assunto:
             motivo = resultado_bruto.get("motivo") or "Falha de conexão com a base de dados do posto."
             return f"🚨 **Atenção**: Dados operacionais temporariamente [vermelho]indisponíveis[/vermelho].\n\n*Diagnóstico:* {motivo}"
 
+        # 0a. SIMULAÇÃO PREDITIVA WHAT-IF & PRECIFICAÇÃO DINÂMICA
+        if intencao in ("cenario_preditivo", "simulacao_preditiva"):
+            props = resultado_bruto.get("props") or resultado_bruto
+            diag = props.get("diagnosis") or resultado_bruto.get("diagnosis") or "Simulação preditiva de demanda e margem calculada."
+            score = float(props.get("confidence_score") or resultado_bruto.get("confidence_score") or 0.94)
+            base = props.get("base_scenario") or {}
+            sim = props.get("simulated_scenario") or {}
+            d_vol = float(props.get("delta_volume_pct") if props.get("delta_volume_pct") is not None else 0.0)
+            d_rec = float(props.get("delta_revenue") if props.get("delta_revenue") is not None else 0.0)
+            d_mg = float(props.get("delta_margin_pct") if props.get("delta_margin_pct") is not None else 0.0)
+            d_lucro = float(resultado_bruto.get("delta_lucro") or 0.0)
+            prod = resultado_bruto.get("produto") or "Combustível"
+            elas = props.get("elasticity_coefficient") or -0.65
+
+            vol_sinal = "+" if d_vol >= 0 else ""
+            rec_sinal = "+" if d_rec >= 0 else ""
+            lucro_sinal = "+" if d_lucro >= 0 else ""
+            mg_sinal = "+" if d_mg >= 0 else ""
+
+            linhas = [
+                "### 📈 AURA Predictive Scenario & What-If (Precificação Dinâmica)",
+                "",
+                f"**Diagnóstico Preditivo:** {diag}",
+                f"- **Confiança Estatística:** [verde]{int(score * 100)}%[/verde] (Elasticidade calibrada: {elas})",
+                f"- **Combustível Analisado:** **{prod}**",
+                "",
+                "**Projeção Comparativa (Base vs Simulado):**",
+                f"- Preço Médio: R$ {base.get('preco_medio', 0):.2f} -> **R$ {sim.get('preco_medio', 0):.2f}**",
+                f"- Volume Projetado: {base.get('volume_projetado', 0):,.0f} L -> **{sim.get('volume_projetado', 0):,.0f} L** ({vol_sinal}{d_vol:.1f}%)",
+                f"- Margem de Contribuição: {base.get('margem_contribuicao_pct', 0):.1f}% -> **{sim.get('margem_contribuicao_pct', 0):.1f}%** ({mg_sinal}{d_mg:.1f} pp)",
+                f"- Impacto na Receita: **{rec_sinal}R$ {d_rec:,.2f}**",
+            ]
+            if d_lucro != 0:
+                cor_l = "[verde]" if d_lucro > 0 else "[vermelho]"
+                cor_lf = "[/verde]" if d_lucro > 0 else "[/vermelho]"
+                linhas.append(f"- Impacto no Lucro Líquido: {cor_l}{lucro_sinal}R$ {d_lucro:,.2f}{cor_lf}")
+            linhas.extend([
+                "",
+                "*(Decisão consultiva HITL: O repasse ou manutenção deve ser validado pelo gestor no PDV)*"
+            ])
+            return "\n".join(linhas)
+
         # 0. MENTORIA EXECUTIVA DE DECISÃO & BRIEFING ESTRATÉGICO (CATÁLOGO EXPANDIDO)
         if intencao in (
             "mentoria_decisao",
             "executive_briefing",
             "comparativo_turnos",
             "analise_margem",
-            "cenario_preditivo",
-            "simulacao_preditiva",
             "benchmark_comparativo",
             "auditoria_fuga_financeira",
             "auditoria_quebras",

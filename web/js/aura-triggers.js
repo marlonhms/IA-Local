@@ -1,6 +1,6 @@
 /**
  * AURA Gatilhos Analíticos em 1-Clique Controller
- * Gerencia a matriz de 12 ferramentas especializadas para execução direta em sub-100ms.
+ * Gerencia a matriz de 13 ferramentas especializadas para execução direta em sub-100ms.
  */
 
 class AuraTriggersController {
@@ -12,7 +12,7 @@ class AuraTriggersController {
   }
 
   /**
-   * Catálogo das 12 ferramentas analíticas
+   * Catálogo das 13 ferramentas analíticas
    */
   getToolsCatalog() {
     return [
@@ -135,6 +135,16 @@ class AuraTriggersController {
         badge: 'Observabilidade',
         desc: 'Métricas de banco de dados, latência do Semantic Router, conexões ativas e integridade das tabelas do posto.',
         defaultParams: {},
+      },
+      {
+        id: 'cenario_preditivo',
+        name: 'Simulação Preditiva & What-If',
+        category: 'combustiveis',
+        icon: 'trending-up',
+        color: 'purple',
+        badge: 'Precificação Preditiva',
+        desc: 'Simulação preditiva de reajustes de preço e repasse de custos com elasticidade calibrada da demanda e paridade 70% Etanol vs Gasolina.',
+        defaultParams: { produto: 'GASOLINA COMUM', delta_preco: 0.10, periodo_dias: 30 },
       },
     ];
   }
@@ -421,15 +431,15 @@ class AuraTriggersController {
       const posRev = Number(metrics.pos_revenue ?? r.faturamento_caixa_total ?? 0);
 
       const diffFormatted = (isNoMovement || isUnavailable)
-        ? '—'
+        ? '-'
         : `${diffVal < 0 ? '-' : diffVal > 0 ? '+' : ''}R$ ${Math.abs(diffVal).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
       const autRevText = (isNoMovement || isUnavailable)
-        ? '—'
+        ? '-'
         : `R$ ${autRev.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
       const posRevText = (isNoMovement || isUnavailable)
-        ? '—'
+        ? '-'
         : `R$ ${posRev.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
       const badgeLabel = assessment.badge_label || r.status_conciliacao || (isPartial ? 'Análise parcial (provisória)' : (isNoMovement ? 'Sem movimentação' : 'Turno em Andamento'));
@@ -447,7 +457,7 @@ class AuraTriggersController {
             <div class="text-right">
               <div class="text-xs text-slate-400">${isPartial ? 'Análise Provisória' : 'Score de Triangulação'}</div>
               <div class="text-base font-bold ${isPartial ? 'text-amber-400' : 'text-emerald-400'}">
-                ${isPartial ? 'Caixa Aberto' : (isNoMovement || isUnavailable ? '—' : `${Number(r.score_conformidade_pct || 100)}%`)}
+                ${isPartial ? 'Caixa Aberto' : (isNoMovement || isUnavailable ? '-' : `${Number(r.score_conformidade_pct || 100)}%`)}
               </div>
             </div>
           </div>
@@ -804,6 +814,126 @@ class AuraTriggersController {
             <div>Tamanho Tabelas: <strong class="text-slate-200 tabular-nums">${tab.table_size || '256 kB'}</strong></div>
             <div>Tamanho Índices: <strong class="text-slate-200 tabular-nums">${tab.indexes_size || '632 kB'}</strong></div>
             <div>Volume Total: <strong class="text-slate-200 tabular-nums">${tab.total_size || '1296 kB'}</strong></div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 12. Simulação Preditiva What-If & Precificação Dinâmica
+    if (toolId === 'cenario_preditivo' || toolId === 'simulacao_preditiva') {
+      const p = data.props || data;
+      const base = p.base_scenario || {};
+      const sim = p.simulated_scenario || {};
+      const deltaVol = Number(data.delta_volume_pct ?? p.delta_volume_pct ?? 0);
+      const deltaRec = Number(data.delta_receita ?? p.delta_revenue ?? 0);
+      const deltaMg = Number(data.delta_margem_pct ?? p.delta_margin_pct ?? 0);
+      const deltaLucro = Number(data.delta_lucro ?? 0);
+      const prod = data.produto || p.scenario_title || 'GASOLINA COMUM';
+      const score = Math.round(Number(data.confidence_score ?? p.confidence_score ?? 0.94) * 100);
+      const elas = p.elasticity_coefficient ?? data.elasticidade ?? -0.65;
+      const dias = data.periodo_dias || 30;
+      const precoAtual = Number(data.preco_atual ?? base.preco_medio ?? 0);
+      const precoSim = Number(data.preco_simulado ?? sim.preco_medio ?? 0);
+      const diag = p.diagnosis || data.diagnosis || '';
+
+      const deltaVolColor = deltaVol >= 0 ? 'text-emerald-400' : 'text-rose-400';
+      const deltaRecColor = deltaRec >= 0 ? 'text-emerald-400' : 'text-rose-400';
+      const deltaMgColor = deltaMg >= 0 ? 'text-emerald-400' : 'text-rose-400';
+      const deltaLucroColor = deltaLucro >= 0 ? 'text-emerald-400' : 'text-rose-400';
+
+      return `
+        <div class="space-y-4 font-sans text-xs">
+          <!-- Cabeçalho Executivo -->
+          <div class="p-4 rounded-xl bg-purple-950/20 border border-purple-500/30 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="text-[11px] text-slate-400 font-mono">Projeção Preditiva What-If (${dias} dias)</div>
+              <div class="text-base sm:text-lg font-bold text-purple-300">
+                ${this.escapeHtml(prod)}: R$ ${precoAtual.toFixed(2)} -> R$ ${precoSim.toFixed(2)}
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-mono text-slate-300 bg-slate-900 px-2 py-1 rounded border border-white/10">Elasticidade: ${elas}</span>
+              <span class="text-xs font-mono font-bold text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 rounded">
+                ${score}% Certeza
+              </span>
+            </div>
+          </div>
+
+          <!-- Diagnóstico -->
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5 space-y-1">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-purple-400 font-mono">Parecer da IA Preditiva</span>
+            <p class="text-slate-200 text-xs sm:text-sm leading-relaxed">${this.escapeHtml(diag)}</p>
+          </div>
+
+          <!-- Comparativo Base vs Simulado -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="p-3 rounded-xl bg-slate-950/60 border border-white/5 space-y-2">
+              <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 font-mono">Cenário Base Atual</span>
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div><span class="text-slate-500">Preço:</span> <div class="font-mono font-bold text-white">R$ ${(base.preco_medio || 0).toFixed(2)}</div></div>
+                <div><span class="text-slate-500">Volume:</span> <div class="font-mono font-bold text-white">${Number(base.volume_projetado || 0).toLocaleString('pt-BR')} L</div></div>
+                <div><span class="text-slate-500">Receita:</span> <div class="font-mono font-bold text-white">R$ ${Number(base.receita_liquida || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div></div>
+                <div><span class="text-slate-500">Margem Contrib.:</span> <div class="font-mono font-bold text-white">${Number(base.margem_contribuicao_pct || 0).toFixed(1)}%</div></div>
+              </div>
+            </div>
+            <div class="p-3 rounded-xl bg-purple-950/20 border border-purple-500/30 space-y-2">
+              <span class="text-[10px] uppercase font-bold tracking-wider text-purple-300 font-mono">Cenário Simulado</span>
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div><span class="text-slate-400">Preço:</span> <div class="font-mono font-bold text-purple-200">R$ ${(sim.preco_medio || 0).toFixed(2)}</div></div>
+                <div><span class="text-slate-400">Volume:</span> <div class="font-mono font-bold text-purple-200">${Number(sim.volume_projetado || 0).toLocaleString('pt-BR')} L</div></div>
+                <div><span class="text-slate-400">Receita:</span> <div class="font-mono font-bold text-purple-200">R$ ${Number(sim.receita_liquida || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div></div>
+                <div><span class="text-slate-400">Margem Contrib.:</span> <div class="font-mono font-bold text-purple-200">${Number(sim.margem_contribuicao_pct || 0).toFixed(1)}%</div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cards de Deltas -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
+              <span class="text-[10px] text-slate-400">Variação Volume</span>
+              <div class="text-sm font-mono font-bold ${deltaVolColor} mt-0.5">
+                ${deltaVol >= 0 ? '+' : ''}${deltaVol.toFixed(1)}%
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
+              <span class="text-[10px] text-slate-400">Delta Margem</span>
+              <div class="text-sm font-mono font-bold ${deltaMgColor} mt-0.5">
+                ${deltaMg >= 0 ? '+' : ''}${deltaMg.toFixed(1)} pp
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
+              <span class="text-[10px] text-slate-400">Delta Receita</span>
+              <div class="text-sm font-mono font-bold ${deltaRecColor} mt-0.5">
+                ${deltaRec >= 0 ? '+R$ ' : '-R$ '}${Math.abs(deltaRec).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
+              <span class="text-[10px] text-slate-400">Delta Lucro Líquido</span>
+              <div class="text-sm font-mono font-bold ${deltaLucroColor} mt-0.5">
+                ${deltaLucro >= 0 ? '+R$ ' : '-R$ '}${Math.abs(deltaLucro).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+          </div>
+
+          <!-- Controles de Simulação Rápida em 1 Clique -->
+          <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 font-mono">Testar Variação Instantânea:</span>
+              <span class="text-[10px] font-mono text-purple-400">Re-simulação 1-clique</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30 text-xs font-mono font-semibold" onclick="window.auraTriggers.executeTrigger('cenario_preditivo', { produto: '${this.escapeHtml(prod)}', delta_preco: -0.10, periodo_dias: ${dias} })">-R$ 0,10</button>
+              <button type="button" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30 text-xs font-mono font-semibold" onclick="window.auraTriggers.executeTrigger('cenario_preditivo', { produto: '${this.escapeHtml(prod)}', delta_preco: -0.05, periodo_dias: ${dias} })">-R$ 0,05</button>
+              <button type="button" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30 text-xs font-mono font-semibold" onclick="window.auraTriggers.executeTrigger('cenario_preditivo', { produto: '${this.escapeHtml(prod)}', delta_preco: 0.05, periodo_dias: ${dias} })">+R$ 0,05</button>
+              <button type="button" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30 text-xs font-mono font-semibold" onclick="window.auraTriggers.executeTrigger('cenario_preditivo', { produto: '${this.escapeHtml(prod)}', delta_preco: 0.10, periodo_dias: ${dias} })">+R$ 0,10</button>
+              <button type="button" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30 text-xs font-mono font-semibold" onclick="window.auraTriggers.executeTrigger('cenario_preditivo', { produto: '${this.escapeHtml(prod)}', delta_preco: 0.20, periodo_dias: ${dias} })">+R$ 0,20</button>
+            </div>
+            <div class="flex items-center gap-2 pt-1 border-t border-white/5">
+              <span class="text-[10px] text-slate-500 font-mono">Trocar Combustível:</span>
+              <button type="button" class="px-2 py-0.5 rounded text-[11px] bg-slate-900 hover:bg-slate-800 text-slate-300 border border-white/10" onclick="window.auraTriggers.executeTrigger('cenario_preditivo', { produto: 'GASOLINA COMUM', delta_preco: 0.10, periodo_dias: ${dias} })">Gasolina Comum</button>
+              <button type="button" class="px-2 py-0.5 rounded text-[11px] bg-slate-900 hover:bg-slate-800 text-slate-300 border border-white/10" onclick="window.auraTriggers.executeTrigger('cenario_preditivo', { produto: 'ETANOL', delta_preco: 0.10, periodo_dias: ${dias} })">Etanol</button>
+              <button type="button" class="px-2 py-0.5 rounded text-[11px] bg-slate-900 hover:bg-slate-800 text-slate-300 border border-white/10" onclick="window.auraTriggers.executeTrigger('cenario_preditivo', { produto: 'DIESEL S10', delta_preco: 0.10, periodo_dias: ${dias} })">Diesel S10</button>
+            </div>
           </div>
         </div>
       `;

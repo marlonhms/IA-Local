@@ -5234,10 +5234,347 @@ class PostoTools:
                 except Exception:
                     pass
 
+    def simular_cenario_precificacao(
+        self,
+        produto: str = "GASOLINA COMUM",
+        delta_preco: float = 0.10,
+        periodo_dias: int = 30,
+        custo_novo: Optional[float] = None,
+        preco_base_override: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """
+        Simula cenarios preditivos What-If, elasticidade de preco da demanda e
+        paridade energetica Etanol vs Gasolina (regra dos 70%) com base em dados reais do ERP.
+        Projeta impacto volumetrico, receita liquida, lucro operacional e expansao de margem.
+        Contrato: PredictiveScenarioProps (GenUI).
+        """
+        p_raw = str(produto or "GASOLINA COMUM").strip().upper()
+        target_code = None
+        if "ADITIVADA" in p_raw:
+            target_code = "00002"
+        elif "COMUM" in p_raw or "GASOLINA" in p_raw:
+            target_code = "00001"
+        elif "ETANOL" in p_raw or "ALCOOL" in p_raw or "ÁLCOOL" in p_raw:
+            target_code = "00003"
+        elif "S500" in p_raw or "S-500" in p_raw:
+            target_code = "00004"
+        elif "S10" in p_raw or "S-10" in p_raw:
+            target_code = "00005"
+
+        fallback_prods = {
+            "00001": {"codpro": "00001", "nompro": "GASOLINA COMUM", "valvenda": 7.19, "custo": 6.00},
+            "00002": {"codpro": "00002", "nompro": "GASOLINA ADITIVADA", "valvenda": 7.29, "custo": 6.15},
+            "00003": {"codpro": "00003", "nompro": "ETANOL", "valvenda": 4.50, "custo": 3.06},
+            "00004": {"codpro": "00004", "nompro": "DIESEL S500.", "valvenda": 6.15, "custo": 5.95},
+            "00005": {"codpro": "00005", "nompro": "DIESEL S10.", "valvenda": 6.19, "custo": 5.49},
+        }
+
+        produtos_map: Dict[str, Dict[str, Any]] = {}
+        conn = None
+        from_db = False
+        try:
+            conn = get_erp_connection()
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT codpro, nompro, valvenda, custo, preco_compra 
+                    FROM produtos 
+                    WHERE codpro IN ('00001', '00002', '00003', '00004', '00005')
+                       OR nompro ILIKE %s
+                    ORDER BY codpro
+                """, (f"%{produto}%",))
+                for r in cur.fetchall():
+                    c_code = str(r[0]).strip()
+                    c_name = str(r[1]).strip()
+                    c_venda = float(r[2] or 0.0)
+                    c_custo = float(r[3] or r[4] or 0.0)
+                    produtos_map[c_code] = {
+                        "codpro": c_code,
+                        "nompro": c_name,
+                        "valvenda": c_venda,
+                        "custo": c_custo,
+                    }
+                from_db = len(produtos_map) > 0
+        except Exception:
+            from_db = False
+        finally:
+            if conn and not conn.closed:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+        # Seleciona o produto-alvo
+        target_prod = None
+        if target_code and target_code in produtos_map:
+            target_prod = produtos_map[target_code]
+        elif target_code and target_code in fallback_prods:
+            target_prod = fallback_prods[target_code]
+        else:
+            for pdata in produtos_map.values():
+                if p_raw in pdata["nompro"].upper():
+                    target_prod = pdata
+                    break
+            if not target_prod:
+                for pdata in fallback_prods.values():
+                    if p_raw in pdata["nompro"].upper():
+                        target_prod = pdata
+                        break
+        if not target_prod:
+            target_prod = fallback_prods.get(target_code or "00001", fallback_prods["00001"])
+
+        nom_upper = target_prod["nompro"].upper()
+
+        # Precos e custos base
+        if preco_base_override is not None and float(preco_base_override) > 0:
+            p0 = float(preco_base_override)
+        else:
+            p0 = float(target_prod.get("valvenda") or 0.0)
+
+        c0 = float(target_prod.get("custo") or 0.0)
+
+        # Sanitizacao para dados de homologacao / precos anomalos no cadastro
+        if p0 <= c0 or p0 < 2.0:
+            if "DIESEL" in nom_upper:
+                p0 = 6.19
+            elif "ETANOL" in nom_upper:
+                p0 = 4.50
+            else:
+                p0 = 7.19
+
+        if c0 <= 0:
+            c0 = round(p0 * 0.835, 4)
+
+        c1 = float(custo_novo) if custo_novo is not None and float(custo_novo) > 0 else c0
+        dp = float(delta_preco)
+        p1 = max(round(p0 + dp, 3), 0.10)
+
+        # Precos base de Gasolina e Etanol para afericao da paridade 70%
+        p_gas_ref = (produtos_map.get("00001") or {}).get("valvenda") or fallback_prods["00001"]["valvenda"]
+        p_eta_ref = (produtos_map.get("00003") or {}).get("valvenda") or fallback_prods["00003"]["valvenda"]
+        if float(p_gas_ref) <= 0:
+            p_gas_ref = 7.19
+        if float(p_eta_ref) <= 0:
+            p_eta_ref = 4.50
+
+        # Coeficiente de elasticidade-preco da demanda calibrado
+        if "ADITIVADA" in nom_upper:
+            elasticidade = -0.85
+        elif "COMUM" in nom_upper or "GASOLINA" in nom_upper:
+            elasticidade = -0.65
+        elif "ETANOL" in nom_upper or "ALCOOL" in nom_upper:
+            elasticidade = -1.25
+        elif "DIESEL" in nom_upper:
+            elasticidade = -0.45
+        else:
+            elasticidade = -0.70
+
+        # Paridade energetica e migracao cruzada de volume
+        is_gas_comum = ("GASOLINA" in nom_upper or "COMUM" in nom_upper) and "ADITIVADA" not in nom_upper
+        is_etanol = "ETANOL" in nom_upper or "ALCOOL" in nom_upper
+
+        r0 = float(p_eta_ref) / float(p_gas_ref) if float(p_gas_ref) > 0 else 0.626
+        r1 = r0
+        delta_migracao = 0.0
+        paridade_obs = None
+
+        if is_gas_comum:
+            r1 = float(p_eta_ref) / p1 if p1 > 0 else r0
+            if r1 < r0:
+                # Gasolina encareceu em relacao ao etanol: incentiva migracao para o etanol
+                delta_migracao = -0.35 * ((r0 - r1) / r0)
+            elif r1 > r0:
+                # Gasolina barateou em relacao ao etanol: recupera clientes do etanol
+                delta_migracao = +0.25 * ((r1 - r0) / r0)
+            paridade_obs = f"Paridade Etanol/Gasolina projetada de {r0 * 100:.1f}% para {r1 * 100:.1f}% (limiar ANP: 70%)"
+
+        elif is_etanol:
+            r1 = p1 / float(p_gas_ref) if float(p_gas_ref) > 0 else r0
+            if r0 <= 0.70 and r1 > 0.70:
+                # Quebra da barreira psicologica dos 70%
+                delta_migracao = -0.06
+            elif r1 > r0:
+                delta_migracao = -0.35 * ((r1 - r0) / r0)
+            elif r1 < r0:
+                delta_migracao = +0.25 * ((r0 - r1) / r0)
+            paridade_obs = f"Paridade Etanol/Gasolina projetada de {r0 * 100:.1f}% para {r1 * 100:.1f}% (limiar ANP: 70%)"
+
+        # Volume de demanda
+        consumo_diario = PostoTools.obter_consumo_benchmark(target_prod["nompro"])
+        dias = max(int(periodo_dias or 30), 1)
+        q0 = consumo_diario * dias
+
+        pct_delta_p = (p1 - p0) / p0 if p0 > 0 else 0.0
+        pct_delta_q_elas = elasticidade * pct_delta_p
+        pct_delta_q_total = pct_delta_q_elas + delta_migracao
+        q1 = max(q0 * (1.0 + pct_delta_q_total), 0.0)
+
+        delta_vol_litros = q1 - q0
+        delta_volume_pct = pct_delta_q_total * 100.0
+
+        # Margens e metricas financeiras
+        m0_unit = p0 - c0
+        m1_unit = p1 - c1
+        m0_pct = (m0_unit / p0 * 100.0) if p0 > 0 else 0.0
+        m1_pct = (m1_unit / p1 * 100.0) if p1 > 0 else 0.0
+        delta_margem_pct = m1_pct - m0_pct
+
+        r_base = p0 * q0
+        r_sim = p1 * q1
+        delta_receita = r_sim - r_base
+
+        l_base = m0_unit * q0
+        l_sim = m1_unit * q1
+        delta_lucro = l_sim - l_base
+
+        # Diagnostico executivo deterministico
+        acao_preco = "Reajuste positivo" if dp > 0 else ("Reducao promocional" if dp < 0 else "Manutencao")
+        direcao_sinal = "+" if dp >= 0 else ""
+        lucro_sinal = "+" if delta_lucro >= 0 else ""
+        rec_sinal = "+" if delta_receita >= 0 else ""
+        vol_sinal = "+" if delta_volume_pct >= 0 else ""
+
+        if delta_lucro > 0:
+            veredito = "Recomendacao executiva: Cenario favoravel com expansao do lucro operacional liquido."
+        elif delta_lucro < 0 and dp > 0:
+            veredito = "Recomendacao executiva: Reajuste desfavoravel devido a retracao volumetrica superior ao ganho de margem unitaria."
+        elif dp < 0 and delta_lucro > 0:
+            veredito = "Recomendacao executiva: Estrategia de escala aprovada (ganho volumetrico compensa margem unitaria menor)."
+        else:
+            veredito = "Recomendacao executiva: Cenario com impacto financeiro neutro ou estavel."
+
+        obs_texto = f" e {paridade_obs}" if paridade_obs else ""
+        diagnostico = (
+            f"Simulacao preditiva What-If ({dias} dias) para {target_prod['nompro']}: "
+            f"{acao_preco} de {direcao_sinal}R$ {abs(dp):.2f}/L (R$ {p0:.2f} -> R$ {p1:.2f}). "
+            f"A elasticidade ({elasticidade}){obs_texto} projeta variacao volumetrica de {vol_sinal}{delta_volume_pct:.1f}% ({delta_vol_litros:+.0f} L). "
+            f"A margem de contribuicao varia de {m0_pct:.1f}% para {m1_pct:.1f}% ({delta_margem_pct:+.1f} pp), "
+            f"com impacto financeiro de {rec_sinal}R$ {delta_receita:,.2f} na receita e {lucro_sinal}R$ {delta_lucro:,.2f} no lucro liquido do periodo. "
+            f"{veredito}"
+        )
+
+        base_scenario = ScenarioPoint(
+            preco_medio=round(p0, 3),
+            volume_projetado=round(q0, 1),
+            receita_liquida=round(r_base, 2),
+            margem_contribuicao_pct=round(m0_pct, 2),
+        )
+        simulated_scenario = ScenarioPoint(
+            preco_medio=round(p1, 3),
+            volume_projetado=round(q1, 1),
+            receita_liquida=round(r_sim, 2),
+            margem_contribuicao_pct=round(m1_pct, 2),
+        )
+
+        actions_scenario = [
+            GenUIActionOption(
+                action_id=generate_action_id(),
+                label="⚡ Aplicar Repasse no PDV",
+                action_type="mutation",
+                variant="primary",
+                is_destructive=False,
+                requires_confirmation=True,
+                payload={
+                    "intent": "cenario_preditivo",
+                    "operacao": "repassar_preco",
+                    "produto": target_prod["nompro"],
+                    "preco_novo": round(p1, 3),
+                    "delta_preco": round(dp, 3),
+                },
+            ),
+            GenUIActionOption(
+                action_id=generate_action_id(),
+                label="🎯 Preservar Preco Atual",
+                action_type="mutation",
+                variant="secondary",
+                is_destructive=False,
+                requires_confirmation=False,
+                payload={
+                    "intent": "cenario_preditivo",
+                    "operacao": "manter_preco",
+                    "produto": target_prod["nompro"],
+                },
+            ),
+            GenUIActionOption(
+                action_id=generate_action_id(),
+                label="🔍 Simular Outro Cenario",
+                action_type="inspection",
+                variant="ghost",
+                is_destructive=False,
+                requires_confirmation=False,
+                payload={"perspective": "cenarios", "produto": target_prod["nompro"]},
+            ),
+        ]
+
+        assumptions = [
+            f"Elasticidade-preco da demanda calibrada para o varejo de combustiveis nacional ({elasticidade})",
+            "Precos da concorrencia no raio primario de atuacao assumidos constantes",
+        ]
+        if paridade_obs:
+            assumptions.append(paridade_obs)
+        if custo_novo is not None:
+            assumptions.append(f"Custo de reposicao ajustado de R$ {c0:.2f} para R$ {c1:.2f}")
+
+        limitations = [
+            "Projecao assume estabilidade da carga tributaria monofasica (ICMS) no periodo",
+            "Governanca HITL: A AURA nao altera precos no ERP/PDV. Qualquer reajuste requer aprovacao humana",
+        ]
+
+        confidence_score = 0.94 if from_db else 0.86
+
+        props_scenario = PredictiveScenarioProps(
+            scenario_title=f"Simulacao What-If: {target_prod['nompro']} ({direcao_sinal}R$ {abs(dp):.2f})",
+            hypothesis=f"Impacto do reajuste de {direcao_sinal}R$ {abs(dp):.2f}/L na demanda e rentabilidade em {dias} dias",
+            base_scenario=base_scenario,
+            simulated_scenario=simulated_scenario,
+            delta_volume_pct=round(delta_volume_pct, 2),
+            delta_revenue=round(delta_receita, 2),
+            delta_margin_pct=round(delta_margem_pct, 2),
+            confidence_score=confidence_score,
+            diagnosis=diagnostico,
+            elasticity_coefficient=elasticidade,
+            assumptions=assumptions,
+            limitations=limitations,
+            suggested_actions=actions_scenario,
+        )
+
+        resultado = {
+            "status": "ok",
+            "timestamp_geracao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "schema_version": "1.0",
+            "intent": "cenario_preditivo",
+            "component_name": "render_PredictiveScenarioUI",
+            "client_component": "PredictiveScenarioUI",
+            "produto": target_prod["nompro"],
+            "codpro": target_prod["codpro"],
+            "preco_atual": round(p0, 3),
+            "preco_simulado": round(p1, 3),
+            "custo": round(c0, 3),
+            "custo_simulado": round(c1, 3),
+            "delta_preco": round(dp, 3),
+            "periodo_dias": dias,
+            "elasticidade": elasticidade,
+            "delta_volume_pct": round(delta_volume_pct, 2),
+            "delta_volume_litros": round(delta_vol_litros, 1),
+            "delta_receita": round(delta_receita, 2),
+            "delta_lucro": round(delta_lucro, 2),
+            "delta_margem_pct": round(delta_margem_pct, 2),
+            "fonte_dados": "ERP_POSTGRESQL" if from_db else "BENCHMARK_CALIBRADO",
+            "diagnosis": props_scenario.diagnosis,
+            "confidence_score": props_scenario.confidence_score,
+            "props": props_scenario.model_dump(mode="json"),
+            "contrato": props_scenario.model_dump(mode="json"),
+        }
+        resultado_limpo, _ = sanitize_dict(resultado)
+        return resultado_limpo
+
     def gerar_diagnostico_mentoria_executiva(
         self,
         tipo: str = "geral",
         data: Optional[str] = None,
+        produto: Optional[str] = None,
+        delta_preco: Optional[float] = None,
+        periodo_dias: Optional[int] = None,
+        custo_novo: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Gera o Diagnóstico do Mentor de Decisões Executivo (Fase 3 GenUI - P0).
@@ -5420,82 +5757,18 @@ class PostoTools:
             return resultado_limpo
 
         # ---------------------------------------------------------------------
-        # 2. F6-02: Micro-Widget PredictiveScenarioUI
+        # 2. F6-02: Micro-Widget PredictiveScenarioUI (Simulacao What-If Dinamica)
         # ---------------------------------------------------------------------
         elif tipo_norm in ("cenario_preditivo", "simulacao_preditiva", "what_if", "what-if", "cenario"):
-            base_p = ScenarioPoint(
-                preco_medio=5.89,
-                volume_projetado=120000.0,
-                receita_liquida=706800.0,
-                margem_contribuicao_pct=14.2
+            prod_arg = produto or "GASOLINA COMUM"
+            dp_arg = float(delta_preco if delta_preco is not None else 0.10)
+            dias_arg = int(periodo_dias if periodo_dias is not None else 30)
+            return self.simular_cenario_precificacao(
+                produto=prod_arg,
+                delta_preco=dp_arg,
+                periodo_dias=dias_arg,
+                custo_novo=custo_novo,
             )
-            sim_p = ScenarioPoint(
-                preco_medio=5.99,
-                volume_projetado=118680.0,
-                receita_liquida=710893.2,
-                margem_contribuicao_pct=14.9
-            )
-            actions_scenario = [
-                GenUIActionOption(
-                    action_id=generate_action_id(),
-                    label="⚡ Repassar Custo no Preco",
-                    action_type="mutation",
-                    variant="primary",
-                    is_destructive=False,
-                    requires_confirmation=True,
-                    payload={"intent": "cenario_preditivo", "operacao": "repassar_custo"}
-                ),
-                GenUIActionOption(
-                    action_id=generate_action_id(),
-                    label="🎯 Absorver Margem Operacional",
-                    action_type="mutation",
-                    variant="secondary",
-                    is_destructive=False,
-                    requires_confirmation=True,
-                    payload={"intent": "cenario_preditivo", "operacao": "absorver_margem"}
-                ),
-                GenUIActionOption(
-                    action_id=generate_action_id(),
-                    label="🔍 Projetar Cenario no Canvas",
-                    action_type="inspection",
-                    variant="ghost",
-                    is_destructive=False,
-                    requires_confirmation=False,
-                    payload={"perspective": "cenarios"}
-                ),
-            ]
-            props_scenario = PredictiveScenarioProps(
-                scenario_title="Simulacao de Frete e Demanda (+3% no Custo)",
-                hypothesis="Repasse parcial de aumento de R$ 0,10 no litro de Gasolina Comum com elasticidade de -0.65",
-                base_scenario=base_p,
-                simulated_scenario=sim_p,
-                delta_volume_pct=-1.1,
-                delta_revenue=4093.20,
-                delta_margin_pct=0.7,
-                confidence_score=0.93,
-                diagnosis="Aumento de R$ 0,10 eleva a margem em +0.7 pp com perda residual de 1.1% em volume, gerando ganho liquido projetado de R$ 4.093,20 no periodo.",
-                elasticity_coefficient=-0.65,
-                assumptions=[
-                    "Preco dos concorrentes no raio de 3km permanece constante",
-                    "Sazonalidade de meio de semana"
-                ],
-                limitations=["Projecao assume ausencia de guerra de precos predatoria regional"],
-                suggested_actions=actions_scenario
-            )
-            resultado = {
-                "status": "ok",
-                "timestamp_geracao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "schema_version": "1.0",
-                "intent": "cenario_preditivo",
-                "component_name": "render_PredictiveScenarioUI",
-                "client_component": "PredictiveScenarioUI",
-                "diagnosis": props_scenario.diagnosis,
-                "confidence_score": props_scenario.confidence_score,
-                "props": props_scenario.model_dump(mode="json"),
-                "contrato": props_scenario.model_dump(mode="json"),
-            }
-            resultado_limpo, _ = sanitize_dict(resultado)
-            return resultado_limpo
 
         # ---------------------------------------------------------------------
         # 3. F6-03: Micro-Widget BenchmarkComparisonUI

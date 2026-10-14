@@ -394,11 +394,16 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
         "cenário preditivo", "cenario preditivo", "simulação preditiva", "simulacao preditiva",
         "cenário what-if", "cenario what-if", "cenário what if", "cenario what if", "what if", "what-if",
         "simular preço", "simular preco", "simular cenario", "simular cenário",
-        "elasticidade de preço", "elasticidade de preco", "elasticidade de demanda",
-        "se aumentar o preço", "se subir o preço", "se baixar o preço",
-        "simulação de preço", "simulacao de preco"
+        "elasticidade de preço", "elasticidade de preco", "elasticidade de demanda", "elasticidade-preço",
+        "precificação dinâmica", "precificacao dinamica", "paridade etanol", "regra dos 70%", "paridade 70%",
+        "se aumentar o preço", "se subir o preço", "se baixar o preço", "se reduzir o preço",
+        "simulação de preço", "simulacao de preco", "reajuste de preço", "reajuste de preco",
+        "simular reajuste", "simular margem", "repassar aumento", "repassar frete"
     ]
     if any(t in p for t in termos_cenario_exatos):
+        return "cenario_preditivo"
+
+    if re.search(r"\b(se\s+(?:eu\s+)?(?:subir|aumentar|baixar|reduzir|elevar|reajustar)|o\s+que\s+acontece\s+se)\b", p):
         return "cenario_preditivo"
 
     # F6-03: Micro-Widget BenchmarkComparisonUI
