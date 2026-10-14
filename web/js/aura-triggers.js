@@ -68,6 +68,7 @@ class AuraTriggersController {
       },
       {
         id: 'conveniencia_vendas_cruzadas',
+        aliases: ['market_basket', 'cesta_compras', 'basket_upsell', 'cross_selling', 'auditar_cesta_conveniencia_vendas_cruzadas'],
         name: 'Cesta de Compras & Cross-Selling',
         category: 'loja',
         icon: 'shopping-cart',
@@ -258,7 +259,7 @@ class AuraTriggersController {
     this.isExecuting = true;
 
     const catalog = this.getToolsCatalog();
-    const tool = catalog.find(t => t.id === toolId) || { id: toolId, name: toolId };
+    const tool = catalog.find(t => t.id === toolId || (t.aliases && t.aliases.includes(toolId))) || { id: toolId, name: toolId };
     this.currentTool = tool;
 
     const inspectorEl = document.getElementById('trigger-inspector-card');
@@ -668,25 +669,153 @@ class AuraTriggersController {
       `;
     }
 
-    // 6. Conveniência e Cross-Selling (Market Basket)
-    if (toolId === 'conveniencia_vendas_cruzadas' && data.top_combos_cross_selling) {
-      let cards = '';
-      data.top_combos_cross_selling.forEach(c => {
-        cards += `
-          <div class="p-3.5 rounded-xl glass-subcard border border-purple-500/30 flex flex-col justify-between font-sans text-xs hover:-translate-y-0.5 transition-all">
-            <div class="flex items-center justify-between text-[11px] mb-1.5 pb-1 border-b border-white/5">
-              <span class="text-purple-300 font-bold tabular-nums">LIFT: ${c.metricas?.lift?.toFixed(1)}x</span>
-              <span class="text-slate-400 tabular-nums">Confiança: ${(c.metricas?.confianca * 100).toFixed(0)}%</span>
+    // 6. Conveniencia e Cross-Selling (Market Basket & BasketUpsellStrategyUI)
+    const isBasketTool = [
+      'conveniencia_vendas_cruzadas', 'market_basket', 'cesta_compras',
+      'basket_upsell', 'cross_selling', 'auditar_cesta_conveniencia_vendas_cruzadas'
+    ].includes(toolId) || data.component_name === 'render_BasketUpsellStrategyUI' || data.client_component === 'BasketUpsellStrategyUI';
+
+    if (isBasketTool) {
+      const props = data.props || {};
+      const metrics = data.metrics || {};
+      const resumo = data.resumo_executivo || {};
+      const combos = props.top_combos || data.top_combos || data.top_combos_cross_selling || [];
+      const actions = props.suggested_actions || data.suggested_actions || [];
+      const limitations = props.limitations || data.limitations || [];
+
+      const maiorLift = Number(props.maior_lift ?? metrics.maior_lift ?? resumo.maior_lift_encontrado ?? (combos.length > 0 ? (combos[0].lift || combos[0].metricas?.lift || 0) : 0));
+      const totalCupons = Number(props.total_transacoes ?? metrics.total_transacoes_analisadas ?? resumo.total_transacoes_analisadas ?? 0);
+      const pctMultiplos = Number(props.pct_multiplos_itens ?? metrics.pct_cestas_multiplos_itens ?? resumo.pct_cestas_multiplos_itens ?? 0);
+      const ticketIncr = Number(props.projected_ticket_increase ?? (combos.length > 0 ? (combos[0].additional_ticket_reais || combos[0].impacto_financeiro?.preco_recomendado || 0) : 0));
+      const diagText = props.diagnosis || data.diagnosis || resumo.diagnostico_estrategico || 'Oportunidades de vendas cruzadas e aumento de ticket medio no PDV.';
+      const confScore = Math.round(Number(props.confidence_score ?? data.confidence_score ?? 0.94) * 100);
+
+      let cardsHtml = '';
+      combos.forEach((c) => {
+        const orig = c.anchor_product || c.produto_origem?.nompro || c.produto_origem || 'Produto Origem';
+        const rec = c.recommended_product || c.produto_recomendado?.nompro || c.produto_recomendado || 'Produto Sugerido';
+        const liftVal = Number(c.lift ?? c.metricas?.lift ?? 1.0).toFixed(2);
+        const confVal = Number(c.confidence_pct ?? ((c.metricas?.confianca || 0) * 100) ?? 0).toFixed(0);
+        const ticketVal = Number(c.additional_ticket_reais ?? c.impacto_financeiro?.preco_recomendado ?? 0).toFixed(2);
+        const scriptPitch = c.script_pitch || c.script_sugerido_caixa || 'Ofereca o produto complementar no fechamento da compra.';
+        const category = c.category || c.categoria || 'Balcao PDV';
+
+        cardsHtml += `
+          <div class="p-4 rounded-xl glass-subcard border border-purple-500/20 bg-slate-900/60 flex flex-col justify-between font-sans text-xs hover:-translate-y-0.5 transition-all shadow-sm">
+            <div>
+              <div class="flex items-center justify-between text-[11px] mb-2 pb-1.5 border-b border-white/5">
+                <span class="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300 font-bold border border-purple-500/30 tabular-nums">
+                  LIFT ${liftVal}x
+                </span>
+                <span class="text-cyan-300 font-medium tabular-nums">
+                  Confianca: ${confVal}%
+                </span>
+                <span class="text-[10px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">
+                  ${this.escapeHtml(category)}
+                </span>
+              </div>
+              <div class="font-bold text-slate-100 text-sm mt-1">
+                ${this.escapeHtml(orig)}
+              </div>
+              <div class="text-emerald-400 font-semibold text-xs mt-1 flex items-center gap-1.5">
+                <span>↳ Sugerir: ${this.escapeHtml(rec)}</span>
+                ${Number(ticketVal) > 0 ? `<span class="text-[11px] text-emerald-300/80 tabular-nums font-mono">(+R$ ${ticketVal})</span>` : ''}
+              </div>
             </div>
-            <div class="text-slate-100 font-semibold">${c.produto_origem?.nompro}</div>
-            <div class="text-emerald-400 text-xs mt-1">↳ + ${c.produto_recomendado?.nompro}</div>
-            <div class="text-[11px] text-slate-300 mt-2.5 pt-2 border-t border-purple-900/30">
-              "${c.script_sugerido_caixa}"
+            <div class="mt-3 pt-2.5 border-t border-purple-900/30 bg-purple-950/20 p-2.5 rounded-lg text-[11px] text-slate-200 leading-relaxed italic">
+              "${this.escapeHtml(scriptPitch)}"
             </div>
           </div>
         `;
       });
-      return `<div class="grid grid-cols-1 md:grid-cols-2 gap-3">${cards}</div>`;
+
+      let actionsHtml = '';
+      if (actions.length > 0) {
+        actionsHtml = `
+          <div class="pt-2 border-t border-white/5 space-y-2">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 font-mono">Acoes Transacionais de 1-Clique (HITL)</span>
+            <div class="flex flex-wrap gap-2">
+              ${actions.map(act => {
+                const variantClass = act.variant === 'primary' 
+                  ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-purple-900/30'
+                  : (act.variant === 'secondary'
+                    ? 'bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30'
+                    : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-white/10');
+                return `
+                  <button type="button" 
+                          class="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all shadow-sm flex items-center gap-1.5 ${variantClass}"
+                          onclick="alert('Acao solicitada: ${this.escapeHtml(act.label)}');">
+                    <span>${this.escapeHtml(act.label)}</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      let limitsHtml = '';
+      if (limitations.length > 0) {
+        limitsHtml = `
+          <div class="p-2.5 rounded-lg bg-slate-950/40 border border-white/5 text-[11px] text-slate-400 space-y-1">
+            <strong class="text-slate-300">Limitacoes e Premissas:</strong>
+            <ul class="list-disc list-inside space-y-0.5">
+              ${limitations.map(lim => `<li>${this.escapeHtml(lim)}</li>`).join('')}
+            </ul>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="space-y-4 font-sans text-xs">
+          <div class="p-4 rounded-xl bg-purple-950/20 border border-purple-500/30 flex flex-wrap items-center justify-between gap-3">
+            <div class="max-w-xl">
+              <div class="text-[11px] text-purple-300/80 font-mono">Diagnostico de Cross-Selling & Cesta de Compras</div>
+              <div class="text-sm sm:text-base font-bold text-slate-100 mt-0.5">
+                ${this.escapeHtml(diagText)}
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-mono text-purple-200 bg-purple-900/40 px-2 py-1 rounded border border-purple-500/30">Apriori PDV</span>
+              <span class="text-xs font-mono font-bold text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded">
+                ${confScore}% Confianca
+              </span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
+            <div>
+              <span class="text-[10px] text-slate-400 block">Maior Lift</span>
+              <strong class="text-purple-300 text-base sm:text-lg tabular-nums mt-0.5 block">${maiorLift.toFixed(2)}x</strong>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 block">Cupons Analisados</span>
+              <strong class="text-slate-100 text-base sm:text-lg tabular-nums mt-0.5 block">${totalCupons.toLocaleString('pt-BR')}</strong>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 block">% Vendas Combinadas</span>
+              <strong class="text-cyan-300 text-base sm:text-lg tabular-nums mt-0.5 block">${pctMultiplos.toFixed(1)}%</strong>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 block">Incremento / Cupom</span>
+              <strong class="text-emerald-400 text-base sm:text-lg tabular-nums mt-0.5 block">+R$ ${ticketIncr.toFixed(2)}</strong>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 font-mono">Combos Recomendados para o Balcao e Pista</span>
+              <span class="text-[11px] text-purple-300 font-mono">${combos.length} combinacoes ativas</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              ${cardsHtml || '<div class="text-slate-500 font-sans p-4 bg-slate-900/50 rounded-lg">Nenhum combo identificado para os parametros informados.</div>'}
+            </div>
+          </div>
+
+          ${actionsHtml}
+          ${limitsHtml}
+        </div>
+      `;
     }
 
     // 7. Posição Geral de Estoque ERP

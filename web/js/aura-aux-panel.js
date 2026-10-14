@@ -1262,7 +1262,11 @@ class AuraAuxPanel {
       effectiveIntent === 'market_basket' ||
       effectiveIntent === 'conveniencia_vendas_cruzadas' ||
       effectiveIntent === 'vendas_cruzadas' ||
+      effectiveIntent === 'cesta_compras' ||
+      effectiveIntent === 'basket_upsell' ||
+      effectiveIntent === 'cross_selling' ||
       toolName === 'conveniencia_vendas_cruzadas' ||
+      toolName === 'auditar_cesta_conveniencia_vendas_cruzadas' ||
       toolName === 'render_BasketUpsellStrategyUI' ||
       toolName === 'BasketUpsellStrategyUI'
     ) {

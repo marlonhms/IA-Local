@@ -1271,6 +1271,31 @@ GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
         "client_component": "BasketUpsellStrategyUI",
         "title": "Minerando oportunidades de vendas cruzadas no PDV...",
     },
+    "market_basket": {
+        "component_name": "render_BasketUpsellStrategyUI",
+        "client_component": "BasketUpsellStrategyUI",
+        "title": "Minerando regras de associacao Market Basket no PDV...",
+    },
+    "cesta_compras": {
+        "component_name": "render_BasketUpsellStrategyUI",
+        "client_component": "BasketUpsellStrategyUI",
+        "title": "Minerando cesta de compras e combos no PDV...",
+    },
+    "basket_upsell": {
+        "component_name": "render_BasketUpsellStrategyUI",
+        "client_component": "BasketUpsellStrategyUI",
+        "title": "Minerando oportunidades de upsell e cross-selling no PDV...",
+    },
+    "cross_selling": {
+        "component_name": "render_BasketUpsellStrategyUI",
+        "client_component": "BasketUpsellStrategyUI",
+        "title": "Minerando regras de cross-selling na conveniencia...",
+    },
+    "auditar_cesta_conveniencia_vendas_cruzadas": {
+        "component_name": "render_BasketUpsellStrategyUI",
+        "client_component": "BasketUpsellStrategyUI",
+        "title": "Minerando oportunidades de vendas cruzadas no PDV...",
+    },
     "vendas_analitico": {
         "component_name": "render_MarginAnalysisUI",
         "client_component": "MarginProfitabilityWidget",
@@ -1574,7 +1599,10 @@ def build_canonical_genui_envelope(
         if not props.get("suggested_actions"):
             props["suggested_actions"] = [a.model_dump(mode="json") if hasattr(a, "model_dump") else a for a in actions]
 
-    elif comp_name == "render_BasketUpsellStrategyUI" or intencao in ("conveniencia_vendas_cruzadas", "vendas_cruzadas"):
+    elif comp_name == "render_BasketUpsellStrategyUI" or intencao in (
+        "conveniencia_vendas_cruzadas", "vendas_cruzadas", "market_basket",
+        "cesta_compras", "basket_upsell", "cross_selling", "auditar_cesta_conveniencia_vendas_cruzadas"
+    ):
         combos_raw = props.get("top_combos_cross_selling") or props.get("top_combos") or props.get("combos") or []
         normalized_combos = []
         for c in combos_raw:
@@ -1659,6 +1687,32 @@ def build_canonical_genui_envelope(
         props["projected_ticket_increase"] = inc_ticket
         props["projected_monthly_revenue_lift"] = float(props.get("projected_monthly_revenue_lift") or round(inc_ticket * 300, 2))
         props["confidence_score"] = float(props.get("confidence_score") or 0.92)
+
+        metrics = props.get("metrics") if isinstance(props.get("metrics"), dict) else {}
+        if props.get("total_transacoes") is None:
+            props["total_transacoes"] = (
+                resumo.get("total_transacoes_analisadas")
+                or metrics.get("total_transacoes_analisadas")
+            )
+        if props.get("pct_multiplos_itens") is None:
+            props["pct_multiplos_itens"] = (
+                resumo.get("pct_cestas_multiplos_itens")
+                or metrics.get("pct_cestas_multiplos_itens")
+            )
+        if props.get("maior_lift") is None:
+            props["maior_lift"] = (
+                resumo.get("maior_lift_encontrado")
+                or metrics.get("maior_lift")
+            )
+            if props["maior_lift"] is None and normalized_combos:
+                props["maior_lift"] = max((float(c.get("lift") or 0.0) for c in normalized_combos), default=0.0)
+        if props.get("regras_forte_sinergia_count") is None:
+            props["regras_forte_sinergia_count"] = (
+                resumo.get("regras_com_forte_sinergia_lift_2")
+                or metrics.get("regras_forte_sinergia_count")
+            )
+            if props["regras_forte_sinergia_count"] is None and normalized_combos:
+                props["regras_forte_sinergia_count"] = sum(1 for c in normalized_combos if float(c.get("lift") or 0.0) >= 2.0)
 
         if not actions:
             orig = c_top.get("anchor_product", "Produto")
@@ -2282,12 +2336,17 @@ class AuraEngine:
 
             elif norm_name in (
                 "conveniencia_vendas_cruzadas", "auditar_cesta_conveniencia_vendas_cruzadas",
-                "cesta", "market_basket", "vendas_cruzadas", "conveniencia", "combos"
+                "cesta", "market_basket", "vendas_cruzadas", "conveniencia", "combos",
+                "cesta_compras", "basket_upsell", "cross_selling", "cross_sell"
             ):
                 return self.tools.auditar_cesta_conveniencia_vendas_cruzadas(
                     filtro_produto=p.get("filtro_produto") or p.get("produto"),
                     min_lift=float(p.get("min_lift", 1.2)),
+                    min_suporte=float(p.get("min_suporte", 0.005)),
+                    min_confianca=float(p.get("min_confianca", 0.05)),
                     limit=int(p.get("limit", 10)),
+                    data_inicio=p.get("data_inicio") or p.get("data"),
+                    data_fim=p.get("data_fim") or p.get("data"),
                 )
 
             elif norm_name in (
@@ -2684,7 +2743,10 @@ Diretrizes Específicas por Assunto:
                 resultado_bruto = self.tools.consultar_analise_vendas_erp(tipo="mais_vendidos")
                 contexto_extra = f"Consulta de Histórico de Vendas no ERP:\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
 
-            elif intencao == "conveniencia_vendas_cruzadas":
+            elif intencao in (
+                "conveniencia_vendas_cruzadas", "market_basket", "cesta_compras",
+                "basket_upsell", "cross_selling", "vendas_cruzadas", "auditar_cesta_conveniencia_vendas_cruzadas"
+            ):
                 filtro_prod = extrair_produto_cesta(pergunta)
                 resultado_bruto = self.tools.auditar_cesta_conveniencia_vendas_cruzadas(
                     filtro_produto=filtro_prod,
@@ -2782,6 +2844,9 @@ Diretrizes Específicas por Assunto:
                         )
             except Exception:
                 pass
+
+        if hasattr(resultado_bruto, "model_dump"):
+            resultado_bruto = resultado_bruto.model_dump(mode="json")
 
         if not resultado_bruto or not isinstance(resultado_bruto, dict):
             return None
@@ -3163,11 +3228,23 @@ Diretrizes Específicas por Assunto:
             ]
             return "\n".join(linhas)
 
-        # 5. COMBOS DA CONVENIÊNCIA
-        elif intencao in ("conveniencia_vendas_cruzadas", "market_basket", "auditar_cesta_conveniencia_vendas_cruzadas"):
-            combos = resultado_bruto.get("top_combos") or resultado_bruto.get("top_combos_cross_selling") or []
+        # 5. COMBOS DA CONVENIENCIA
+        elif intencao in (
+            "conveniencia_vendas_cruzadas", "market_basket", "cesta_compras",
+            "basket_upsell", "cross_selling", "vendas_cruzadas", "auditar_cesta_conveniencia_vendas_cruzadas"
+        ):
+            props = resultado_bruto.get("props") or {}
+            combos = props.get("top_combos") or resultado_bruto.get("top_combos") or resultado_bruto.get("top_combos_cross_selling") or []
             resumo = resultado_bruto.get("resumo_executivo") or {}
-            maior_lift = float(resumo.get("maior_lift_encontrado", 0) or 0)
+            metrics = resultado_bruto.get("metrics") or {}
+            maior_lift = float(props.get("maior_lift") or metrics.get("maior_lift") or resumo.get("maior_lift_encontrado", 0) or 0)
+            if maior_lift == 0 and combos:
+                for c in combos:
+                    val = c.get("lift") if isinstance(c, dict) else getattr(c, "lift", 0)
+                    if not val and isinstance(c, dict):
+                        val = c.get("metricas", {}).get("lift", 0)
+                    if float(val or 0) > maior_lift:
+                        maior_lift = float(val)
 
             linhas = [
                 "### 🛒 Inteligência de Vendas Cruzadas (Market Basket PDV)",
@@ -3177,15 +3254,22 @@ Diretrizes Específicas por Assunto:
             ]
             if combos:
                 c1 = combos[0]
-                orig = c1.get("produto_origem")
+                def _c_val(obj, key, default=None):
+                    if isinstance(obj, dict):
+                        return obj.get(key, default)
+                    return getattr(obj, key, default)
+
+                orig = _c_val(c1, "anchor_product") or _c_val(c1, "produto_origem") or "Produto"
                 orig_nome = orig.get("nompro") if isinstance(orig, dict) else str(orig)
-                rec = c1.get("produto_recomendado")
+                rec = _c_val(c1, "recommended_product") or _c_val(c1, "produto_recomendado") or "Item"
                 rec_nome = rec.get("nompro") if isinstance(rec, dict) else str(rec)
-                lift = float(c1.get("lift") or c1.get("metricas", {}).get("lift") or 0)
+                m_c1 = _c_val(c1, "metricas") if isinstance(_c_val(c1, "metricas"), dict) else {}
+                lift = float(_c_val(c1, "lift") or m_c1.get("lift") or 0.0)
+                pitch = _c_val(c1, "script_pitch") or _c_val(c1, "script_sugerido_caixa") or "Ofereca o produto complementar no fechamento da compra."
                 linhas.extend([
                     "",
                     f"**Combo Destaque:** **{orig_nome}** + **{rec_nome}** (Lift: [roxo]{lift:.2f}x[/roxo])",
-                    f"- *Script para o Caixa:* {c1.get('script_sugerido_caixa', 'Ofereça o produto complementar no fechamento da compra.')}"
+                    f"- *Script para o Caixa:* {pitch}",
                 ])
             return "\n".join(linhas)
 

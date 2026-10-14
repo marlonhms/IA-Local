@@ -594,28 +594,36 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     termos_cesta_exatos = [
         "venda cruzada", "vendas cruzadas", "venda cruzadas", "vendas cruzada",
         "cross-sell", "cross sell", "cross selling", "cross-selling",
-        "market basket", "basket analysis", "cesta de compras", "cesta de compra",
-        "cesta da loja", "afinidade de produtos", "afinidade de compra", "afinidade entre produtos",
+        "market basket", "basket analysis", "basket upsell", "cesta de compras", "cesta de compra",
+        "cesta da loja", "cesta da conveniencia", "cesta de produtos",
+        "afinidade de produtos", "afinidade de compra", "afinidade entre produtos",
         "regras de associação", "regras de associacao", "regra de associação", "regra de associacao",
+        "algoritmo apriori", "apriori", "regras de apriori", "apriori algorithm",
         "combos da conveniência", "combos da conveniencia", "combo da conveniência", "combo da conveniencia",
         "combos de conveniência", "combos de conveniencia", "combos na conveniência", "combos na conveniencia",
-        "combos do pdv", "combo do pdv", "combos do caixa", "combo do caixa",
+        "combos do pdv", "combo do pdv", "combos do caixa", "combo do caixa", "combos de produtos",
         "combos mais vendidos", "combo mais vendido", "sugestão de combo", "sugestao de combo",
         "sugestão de combos", "sugestao de combos", "sugestões de combo", "sugestoes de combos",
         "o que vende junto", "o que mais vende junto", "o que sai junto", "o que mais sai junto",
         "o que compra junto", "o que mais compra junto", "comprados juntos", "vendidos juntos",
+        "produtos vendidos juntos", "itens vendidos juntos", "mercadorias vendidas juntas",
+        "produtos comprados juntos", "itens comprados juntos",
         "saem juntos", "compram juntos", "vender junto", "vende junto", "sai junto",
         "sinergia de produtos", "sinergia de vendas", "sinergia de venda",
         "análise de cesta", "analise de cesta", "o que vende com", "o que sai com",
-        "o que comprar com", "o que vender com", "o que compra com", "o que levar com", "o que oferecer com"
+        "o que comprar com", "o que vender com", "o que compra com", "o que levar com", "o que oferecer com",
+        "upsell na conveniencia", "upsell no pdv", "cross sell no caixa", "cross-selling no caixa"
     ]
     if any(t in p for t in termos_cesta_exatos):
+        return "conveniencia_vendas_cruzadas"
+
+    if re.search(r"\b(apriori|cross[- ]?sell(ing)?|market[- ]?basket|basket[- ]?upsell|cesta\s+de\s+compras?|vendas?\s+cruzadas?|produtos?\s+(?:vendem?|vendidos?|saem?|compram?|comprados?)\s+juntos?|itens?\s+(?:vendem?|vendidos?|saem?|compram?|comprados?)\s+juntos?)\b", p):
         return "conveniencia_vendas_cruzadas"
 
     if re.search(r"\bcombos?\b", p) and not any(w in p for w in ["combustível", "combustivel", "carreta", "bico", "tanque"]):
         return "conveniencia_vendas_cruzadas"
 
-    if re.search(r"\b(vende[rm]?|sai[rm]?|compra[rm]?|levar?|oferece[rm]?)\s+(junto|com)\b", p) or "junto com" in p or "junto de" in p or "junto a" in p:
+    if re.search(r"\b(vende[rm]?|sai[rm]?|compra[rm]?|levar?|oferece[rm]?)\s+(juntos?|com)\b", p) or "junto com" in p or "junto de" in p or "junto a" in p:
         return "conveniencia_vendas_cruzadas"
 
     # 2. Perguntas sobre estoque, saldo e tanques de combustível

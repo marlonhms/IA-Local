@@ -790,38 +790,129 @@ class FinancialLeakAuditProps(BaseModel):
 
 
 class UpsellComboItem(BaseModel):
-    """Sugestão acionável de combo ou venda combinada com Lift."""
-    model_config = ConfigDict(frozen=True, extra="ignore")
+    """Sugestao acionavel de combo ou venda combinada com Lift."""
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True, from_attributes=True)
 
-    anchor_product: str = Field(..., description="Produto âncora comprado (Pista ou Conveniência)")
-    recommended_product: str = Field(..., description="Produto complementar sugerido")
-    lift: float = Field(..., ge=0.0, description="Multiplicador de Lift da associação")
-    confidence_pct: float = Field(..., ge=0.0, le=100.0, description="Confiança estatística da regra (%)")
-    support_pct: float = Field(..., ge=0.0, le=100.0, description="Suporte amostral nos cupons (%)")
-    additional_ticket_reais: float = Field(..., ge=0.0, description="Ticket adicional gerado pela conversão em R$")
-    script_pitch: str = Field(..., description="Script prático e direto para o frentista ou operador de caixa")
-    category: Optional[str] = Field(default=None, description="Categoria do combo (ex: Pista + Aditivo, Balcão PDV)")
+    anchor_product: str = Field(..., validation_alias=AliasChoices("anchor_product", "produto_origem", "origem"), description="Produto ancora comprado (Pista ou Conveniencia)")
+    recommended_product: str = Field(..., validation_alias=AliasChoices("recommended_product", "produto_recomendado", "recomendado"), description="Produto complementar sugerido")
+    lift: float = Field(default=1.0, ge=0.0, description="Multiplicador de Lift da associacao")
+    confidence_pct: float = Field(..., ge=0.0, le=100.0, validation_alias=AliasChoices("confidence_pct", "confianca_pct", "confidence"), description="Confianca estatistica da regra (%)")
+    support_pct: float = Field(..., ge=0.0, le=100.0, validation_alias=AliasChoices("support_pct", "suporte_conjunto_pct", "suporte_pct", "support"), description="Suporte amostral nos cupons (%)")
+    additional_ticket_reais: float = Field(default=0.0, ge=0.0, validation_alias=AliasChoices("additional_ticket_reais", "ticket_recomendado_reais", "ticket_adicional_reais", "additional_ticket"), description="Ticket adicional gerado pela conversao em R$")
+    script_pitch: str = Field(..., validation_alias=AliasChoices("script_pitch", "script_sugerido_caixa", "script"), description="Script pratico e direto para o frentista ou operador de caixa")
+    category: Optional[str] = Field(default=None, validation_alias=AliasChoices("category", "categoria"), description="Categoria do combo (ex: Pista + Aditivo, Balcao PDV)")
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_fields(cls, data: Any) -> Any:
+        if hasattr(data, "model_dump"):
+            data = data.model_dump()
+        elif hasattr(data, "__dict__") and not isinstance(data, dict):
+            data = dict(data.__dict__)
+
+        if isinstance(data, dict):
+            data = dict(data)
+
+            # 1. Normaliza produto_origem se for dict ou string
+            if "anchor_product" not in data:
+                p_orig = data.get("produto_origem") or data.get("origem")
+                if isinstance(p_orig, dict):
+                    data["anchor_product"] = p_orig.get("nompro") or p_orig.get("nome") or p_orig.get("produto") or str(p_orig.get("codpro", ""))
+                elif p_orig is not None:
+                    data["anchor_product"] = str(p_orig)
+            elif isinstance(data.get("anchor_product"), dict):
+                p_orig = data["anchor_product"]
+                data["anchor_product"] = p_orig.get("nompro") or p_orig.get("nome") or str(p_orig.get("codpro", ""))
+
+            # 2. Normaliza produto_recomendado se for dict ou string
+            if "recommended_product" not in data:
+                p_rec = data.get("produto_recomendado") or data.get("recomendado")
+                if isinstance(p_rec, dict):
+                    data["recommended_product"] = p_rec.get("nompro") or p_rec.get("nome") or p_rec.get("produto") or str(p_rec.get("codpro", ""))
+                elif p_rec is not None:
+                    data["recommended_product"] = str(p_rec)
+            elif isinstance(data.get("recommended_product"), dict):
+                p_rec = data["recommended_product"]
+                data["recommended_product"] = p_rec.get("nompro") or p_rec.get("nome") or str(p_rec.get("codpro", ""))
+
+            # 3. Normaliza lift (direto ou de metricas)
+            if "lift" not in data or data["lift"] is None:
+                if "metricas" in data and isinstance(data["metricas"], dict):
+                    data["lift"] = data["metricas"].get("lift", 1.0)
+                else:
+                    data["lift"] = 1.0
+
+            # 4. Normaliza confianca_pct (direto ou de metricas)
+            if "confidence_pct" not in data or data["confidence_pct"] is None:
+                conf = data.get("confianca_pct") or data.get("confidence")
+                if conf is None and "metricas" in data and isinstance(data["metricas"], dict):
+                    c_val = data["metricas"].get("confianca", 0.0)
+                    conf = float(c_val) * 100.0 if float(c_val) <= 1.0 else float(c_val)
+                data["confidence_pct"] = float(conf if conf is not None else 0.0)
+
+            # 5. Normaliza suporte_conjunto_pct (direto ou de metricas)
+            if "support_pct" not in data or data["support_pct"] is None:
+                sup = data.get("suporte_conjunto_pct") or data.get("suporte_pct") or data.get("support")
+                if sup is None and "metricas" in data and isinstance(data["metricas"], dict):
+                    s_val = data["metricas"].get("suporte", 0.0)
+                    sup = float(s_val) * 100.0 if float(s_val) <= 1.0 else float(s_val)
+                data["support_pct"] = float(sup if sup is not None else 0.0)
+
+            # 6. Normaliza ticket adicional (direto ou de impacto_financeiro)
+            if "additional_ticket_reais" not in data or data["additional_ticket_reais"] is None:
+                ticket = (
+                    data.get("ticket_recomendado_reais")
+                    or data.get("ticket_adicional_reais")
+                    or data.get("additional_ticket")
+                    or (data.get("impacto_financeiro", {}).get("preco_recomendado") if isinstance(data.get("impacto_financeiro"), dict) else None)
+                    or (data.get("impacto_financeiro", {}).get("incremento_ticket_reais") if isinstance(data.get("impacto_financeiro"), dict) else None)
+                    or 0.0
+                )
+                data["additional_ticket_reais"] = float(ticket or 0.0)
+
+            # 7. Normaliza categoria
+            if "category" not in data or not data["category"]:
+                data["category"] = data.get("categoria") or "Balcao PDV"
+
+            # 8. Normaliza script
+            if "script_pitch" not in data or not data["script_pitch"]:
+                pitch = data.get("script_sugerido_caixa") or data.get("script")
+                if not pitch:
+                    orig = data.get("anchor_product") or "o produto principal"
+                    rec = data.get("recommended_product") or "o produto complementar"
+                    pitch = f"Ao vender {orig}, ofereca {rec} no caixa."
+                data["script_pitch"] = pitch
+        return data
 
 
 class BasketUpsellStrategyProps(BaseModel):
     """Propriedades do Micro-Widget BasketUpsellStrategyUI (Fase 6: F6-01)."""
-    model_config = ConfigDict(frozen=True, extra="ignore")
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True, from_attributes=True)
 
-    diagnosis: str = Field(..., description="Diagnóstico executivo de oportunidades de ticket médio")
-    confidence_score: float = Field(..., ge=0.0, le=1.0, description="Confiança na mineração de cupons (0.0 a 1.0)")
-    projected_ticket_increase: float = Field(..., ge=0.0, description="Aumento potencial no ticket médio por cupom em R$")
+    diagnosis: str = Field(..., validation_alias=AliasChoices("diagnosis", "diagnostico", "diagnostico_estrategico"), description="Diagnostico executivo de oportunidades de ticket medio")
+    confidence_score: float = Field(default=0.92, ge=0.0, le=1.0, validation_alias=AliasChoices("confidence_score", "confianca", "score"), description="Confianca na mineracao de cupons (0.0 a 1.0)")
+    projected_ticket_increase: float = Field(default=0.0, ge=0.0, validation_alias=AliasChoices("projected_ticket_increase", "incremento_ticket_medio", "ticket_increase"), description="Aumento potencial no ticket medio por cupom em R$")
     projected_monthly_revenue_lift: Optional[float] = Field(default=None, ge=0.0, description="Ganho financeiro mensal estimado em R$")
-    category_focus: Optional[str] = Field(default=None, description="Foco estratégico (ex: Pista x Conveniência)")
-    top_combos: List[UpsellComboItem] = Field(default_factory=list, description="Lista dos combos com maior Lift e viabilidade")
-    limitations: List[str] = Field(default_factory=list, description="Limitações da amostra de cupons analisada")
-    suggested_actions: List[GenUIActionOption] = Field(default_factory=list, description="Ações para ativação imediata de campanhas")
+    category_focus: Optional[str] = Field(default=None, description="Foco estrategico (ex: Pista x Conveniencia)")
+    top_combos: List[UpsellComboItem] = Field(default_factory=list, validation_alias=AliasChoices("top_combos", "combos", "top_combos_cross_selling"), description="Lista dos combos com maior Lift e viabilidade")
+    limitations: List[str] = Field(default_factory=list, description="Limitacoes da amostra de cupons analisada")
+    suggested_actions: List[GenUIActionOption] = Field(default_factory=list, description="Acoes para ativacao imediata de campanhas")
+    total_transacoes: Optional[int] = Field(default=None, description="Total de transacoes analisadas no periodo")
+    pct_multiplos_itens: Optional[float] = Field(default=None, description="Percentual de compras com multiplos itens (%)")
+    maior_lift: Optional[float] = Field(default=None, description="Maior Lift encontrado nas regras")
+    regras_forte_sinergia_count: Optional[int] = Field(default=None, description="Total de regras com Lift >= 2.0x")
 
-    @field_validator("diagnosis")
+    @field_validator("diagnosis", mode="before")
     @classmethod
-    def check_diagnosis(cls, v: str) -> str:
-        if not isinstance(v, str) or not v.strip():
-            raise ValueError("diagnosis não pode ser vazio")
-        return v.strip()
+    def check_diagnosis(cls, v: Any) -> str:
+        if isinstance(v, dict):
+            v = v.get("text") or v.get("summary") or v.get("diagnostico") or v.get("diagnostico_estrategico") or str(v)
+        elif hasattr(v, "text"):
+            v = getattr(v, "text")
+        v = str(v or "").strip()
+        if not v:
+            raise ValueError("diagnosis nao pode ser vazio")
+        return v
 
     @field_validator("limitations", mode="before")
     @classmethod
@@ -839,6 +930,21 @@ class BasketUpsellStrategyProps(BaseModel):
                     res.append(str(item).strip())
             return res
         return [str(v)]
+
+    @field_validator("top_combos", mode="before")
+    @classmethod
+    def normalize_top_combos(cls, v: Any) -> List[Any]:
+        if not v:
+            return []
+        if not isinstance(v, (list, tuple)):
+            v = [v]
+        normalized = []
+        for item in v:
+            if isinstance(item, UpsellComboItem):
+                normalized.append(item)
+            else:
+                normalized.append(UpsellComboItem.model_validate(item))
+        return normalized
 
 
 
