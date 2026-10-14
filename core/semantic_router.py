@@ -296,6 +296,26 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
             "Quais são as funcionalidades e módulos do sistema AURA?",
         ]
     },
+    "benchmark_comparativo": {
+        "descricao": "Benchmark comparativo de preços de combustíveis, ticket médio, conversão de aditivada e posicionamento competitivo frente a concorrentes no raio e metas da rede",
+        "exemplos": [
+            "Como estão nossos preços frente à concorrência?",
+            "Benchmark comparativo com concorrentes do raio",
+            "Comparativo de preços dos postos vizinhos",
+            "Como está nosso ticket médio e conversão frente ao mercado?",
+            "Comparar com a concorrência no raio de 3km",
+            "Ranking de competitividade do posto",
+            "Preço da concorrência na gasolina comum e aditivada",
+            "Como estamos posicionados no mercado local?",
+            "Benchmark de preços e conversão de aditivada",
+            "Comparação de performance frente aos concorrentes",
+            "Concorrentes no raio e paridade de preços",
+            "Posicionamento competitivo da filial",
+            "Comparar preços de combustíveis com o mercado",
+            "Estamos mais caros ou mais baratos que a concorrência?",
+            "Comparativo de turnos e benchmark de mercado",
+        ]
+    },
 }
 
 
@@ -410,9 +430,22 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     termos_benchmark_exatos = [
         "benchmark comparativo", "comparativo de turnos", "comparar turnos", "comparação de turnos",
         "comparacao de turnos", "turno a vs turno b", "comparativo de concorrentes", "comparar com a concorrência",
-        "comparar com concorrentes", "benchmark de mercado", "concorrentes no raio", "ranking de competitividade"
+        "comparar com a concorrencia", "comparar com concorrentes", "benchmark de mercado", "concorrentes no raio",
+        "ranking de competitividade", "posicionamento competitivo", "benchmark de preços", "benchmark de precos",
+        "comparativo regional", "comparativo de postos", "preço da concorrência", "preco da concorrencia",
+        "preços da concorrência", "precos da concorrencia", "preço dos concorrentes", "preco dos concorrentes",
+        "preços dos concorrentes", "precos dos concorrentes", "frente à concorrência", "frente a concorrencia",
+        "frente ao mercado", "comparar com mercado", "comparativo com o mercado", "pesquisa de concorrência",
+        "pesquisa de concorrencia", "pesquisa de mercado", "score competitivo", "score de competitividade",
+        "concorrentes vizinhos", "postos vizinhos", "mais caro que a concorrência", "mais barato que a concorrência",
     ]
     if any(t in p for t in termos_benchmark_exatos):
+        return "benchmark_comparativo"
+
+    if "benchmark" in p:
+        return "benchmark_comparativo"
+
+    if ("concorrência" in p or "concorrencia" in p or "concorrentes" in p or "mercado" in p) and any(w in p for w in ["preço", "preco", "preços", "precos", "comparar", "comparativo", "raio", "vizinhos", "frente", "como"]):
         return "benchmark_comparativo"
 
     # F6-04: Micro-Widget FinancialLeakAuditUI
@@ -453,9 +486,9 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
         "investigar causa-raiz", "investigar a quebra", "investigar o furo", "investigar divergência", "investigar divergencia",
         "analisar quebra", "analisar a quebra", "analisar causa", "analisar hipótese", "analisar hipotese",
         "hipótese da quebra", "hipotese da quebra", "perícia forense", "pericia forense", "análise forense", "analise forense",
-        "rca", "laudo forense", "abastecimento órfão", "abastecimento orfao", "estorno descompassado"
+        "laudo forense", "abastecimento órfão", "abastecimento orfao", "estorno descompassado"
     ]
-    if any(t in p for t in termos_rca_exatos):
+    if any(t in p for t in termos_rca_exatos) or re.search(r"\brca\b", p):
         return "investigar_causa_raiz"
 
     # 0. Conciliação de Turnos & Auditoria de Pista

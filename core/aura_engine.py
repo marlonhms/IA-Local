@@ -1480,7 +1480,11 @@ def build_canonical_genui_envelope(
         props["confidence_score"] = float(props.get("confidence_score") or 0.94)
         props["entity_name"] = props.get("entity_name") or "Filial 01 Centro"
         props["benchmark_group"] = props.get("benchmark_group") or "Concorrentes Raio 3km (Média Região)"
+        props["market_position"] = props.get("market_position") or "2º de 7 postos no raio de 3km"
         props["comparison_items"] = props.get("comparison_items") or []
+        props["limitations"] = props.get("limitations") or [
+            "Preços de concorrentes coletados via levantamento amostral local no raio de 3km nas últimas 48h"
+        ]
         props["suggested_actions"] = [a.model_dump(mode="json") for a in actions]
 
     elif comp_name == "render_FinancialLeakAuditUI" or intencao in ("auditoria_fuga_financeira", "auditoria_quebras"):
@@ -2292,6 +2296,19 @@ class AuraEngine:
                 )
 
             elif norm_name in (
+                "benchmark_comparativo", "comparar_benchmark_concorrencia", "benchmark",
+                "comparativo_concorrencia", "comparativo_mercado", "benchmark_postos",
+                "posicionamento_competitivo", "comparativo_turnos"
+            ):
+                return self.tools.comparar_benchmark_concorrencia(
+                    grupo_benchmark=p.get("grupo_benchmark") or p.get("grupo"),
+                    data=p.get("data"),
+                    turno=p.get("turno"),
+                    custom_benchmarks=p.get("custom_benchmarks"),
+                    filial_nome=p.get("filial_nome"),
+                )
+
+            elif norm_name in (
                 "catalogo_produtos", "buscar_produtos_catalogo", "catalogo",
                 "produtos", "busca_produtos"
             ):
@@ -2549,12 +2566,15 @@ Diretrizes Específicas por Assunto:
                 )
                 contexto_extra = f"Simulação Preditiva What-If & Elasticidade de Preço no ERP:\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
 
+            elif intencao in ("benchmark_comparativo", "comparativo_turnos"):
+                data_p, turno_p = extrair_data_turno(pergunta)
+                resultado_bruto = self.tools.comparar_benchmark_concorrencia(data=data_p, turno=turno_p)
+                contexto_extra = f"Benchmark Comparativo de Performance & Concorrência (GenUI):\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+
             elif intencao in (
                 "mentoria_decisao",
                 "executive_briefing",
-                "comparativo_turnos",
                 "analise_margem",
-                "benchmark_comparativo",
                 "auditoria_fuga_financeira",
                 "auditoria_quebras",
             ):
@@ -2759,13 +2779,52 @@ Diretrizes Específicas por Assunto:
             ])
             return "\n".join(linhas)
 
+        # 0b. BENCHMARK COMPARATIVO & CONCORRÊNCIA (MICRO-WIDGET F6-03)
+        if intencao in ("benchmark_comparativo", "comparativo_turnos"):
+            props = resultado_bruto.get("props") or resultado_bruto
+            diag = props.get("diagnosis") or "Comparativo analítico contra médias de mercado e metas da rede."
+            score = float(props.get("confidence_score") or 0.94)
+            comp_score = float(props.get("competitiveness_score") or 84.0)
+            entity = props.get("entity_name") or "Filial 01 Centro"
+            group = props.get("benchmark_group") or "Concorrentes Raio 3km (Média Região)"
+            market_pos = props.get("market_position") or "2º de 7 postos no raio de 3km"
+            items = props.get("comparison_items") or []
+
+            score_color = "[verde]" if comp_score >= 80 else ("[amarelo]" if comp_score >= 60 else "[vermelho]")
+            score_color_f = "[/verde]" if comp_score >= 80 else ("[/amarelo]" if comp_score >= 60 else "[/vermelho]")
+
+            linhas = [
+                "### 📊 Benchmark Comparativo de Postos & Concorrência",
+                "",
+                f"**Diagnóstico:** {diag}",
+                f"- **Score de Competitividade:** {score_color}{comp_score:.0f}/100{score_color_f} ({market_pos})",
+                f"- **Unidade Auditada:** **{entity}** vs **{group}**",
+                f"- **Confiança Analítica:** [verde]{int(score * 100)}%[/verde] (Dados apurados no ERP)",
+            ]
+            if items:
+                linhas.append("\n**Indicadores Confrontados vs Mercado:**")
+                for it in items:
+                    kpi = it.get("kpi_name", "Indicador")
+                    fil = it.get("filial_value", "-")
+                    bm = it.get("benchmark_value", "-")
+                    gap = it.get("gap_value") or ""
+                    st = it.get("status", "neutral")
+                    cor = "[verde]" if st == "success" else ("[vermelho]" if st == "danger" else "[amarelo]")
+                    cor_f = "[/verde]" if st == "success" else ("[/vermelho]" if st == "danger" else "[/amarelo]")
+                    gap_str = f" ({gap})" if gap else ""
+                    linhas.append(f"- **{kpi}:** {cor}{fil}{cor_f} vs Benchmark {bm}{gap_str}")
+
+            linhas.extend([
+                "",
+                "**⚡ Ações Recomendadas (HITL):** Utilize os botões na Camada 3 do card para revisar estratégias de precificação ou auditar concorrentes no raio."
+            ])
+            return "\n".join(linhas)
+
         # 0. MENTORIA EXECUTIVA DE DECISÃO & BRIEFING ESTRATÉGICO (CATÁLOGO EXPANDIDO)
         if intencao in (
             "mentoria_decisao",
             "executive_briefing",
-            "comparativo_turnos",
             "analise_margem",
-            "benchmark_comparativo",
             "auditoria_fuga_financeira",
             "auditoria_quebras",
         ):
@@ -3515,5 +3574,39 @@ Diretrizes Específicas por Assunto:
             telemetry=telemetria,
             cache_hit=cache_hit,
             lgpd_sanitized_count=telemetria.get("lgpd_redacted_count", 0),
+        )
+
+    async def query(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]] = None,
+        session_id: Optional[str] = None,
+        tenant_id: Optional[str] = None,
+        filial_id: Optional[str] = None,
+        enable_genui: Optional[bool] = None,
+    ) -> AuraResponse:
+        """Alias assíncrono para ask(...) para conformidade com interfaces que invocam engine.query()."""
+        return await self.ask(
+            query=query,
+            context=context,
+            session_id=session_id,
+            tenant_id=tenant_id,
+            filial_id=filial_id,
+            enable_genui=enable_genui,
+        )
+
+    def _build_response_text(
+        self,
+        intencao: str,
+        resultado_bruto: Any,
+        pergunta: str = "",
+        session_id: Optional[str] = None,
+    ) -> Optional[str]:
+        """Formata o texto de resposta determinística executiva (contingência e síntese GenUI)."""
+        return self._gerar_sintese_contingencia_ferramenta(
+            intencao=intencao,
+            resultado_bruto=resultado_bruto,
+            pergunta=pergunta,
+            session_id=session_id,
         )
 

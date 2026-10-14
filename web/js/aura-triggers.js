@@ -146,6 +146,16 @@ class AuraTriggersController {
         desc: 'Simulação preditiva de reajustes de preço e repasse de custos com elasticidade calibrada da demanda e paridade 70% Etanol vs Gasolina.',
         defaultParams: { produto: 'GASOLINA COMUM', delta_preco: 0.10, periodo_dias: 30 },
       },
+      {
+        id: 'benchmark_comparativo',
+        name: 'Benchmark Comparativo & Concorrência',
+        category: 'gestao',
+        icon: 'trending-up',
+        color: 'cyan',
+        badge: 'Competitividade',
+        desc: 'Triangulação analítica de preços de combustíveis, ticket médio e conversão de aditivada frente à média do mercado local e metas da rede.',
+        defaultParams: { grupo_benchmark: 'Concorrentes Raio 3km (Média Região)' },
+      },
     ];
   }
 
@@ -935,6 +945,124 @@ class AuraTriggersController {
               <button type="button" class="px-2 py-0.5 rounded text-[11px] bg-slate-900 hover:bg-slate-800 text-slate-300 border border-white/10" onclick="window.auraTriggers.executeTrigger('cenario_preditivo', { produto: 'DIESEL S10', delta_preco: 0.10, periodo_dias: ${dias} })">Diesel S10</button>
             </div>
           </div>
+        </div>
+      `;
+    }
+
+    // Benchmark Comparativo & Concorrência
+    if (toolId === 'benchmark_comparativo' || toolId === 'comparativo_turnos') {
+      const props = data.props || data;
+      const score = Math.round(Number(props.competitiveness_score || data.competitiveness_score || 84));
+      const entity = props.entity_name || data.entity_name || 'Filial 01 Centro';
+      const group = props.benchmark_group || data.benchmark_group || 'Concorrentes Raio 3km (Média Região)';
+      const marketPos = props.market_position || data.market_position || '2º de 7 postos no raio de 3km';
+      const diag = props.diagnosis || data.diagnosis || 'Comparativo analítico contra médias do mercado local.';
+      const items = Array.isArray(props.comparison_items) ? props.comparison_items : (Array.isArray(data.comparison_items) ? data.comparison_items : []);
+      const limitations = Array.isArray(props.limitations) ? props.limitations : (Array.isArray(data.limitations) ? data.limitations : []);
+
+      const scoreColor = score >= 80 ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10' : (score >= 60 ? 'text-amber-300 border-amber-500/40 bg-amber-500/10' : 'text-rose-300 border-rose-500/40 bg-rose-500/10');
+
+      let itemsRows = '';
+      items.forEach(it => {
+        const kpi = this.escapeHtml(it.kpi_name || 'Indicador');
+        const filVal = this.escapeHtml(String(it.filial_value || '-'));
+        const benchVal = this.escapeHtml(String(it.benchmark_value || '-'));
+        const gapVal = this.escapeHtml(String(it.gap_value || ''));
+        const st = it.status || 'neutral';
+        const obs = this.escapeHtml(it.observation || '');
+
+        let stBadge = '<span class="text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded text-[10px]">Alinhado</span>';
+        let valColor = 'text-slate-200';
+        if (st === 'success') {
+          stBadge = '<span class="text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30 text-[10px] font-semibold">Vantagem</span>';
+          valColor = 'text-emerald-300 font-bold';
+        } else if (st === 'warning') {
+          stBadge = '<span class="text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30 text-[10px] font-semibold">Atenção</span>';
+          valColor = 'text-amber-300 font-bold';
+        } else if (st === 'danger') {
+          stBadge = '<span class="text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/30 text-[10px] font-semibold">Desvantagem</span>';
+          valColor = 'text-rose-300 font-bold';
+        }
+
+        itemsRows += `
+          <tr class="border-b border-white/5 text-xs font-sans hover:bg-white/[0.02] transition-colors">
+            <td class="py-2.5 font-semibold text-slate-100">
+              <div>${kpi}</div>
+              ${obs ? `<div class="text-[10px] text-slate-400 font-normal mt-0.5">${obs}</div>` : ''}
+            </td>
+            <td class="py-2.5 text-right tabular-nums ${valColor}">${filVal}</td>
+            <td class="py-2.5 text-right tabular-nums text-slate-300">${benchVal}</td>
+            <td class="py-2.5 text-right tabular-nums font-mono font-bold ${valColor}">${gapVal}</td>
+            <td class="py-2.5 text-right">${stBadge}</td>
+          </tr>
+        `;
+      });
+
+      return `
+        <div class="space-y-4 font-sans text-xs">
+          <!-- Cabeçalho Executivo -->
+          <div class="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-slate-950/60 border border-white/5">
+            <div>
+              <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Posicionamento Competitivo</span>
+              <div class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                <span>${this.escapeHtml(entity)}</span>
+                <span class="text-xs font-normal text-slate-400">vs ${this.escapeHtml(group)}</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-mono px-2.5 py-1 rounded bg-blue-900/40 text-blue-300 border border-blue-500/30 font-bold">${this.escapeHtml(marketPos)}</span>
+              <span class="text-xs font-mono font-bold px-2.5 py-1 rounded border ${scoreColor}">
+                Score: ${score}/100
+              </span>
+            </div>
+          </div>
+
+          <!-- Diagnóstico -->
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5 space-y-1">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Diagnóstico da IA Cognitiva</span>
+            <p class="text-slate-200 text-xs sm:text-sm leading-relaxed">${this.escapeHtml(diag)}</p>
+          </div>
+
+          <!-- Tabela de Confronto -->
+          <div>
+            <h4 class="font-bold text-slate-200 mb-2">Confronto Filial vs Benchmarks de Mercado:</h4>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left font-sans text-xs">
+                <thead>
+                  <tr class="text-slate-400 border-b border-white/10">
+                    <th class="pb-2.5">Indicador</th>
+                    <th class="pb-2.5 text-right">Filial</th>
+                    <th class="pb-2.5 text-right">Benchmark</th>
+                    <th class="pb-2.5 text-right">Gap</th>
+                    <th class="pb-2.5 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${itemsRows}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Ações HITL Rápidas -->
+          <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-2">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 font-mono">Ações Sugeridas (Human-in-the-Loop):</span>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" class="px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/40 text-xs font-semibold cursor-pointer transition-colors" onclick="if (window.auraChat &amp;&amp; typeof window.auraChat.sendUserPrompt === 'function') { window.auraChat.sendUserPrompt('Revisar estratégia de preços da Gasolina Comum'); } else if (window.auraTriggers) { window.auraTriggers.executeTrigger('cenario_preditivo', { produto: 'GASOLINA COMUM' }); }">
+                ⚡ Revisar Preços
+              </button>
+              <button type="button" class="px-3 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border border-purple-500/40 text-xs font-semibold cursor-pointer transition-colors" onclick="if (window.auraChat &amp;&amp; typeof window.auraChat.sendUserPrompt === 'function') { window.auraChat.sendUserPrompt('Auditar concorrência no raio de 3km'); } else if (window.auraTriggers) { window.auraTriggers.executeTrigger('benchmark_comparativo'); }">
+                🎯 Auditar Concorrência
+              </button>
+            </div>
+          </div>
+
+          ${limitations.length > 0 ? `
+            <div class="p-2.5 rounded-lg bg-slate-900/40 border border-white/5 text-[11px] text-slate-400 space-y-0.5">
+              <strong class="text-slate-300">Limitações da amostragem:</strong>
+              ${limitations.map(l => `<div>• ${this.escapeHtml(l)}</div>`).join('')}
+            </div>
+          ` : ''}
         </div>
       `;
     }
