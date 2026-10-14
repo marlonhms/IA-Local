@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -30,6 +30,11 @@ from config.settings import AURA_API_KEY, get_cors_origins
 from core.aura_engine import (
     AuraEngine,
     StationStatus,
+)
+from core.automation_config import (
+    AutomationSettings,
+    get_automation_settings,
+    update_automation_settings,
 )
 from core.config import (
     get_feature_flags,
@@ -840,6 +845,60 @@ async def update_feature_flags_endpoint(req: FeatureFlagsUpdateRequest):
         "flags": updated_flags,
         "timestamp": datetime.now(UTC).isoformat(),
     }
+
+
+# =============================================================================
+# CENTRAL DE AUTOMACAO & MONITORAMENTO CONFIGURAVEL (P1 / FRENTE 1)
+# =============================================================================
+
+@router.get(
+    "/admin/automation-settings",
+    summary="Consulta das Configuracoes e Toggles de Automacao da AURA",
+    dependencies=[Depends(verify_admin_auth)],
+)
+async def get_automation_settings_endpoint():
+    """
+    Retorna as configuracoes e toggles ativos de automacao em segundo plano.
+    Permite verificar o Master Switch, regras de turno, tanques e pista.
+    """
+    settings = get_automation_settings()
+    return {
+        "status": "ok",
+        "settings": settings.model_dump(),
+        "timestamp": datetime.now(UTC).isoformat(),
+    }
+
+
+@router.post(
+    "/admin/automation-settings",
+    summary="Atualizacao a Quente de Configuracoes e Toggles de Automacao",
+    dependencies=[Depends(verify_admin_auth)],
+)
+async def update_automation_settings_endpoint(
+    req: dict[str, Any] = Body(..., description="Payload de configuracao parcial ou completo"),
+    request: Request = None,
+):
+    """
+    Atualiza as regras e interruptores de automacao em tempo de execucao,
+    persistindo as alteracoes em JSON local e sincronizando feature flags.
+    """
+    updated_by = "gestor"
+    if request and request.headers.get("X-Operator-Role"):
+        updated_by = request.headers.get("X-Operator-Role")
+
+    try:
+        updated = update_automation_settings(req, updated_by=updated_by)
+        return {
+            "status": "updated",
+            "settings": updated.model_dump(),
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+    except Exception as exc:
+        logger.error(f"Erro ao atualizar configuracoes de automacao: {exc}")
+        raise HTTPException(
+            status_code=400,
+            detail={"error": f"Erro de validacao nas configuracoes: {exc!s}"},
+        )
 
 
 # =============================================================================

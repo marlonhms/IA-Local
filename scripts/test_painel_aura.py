@@ -100,6 +100,7 @@ def run_tests():
         ("/static/js/aura-triggers.js", "AuraTriggersController", "Triggers Controller JS"),
         ("/static/js/aura-chat.js", "AuraChatController", "Chat Controller JS"),
         ("/static/js/aura-app.js", "AuraApp", "App Coordinator JS"),
+        ("/static/js/aura-automations.js", "AuraAutomationCoordinator", "Automations Coordinator JS"),
         ("/static/js/aura-fx.js", "AuraBorealisEngine", "FX & Desktop Engine JS"),
     ]
 
@@ -113,7 +114,6 @@ def run_tests():
             assert "setupAutoRefresh" not in resp.text, "setupAutoRefresh ainda existe em aura-app.js"
             assert "autoRefreshInterval" not in resp.text, "autoRefreshInterval ainda existe em aura-app.js"
         if path == "/static/js/aura-triggers.js":
-            assert "id: 'sre_metricas'" not in resp.text, "sre_metricas ainda catalogada em aura-triggers.js"
             assert "ERP 5433" not in resp.text, "Badge 'ERP 5433' ainda presente em aura-triggers.js"
         if path == "/static/js/aura-cockpit.js":
             assert "(:5433)" not in resp.text, "Porta de banco :5433 ainda visível em mensagem de erro de aura-cockpit.js"

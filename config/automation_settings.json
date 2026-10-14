@@ -1,0 +1,31 @@
+{
+  "master_enabled": false,
+  "shift_audit": {
+    "enabled": false,
+    "schedules": [
+      "06:05",
+      "14:05",
+      "22:05"
+    ],
+    "notify_cash_divergence": true,
+    "cash_tolerance_reais": 65.0
+  },
+  "tank_alerts": {
+    "enabled": false,
+    "min_autonomy_hours": 12,
+    "min_volume_percentage": 15.0,
+    "check_interval_minutes": 60
+  },
+  "pumps_audit": {
+    "enabled": false,
+    "alert_slow_flow": true,
+    "alert_encerrante_divergence": true
+  },
+  "notifications": {
+    "web_banner": true,
+    "webhook_enabled": false,
+    "webhook_url": ""
+  },
+  "updated_at": "2026-10-14T13:28:36.465076+00:00",
+  "updated_by": "gestor"
+}

@@ -541,6 +541,37 @@ class AuraApiClient {
     }
     return await resp.json();
   }
+
+  /**
+   * Consulta as configuracoes e toggles da Central de Automacoes da AURA.
+   * @returns {Promise<Object>}
+   */
+  async getAutomationSettings() {
+    const resp = await fetch(`${this.baseUrl}/api/v1/aura/admin/automation-settings`);
+    if (!resp.ok) {
+      throw new Error(`Falha ao consultar configuracoes de automacao: HTTP ${resp.status}`);
+    }
+    return await resp.json();
+  }
+
+  /**
+   * Atualiza as configuracoes e regras da Central de Automacoes.
+   * @param {Object} settings
+   * @returns {Promise<Object>}
+   */
+  async updateAutomationSettings(settings) {
+    const resp = await fetch(`${this.baseUrl}/api/v1/aura/admin/automation-settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+    if (!resp.ok) {
+      let errDetail = {};
+      try { errDetail = await resp.json(); } catch (_) {}
+      throw new Error(errDetail.detail?.error || `Falha ao atualizar configuracoes de automacao: HTTP ${resp.status}`);
+    }
+    return await resp.json();
+  }
 }
 
 // 1. Exportação Global no Navegador (Window)

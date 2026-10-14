@@ -35,10 +35,10 @@ def test_format_turno_whatsapp_message():
         bicos_analisados=16,
     )
     msg = format_turno_whatsapp_message(payload)
-    assert "AURA // FECHAMENTO DE TURNO EXECUTIVO" in msg
+    assert "AURA | FECHAMENTO DE TURNO" in msg
     assert "posto_central_01" in msg
-    assert "45.850,75" in msg
-    assert "7.620,4 L" in msg
+    assert "45.\u200b850,75" in msg
+    assert "7.\u200b620,4 L" in msg
     assert "CONCILIADO" in msg
 
 
@@ -56,7 +56,7 @@ def test_format_alerta_tanque_whatsapp_message():
         urgencia="ALTA",
     )
     msg = format_alerta_tanque_whatsapp_message(payload)
-    assert "AURA // ALERTA DE RUPTURA DE COMBUSTÍVEL" in msg
+    assert "AURA | ALERTA OPERACIONAL DE TANQUES" in msg
     assert "GASOLINA ADITIVADA" in msg
     assert "4.5 horas" in msg
     assert "ALTA" in msg
