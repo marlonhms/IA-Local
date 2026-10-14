@@ -1,0 +1,39 @@
+# =============================================================================
+# AURA Core Engine: Docker Compose para Onboarding e Deploy Multi-Posto (Fase 2.5)
+# Provisiona o banco vetorial pgvector isolado na porta 5434, garantindo
+# coexistência harmônica com PostgreSQL legado do ERP (5432/5433).
+# Zero travessões em todo o arquivo.
+# =============================================================================
+
+version: '3.8'
+
+services:
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: aura_pgvector_posto
+    restart: always
+    environment:
+      POSTGRES_DB: ${VECTOR_DB_NAME:-posto_ai}
+      POSTGRES_USER: ${VECTOR_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${VECTOR_DB_PASSWORD:-aura_vector_secret_2026}
+    ports:
+      - "${VECTOR_DB_PORT:-5434}:5432"
+    volumes:
+      - aura_pgvector_posto_data:/var/lib/postgresql/data
+    command: >
+      postgres
+        -c shared_buffers=256MB
+        -c work_mem=16MB
+        -c maintenance_work_mem=64MB
+        -c max_connections=50
+        -c effective_cache_size=512MB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${VECTOR_DB_USER:-postgres} -d ${VECTOR_DB_NAME:-posto_ai}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  aura_pgvector_posto_data:
+    name: aura_pgvector_posto_data

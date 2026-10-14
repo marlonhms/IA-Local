@@ -237,10 +237,10 @@ flowchart TD
 
 ---
 
-### 📦 FASE 2.5: Esteira de Deploy Automatizado & Onboarding Multi-Posto (Prioridade P0 - Imediata / Deploy-Ready)
+### 📦 FASE 2.5: Esteira de Deploy Automatizado & Onboarding Multi-Posto (Status: Concluída ✅)
 > **Objetivo:** Padronizar a instalação da AURA para novos postos em procedimento de 1-clique, garantindo coexistência harmônica com qualquer versão de ERP legado (PostgreSQL 9.5 / 12) sem necessidade de suporte técnico avançado no local.
 
-- [ ] **Pacote de Containerização Docker Compose (`docker-compose.yml`):**
+- [x] **Pacote de Containerização Docker Compose (`docker-compose.yml`):**
   - Imagem oficial otimizada: `pgvector/pgvector:pg16`.
   - Mapeamento de portas seguro: Exposição do pgvector na porta `5434` do host, eliminando colisão com a porta `5432`/`5433` do ERP.
   - Persistência em volume Docker nomeado (`aura_pgvector_posto_data`).
@@ -253,15 +253,15 @@ flowchart TD
         -c maintenance_work_mem=64MB
         -c max_connections=50
     ```
-- [ ] **Script de Implantação Automatizada em 1-Clique (`scripts/deploy_posto.ps1`):**
+- [x] **Script de Implantação Automatizada em 1-Clique (`scripts/deploy_posto.ps1`):**
   - Checagem de pré-requisitos (Docker Engine ativo, Python 3.10+).
   - Teste de conectividade TCP no ERP legado (`5432`/`5433`) e liberação da porta `5434`.
-  - Subida do container pgvector e migração de schema com tabelas vetoriais.
+  - Subida do container pgvector e migração de schema com tabelas vetoriais (`scripts/init_posto_database.py`).
   - Carga inicial de catálogo e checagem de saúde operacional.
-- [ ] **Entregáveis da Fase 2.5:**
+- [x] **Entregáveis da Fase 2.5:**
   - `docker-compose.yml` (template oficial na raiz do projeto).
   - `scripts/deploy_posto.ps1` (orquestrador de implantação em PowerShell idempotente).
-  - Documentação de onboarding rápido para equipes de campo.
+  - `docs/guia_deploy_posto.md` (documentação de onboarding rápido para equipes de campo).
 
 ---
 
