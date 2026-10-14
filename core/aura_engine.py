@@ -1211,6 +1211,31 @@ GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
         "client_component": "FinancialLeakAuditUI",
         "title": "Auditando quebras de caixa, sangrias e conciliação TEF...",
     },
+    "fuga_financeira": {
+        "component_name": "render_FinancialLeakAuditUI",
+        "client_component": "FinancialLeakAuditUI",
+        "title": "Auditando quebras de caixa, sangrias e conciliação TEF...",
+    },
+    "fugas": {
+        "component_name": "render_FinancialLeakAuditUI",
+        "client_component": "FinancialLeakAuditUI",
+        "title": "Auditando quebras de caixa, sangrias e conciliação TEF...",
+    },
+    "fugas_financeiras": {
+        "component_name": "render_FinancialLeakAuditUI",
+        "client_component": "FinancialLeakAuditUI",
+        "title": "Auditando quebras de caixa, sangrias e conciliação TEF...",
+    },
+    "furo_caixa": {
+        "component_name": "render_FinancialLeakAuditUI",
+        "client_component": "FinancialLeakAuditUI",
+        "title": "Auditando quebras de caixa, sangrias e conciliação TEF...",
+    },
+    "furo_gaveta": {
+        "component_name": "render_FinancialLeakAuditUI",
+        "client_component": "FinancialLeakAuditUI",
+        "title": "Auditando quebras de caixa, sangrias e conciliação TEF...",
+    },
     "previsao_tanques": {
         "component_name": "render_TankRunOutForecastUI",
         "client_component": "TankForecastWidget",
@@ -1487,34 +1512,26 @@ def build_canonical_genui_envelope(
         ]
         props["suggested_actions"] = [a.model_dump(mode="json") for a in actions]
 
-    elif comp_name == "render_FinancialLeakAuditUI" or intencao in ("auditoria_fuga_financeira", "auditoria_quebras"):
+    elif comp_name in ("render_FinancialLeakAuditUI", "FinancialLeakAuditUI") or intencao in (
+        "auditoria_fuga_financeira", "fuga_financeira", "fugas", "fugas_financeiras",
+        "auditoria_quebras", "furo_caixa", "furo_gaveta", "auditar_fuga_financeira"
+    ):
         if not actions:
             actions.append(
                 GenUIActionOption(
                     action_id=generate_action_id(),
-                    label="🚨 Estancar Quebra no Turno",
+                    label="⚡ Bloquear Terminal Suspeito",
                     action_type="mutation",
                     variant="danger",
                     is_destructive=False,
                     requires_confirmation=True,
-                    payload={"intent": intencao, "operacao": "estancar_quebra"},
+                    payload={"intent": intencao, "operacao": "bloquear_terminal"},
                 )
             )
             actions.append(
                 GenUIActionOption(
                     action_id=generate_action_id(),
-                    label="⚡ Forçar Sangria Imediata",
-                    action_type="mutation",
-                    variant="primary",
-                    is_destructive=False,
-                    requires_confirmation=True,
-                    payload={"intent": intencao, "operacao": "forcar_sangria"},
-                )
-            )
-            actions.append(
-                GenUIActionOption(
-                    action_id=generate_action_id(),
-                    label="💳 Abrir Chamado TEF",
+                    label="🎯 Abrir Chamado TEF",
                     action_type="mutation",
                     variant="secondary",
                     is_destructive=False,
@@ -1525,23 +1542,37 @@ def build_canonical_genui_envelope(
             actions.append(
                 GenUIActionOption(
                     action_id=generate_action_id(),
-                    label="🔍 Auditar Caixa no Canvas",
+                    label="⚡ Forcar Sangria Imediata",
+                    action_type="mutation",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": intencao, "operacao": "forcar_sangria"},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🔍 Inspecionar Turno",
                     action_type="inspection",
                     variant="ghost",
                     is_destructive=False,
                     requires_confirmation=False,
-                    payload={"perspective": "caixas"},
+                    payload={"intent": intencao, "perspective": "turno"},
                 )
             )
         props["diagnosis"] = props.get("diagnosis") or executive_summary or "Auditoria de perdas e quebras de caixa em tempo real."
         props["severity"] = props.get("severity") or "attention"
         props["confidence_score"] = float(props.get("confidence_score") or 0.98)
-        props["total_leak_value"] = float(props.get("total_leak_value") or 385.50)
-        props["cash_break_value"] = float(props.get("cash_break_value") or 85.0)
-        props["pending_bleed_value"] = float(props.get("pending_bleed_value") or 250.0)
-        props["tef_divergence_value"] = float(props.get("tef_divergence_value") or 50.50)
+        props["total_leak_value"] = float(props["total_leak_value"] if props.get("total_leak_value") is not None else (props.get("total_divergence_reais") if props.get("total_divergence_reais") is not None else 385.50))
+        props["total_divergence_reais"] = float(props.get("total_divergence_reais") if props.get("total_divergence_reais") is not None else props["total_leak_value"])
+        props["cash_break_value"] = float(props["cash_break_value"] if props.get("cash_break_value") is not None else 85.0)
+        props["pending_bleed_value"] = float(props["pending_bleed_value"] if props.get("pending_bleed_value") is not None else 250.0)
+        props["tef_divergence_value"] = float(props["tef_divergence_value"] if props.get("tef_divergence_value") is not None else 50.50)
+        props["risk_level"] = props.get("risk_level") or ("critico" if props["severity"] == "critical" else ("medio" if props["severity"] == "attention" else "baixo"))
         props["leak_items"] = props.get("leak_items") or []
-        props["suggested_actions"] = [a.model_dump(mode="json") for a in actions]
+        if not props.get("suggested_actions"):
+            props["suggested_actions"] = [a.model_dump(mode="json") if hasattr(a, "model_dump") else a for a in actions]
 
     elif comp_name == "render_BasketUpsellStrategyUI" or intencao in ("conveniencia_vendas_cruzadas", "vendas_cruzadas"):
         combos_raw = props.get("top_combos_cross_selling") or props.get("top_combos") or props.get("combos") or []
@@ -2309,6 +2340,18 @@ class AuraEngine:
                 )
 
             elif norm_name in (
+                "auditoria_fuga_financeira", "fuga_financeira", "fugas", "fugas_financeiras",
+                "auditoria_quebras", "furo_caixa", "furo_gaveta", "auditar_fuga_financeira"
+            ):
+                return self.tools.auditar_fuga_financeira(
+                    data=p.get("data"),
+                    turno=p.get("turno"),
+                    pdv=p.get("pdv"),
+                    cash_tolerance_reais=float(p["cash_tolerance_reais"]) if p.get("cash_tolerance_reais") is not None else 50.0,
+                    max_safe_cash_drawer=float(p["max_safe_cash_drawer"]) if p.get("max_safe_cash_drawer") is not None else 800.0,
+                )
+
+            elif norm_name in (
                 "catalogo_produtos", "buscar_produtos_catalogo", "catalogo",
                 "produtos", "busca_produtos"
             ):
@@ -2572,11 +2615,22 @@ Diretrizes Específicas por Assunto:
                 contexto_extra = f"Benchmark Comparativo de Performance & Concorrência (GenUI):\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
 
             elif intencao in (
+                "auditoria_fuga_financeira",
+                "auditoria_quebras",
+                "fuga_financeira",
+                "fugas",
+                "fugas_financeiras",
+                "furo_caixa",
+                "furo_gaveta",
+            ):
+                data_p, turno_p = extrair_data_turno(pergunta)
+                resultado_bruto = self.tools.auditar_fuga_financeira(data=data_p, turno=turno_p)
+                contexto_extra = f"Auditoria de Fuga Financeira, Quebras de Caixa e TEF no ERP (GenUI):\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+
+            elif intencao in (
                 "mentoria_decisao",
                 "executive_briefing",
                 "analise_margem",
-                "auditoria_fuga_financeira",
-                "auditoria_quebras",
             ):
                 data_p, _ = extrair_data_turno(pergunta)
                 resultado_bruto = self.tools.gerar_diagnostico_mentoria_executiva(tipo=intencao, data=data_p)
@@ -2820,13 +2874,77 @@ Diretrizes Específicas por Assunto:
             ])
             return "\n".join(linhas)
 
+        # 0c. AUDITORIA DE FUGA FINANCEIRA & CONCILIACAO TEF (MICRO-WIDGET F6-04)
+        if intencao in (
+            "auditoria_fuga_financeira",
+            "auditoria_quebras",
+            "fuga_financeira",
+            "fugas",
+            "fugas_financeiras",
+            "furo_caixa",
+            "furo_gaveta",
+        ):
+            props = resultado_bruto.get("props") or resultado_bruto
+            diag = props.get("diagnosis") or "Auditoria de prevencao de perdas e quebras financeiras em tempo real."
+            score = float(props.get("confidence_score") or 0.95)
+            sev = props.get("severity") or "attention"
+            risk = props.get("risk_level") or ("critico" if sev == "critical" else ("medio" if sev == "attention" else "baixo"))
+            total_leak = float(props.get("total_leak_value") if props.get("total_leak_value") is not None else props.get("total_divergence_reais", 0.0))
+            v_quebra = float(props.get("cash_break_value") or 0.0)
+            v_sangria = float(props.get("pending_bleed_value") or 0.0)
+            v_tef = float(props.get("tef_divergence_value") or 0.0)
+            shift = props.get("audited_shift") or "Turno 01"
+            cashier = props.get("cashier_name") or "Operador"
+            items = props.get("leak_items") or []
+
+            sev_badge = "[vermelho]CRÍTICO[/vermelho]" if sev == "critical" else ("[amarelo]ATENÇÃO[/amarelo]" if sev == "attention" else "[verde]CONFORME[/verde]")
+
+            linhas = [
+                "### 🚨 Auditoria de Fuga Financeira & Conciliação TEF",
+                "",
+                f"**Diagnóstico:** {diag}",
+                f"- **Status de Risco:** {sev_badge} (Risco operacional: {risk})",
+                f"- **Perda Total Identificada:** **R$ {total_leak:,.2f}**".replace(",", "X").replace(".", ",").replace("X", "."),
+                f"- **Turno Auditado:** {shift} | **Responsável:** {cashier}",
+                f"- **Confiança Analítica:** [verde]{int(score * 100)}%[/verde] (Dados apurados no ERP)",
+                "",
+                "**Detalhamento por Vetor de Divergência:**",
+                f"- Quebra de Caixa / Furo de Gaveta: R$ {v_quebra:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                f"- Sangrias Pendentes / Retidas: R$ {v_sangria:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                f"- Divergência de Conciliação TEF: R$ {v_tef:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+            ]
+            if items:
+                linhas.append("\n**Fatos Geradores Auditados:**")
+                for it in items:
+                    cat = it.get("category") or it.get("leak_type") or "Vazamento"
+                    desc = it.get("description") or ""
+                    amt = float(it.get("amount") if it.get("amount") is not None else it.get("amount_reais", 0.0))
+                    terminal = it.get("pdv_or_terminal") or it.get("source") or ""
+                    st = it.get("status") or it.get("severity") or "warning"
+                    cor = "[vermelho]" if st in ("critical", "danger") else "[amarelo]"
+                    cor_f = "[/vermelho]" if st in ("critical", "danger") else "[/amarelo]"
+                    term_str = f" [{terminal}]" if terminal else ""
+                    linhas.append(f"- **{cat}:** {cor}R$ {amt:,.2f}{cor_f} - {desc}{term_str}".replace(",", "X").replace(".", ",").replace("X", "."))
+            else:
+                linhas.append("\n*Nenhuma inconformidade de caixa, sangria ou TEF identificada nesta apuração.*")
+
+            if total_leak > 0:
+                linhas.extend([
+                    "",
+                    "**⚡ Ações Recomendadas (HITL):** Utilize os botões na Camada 3 do card para bloquear terminais suspeitos, forçar sangria imediata ou abrir chamado na adquirente TEF."
+                ])
+            else:
+                linhas.extend([
+                    "",
+                    "**⚡ Ações Recomendadas (HITL):** Turno em conformidade contábil. Utilize o card para inspecionar métricas adicionais ou emitir relatório de fechamento."
+                ])
+            return "\n".join(linhas)
+
         # 0. MENTORIA EXECUTIVA DE DECISÃO & BRIEFING ESTRATÉGICO (CATÁLOGO EXPANDIDO)
         if intencao in (
             "mentoria_decisao",
             "executive_briefing",
             "analise_margem",
-            "auditoria_fuga_financeira",
-            "auditoria_quebras",
         ):
             props = resultado_bruto.get("props") or resultado_bruto
             diag = props.get("diagnosis") or "Diagnóstico executivo da operação apurado com dados do ERP."

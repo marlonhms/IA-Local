@@ -12,7 +12,7 @@ import os
 import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional, Union
-from pydantic import BaseModel, Field, ConfigDict, field_validator, AliasChoices
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator, AliasChoices
 
 from core.schemas.idempotency import (
     validate_tool_call_id,
@@ -663,35 +663,106 @@ class BenchmarkComparisonProps(BaseModel):
 
 
 class FinancialLeakItem(BaseModel):
-    """Registro individual de fuga financeira ou divergência auditada."""
-    model_config = ConfigDict(frozen=True, extra="ignore")
+    """Registro individual de fuga financeira ou divergencia auditada."""
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
 
-    category: str = Field(..., description="Categoria da perda (Quebra de Caixa, Sangria Pendente, TEF Cartão)")
-    description: str = Field(..., description="Descrição detalhada do fato gerador")
-    amount: float = Field(..., ge=0.0, description="Valor monetário apurado em R$")
+    category: str = Field(..., description="Categoria da perda (Quebra de Caixa, Sangria Pendente, TEF Cartao, Cancelamento Suspeito)")
+    description: str = Field(..., description="Descricao detalhada do fato gerador")
+    amount: float = Field(..., ge=0.0, description="Valor monetario apurado em R$")
     status: Literal["critical", "warning", "resolved", "investigating"] = Field(
         default="warning",
         description="Gravidade ou status da auditoria"
     )
-    pdv_or_terminal: Optional[str] = Field(default=None, description="Identificação do PDV, POS ou turno envolvido")
+    pdv_or_terminal: Optional[str] = Field(default=None, description="Identificacao do PDV, POS ou turno envolvido")
+    leak_type: Optional[str] = Field(default=None, description="Alias canonico para category")
+    amount_reais: Optional[float] = Field(default=None, ge=0.0, description="Alias canonico para amount")
+    severity: Optional[str] = Field(default=None, description="Alias canonico para status")
+    source: Optional[str] = Field(default=None, description="Alias canonico para pdv_or_terminal")
+    mitigation_action: Optional[str] = Field(default=None, description="Acao recomendada de contencao")
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_leak_item_aliases(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        d = dict(data)
+        if "leak_type" in d and not d.get("category"):
+            d["category"] = d["leak_type"]
+        elif "category" in d and not d.get("leak_type"):
+            d["leak_type"] = d["category"]
+
+        if "amount_reais" in d and d.get("amount") is None:
+            d["amount"] = d["amount_reais"]
+        elif "amount" in d and d.get("amount_reais") is None:
+            d["amount_reais"] = d["amount"]
+
+        if "source" in d and not d.get("pdv_or_terminal"):
+            d["pdv_or_terminal"] = d["source"]
+        elif "pdv_or_terminal" in d and not d.get("source"):
+            d["source"] = d["pdv_or_terminal"]
+
+        if "severity" in d and not d.get("status"):
+            sev = str(d["severity"]).lower().strip()
+            if sev in ("critical", "critico", "danger"):
+                d["status"] = "critical"
+            elif sev in ("warning", "attention", "medio", "alerta"):
+                d["status"] = "warning"
+            elif sev in ("resolved", "normal", "baixo", "conforme"):
+                d["status"] = "resolved"
+            else:
+                d["status"] = "investigating"
+        elif "status" in d and not d.get("severity"):
+            d["severity"] = d["status"]
+        return d
 
 
 class FinancialLeakAuditProps(BaseModel):
     """Propriedades do Micro-Widget FinancialLeakAuditUI (Fase 6: F6-01)."""
-    model_config = ConfigDict(frozen=True, extra="ignore")
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
 
-    diagnosis: str = Field(..., description="Diagnóstico de prevenção de perdas e quebras financeiras")
-    severity: Literal["normal", "attention", "critical"] = Field(default="attention", description="Nível de severidade do alerta")
-    confidence_score: float = Field(..., ge=0.0, le=1.0, description="Confiança na conciliação contábil (0.0 a 1.0)")
+    diagnosis: str = Field(..., description="Diagnostico de prevencao de perdas e quebras financeiras")
+    severity: Literal["normal", "attention", "critical"] = Field(default="attention", description="Nivel de severidade do alerta")
+    confidence_score: float = Field(..., ge=0.0, le=1.0, description="Confianca na conciliacao contabil (0.0 a 1.0)")
     total_leak_value: float = Field(..., ge=0.0, description="Perda total identificada em R$")
     cash_break_value: float = Field(default=0.0, ge=0.0, description="Quebra de caixa apurada em R$")
     pending_bleed_value: float = Field(default=0.0, ge=0.0, description="Volume de sangrias em atraso/gaveta em R$")
-    tef_divergence_value: float = Field(default=0.0, ge=0.0, description="Divergência de conciliação TEF/cartões em R$")
+    tef_divergence_value: float = Field(default=0.0, ge=0.0, description="Divergencia de conciliacao TEF/cartoes em R$")
+    total_divergence_reais: Optional[float] = Field(default=None, ge=0.0, description="Alias canonico para total_leak_value")
+    risk_level: Optional[str] = Field(default=None, description="Nivel de risco: baixo, medio ou critico")
     audited_shift: Optional[Union[str, int]] = Field(default=None, description="Turno auditado")
-    cashier_name: Optional[str] = Field(default=None, description="Operador ou responsável pelo caixa")
+    cashier_name: Optional[str] = Field(default=None, description="Operador ou responsavel pelo caixa")
     leak_items: List[FinancialLeakItem] = Field(default_factory=list, description="Itens detalhados de vazamentos")
-    limitations: List[str] = Field(default_factory=list, description="Limitações da apuração bancária e fiscal")
-    suggested_actions: List[GenUIActionOption] = Field(default_factory=list, description="Ações de contenção de perdas")
+    limitations: List[str] = Field(default_factory=list, description="Limitacoes da apuracao bancaria e fiscal")
+    suggested_actions: List[GenUIActionOption] = Field(default_factory=list, description="Acoes de contencao de perdas")
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_leak_props_aliases(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        d = dict(data)
+        if "total_divergence_reais" in d and d.get("total_leak_value") is None:
+            d["total_leak_value"] = d["total_divergence_reais"]
+        elif "total_leak_value" in d and d.get("total_divergence_reais") is None:
+            d["total_divergence_reais"] = d["total_leak_value"]
+
+        if "risk_level" in d and not d.get("severity"):
+            rl = str(d["risk_level"]).lower().strip()
+            if rl in ("critico", "critical"):
+                d["severity"] = "critical"
+            elif rl in ("medio", "attention", "warning"):
+                d["severity"] = "attention"
+            else:
+                d["severity"] = "normal"
+        elif "severity" in d and not d.get("risk_level"):
+            s = str(d["severity"]).lower().strip()
+            if s == "critical":
+                d["risk_level"] = "critico"
+            elif s == "attention":
+                d["risk_level"] = "medio"
+            else:
+                d["risk_level"] = "baixo"
+        return d
 
     @field_validator("diagnosis")
     @classmethod

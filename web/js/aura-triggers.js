@@ -156,6 +156,16 @@ class AuraTriggersController {
         desc: 'Triangulação analítica de preços de combustíveis, ticket médio e conversão de aditivada frente à média do mercado local e metas da rede.',
         defaultParams: { grupo_benchmark: 'Concorrentes Raio 3km (Média Região)' },
       },
+      {
+        id: 'auditoria_fuga_financeira',
+        name: 'Auditoria de Fuga Financeira & TEF',
+        category: 'caixa',
+        icon: 'alert-triangle',
+        color: 'purple',
+        badge: 'Prevenção de Perdas',
+        desc: 'Detecção determinística de quebras de gaveta, sangrias anômalas retidas no caixa e divergências de conciliação de cartões TEF.',
+        defaultParams: { data: 'hoje', cash_tolerance_reais: 50.0 },
+      },
     ];
   }
 
@@ -1060,6 +1070,154 @@ class AuraTriggersController {
           ${limitations.length > 0 ? `
             <div class="p-2.5 rounded-lg bg-slate-900/40 border border-white/5 text-[11px] text-slate-400 space-y-0.5">
               <strong class="text-slate-300">Limitações da amostragem:</strong>
+              ${limitations.map(l => `<div>• ${this.escapeHtml(l)}</div>`).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // Auditoria de Fuga Financeira & TEF (F6-04)
+    if (toolId === 'auditoria_fuga_financeira' || toolId === 'fuga_financeira' || toolId === 'auditoria_quebras') {
+      const props = data.props || data;
+      const totalLeak = Number(props.total_leak_value !== undefined ? props.total_leak_value : (props.total_divergence_reais || 0));
+      const cashBreak = Number(props.cash_break_value || 0);
+      const pendingBleed = Number(props.pending_bleed_value || 0);
+      const tefDiv = Number(props.tef_divergence_value || 0);
+      const diag = props.diagnosis || data.diagnosis || 'Auditoria de prevencao de perdas e quebras financeiras em tempo real.';
+      const severity = props.severity || 'attention';
+      const shift = props.audited_shift || data.audited_shift || 'Turno 01';
+      const cashier = props.cashier_name || data.cashier_name || 'Operador';
+      const items = Array.isArray(props.leak_items) ? props.leak_items : (Array.isArray(data.leak_items) ? data.leak_items : []);
+      const limitations = Array.isArray(props.limitations) ? props.limitations : (Array.isArray(data.limitations) ? data.limitations : []);
+
+      const sevBadge = severity === 'critical'
+        ? '<span class="text-rose-300 border-rose-500/40 bg-rose-500/10 px-2 py-0.5 rounded-full font-mono text-[11px] font-bold">ALERTA CRÍTICO</span>'
+        : (severity === 'attention' ? '<span class="text-amber-300 border-amber-500/40 bg-amber-500/10 px-2 py-0.5 rounded-full font-mono text-[11px] font-bold">ATENÇÃO OPERACIONAL</span>' : '<span class="text-emerald-300 border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono text-[11px] font-bold">CONFORME</span>');
+
+      let itemsRows = '';
+      items.forEach(it => {
+        const cat = this.escapeHtml(it.category || it.leak_type || 'Vazamento');
+        const desc = this.escapeHtml(it.description || '');
+        const amt = Number(it.amount !== undefined ? it.amount : (it.amount_reais || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+        const terminal = it.pdv_or_terminal || it.source ? this.escapeHtml(it.pdv_or_terminal || it.source) : '';
+        const st = it.status || it.severity || 'warning';
+        const action = it.mitigation_action ? this.escapeHtml(it.mitigation_action) : '';
+
+        let stBadge = '<span class="text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30 text-[10px] font-semibold">Alerta</span>';
+        let valColor = 'text-amber-300 font-bold';
+        if (st === 'critical' || st === 'danger') {
+          stBadge = '<span class="text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/30 text-[10px] font-semibold">Crítico</span>';
+          valColor = 'text-rose-400 font-bold';
+        } else if (st === 'resolved' || st === 'normal') {
+          stBadge = '<span class="text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30 text-[10px] font-semibold">Regular</span>';
+          valColor = 'text-emerald-300 font-semibold';
+        }
+
+        itemsRows += `
+          <tr class="border-b border-white/5 text-xs font-sans hover:bg-white/[0.02] transition-colors">
+            <td class="py-2.5 font-semibold text-slate-100">
+              <div class="flex items-center gap-1.5">
+                <span>${cat}</span>
+                ${terminal ? `<span class="text-[9px] font-mono text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded border border-white/5">${terminal}</span>` : ''}
+              </div>
+              ${desc ? `<div class="text-[10px] text-slate-400 font-normal mt-0.5">${desc}</div>` : ''}
+              ${action ? `<div class="text-[10px] text-cyan-300/80 font-normal mt-0.5">Mitigação: ${action}</div>` : ''}
+            </td>
+            <td class="py-2.5 text-right tabular-nums font-mono ${valColor}">R$ ${amt}</td>
+            <td class="py-2.5 text-right">${stBadge}</td>
+          </tr>
+        `;
+      });
+
+      return `
+        <div class="space-y-4 font-sans text-xs">
+          <!-- Cabeçalho Executivo com Criticidade -->
+          <div class="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-slate-950/60 border border-white/5">
+            <div>
+              <span class="text-[10px] uppercase font-bold tracking-wider text-rose-400 font-mono">Auditoria de Fuga Financeira &amp; TEF</span>
+              <div class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                <span>${this.escapeHtml(shift)}</span>
+                <span class="text-xs font-normal text-slate-400">(${this.escapeHtml(cashier)})</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              ${sevBadge}
+              <span class="text-xs font-mono font-bold px-2.5 py-1 rounded border border-rose-500/30 text-rose-300 bg-rose-500/10">
+                Perda Total: R$ ${totalLeak.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+
+          <!-- Cards de Criticidade -->
+          <div class="grid grid-cols-3 gap-2">
+            <div class="p-2.5 rounded-xl bg-slate-950/40 border border-rose-500/20 text-center">
+              <span class="text-[10px] text-slate-400">Quebra de Caixa</span>
+              <div class="text-sm sm:text-base font-mono font-bold text-rose-400">
+                R$ ${cashBreak.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-950/40 border border-amber-500/20 text-center">
+              <span class="text-[10px] text-slate-400">Sangrias Pendentes</span>
+              <div class="text-sm sm:text-base font-mono font-bold text-amber-300">
+                R$ ${pendingBleed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-950/40 border border-cyan-500/20 text-center">
+              <span class="text-[10px] text-slate-400">Divergência TEF</span>
+              <div class="text-sm sm:text-base font-mono font-bold text-cyan-300">
+                R$ ${tefDiv.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+          </div>
+
+          <!-- Diagnóstico -->
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5 space-y-1">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-rose-400 font-mono">Diagnóstico da IA Cognitiva</span>
+            <p class="text-slate-200 text-xs sm:text-sm leading-relaxed">${this.escapeHtml(diag)}</p>
+          </div>
+
+          <!-- Tabela de Divergências Identificadas -->
+          <div>
+            <h4 class="font-bold text-slate-200 mb-2">Fatos Geradores &amp; Divergências Auditadas:</h4>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left font-sans text-xs">
+                <thead>
+                  <tr class="text-slate-400 border-b border-white/10">
+                    <th class="pb-2.5">Ocorrência / Terminal</th>
+                    <th class="pb-2.5 text-right">Valor</th>
+                    <th class="pb-2.5 text-right">Gravidade</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${itemsRows || '<tr><td colspan="3" class="py-3 text-center text-slate-400">Nenhuma irregularidade encontrada.</td></tr>'}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Botões de Ação HITL Rápidos -->
+          <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-2">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 font-mono">Ações de Contenção (Human-in-the-Loop):</span>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" class="px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 text-xs font-semibold cursor-pointer transition-colors" onclick="if (window.auraChat &amp;&amp; typeof window.auraChat.sendUserPrompt === 'function') { window.auraChat.sendUserPrompt('Bloquear terminal com quebra de caixa anômala'); } else if (window.auraTriggers) { window.auraTriggers.executeTrigger('auditoria_fuga_financeira'); }">
+                ⚡ Bloquear Terminal Suspeito
+              </button>
+              <button type="button" class="px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/40 text-xs font-semibold cursor-pointer transition-colors" onclick="if (window.auraChat &amp;&amp; typeof window.auraChat.sendUserPrompt === 'function') { window.auraChat.sendUserPrompt('Abrir chamado de conciliação TEF com adquirente'); } else if (window.auraTriggers) { window.auraTriggers.executeTrigger('auditoria_fuga_financeira'); }">
+                🎯 Abrir Chamado TEF
+              </button>
+              <button type="button" class="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 text-xs font-semibold cursor-pointer transition-colors" onclick="if (window.auraChat &amp;&amp; typeof window.auraChat.sendUserPrompt === 'function') { window.auraChat.sendUserPrompt('Forçar sangria imediata de segurança do caixa'); } else if (window.auraTriggers) { window.auraTriggers.executeTrigger('auditoria_fuga_financeira'); }">
+                ⚡ Forçar Sangria Imediata
+              </button>
+              <button type="button" class="px-3 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border border-purple-500/40 text-xs font-semibold cursor-pointer transition-colors" onclick="if (window.auraChat &amp;&amp; typeof window.auraChat.sendUserPrompt === 'function') { window.auraChat.sendUserPrompt('Inspecionar fechamento de turno no Canvas'); } else if (window.auraTriggers) { window.auraTriggers.executeTrigger('conciliacao_turno'); }">
+                🔍 Inspecionar Turno
+              </button>
+            </div>
+          </div>
+
+          ${limitations.length > 0 ? `
+            <div class="p-2.5 rounded-lg bg-slate-900/40 border border-white/5 text-[11px] text-slate-400 space-y-0.5">
+              <strong class="text-slate-300">Limitações da conciliação contábil:</strong>
               ${limitations.map(l => `<div>• ${this.escapeHtml(l)}</div>`).join('')}
             </div>
           ` : ''}

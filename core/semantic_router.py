@@ -448,13 +448,24 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     if ("concorrência" in p or "concorrencia" in p or "concorrentes" in p or "mercado" in p) and any(w in p for w in ["preço", "preco", "preços", "precos", "comparar", "comparativo", "raio", "vizinhos", "frente", "como"]):
         return "benchmark_comparativo"
 
-    # F6-04: Micro-Widget FinancialLeakAuditUI
+    # F6-04: Micro-Widget FinancialLeakAuditUI - Auditoria de Fuga Financeira & TEF
     termos_fuga_exatos = [
         "fuga financeira", "fugas financeiras", "auditoria de fuga financeira", "auditoria de quebras",
-        "auditar quebras de caixa", "sangria anômala", "sangria anomala", "sangrias pendentes",
-        "sangria pendente", "divergência tef", "divergencia tef", "desvio de caixa", "furo de gaveta"
+        "auditar quebras de caixa", "auditar quebra de caixa", "quebra de gaveta", "quebras de gaveta",
+        "furo de gaveta", "furos de gaveta", "furo de caixa", "furos de caixa",
+        "sangria anômala", "sangria anomala", "sangrias anômalas", "sangrias anomalas",
+        "sangria suspeita", "sangrias suspeitas", "sangrias pendentes", "sangria pendente",
+        "sangria atrasada", "sangrias atrasadas", "divergência tef", "divergencia tef",
+        "divergências tef", "divergencias tef", "descompasso tef", "divergência de cartão",
+        "divergencia de cartao", "divergência de liquidação", "divergencia de liquidacao",
+        "desvio de caixa", "desvios de caixa", "fuga de caixa", "fugas de caixa",
+        "auditoria de perdas financeiras", "perdas de caixa", "perda financeira de caixa",
+        "conferência de sangria", "conferencia de sangria", "bloquear terminal suspeito",
     ]
-    if any(t in p for t in termos_fuga_exatos):
+    if any(t in p for t in termos_fuga_exatos) or re.search(
+        r"\b(fuga[s]?\s+financeira[s]?|furo[s]?\s+de\s+(gaveta|caixa)|diverg[eê]ncia[s]?\s+(tef|cart[aã]o|liquida[cç][aã]o)|sangria[s]?\s+(an[oô]mala[s]?|suspeita[s]?|pendente[s]?))\b",
+        p,
+    ):
         return "auditoria_fuga_financeira"
 
     # F6-01: Micro-Widget MarginAnalysisUI
