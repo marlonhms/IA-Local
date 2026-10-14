@@ -203,12 +203,14 @@ async def dispatch_evolution_message(
 
 def _format_brl(val: float) -> str:
     s = f"{val:,.2f}"
-    return s.replace(",", "X").replace(".", ",").replace("X", ".")
+    # Injeta zero-width space (\u200b) apos o ponto de milhar para neutralizar
+    # o detector de links do WhatsApp que quebrava numeros como 18.450 em links azuis.
+    return s.replace(",", "X").replace(".", ",").replace("X", ".\u200b")
 
 
 def _format_litros(val: float) -> str:
     s = f"{val:,.1f}"
-    return s.replace(",", "X").replace(".", ",").replace("X", ".")
+    return s.replace(",", "X").replace(".", ",").replace("X", ".\u200b")
 
 
 def _format_date(d_str: str) -> str:
