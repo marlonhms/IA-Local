@@ -84,6 +84,13 @@ from core.schemas.genui import (
     UpsellComboItem,
     BasketUpsellStrategyProps,
 )
+from core.schemas.rca import (
+    RCAEvidenceItem,
+    RCAHypothesis,
+    RCARecommendation,
+    RCAReport,
+)
+from core.automation_config import AutomationSettingsManager
 from core.schemas.idempotency import generate_action_id
 
 def get_erp_connection(timeout: Optional[int] = None):
@@ -1428,6 +1435,690 @@ class PostoTools:
                 "recommended_action": contrato_erro.recommended_action.model_dump(),
                 "explanation": contrato_erro.explanation.model_dump(),
                 "contrato": contrato_erro.model_dump(),
+            }
+
+    def investigar_causa_raiz_turno(
+        self,
+        data: Any = None,
+        turno: Any = None,
+        caixa_id: Any = None,
+        bico: Any = None,
+    ) -> dict:
+        """
+        Investigacao Forense de Causa-Raiz (Root Cause Analysis - RCA Forense v1.0).
+        Triangulacao deterministica de 4 padroes matematicos sem necessidade de cadastro de erros:
+        1. Abastecimento Orfao (telemetria CBC04 sem cupom fiscal no PDV).
+        2. Estorno Descompassado (cupom cancelado no PDV, mas bico rodou fisicamente).
+        3. Afericao Inmetro Esquecida (furo volumetrico exato de 20L ou 40L sem lancamento de qtdeaf).
+        4. Inversao de Forma de Pagamento (falta de dinheiro coincide com sobra exata em cartao/PIX).
+
+        Conformidade Estrita:
+        - Execucao estritamente sob demanda (Pull, nao Push 24/7).
+        - Barreira de tolerancia anti-fadiga via AutomationSettingsManager (cash_tolerance_reais).
+        - Human-in-the-Loop (HITL) estrito: IA consultiva, nunca executora de alteracoes contabeis.
+        - Zero travessoes em todo o processamento.
+        """
+        try:
+            # 1. Recupera a barreira de tolerancia anti-fadiga configurada
+            try:
+                auto_settings = AutomationSettingsManager().get_settings()
+                cash_tolerance = float(auto_settings.shift_audit.cash_tolerance_reais)
+            except Exception:
+                cash_tolerance = 50.0
+
+            # 2. Executa a conciliacao base para obter os numeros oficiais do turno
+            res_conciliacao = self.auditar_fechamento_turno(data=data, turno=turno)
+            if res_conciliacao.get("status") == "sem_movimento":
+                data_informada = str(res_conciliacao.get("data_auditada") or data or "hoje")
+                laudo_vazio = RCAReport(
+                    schema_version="1.0",
+                    report_id=f"rca-{data_informada}-sem_movimento",
+                    intent="investigar_causa_raiz",
+                    generated_at=datetime.now().astimezone().isoformat(),
+                    unit_id="posto_01",
+                    target_date=data_informada,
+                    target_shift=str(turno or "todos"),
+                    target_caixa_id=int(caixa_id) if caixa_id else None,
+                    target_bico=str(bico) if bico else None,
+                    cash_tolerance_reais=cash_tolerance,
+                    total_divergence_reais=0.0,
+                    divergence_type="conforme",
+                    total_explained_reais=0.0,
+                    unexplained_reais=0.0,
+                    confidence_overall=1.0,
+                    hypotheses=[],
+                    recommendations=[
+                        RCARecommendation(
+                            action_type="human_audit",
+                            title="Sem movimentacao no periodo",
+                            description="Nao ha abastecimentos, caixas ou encerrantes registrados na data selecionada.",
+                            required_role="Gerente de Pista / Operador",
+                        )
+                    ],
+                    human_in_the_loop=True,
+                    execution_mode="on_demand",
+                    summary_markdown="Nao ha registros de movimentacao no periodo consultado para pericia forense.",
+                )
+                return {
+                    "status": "sem_movimento",
+                    "mensagem": res_conciliacao.get("mensagem") or "Sem movimentacao para auditar.",
+                    "report": laudo_vazio.model_dump(),
+                    "contrato": laudo_vazio.model_dump(),
+                }
+
+            data_alvo = str(res_conciliacao.get("data_auditada") or "hoje")
+            filtro_turno_pattern, _ = self.normalizar_turno(turno)
+
+            metrics = res_conciliacao.get("metrics") or {}
+            resumo_exec = res_conciliacao.get("resumo_executivo") or {}
+            tri_pista = res_conciliacao.get("triangulacao_pista") or {}
+            tri_caixa = res_conciliacao.get("triangulacao_caixa") or {}
+
+            diferenca_caixa = float(
+                metrics.get("difference", resumo_exec.get("diferenca_financeira_caixa", 0.0))
+            )
+            dif_litros_pista = float(
+                tri_pista.get("diferenca_litros_pista", 0.0)
+            )
+
+            # Classifica o tipo de divergencia contabil
+            if diferenca_caixa < -0.05:
+                div_type = "furo_caixa"
+            elif diferenca_caixa > 0.05:
+                div_type = "sobra_caixa"
+            elif abs(dif_litros_pista) >= 0.05:
+                div_type = "divergencia_pista"
+            else:
+                div_type = "conforme"
+
+            hypotheses: List[RCAHypothesis] = []
+            evidences: List[RCAEvidenceItem] = []
+            recommendations: List[RCARecommendation] = []
+
+            # 3. Barreira de Tolerancia Anti-Fadiga:
+            # Se a diferenca for menor que a tolerancia contratual, nao gera alarmes falsos
+            if abs(diferenca_caixa) < cash_tolerance and abs(dif_litros_pista) < 0.5:
+                hyp_conforme = RCAHypothesis(
+                    hypothesis_id="HYP-00-CONFORME",
+                    pattern_code="DIVERGENCIA_OPERACIONAL_GENERICA",
+                    title="Operacao em Conformidade Contratual",
+                    confidence_score=1.0,
+                    explained_amount_reais=abs(diferenca_caixa),
+                    explained_volume_liters=abs(dif_litros_pista),
+                    severity="info",
+                    summary=(
+                        f"A divergencia apurada de R$ {diferenca_caixa:.2f} encontra-se dentro da margem de tolerancia "
+                        f"configurada de R$ {cash_tolerance:.2f}. Nao foram detectadas anomalias criticas."
+                    ),
+                    evidences=[],
+                    recommended_action="Fechamento aprovado dentro dos parametros operacionais padrao.",
+                )
+                hypotheses.append(hyp_conforme)
+                recommendations.append(
+                    RCARecommendation(
+                        action_type="human_audit",
+                        title="Homologacao Normal do Turno",
+                        description=f"Divergencia de R$ {diferenca_caixa:.2f} inferior ao limite de R$ {cash_tolerance:.2f}.",
+                        required_role="Gerente de Pista",
+                        action_button_label="Homologar Fechamento",
+                        action_intent="auditar_fechamento_turno",
+                        action_params={"data": data_alvo, "turno": turno},
+                    )
+                )
+
+                laudo_conforme = RCAReport(
+                    schema_version="1.0",
+                    report_id=f"rca-{data_alvo}-conforme",
+                    intent="investigar_causa_raiz",
+                    generated_at=datetime.now().astimezone().isoformat(),
+                    unit_id="posto_01",
+                    target_date=data_alvo,
+                    target_shift=str(turno or "todos"),
+                    target_caixa_id=int(caixa_id) if caixa_id else None,
+                    target_bico=str(bico) if bico else None,
+                    cash_tolerance_reais=cash_tolerance,
+                    total_divergence_reais=diferenca_caixa,
+                    divergence_type=div_type,
+                    total_explained_reais=abs(diferenca_caixa),
+                    unexplained_reais=0.0,
+                    confidence_overall=1.0,
+                    hypotheses=hypotheses,
+                    recommendations=recommendations,
+                    human_in_the_loop=True,
+                    execution_mode="on_demand",
+                    summary_markdown=(
+                        f"### Pericia Forense Concluida: Conforme\n"
+                        f"- **Diferenca Apurada:** R$ {diferenca_caixa:.2f}\n"
+                        f"- **Tolerancia Contratual:** R$ {cash_tolerance:.2f}\n"
+                        f"- **Status:** Nenhuma quebra anomala identificada. Variacao dentro dos limites operacionais."
+                    ),
+                )
+                res_dict = {
+                    "status": "ok",
+                    "intent": "investigar_causa_raiz",
+                    "diagnostico": "conforme",
+                    "data_auditada": data_alvo,
+                    "turno_auditado": turno or "TODOS OS TURNOS",
+                    "cash_tolerance_reais": cash_tolerance,
+                    "total_divergence_reais": diferenca_caixa,
+                    "total_explained_reais": abs(diferenca_caixa),
+                    "unexplained_reais": 0.0,
+                    "confidence_overall": 1.0,
+                    "resumo_executivo": {
+                        "diagnostico_principal": "Operacao em Conformidade Contratual",
+                        "confianca_pct": 100,
+                        "total_quebra_reais": diferenca_caixa,
+                        "total_explicado_reais": abs(diferenca_caixa),
+                        "saldo_remanescente_reais": 0.0,
+                        "human_in_the_loop": True,
+                    },
+                    "hipoteses": [h.model_dump() for h in hypotheses],
+                    "evidencias": [],
+                    "recomendacoes": [r.model_dump() for r in recommendations],
+                    "report": laudo_conforme.model_dump(),
+                    "contrato": laudo_conforme.model_dump(),
+                    "summary_markdown": laudo_conforme.summary_markdown,
+                }
+                res_dict_limpo, _ = sanitize_dict(res_dict)
+                return res_dict_limpo
+
+            # 4. TRIANGULACAO FORENSE DOS 4 PADROES NO BANCO ERP
+            conn = get_erp_connection()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # -------------------------------------------------------------
+                # PADRAO 1: Abastecimento Orfao (Automacao CBC04 vs Cupons PDV)
+                # Bico disparou telemetria, mas nao ha cupom correspondente no PDV
+                # -------------------------------------------------------------
+                cur.execute("""
+                    SELECT 
+                        TRIM(COALESCE(a.idabast, '')) AS idabast,
+                        TRIM(a.bomba) AS bico,
+                        TRIM(a.tanque) AS tanque,
+                        TRIM(a.codpro) AS codpro,
+                        COALESCE(TRIM(p.nompro), 'COMBUSTÍVEL ' || TRIM(a.codpro)) AS nompro,
+                        COALESCE(a.litros, 0)::numeric AS litros,
+                        COALESCE(a.total, 0)::numeric AS total,
+                        a.data,
+                        a.hora,
+                        COALESCE(a.ei, 0)::numeric AS ei,
+                        COALESCE(a.encerrante, 0)::numeric AS encerrante,
+                        TRIM(COALESCE(a.turno, '')) AS turno
+                    FROM abastecimentos a
+                    LEFT JOIN produtos p ON p.codpro = a.codpro
+                    WHERE a.data = %s
+                      AND (%s::text IS NULL OR a.turno ILIKE %s)
+                      AND (a.abt_bl_venda_cancelada IS NOT TRUE)
+                      AND (%s::text IS NULL OR TRIM(a.bomba) = %s)
+                      AND NOT EXISTS (
+                          SELECT 1 FROM itemped ip 
+                          WHERE (ip.idabast IS NOT NULL AND TRIM(ip.idabast) = TRIM(a.idabast) AND ip.idabast != '')
+                             OR (ip.dtmov = a.data AND TRIM(COALESCE(ip.bico, '')) = TRIM(a.bomba) AND ABS(COALESCE(ip.quant, 0) - a.litros) < 0.05)
+                      )
+                    ORDER BY a.total DESC, a.hora ASC
+                    LIMIT 20;
+                """, (data_alvo, filtro_turno_pattern, filtro_turno_pattern, bico, bico))
+                orfaos_rows = cur.fetchall()
+
+                # -------------------------------------------------------------
+                # PADRAO 2: Estorno Descompassado / Cancelamento Fantasma
+                # Cupons cancelados no PDV enquanto bico rodou fisicamente
+                # -------------------------------------------------------------
+                cur.execute("""
+                    SELECT 
+                        TRIM(COALESCE(p.codi, '')) AS codi,
+                        TRIM(COALESCE(p.cupom, '')) AS cupom,
+                        TRIM(COALESCE(p.pdv, '')) AS pdv,
+                        TRIM(COALESCE(p.turno, '')) AS turno,
+                        TRIM(COALESCE(p.vendedor, '')) AS vendedor,
+                        COALESCE(p.valortotal, 0)::numeric AS valortotal,
+                        p.dtem,
+                        p.hsmov,
+                        p.dtcanc,
+                        p.ven_ts_cancelamento,
+                        COALESCE(p.ven_tx_motivo_cancelamento, 'Motivo não informado') AS motivo,
+                        p.situ
+                    FROM pedido p
+                    WHERE (p.dtem = %s OR DATE(p.ven_ts_venda) = %s)
+                      AND (%s::text IS NULL OR p.turno ILIKE %s)
+                      AND (p.situ = 'C' OR p.dtcanc IS NOT NULL OR p.ven_ts_cancelamento IS NOT NULL)
+                    ORDER BY p.valortotal DESC
+                    LIMIT 20;
+                """, (data_alvo, data_alvo, filtro_turno_pattern, filtro_turno_pattern))
+                estornos_rows = cur.fetchall()
+
+                # -------------------------------------------------------------
+                # PADRAO 4: Inversao de Forma de Pagamento (Dinheiro vs Cartao/PIX)
+                # Agrupa pagamentos registrados no PDV
+                # -------------------------------------------------------------
+                cur.execute("""
+                    SELECT 
+                        TRIM(COALESCE(p.pdv, '1')) AS pdv,
+                        CASE 
+                            WHEN p.formapg ILIKE '%%DIN%%' OR p.tipopg = '1' THEN 'DINHEIRO'
+                            WHEN p.formapg ILIKE '%%CART%%' OR p.formapg ILIKE '%%TEF%%' OR p.formapg ILIKE '%%PIX%%' OR p.tipopg IN ('2', '3') THEN 'CARTAO_PIX'
+                            WHEN p.formapg ILIKE '%%PRAZ%%' OR p.tipopg = '4' THEN 'A_PRAZO'
+                            ELSE 'OUTROS'
+                        END AS forma_grupo,
+                        COUNT(*)::int AS qtd,
+                        ROUND(COALESCE(SUM(p.valortotal), 0)::numeric, 2) AS total_faturado
+                    FROM pedido p
+                    WHERE (p.dtem = %s OR DATE(p.ven_ts_venda) = %s)
+                      AND (%s::text IS NULL OR p.turno ILIKE %s)
+                      AND p.situ != 'C'
+                    GROUP BY 1, 2;
+                """, (data_alvo, data_alvo, filtro_turno_pattern, filtro_turno_pattern))
+                formas_pdv_rows = cur.fetchall()
+
+                conn.close()
+
+            # Processamento do Padrao 1: Abastecimentos Orfaos
+            total_orfaos_reais = sum(float(r['total']) for r in orfaos_rows)
+            for idx, r in enumerate(orfaos_rows, 1):
+                val_total = float(r['total'])
+                vol_litros = float(r['litros'])
+                bico_cod = r['bico']
+                hora_str = str(r['hora'] or '')
+                prod_nome = r['nompro']
+
+                ev = RCAEvidenceItem(
+                    evidence_id=f"EV-ORFAO-{idx:03d}",
+                    pattern_type="abastecimento_orfao",
+                    source_table="abastecimentos",
+                    description=(
+                        f"Abastecimento fisico no Bico {bico_cod} ({prod_nome}) as {hora_str}: "
+                        f"{vol_litros:.2f} L somando R$ {val_total:.2f} sem cupom fiscal emitido no PDV."
+                    ),
+                    occurred_at=hora_str,
+                    amount_reais=val_total,
+                    volume_liters=vol_litros,
+                    bico=bico_cod,
+                    tanque=r['tanque'],
+                    combustivel=prod_nome,
+                    operador=None,
+                    pdv=None,
+                    cupom=None,
+                    metadata={"idabast": r['idabast'], "encerrante_automacao": float(r['encerrante'])},
+                )
+                evidences.append(ev)
+
+                # Confianca calculada matematicamente:
+                # Se o valor orfao for identico a diferenca do caixa (margem <= R$ 3,00)
+                aderencia_quebra = abs(abs(diferenca_caixa) - val_total)
+                if aderencia_quebra <= 3.0:
+                    conf = 0.96
+                elif aderencia_quebra <= 15.0:
+                    conf = 0.88
+                elif val_total > 0:
+                    conf = 0.78
+                else:
+                    conf = 0.60
+
+                hypotheses.append(
+                    RCAHypothesis(
+                        hypothesis_id=f"HYP-ORFAO-{idx:02d}",
+                        pattern_code="ABASTECIMENTO_ORFAO",
+                        title=f"Abastecimento Orfao no Bico {bico_cod} ({prod_nome})",
+                        confidence_score=conf,
+                        explained_amount_reais=val_total,
+                        explained_volume_liters=vol_litros,
+                        severity="high" if val_total >= cash_tolerance else "medium",
+                        summary=(
+                            f"O bico {bico_cod} liberou fisicamente {vol_litros:.2f} L de {prod_nome} as {hora_str} "
+                            f"(R$ {val_total:.2f}), mas nenhum cupom fiscal de venda foi registrado no PDV para esta transacao."
+                        ),
+                        evidences=[ev],
+                        recommended_action=(
+                            f"Conferir as imagens da pista as {hora_str} para identificar o veiculo e operador do Bico {bico_cod}, "
+                            f"ou verificar se a comanda permaneceu retida no terminal PDV."
+                        ),
+                    )
+                )
+
+            # Processamento do Padrao 2: Estornos Descompassados
+            for idx, r in enumerate(estornos_rows, 1):
+                val_estorno = float(r['valortotal'])
+                cupom_cod = r['cupom'] or r['codi']
+                pdv_cod = r['pdv']
+                motivo_estorno = r['motivo']
+                hora_str = str(r['hsmov'] or '')
+
+                ev = RCAEvidenceItem(
+                    evidence_id=f"EV-ESTORNO-{idx:03d}",
+                    pattern_type="estorno_descompassado",
+                    source_table="pedido",
+                    description=(
+                        f"Cupom fiscal #{cupom_cod} no valor de R$ {val_estorno:.2f} foi cancelado no PDV {pdv_cod} "
+                        f"as {hora_str}. Motivo registrado: '{motivo_estorno}'."
+                    ),
+                    occurred_at=hora_str,
+                    amount_reais=val_estorno,
+                    volume_liters=None,
+                    bico=None,
+                    tanque=None,
+                    combustivel=None,
+                    operador=r['vendedor'],
+                    pdv=pdv_cod,
+                    cupom=cupom_cod,
+                    metadata={"motivo_cancelamento": motivo_estorno},
+                )
+                evidences.append(ev)
+
+                aderencia_estorno = abs(abs(diferenca_caixa) - val_estorno)
+                conf = 0.95 if aderencia_estorno <= 3.0 else (0.85 if aderencia_estorno <= 15.0 else 0.72)
+
+                hypotheses.append(
+                    RCAHypothesis(
+                        hypothesis_id=f"HYP-ESTORNO-{idx:02d}",
+                        pattern_code="ESTORNO_DESCOMPASSADO",
+                        title=f"Estorno / Cancelamento no PDV {pdv_cod} (Cupom #{cupom_cod})",
+                        confidence_score=conf,
+                        explained_amount_reais=val_estorno,
+                        explained_volume_liters=None,
+                        severity="high" if val_estorno >= cash_tolerance else "medium",
+                        summary=(
+                            f"Venda de R$ {val_estorno:.2f} cancelada no PDV {pdv_cod}. Caso o combustivel tenha sido liberado "
+                            f"no bico e nao tenha ocorrido reemissao de novo cupom fiscal, a diferenca de caixa reflete este estorno."
+                        ),
+                        evidences=[ev],
+                        recommended_action=(
+                            f"Auditar com o operador do PDV {pdv_cod} o motivo do cancelamento do cupom #{cupom_cod} "
+                            f"e verificar se houve emissao de cupom substituto na mesma transacao."
+                        ),
+                    )
+                )
+
+            # Processamento do Padrao 3: Afericao Inmetro Esquecida (20L / 40L)
+            bicos_det = tri_pista.get("detalhamento_bicos") or []
+            for idx, b_item in enumerate(bicos_det, 1):
+                af_litros = float(b_item.get("afericao_litros") or 0.0)
+                dif_bico_l = float(b_item.get("diferenca_litros") or 0.0)
+                preco_bico = float(b_item.get("preco_unitario") or 0.0)
+                bico_num = b_item.get("bico")
+                comb_nome = b_item.get("combustivel")
+
+                # Verifica se o bico tem diferenca proxima de 20L ou 40L e afericao zerada
+                dif_abs_l = abs(dif_bico_l)
+                eh_balde_20l = (af_litros == 0.0) and (abs(dif_abs_l - 20.0) <= 0.35)
+                eh_balde_40l = (af_litros == 0.0) and (abs(dif_abs_l - 40.0) <= 0.50)
+
+                # Ou se a quebra em reais dividida pelo preco do bico coincide com 20L
+                litros_calculados_quebra = (abs(diferenca_caixa) / preco_bico) if preco_bico > 0 else 0.0
+                quebra_bate_20l = (af_litros == 0.0) and (abs(litros_calculados_quebra - 20.0) <= 0.40)
+
+                if eh_balde_20l or eh_balde_40l or quebra_bate_20l:
+                    vol_afericao = 40.0 if eh_balde_40l else 20.0
+                    val_afericao = round(vol_afericao * preco_bico, 2)
+                    conf = 0.95 if (eh_balde_20l or eh_balde_40l) else 0.91
+
+                    ev = RCAEvidenceItem(
+                        evidence_id=f"EV-AFERICAO-{idx:03d}",
+                        pattern_type="afericao_inmetro_20l",
+                        source_table="fechabomba",
+                        description=(
+                            f"Bico {bico_num} ({comb_nome}) com variacao de {dif_abs_l:.2f} L "
+                            f"compativeis com afericao de balde Inmetro ({vol_afericao:.0f} L a R$ {preco_bico:.2f}/L). "
+                            f"Campo qtdeaf encontra-se zerado no fechamento de bomba."
+                        ),
+                        occurred_at=None,
+                        amount_reais=val_afericao,
+                        volume_liters=vol_afericao,
+                        bico=bico_num,
+                        tanque=b_item.get("tanque"),
+                        combustivel=comb_nome,
+                        operador=None,
+                        pdv=None,
+                        cupom=None,
+                        metadata={"preco_unitario": preco_bico, "qtdeaf_atual": af_litros},
+                    )
+                    evidences.append(ev)
+
+                    hypotheses.append(
+                        RCAHypothesis(
+                            hypothesis_id=f"HYP-AFERICAO-{idx:02d}",
+                            pattern_code="AFERICAO_INMETRO_NAO_LANCADA",
+                            title=f"Afericao Inmetro ({vol_afericao:.0f}L) Nao Lancada no Bico {bico_num}",
+                            confidence_score=conf,
+                            explained_amount_reais=val_afericao,
+                            explained_volume_liters=vol_afericao,
+                            severity="medium",
+                            summary=(
+                                f"A diferenca observada no Bico {bico_num} equivale exatamente a {vol_afericao:.0f} L "
+                                f"de afericao regulamentar Inmetro (R$ {val_afericao:.2f}). O campo qtdeaf nao foi preenchido no ERP."
+                            ),
+                            evidences=[ev],
+                            recommended_action=(
+                                f"Confirmar com a equipe de pista se houve afericao de bico de 20L/40L com o balde aferidor "
+                                f"e solicitar o lancamento da quantidade aferida no modulo fechabomba."
+                            ),
+                        )
+                    )
+
+            # Processamento do Padrao 4: Inversao de Forma de Pagamento
+            # Analisa diferenca entre dinheiro declarado vs cartao declarado
+            caixas_list = tri_caixa.get("caixas") or []
+            formas_map = {}
+            for r in formas_pdv_rows:
+                grp = r['forma_grupo']
+                formas_map[grp] = formas_map.get(grp, 0.0) + float(r['total_faturado'])
+
+            total_dinh_declarado = sum(float(c.get("dinheiro", 0.0)) for c in caixas_list)
+            total_cart_declarado = sum(float(c.get("cartao", 0.0)) for c in caixas_list)
+
+            pdv_dinh_esperado = formas_map.get("DINHEIRO", 0.0)
+            pdv_cart_esperado = formas_map.get("CARTAO_PIX", 0.0)
+
+            dif_dinh = total_dinh_declarado - pdv_dinh_esperado
+            dif_cart = total_cart_declarado - pdv_cart_esperado
+
+            # Falta em dinheiro coincide com sobra em cartao/pix
+            if dif_dinh < -10.0 and dif_cart > 10.0 and abs(dif_dinh + dif_cart) <= 30.0:
+                valor_invertido = min(abs(dif_dinh), abs(dif_cart))
+                ev = RCAEvidenceItem(
+                    evidence_id="EV-INVERSAO-001",
+                    pattern_type="inversao_pagamento",
+                    source_table="fechacaixa",
+                    description=(
+                        f"Falta de R$ {abs(dif_dinh):.2f} em dinheiro fisico acompanhada de sobra de R$ {dif_cart:.2f} "
+                        f"em recebimentos de Cartao/PIX no PDV. Variacao liquida compensada."
+                    ),
+                    occurred_at=None,
+                    amount_reais=valor_invertido,
+                    volume_liters=None,
+                    bico=None,
+                    tanque=None,
+                    combustivel=None,
+                    operador=None,
+                    pdv=None,
+                    cupom=None,
+                    metadata={"dif_dinheiro": dif_dinh, "dif_cartao": dif_cart},
+                )
+                evidences.append(ev)
+
+                hypotheses.append(
+                    RCAHypothesis(
+                        hypothesis_id="HYP-INVERSAO-01",
+                        pattern_code="INVERSAO_FORMA_PAGAMENTO",
+                        title="Inversao de Forma de Pagamento (Dinheiro vs Cartao/PIX)",
+                        confidence_score=0.93,
+                        explained_amount_reais=valor_invertido,
+                        explained_volume_liters=None,
+                        severity="medium",
+                        summary=(
+                            f"Houve inversao no momento da cobranca: vendas pagas em Cartao/PIX foram registradas como Dinheiro "
+                            f"(ou vice-versa). O valor financeiro total do turno esta preservado, mas a gaveta fisica de dinheiro acusa falta de R$ {abs(dif_dinh):.2f}."
+                        ),
+                        evidences=[ev],
+                        recommended_action=(
+                            "Conferir os comprovantes das maquinetas TEF/POS com as sangrias de dinheiro para retificar "
+                            "a forma de pagamento no sistema sem necessidade de reposicao monetaria pelo operador."
+                        ),
+                    )
+                )
+
+            # Ordena hipoteses por confianca decrescente
+            hypotheses.sort(key=lambda h: h.confidence_score, reverse=True)
+
+            # Calcula totais explicados e saldo remanescente
+            # Considera a melhor combinacao sem ultrapassar o valor absoluto da divergencia
+            total_quebra_abs = abs(diferenca_caixa)
+            total_explicado = 0.0
+            for h in hypotheses:
+                if total_explicado + h.explained_amount_reais <= total_quebra_abs + 10.0:
+                    total_explicado += h.explained_amount_reais
+                elif total_explicado < total_quebra_abs:
+                    # Adiciona parcela residual
+                    total_explicado = total_quebra_abs
+                    break
+
+            unexplained = max(0.0, round(total_quebra_abs - total_explicado, 2))
+
+            # Se restou valor nao explicado e nao ha hipoteses fortes, adiciona hipotese residual
+            if not hypotheses:
+                hypotheses.append(
+                    RCAHypothesis(
+                        hypothesis_id="HYP-GENERICA-01",
+                        pattern_code="DIVERGENCIA_OPERACIONAL_GENERICA",
+                        title="Divergencia Operacional a Apurar",
+                        confidence_score=0.55,
+                        explained_amount_reais=0.0,
+                        explained_volume_liters=None,
+                        severity="high",
+                        summary=(
+                            f"Diferenca de R$ {diferenca_caixa:.2f} sem correlacao matematica direta com orfaos, "
+                            f"cancelamentos ou afericoes de 20L. Requer auditoria fisica detalhada das sangrias e comprovantes."
+                        ),
+                        evidences=[],
+                        recommended_action="Efetuar contagem fisica das notas na tesouraria e conferir lotes TEF do dia.",
+                    )
+                )
+
+            # Confianca geral ponderada
+            if hypotheses:
+                conf_overall = round(max(h.confidence_score for h in hypotheses), 2)
+            else:
+                conf_overall = 0.50
+
+            # Recomendações HITL consolidadas
+            for h in hypotheses[:3]:
+                recommendations.append(
+                    RCARecommendation(
+                        action_type="human_audit",
+                        title=f"Validar: {h.title}",
+                        description=h.recommended_action,
+                        required_role="Gerente de Pista / Operador",
+                        action_button_label="Verificar Comprovantes",
+                        action_intent="auditar_fechamento_turno",
+                        action_params={"data": data_alvo, "turno": turno},
+                    )
+                )
+
+            # Sintese executiva em Markdown (Zero travessoes)
+            linhas_md = [
+                f"### 🔍 Laudo Pericial Forense de Causa-Raiz (RCA)",
+                f"- **Data Auditada:** {data_alvo} ({turno or 'TODOS OS TURNOS'})",
+                f"- **Divergencia Total:** R$ {diferenca_caixa:.2f} ({div_type.replace('_', ' ').title()})",
+                f"- **Valor Explicado pela IA:** R$ {total_explicado:.2f} ({int(conf_overall * 100)}% de confianca)",
+                f"- **Saldo Remanescente:** R$ {unexplained:.2f}",
+                "",
+                f"**Hipoteses Detectadas:**",
+            ]
+            for h in hypotheses[:3]:
+                linhas_md.append(f"- **{h.title}** (Confianca: {int(h.confidence_score * 100)}%): {h.summary}")
+
+            linhas_md.append("")
+            linhas_md.append(f"**Recomendacao do Gestor:** Conferir as evidencias na gaveta de auditoria antes de fechar o turno.")
+            sum_md = "\n".join(linhas_md)
+
+            # Montagem e validacao do Contrato Pydantic
+            rca_report = RCAReport(
+                schema_version="1.0",
+                report_id=f"rca-{data_alvo}-{filtro_turno_pattern or 'all'}",
+                intent="investigar_causa_raiz",
+                generated_at=datetime.now().astimezone().isoformat(),
+                unit_id="posto_01",
+                target_date=data_alvo,
+                target_shift=str(turno or "todos"),
+                target_caixa_id=int(caixa_id) if caixa_id else None,
+                target_bico=str(bico) if bico else None,
+                cash_tolerance_reais=cash_tolerance,
+                total_divergence_reais=diferenca_caixa,
+                divergence_type=div_type,
+                total_explained_reais=total_explicado,
+                unexplained_reais=unexplained,
+                confidence_overall=conf_overall,
+                hypotheses=hypotheses,
+                recommendations=recommendations,
+                human_in_the_loop=True,
+                execution_mode="on_demand",
+                summary_markdown=sum_md,
+            )
+
+            res_final = {
+                "status": "ok",
+                "schema_version": "1.0",
+                "report_id": rca_report.report_id,
+                "intent": "investigar_causa_raiz",
+                "data_auditada": data_alvo,
+                "turno_auditado": turno or "TODOS OS TURNOS",
+                "cash_tolerance_reais": cash_tolerance,
+                "total_divergence_reais": diferenca_caixa,
+                "divergence_type": div_type,
+                "total_explained_reais": total_explicado,
+                "unexplained_reais": unexplained,
+                "confidence_overall": conf_overall,
+                "resumo_executivo": {
+                    "diagnostico_principal": hypotheses[0].title if hypotheses else "Nenhuma anomalia",
+                    "confianca_pct": int(conf_overall * 100),
+                    "total_quebra_reais": diferenca_caixa,
+                    "total_explicado_reais": total_explicado,
+                    "saldo_remanescente_reais": unexplained,
+                    "human_in_the_loop": True,
+                },
+                "hipoteses": [h.model_dump() for h in hypotheses],
+                "evidencias": [e.model_dump() for e in evidences],
+                "recomendacoes": [r.model_dump() for r in recommendations],
+                "report": rca_report.model_dump(),
+                "contrato": rca_report.model_dump(),
+                "summary_markdown": sum_md,
+            }
+            res_final_limpo, _ = sanitize_dict(res_final)
+            return res_final_limpo
+
+        except Exception as e:
+            err_report = RCAReport(
+                schema_version="1.0",
+                report_id=f"rca-erro-{int(datetime.now().timestamp())}",
+                intent="investigar_causa_raiz",
+                generated_at=datetime.now().astimezone().isoformat(),
+                unit_id="posto_01",
+                target_date=str(data or "desconhecida"),
+                target_shift=str(turno or "todos"),
+                target_caixa_id=int(caixa_id) if caixa_id else None,
+                target_bico=str(bico) if bico else None,
+                cash_tolerance_reais=50.0,
+                total_divergence_reais=0.0,
+                divergence_type="conforme",
+                total_explained_reais=0.0,
+                unexplained_reais=0.0,
+                confidence_overall=0.0,
+                hypotheses=[],
+                recommendations=[
+                    RCARecommendation(
+                        action_type="human_audit",
+                        title="Falha na pericia automatica",
+                        description=f"Nao foi possivel concluir a analise forense: {e}",
+                        required_role="Suporte Tecnico",
+                    )
+                ],
+                human_in_the_loop=True,
+                execution_mode="on_demand",
+                summary_markdown=f"Falha ao executar investigacao de causa-raiz no ERP: {e}",
+            )
+            return {
+                "status": "error",
+                "motivo": f"Falha na investigacao forense de causa-raiz: {e}",
+                "report": err_report.model_dump(),
+                "contrato": err_report.model_dump(),
             }
 
     @staticmethod

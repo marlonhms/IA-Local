@@ -1,6 +1,6 @@
 /**
  * AURA Gatilhos Analíticos em 1-Clique Controller
- * Gerencia a matriz de 11 ferramentas especializadas para execução direta em sub-100ms.
+ * Gerencia a matriz de 12 ferramentas especializadas para execução direta em sub-100ms.
  */
 
 class AuraTriggersController {
@@ -12,7 +12,7 @@ class AuraTriggersController {
   }
 
   /**
-   * Catálogo das 11 ferramentas analíticas
+   * Catálogo das 12 ferramentas analíticas
    */
   getToolsCatalog() {
     return [
@@ -44,6 +44,16 @@ class AuraTriggersController {
         color: 'cyan',
         badge: 'Auditoria',
         desc: 'Triangulação contábil entre encerrantes de bicos na pista, vendas do PDV e balanço volumétrico de tanques.',
+        defaultParams: { data: 'hoje' },
+      },
+      {
+        id: 'investigar_causa_raiz',
+        name: 'Perícia Forense RCA (Causa-Raiz)',
+        category: 'caixa',
+        icon: 'search-check',
+        color: 'purple',
+        badge: 'IA Forense',
+        desc: 'Triangulação autônoma de quebras de turno: abastecimentos órfãos, estornos descompassados, aferições 20L e inversões de forma de pagamento.',
         defaultParams: { data: 'hoje' },
       },
       {
@@ -446,6 +456,85 @@ class AuraTriggersController {
             <div>Faturamento Caixa PDV: <strong class="text-cyan-300 block mt-0.5 tabular-nums">${posRevText}</strong></div>
             <div>${isPartial ? 'Diferença Provisória:' : 'Diferença Caixa:'} <strong class="${isPartial ? 'text-amber-400' : 'text-emerald-400'} block mt-0.5 tabular-nums">${diffFormatted}</strong></div>
             <div>Diagnóstico: <span class="text-slate-400 block mt-0.5">${this.escapeHtml(diagText)}</span></div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 3b. Perícia Forense de Causa-Raiz (RCA)
+    if (toolId === 'investigar_causa_raiz') {
+      const rep = data.report || data.contrato || data;
+      const resExec = data.resumo_executivo || rep.resumo_executivo || {};
+      const hipoteses = data.hipoteses || rep.hypotheses || [];
+      const totalQuebra = Number(data.total_divergence_reais ?? rep.total_divergence_reais ?? 0);
+      const totalExp = Number(data.total_explained_reais ?? rep.total_explained_reais ?? 0);
+      const unexplained = Number(data.unexplained_reais ?? rep.unexplained_reais ?? 0);
+      const confOverall = Math.round(Number(data.confidence_overall ?? rep.confidence_overall ?? 0.9) * 100);
+      const isConforme = data.diagnostico === 'conforme' || (hipoteses.length === 1 && String(hipoteses[0].hypothesis_id || '').includes('CONFORME'));
+
+      return `
+        <div class="space-y-4 font-sans text-xs">
+          <div class="p-4 rounded-xl ${isConforme ? 'bg-emerald-950/20 border border-emerald-500/30' : 'bg-purple-950/20 border border-purple-500/30'} flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="text-[11px] text-slate-400 font-mono">Status da Perícia Forense</div>
+              <div class="text-base sm:text-lg font-bold ${isConforme ? 'text-emerald-300' : 'text-purple-300'}">
+                ${this.escapeHtml(resExec.diagnostico_principal || (isConforme ? 'Conforme (Dentro da Tolerância)' : 'Quebra Investigada'))}
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-mono text-slate-300 bg-slate-900 px-2 py-1 rounded border border-white/10">HITL Consultivo</span>
+              <span class="text-xs font-mono font-bold text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded">
+                ${confOverall}% Certeza
+              </span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3 p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
+            <div>
+              <span class="text-[10px] text-slate-400">Divergência Total</span>
+              <strong class="${totalQuebra < 0 ? 'text-rose-400' : 'text-cyan-300'} block text-sm sm:text-base mt-0.5 tabular-nums">
+                ${totalQuebra < 0 ? '-R$ ' : '+R$ '}${Math.abs(totalQuebra).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </strong>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400">Explicado pela IA</span>
+              <strong class="text-emerald-400 block text-sm sm:text-base mt-0.5 tabular-nums">
+                R$ ${totalExp.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </strong>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400">Saldo Remanescente</span>
+              <strong class="${unexplained > 0 ? 'text-amber-400' : 'text-slate-300'} block text-sm sm:text-base mt-0.5 tabular-nums">
+                R$ ${unexplained.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </strong>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 font-mono">Hipóteses Trianguladas no ERP</span>
+            ${hipoteses.length === 0 ? `
+              <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 text-slate-400">
+                Nenhuma anomalia identificada para o período.
+              </div>
+            ` : hipoteses.map(h => {
+              const score = Math.round(Number(h.confidence_score || 0.8) * 100);
+              const expVal = Number(h.explained_amount_reais || 0);
+              return `
+                <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5 space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold text-slate-100">${this.escapeHtml(h.title || 'Hipótese')}</span>
+                    <div class="flex items-center gap-2">
+                      <span class="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">${score}% Certeza</span>
+                      <span class="font-mono font-bold text-emerald-400">R$ ${expVal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                  <p class="text-slate-300 text-xs leading-relaxed">${this.escapeHtml(h.summary || '')}</p>
+                  <div class="p-2 rounded bg-slate-950/60 text-[11px] text-amber-200/90">
+                    <strong>Ação Recomendada:</strong> ${this.escapeHtml(h.recommended_action || '')}
+                  </div>
+                </div>
+              `;
+            }).join('')}
           </div>
         </div>
       `;

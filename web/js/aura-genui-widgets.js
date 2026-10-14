@@ -527,6 +527,16 @@
         return true;
       }
 
+      // Acao especial: Disparo de Investigacao Forense de Causa-Raiz (RCA)
+      if (actionId === 'act_investigar_rca' || btnElement?.getAttribute('data-action-id') === 'act_investigar_rca') {
+        if (typeof window !== 'undefined' && window.auraChat && typeof window.auraChat.sendMessage === 'function') {
+          const shift = this.props?.turno_auditado && !this.props.turno_auditado.includes('TODOS') ? ` do ${this.props.turno_auditado}` : '';
+          const dataA = this.props?.data_auditada ? ` de ${this.props.data_auditada}` : '';
+          window.auraChat.sendMessage(`Investigar causa raiz da quebra${shift}${dataA}`);
+          return true;
+        }
+      }
+
       // 2. Acao de mutacao / recomendacao transacional
       const actionDef = (this.actions || []).find(a => a.action_id === actionId) || {
         action_id: actionId,
@@ -1742,7 +1752,21 @@
 
     getDefaultActionsHtml() {
       const shouldDisable = this.state.isLocked || this.isExpired();
+      const p = this.props || {};
+      const diff = Number(p.difference ?? p.dif_val ?? p.diferenca_financeira_caixa ?? 0);
+      const showRca = Math.abs(diff) >= 20.0;
+
       return `
+        ${showRca ? `
+          <button type="button"
+                  class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 font-bold hover:brightness-110 shadow-lg shadow-amber-500/20"
+                  data-action-id="act_investigar_rca"
+                  data-action-type="inspection"
+                  data-intent="investigar_causa_raiz"
+                  data-tool-call-id="${escapeHtml(this.toolCallId)}">
+            <span>🔍 Analisar Causa da Quebra (RCA)</span>
+          </button>
+        ` : ''}
         <button type="button"
                 class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold hover:brightness-110 ${shouldDisable ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
                 data-action-id="act_shift_homologar"
@@ -1770,6 +1794,170 @@
   }
 
   const ShiftReconciliationWidget = ShiftReconciliationUI;
+
+  // =========================================================================
+  // 7c. MICRO-WIDGET: RootCauseAnalysisUI (Pericia Forense de Causa-Raiz - RCA)
+  // =========================================================================
+
+  class RootCauseAnalysisUI extends BaseGenUIWidget {
+    constructor(payload = {}) {
+      super(payload, 'investigar_causa_raiz', 'render_RootCauseAnalysisUI');
+      this.cardClass = 'genui-root-cause-analysis-card';
+      this.ariaLabel = 'Pericia Forense de Causa-Raiz (RCA) AURA';
+    }
+
+    renderLayer1() {
+      const p = this.props || {};
+      const dateAudit = p.data_auditada || '';
+      const shiftName = p.turno_auditado || 'TODOS OS TURNOS';
+      const confOverall = Math.round(Number(p.confidence_overall ?? 0.9) * 100);
+      const isConforme = p.diagnostico === 'conforme' || (p.hipoteses && p.hipoteses.length === 1 && String(p.hipoteses[0].hypothesis_id || '').includes('CONFORME'));
+      const diagPrincipal = p.diagnostico_principal || (p.resumo_executivo && p.resumo_executivo.diagnostico_principal) || (isConforme ? 'Operacao em Conformidade Contratual' : 'Quebra Investigada com Sucesso');
+
+      const statusBadge = isConforme
+        ? '<span class="text-emerald-300 border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono text-[11px] font-bold">CONFORME</span>'
+        : '<span class="text-amber-300 border-amber-500/40 bg-amber-500/10 px-2 py-0.5 rounded-full font-mono text-[11px] font-bold">PERICIA FORENSE</span>';
+
+      return `
+        <div class="genui-layer genui-layer-1 mb-4 pb-3 border-b border-white/10">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full ${isConforme ? 'bg-emerald-400' : 'bg-cyan-400'} animate-pulse flex-shrink-0"></span>
+              <h4 class="text-xs font-mono font-bold tracking-wider text-cyan-300 uppercase">
+                AURA Forensic RCA Engine
+              </h4>
+              <span class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">
+                ${escapeHtml(shiftName)}${dateAudit ? ' • ' + escapeHtml(dateAudit) : ''}
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-mono font-bold text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-white/10">
+                HITL Consultivo
+              </span>
+              ${statusBadge}
+              <span class="text-xs font-mono font-bold text-cyan-300 bg-cyan-500/10 border-cyan-500/20 px-2 py-0.5 rounded border">
+                ${confOverall}% Certeza
+              </span>
+            </div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Diagnostico Pericial de Causa-Raiz</span>
+            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+              ${escapeHtml(diagPrincipal)}
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const p = this.props || {};
+      const totQuebra = Number(p.total_divergence_reais ?? (p.resumo_executivo && p.resumo_executivo.total_quebra_reais) ?? 0);
+      const totExp = Number(p.total_explained_reais ?? (p.resumo_executivo && p.resumo_executivo.total_explicado_reais) ?? 0);
+      const unexplained = Number(p.unexplained_reais ?? (p.resumo_executivo && p.resumo_executivo.saldo_remanescente_reais) ?? 0);
+      const hipoteses = Array.isArray(p.hipoteses) ? p.hipoteses : [];
+
+      return `
+        <div class="genui-layer genui-layer-2 mb-4 space-y-3">
+          <div class="grid grid-cols-3 gap-2">
+            <div class="p-2.5 rounded-xl bg-slate-950/40 border border-rose-500/20 text-center">
+              <span class="text-[10px] text-slate-400">Divergencia Total</span>
+              <div class="text-sm sm:text-base font-mono font-bold ${totQuebra < 0 ? 'text-rose-400' : 'text-cyan-300'}">
+                ${totQuebra < 0 ? '-R$ ' : '+R$ '}${formatNumber(Math.abs(totQuebra))}
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-950/40 border border-emerald-500/20 text-center">
+              <span class="text-[10px] text-slate-400">Explicado pela IA</span>
+              <div class="text-sm sm:text-base font-mono font-bold text-emerald-300">
+                R$ ${formatNumber(totExp)}
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-950/40 border border-slate-700/40 text-center">
+              <span class="text-[10px] text-slate-400">Saldo Remanescente</span>
+              <div class="text-sm sm:text-base font-mono font-bold ${unexplained > 0 ? 'text-amber-300' : 'text-slate-300'}">
+                R$ ${formatNumber(unexplained)}
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 font-mono">Hipoteses Forenses Trianguladas</span>
+            ${hipoteses.length === 0 ? `
+              <div class="p-3 rounded-xl bg-slate-950/30 border border-white/5 text-xs text-slate-400">
+                Nenhuma anomalia identificada para o turno selecionado.
+              </div>
+            ` : hipoteses.map((h, i) => {
+              const code = h.pattern_code || '';
+              let icon = '🔍';
+              if (code === 'ABASTECIMENTO_ORFAO') icon = '⛽';
+              else if (code === 'ESTORNO_DESCOMPASSADO') icon = '🧾';
+              else if (code === 'AFERICAO_INMETRO_NAO_LANCADA') icon = '🪣';
+              else if (code === 'INVERSAO_FORMA_PAGAMENTO') icon = '💳';
+
+              const scorePct = Math.round(Number(h.confidence_score || 0.8) * 100);
+              const expVal = Number(h.explained_amount_reais || 0);
+
+              return `
+                <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <div class="flex items-center gap-2">
+                      <span class="text-base">${icon}</span>
+                      <span class="font-bold text-slate-200">${escapeHtml(h.title || 'Hipotese')}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                        ${scorePct}% Certeza
+                      </span>
+                      <span class="font-mono font-bold text-emerald-400">
+                        R$ ${formatNumber(expVal)}
+                      </span>
+                    </div>
+                  </div>
+                  <p class="text-xs text-slate-300 leading-relaxed font-sans">
+                    ${escapeHtml(h.summary || '')}
+                  </p>
+                  <div class="p-2 rounded-lg bg-slate-900/80 border border-white/5 text-[11px] text-amber-200/90 flex items-start gap-2">
+                    <span class="text-amber-400">💡</span>
+                    <span><strong>Acao Recomendada:</strong> ${escapeHtml(h.recommended_action || '')}</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    getDefaultActionsHtml() {
+      const shouldDisable = this.state.isLocked || this.isExpired();
+      return `
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold hover:brightness-110 ${shouldDisable ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
+                data-action-id="act_rca_conferir_pdv"
+                data-action-type="inspection"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}"
+                ${shouldDisable ? 'disabled' : ''}>
+          <span>🔍 Conferir Cupons no PDV</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-cyan-300 border border-cyan-500/30 hover:bg-slate-700"
+                data-action-id="act_rca_reconciliar"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>⚡ Reconciliar Fechamento</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 text-slate-300 border border-white/10 hover:bg-slate-800"
+                data-action-id="act_rca_canvas"
+                data-action-type="inspection"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>🔍 Auditar no Canvas</span>
+        </button>
+      `;
+    }
+  }
+
+  const RootCauseAnalysisWidget = RootCauseAnalysisUI;
 
   // =========================================================================
   // 8. MICRO-WIDGET 5: BasketUpsellStrategyUI (Fase 6: F6-02)
@@ -1994,6 +2182,12 @@
         cls: ShiftReconciliationUI,
         aliases: ['ShiftReconciliationUI', 'ShiftReconciliationWidget'],
         intent: 'auditoria_turno'
+      },
+      {
+        name: 'render_RootCauseAnalysisUI',
+        cls: RootCauseAnalysisUI,
+        aliases: ['RootCauseAnalysisUI', 'RootCauseAnalysisWidget'],
+        intent: 'investigar_causa_raiz'
       }
     ];
 
@@ -2127,6 +2321,8 @@
     window.AuraGenUI.BasketUpsellWidget = BasketUpsellWidget;
     window.AuraGenUI.ShiftReconciliationUI = ShiftReconciliationUI;
     window.AuraGenUI.ShiftReconciliationWidget = ShiftReconciliationWidget;
+    window.AuraGenUI.RootCauseAnalysisUI = RootCauseAnalysisUI;
+    window.AuraGenUI.RootCauseAnalysisWidget = RootCauseAnalysisWidget;
     window.AuraGenUI.initGlobalActionDelegation = initGlobalGenUIActionDelegation;
     window.initGlobalGenUIActionDelegation = initGlobalGenUIActionDelegation;
 
@@ -2155,6 +2351,8 @@
       FinancialLeakAuditWidget,
       ShiftReconciliationUI,
       ShiftReconciliationWidget,
+      RootCauseAnalysisUI,
+      RootCauseAnalysisWidget,
       BasketUpsellStrategyUI,
       BasketUpsellWidget,
       registerWidgets,

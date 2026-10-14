@@ -4,7 +4,7 @@ Endpoints HTTP de Integração FastAPI para o Motor Cognitivo AURA.
 
 Conectores:
 1. POST /api/v1/aura/chat: Suporte a streaming SSE em tempo real ou resposta síncrona JSON
-2. POST /api/v1/aura/execute-intent: Invocação direta das 11 ferramentas analíticas (Run-Out, LMC, Turno...)
+2. POST /api/v1/aura/execute-intent: Invocação direta das 12 ferramentas analíticas (Run-Out, LMC, Turno, RCA...)
 3. GET  /api/v1/aura/stations: Lista filiais homologadas e status de conexão ERP/pgvector
 4. GET  /api/v1/aura/health: Health check de prontidão operacional
 """
@@ -269,7 +269,7 @@ async def execute_intent_endpoint(
     engine: AuraEngine = Depends(get_aura_engine),
 ):
     """
-    Invoca diretamente uma das 11 ferramentas analíticas (ex: Run-Out, LMC, Pista, Conciliação),
+    Invoca diretamente uma das 12 ferramentas analíticas (ex: Run-Out, LMC, Pista, Conciliação, Causa-Raiz RCA),
     sem latência de síntese de LLM. Retorna os dados analíticos estruturados em JSON.
     """
     result = await engine.execute_tool(

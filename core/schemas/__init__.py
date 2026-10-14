@@ -95,9 +95,19 @@ from core.schemas.genui import (
     UpsellComboItem,
     BasketUpsellStrategyProps,
 )
+from core.schemas.rca import (
+    RCAEvidenceItem,
+    RCAHypothesis,
+    RCARecommendation,
+    RCAReport,
+)
 
 
 __all__ = [
+    "RCAEvidenceItem",
+    "RCAHypothesis",
+    "RCARecommendation",
+    "RCAReport",
     "BranchStatus",
     "MetricUrgency",
     "BranchConfig",

@@ -1157,6 +1157,11 @@ GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
         "client_component": "ShiftReconciliationWidget",
         "title": "Auditando fechamento de turno e conciliação de caixa...",
     },
+    "investigar_causa_raiz": {
+        "component_name": "render_RootCauseAnalysisUI",
+        "client_component": "RootCauseAnalysisWidget",
+        "title": "Executando perícia forense de causa-raiz (RCA)...",
+    },
     "lmc_anp": {
         "component_name": "render_LMCReportUI",
         "client_component": "LMCReportWidget",
@@ -1731,6 +1736,77 @@ def build_canonical_genui_envelope(
         props["data_auditada"] = props.get("data_auditada") or ""
         props["aviso_data"] = props.get("aviso_data") or ""
         props["pending_items"] = props.get("pending_items") or []
+
+        # Se houver diferenca relevante alem da margem, adiciona a acao de Investigacao de Causa-Raiz (RCA)
+        if abs(diff_val) >= 20.0:
+            actions.insert(
+                0,
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🔍 Analisar Causa da Quebra (RCA Forense)",
+                    action_type="inspection",
+                    variant="secondary",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={
+                        "intent": "investigar_causa_raiz",
+                        "data": props.get("data_auditada"),
+                        "turno": props.get("turno_auditado"),
+                    },
+                )
+            )
+
+        props["suggested_actions"] = [a.model_dump(mode="json") for a in actions]
+
+    elif intencao == "investigar_causa_raiz" or comp_name == "render_RootCauseAnalysisUI":
+        if not actions:
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🔍 Conferir Cupons & Sangrias no PDV",
+                    action_type="inspection",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"intent": "auditoria_turno", "data": props.get("data_auditada"), "turno": props.get("turno_auditado")},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="⚡ Reconciliar Fechamento de Turno",
+                    action_type="mutation",
+                    variant="secondary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": "auditoria_turno", "operacao": "homologar_fechamento"},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🔍 Auditar Caixa no Canvas",
+                    action_type="inspection",
+                    variant="ghost",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"perspective": "caixas"},
+                )
+            )
+
+        resumo_exec = props.get("resumo_executivo") or {}
+        props["data_auditada"] = props.get("data_auditada") or ""
+        props["turno_auditado"] = props.get("turno_auditado") or "TODOS OS TURNOS"
+        props["cash_tolerance_reais"] = float(props.get("cash_tolerance_reais") or 50.0)
+        props["total_divergence_reais"] = float(props.get("total_divergence_reais") or resumo_exec.get("total_quebra_reais") or 0.0)
+        props["total_explained_reais"] = float(props.get("total_explained_reais") or resumo_exec.get("total_explicado_reais") or 0.0)
+        props["unexplained_reais"] = float(props.get("unexplained_reais") or resumo_exec.get("saldo_remanescente_reais") or 0.0)
+        props["confidence_overall"] = float(props.get("confidence_overall") or (resumo_exec.get("confianca_pct", 90) / 100.0))
+        props["diagnostico_principal"] = str(resumo_exec.get("diagnostico_principal") or props.get("diagnostico") or "Perícia Forense Concluída")
+        props["hipoteses"] = props.get("hipoteses") or []
+        props["evidencias"] = props.get("evidencias") or []
+        props["recomendacoes"] = props.get("recomendacoes") or []
+        props["human_in_the_loop"] = True
         props["suggested_actions"] = [a.model_dump(mode="json") for a in actions]
 
     elif intencao == "lmc_anp":
@@ -2057,6 +2133,17 @@ class AuraEngine:
                 data_val = p.get("data")
                 turno_val = p.get("turno")
                 return self.tools.auditar_fechamento_turno(data=data_val, turno=turno_val)
+
+            elif norm_name in (
+                "investigar_causa_raiz", "investigar_causa", "causa_raiz", "rca",
+                "analisar_causa_quebra", "pericia_forense", "analisar_hipotese_quebra"
+            ):
+                return self.tools.investigar_causa_raiz_turno(
+                    data=p.get("data"),
+                    turno=p.get("turno"),
+                    caixa_id=p.get("caixa_id"),
+                    bico=p.get("bico"),
+                )
 
             elif norm_name in (
                 "previsao_tanques", "prever_esgotamento_tanques", "runout", "run_out",
@@ -2396,6 +2483,11 @@ Diretrizes Específicas por Assunto:
                 resultado_bruto = self.tools.auditar_fechamento_turno(data=data_p, turno=turno_p)
                 contexto_extra = f"Auditoria de Fechamento de Turno e Conciliação de Pista no ERP:\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
 
+            elif intencao == "investigar_causa_raiz":
+                data_p, turno_p = extrair_data_turno(pergunta)
+                resultado_bruto = self.tools.investigar_causa_raiz_turno(data=data_p, turno=turno_p)
+                contexto_extra = f"Perícia Forense de Causa-Raiz (RCA) no ERP:\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+
             elif intencao == "previsao_tanques":
                 comb_filtro = extrair_combustivel(pergunta)
                 resultado_bruto = self.tools.prever_esgotamento_tanques(filtro_combustivel=comb_filtro)
@@ -2719,6 +2811,34 @@ Diretrizes Específicas por Assunto:
                 "",
                 "**💡 Ação Recomendada:** Confira os comprovantes físicos e encerrantes de bico na gaveta de evidências para validar as divergências antes do fechamento contábil."
             ]
+            return "\n".join(linhas)
+
+        # 3b. INVESTIGAÇÃO FORENSE DE CAUSA-RAIZ (RCA)
+        elif intencao in ("investigar_causa_raiz", "rca", "causa_raiz"):
+            resumo = resultado_bruto.get("resumo_executivo") or {}
+            hipoteses = resultado_bruto.get("hipoteses") or []
+            total_quebra = float(resultado_bruto.get("total_divergence_reais") or 0.0)
+            total_exp = float(resultado_bruto.get("total_explained_reais") or 0.0)
+            unexplained = float(resultado_bruto.get("unexplained_reais") or 0.0)
+            conf_pct = int(resultado_bruto.get("confidence_overall", 0.0) * 100)
+            diag_p = resumo.get("diagnostico_principal", "Perícia Forense Concluída")
+
+            linhas = [
+                "### 🔍 Laudo Pericial Forense de Causa-Raiz (RCA)",
+                "",
+                f"- **Diagnóstico Principal:** {diag_p} ({conf_pct}% de certeza)",
+                f"- **Diferença Total Apurada:** R$ {total_quebra:.2f}",
+                f"- **Valor Explicado pela Perícia:** [verde]R$ {total_exp:.2f}[/verde]",
+                f"- **Saldo Remanescente:** R$ {unexplained:.2f}",
+                "",
+                "**Evidências & Hipóteses Forenses Identificadas:**"
+            ]
+            for h in hipoteses[:3]:
+                score = int(float(h.get("confidence_score", 0.0)) * 100)
+                linhas.append(f"- **{h.get('title')}** ({score}% de confiança): {h.get('summary')}")
+
+            linhas.append("")
+            linhas.append("**💡 Ação do Gestor (Human-in-the-Loop):** Confira as evidências factuais listadas acima antes de fechar formalmente o caixa.")
             return "\n".join(linhas)
 
         # 4. LMC OFICIAL DA ANP

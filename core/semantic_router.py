@@ -90,6 +90,25 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
             "relatório de fechamento de turno",
         ]
     },
+    "investigar_causa_raiz": {
+        "descricao": "Investigação forense autônoma de causa-raiz (RCA) de quebras, furos e divergências de caixa e pista",
+        "exemplos": [
+            "Investigar causa raiz da quebra",
+            "Por que deu furo no caixa hoje?",
+            "Qual a causa da divergência no turno?",
+            "Analisar hipótese da quebra de caixa",
+            "Investigar furo no bico de combustível",
+            "Fazer perícia forense no fechamento de hoje",
+            "O que causou essa diferença no caixa?",
+            "Investigar causa do descompasso de pista",
+            "Por que o caixa não bateu?",
+            "Investigação autônoma de quebra",
+            "Qual o motivo da falta de dinheiro no turno?",
+            "Perícia de abastecimento órfão ou estorno",
+            "Investigar causa da quebra de ontem",
+            "Qual a causa raiz da divergência de fechamento?",
+        ]
+    },
     "mentoria_decisao": {
         "descricao": "Mentoria executiva de decisão, briefing estratégico, diagnóstico de rentabilidade e gaps do negócio",
         "exemplos": [
@@ -420,6 +439,19 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
 
     if ("briefing" in p or "mentor" in p or "mentoria" in p):
         return "mentoria_decisao"
+
+    # 0a. Investigação Forense de Causa-Raiz (RCA)
+    termos_rca_exatos = [
+        "causa raiz", "causa-raiz", "causa da quebra", "causa do furo", "causa da divergência", "causa da divergencia",
+        "por que deu furo", "por que deu quebra", "por que não bateu", "por que nao bateu", "porque deu furo",
+        "porque deu quebra", "investigar quebra", "investigar furo", "investigar causa", "investigar causa raiz",
+        "investigar causa-raiz", "investigar a quebra", "investigar o furo", "investigar divergência", "investigar divergencia",
+        "analisar quebra", "analisar a quebra", "analisar causa", "analisar hipótese", "analisar hipotese",
+        "hipótese da quebra", "hipotese da quebra", "perícia forense", "pericia forense", "análise forense", "analise forense",
+        "rca", "laudo forense", "abastecimento órfão", "abastecimento orfao", "estorno descompassado"
+    ]
+    if any(t in p for t in termos_rca_exatos):
+        return "investigar_causa_raiz"
 
     # 0. Conciliação de Turnos & Auditoria de Pista
     termos_auditoria_exatos = [
@@ -1010,6 +1042,7 @@ class SemanticRouter:
                     "benchmark_comparativo",
                     "auditoria_fuga_financeira",
                     "analise_margem",
+                    "investigar_causa_raiz",
                 ):
                     intencao_detectada = intencao_h
                     similarity = max(similarity, 0.95)
