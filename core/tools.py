@@ -592,9 +592,9 @@ class PostoTools:
         """
         Motor de Conciliação de Turnos & Auditoria de Pista (Fase 2 - P0).
         Executa a triangulação matemática entre:
-        1. Encerrantes físicos de pista (fechabomba): Volume = (enclts - encltsa) - qtdeaf
-        2. Telemetria em tempo real Companytec CBC04 (abastecimentos)
-        3. Fechamento financeiro dos caixas (fechacaixa + pedido)
+        1. Encerrantes fisicos de pista (leituras de medicao de bicos): Volume bruto menos afericoes
+        2. Telemetria em tempo real Companytec CBC04 (abastecimentos de pista)
+        3. Fechamento financeiro dos caixas e cupons fiscais emitidos
         4. Balanço de tanques e tolerância volumétrica ANP (±0.6%)
         Calcula quebras, sobras, furos e divergências de pista/caixa com conformidade LGPD.
         """
@@ -901,7 +901,7 @@ class PostoTools:
             # Origem e valor do Faturamento de Pista esperado
             if tot_fat_encerrante > Decimal("0.0"):
                 faturamento_pista_esperado = tot_fat_encerrante
-                origem_faturamento_pista = "Encerrantes Físicos (fechabomba)"
+                origem_faturamento_pista = "Encerrantes Fisicos de Pista"
             elif tot_fat_automacao > Decimal("0.0"):
                 faturamento_pista_esperado = tot_fat_automacao
                 origem_faturamento_pista = "Automação Companytec CBC04 (tempo real)"
@@ -1032,9 +1032,9 @@ class PostoTools:
 
             if encerrantes_pendentes:
                 diag_pista = (
-                    f"ENCERRANTES PENDENTES: Automação CBC04 registrou {float(tot_litros_automacao):.3f} L "
+                    f"ENCERRANTES PENDENTES: Automacao CBC04 registrou {float(tot_litros_automacao):.3f} L "
                     f"({total_abast_count} abastecimentos) totalizando R$ {float(tot_fat_automacao):.2f}, "
-                    f"mas os encerrantes de fechamento ainda não foram digitados no módulo fechabomba."
+                    f"mas os encerrantes de fechamento ainda nao foram informados no fechamento de pista."
                 )
             elif abs(dif_pista_total_litros) < Decimal("0.01"):
                 diag_pista = f"PISTA 100% CONCILIADA: Encerrantes mecânicos e automação Companytec batem perfeitamente ({float(tot_litros_faturados_encerrante):.3f} L)."
@@ -1102,27 +1102,27 @@ class PostoTools:
                 phys_volume = 0.0
                 phys_state = "zero_registered"
 
-            # Itens de pendência explícitos
+            # Itens de pendencia explicitos
             pending_items = []
             if encerrantes_pendentes:
                 pending_items.append(PendingItem(
                     code="physical_readings_missing",
-                    label="Encerrantes não informados",
-                    detail=f"Automação CBC04 registrou {float(tot_litros_automacao):.3f} L ({total_abast_count} abastecimentos), mas os encerrantes de fechamento ainda não foram lançados no módulo fechabomba.",
+                    label="Encerrantes nao informados",
+                    detail=f"Automacao CBC04 registrou {float(tot_litros_automacao):.3f} L ({total_abast_count} abastecimentos), mas os encerrantes de fechamento ainda nao foram lancados no fechamento de pista.",
                     severity="attention"
                 ))
             if caixa_em_aberto:
                 pending_items.append(PendingItem(
                     code="registers_open",
                     label="Caixas ainda abertos no PDV",
-                    detail="Operador com caixa aberto no PDV. Fechamento contábil definitivo será apurado após o encerramento formal do caixa.",
+                    detail="Operador com caixa aberto no PDV. Fechamento contabil definitivo sera apurado apos o encerramento formal do caixa.",
                     severity="attention"
                 ))
             if tanques_fora_tolerancia > 0:
                 pending_items.append(PendingItem(
                     code="tanks_anp_alert",
-                    label=f"{tanques_fora_tolerancia} tanque(s) fora da tolerância ANP",
-                    detail="Variação física vs livro excede o limite legal de ±0.6% da Portaria ANP 26/1992.",
+                    label=f"{tanques_fora_tolerancia} tanque(s) fora da tolerancia ANP",
+                    detail="Variacao fisica vs livro excede o limite legal de +-0.6% da Portaria ANP 26/1992.",
                     severity="attention"
                 ))
 
@@ -1135,7 +1135,7 @@ class PostoTools:
             sources = [
                 DataSource(
                     id="automation",
-                    label="Automação Companytec CBC04",
+                    label="Automacao Companytec CBC04",
                     availability="available" if has_auto else "missing",
                     data_as_of=str(data_alvo) if has_auto else None
                 ),
@@ -1147,24 +1147,24 @@ class PostoTools:
                 ),
                 DataSource(
                     id="physical_readings",
-                    label="Encerrantes Físicos (fechabomba)",
+                    label="Encerrantes Fisicos de Pista",
                     availability="missing" if encerrantes_pendentes else ("available" if has_mech else "missing"),
                     data_as_of=str(data_alvo) if (has_mech and not encerrantes_pendentes) else None
                 ),
                 DataSource(
                     id="tanks",
-                    label="Medição de Tanques",
+                    label="Medicao de Tanques",
                     availability="available" if has_tanks else "missing",
                     data_as_of=str(data_alvo) if has_tanks else None
                 ),
             ]
 
-            # Ação recomendada (segura, manual no ERP)
+            # Acao recomendada (segura, manual no ERP)
             if is_partial:
                 rec_action = RecommendedAction(
                     label="Conferir encerrantes e fechamento no ERP",
                     execution="external_manual",
-                    detail="Solicitar a digitação dos encerrantes no módulo fechabomba e o fechamento de caixa no PDV."
+                    detail="Solicitar a digitacao dos encerrantes no fechamento de pista e o fechamento de caixa no PDV."
                 )
             elif tem_furo_caixa:
                 rec_action = RecommendedAction(
@@ -1373,7 +1373,7 @@ class PostoTools:
         Triangulacao deterministica de 4 padroes matematicos sem necessidade de cadastro de erros:
         1. Abastecimento Orfao (telemetria CBC04 sem cupom fiscal no PDV).
         2. Estorno Descompassado (cupom cancelado no PDV, mas bico rodou fisicamente).
-        3. Afericao Inmetro Esquecida (furo volumetrico exato de 20L ou 40L sem lancamento de qtdeaf).
+        3. Afericao Inmetro Esquecida (furo volumetrico exato de 20L ou 40L sem lancamento de afericao no sistema).
         4. Inversao de Forma de Pagamento (falta de dinheiro coincide com sobra exata em cartao/PIX).
 
         Conformidade Estrita:
@@ -1782,7 +1782,7 @@ class PostoTools:
                         description=(
                             f"Bico {bico_num} ({comb_nome}) com variacao de {dif_abs_l:.2f} L "
                             f"compativeis com afericao de balde Inmetro ({vol_afericao:.0f} L a R$ {preco_bico:.2f}/L). "
-                            f"Campo qtdeaf encontra-se zerado no fechamento de bomba."
+                            f"Afericao regulamentar encontra-se zerada no fechamento de pista."
                         ),
                         occurred_at=None,
                         amount_reais=val_afericao,
@@ -1808,12 +1808,12 @@ class PostoTools:
                             severity="medium",
                             summary=(
                                 f"A diferenca observada no Bico {bico_num} equivale exatamente a {vol_afericao:.0f} L "
-                                f"de afericao regulamentar Inmetro (R$ {val_afericao:.2f}). O campo qtdeaf nao foi preenchido no ERP."
+                                f"de afericao regulamentar Inmetro (R$ {val_afericao:.2f}). A quantidade aferida nao foi informada no fechamento de pista."
                             ),
                             evidences=[ev],
                             recommended_action=(
                                 f"Confirmar com a equipe de pista se houve afericao de bico de 20L/40L com o balde aferidor "
-                                f"e solicitar o lancamento da quantidade aferida no modulo fechabomba."
+                                f"e solicitar o lancamento da quantidade aferida no fechamento de pista."
                             ),
                         )
                     )
@@ -4402,7 +4402,7 @@ class PostoTools:
                 ))
 
             sources_lmc = [
-                DataSource(id="fechabomba", label="Encerrantes Fiscais (ERP)", availability="available", data_as_of=str(data_alvo)),
+                DataSource(id="encerrantes_pista", label="Encerrantes Fiscais de Pista", availability="available", data_as_of=str(data_alvo)),
                 DataSource(id="medicao_tanques", label="Régua / Sonda Física", availability="available", data_as_of=str(data_alvo)),
                 DataSource(id="notas_fiscais", label="Notas Fiscais de Entrada", availability="available", data_as_of=str(data_alvo)),
             ]
@@ -4754,7 +4754,7 @@ class PostoTools:
     ) -> Dict[str, Any]:
         """
         Motor de Inteligência de Loja de Conveniência (Market Basket Analysis & Vendas Cruzadas).
-        Analisa o comportamento de compra em cupons fiscais e pedidos do PDV (`pedido` + `itemped`),
+        Analisa o comportamento de compra em cupons fiscais e pedidos do PDV,
         descobrindo afinidades entre mercadorias, minerando regras de associação (Suporte, Confiança e Lift)
         e gerando recomendações acionáveis de combos para alavancagem de ticket médio e margem de lucro.
 
@@ -5147,7 +5147,7 @@ class PostoTools:
             sources_mb = [
                 DataSource(
                     id="pedidos_pdv",
-                    label="Pedidos e Cupons do PDV (pedido + itemped)" if from_db else "Auditoria Calibrada Offline (pedido + itemped)",
+                    label="Pedidos e Cupons do PDV" if from_db else "Auditoria Calibrada Offline",
                     availability="available",
                     data_as_of=datetime.now().isoformat()
                 ),
@@ -6104,10 +6104,10 @@ class PostoTools:
     ) -> Dict[str, Any]:
         """
         Audita deterministicamente quebras de caixa, sangrias pendentes e divergencias TEF.
-        Cruza dados do ERP (fechacaixa, fechabomba, pedido, abastecimentos) para detectar:
+        Cruza dados consolidados de turnos, encerrantes, cupons fiscais e automacao para detectar:
         1. Furos de gaveta recorrentes acima da tolerancia (cash_tolerance_reais);
         2. Sangrias anomalas e retencao excessiva de numerario em gaveta (> max_safe_cash_drawer);
-        3. Divergencias de liquidacao TEF e cartoes (confronto PDV vs fechacaixa);
+        3. Divergencias de liquidacao TEF e cartoes (confronto PDV vs fechamento de caixa);
         4. Cancelamentos e estornos suspeitos de alto valor.
         Valida o resultado contra o contrato canonico FinancialLeakAuditProps.
         """

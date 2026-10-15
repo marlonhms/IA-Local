@@ -19,9 +19,13 @@ class RCAEvidenceItem(BaseModel):
         ...,
         description="Tipo do padrao: abastecimento_orfao, estorno_descompassado, afericao_inmetro_20l, inversao_pagamento, divergencia_encerrante"
     )
-    source_table: Literal["abastecimentos", "fechabomba", "fechacaixa", "pedido", "itemped", "tanques"] = Field(
+    source_table: Literal[
+        "abastecimentos", "fechabomba", "fechacaixa", "pedido", "itemped", "tanques",
+        "dispenser_logs", "cashier_shifts", "sales_receipts", "tank_readings",
+        "encerrantes_pista", "caixas_turno", "vendas_pdv", "estoque_tanques"
+    ] = Field(
         ...,
-        description="Tabela de origem no ERP"
+        description="Origem dos dados ou entidade canonica"
     )
     description: str = Field(..., description="Descricao factual detalhada da ocorrencia")
     occurred_at: Optional[str] = Field(None, description="Horario ou timestamp em que o fato ocorreu")

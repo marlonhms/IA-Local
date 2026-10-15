@@ -161,21 +161,21 @@ A migração foi dividida em 4 etapas seguras, mantendo regressão zero (192 tes
 
 ---
 
-### BLOCO 5: Higienização de Prompts, RAG e Telemetria (Próximo Passo Imediato)
+### BLOCO 5: Higienização de Prompts, RAG e Telemetria (Concluído)
 **Objetivo:** Auditar todo o fluxo de linguagem natural e meta-RAG para assegurar que nenhum prompt enviado para modelos generativos ou indexado na base vetorial contenha nomenclaturas de schemas legados.
 
-* **Ações:**
-  1. Varredura com script automatizado buscando referências literais de tabelas legadas em `core/prompts/`, `core/rag_engine.py`, `core/aura_engine.py` e `config/`.
-  2. Ajustar os prompts de sistema para usar terminologia de negócios pura:
-     * *Antes:* "Consulte os registros de fechacaixa e pedido para detectar quebra."
-     * *Depois:* "Analise os fechamentos de turno e as vendas declaradas pelo operador para auditar a conformidade de caixa."
-  3. Verificar que as memórias e vetores RAG utilizem o schema de entidades canônicas universais.
+* **Ações Realizadas:**
+  1. Criação do pacote modular `core/prompts/` com `system_prompts.py` e `__init__.py`, desacoplando completamente a engenharia de prompts do `AuraEngine`.
+  2. Ajuste dos prompts sistêmicos e de auto-ajuda para utilizar terminologia conceitual de negócios pura, persona executiva, regras estritas de design system e diretrizes anti-alucinação SQL (a LLM nunca gera queries SQL nem cita tabelas relacionais internas).
+  3. Higienização das fontes e labels retornados pelo `PostoTools` (ex: "Encerrantes Fisicos de Pista", "Fechamento de Caixa Declarado", "Encerrantes Fiscais de Pista").
+  4. Suporte a entidades canônicas universais em `RCAEvidenceItem` (`dispenser_logs`, `cashier_shifts`, `sales_receipts`, `tank_readings`).
+  5. Varredura completa da base de conhecimento RAG em `scripts/seed_aura_conhecimento.py`, assegurando zero menções a tabelas legadas.
 * **Verificação do Bloco:**
-  * Teste unitário de higienização de prompts em `tests/unit/test_prompt_clean_room.py` (< 0.5s).
+  * Teste unitário de higienização de prompts em `tests/unit/test_prompt_clean_room.py` (8 testes aprovados em 0.21s).
 
 ---
 
-### BLOCO 6: Documento de Conformidade & Opt-In do Lojista
+### BLOCO 6: Documento de Conformidade & Opt-In do Lojista (Próximo Passo Imediato)
 **Objetivo:** Criar os termos técnicos e jurídicos oficiais para instalação da AURA no cliente, amparados na legislação brasileira.
 
 * **Artefato:** `docs/compliance/termo_interoperabilidade_lgpd.md`
@@ -199,6 +199,6 @@ A migração foi dividida em 4 etapas seguras, mantendo regressão zero (192 tes
 ## 5. Próximo Passo Imediato
  
 Este roadmap é um plano de arquitetura e conformidade em execução faseada.  
-O **Bloco 1 (Domínio Canônico Universal AUPS)**, o **Bloco 2 (Protocolo Abstrato ERP Port)**, o **Bloco 3 (Driver de Borda PostgreSQL Local)** e o **Bloco 4 (Migração Gradual do PostoTools - 4 Etapas)** foram concluídos com 100% de sucesso (192 testes verdes).  
-O próximo passo imediato é a implementação do **Bloco 5: Higienização de Prompts, RAG e Telemetria**.
+O **Bloco 1 (Domínio Canônico Universal AUPS)**, o **Bloco 2 (Protocolo Abstrato ERP Port)**, o **Bloco 3 (Driver de Borda PostgreSQL Local)**, o **Bloco 4 (Migração Gradual do PostoTools - 4 Etapas)** e o **Bloco 5 (Higienização de Prompts, RAG e Telemetria)** foram concluídos com 100% de sucesso (200 testes unitários verdes).  
+O próximo passo imediato é a implementação do **Bloco 6: Documento de Conformidade & Opt-In do Lojista**.
 
