@@ -106,4 +106,8 @@ class ComplianceVerificationResult(BaseModel):
         default=True,
         description="Garantia de que o core opera exclusivamente com entidades universais AUPS"
     )
+    driver_level_protection: bool = Field(
+        default=True,
+        description="Garantia de blindagem em nivel de driver (read_only, statement_timeout, lock_timeout)"
+    )
     mensagem: str = Field(..., description="Mensagem executiva de status da conformidade")

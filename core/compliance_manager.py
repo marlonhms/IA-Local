@@ -506,10 +506,28 @@ class ComplianceManager:
             mensagem=mensagem,
         )
 
+    def get_driver_protection_status(self) -> dict[str, Any]:
+        """Retorna o status da blindagem em nivel de driver PostgreSQL (Secao 3.2 e Clausula Quarta da v1.1)."""
+        from config.settings import DB_ERP_CONFIG
+
+        options_str = str(DB_ERP_CONFIG.get("options", ""))
+        has_ro = "default_transaction_read_only=on" in options_str
+        has_stmt_timeout = "statement_timeout=" in options_str
+        has_lock_timeout = "lock_timeout=" in options_str
+        return {
+            "driver_options": options_str,
+            "read_only_enforced": has_ro,
+            "statement_timeout_enforced": has_stmt_timeout,
+            "lock_timeout_enforced": has_lock_timeout,
+            "forensic_safe": has_ro and has_stmt_timeout and has_lock_timeout,
+        }
+
     def verify_compliance_environment(
         self,
         loja_cnpj: str | None = None,
     ) -> dict[str, Any]:
         """Metodo utilitario compativel com dicionarios para consumo simplificado."""
         result = self.verify_compliance(loja_cnpj)
-        return result.model_dump()
+        out = result.model_dump()
+        out["driver_protection"] = self.get_driver_protection_status()
+        return out

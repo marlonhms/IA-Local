@@ -422,3 +422,46 @@ class TestComplianceOptIn:
         res_after = client.get("/api/v1/aura/compliance/status?cnpj=44.555.666/0001-77")
         assert res_after.status_code == 200
         assert res_after.json()["compliant"] is True
+
+    def test_driver_level_protection_options(self) -> None:
+        """Garante que as opcoes de blindagem a prova de pericia tecnica estao ativas no driver PostgreSQL."""
+        from config.settings import DB_ERP_CONFIG
+        from core.adapters.erp.postgres_local_adapter import PostgresLocalERPAdapter
+
+        options = str(DB_ERP_CONFIG.get("options", ""))
+        assert "default_transaction_read_only=on" in options
+        assert "statement_timeout=4000" in options
+        assert "lock_timeout=1000" in options
+
+        # Valida no ComplianceManager
+        manager = ComplianceManager(db_path=":memory:")
+        prot_status = manager.get_driver_protection_status()
+        assert prot_status["read_only_enforced"] is True
+        assert prot_status["statement_timeout_enforced"] is True
+        assert prot_status["lock_timeout_enforced"] is True
+        assert prot_status["forensic_safe"] is True
+
+        # Valida no PostgresLocalERPAdapter
+        adapter = PostgresLocalERPAdapter(force_offline=True)
+        assert adapter.driver_options == options
+
+    def test_term_v1_1_clauses_and_forensic_immunity(self) -> None:
+        """Valida as clausulas especificas da versao 1.1: Art. 39 LGPD, Secao 3.2 e Clausula Quarta."""
+        term_path = BASE_DIR / "docs" / "compliance" / "termo_interoperabilidade_lgpd.md"
+        assert term_path.exists()
+        content = term_path.read_text(encoding="utf-8")
+
+        # Versao 1.1
+        assert "Versao Oficial:** 1.1" in content or "1.1" in content
+
+        # Art. 39 da LGPD (Enquadramento Controlador x Operador)
+        assert "Art. 39" in content or "Artigo 39" in content
+        assert "Controlador" in content
+        assert "Operadora" in content
+
+        # Secao 3.2 e Clausula Quarta (Isencao e Pericia Tecnica)
+        assert "statement_timeout=4000" in content
+        assert "lock_timeout=1000" in content
+        assert "default_transaction_read_only=on" in content
+        assert "pg_stat_activity" in content
+        assert "Isencao de Responsabilidade" in content or "isencao" in content.lower()

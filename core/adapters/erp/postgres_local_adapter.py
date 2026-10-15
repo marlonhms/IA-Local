@@ -18,7 +18,7 @@ from typing import Any
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-from config.settings import ERP_USER
+from config.settings import DB_ERP_CONFIG, ERP_USER
 from core.adapters.erp.base import (
     BaseERPAdapter,
     ERPConnectionError,
@@ -74,6 +74,11 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
     def db_role(self) -> str:
         """Role de seguranca somente-leitura utilizada na conexao."""
         return self._db_role
+
+    @property
+    def driver_options(self) -> str:
+        """Opcoes de blindagem transacional e timeouts em nivel de driver PostgreSQL."""
+        return str(DB_ERP_CONFIG.get("options", ""))
 
     @property
     def fallback_adapter(self) -> BaseERPAdapter:
@@ -908,6 +913,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                 "mode": "live_postgres",
                 "latency_ms": round(latency_ms, 2),
                 "db_role": self._db_role,
+                "driver_options": self.driver_options,
                 "record_counts": {
                     "pedidos": cnt_pedidos,
                     "tanques": cnt_tanques,

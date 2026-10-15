@@ -98,6 +98,12 @@ WHATSAPP_MANAGER_PHONE = os.getenv("WHATSAPP_MANAGER_PHONE", "")
 # Prioriza a role tecnica dedicada aura_service_ro (P1-1)
 ERP_USER = os.getenv("ERP_SERVICE_USER") or os.getenv("ERP_DB_USER", "aura_service_ro")
 
+# Blindagem em nivel de driver no PostgreSQL (Secao 3.2 e Clausula Quarta da v1.1)
+ERP_DB_DRIVER_OPTIONS = os.getenv(
+    "ERP_DB_OPTIONS",
+    "-c default_transaction_read_only=on -c statement_timeout=4000 -c lock_timeout=1000",
+)
+
 DB_ERP_CONFIG = {
     "host": os.getenv("ERP_DB_HOST", "localhost"),
     "port": int(os.getenv("ERP_DB_PORT", "5433")),
@@ -105,6 +111,7 @@ DB_ERP_CONFIG = {
     "user": ERP_USER,
     "password": get_erp_password(),
     "connect_timeout": int(os.getenv("ERP_DB_CONNECT_TIMEOUT", "5")),
+    "options": ERP_DB_DRIVER_OPTIONS,
 }
 
 # Configuracao do Banco Vetorial (PostgreSQL 16 Windows pgvector - Porta 5433)
