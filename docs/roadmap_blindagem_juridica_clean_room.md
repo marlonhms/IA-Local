@@ -2,7 +2,7 @@
 ## Desacoplamento de Schemas Proprietários e Garantia de Interoperabilidade AURA
 
 > **Data de Elaboração:** 15 de Outubro de 2026  
-> **Status:** Em Execucao (Blocos 1 e 2 Concluidos com Sucesso: 141 Testes Verdes)  
+> **Status:** Em Execucao (Blocos 1, 2 e 3 Concluidos com Sucesso: 166 Testes Verdes)  
 > **Meta Central:** Blindar o ecossistema AURA contra reivindicações de propriedade intelectual de fornecedores de ERP (ex: WebPosto, Linx, Petros), garantindo que a IA, o RAG e o Core operem 100% em cima de contratos canônicos universais sem perder precisão analítica.
 
 ---
@@ -199,5 +199,6 @@ A migração é dividida em 4 etapas seguras. A cada etapa, os 75 testes são ex
 ## 5. Proximo Passo Imediato
  
 Este roadmap e um plano de arquitetura e conformidade em execucao faseada.  
-O **Bloco 1 (Dominio Canonico Universal AUPS)** e o **Bloco 2 (Protocolo Abstrato ERP Port & Open Posto Architecture)** foram concluidos com 100% de sucesso.  
-O proximo passo imediato e a implementacao do **Bloco 3: Driver de Borda PostgreSQL Local (Data Mapper)** em `core/adapters/erp/postgres_local_adapter.py`, garantindo mapeamento de-para isolado com a role `aura_service_ro`.
+O **Bloco 1 (Dominio Canonico Universal AUPS)**, o **Bloco 2 (Protocolo Abstrato ERP Port & Open Posto Architecture)** e o **Bloco 3 (Driver de Borda PostgreSQL Local - Data Mapper)** foram concluidos com 100% de sucesso (166 testes verdes).  
+O proximo passo imediato e a implementacao do **Bloco 4: Migracao Gradual e Cirurgica do PostoTools**, conectando o PostoTools ao PostgresLocalERPAdapter em 4 etapas seguras.
+

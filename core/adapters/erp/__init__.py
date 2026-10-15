@@ -12,6 +12,7 @@ from core.adapters.erp.base import (
     normalize_date_filter,
 )
 from core.adapters.erp.mock_adapter import MockERPAdapter
+from core.adapters.erp.postgres_local_adapter import PostgresLocalERPAdapter
 
 __all__ = [
     "BaseERPAdapter",
@@ -19,5 +20,7 @@ __all__ = [
     "ERPConnectionError",
     "ERPQueryError",
     "MockERPAdapter",
+    "PostgresLocalERPAdapter",
     "normalize_date_filter",
 ]
+
