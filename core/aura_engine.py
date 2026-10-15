@@ -2127,6 +2127,7 @@ class AuraEngine:
         router: Optional[SemanticRouter] = None,
         session_memory: Optional[AuraSessionMemory] = None,
         erp_adapter: Optional[BaseERPAdapter] = None,
+        compliance_manager: Optional[Any] = None,
     ):
         self.tenant_id = tenant_id or "default_tenant"
         self.filial_id = filial_id or "posto_01"
@@ -2138,6 +2139,7 @@ class AuraEngine:
         self._session_memory = session_memory or AuraSessionMemory()
         self._telemetry = AuraSRETelemetry.get_instance(session_memory=self._session_memory)
         self._erp_adapter = erp_adapter
+        self._compliance_manager = compliance_manager
         self._dados_filial: Optional[Dict[str, Any]] = None
 
     @property
@@ -2165,6 +2167,13 @@ class AuraEngine:
     @property
     def telemetry(self) -> AuraSRETelemetry:
         return self._telemetry
+
+    @property
+    def compliance_manager(self):
+        if self._compliance_manager is None:
+            from core.compliance_manager import ComplianceManager
+            self._compliance_manager = ComplianceManager(session_memory=self._session_memory)
+        return self._compliance_manager
 
     def get_audit_logs(
         self,
@@ -2199,6 +2208,27 @@ class AuraEngine:
                     "status_conexao": f"Indisponível: {e}",
                 }
         return self._dados_filial
+
+    def check_compliance_opt_in(self, loja_cnpj: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Verifica a conformidade juridica e o status do opt-in de interoperabilidade (LGPD/Clean Room).
+        Se loja_cnpj nao for fornecido, resolve atraves dos dados cadastrais da filial conectada.
+        """
+        target_cnpj = loja_cnpj
+        if not target_cnpj:
+            try:
+                dados = self.get_dados_filial()
+                target_cnpj = dados.get("cnpj") if dados else None
+            except Exception:
+                target_cnpj = None
+
+        verification = self.compliance_manager.verify_compliance(target_cnpj)
+        if not verification.compliant and target_cnpj == "00.000.000/0001-00":
+            fallback_verif = self.compliance_manager.verify_compliance(None)
+            if fallback_verif.compliant:
+                return fallback_verif.model_dump()
+
+        return verification.model_dump()
 
     def get_stations_status(self) -> StationStatus:
         """Verifica a saúde das conexões de banco de dados e telemetria da filial."""

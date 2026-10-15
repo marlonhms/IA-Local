@@ -961,6 +961,53 @@ async def health_endpoint():
 
 
 # =============================================================================
+# CONFORMIDADE JURIDICA E OPT-IN DO LOJISTA (LGPD & CLEAN ROOM - BLOCO 6)
+# =============================================================================
+
+@router.get(
+    "/compliance/status",
+    summary="Verificacao de Conformidade Juridica e Opt-In LGPD",
+)
+async def get_compliance_status_endpoint(
+    cnpj: str | None = Query(None, description="CNPJ opcional do estabelecimento comercial"),
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """
+    Retorna o status completo de conformidade juridica e tecnica do estabelecimento,
+    incluindo conferencia de hash do termo formal, role read-only e isolamento AUPS.
+    """
+    result = await asyncio.to_thread(engine.check_compliance_opt_in, cnpj)
+    return result
+
+
+@router.post(
+    "/compliance/opt-in",
+    summary="Registro Formal de Opt-In de Interoperabilidade pelo Lojista",
+    dependencies=[Depends(verify_admin_auth)],
+)
+async def register_compliance_opt_in_endpoint(
+    payload: dict[str, Any] = Body(..., description="Dados formais do opt-in do lojista"),
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """
+    Registra duravelmente o opt-in de interoperabilidade do lojista em SQLite e JSON.
+    """
+    try:
+        record = await asyncio.to_thread(engine.compliance_manager.register_opt_in, payload)
+        verif = await asyncio.to_thread(engine.compliance_manager.verify_compliance, record.loja_cnpj)
+        return {
+            "status": "ok",
+            "opt_in": record.model_dump(),
+            "verification": verif.model_dump(),
+        }
+    except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": f"Falha ao registrar opt-in: {exc!s}"},
+        ) from exc
+
+
+# =============================================================================
 # FACTORY DA APLICAÇÃO STANDALONE
 # =============================================================================
 
