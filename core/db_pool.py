@@ -7,9 +7,9 @@ Zero travessoes em todo o modulo.
 
 import logging
 import threading
-import time
-from contextlib import contextmanager
-from typing import Dict, Any, Optional
+from contextlib import contextmanager, suppress
+from typing import Any
+
 import psycopg2
 from psycopg2 import pool
 
@@ -18,15 +18,20 @@ from config.settings import (
     DB_VECTOR_CONFIG,
     get_erp_password,
 )
+from core.tenancy import (
+    TenantContext,
+    inject_rls_filial_context,
+    validate_filial_id,
+)
 
 logger = logging.getLogger("AuraDBPool")
 
 # Lock global para instanciacao singleton thread-safe dos pools
 _pool_lock = threading.Lock()
 
-_erp_pool: Optional[pool.ThreadedConnectionPool] = None
-_vector_pool: Optional[pool.ThreadedConnectionPool] = None
-_last_working_erp_port: Optional[int] = None
+_erp_pool: pool.ThreadedConnectionPool | None = None
+_vector_pool: pool.ThreadedConnectionPool | None = None
+_last_working_erp_port: int | None = None
 
 
 class PooledConnectionWrapper:
@@ -36,28 +41,35 @@ class PooledConnectionWrapper:
     quanto como context manager (devolvendo ao pool ao sair do bloco 'with').
     """
 
-    def __init__(self, real_conn, pool_instance: pool.ThreadedConnectionPool):
+    def __init__(
+        self,
+        real_conn,
+        pool_instance: pool.ThreadedConnectionPool,
+        rls_filial_id: int | None = None,
+    ):
         self._real_conn = real_conn
         self._pool = pool_instance
+        self._rls_filial_id = rls_filial_id
         self._returned = False
         self._lock = threading.Lock()
+
+    @property
+    def rls_filial_id(self) -> int | None:
+        """Retorna o identificador de filial RLS injetado nesta sessao, se houver."""
+        return self._rls_filial_id
 
     def close(self):
         """Devolve a conexao de volta ao pool de forma idempotente."""
         with self._lock:
             if not self._returned:
                 self._returned = True
-                try:
+                with suppress(Exception):
                     if self._real_conn.closed:
                         self._pool.putconn(self._real_conn, close=True)
                     else:
-                        try:
+                        with suppress(Exception):
                             self._real_conn.rollback()
-                        except Exception:
-                            pass
                         self._pool.putconn(self._real_conn)
-                except Exception:
-                    pass
 
     @property
     def closed(self) -> bool:
@@ -71,17 +83,13 @@ class PooledConnectionWrapper:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
-            try:
+            with suppress(Exception):
                 self._real_conn.rollback()
-            except Exception:
-                pass
         self.close()
 
     def __del__(self):
-        try:
+        with suppress(Exception):
             self.close()
-        except Exception:
-            pass
 
 
 def _create_erp_pool(
@@ -121,7 +129,7 @@ def _create_erp_pool(
             _last_working_erp_port = port
             logger.info(f"ERP ThreadedConnectionPool inicializado na porta {port} (min={minconn}, max={maxconn}).")
             return p
-        except Exception as exc:
+        except (psycopg2.Error, OSError, RuntimeError) as exc:
             last_exc = exc
             continue
 
@@ -169,7 +177,7 @@ def get_vector_pool() -> pool.ThreadedConnectionPool:
     return _vector_pool
 
 
-def get_erp_connection(timeout: Optional[int] = None) -> PooledConnectionWrapper:
+def get_erp_connection(timeout: int | None = None) -> PooledConnectionWrapper:
     """
     Obtem conexao do pool ERP envolvida em PooledConnectionWrapper.
     Ao chamar .close() ou sair de bloco 'with', a conexao retorna ao pool.
@@ -179,32 +187,43 @@ def get_erp_connection(timeout: Optional[int] = None) -> PooledConnectionWrapper
     if conn.closed:
         p.putconn(conn, close=True)
         conn = p.getconn()
-    try:
+    with suppress(Exception):
         conn.set_client_encoding('UTF8')
-    except Exception:
-        pass
     return PooledConnectionWrapper(conn, p)
 
 
-def get_vector_connection() -> PooledConnectionWrapper:
+def get_vector_connection(filial_id: int | None = None) -> PooledConnectionWrapper:
     """
     Obtem conexao do pool pgvector envolvida em PooledConnectionWrapper.
+    Quando filial_id e informado (ou esta ativo no TenantContext), injeta
+    automaticamente 'SET SESSION app.current_filial = ...' para isolamento RLS.
     Ao chamar .close() ou sair de bloco 'with', a conexao retorna ao pool.
     """
+    effective_filial = filial_id if filial_id is not None else TenantContext.get_filial_id()
+    if effective_filial is not None:
+        effective_filial = validate_filial_id(effective_filial)
+
     p = get_vector_pool()
     conn = p.getconn()
     if conn.closed:
         p.putconn(conn, close=True)
         conn = p.getconn()
-    try:
+    with suppress(Exception):
         conn.set_client_encoding('UTF8')
-    except Exception:
-        pass
-    return PooledConnectionWrapper(conn, p)
+
+    if effective_filial is not None:
+        try:
+            inject_rls_filial_context(conn, effective_filial, session_scope=True)
+        except Exception:
+            with suppress(Exception):
+                p.putconn(conn)
+            raise
+
+    return PooledConnectionWrapper(conn, p, rls_filial_id=effective_filial)
 
 
 @contextmanager
-def get_erp_db_connection(timeout: Optional[int] = None):
+def get_erp_db_connection(timeout: int | None = None):
     """
     Context manager thread-safe para obtencao de conexao com o banco ERP a partir do pool.
     Garante devolucao automatica ao pool no bloco finally.
@@ -217,12 +236,12 @@ def get_erp_db_connection(timeout: Optional[int] = None):
 
 
 @contextmanager
-def get_vector_db_connection():
+def get_vector_db_connection(filial_id: int | None = None):
     """
     Context manager thread-safe para obtencao de conexao com o banco vetorial pgvector a partir do pool.
     Garante devolucao automatica ao pool no bloco finally.
     """
-    wrapper = get_vector_connection()
+    wrapper = get_vector_connection(filial_id=filial_id)
     try:
         yield wrapper
     finally:
@@ -234,21 +253,17 @@ def close_all_pools():
     global _erp_pool, _vector_pool
     with _pool_lock:
         if _erp_pool is not None:
-            try:
+            with suppress(Exception):
                 _erp_pool.closeall()
-            except Exception:
-                pass
             _erp_pool = None
 
         if _vector_pool is not None:
-            try:
+            with suppress(Exception):
                 _vector_pool.closeall()
-            except Exception:
-                pass
             _vector_pool = None
 
 
-def get_pool_status() -> Dict[str, Any]:
+def get_pool_status() -> dict[str, Any]:
     """Retorna estado e telemetria dos connection pools."""
     status = {
         "erp_pool": {"active": False},

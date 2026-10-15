@@ -1,0 +1,17 @@
+{
+  "name": "@aura/web-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "SDK e Arquitetura Frontend TypeScript da AURA com Bundler Vite e Contratos Estaticos (P2-6)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}

@@ -8,6 +8,7 @@ Conectores:
 3. GET  /api/v1/aura/stations: Lista filiais homologadas e status de conexão ERP/pgvector
 4. GET  /api/v1/aura/health: Health check de prontidão operacional
 """
+# ruff: noqa: B008, BLE001, RUF059, TRY201
 
 from __future__ import annotations
 
@@ -20,7 +21,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    FastAPI,
+    HTTPException,
+    Query,
+    Request,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -32,7 +42,6 @@ from core.aura_engine import (
     StationStatus,
 )
 from core.automation_config import (
-    AutomationSettings,
     get_automation_settings,
     update_automation_settings,
 )
@@ -799,6 +808,21 @@ async def report_telemetry_endpoint(
     return {"status": "ok", **result}
 
 
+@router.get("/metrics/prometheus", summary="Exportador Prometheus OpenMetrics (P2-4)")
+async def get_prometheus_metrics_endpoint(
+    engine: AuraEngine = Depends(get_aura_engine),
+) -> Response:
+    """
+    Exporta todas as metricas operacionais e SLIs da AURA no padrao OpenMetrics / Prometheus.
+    """
+    payload = engine.telemetry.export_prometheus_metrics()
+    return Response(
+        content=payload,
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
+
+
+
 # =============================================================================
 # CONTINGENCIA & GESTAO DE FEATURE FLAGS (CIRCUIT BREAKER - F9-03)
 # =============================================================================
@@ -1118,6 +1142,24 @@ def create_aura_app(engine: AuraEngine | None = None) -> FastAPI:
 
     # Registra rotas da API
     app.include_router(router)
+
+    @app.get(
+        "/metrics",
+        tags=["SRE Observability"],
+        summary="Exportador Prometheus OpenMetrics (P2-4)",
+    )
+    async def root_prometheus_metrics_endpoint(
+        engine_dep: AuraEngine = Depends(get_aura_engine),
+    ) -> Response:
+        """
+        Endpoint canonico /metrics para scrape de servidores Prometheus e Grafana.
+        """
+        payload = engine_dep.telemetry.export_prometheus_metrics()
+        return Response(
+            content=payload,
+            media_type="text/plain; version=0.0.4; charset=utf-8",
+        )
+
 
     # Montagem do Painel Web SPA Local da AURA
     web_dir = Path(__file__).resolve().parent.parent / "web"

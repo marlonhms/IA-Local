@@ -1,0 +1,262 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Dashboard Oficial de Observabilidade SRE da AURA (Monitoramento Centralizado de Frota de Postos, Latencia Cognitiva, Pool ERP e Seguranca HITL)",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "TTFT Latency (P50 / P95 / P99 ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "aura_ttft_ms{quantile=\"0.5\"}",
+          "legendFormat": "TTFT P50",
+          "refId": "A"
+        },
+        {
+          "expr": "aura_ttft_ms{quantile=\"0.95\"}",
+          "legendFormat": "TTFT P95",
+          "refId": "B"
+        },
+        {
+          "expr": "aura_ttft_ms{quantile=\"0.99\"}",
+          "legendFormat": "TTFT P99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 800 },
+              { "color": "red", "value": 2000 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "Vector Search & Inference Latency (P50 / P95 / P99 ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "aura_vector_search_latency_ms{quantile=\"0.5\"}",
+          "legendFormat": "Vector P50",
+          "refId": "A"
+        },
+        {
+          "expr": "aura_vector_search_latency_ms{quantile=\"0.95\"}",
+          "legendFormat": "Vector P95",
+          "refId": "B"
+        },
+        {
+          "expr": "aura_vector_search_latency_ms{quantile=\"0.99\"}",
+          "legendFormat": "Vector P99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 150 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "SemanticRouter Cache Hit Ratio",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "aura_router_cache_hit_ratio",
+          "legendFormat": "Cache Hit Ratio",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "green", "value": 0.75 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Database Connection Pool (ERP & Vector)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "aura_db_pool_active_connections{pool=\"erp\"}",
+          "legendFormat": "Active ERP Connections",
+          "refId": "A"
+        },
+        {
+          "expr": "aura_db_pool_active_connections{pool=\"vector\"}",
+          "legendFormat": "Active Vector Connections",
+          "refId": "B"
+        },
+        {
+          "expr": "aura_db_pool_wait_ms",
+          "legendFormat": "Pool Wait (ms)",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "title": "Analytical Tool Executions by Status",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "aura_tool_executions_total",
+          "legendFormat": "{{tool_name}} ({{status}})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Transactional Actions & Security Blocks (HITL & RBAC)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "aura_actions_requested_total",
+          "legendFormat": "Requested",
+          "refId": "A"
+        },
+        {
+          "expr": "aura_actions_approved_total",
+          "legendFormat": "Approved",
+          "refId": "B"
+        },
+        {
+          "expr": "aura_actions_rolled_back_total",
+          "legendFormat": "Rolled Back",
+          "refId": "C"
+        },
+        {
+          "expr": "aura_security_blocks_total",
+          "legendFormat": "Security Blocks",
+          "refId": "D"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "title": "GenUI Micro-Widget Hydration Latency (P50 / P95 / P99 ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "aura_genui_hydration_ms{quantile=\"0.5\"}",
+          "legendFormat": "Hydration P50",
+          "refId": "A"
+        },
+        {
+          "expr": "aura_genui_hydration_ms{quantile=\"0.95\"}",
+          "legendFormat": "Hydration P95",
+          "refId": "B"
+        },
+        {
+          "expr": "aura_genui_hydration_ms{quantile=\"0.99\"}",
+          "legendFormat": "Hydration P99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      }
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["aura", "sre", "posto", "genui", "observability"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "AURA Enterprise Fleet SRE Observability",
+  "uid": "aura-sre-fleet-v1",
+  "version": 1
+}
