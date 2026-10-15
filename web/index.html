@@ -9,6 +9,11 @@
   <!-- Tailwind CSS Local (Offline-First) -->
   <script src="/static/vendor/tailwind.min.js"></script>
   <script>
+    if (!window.tailwind) {
+      document.write('<script src="static/vendor/tailwind.min.js"><\/script>');
+    }
+  </script>
+  <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
@@ -40,11 +45,29 @@
 
   <!-- Marked.js Local para renderizacao de Markdown no streaming -->
   <script src="/static/vendor/marked.min.js"></script>
+  <script>
+    if (!window.marked) {
+      document.write('<script src="static/vendor/marked.min.js"><\/script>');
+    }
+  </script>
   <!-- Lucide Icons Local -->
   <script src="/static/vendor/lucide.min.js"></script>
+  <script>
+    if (!window.lucide) {
+      document.write('<script src="static/vendor/lucide.min.js"><\/script>');
+    }
+  </script>
 
   <!-- Folha de Estilos Customizada do Design System AURA -->
   <link rel="stylesheet" href="/static/css/aura.css?v=2.10.2">
+  <script>
+    if (window.location.protocol === 'file:') {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'css/aura.css?v=2.10.2';
+      document.head.appendChild(link);
+    }
+  </script>
 </head>
 <body class="min-h-screen flex flex-col bg-obsidian text-slate-200 antialiased selection:bg-auraCyan/30 selection:text-white overflow-x-hidden">
 

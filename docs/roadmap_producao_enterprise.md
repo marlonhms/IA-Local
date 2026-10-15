@@ -126,24 +126,21 @@ Esta fase reúne correções indispensáveis para que o primeiro posto piloto op
 
 ---
 
-### 🔴 P0-5: Frontend 100% Offline-First (Embarque de Assets Locais)
-- **Diagnóstico Atual:** A interface gráfica em [`web/index.html`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/index.html) e [`web/showcase.html`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/showcase.html) carrega dependências essenciais de CDNs públicas:
-  - Tailwind CSS via `https://cdn.tailwindcss.com` (gerando avisos explícitos no console do navegador contra o uso de Play CDN em produção).
-  - Ícones Lucide via `https://unpkg.com/lucide@latest`.
-  - Renderizador Markdown via `https://cdn.jsdelivr.net/npm/marked/marked.min.js`.
-  Se a internet do posto oscilar ou for bloqueada por firewall, a interface do chat quebra completamente.
-- **Solução Técnica:**
-  - Criar o diretório de assets estáticos locais [`web/static/vendor/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/static/vendor/).
-  - Baixar e versionar localmente:
-    - [`web/static/vendor/tailwind.min.js`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/static/vendor/tailwind.min.js) (versão autônoma compilada ou CSS estático otimizado).
-    - [`web/static/vendor/lucide.min.js`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/static/vendor/lucide.min.js).
-    - [`web/static/vendor/marked.min.js`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/static/vendor/marked.min.js).
-  - Atualizar os links `<script src="...">` em [`web/index.html`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/index.html) e [`web/showcase.html`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/showcase.html) para os caminhos relativos locais (`/static/vendor/...`).
+### 🟢 P0-5: Frontend 100% Offline-First (Embarque de Assets Locais) [CONCLUÍDO]
+- **Diagnóstico:** A interface gráfica em [`web/index.html`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/index.html) e [`web/showcase.html`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/showcase.html) dependia de CDNs públicas (Tailwind, Lucide, Marked, Google Fonts), correndo risco de quebra caso o posto ficasse sem internet externa.
+- **Solução Implementada:**
+  - Diretório de assets estáticos locais [`web/static/vendor/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/static/vendor/) versionado com `tailwind.min.js`, `lucide.min.js` e `marked.min.js`.
+  - [`web/index.html`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/index.html) e [`web/showcase.html`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/showcase.html) convertidos integralmente para referenciar os assets locais em `/static/vendor/` e estilos locais em `/static/css/aura.css`.
+  - Fallbacks defensivos implementados para renderização offline mesmo quando visualizado diretamente no sistema de arquivos local (`file:///`).
+  - Fontes remotas removidas em favor da pilha tipográfica do sistema operacional (`system-ui`, `Segoe UI`, `Georgia`, `-apple-system`, `sans-serif`), garantindo latência zero de carregamento sem chamadas externas.
+  - Suíte de testes automatizada implementada em [`tests/unit/test_frontend_offline.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/unit/test_frontend_offline.py).
 - **Arquivos Afetados:**
   - [`web/static/vendor/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/static/vendor/)
   - [`web/index.html`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/index.html)
   - [`web/showcase.html`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/showcase.html)
-- **Critério de Aceite:** O frontend renderiza 100% idêntico, com ícones, estilos dark glass e formatação markdown funcionando mesmo com a placa de rede externa desabilitada (modo avião / offline completo). Zero chamadas a domínios externos no DevTools Network tab.
+  - [`scripts/build_showcase_page.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/build_showcase_page.py)
+  - [`tests/unit/test_frontend_offline.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/unit/test_frontend_offline.py)
+- **Status:** Concluído com 100% dos testes unitários e de showcase aprovados. Zero chamadas a domínios externos.
 
 ---
 

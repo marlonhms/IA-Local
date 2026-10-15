@@ -7,6 +7,7 @@ e Grafo de Conhecimento Operacional (Knowledge Graph de 3 Colunas).
 
 from pathlib import Path
 
+
 def generate_showcase_html():
     html = """<!DOCTYPE html>
 <html lang="pt-BR" class="scroll-smooth">
@@ -17,13 +18,15 @@ def generate_showcase_html():
   <title>AURA // Apresentação & Showcase Executivo (Simulação Autônoma em Tempo Real)</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.ico">
 
-  <!-- Tipografia Editorial & Executiva de Alta Precisão (Geist + Newsreader / Editorial Serif - Padrão Harness.io) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+  <!-- Tipografia Editorial & Executiva de Alta Precisão (Geist + Newsreader / Editorial Serif - Padrão Harness.io Offline-First) -->
 
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind CSS Local (Offline-First) -->
+  <script src="/static/vendor/tailwind.min.js"></script>
+  <script>
+    if (!window.tailwind) {
+      document.write('<script src="static/vendor/tailwind.min.js"></' + 'script>');
+    }
+  </script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -60,11 +63,24 @@ def generate_showcase_html():
     }
   </script>
 
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Lucide Icons Local (Offline-First) -->
+  <script src="/static/vendor/lucide.min.js"></script>
+  <script>
+    if (!window.lucide) {
+      document.write('<script src="static/vendor/lucide.min.js"></' + 'script>');
+    }
+  </script>
 
   <!-- Folha de Estilos Oficial do Design System AURA -->
   <link rel="stylesheet" href="/static/css/aura.css">
+  <script>
+    if (window.location.protocol === 'file:') {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'css/aura.css';
+      document.head.appendChild(link);
+    }
+  </script>
 
   <style>
     /* Estilos Customizados do Showcase Executivo - Acabamento Obsidian & Zero Edge Glow */
