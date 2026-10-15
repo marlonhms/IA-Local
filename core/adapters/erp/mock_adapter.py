@@ -598,6 +598,8 @@ class MockERPAdapter(BaseERPAdapter):
             UniversalTankReading(
                 identificador_tanque="1",
                 combustivel="Gasolina Comum",
+                codigo_lmc="420101001",
+                bicos_conectados=["1"],
                 timestamp_leitura=datetime(2026, 10, 15, 18, 0, 0),
                 volume_atual_litros=15420.0,
                 volume_agua_mm=0.0,
@@ -611,6 +613,8 @@ class MockERPAdapter(BaseERPAdapter):
             UniversalTankReading(
                 identificador_tanque="2",
                 combustivel="Gasolina Aditivada",
+                codigo_lmc="420101002",
+                bicos_conectados=["2"],
                 timestamp_leitura=datetime(2026, 10, 15, 18, 0, 0),
                 volume_atual_litros=8200.0,
                 volume_agua_mm=0.0,
@@ -624,6 +628,8 @@ class MockERPAdapter(BaseERPAdapter):
             UniversalTankReading(
                 identificador_tanque="3",
                 combustivel="Etanol Hidratado",
+                codigo_lmc="420102001",
+                bicos_conectados=["4"],
                 timestamp_leitura=datetime(2026, 10, 15, 18, 0, 0),
                 volume_atual_litros=9850.0,
                 volume_agua_mm=2.0,
@@ -637,6 +643,8 @@ class MockERPAdapter(BaseERPAdapter):
             UniversalTankReading(
                 identificador_tanque="4",
                 combustivel="Diesel S10",
+                codigo_lmc="420103001",
+                bicos_conectados=["3"],
                 timestamp_leitura=datetime(2026, 10, 15, 18, 0, 0),
                 volume_atual_litros=21500.0,
                 volume_agua_mm=0.0,

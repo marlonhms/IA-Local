@@ -295,16 +295,27 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
         query = """
             SELECT 
                 TRIM(t.codtan) AS identificador_tanque,
-                COALESCE(TRIM(t.prl_ds_produto_lmc), 'COMBUSTÍVEL ' || TRIM(t.codtan)) AS combustivel,
+                COALESCE(
+                    NULLIF(TRIM(t.prl_ds_produto_lmc), ''),
+                    NULLIF(TRIM(p.nompro), ''),
+                    'COMBUSTÍVEL ' || TRIM(t.codtan)
+                ) AS combustivel,
+                TRIM(COALESCE(t.codlmc, '')) AS codigo_lmc,
                 COALESCE(t.ultima_leitura, CURRENT_TIMESTAMP) AS timestamp_leitura,
                 ROUND(COALESCE(t.volume, t.qtdeat, 0)::numeric, 2) AS volume_atual_litros,
                 ROUND(COALESCE(t.volume_agua, 0)::numeric, 2) AS volume_agua_mm,
                 ROUND(COALESCE(t.temperatura, 25.0)::numeric, 1) AS temperatura_celsius,
                 ROUND(COALESCE(t.capacidade, 0)::numeric, 2) AS capacidade_nominal_litros,
-                ROUND(COALESCE(t.qtdeinicioturno, t.qtdean, t.qtdeat, 0)::numeric, 2) AS saldo_inicial_litros,
-                ROUND(COALESCE(t.tan_vl_quantidade_fim, t.qtdeat, 0)::numeric, 2) AS saldo_final_litros,
-                (t.qtdeinicioturno IS NOT NULL OR t.tan_vl_quantidade_fim IS NOT NULL) AS tem_medicao_fisica
+                ROUND(COALESCE(t.iniciodia, t.qtdeinicioturno, t.qtdean, t.qtdeat, 0)::numeric, 2) AS saldo_inicial_litros,
+                ROUND(COALESCE(t.tan_vl_quantidade_fim, t.volume, t.qtdeat, 0)::numeric, 2) AS saldo_final_litros,
+                (t.qtdeinicioturno IS NOT NULL OR t.tan_vl_quantidade_fim IS NOT NULL OR t.volume IS NOT NULL) AS tem_medicao_fisica
             FROM tanques t
+            LEFT JOIN (
+                SELECT DISTINCT ON (TRIM(codlmc)) TRIM(codlmc) AS codlmc, nompro
+                FROM produtos
+                WHERE codlmc IS NOT NULL AND TRIM(codlmc) != ''
+                ORDER BY TRIM(codlmc), codpro
+            ) p ON p.codlmc = TRIM(t.codlmc)
             ORDER BY t.codtan;
         """
 
@@ -316,15 +327,32 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                 return self._fallback_adapter.get_tank_inventory()
             raise ERPQueryError(f"Erro ao consultar inventario de tanques no PostgreSQL: {exc}") from exc
 
+        bicos_por_tanque: dict[str, list[str]] = {}
+        try:
+            bomba_rows = self._execute_query(
+                "SELECT TRIM(b.codbom) AS codbom, TRIM(b.codtan) AS codtan FROM bombas b WHERE b.codtan IS NOT NULL ORDER BY b.codbom ASC;"
+            )
+            for br in bomba_rows:
+                c_tan = br.get("codtan")
+                c_bom = br.get("codbom")
+                if c_tan and c_bom:
+                    bicos_por_tanque.setdefault(c_tan, []).append(c_bom)
+        except Exception as exc:
+            logger.debug("Nao foi possivel carregar bicos_conectados da tabela bombas (%s)", exc)
+
         readings: list[UniversalTankReading] = []
         for r in rows:
             vol = float(r["volume_atual_litros"])
             cap = float(r["capacidade_nominal_litros"])
             pct = round((vol / cap * 100.0), 2) if cap > 0 else 0.0
+            tanque_id = str(r["identificador_tanque"])
+            cod_lmc = str(r["codigo_lmc"]).strip() if r.get("codigo_lmc") else None
 
             reading = UniversalTankReading(
-                identificador_tanque=str(r["identificador_tanque"]),
+                identificador_tanque=tanque_id,
                 combustivel=str(r["combustivel"]),
+                codigo_lmc=cod_lmc or None,
+                bicos_conectados=bicos_por_tanque.get(tanque_id, []),
                 timestamp_leitura=r["timestamp_leitura"],
                 volume_atual_litros=vol,
                 volume_agua_mm=float(r["volume_agua_mm"]),
@@ -426,7 +454,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                 SELECT 
                     COALESCE(TRIM(b.ilha::text), TRIM(a.bomba)) AS identificador_bomba,
                     TRIM(a.bomba) AS identificador_bico,
-                    TRIM(COALESCE(a.tanque, '')) AS identificador_tanque,
+                    COALESCE(NULLIF(TRIM(a.tanque), ''), TRIM(b.codtan), '') AS identificador_tanque,
                     TRIM(COALESCE(a.codpro, '')) AS codigo_combustivel,
                     COALESCE(TRIM(pr.nompro), 'COMBUSTÍVEL ' || TRIM(COALESCE(a.codpro, ''))) AS descricao_combustivel,
                     TRIM(COALESCE(a.turno, '')) AS turno_descricao,
@@ -444,7 +472,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                 LEFT JOIN bombas b ON TRIM(b.codbom) = TRIM(a.bomba)
                 LEFT JOIN produtos pr ON pr.codpro = a.codpro
                 {where_ab_sql}
-                GROUP BY b.ilha, a.bomba, a.tanque, a.codpro, pr.nompro, a.turno, a.abt_ts_abastecimento, a.data, a.hora
+                GROUP BY b.ilha, a.bomba, COALESCE(NULLIF(TRIM(a.tanque), ''), TRIM(b.codtan), ''), a.codpro, pr.nompro, a.turno, a.abt_ts_abastecimento, a.data, a.hora
                 ORDER BY COALESCE(a.abt_ts_abastecimento, (a.data + a.hora)::timestamp, a.data::timestamp) DESC
                 LIMIT %s;
             """

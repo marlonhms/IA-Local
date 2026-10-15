@@ -198,6 +198,16 @@ class UniversalTankReading(AUPSBaseModel):
         ),
         description="Indica se houve medicao fisica com regua ou telemetria no turno",
     )
+    codigo_lmc: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("codigo_lmc", "codlmc", "codlmc_anp"),
+        description="Codigo LMC do combustivel conforme cadastro ANP",
+    )
+    bicos_conectados: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("bicos_conectados", "bicos", "bicos_vinculados"),
+        description="Lista de bicos abastecedores conectados a este tanque",
+    )
 
 
     @property
@@ -252,6 +262,23 @@ class UniversalTankReading(AUPSBaseModel):
     @classmethod
     def _validate_tem_medicao_fisica(cls, v: Any) -> bool:
         return bool(v) if v is not None else False
+
+    @field_validator("codigo_lmc", mode="before")
+    @classmethod
+    def _validate_codigo_lmc(cls, v: Any) -> str | None:
+        if v is None:
+            return None
+        parsed = parse_str_safe(v, default="")
+        return parsed if parsed else None
+
+    @field_validator("bicos_conectados", mode="before")
+    @classmethod
+    def _validate_bicos_conectados(cls, v: Any) -> list[str]:
+        if not v:
+            return []
+        if isinstance(v, (list, tuple, set)):
+            return [str(x).strip() for x in v if str(x).strip()]
+        return [str(v).strip()]
 
 
 

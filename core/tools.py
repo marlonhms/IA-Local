@@ -2210,96 +2210,81 @@ class PostoTools:
         data_referencia: Optional[datetime] = None,
     ) -> dict:
         """
-        Motor de Previsão de Esgotamento de Combustível (Run-Out Forecast) &
-        Sugestão Inteligente de Pedidos de Caminhão-Tanque.
-        Conecta ao ERP PostgreSQL (porta 5433).
+        Motor de Previsao de Esgotamento de Combustivel (Run-Out Forecast) &
+        Sugestao Inteligente de Pedidos de Caminhao-Tanque.
+        Utiliza o adaptador ERP em Clean-Room Architecture.
         """
         try:
-            conn = get_erp_connection()
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # 1. Posição atual dos tanques (com fallback para produtos via codlmc)
-                cur.execute("""
-                    SELECT 
-                        TRIM(t.codtan) AS codtan,
-                        COALESCE(
-                            NULLIF(TRIM(t.prl_ds_produto_lmc), ''),
-                            NULLIF(TRIM(p.nompro), ''),
-                            'COMBUSTÍVEL ' || TRIM(t.codtan)
-                        ) AS combustivel,
-                        ROUND(COALESCE(t.capacidade, 0)::numeric, 2) AS capacidade_litros,
-                        ROUND(COALESCE(t.qtdeat, 0)::numeric, 2) AS saldo_atual_litros
-                    FROM tanques t
-                    LEFT JOIN (
-                        SELECT DISTINCT ON (TRIM(codlmc)) TRIM(codlmc) AS codlmc, nompro
-                        FROM produtos
-                        WHERE codlmc IS NOT NULL AND TRIM(codlmc) != ''
-                        ORDER BY TRIM(codlmc), codpro
-                    ) p ON p.codlmc = TRIM(t.codlmc)
-                    ORDER BY t.codtan;
-                """)
-                linhas_tanques = cur.fetchall()
+            tanques_readings = self.erp_adapter.get_tank_inventory()
+            dispenses = self.erp_adapter.get_pump_dispenses(limit=5000)
 
-                # 2. Vínculos de bicos por tanque na tabela bombas
-                cur.execute("""
-                    SELECT 
-                        TRIM(b.codbom) AS codbom,
-                        TRIM(b.codtan) AS codtan,
-                        TRIM(b.codpro) AS codpro
-                    FROM bombas b
-                    WHERE b.codtan IS NOT NULL;
-                """)
-                linhas_bombas = cur.fetchall()
-
-                # 3. Telemetria de consumo em abastecimentos
-                cur.execute("""
-                    SELECT 
-                        COALESCE(TRIM(a.tanque), TRIM(b.codtan)) AS codtan,
-                        TRIM(a.codpro) AS codpro,
-                        COALESCE(TRIM(p.nompro), TRIM(t.prl_ds_produto_lmc)) AS produto_nome,
-                        COUNT(*)::int AS total_abastecimentos,
-                        ROUND(COALESCE(SUM(a.litros), 0)::numeric, 3) AS total_litros,
-                        MIN(a.data) AS data_min,
-                        MAX(a.data) AS data_max,
-                        COUNT(DISTINCT a.data)::int AS dias_com_venda
-                    FROM abastecimentos a
-                    LEFT JOIN bombas b ON b.codbom = a.bomba
-                    LEFT JOIN tanques t ON t.codtan = COALESCE(a.tanque, b.codtan)
-                    LEFT JOIN produtos p ON p.codpro = a.codpro
-                    WHERE a.abt_bl_venda_cancelada IS NOT TRUE
-                    GROUP BY COALESCE(TRIM(a.tanque), TRIM(b.codtan)), TRIM(a.codpro), p.nompro, t.prl_ds_produto_lmc;
-                """)
-                linhas_telemetria = cur.fetchall()
-
-                # 4. Total de abastecimentos gerais na base para metadados
-                cur.execute("""
-                    SELECT 
-                        COUNT(*)::int AS total_abast_geral,
-                        ROUND(COALESCE(SUM(litros), 0)::numeric, 3) AS total_litros_geral,
-                        MIN(data) AS primeira_data_abast,
-                        MAX(data) AS ultima_data_abast,
-                        COUNT(DISTINCT data)::int AS total_dias_base
-                    FROM abastecimentos
-                    WHERE abt_bl_venda_cancelada IS NOT TRUE;
-                """)
-                telemetria_geral = cur.fetchone() or {}
-
-                conn.close()
+            linhas_tanques = []
+            for t in tanques_readings:
+                linhas_tanques.append({
+                    "codtan": t.identificador_tanque,
+                    "combustivel": t.combustivel or f"COMBUSTÍVEL {t.identificador_tanque}",
+                    "capacidade_litros": float(t.capacidade_nominal_litros),
+                    "saldo_atual_litros": float(t.volume_atual_litros),
+                    "bicos_conectados": list(t.bicos_conectados),
+                })
 
             agora = data_referencia or datetime.now()
 
             # Mapeamento de bicos por tanque
             bicos_por_tanque: Dict[str, List[str]] = {}
-            for rb in linhas_bombas:
-                c_tan = rb['codtan']
-                if c_tan:
-                    bicos_por_tanque.setdefault(c_tan, []).append(rb['codbom'])
+            for t in linhas_tanques:
+                c_tan = t["codtan"]
+                if t["bicos_conectados"]:
+                    bicos_por_tanque[c_tan] = list(t["bicos_conectados"])
+
+            for d in dispenses:
+                c_tan = d.identificador_tanque
+                c_bom = d.identificador_bico
+                if c_tan and c_bom:
+                    if c_bom not in bicos_por_tanque.setdefault(c_tan, []):
+                        bicos_por_tanque[c_tan].append(c_bom)
 
             # Mapeamento de telemetria por tanque
             telemetria_por_tanque: Dict[str, List[dict]] = {}
-            for rt in linhas_telemetria:
-                c_tan = rt['codtan']
+            dispenses_por_tanque: Dict[str, list] = {}
+            datas_abast: set[date] = set()
+            total_abast_geral = 0
+            total_litros_geral = 0.0
+
+            for d in dispenses:
+                c_tan = d.identificador_tanque
                 if c_tan:
-                    telemetria_por_tanque.setdefault(c_tan, []).append(rt)
+                    dispenses_por_tanque.setdefault(c_tan, []).append(d)
+
+            for c_tan, d_list in dispenses_por_tanque.items():
+                litros_tq = 0.0
+                abast_tq = 0
+                for d in d_list:
+                    vol = d.volume_automacao_litros
+                    if vol <= 0.0 and d.encerrante_final_litros > d.encerrante_inicial_litros:
+                        vol = max(0.0, d.encerrante_final_litros - d.encerrante_inicial_litros - d.volume_aferido_litros)
+                    litros_tq += vol
+                    abast_tq += (d.qtd_abastecimentos or 1)
+                    if d.timestamp_registro:
+                        datas_abast.add(d.timestamp_registro.date())
+
+                total_litros_geral += litros_tq
+                total_abast_geral += abast_tq
+                telemetria_por_tanque[c_tan] = [{
+                    "codtan": c_tan,
+                    "total_abastecimentos": abast_tq,
+                    "total_litros": litros_tq,
+                    "dias_com_venda": len(datas_abast) or 1,
+                }]
+
+            total_dias_base = max(1, len(datas_abast))
+            telemetria_geral = {
+                "total_abast_geral": total_abast_geral,
+                "total_litros_geral": total_litros_geral,
+                "total_dias_base": total_dias_base,
+                "primeira_data_abast": str(min(datas_abast)) if datas_abast else str(agora.date()),
+                "ultima_data_abast": str(max(datas_abast)) if datas_abast else str(agora.date()),
+            }
 
             # Função auxiliar interna de normalização de categoria de combustível
             def normalizar_categoria(nome: str) -> str:
@@ -4020,162 +4005,101 @@ class PostoTools:
         e escriturado (abertura + recebimentos - vendas) para cada tanque,
         auditando a margem legal de tolerância de ±0.6%.
         """
-        conn = None
         try:
-            conn = get_erp_connection()
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # 1. Determinação da Data Alvo
-                data_param = self.normalizar_data(data)
-                aviso_data = None
-                data_alvo = None
+            # 1. Determinacao da Data Alvo
+            data_param = self.normalizar_data(data)
+            aviso_data = None
+            data_alvo = None
 
-                cur.execute("SELECT CURRENT_DATE;")
-                data_hoje = cur.fetchone()['current_date']
+            data_hoje = date.today()
 
-                if not data_param or data_param == "hoje":
-                    cur.execute("SELECT COUNT(*) as c FROM abastecimentos WHERE data = %s AND abt_bl_venda_cancelada IS NOT TRUE;", (data_hoje,))
-                    c_ab = cur.fetchone()['c']
-                    cur.execute("SELECT COUNT(*) as c FROM fechabomba WHERE dtmov = %s;", (data_hoje,))
-                    c_fb = cur.fetchone()['c']
-
-                    if c_ab > 0 or c_fb > 0:
-                        data_alvo = str(data_hoje)
-                    else:
-                        cur.execute("""
-                            SELECT GREATEST(
-                                (SELECT MAX(data) FROM abastecimentos WHERE abt_bl_venda_cancelada IS NOT TRUE),
-                                (SELECT MAX(dtmov) FROM fechabomba)
-                            ) as max_d;
-                        """)
-                        max_d = cur.fetchone()['max_d']
-                        if max_d:
-                            data_alvo = str(max_d)
-                            aviso_data = (
-                                f"Nenhuma movimentação registrada para hoje ({data_hoje}). "
-                                f"Exibindo LMC da data mais recente com movimentação: {data_alvo}."
-                            )
-                        else:
-                            data_alvo = str(data_hoje)
-                elif data_param == "ontem":
-                    cur.execute("SELECT (CURRENT_DATE - INTERVAL '1 day')::date as ontem;")
-                    data_alvo = str(cur.fetchone()['ontem'])
-                    cur.execute("SELECT COUNT(*) as c FROM abastecimentos WHERE data = %s AND abt_bl_venda_cancelada IS NOT TRUE;", (data_alvo,))
-                    c_ab = cur.fetchone()['c']
-                    cur.execute("SELECT COUNT(*) as c FROM fechabomba WHERE dtmov = %s;", (data_alvo,))
-                    c_fb = cur.fetchone()['c']
-                    if c_ab == 0 and c_fb == 0:
-                        cur.execute("""
-                            SELECT GREATEST(
-                                (SELECT MAX(data) FROM abastecimentos WHERE abt_bl_venda_cancelada IS NOT TRUE),
-                                (SELECT MAX(dtmov) FROM fechabomba)
-                            ) as max_d;
-                        """)
-                        max_d = cur.fetchone()['max_d']
-                        if max_d:
-                            aviso_data = (
-                                f"Nenhuma movimentação registrada para ontem ({data_alvo}). "
-                                f"Exibindo LMC da data mais recente com movimentação: {max_d}."
-                            )
-                            data_alvo = str(max_d)
-                elif data_param == "anteontem":
-                    cur.execute("SELECT (CURRENT_DATE - INTERVAL '2 days')::date as anteontem;")
-                    data_alvo = str(cur.fetchone()['anteontem'])
-                    cur.execute("SELECT COUNT(*) as c FROM abastecimentos WHERE data = %s AND abt_bl_venda_cancelada IS NOT TRUE;", (data_alvo,))
-                    c_ab = cur.fetchone()['c']
-                    cur.execute("SELECT COUNT(*) as c FROM fechabomba WHERE dtmov = %s;", (data_alvo,))
-                    c_fb = cur.fetchone()['c']
-                    if c_ab == 0 and c_fb == 0:
-                        cur.execute("""
-                            SELECT GREATEST(
-                                (SELECT MAX(data) FROM abastecimentos WHERE abt_bl_venda_cancelada IS NOT TRUE),
-                                (SELECT MAX(dtmov) FROM fechabomba)
-                            ) as max_d;
-                        """)
-                        max_d = cur.fetchone()['max_d']
-                        if max_d:
-                            aviso_data = (
-                                f"Nenhuma movimentação registrada para anteontem ({data_alvo}). "
-                                f"Exibindo LMC da data mais recente com movimentação: {max_d}."
-                            )
-                            data_alvo = str(max_d)
+            if not data_param or data_param == "hoje":
+                disp_hoje = self.erp_adapter.get_pump_dispenses(start_date=data_hoje, end_date=data_hoje, limit=10)
+                if disp_hoje:
+                    data_alvo = str(data_hoje)
                 else:
-                    data_alvo = data_param
-                    cur.execute("SELECT COUNT(*) as c FROM abastecimentos WHERE data = %s AND abt_bl_venda_cancelada IS NOT TRUE;", (data_alvo,))
-                    c_ab = cur.fetchone()['c']
-                    cur.execute("SELECT COUNT(*) as c FROM fechabomba WHERE dtmov = %s;", (data_alvo,))
-                    c_fb = cur.fetchone()['c']
-                    if c_ab == 0 and c_fb == 0:
-                        aviso_data = f"Nenhuma movimentação de vendas ou encerrantes registrada para a data {data_alvo}."
+                    disp_recent = self.erp_adapter.get_pump_dispenses(limit=50)
+                    if disp_recent:
+                        max_d = max(d.timestamp_registro.date() for d in disp_recent if d.timestamp_registro)
+                        data_alvo = str(max_d)
+                        aviso_data = (
+                            f"Nenhuma movimentação registrada para hoje ({data_hoje}). "
+                            f"Exibindo LMC da data mais recente com movimentação: {data_alvo}."
+                        )
+                    else:
+                        data_alvo = str(data_hoje)
+            elif data_param == "ontem":
+                data_ontem = data_hoje - timedelta(days=1)
+                data_alvo = str(data_ontem)
+                disp_ontem = self.erp_adapter.get_pump_dispenses(start_date=data_ontem, end_date=data_ontem, limit=10)
+                if not disp_ontem:
+                    disp_recent = self.erp_adapter.get_pump_dispenses(limit=50)
+                    if disp_recent:
+                        max_d = max(d.timestamp_registro.date() for d in disp_recent if d.timestamp_registro)
+                        aviso_data = (
+                            f"Nenhuma movimentação registrada para ontem ({data_alvo}). "
+                            f"Exibindo LMC da data mais recente com movimentação: {max_d}."
+                        )
+                        data_alvo = str(max_d)
+            elif data_param == "anteontem":
+                data_anteontem = data_hoje - timedelta(days=2)
+                data_alvo = str(data_anteontem)
+                disp_anteontem = self.erp_adapter.get_pump_dispenses(start_date=data_anteontem, end_date=data_anteontem, limit=10)
+                if not disp_anteontem:
+                    disp_recent = self.erp_adapter.get_pump_dispenses(limit=50)
+                    if disp_recent:
+                        max_d = max(d.timestamp_registro.date() for d in disp_recent if d.timestamp_registro)
+                        aviso_data = (
+                            f"Nenhuma movimentação registrada para anteontem ({data_alvo}). "
+                            f"Exibindo LMC da data mais recente com movimentação: {max_d}."
+                        )
+                        data_alvo = str(max_d)
+            else:
+                data_alvo = str(data_param)
+                disp_especifico = self.erp_adapter.get_pump_dispenses(start_date=data_alvo, end_date=data_alvo, limit=10)
+                if not disp_especifico:
+                    aviso_data = f"Nenhuma movimentação de vendas ou encerrantes registrada para a data {data_alvo}."
 
-                # 2. Dados Cadastrais dos Tanques
-                cur.execute("""
-                    SELECT 
-                        TRIM(t.codtan) AS codtan,
-                        COALESCE(
-                            NULLIF(TRIM(t.prl_ds_produto_lmc), ''),
-                            NULLIF(TRIM(p.nompro), ''),
-                            'COMBUSTÍVEL ' || TRIM(t.codtan)
-                        ) AS combustivel,
-                        TRIM(t.codlmc) AS codlmc,
-                        ROUND(COALESCE(t.capacidade, 0)::numeric, 3) AS capacidade_litros,
-                        ROUND(COALESCE(t.qtdeat, 0)::numeric, 3) AS saldo_atual_litros,
-                        ROUND(COALESCE(t.qtdean, 0)::numeric, 3) AS qtdean,
-                        ROUND(COALESCE(t.iniciodia, 0)::numeric, 3) AS iniciodia,
-                        ROUND(COALESCE(t.tan_vl_quantidade_fim, 0)::numeric, 3) AS tan_vl_quantidade_fim,
-                        ROUND(COALESCE(t.volume, 0)::numeric, 3) AS volume
-                    FROM tanques t
-                    LEFT JOIN (
-                        SELECT DISTINCT ON (TRIM(codlmc)) TRIM(codlmc) AS codlmc, nompro
-                        FROM produtos
-                        WHERE codlmc IS NOT NULL AND TRIM(codlmc) != ''
-                        ORDER BY TRIM(codlmc), codpro
-                    ) p ON p.codlmc = TRIM(t.codlmc)
-                    ORDER BY t.codtan;
-                """)
-                linhas_tanques = cur.fetchall()
+            # 2. Dados Cadastrais dos Tanques
+            tanques_readings = self.erp_adapter.get_tank_inventory()
+            linhas_tanques = []
+            for t in tanques_readings:
+                linhas_tanques.append({
+                    "codtan": t.identificador_tanque,
+                    "combustivel": t.combustivel or f"COMBUSTÍVEL {t.identificador_tanque}",
+                    "codlmc": t.codigo_lmc or "",
+                    "capacidade_litros": float(t.capacidade_nominal_litros),
+                    "saldo_atual_litros": float(t.volume_atual_litros),
+                    "qtdean": float(t.saldo_inicial_litros),
+                    "iniciodia": float(t.saldo_inicial_litros),
+                    "tan_vl_quantidade_fim": float(t.saldo_final_litros),
+                    "volume": float(t.volume_atual_litros),
+                    "bicos_vinculados": list(t.bicos_conectados),
+                })
 
-                # 3. Mapeamento de Bicos por Tanque
-                cur.execute("""
-                    SELECT 
-                        TRIM(b.codbom) AS codbom,
-                        TRIM(b.codtan) AS codtan,
-                        TRIM(b.codpro) AS codpro
-                    FROM bombas b
-                    WHERE b.codtan IS NOT NULL
-                    ORDER BY b.codbom ASC;
-                """)
-                linhas_bombas = cur.fetchall()
-                bicos_por_tanque: Dict[str, List[str]] = {}
-                for rb in linhas_bombas:
-                    c_tan = rb['codtan']
-                    if c_tan:
-                        bicos_por_tanque.setdefault(c_tan, []).append(rb['codbom'])
+            # 3. Vendas do Dia e Mapeamento de Bicos
+            disp_dia = self.erp_adapter.get_pump_dispenses(start_date=data_alvo, end_date=data_alvo, limit=5000)
+            vendas_por_tanque: Dict[str, dict] = {}
+            bicos_por_tanque: Dict[str, List[str]] = {}
 
-                # 4. Vendas do Dia por Tanque (abastecimentos Companytec)
-                cur.execute("""
-                    SELECT 
-                        COALESCE(TRIM(a.tanque), TRIM(b.codtan)) AS codtan,
-                        COUNT(*)::int AS total_abastecimentos,
-                        ROUND(COALESCE(SUM(a.litros), 0)::numeric, 3) AS total_litros,
-                        ROUND(COALESCE(SUM(a.total), 0)::numeric, 2) AS total_reais
-                    FROM abastecimentos a
-                    LEFT JOIN bombas b ON b.codbom = a.bomba
-                    WHERE a.data = %s AND a.abt_bl_venda_cancelada IS NOT TRUE
-                    GROUP BY COALESCE(TRIM(a.tanque), TRIM(b.codtan));
-                """, (data_alvo,))
-                vendas_abastecimentos = {r['codtan']: r for r in cur.fetchall() if r['codtan']}
+            for d in disp_dia:
+                c_tan = d.identificador_tanque
+                if not c_tan:
+                    continue
+                v_entry = vendas_por_tanque.setdefault(c_tan, {
+                    "total_litros": 0.0,
+                    "total_reais": 0.0,
+                    "total_abastecimentos": 0,
+                })
+                vol = d.volume_automacao_litros
+                if vol <= 0.0 and d.encerrante_final_litros > d.encerrante_inicial_litros:
+                    vol = max(0.0, d.encerrante_final_litros - d.encerrante_inicial_litros - d.volume_aferido_litros)
+                v_entry["total_litros"] += vol
+                v_entry["total_reais"] += (d.total_faturado_reais or d.total_automacao_reais or 0.0)
+                v_entry["total_abastecimentos"] += (d.qtd_abastecimentos or 1)
 
-                # 5. Vendas por Encerrantes do Dia (fechabomba)
-                cur.execute("""
-                    SELECT 
-                        TRIM(fb.codtan) AS codtan,
-                        COUNT(*)::int AS bicos_fechados,
-                        ROUND(COALESCE(SUM(fb.qtdeaf), SUM(GREATEST(fb.enclts - fb.encltsa, 0)), 0)::numeric, 3) AS litros_encerrantes
-                    FROM fechabomba fb
-                    WHERE fb.dtmov = %s
-                    GROUP BY TRIM(fb.codtan);
-                """, (data_alvo,))
-                vendas_encerrantes = {r['codtan']: r for r in cur.fetchall() if r['codtan']}
+                if d.identificador_bico and d.identificador_bico not in bicos_por_tanque.setdefault(c_tan, []):
+                    bicos_por_tanque[c_tan].append(d.identificador_bico)
 
             # Helper para buscar parâmetros customizados com correspondência flexível
             def _obter_custom(mapa: Optional[Dict[str, float]], cod_t: str, nome_c: str) -> Optional[float]:
@@ -4238,18 +4162,10 @@ class PostoTools:
                         continue
 
                 # Vendas do dia (V)
-                v_abast = vendas_abastecimentos.get(cod_tan)
-                v_enc = vendas_encerrantes.get(cod_tan)
-
-                vendas_l = 0.0
-                total_reais = 0.0
-                qtd_abast = 0
-                if v_abast:
-                    vendas_l = float(v_abast['total_litros'] or 0.0)
-                    total_reais = float(v_abast['total_reais'] or 0.0)
-                    qtd_abast = int(v_abast['total_abastecimentos'] or 0)
-                elif v_enc:
-                    vendas_l = float(v_enc['litros_encerrantes'] or 0.0)
+                v_dados = vendas_por_tanque.get(cod_tan)
+                vendas_l = float(v_dados["total_litros"]) if v_dados else 0.0
+                total_reais = float(v_dados["total_reais"]) if v_dados else 0.0
+                qtd_abast = int(v_dados["total_abastecimentos"]) if v_dados else 0
 
                 # Recebimentos / Descargas (R)
                 rec_custom = _obter_custom(recebimentos_custom, cod_tan, nome_comb)
@@ -4295,7 +4211,7 @@ class PostoTools:
                     tolerancia_pct=0.6,
                 )
 
-                bicos = sorted(bicos_por_tanque.get(cod_tan, []))
+                bicos = sorted(set(t.get("bicos_vinculados", []) + bicos_por_tanque.get(cod_tan, [])))
 
                 item_tanque = {
                     "tanque": cod_tan,
@@ -4547,12 +4463,6 @@ class PostoTools:
                 "status": "indisponivel",
                 "motivo": f"Falha na geração do LMC Oficial da ANP no ERP: {e}",
             }
-        finally:
-            if conn and not conn.closed:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
 
     @staticmethod
     def calcular_metricas_associacao(
