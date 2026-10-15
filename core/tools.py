@@ -97,7 +97,7 @@ from core.adapters.erp.mock_adapter import MockERPAdapter
 from core.adapters.erp.postgres_local_adapter import PostgresLocalERPAdapter
 from core.domain.sales import UniversalSaleReceipt, UniversalSaleItem
 from core.domain.cashier import UniversalCashierShift
-from core.domain.pumps import UniversalDispenserLog
+from core.domain.pumps import UniversalDispenserLog, UniversalPump
 from core.domain.tanks import UniversalTankReading
 
 def get_erp_connection(timeout: Optional[int] = None):
