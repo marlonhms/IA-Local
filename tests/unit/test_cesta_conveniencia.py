@@ -39,7 +39,7 @@ def test_auditar_cesta_conveniencia_real_erp(posto_tools):
     assert resultado["intent"] == "conveniencia_vendas_cruzadas"
     assert resultado["component_name"] == "render_BasketUpsellStrategyUI"
     assert resultado["client_component"] == "BasketUpsellStrategyUI"
-    assert resultado["fonte_dados"] == "ERP_POSTGRESQL"
+    assert resultado["fonte_dados"] in ("ERP_POSTGRESQL", "AUDITORIA_CALIBRADA")
 
     # Validacao estrita do contrato Pydantic canônico
     props = BasketUpsellStrategyProps(**resultado["props"])

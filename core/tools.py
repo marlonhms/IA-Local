@@ -1425,6 +1425,7 @@ class PostoTools:
                 )
                 return {
                     "status": "sem_movimento",
+                    "intent": "investigar_causa_raiz",
                     "mensagem": res_conciliacao.get("mensagem") or "Sem movimentacao para auditar.",
                     "report": laudo_vazio.model_dump(),
                     "contrato": laudo_vazio.model_dump(),
@@ -2040,6 +2041,7 @@ class PostoTools:
             )
             return {
                 "status": "error",
+                "intent": "investigar_causa_raiz",
                 "motivo": f"Falha na investigacao forense de causa-raiz: {e}",
                 "report": err_report.model_dump(),
                 "contrato": err_report.model_dump(),
@@ -4775,23 +4777,35 @@ class PostoTools:
             dt_ini_norm = self.normalizar_data(data_inicio) if data_inicio else None
             dt_fim_norm = self.normalizar_data(data_fim) if data_fim else None
 
-            try:
-                # Valida conexao (respeita mock em testes) e consulta via Adaptador AUPS
-                conn_test = get_erp_connection(timeout=1)
-                if hasattr(conn_test, "close"):
-                    conn_test.close()
+            # Verifica conectividade se o adaptador for o driver Postgres local padrao
+            db_online = True
+            is_mock_injected = not isinstance(self.erp_adapter, PostgresLocalERPAdapter)
+            if not is_mock_injected:
+                try:
+                    conn_test = get_erp_connection(timeout=1)
+                    if hasattr(conn_test, "close"):
+                        conn_test.close()
+                except Exception:
+                    db_online = False
 
+            try:
                 vendas = self.erp_adapter.get_recent_sales(
                     start_date=dt_ini_norm,
                     end_date=dt_fim_norm,
                     limit=1000,
                 )
-                from_db = bool(getattr(self.erp_adapter, "is_connected", False))
+                from_db = bool(getattr(self.erp_adapter, "is_connected", False)) and db_online
             except Exception:
                 from_db = False
                 vendas = []
 
-            if not from_db:
+            # O fallback estatico calibrado de 1250 transacoes so e ativado quando:
+            # 1. Nao ha conexao com o banco (ou em teste com banco offline)
+            # 2. Nao foi injetado um adaptador mock explicito com vendas de teste
+            # 3. Nao foi informado um periodo especifico de datas (evitando sobrepor filtros de periodo sem vendas)
+            usar_fallback_calibrado = (not from_db and not is_mock_injected and not dt_ini_norm and not dt_fim_norm)
+
+            if usar_fallback_calibrado:
                 fallback_top_combos_raw = [
                     {
                         "produto_origem": {"codpro": "00002", "nompro": "Gasolina Aditivada", "preco": 7.29},
@@ -4840,18 +4854,27 @@ class PostoTools:
                         c for c in fallback_top_combos_raw
                         if fp_clean in c["produto_origem"]["nompro"].lower() or fp_clean in c["produto_recomendado"]["nompro"].lower()
                     ]
+                # Filtra estritamente por min_lift no fallback
+                todas_regras = [
+                    c for c in fallback_top_combos_raw
+                    if float(c["metricas"]["lift"]) >= min_lift
+                ]
                 total_transacoes = 1250
                 total_multiplas = 812
                 pct_multiplas = 64.96
                 todos_skus = {"00001", "00002", "00010", "00011", "00020", "00021", "00030", "00031", "00040", "00041"}
                 ticket_medio_geral = 18.50
-                todas_regras = fallback_top_combos_raw
                 top_combos = todas_regras[:limit]
                 for idx, combo in enumerate(top_combos, start=1):
                     combo["ranking"] = idx
                 count_forte_sinergia = sum(1 for r in todas_regras if r["metricas"]["lift"] >= 2.0)
                 maior_lift = max((r["metricas"]["lift"] for r in todas_regras), default=0.0)
-                diagnostico = f"Excelente potencial de cross-selling: {count_forte_sinergia} combo(s) identificados com Lift >= 2.0 (forte afinidade de consumo). Maior Lift apurado: {maior_lift:.2f}x."
+                if count_forte_sinergia > 0:
+                    diagnostico = f"Excelente potencial de cross-selling: {count_forte_sinergia} combo(s) identificados com Lift >= 2.0 (forte afinidade de consumo). Maior Lift apurado: {maior_lift:.2f}x."
+                elif len(todas_regras) > 0:
+                    diagnostico = f"Identificadas {len(todas_regras)} associacoes com correlacao positiva (Lift entre {min_lift} e 2.0)."
+                else:
+                    diagnostico = f"Nenhuma regra atendeu ao criterio minimo de Lift >= {min_lift} para o filtro solicitado."
                 recomendacoes = [
                     "Estimular ativamente combos de maior Lift no PDV e balcao.",
                     "Posicionar produtos complementares estrategicamente na loja de conveniencia.",
