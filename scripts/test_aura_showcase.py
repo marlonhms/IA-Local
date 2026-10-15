@@ -149,24 +149,21 @@ def run_showcase_tests():
     print("   [OK] Termos generalizados (CNPJ, CPF, Identificador Fiscal de Transação, Credenciais) e segmentos validados.")
 
     # =========================================================================
-    # 2C. CONFORMIDADE EXPLÍCITA COM A LGPD (LEI 13.709/2018) & BLINDAGEM JURÍDICA
+    # 2C. CONFORMIDADE EXPLÍCITA COM A LGPD (LEI 13.709/2018) & GOVERNANÇA ENTERPRISE
     # =========================================================================
-    print("\n2C. Testando Destaque e Citações Explícitas à LGPD (Lei 13.709/2018) & Blindagem Jurídica...")
+    print("\n2C. Testando Destaque e Citações Explícitas à LGPD (Lei 13.709/2018) & Governança Enterprise...")
     assert "lgpd" in content_lower, "Menção à LGPD ausente"
     assert "13.709" in content_lower, "Citação à Lei 13.709 ausente"
     assert "privacy by design" in content_lower, "Princípio 'Privacy by Design' ausente"
     
-    # Validação do Bloco de Blindagem Jurídica & Driver Shield v1.1
-    assert "Termo de Interoperabilidade v1.1" in html_content, "Termo de Interoperabilidade v1.1 ausente"
-    assert "Blindagem Jurídica & Proteção Técnica em Nível de Driver" in html_content, "Título do bloco de blindagem ausente"
-    assert "default_transaction_read_only = on" in html_content, "Parâmetro read-only do driver ausente"
-    assert "statement_timeout = 4.000ms" in html_content, "Parâmetro statement_timeout ausente"
-    assert "lock_timeout = 1.000ms" in html_content, "Parâmetro lock_timeout ausente"
-    assert "aura_service_ro" in html_content, "Role segura aura_service_ro ausente"
-    assert "Lei de Software" in html_content and "9.609" in html_content, "Citação à Lei 9.609 ausente"
-    assert "Marco Civil da Internet" in html_content and "12.965" in html_content, "Citação à Lei 12.965 ausente"
-    assert "c09e64e2bf60767cbe89637f25b8a226c2e4eb0b4b625977fd3fe2d34dd16e4f" in html_content, "Hash SHA-256 oficial do termo ausente"
-    print("   [OK] Conformidade com a LGPD (Lei 13.709/2018), Driver Shield v1.1 e 4 Pilares Legais validados.")
+    # Validação do Bloco de Governança Enterprise & Arquitetura Não-Invasiva
+    assert "Governança Enterprise" in html_content, "Governança Enterprise ausente"
+    assert "Arquitetura Não-Invasiva & Soberania dos Dados" in html_content, "Título do bloco de governança ausente"
+    assert "Acesso Estritamente Somente-Leitura" in html_content, "Pilar somente-leitura ausente"
+    assert "Zero Concorrência com os Caixas" in html_content, "Pilar de performance e concorrência ausente"
+    assert "Soberania dos Dados & LGPD" in html_content, "Pilar de soberania de dados ausente"
+    assert "Padrão de Governança AURA" in html_content, "Chancela de governança ausente"
+    print("   [OK] Conformidade com a LGPD (Lei 13.709/2018) e Governança Enterprise Não-Invasiva validadas.")
 
     # =========================================================================
     # 2D. MINI JANELA DE CHAT DA AURA + FLUXOGRAMA / GRAFO MODERNO LADO A LADO

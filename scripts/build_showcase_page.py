@@ -1391,198 +1391,126 @@ def generate_showcase_html():
       </div>
 
       <!-- =====================================================================
-           BLOCO EXECUTIVO: BLINDAGEM JURÍDICA & DRIVER SHIELD v1.1
+           BLOCO EXECUTIVO: GOVERNANÇA ENTERPRISE & CONECTIVIDADE SEGURA
            ===================================================================== -->
       <div class="obsidian-card p-6 sm:p-8 rounded-3xl space-y-6 border border-white/[0.08]">
         
-        <!-- Cabeçalho do Bloco de Blindagem Jurídica -->
+        <!-- Cabeçalho do Bloco de Governança Enterprise -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.08] pb-5">
           <div>
             <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[10px] font-mono uppercase tracking-wider mb-2">
-              <i data-lucide="scale" class="w-3.5 h-3.5"></i>
-              <span>Termo de Interoperabilidade v1.1 • Marco Legal & Driver Shield</span>
+              <i data-lucide="shield" class="w-3.5 h-3.5"></i>
+              <span>Governança Enterprise • Conectividade Segura</span>
             </div>
-            <h3 class="card-title-serif heading-small text-xl sm:text-2xl font-serif font-normal text-white">
-              Blindagem Jurídica & Proteção Técnica em Nível de Driver
+            <h3 class="text-xl sm:text-2xl font-sans font-semibold text-white tracking-tight">
+              Arquitetura Não-Invasiva & Soberania dos Dados
             </h3>
-            <p class="card-desc-geist body-small text-slate-300/90 text-sm max-w-3xl leading-relaxed mt-1">
-              Arquitetura auditável e à prova de perícia técnica: isolamento Clean Room, leitura estrita sem comandos de alteração, limites físicos de execução no banco local e pleno respaldo na legislação brasileira.
+            <p class="body-regular text-slate-300 text-sm max-w-3xl leading-relaxed mt-1">
+              Engenharia de precisão desenhada para operar com impacto zero: acesso estritamente somente-leitura, estabilidade operacional garantida e pleno respeito à privacidade da sua empresa.
             </p>
           </div>
           <div class="flex-shrink-0">
             <span class="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1.5 font-mono">
               <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
-              <span>100% Read-Only Shield</span>
+              <span>Zero Impacto Operacional</span>
             </span>
           </div>
         </div>
 
-        <!-- Grid de 2 Colunas: Driver Shield Físico (Esquerda) vs Marco Legal Brasileiro (Direita) -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        <!-- Grid de 3 Pilares Nítidos e Transparentes (Sem caixas aninhadas embaçadas) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
           
-          <!-- Coluna Esquerda: Driver Shield Físico -->
-          <div class="lg:col-span-6 p-5 rounded-2xl bg-slate-950/70 border border-white/[0.08] space-y-4">
-            <div class="flex items-center justify-between border-b border-white/[0.06] pb-3">
-              <div class="flex items-center gap-2">
-                <i data-lucide="shield" class="w-4 h-4 text-cyan-400"></i>
-                <h4 class="card-title-serif font-serif text-base sm:text-[17px] font-normal text-white">
-                  Driver Shield: Proteção Física na Conexão
+          <!-- Pilar 1: Read-Only por Design -->
+          <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.08] space-y-3 flex flex-col justify-between">
+            <div class="space-y-3">
+              <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 flex items-center justify-center">
+                <i data-lucide="lock" class="w-5 h-5"></i>
+              </div>
+              <div class="space-y-1">
+                <h4 class="font-sans font-semibold text-white text-base tracking-tight">
+                  Acesso Estritamente Somente-Leitura
                 </h4>
+                <p class="text-slate-300 text-xs leading-relaxed">
+                  A AURA opera exclusivamente em modo de consulta com credenciais de auditoria independentes. Impossibilidade física de qualquer gravação, alteração de dados ou risco à sua base.
+                </p>
               </div>
-              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                Driver Level Options
-              </span>
             </div>
-
-            <div class="space-y-3 text-xs">
-              <!-- Item 1: Read-Only Transacional -->
-              <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-start gap-3">
-                <div class="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <i data-lucide="lock" class="w-3.5 h-3.5"></i>
-                </div>
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center justify-between">
-                    <span class="text-white font-medium">default_transaction_read_only = on</span>
-                    <span class="text-[10px] font-mono text-emerald-400">Ativo</span>
-                  </div>
-                  <p class="text-slate-300/80 text-[11px] leading-relaxed mt-0.5">
-                    Bloqueio físico e irrevogável no driver de rede. Impossibilidade técnica de comandos INSERT, UPDATE, DELETE ou DROP na base da revenda.
-                  </p>
-                </div>
-              </div>
-
-              <!-- Item 2: Statement Timeout -->
-              <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-start gap-3">
-                <div class="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <i data-lucide="clock" class="w-3.5 h-3.5"></i>
-                </div>
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center justify-between">
-                    <span class="text-white font-medium">statement_timeout = 4.000ms</span>
-                    <span class="text-[10px] font-mono text-cyan-300">4 Segundos</span>
-                  </div>
-                  <p class="text-slate-300/80 text-[11px] leading-relaxed mt-0.5">
-                    Interrupção preventiva automática no banco caso qualquer consulta analítica exceda 4s, eliminando qualquer risco de sobrecarga no sistema de gestão.
-                  </p>
-                </div>
-              </div>
-
-              <!-- Item 3: Lock Timeout -->
-              <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-start gap-3">
-                <div class="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <i data-lucide="zap" class="w-3.5 h-3.5"></i>
-                </div>
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center justify-between">
-                    <span class="text-white font-medium">lock_timeout = 1.000ms</span>
-                    <span class="text-[10px] font-mono text-purple-300">1 Segundo</span>
-                  </div>
-                  <p class="text-slate-300/80 text-[11px] leading-relaxed mt-0.5">
-                    Aborta instantaneamente em 1 segundo caso haja qualquer disputa de concorrência com faturamento, emissão fiscal ou fechamento de caixa do PDV.
-                  </p>
-                </div>
-              </div>
-
-              <!-- Item 4: Clean Room & Role Isolada -->
-              <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-start gap-3">
-                <div class="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <i data-lucide="cpu" class="w-3.5 h-3.5"></i>
-                </div>
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center justify-between">
-                    <span class="text-white font-medium">Credencial Segura: aura_service_ro</span>
-                    <span class="text-[10px] font-mono text-amber-300">Clean Room</span>
-                  </div>
-                  <p class="text-slate-300/80 text-[11px] leading-relaxed mt-0.5">
-                    Isolamento completo via adaptador abstrato e modelo neutro AUPS. Zero injeção de DLLs, gatilhos, procedures ou tabelas adicionais no banco legado.
-                  </p>
-                </div>
-              </div>
+            <div class="pt-2 border-t border-white/[0.05]">
+              <span class="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400">
+                <i data-lucide="check" class="w-3 h-3"></i>
+                <span>Read-Only Nativo</span>
+              </span>
             </div>
           </div>
 
-          <!-- Coluna Direita: Marco Legal Brasileiro (4 Pilares) -->
-          <div class="lg:col-span-6 p-5 rounded-2xl bg-slate-950/70 border border-white/[0.08] space-y-4">
-            <div class="flex items-center justify-between border-b border-white/[0.06] pb-3">
-              <div class="flex items-center gap-2">
-                <i data-lucide="scale" class="w-4 h-4 text-emerald-400"></i>
-                <h4 class="card-title-serif font-serif text-base sm:text-[17px] font-normal text-white">
-                  Marco Legal: 4 Pilares da Legislação
-                </h4>
+          <!-- Pilar 2: Performance Garantida -->
+          <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.08] space-y-3 flex flex-col justify-between">
+            <div class="space-y-3">
+              <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 flex items-center justify-center">
+                <i data-lucide="zap" class="w-5 h-5"></i>
               </div>
-              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                Direito do Lojista
+              <div class="space-y-1">
+                <h4 class="font-sans font-semibold text-white text-base tracking-tight">
+                  Zero Concorrência com os Caixas
+                </h4>
+                <p class="text-slate-300 text-xs leading-relaxed">
+                  Controle ativo de tempo e limites estritos de processamento para que as análises de inteligência nunca disputem recursos ou causem lentidão no PDV e na pista.
+                </p>
+              </div>
+            </div>
+            <div class="pt-2 border-t border-white/[0.05]">
+              <span class="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-300">
+                <i data-lucide="check" class="w-3 h-3"></i>
+                <span>Prioridade Operacional Total</span>
               </span>
             </div>
+          </div>
 
-            <div class="space-y-3 text-xs">
-              <!-- Pilar 1: Lei do Software -->
-              <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-1">
-                <div class="flex items-center gap-2 text-white font-medium">
-                  <span class="text-cyan-400 font-mono text-[11px]">01</span>
-                  <span>Lei de Software (Lei 9.609/1998, Art. 6, I e II)</span>
-                </div>
-                <p class="text-slate-300/80 text-[11px] leading-relaxed pl-5">
-                  Garante expressamente a interoperabilidade de sistemas e a cópia de salvaguarda como direitos inalienáveis, sem constituir infração a direitos autorais.
-                </p>
+          <!-- Pilar 3: Soberania & LGPD -->
+          <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.08] space-y-3 flex flex-col justify-between">
+            <div class="space-y-3">
+              <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/25 text-purple-400 flex items-center justify-center">
+                <i data-lucide="shield" class="w-5 h-5"></i>
               </div>
-
-              <!-- Pilar 2: LGPD -->
-              <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-1">
-                <div class="flex items-center gap-2 text-white font-medium">
-                  <span class="text-emerald-400 font-mono text-[11px]">02</span>
-                  <span>LGPD (Lei 13.709/2018, Art. 7, IX e Art. 18)</span>
-                </div>
-                <p class="text-slate-300/80 text-[11px] leading-relaxed pl-5">
-                  Estabelece que a titularidade de todos os dados fiscais e gerenciais pertence à empresa lojista, assegurando livre acesso, consulta e portabilidade.
-                </p>
-              </div>
-
-              <!-- Pilar 3: Marco Civil da Internet -->
-              <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-1">
-                <div class="flex items-center gap-2 text-white font-medium">
-                  <span class="text-purple-400 font-mono text-[11px]">03</span>
-                  <span>Marco Civil da Internet (Lei 12.965/2014, Art. 3 e 4)</span>
-                </div>
-                <p class="text-slate-300/80 text-[11px] leading-relaxed pl-5">
-                  Impõe a livre concorrência, a interoperabilidade tecnológica e a promoção de padrões abertos, proibindo barreiras artificiais de integração.
-                </p>
-              </div>
-
-              <!-- Pilar 4: Código de Defesa do Consumidor e Código Civil -->
-              <div class="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-1">
-                <div class="flex items-center gap-2 text-white font-medium">
-                  <span class="text-amber-400 font-mono text-[11px]">04</span>
-                  <span>Código de Defesa do Consumidor & Código Civil</span>
-                </div>
-                <p class="text-slate-300/80 text-[11px] leading-relaxed pl-5">
-                  Veda categoricamente o aprisionamento tecnológico abusivo (vendor lock-in) e a imposição de dificuldades para consulta ao histórico da revenda.
+              <div class="space-y-1">
+                <h4 class="font-sans font-semibold text-white text-base tracking-tight">
+                  Soberania dos Dados & LGPD
+                </h4>
+                <p class="text-slate-300 text-xs leading-relaxed">
+                  Privacidade por design conforme a Lei 13.709/2018. Todos os dados estratégicos e fiscais pertencem exclusivamente à sua empresa, com livre acesso e portabilidade garantidos.
                 </p>
               </div>
             </div>
+            <div class="pt-2 border-t border-white/[0.05]">
+              <span class="inline-flex items-center gap-1 text-[11px] font-mono text-purple-300">
+                <i data-lucide="check" class="w-3 h-3"></i>
+                <span>Privacy by Design</span>
+              </span>
+            </div>
           </div>
+
         </div>
 
-        <!-- Rodapé do Bloco: Hash SHA-256 e Ação de Verificação -->
+        <!-- Rodapé do Bloco: Chancela de Governança e Link Discreto -->
         <div class="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div class="flex items-center gap-2.5 min-w-0">
             <span class="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 flex items-center justify-center flex-shrink-0">
               <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
             </span>
             <div class="min-w-0">
-              <div class="text-[10px] text-slate-400 font-mono flex items-center gap-2">
-                <span>HASH DE INTEGRIDADE OFICIAL v1.1:</span>
-                <span class="text-emerald-400 font-bold">VERIFICADO</span>
+              <div class="text-[11px] text-white font-medium flex items-center gap-2">
+                <span>Padrão de Governança AURA</span>
+                <span class="text-emerald-400 font-mono text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/25">Homologado</span>
               </div>
-              <div class="font-mono text-cyan-300 text-[11px] truncate" title="c09e64e2bf60767cbe89637f25b8a226c2e4eb0b4b625977fd3fe2d34dd16e4f">
-                SHA-256: c09e64e2bf60767cbe89637f25b8a226c2e4eb0b4b625977fd3fe2d34dd16e4f
+              <div class="text-slate-400 text-[11px]">
+                Diretrizes de interoperabilidade técnica e proteção da titularidade de dados disponíveis no console.
               </div>
             </div>
           </div>
           <div class="flex items-center gap-2 flex-shrink-0">
             <a href="/" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-semibold transition-colors">
               <i data-lucide="scale" class="w-3.5 h-3.5"></i>
-              <span>Ver Termo no Painel AURA</span>
+              <span>Consultar Diretrizes de Governança</span>
               <i data-lucide="arrow-right" class="w-3 h-3"></i>
             </a>
           </div>
