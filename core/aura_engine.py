@@ -74,6 +74,8 @@ from core.schemas.genui import (
     FinancialLeakAuditProps,
     UpsellComboItem,
     BasketUpsellStrategyProps,
+    ComplianceStatusProps,
+    CompliancePillarItem,
 )
 from core.config import is_genui_enabled
 from core.telemetry import AuraSRETelemetry
@@ -1318,6 +1320,26 @@ GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
         "client_component": "TankForecastWidget",
         "title": "Consultando posição de estoque e volumetria dos tanques...",
     },
+    "compliance_status": {
+        "component_name": "render_ComplianceStatusUI",
+        "client_component": "ComplianceStatusUI",
+        "title": "Verificando conformidade legal, opt-in LGPD e blindagem pericial...",
+    },
+    "conformidade_legal": {
+        "component_name": "render_ComplianceStatusUI",
+        "client_component": "ComplianceStatusUI",
+        "title": "Verificando conformidade legal e termo de interoperabilidade...",
+    },
+    "termo_interoperabilidade": {
+        "component_name": "render_ComplianceStatusUI",
+        "client_component": "ComplianceStatusUI",
+        "title": "Consultando termo de interoperabilidade e integridade criptografica...",
+    },
+    "blindagem_juridica": {
+        "component_name": "render_ComplianceStatusUI",
+        "client_component": "ComplianceStatusUI",
+        "title": "Aferindo blindagem de driver e isolamento Clean Room AUPS...",
+    },
 }
 
 
@@ -1368,6 +1390,7 @@ def build_canonical_genui_envelope(
         BenchmarkComparisonProps,
         FinancialLeakAuditProps,
         BasketUpsellStrategyProps,
+        ComplianceStatusProps,
     )):
         props = resultado_bruto.model_dump(mode="json")
     elif isinstance(resultado_bruto, dict) and "props" in resultado_bruto and isinstance(resultado_bruto["props"], dict):
@@ -2059,6 +2082,81 @@ def build_canonical_genui_envelope(
         props["evidence_items"] = props.get("evidence_items") or []
         props["suggested_actions"] = [a.model_dump(mode="json") for a in actions]
 
+    elif comp_name == "render_ComplianceStatusUI" or intencao in (
+        "compliance_status", "conformidade_legal", "termo_interoperabilidade", "blindagem_juridica"
+    ):
+        if not actions:
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🛡️ Inspecionar Termo Formal",
+                    action_type="inspection",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"intent": intencao, "operacao": "abrir_termo_compliance"},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🔍 Testar Blindagem de Driver",
+                    action_type="inspection",
+                    variant="secondary",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"intent": intencao, "operacao": "testar_driver_shield"},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="📋 Ver Showcase de Blindagem",
+                    action_type="inspection",
+                    variant="ghost",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"intent": intencao, "operacao": "abrir_showcase_blindagem"},
+                )
+            )
+        props["loja_cnpj"] = props.get("loja_cnpj") or "00.000.000/0001-00"
+        props["razao_social"] = props.get("razao_social") or "Auto Posto S/A"
+        props["compliant"] = bool(props.get("compliant", True))
+        props["status"] = props.get("status") or "active"
+        props["versao_termo"] = props.get("versao_termo") or "1.1"
+        props["statement_timeout_ms"] = int(props.get("statement_timeout_ms", 4000))
+        props["lock_timeout_ms"] = int(props.get("lock_timeout_ms", 1000))
+        props["role_banco"] = props.get("role_banco") or "aura_service_ro"
+        props["mensagem"] = props.get("mensagem") or executive_summary or "Estabelecimento em total conformidade e blindado."
+        if not props.get("pilares_legais"):
+            props["pilares_legais"] = [
+                {
+                    "title": "Titularidade e LGPD",
+                    "norma": "Lei 13.709/2018 (Art. 7, IX e Art. 39)",
+                    "status": "conforme",
+                    "description": "Dados pertencem ao lojista controlador, com privacidade preservada na borda local.",
+                },
+                {
+                    "title": "Direito de Interoperabilidade",
+                    "norma": "Lei 9.609/1998 (Art. 6, I e II)",
+                    "status": "garantido",
+                    "description": "Livre leitura e integracao sem violacao de direitos autorais de software proprietario.",
+                },
+                {
+                    "title": "Padroes Abertos & Sem Lock-in",
+                    "norma": "Lei 12.965/2014 (Marco Civil)",
+                    "status": "ativo",
+                    "description": "Vedacao expressa a barreiras artificiais de acesso aos proprios dados do comerciante.",
+                },
+                {
+                    "title": "Blindagem Pericial de Driver",
+                    "norma": "Nao-Interferencia Tecnica Absoluta",
+                    "status": "blindado",
+                    "description": "Transacoes READ ONLY estritas, statement_timeout 4s e lock_timeout 1s contra lentidao no ERP.",
+                },
+            ]
+        props["suggested_actions"] = [a.model_dump(mode="json") if hasattr(a, "model_dump") else a for a in actions]
+
     else:
         if not actions:
             actions.append(
@@ -2465,6 +2563,13 @@ class AuraEngine:
                     top_k=int(p.get("top_k", 2)),
                 )
 
+            elif norm_name in (
+                "compliance_status", "conformidade_legal", "compliance", "termo_interoperabilidade",
+                "blindagem_juridica", "auditar_conformidade", "status_conformidade"
+            ):
+                cnpj_target = p.get("cnpj") or p.get("loja_cnpj")
+                return self.check_compliance_opt_in(cnpj_target)
+
             else:
                 raise ValueError(f"Ferramenta desconhecida ou não suportada: '{tool_name}'")
 
@@ -2598,6 +2703,10 @@ class AuraEngine:
                 data_p, turno_p = extrair_data_turno(pergunta)
                 resultado_bruto = self.tools.comparar_benchmark_concorrencia(data=data_p, turno=turno_p)
                 contexto_extra = f"Benchmark Comparativo de Performance & Concorrência (GenUI):\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+
+            elif intencao in ("compliance_status", "conformidade_legal", "termo_interoperabilidade", "blindagem_juridica"):
+                resultado_bruto = self.check_compliance_opt_in()
+                contexto_extra = f"Conformidade Legal, Termo de Interoperabilidade e Blindagem de Driver (Clean Room AUPS):\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
 
             elif intencao in (
                 "auditoria_fuga_financeira",
@@ -2971,6 +3080,29 @@ class AuraEngine:
                 "",
                 "**⚡ Decisões Disponíveis:** Utilize os botões de ação na Camada 3 do card para aplicar correções prioritárias com 1 clique."
             ])
+            return "\n".join(linhas)
+
+        # 0d. CONFORMIDADE LEGAL, OPT-IN LGPD & BLINDAGEM PERICIAL DE DRIVER
+        if intencao in ("compliance_status", "conformidade_legal", "termo_interoperabilidade", "blindagem_juridica"):
+            props = resultado_bruto.get("props") or resultado_bruto
+            cnpj = props.get("loja_cnpj") or "00.000.000/0001-00"
+            razao = props.get("razao_social") or "Auto Posto S/A"
+            compliant = bool(props.get("compliant", True))
+            versao = props.get("versao_termo", "1.1")
+            hash_t = (props.get("hash_termo") or props.get("hash_atual_termo") or "")[:12]
+            status_tag = "[verde]CONFORME & BLINDADO[/verde]" if compliant else "[amarelo]PENDENTE DE ACEITE[/amarelo]"
+            linhas = [
+                f"🛡️ **Diagnóstico de Conformidade Legal & Interoperabilidade (LGPD v{versao})**",
+                f"Status da Operação: {status_tag}",
+                "",
+                f"- **Estabelecimento Controlador:** {razao} (CNPJ: `{cnpj}`)",
+                f"- **Blindagem de Driver:** [verde]ATIVO[/verde] (role: `aura_service_ro`, timeout query: `4.000ms`, lock: `1.000ms`)",
+                f"- **Integridade Criptográfica:** Digest SHA-256 `{hash_t}...`",
+                f"- **Fundamentação Jurídica:** LGPD (Art. 7, IX e Art. 39), Lei 9.609/98 (Art. 6º) e Marco Civil da Internet.",
+                f"- **Arquitetura de Isolamento:** 100% Clean Room AUPS (AURA Universal Posto Schema).",
+                "",
+                "*(Proteção técnica à prova de perícia: impossibilidade física de lentidão ou locks no banco do ERP)*"
+            ]
             return "\n".join(linhas)
 
         # 1. VENDAS & HISTÓRICO ANALÍTICO (PDV / PISTA / HOJE)

@@ -572,6 +572,56 @@ class AuraApiClient {
     }
     return await resp.json();
   }
+
+  /**
+   * Consulta o status de conformidade juridica e opt-in do lojista (LGPD & Clean Room).
+   * @param {string|null} cnpj
+   * @returns {Promise<Object>}
+   */
+  async getComplianceStatus(cnpj = null) {
+    const query = cnpj ? `?cnpj=${encodeURIComponent(cnpj)}` : '';
+    const resp = await fetch(`${this.baseUrl}/api/v1/aura/compliance/status${query}`);
+    if (!resp.ok) {
+      throw new Error(`Falha ao consultar status de conformidade: HTTP ${resp.status}`);
+    }
+    return await resp.json();
+  }
+
+  /**
+   * Obtem o conteudo integral do termo de interoperabilidade v1.1 e hash SHA-256.
+   * @returns {Promise<Object>}
+   */
+  async getComplianceTerm() {
+    const resp = await fetch(`${this.baseUrl}/api/v1/aura/compliance/term`);
+    if (!resp.ok) {
+      throw new Error(`Falha ao obter termo de conformidade: HTTP ${resp.status}`);
+    }
+    return await resp.json();
+  }
+
+  /**
+   * Registra duravelmente o opt-in de interoperabilidade do lojista.
+   * @param {Object} payload
+   * @returns {Promise<Object>}
+   */
+  async registerComplianceOptIn(payload) {
+    const headers = { 'Content-Type': 'application/json' };
+    const apiKey = (typeof window !== 'undefined' && (window.AURA_API_KEY || localStorage.getItem('aura_api_key'))) || '';
+    if (apiKey) {
+      headers['X-API-Key'] = apiKey;
+    }
+    const resp = await fetch(`${this.baseUrl}/api/v1/aura/compliance/opt-in`, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      let errDetail = {};
+      try { errDetail = await resp.json(); } catch (_) {}
+      throw new Error(errDetail.detail?.error || `Falha ao registrar opt-in: HTTP ${resp.status}`);
+    }
+    return await resp.json();
+  }
 }
 
 // 1. Exportação Global no Navegador (Window)

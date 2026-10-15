@@ -167,6 +167,17 @@ class AuraTriggersController {
         desc: 'Detecção determinística de quebras de gaveta, sangrias anômalas retidas no caixa e divergências de conciliação de cartões TEF.',
         defaultParams: { data: 'hoje', cash_tolerance_reais: 50.0 },
       },
+      {
+        id: 'compliance_status',
+        aliases: ['conformidade_legal', 'termo_interoperabilidade', 'blindagem_juridica', 'status_conformidade'],
+        name: 'Conformidade Legal & LGPD (Termo v1.1)',
+        category: 'gestao',
+        icon: 'shield-check',
+        color: 'emerald',
+        badge: 'Blindagem Jurídica',
+        desc: 'Verificação em tempo real do Opt-In formal, Termo de Interoperabilidade v1.1, driver shield e isolamento Clean Room AUPS.',
+        defaultParams: {},
+      },
     ];
   }
 
@@ -1350,6 +1361,122 @@ class AuraTriggersController {
               ${limitations.map(l => `<div>• ${this.escapeHtml(l)}</div>`).join('')}
             </div>
           ` : ''}
+        </div>
+      `;
+    }
+
+    // 16. Conformidade Legal & Interoperabilidade (Termo v1.1)
+    if (toolId === 'compliance_status' || toolId === 'conformidade_legal' || toolId === 'termo_interoperabilidade') {
+      const compliant = !!(data.compliant !== false && data.status !== 'pending' && data.status !== 'revoked' && data.status !== 'missing');
+      const statusBadge = compliant
+        ? '<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">100% CONFORME &amp; BLINDADO</span>'
+        : '<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">PENDENTE DE ACEITE</span>';
+
+      const cnpj = data.loja_cnpj || '00.000.000/0001-00';
+      const razao = data.razao_social || 'Auto Posto S/A';
+      const versao = data.versao_termo || '1.1';
+      const assinante = data.assinado_por || (compliant ? 'Representante Legal Homologado' : 'Aguardando Assinatura');
+      const hashTermo = (data.hash_termo || data.hash_atual_termo || '').substring(0, 16);
+      const dataAceite = data.aceite_interoperabilidade_em ? new Date(data.aceite_interoperabilidade_em).toLocaleString('pt-BR') : 'Pendente';
+
+      return `
+        <div class="space-y-4 font-sans text-xs">
+          <!-- Card de Status Principal -->
+          <div class="p-4 rounded-2xl bg-slate-900/80 border border-cyan-500/30 shadow-lg space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-3">
+              <div>
+                <div class="text-[10px] uppercase font-mono text-cyan-400 font-semibold tracking-wider">Governança &amp; Titularidade de Dados</div>
+                <h4 class="text-sm font-bold text-white">${this.escapeHtml(razao)}</h4>
+                <div class="text-[11px] text-slate-400">CNPJ: <span class="font-mono text-slate-200">${this.escapeHtml(cnpj)}</span> • Termo: <span class="text-cyan-300 font-semibold">v${this.escapeHtml(versao)}</span></div>
+              </div>
+              <div class="flex-shrink-0">
+                ${statusBadge}
+              </div>
+            </div>
+
+            <!-- Grade de Indicadores Técnicos de Driver Shield -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+              <div class="p-2.5 rounded-xl bg-slate-950/60 border border-white/5">
+                <div class="text-[10px] text-slate-400 font-mono">Modo de Acesso</div>
+                <div class="text-xs font-bold text-emerald-400 flex items-center gap-1.5 mt-0.5">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  READ-ONLY ATIVO
+                </div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-950/60 border border-white/5">
+                <div class="text-[10px] text-slate-400 font-mono">Query Timeout</div>
+                <div class="text-xs font-bold text-cyan-300 font-mono mt-0.5">4.000 ms</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-950/60 border border-white/5">
+                <div class="text-[10px] text-slate-400 font-mono">Lock Timeout</div>
+                <div class="text-xs font-bold text-cyan-300 font-mono mt-0.5">1.000 ms</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-950/60 border border-white/5">
+                <div class="text-[10px] text-slate-400 font-mono">Role PostgreSQL</div>
+                <div class="text-xs font-bold text-purple-300 font-mono mt-0.5">aura_service_ro</div>
+              </div>
+            </div>
+
+            <!-- Dados de Auditoria Criptográfica -->
+            <div class="p-3 rounded-xl bg-slate-950/40 border border-white/5 space-y-1.5 text-[11px]">
+              <div class="flex justify-between items-center text-slate-300">
+                <span>Formalizado por: <strong class="text-white">${this.escapeHtml(assinante)}</strong></span>
+                <span class="text-slate-400 font-mono text-[10px]">${this.escapeHtml(dataAceite)}</span>
+              </div>
+              <div class="flex justify-between items-center text-slate-400 font-mono text-[10px]">
+                <span>Hash SHA-256 do Termo:</span>
+                <span class="text-slate-300 bg-white/5 px-2 py-0.5 rounded border border-white/5">${hashTermo ? `${hashTermo}...` : 'Não calculado'}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pilares Legais Brasileiros -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-white/5 space-y-1">
+              <div class="flex items-center gap-1.5 text-cyan-300 font-semibold text-xs">
+                <span>⚖️ LGPD (Lei 13.709/18)</span>
+              </div>
+              <p class="text-slate-400 text-[11px] leading-relaxed">
+                Art. 7, IX e Art. 39. Titularidade exclusiva dos dados pela empresa controladora.
+              </p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-white/5 space-y-1">
+              <div class="flex items-center gap-1.5 text-emerald-300 font-semibold text-xs">
+                <span>📜 Lei de Software (9.609/98)</span>
+              </div>
+              <p class="text-slate-400 text-[11px] leading-relaxed">
+                Art. 6º, I e II. Garantia inalienável de interoperabilidade sem quebra de direitos autorais.
+              </p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-white/5 space-y-1">
+              <div class="flex items-center gap-1.5 text-purple-300 font-semibold text-xs">
+                <span>🌐 Marco Civil da Internet</span>
+              </div>
+              <p class="text-slate-400 text-[11px] leading-relaxed">
+                Lei 12.965/14. Padrões abertos e vedação absoluta a práticas de Vendor Lock-in abusivo.
+              </p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-white/5 space-y-1">
+              <div class="flex items-center gap-1.5 text-amber-300 font-semibold text-xs">
+                <span>🛡️ Proteção Pericial Técnica</span>
+              </div>
+              <p class="text-slate-400 text-[11px] leading-relaxed">
+                Driver shield com timeouts estritos. Zero impacto físico ou contenção no ERP local.
+              </p>
+            </div>
+          </div>
+
+          <!-- Botões de Ação HITL -->
+          <div class="flex flex-wrap items-center gap-2 pt-2">
+            <button type="button" onclick="if (window.auraCompliance) window.auraCompliance.openModal();" class="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-sans font-bold text-xs transition-colors flex items-center gap-2 cursor-pointer shadow-lg shadow-cyan-500/20">
+              <span>Abrir Central de Conformidade Legal</span>
+              <span>↗</span>
+            </button>
+            <a href="/showcase#sec-blindagem" target="_blank" rel="noopener noreferrer" class="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 font-sans font-medium text-xs transition-colors inline-flex items-center gap-1.5">
+              <span>Ver Vitrine no Showcase</span>
+              <span>↗</span>
+            </a>
+          </div>
         </div>
       `;
     }

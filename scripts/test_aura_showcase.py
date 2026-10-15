@@ -149,13 +149,24 @@ def run_showcase_tests():
     print("   [OK] Termos generalizados (CNPJ, CPF, Identificador Fiscal de Transação, Credenciais) e segmentos validados.")
 
     # =========================================================================
-    # 2C. CONFORMIDADE EXPLÍCITA COM A LGPD (LEI 13.709/2018)
+    # 2C. CONFORMIDADE EXPLÍCITA COM A LGPD (LEI 13.709/2018) & BLINDAGEM JURÍDICA
     # =========================================================================
-    print("\n2C. Testando Destaque e Citações Explícitas à LGPD (Lei 13.709/2018)...")
+    print("\n2C. Testando Destaque e Citações Explícitas à LGPD (Lei 13.709/2018) & Blindagem Jurídica...")
     assert "lgpd" in content_lower, "Menção à LGPD ausente"
     assert "13.709" in content_lower, "Citação à Lei 13.709 ausente"
     assert "privacy by design" in content_lower, "Princípio 'Privacy by Design' ausente"
-    print("   [OK] Conformidade com a LGPD (Lei 13.709/2018 e Privacy by Design) validada.")
+    
+    # Validação do Bloco de Blindagem Jurídica & Driver Shield v1.1
+    assert "Termo de Interoperabilidade v1.1" in html_content, "Termo de Interoperabilidade v1.1 ausente"
+    assert "Blindagem Jurídica & Proteção Técnica em Nível de Driver" in html_content, "Título do bloco de blindagem ausente"
+    assert "default_transaction_read_only = on" in html_content, "Parâmetro read-only do driver ausente"
+    assert "statement_timeout = 4.000ms" in html_content, "Parâmetro statement_timeout ausente"
+    assert "lock_timeout = 1.000ms" in html_content, "Parâmetro lock_timeout ausente"
+    assert "aura_service_ro" in html_content, "Role segura aura_service_ro ausente"
+    assert "Lei de Software" in html_content and "9.609" in html_content, "Citação à Lei 9.609 ausente"
+    assert "Marco Civil da Internet" in html_content and "12.965" in html_content, "Citação à Lei 12.965 ausente"
+    assert "c09e64e2bf60767cbe89637f25b8a226c2e4eb0b4b625977fd3fe2d34dd16e4f" in html_content, "Hash SHA-256 oficial do termo ausente"
+    print("   [OK] Conformidade com a LGPD (Lei 13.709/2018), Driver Shield v1.1 e 4 Pilares Legais validados.")
 
     # =========================================================================
     # 2D. MINI JANELA DE CHAT DA AURA + FLUXOGRAMA / GRAFO MODERNO LADO A LADO
@@ -203,8 +214,8 @@ def run_showcase_tests():
     assert "assertividade" in content_lower, "Pilar de assertividade e precisão ausente"
     assert "Como o Mercado Tradicional de IA Opera" in html_content, "Coluna de contraste do mercado tradicional ausente"
     assert "A Abordagem Inteligente da AURA" in html_content, "Coluna de contraste da abordagem AURA ausente"
-    assert "—" not in html_content, "Uso proibido de travessão (—) detectado no showcase"
-    assert "–" not in html_content, "Uso proibido de meia-risca (–) detectado no showcase"
+    assert "\u2014" not in html_content, "Uso proibido de travessao (\\u2014) detectado no showcase"
+    assert "\u2013" not in html_content, "Uso proibido de meia-risca (\\u2013) detectado no showcase"
 
     # Validação da Tabela de ROI Compactada (Exatamente 4 dimensões críticas de valor de produto)
     table_match = re.search(r'<tbody[^>]*>(.*?)</tbody>', html_content, re.DOTALL)

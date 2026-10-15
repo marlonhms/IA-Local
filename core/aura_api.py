@@ -980,6 +980,35 @@ async def get_compliance_status_endpoint(
     return result
 
 
+@router.get(
+    "/compliance/term",
+    summary="Conteudo Integral do Termo de Interoperabilidade e Hash SHA-256",
+)
+async def get_compliance_term_endpoint(
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """
+    Retorna o conteudo textual integral do termo formal de interoperabilidade v1.1
+    e seu respectivo hash criptografico SHA-256 para exibicao e auditoria no frontend.
+    """
+    try:
+        content = await asyncio.to_thread(engine.compliance_manager.get_term_content)
+        term_hash = await asyncio.to_thread(engine.compliance_manager.compute_term_hash)
+        return {
+            "status": "ok",
+            "versao": "1.1",
+            "version": "1.1",
+            "title": "Termo de Interoperabilidade e Tratamento de Dados v1.1 - AURA Clean Room",
+            "hash_sha256": term_hash,
+            "content_markdown": content,
+        }
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": f"Falha ao carregar termo de conformidade: {exc!s}"},
+        ) from exc
+
+
 @router.post(
     "/compliance/opt-in",
     summary="Registro Formal de Opt-In de Interoperabilidade pelo Lojista",
@@ -997,6 +1026,7 @@ async def register_compliance_opt_in_endpoint(
         verif = await asyncio.to_thread(engine.compliance_manager.verify_compliance, record.loja_cnpj)
         return {
             "status": "ok",
+            "sucesso": True,
             "opt_in": record.model_dump(),
             "verification": verif.model_dump(),
         }

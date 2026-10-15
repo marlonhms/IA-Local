@@ -2123,8 +2123,120 @@
   }
 
   // =========================================================================
-  // 9. ALIASES E NOMES CANONICOS DO ROADMAP
+  // 9. MICRO-WIDGET 7: ComplianceStatusUI (Conformidade Legal & Interoperabilidade)
   // =========================================================================
+
+  class ComplianceStatusUI extends BaseGenUIWidget {
+    constructor(payload = {}) {
+      super(payload, 'compliance_status', 'render_ComplianceStatusUI');
+      this.cardClass = 'genui-compliance-card';
+      this.ariaLabel = 'Painel de Conformidade Legal e Interoperabilidade AURA';
+    }
+
+    renderLayer1() {
+      const p = this.props;
+      const compliant = coerceBoolean(p.compliant, true) && p.status !== 'pending' && p.status !== 'revoked' && p.status !== 'missing';
+      const statusText = compliant ? '100% CONFORME & BLINDADO' : 'PENDENTE DE ACEITE';
+      const badgeCls = compliant
+        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+        : 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+
+      const diag = escapeHtml(p.diagnosis || p.mensagem || (compliant ? 'Operação local em total conformidade jurídica e técnica.' : 'Opt-in de interoperabilidade pendente de formalização.'));
+      const cnpj = escapeHtml(p.loja_cnpj || '00.000.000/0001-00');
+      const razao = escapeHtml(p.razao_social || 'Auto Posto S/A');
+      const versao = escapeHtml(p.versao_termo || '1.1');
+
+      return `
+        <div class="genui-layer1 p-4 rounded-2xl bg-slate-900/80 border border-cyan-500/30 shadow-lg space-y-3 font-sans">
+          <div class="flex items-center justify-between gap-3 border-b border-white/5 pb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full ${compliant ? 'bg-emerald-400' : 'bg-amber-400'}"></span>
+              <span class="text-[11px] font-mono uppercase tracking-wider text-cyan-400 font-semibold">Conformidade Legal &amp; LGPD (Termo v${versao})</span>
+            </div>
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${badgeCls}">
+              ${statusText}
+            </span>
+          </div>
+
+          <div class="space-y-1">
+            <div class="text-xs font-bold text-white">${razao} <span class="font-mono text-[11px] font-normal text-slate-400">(CNPJ: ${cnpj})</span></div>
+            <p class="text-xs text-slate-300 leading-relaxed">${diag}</p>
+          </div>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const p = this.props;
+      const timeoutMs = coerceNumber(p.statement_timeout_ms, 4000);
+      const lockTimeoutMs = coerceNumber(p.lock_timeout_ms, 1000);
+      const roleBanco = escapeHtml(p.role_banco || 'aura_service_ro');
+      const hashTermo = escapeHtml((p.hash_termo || p.hash_atual_termo || '').substring(0, 16));
+      const assinante = escapeHtml(p.assinado_por || 'Representante Legal');
+      const dataAceite = p.aceite_interoperabilidade_em ? new Date(p.aceite_interoperabilidade_em).toLocaleDateString('pt-BR') : 'Pendente';
+
+      return `
+        <div class="genui-layer2 p-4 rounded-2xl bg-slate-950/60 border border-white/5 space-y-3 font-sans text-xs">
+          <!-- Grade de Driver Shield -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div class="p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
+              <div class="text-[10px] text-slate-400 font-mono">Modo de Acesso</div>
+              <div class="text-xs font-bold text-emerald-400 flex items-center gap-1 mt-0.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                READ-ONLY ATIVO
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
+              <div class="text-[10px] text-slate-400 font-mono">Query Timeout</div>
+              <div class="text-xs font-bold text-cyan-300 font-mono mt-0.5">${timeoutMs} ms</div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
+              <div class="text-[10px] text-slate-400 font-mono">Lock Timeout</div>
+              <div class="text-xs font-bold text-cyan-300 font-mono mt-0.5">${lockTimeoutMs} ms</div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
+              <div class="text-[10px] text-slate-400 font-mono">Role PostgreSQL</div>
+              <div class="text-xs font-bold text-purple-300 font-mono mt-0.5">${roleBanco}</div>
+            </div>
+          </div>
+
+          <!-- Pilares Legais Resumidos -->
+          <div class="p-3 rounded-xl bg-slate-900/40 border border-white/5 space-y-1.5 text-[11px]">
+            <div class="flex justify-between items-center text-slate-300">
+              <span>Opt-in Formal: <strong class="text-white">${assinante}</strong></span>
+              <span class="text-slate-400 font-mono text-[10px]">${dataAceite}</span>
+            </div>
+            <div class="flex justify-between items-center text-slate-400 font-mono text-[10px]">
+              <span>Hash Criptográfico SHA-256:</span>
+              <span class="text-slate-200 bg-white/5 px-2 py-0.5 rounded border border-white/5">${hashTermo ? `${hashTermo}...` : 'Calculado'}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    renderLayer3() {
+      return `
+        <div class="genui-layer3 flex flex-wrap items-center gap-2 pt-1 font-sans">
+          <button type="button"
+                  class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-cyan-500 text-slate-950 hover:bg-cyan-400 shadow-md shadow-cyan-500/20"
+                  onclick="if (window.auraCompliance) window.auraCompliance.openModal();"
+                  data-action-id="act_open_compliance_modal"
+                  data-action-type="inspection"
+                  data-tool-call-id="${escapeHtml(this.toolCallId)}">
+            <span>🛡️ Abrir Termo de Interoperabilidade</span>
+          </button>
+          <a href="/showcase#sec-blindagem"
+             target="_blank"
+             rel="noopener noreferrer"
+             class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 text-slate-300 border border-white/10 hover:bg-slate-800 inline-flex items-center gap-1.5">
+            <span>📋 Ver Vitrine no Showcase</span>
+            <span>↗</span>
+          </a>
+        </div>
+      `;
+    }
+  }
 
   const ExecutiveBriefingWidget = ExecutiveDecisionMentorUI;
   const MarginProfitabilityWidget = MarginAnalysisUI;
@@ -2132,6 +2244,7 @@
   const ComparativeBenchmarkWidget = BenchmarkComparisonUI;
   const FinancialLeakAuditWidget = FinancialLeakAuditUI;
   const BasketUpsellWidget = BasketUpsellStrategyUI;
+  const ComplianceStatusWidget = ComplianceStatusUI;
 
   // =========================================================================
   // 10. REGISTRO NO SecureComponentRegistry & EXPORTACOES ZERO-BUNDLER
@@ -2188,6 +2301,12 @@
         cls: RootCauseAnalysisUI,
         aliases: ['RootCauseAnalysisUI', 'RootCauseAnalysisWidget'],
         intent: 'investigar_causa_raiz'
+      },
+      {
+        name: 'render_ComplianceStatusUI',
+        cls: ComplianceStatusUI,
+        aliases: ['ComplianceStatusUI', 'ComplianceStatusWidget', 'render_ComplianceUI'],
+        intent: 'compliance_status'
       }
     ];
 
@@ -2319,6 +2438,8 @@
     window.AuraGenUI.FinancialLeakAuditWidget = FinancialLeakAuditWidget;
     window.AuraGenUI.BasketUpsellStrategyUI = BasketUpsellStrategyUI;
     window.AuraGenUI.BasketUpsellWidget = BasketUpsellWidget;
+    window.AuraGenUI.ComplianceStatusUI = ComplianceStatusUI;
+    window.AuraGenUI.ComplianceStatusWidget = ComplianceStatusWidget;
     window.AuraGenUI.ShiftReconciliationUI = ShiftReconciliationUI;
     window.AuraGenUI.ShiftReconciliationWidget = ShiftReconciliationWidget;
     window.AuraGenUI.RootCauseAnalysisUI = RootCauseAnalysisUI;
@@ -2355,6 +2476,8 @@
       RootCauseAnalysisWidget,
       BasketUpsellStrategyUI,
       BasketUpsellWidget,
+      ComplianceStatusUI,
+      ComplianceStatusWidget,
       registerWidgets,
       initGlobalGenUIActionDelegation,
       escapeHtml,

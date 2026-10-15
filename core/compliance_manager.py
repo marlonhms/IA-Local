@@ -155,7 +155,7 @@ class ComplianceManager:
             if not dados.get("aceite_interoperabilidade_em"):
                 dados["aceite_interoperabilidade_em"] = datetime.now(UTC).isoformat()
             if not dados.get("versao_termo"):
-                dados["versao_termo"] = "1.0"
+                dados["versao_termo"] = "1.1"
             if not dados.get("status"):
                 dados["status"] = "active"
             record = ComplianceOptInStatus(**dados)

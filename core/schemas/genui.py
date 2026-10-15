@@ -947,4 +947,40 @@ class BasketUpsellStrategyProps(BaseModel):
         return normalized
 
 
+class CompliancePillarItem(BaseModel):
+    """Item explicativo de um dos pilares legais e tecnicos de conformidade."""
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
+
+    title: str = Field(..., description="Titulo do pilar legal ou tecnico")
+    norma: str = Field(..., description="Referencia legislativa ou arquitetural")
+    status: str = Field(default="conforme", description="Status do pilar: conforme, ativo, seguro")
+    description: str = Field(..., description="Explicacao de seguranca juridica e operacional")
+
+
+class ComplianceStatusProps(BaseModel):
+    """Propriedades do Micro-Widget ComplianceStatusUI (Conformidade Legal & Interoperabilidade)."""
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True, from_attributes=True)
+
+    loja_cnpj: str = Field(..., validation_alias=AliasChoices("loja_cnpj", "cnpj"), description="CNPJ do estabelecimento")
+    razao_social: Optional[str] = Field(default=None, description="Razao Social do estabelecimento controlador")
+    compliant: bool = Field(default=True, validation_alias=AliasChoices("compliant", "conforme"), description="Se esta 100% conforme")
+    status: str = Field(default="active", description="Status do opt-in: active, accepted, pending")
+    versao_termo: str = Field(default="1.1", description="Versao do termo juridico formal")
+    assinado_por: Optional[str] = Field(default=None, description="Representante legal que formalizou o opt-in")
+    aceite_interoperabilidade_em: Optional[str] = Field(default=None, description="Data e hora do aceite formal")
+    hash_termo: Optional[str] = Field(default=None, description="Digest SHA-256 no momento do aceite")
+    hash_atual_termo: str = Field(default="", description="Digest SHA-256 do arquivo fisico atual do termo")
+    hash_confere: bool = Field(default=True, description="Se o hash assinado confere com o termo atual")
+    garantia_leitura_exclusiva: bool = Field(default=True, description="Garantia de transacoes READ ONLY estritas")
+    isolamento_aups: bool = Field(default=True, description="Garantia de isolamento canonico AUPS Clean Room")
+    driver_level_protection: bool = Field(default=True, description="Garantia de timeouts em nivel de driver")
+    statement_timeout_ms: int = Field(default=4000, description="Timeout maximo de query para nao onerar o ERP (ms)")
+    lock_timeout_ms: int = Field(default=1000, description="Timeout maximo de espera por lock (ms)")
+    role_banco: str = Field(default="aura_service_ro", description="Role de leitura especializada somente-leitura")
+    mensagem: str = Field(default="Conformidade legal e tecnica ativa.", description="Mensagem executiva do status")
+    pilares_legais: List[CompliancePillarItem] = Field(default_factory=list, description="Pilares legais e tecnicos da protecao")
+    suggested_actions: List[GenUIActionOption] = Field(default_factory=list, description="Acoes HITL executivas")
+
+
+
 

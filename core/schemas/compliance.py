@@ -27,7 +27,7 @@ class ComplianceOptInStatus(BaseModel):
         description="Timestamp ISO-8601 da data e hora em que o aceite formal foi concedido"
     )
     versao_termo: str = Field(
-        default="1.0",
+        default="1.1",
         min_length=1,
         description="Versao do termo juridico de interoperabilidade aceito pelo lojista"
     )

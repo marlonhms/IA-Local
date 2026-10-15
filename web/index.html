@@ -128,6 +128,22 @@
             <svg class="w-4 h-4 text-slate-500 group-hover:text-cyan-300 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </a>
 
+          <button id="sidebar-btn-open-compliance" class="sidebar-nav-item min-h-[48px] flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-emerald-500/30 transition-all text-left text-xs group" aria-label="Conformidade Legal e Interoperabilidade">
+            <div class="flex items-center gap-3">
+              <div class="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-width="1.75" stroke-linejoin="round"/>
+                  <path d="M9 12l2 2 4-4" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div>
+                <div class="font-semibold text-slate-100">Conformidade Legal</div>
+                <div class="text-[10px] text-slate-400 font-normal">Termo v1.1 & Driver Shield</div>
+              </div>
+            </div>
+            <span id="sidebar-compliance-badge" class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">v1.1 Ativo</span>
+          </button>
+
         </div>
       </div>
 
@@ -325,6 +341,19 @@
           <svg class="w-4 h-4 text-cyan-400 flex-shrink-0 group-hover:rotate-45 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3" stroke-width="1.75"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke-width="1.5"/></svg>
           <span class="text-[11px] font-medium hidden sm:inline">Automações</span>
           <span id="header-automation-status-dot" class="w-2 h-2 rounded-full bg-slate-500" title="Monitoramento Automático: Desativado (100% sob demanda)"></span>
+        </button>
+
+        <!-- Botão Conformidade Legal & Termo de Interoperabilidade v1.1 -->
+        <button id="btn-open-compliance" class="flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 font-sans text-xs transition-all shadow-sm relative group" title="Conformidade Legal & LGPD (Termo v1.1)" aria-label="Abrir Conformidade Legal">
+          <svg class="w-4 h-4 text-emerald-400 flex-shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-width="1.75" stroke-linejoin="round"/>
+            <path d="M9 12l2 2 4-4" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="text-[11px] font-medium hidden sm:inline">Conformidade</span>
+          <span id="header-compliance-pill" class="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-sans font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span>v1.1</span>
+          </span>
         </button>
 
         <!-- Botão Nova Conversa (Header Superior Direito - min-h: 44px) -->
@@ -1088,6 +1117,266 @@
   </div>
 
   <!-- =========================================================================
+       AURA MODAL DE CONFORMIDADE LEGAL, LGPD & TERMO DE INTEROPERABILIDADE v1.1
+       ========================================================================= -->
+  <div id="aura-compliance-modal" class="palette-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="compliance-modal-title">
+    <div class="palette-container !max-w-3xl flex flex-col max-h-[90vh] overflow-hidden border border-emerald-500/35 shadow-[0_24px_70px_rgba(0,0,0,0.85)]">
+      
+      <!-- Topo do Modal -->
+      <div class="p-4 border-b border-slate-800/80 bg-slate-900/95 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="p-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-width="1.75" stroke-linejoin="round"/>
+              <path d="M9 12l2 2 4-4" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 id="compliance-modal-title" class="font-bold text-white text-base font-sans">Conformidade Legal &amp; Termo de Interoperabilidade</h3>
+              <span id="compliance-master-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-sans font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                100% CONFORME &amp; BLINDADO
+              </span>
+            </div>
+            <p class="text-xs text-slate-400 font-sans">Blindagem Jurídica LGPD, Lei de Software 9.609/98 e Driver Shield a Prova de Perícia Técnica</p>
+          </div>
+        </div>
+
+        <button id="btn-close-compliance-modal" class="p-2 rounded-xl bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-white/10 transition-colors cursor-pointer" title="Fechar (Esc)" aria-label="Fechar Modal de Conformidade">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Barra de Abas do Modal -->
+      <div class="flex items-center gap-1 px-4 pt-2 border-b border-slate-800/80 bg-slate-900/80 text-xs font-sans">
+        <button id="compliance-tab-btn-overview" type="button" class="px-3.5 py-2 rounded-t-lg font-semibold border-b-2 border-cyan-500 text-cyan-300 bg-cyan-500/10 transition-all flex items-center gap-1.5 cursor-pointer">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke-width="1.75"/><polyline points="12 6 12 12 14 14" stroke-width="1.75"/></svg>
+          <span>Visão Geral &amp; Blindagem Técnica</span>
+        </button>
+        <button id="compliance-tab-btn-term" type="button" class="px-3.5 py-2 rounded-t-lg font-semibold border-b-2 border-transparent text-slate-400 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-width="1.75"/><polyline points="14 2 14 8 20 8" stroke-width="1.75"/></svg>
+          <span>Termo Integral de Interoperabilidade (v1.1)</span>
+        </button>
+      </div>
+
+      <!-- Conteúdo Scrollável -->
+      <div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 font-sans text-xs">
+        
+        <!-- ==================== ABA 1: VISAO GERAL & BLINDAGEM ==================== -->
+        <div id="compliance-view-overview" class="space-y-4">
+          
+          <!-- Card de Identificação da Empresa & Status -->
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-white/10 space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-2.5">
+              <div>
+                <span class="text-[10px] uppercase font-mono text-cyan-400 font-semibold tracking-wider">Estabelecimento Controlador (Titular)</span>
+                <h4 id="compliance-field-razao" class="text-sm font-bold text-white">Auto Posto S/A</h4>
+                <div class="text-[11px] text-slate-400">
+                  CNPJ: <span id="compliance-field-cnpj" class="font-mono text-slate-200">00.000.000/0001-00</span>
+                  • Versão do Termo: <span id="compliance-field-versao" class="font-semibold text-cyan-300">v1.1</span>
+                </div>
+              </div>
+              <div class="text-left sm:text-right">
+                <div class="text-[10px] text-slate-400">Data do Aceite Formal:</div>
+                <div id="compliance-field-data-aceite" class="text-[11px] font-mono text-emerald-300 font-semibold">15/10/2026 14:30</div>
+              </div>
+            </div>
+
+            <!-- Parâmetros de Blindagem Técnica do Driver Shield (A Prova de Perícia) -->
+            <div>
+              <div class="text-[10px] uppercase font-mono text-slate-400 font-semibold mb-2">Blindagem Técnica em Nível de Driver (PostgreSQL Local)</div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div class="p-2.5 rounded-xl bg-slate-950/70 border border-emerald-500/20">
+                  <div class="text-[10px] text-slate-400 font-mono">Modo de Transação</div>
+                  <div class="text-xs font-bold text-emerald-400 flex items-center gap-1.5 mt-0.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    READ-ONLY ATIVO
+                  </div>
+                  <div class="text-[9px] text-slate-500 font-mono mt-0.5">default_transaction_read_only=on</div>
+                </div>
+
+                <div class="p-2.5 rounded-xl bg-slate-950/70 border border-cyan-500/20">
+                  <div class="text-[10px] text-slate-400 font-mono">Timeout de Query</div>
+                  <div class="text-xs font-bold text-cyan-300 font-mono mt-0.5">4.000 ms</div>
+                  <div class="text-[9px] text-slate-500 font-mono mt-0.5">statement_timeout=4000</div>
+                </div>
+
+                <div class="p-2.5 rounded-xl bg-slate-950/70 border border-cyan-500/20">
+                  <div class="text-[10px] text-slate-400 font-mono">Timeout de Bloqueio</div>
+                  <div class="text-xs font-bold text-cyan-300 font-mono mt-0.5">1.000 ms</div>
+                  <div class="text-[9px] text-slate-500 font-mono mt-0.5">lock_timeout=1000</div>
+                </div>
+
+                <div class="p-2.5 rounded-xl bg-slate-950/70 border border-purple-500/20">
+                  <div class="text-[10px] text-slate-400 font-mono">Role do Banco</div>
+                  <div class="text-xs font-bold text-purple-300 font-mono mt-0.5">aura_service_ro</div>
+                  <div class="text-[9px] text-slate-500 font-mono mt-0.5">Sem permissão de escrita</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Dados de Formalização Criptográfica -->
+            <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1.5 text-[11px]">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between text-slate-300 gap-1">
+                <span>Representante Legal Signatário: <strong id="compliance-field-assinante" class="text-white">Marlon / Diretor Operacional</strong></span>
+                <span class="text-emerald-400 font-semibold flex items-center gap-1">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12" stroke-width="2.5"/></svg>
+                  Assinatura Digital Auditada
+                </span>
+              </div>
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between text-slate-400 font-mono text-[10px] gap-1">
+                <span>Digest Criptográfico SHA-256 do Termo:</span>
+                <div class="flex items-center gap-1.5">
+                  <span id="compliance-field-hash" class="text-slate-300 bg-white/5 px-2 py-0.5 rounded border border-white/5">Calculando...</span>
+                  <button id="btn-copy-term-hash" type="button" class="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-slate-300 text-[10px] transition-colors cursor-pointer" title="Copiar Hash SHA-256">Copiar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Os 4 Pilares da Legislação Brasileira -->
+          <div>
+            <div class="text-[10px] uppercase font-mono text-slate-400 font-semibold mb-2">Fundamentação Jurídica &amp; Direitos Inalienáveis do Lojista</div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="p-3.5 rounded-xl bg-slate-900/60 border border-white/10 space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-slate-100 flex items-center gap-1.5">
+                    <span class="text-cyan-400">⚖️</span> LGPD (Lei 13.709/2018)
+                  </span>
+                  <span class="px-2 py-0.2 rounded text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Art. 7, IX e Art. 39</span>
+                </div>
+                <p class="text-slate-400 text-[11px] leading-relaxed">
+                  Os dados operacionais, fiscais e de faturamento pertencem exclusivamente ao estabelecimento comercial (Controlador). O lojista possui titularidade inalienável e direito de acesso irrestrito aos seus próprios números.
+                </p>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-slate-900/60 border border-white/10 space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-slate-100 flex items-center gap-1.5">
+                    <span class="text-emerald-400">📜</span> Lei de Software (Lei 9.609/1998)
+                  </span>
+                  <span class="px-2 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Art. 6º, I e II</span>
+                </div>
+                <p class="text-slate-400 text-[11px] leading-relaxed">
+                  Não constitui infração a direitos autorais a leitura, interoperabilidade e integração tecnológica para viabilizar operações ou cópia de salvaguarda. Fornecedores de software não podem impedir a leitura dos dados do cliente.
+                </p>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-slate-900/60 border border-white/10 space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-slate-100 flex items-center gap-1.5">
+                    <span class="text-purple-400">🌐</span> Marco Civil da Internet (Lei 12.965/2014)
+                  </span>
+                  <span class="px-2 py-0.2 rounded text-[9px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">Art. 3º e 4º</span>
+                </div>
+                <p class="text-slate-400 text-[11px] leading-relaxed">
+                  Preserva a interoperabilidade por padrões abertos e veda práticas anti-competitivas de Vendor Lock-in abusivo, garantindo liberdade de escolha tecnológica ao empresário.
+                </p>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-slate-900/60 border border-white/10 space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-slate-100 flex items-center gap-1.5">
+                    <span class="text-amber-400">🛡️</span> Não-Interferência &amp; Perícia Técnica
+                  </span>
+                  <span class="px-2 py-0.2 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Clean Room AUPS</span>
+                </div>
+                <p class="text-slate-400 text-[11px] leading-relaxed">
+                  A AURA nunca executa comandos de escrita (INSERT/UPDATE/DELETE) no banco do ERP. Com timeouts de 4.000ms e locks de 1.000ms, é tecnicamente e pericialmente impossível que a ferramenta cause lentidão na pista.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Banner Informativo quando já assinado -->
+          <div id="compliance-optin-signed-banner" class="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex items-center justify-between gap-3 text-xs">
+            <div class="flex items-center gap-2.5 text-emerald-300">
+              <svg class="w-5 h-5 text-emerald-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-width="1.75"/><polyline points="9 12 11 14 15 10" stroke-width="2"/></svg>
+              <span>Opt-In de Interoperabilidade Formalizado e Ativo no SQLite e JSON de contingência.</span>
+            </div>
+            <a href="/showcase#sec-blindagem" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 text-[11px] font-semibold transition-colors flex items-center gap-1 flex-shrink-0">
+              <span>Ver no Showcase</span>
+              <span>↗</span>
+            </a>
+          </div>
+
+          <!-- Formulário de Formalização de Opt-In (quando pendente) -->
+          <div id="compliance-optin-form-container" class="hidden p-4 rounded-xl bg-slate-900/80 border border-amber-500/30 space-y-3">
+            <div class="flex items-center gap-2 text-amber-300 font-bold text-xs">
+              <span>⚠️ Formalização do Opt-In de Interoperabilidade</span>
+            </div>
+            <p class="text-slate-300 text-[11px] leading-relaxed">
+              Para assegurar a salvaguarda jurídica completa da revenda frente a qualquer notificação de fornecedores de software, registre o aceite do representante legal do estabelecimento.
+            </p>
+
+            <div class="space-y-2 pt-1">
+              <label class="block text-slate-300 text-[11px] font-medium">Nome Completo e Cargo do Representante Legal:</label>
+              <input id="compliance-input-signer" type="text" placeholder="Ex: Marlon / Diretor Operacional" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500" />
+            </div>
+
+            <div class="flex items-start gap-2 pt-1">
+              <input id="compliance-check-confirm" type="checkbox" checked class="mt-0.5 rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-0 cursor-pointer" />
+              <label for="compliance-check-confirm" class="text-[11px] text-slate-300 leading-snug cursor-pointer">
+                Declaro que o estabelecimento comercial é o legítimo titular dos dados operacionais e autorizo a leitura estritamente consultiva pela AURA sob as garantias do Termo v1.1.
+              </label>
+            </div>
+
+            <div class="pt-2">
+              <button id="btn-submit-compliance-optin" type="button" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-width="1.75"/><polyline points="9 12 11 14 15 10" stroke-width="2"/></svg>
+                <span>Assinar e Ativar Interoperabilidade (Opt-In v1.1)</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ==================== ABA 2: TERMO INTEGRAL ==================== -->
+        <div id="compliance-view-term" class="hidden space-y-3">
+          <div class="flex items-center justify-between text-xs text-slate-400 border-b border-white/5 pb-2">
+            <span>Arquivo Oficial: <code class="text-cyan-300 font-mono text-[11px]">docs/compliance/termo_interoperabilidade_lgpd.md</code></span>
+            <div class="flex items-center gap-2">
+              <button id="btn-copy-term-content" type="button" class="px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-slate-200 text-xs transition-colors flex items-center gap-1 cursor-pointer">
+                <span>Copiar Termo Completo</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Visualizador do Texto Formatado -->
+          <div class="p-4 rounded-xl bg-slate-950 border border-white/5 max-h-[50vh] overflow-y-auto">
+            <pre id="compliance-term-text" class="text-slate-300 font-sans text-xs leading-relaxed whitespace-pre-wrap select-text">Carregando conteúdo integral do termo...</pre>
+          </div>
+
+          <!-- Hash Completo SHA-256 -->
+          <div class="p-3 rounded-xl bg-slate-900/60 border border-white/5 text-[11px] font-mono text-slate-400 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <span>SHA-256: <code id="compliance-term-hash-full" class="text-slate-200 select-all">Carregando...</code></span>
+            <span class="text-emerald-400 font-semibold">Integridade Certificada</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Rodapé do Modal -->
+      <div class="p-3.5 sm:p-4 border-t border-slate-800/80 bg-slate-900/95 flex items-center justify-between gap-3 text-xs">
+        <div class="flex items-center gap-2 text-slate-400">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span>AURA Governance &amp; Clean Room Architecture</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="/showcase#sec-blindagem" target="_blank" rel="noopener noreferrer" class="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 font-sans text-xs transition-colors inline-flex items-center gap-1.5">
+            <span>Vitrine Executiva (Showcase)</span>
+            <span>↗</span>
+          </a>
+          <button onclick="if(window.auraCompliance) window.auraCompliance.closeModal();" type="button" class="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-colors cursor-pointer">
+            <span>Fechar</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- =========================================================================
        AURA COMMAND PALETTE MODAL EXECUTIVA (CTRL+K / CMD+K)
        ========================================================================= -->
   <div id="aura-command-palette-modal" class="palette-modal-backdrop hidden">
@@ -1107,6 +1396,22 @@
       <!-- Lista de Comandos Rápidos e Diagnósticos de 1-Clique -->
       <div id="palette-items-list" class="max-h-[380px] overflow-y-auto divide-y divide-slate-800/40 text-xs font-sans">
         
+        <div onclick="if(window.auraCompliance) window.auraCompliance.openModal(); document.getElementById('aura-command-palette-modal').classList.add('hidden');" class="palette-item">
+          <div class="flex items-center gap-3">
+            <span class="p-1.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-width="1.75" stroke-linejoin="round"/>
+                <path d="M9 12l2 2 4-4" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <div>
+              <div class="font-bold text-slate-100">Conformidade Legal &amp; LGPD (Termo v1.1)</div>
+              <div class="text-[11px] text-slate-400 font-sans">Formalizar opt-in, checar hash SHA-256 e auditar blindagem técnica do driver.</div>
+            </div>
+          </div>
+          <span class="text-[11px] text-auraCyan font-semibold">Inspecionar ↵</span>
+        </div>
+
         <div onclick="if(window.auraAutomations) window.auraAutomations.openModal(); document.getElementById('aura-command-palette-modal').classList.add('hidden');" class="palette-item">
           <div class="flex items-center gap-3">
             <span class="p-1.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3" stroke-width="1.75"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke-width="1.5"/></svg></span>
@@ -1282,6 +1587,7 @@
   <script src="/static/js/aura-cockpit.js?v=2.10.4"></script>
   <script src="/static/js/aura-triggers.js?v=2.10.4"></script>
   <script src="/static/js/aura-automations.js?v=2.10.4"></script>
+  <script src="/static/js/aura-compliance.js?v=2.10.4"></script>
   <script src="/static/js/aura-aux-panel.js?v=2.10.4"></script>
   <script src="/static/js/aura-chat.js?v=2.10.4"></script>
   <script src="/static/js/aura-app.js?v=2.10.4"></script>

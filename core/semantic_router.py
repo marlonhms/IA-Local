@@ -316,6 +316,16 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
             "Comparativo de turnos e benchmark de mercado",
         ]
     },
+    "compliance_status": {
+        "descricao": "Verificacao de conformidade legal, opt-in formal do lojista, LGPD Art. 39, Lei de Software 9.609/98 e blindagem de driver a prova de pericia",
+        "exemplos": [
+            "Qual o status de conformidade legal do posto?",
+            "Verificar termo de interoperabilidade e opt-in LGPD",
+            "O posto esta conforme com a LGPD e lei de software?",
+            "Status da blindagem juridica e driver shield",
+            "Mostrar termo de conformidade e opt-in",
+        ]
+    },
 }
 
 
@@ -447,6 +457,24 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
 
     if ("concorrência" in p or "concorrencia" in p or "concorrentes" in p or "mercado" in p) and any(w in p for w in ["preço", "preco", "preços", "precos", "comparar", "comparativo", "raio", "vizinhos", "frente", "como"]):
         return "benchmark_comparativo"
+
+    # F6-06: Conformidade Legal, Termo de Interoperabilidade & Blindagem Juridica
+    termos_compliance_exatos = [
+        "conformidade legal", "status de conformidade", "termo de interoperabilidade",
+        "termo de conformidade", "blindagem juridica", "blindagem jurídica",
+        "opt-in", "opt in", "optin", "termo de opt-in", "termo de opt in", "opt-in lgpd",
+        "opt in lgpd", "optin lgpd", "conformidade lgpd", "driver shield",
+        "direito de interoperabilidade", "lei de software",
+        "pericia tecnica", "perícia técnica", "termo de aceite",
+    ]
+    if any(t in p for t in termos_compliance_exatos):
+        return "compliance_status"
+
+    if ("compliance" in p or "conformidade" in p or "interoperabilidade" in p) and any(w in p for w in ["status", "legal", "termo", "lgpd", "posto", "lei", "blindagem", "como", "esta", "está"]):
+        return "compliance_status"
+
+    if "blindagem" in p and any(w in p for w in ["juridica", "jurídica", "legal", "driver", "pericia", "perícia"]):
+        return "compliance_status"
 
     # F6-04: Micro-Widget FinancialLeakAuditUI - Auditoria de Fuga Financeira & TEF
     termos_fuga_exatos = [
@@ -1098,6 +1126,7 @@ class SemanticRouter:
                     "simulacao_preditiva",
                     "benchmark_comparativo",
                     "auditoria_fuga_financeira",
+                    "compliance_status",
                     "analise_margem",
                     "investigar_causa_raiz",
                 ):
