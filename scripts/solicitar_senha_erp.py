@@ -7,9 +7,9 @@ em tempo real no PostgreSQL e atualiza tanto o backups/erp_password.txt
 quanto o arquivo .env (ERP_DB_PASSWORD).
 """
 
-import sys
 import os
 import socket
+import sys
 from pathlib import Path
 
 # Protege terminal UTF-8 no Windows
@@ -32,7 +32,7 @@ BACKUP_PASS_PATH = ROOT_DIR / "backups" / "erp_password.txt"
 def obter_config_erp() -> dict:
     """Lê configurações do ERP diretamente do .env ou variáveis de ambiente."""
     cfg = {
-        "host": os.getenv("ERP_DB_HOST", "100.77.164.17"),
+        "host": os.getenv("ERP_DB_HOST", "localhost"),
         "port": int(os.getenv("ERP_DB_PORT", "5433")),
         "dbname": os.getenv("ERP_DB_NAME", "posto"),
         "user": os.getenv("ERP_DB_USER", "suporte"),
@@ -120,7 +120,7 @@ def testar_conexao_erp(cfg: dict, senha: str) -> tuple[bool, str]:
     try:
         s = socket.create_connection((host, port), timeout=2.0)
         s.close()
-    except socket.timeout:
+    except TimeoutError:
         return False, f"Timeout na rede ao alcançar {host}:{port} (Notebook offline ou Firewall bloqueando)"
     except ConnectionRefusedError:
         return False, f"Conexão recusada em {host}:{port} (Serviço PostgreSQL não está em execução)"
@@ -176,8 +176,8 @@ def solicitar_senha_interativa():
 
         if ok:
             salvar_senha(senha_candidata)
-            print(f"  [OK] Conectado e autenticado com sucesso no banco ERP!")
-            print(f"  [SALVO] Senha registrada em 'backups/erp_password.txt' e '.env'.")
+            print("  [OK] Conectado e autenticado com sucesso no banco ERP!")
+            print("  [SALVO] Senha registrada em 'backups/erp_password.txt' e '.env'.")
             print("=" * 75 + "\n")
             sys.exit(0)
         else:
@@ -193,7 +193,7 @@ def solicitar_senha_interativa():
                     sys.exit(1)
                 if resp in ("", "s", "sim", "y", "yes"):
                     salvar_senha(senha_candidata)
-                    print(f"  [SALVO] Senha registrada para quando o servico estiver online.")
+                    print("  [SALVO] Senha registrada para quando o servico estiver online.")
                     print("=" * 75 + "\n")
                     sys.exit(0)
                 else:
@@ -212,7 +212,7 @@ def solicitar_senha_interativa():
 
             if opc == "2":
                 salvar_senha(senha_candidata)
-                print(f"  [SALVO] Senha registrada. Prosseguindo...")
+                print("  [SALVO] Senha registrada. Prosseguindo...")
                 print("=" * 75 + "\n")
                 sys.exit(0)
             elif opc == "3":

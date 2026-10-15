@@ -1,4 +1,4 @@
-# ⛽ Ai.la — Inteligência Artificial Local Especialista em Postos de Combustíveis & PDV
+# ⛽ Ai.la : Inteligência Artificial Local Especialista em Postos de Combustíveis & PDV
 
 <div align="center">
 
@@ -65,38 +65,38 @@ O ecossistema adota uma **Topologia Híbrida de Borda (Edge AI On-Premises + Hub
 flowchart TB
     subgraph EDGE["⛽ BORDA LOCAL NO POSTO (Edge AI On-Premises)"]
         direction TB
-        ERP["💾 ERP PostgreSQL Legado (9.5 / 12 / 16)\nPorta 5433 (ou 5432)\n[ERP Transacional - Acesso Estritamente Read-Only]"]
-        VEC["🧠 PostgreSQL 16 + pgvector (Docker)\nPorta 5434 | DB: posto_ai\n[Embeddings 768d, HNSW, GIN FTS, Cache Semântico]"]
+        ERP["💾 ERP PostgreSQL Legado (9.5 / 12 / 16)<br/>Porta 5433 (ou 5432)<br/>[ERP Transacional: Acesso Estritamente Read-Only]"]
+        VEC["🧠 PostgreSQL 16 + pgvector<br/>Porta 5433 (Nativo) ou 5434 (Docker)<br/>[Embeddings 768d, HNSW, GIN FTS, Cache Semântico]"]
         
         subgraph ENGINE["⚡ Ai.la Core Engine"]
             ROUTER["Roteador de Intenções & Intent Classifier"]
-            SAN["🛡️ Sanitizador LGPD (24 Categorias)\n+ Neutralizador OWASP Prompt Injection"]
-            AUDIT["📊 Motor de Auditoria & Conciliação de Turnos\n(Triangulação Pista vs Caixa vs ANP)"]
-            RAG["🔍 Hybrid RAG Engine\n(HNSW Dense + GIN Portuguese FTS + RRF SQL)"]
+            SAN["🛡️ Sanitizador LGPD (24 Categorias)<br/>+ Neutralizador OWASP Prompt Injection"]
+            AUDIT["📊 Motor de Auditoria & Conciliação de Turnos<br/>(Triangulação Pista vs Caixa vs ANP)"]
+            RAG["🔍 Hybrid RAG Engine<br/>(HNSW Dense + GIN Portuguese FTS + RRF SQL)"]
         end
 
-        CLI["💻 CLI Operacional com Streaming\n(Launcher 1-Clique / iniciar.bat)"]
+        CLI["💻 CLI Operacional com Streaming<br/>(Launcher 1-Clique / iniciar.bat)"]
 
-        ERP -- "SELECT Exclusivo\n(Zero Writes / Zero Locks)" --> ENGINE
+        ERP -->|"SELECT Exclusivo<br/>(Zero Writes / Zero Locks)"| ENGINE
         ENGINE <--> VEC
         ENGINE <--> CLI
     end
 
     subgraph HUB["🏢 HUB CENTRAL DE GESTÃO / MONITORAMENTO"]
         direction TB
-        MAESTRO_HUB["🎼 Maestro Orquestrador Central\n(LangGraph + FastAPI / RAG Hierárquico)"]
-        SRE["📈 Telemetria Sentinel SRE\n(QPS, Cache Hit Ratio, Latência)"]
-        N8N["📲 Gateway de Notificações\n(n8n + WhatsApp Evolution API)"]
+        MAESTRO_HUB["🎼 Maestro Orquestrador Central<br/>(LangGraph + FastAPI / RAG Hierárquico)"]
+        SRE["📈 Telemetria Sentinel SRE<br/>(QPS, Cache Hit Ratio, Latência)"]
+        N8N["📲 Gateway de Notificações<br/>(n8n + WhatsApp Evolution API)"]
         REPO["📦 Esteira de Deploy & Versionamento Git"]
     end
 
     subgraph CLOUD["☁️ PROVEDOR DE IA EXTERNO"]
-        GEMINI["🌐 Google Gemini API\n(gemini-3.1-flash / gemini-embedding-001)"]
+        GEMINI["🌐 Google Gemini API<br/>(gemini-3.1-flash / gemini-embedding-001)"]
     end
 
-    SAN -- "Prompts 100% Higienizados\n(Zero PII / Documentos Mascarados)" --> GEMINI
-    ENGINE -. "Métricas Anônimas & Heartbeat" .-> SRE
-    ENGINE -. "Fechamento de Turno & Alertas" .-> N8N
+    SAN -->|"Prompts 100% Higienizados<br/>(Zero PII / Documentos Mascarados)"| GEMINI
+    ENGINE -.->|"Métricas Anônimas e Heartbeat"| SRE
+    ENGINE -.->|"Fechamento de Turno e Alertas"| N8N
 ```
 
 ---
@@ -108,27 +108,27 @@ Para grupos econômicos e redes de postos, o Ai.la adota uma arquitetura distrib
 
 ```mermaid
 flowchart TB
-    USER["👤 Dono da Rede / Gestor Geral\nConsulta: 'Qual o status de estoque de gasolina de toda a rede?'"]
+    USER["👤 Dono da Rede / Gestor Geral<br/>Consulta: 'Qual o status de estoque de gasolina de toda a rede?'"]
 
     subgraph HUB["🏢 NÓ CENTRAL / MAESTRO ORQUESTRADOR (LangGraph + FastAPI)"]
         MAESTRO["🎼 Maestro Orquestrador Central"]
-        ROUTER{"Roteador de Escopo\n(Global vs Filial Específica?)"}
-        DISPATCH["⚡ Fan-Out Assíncrono (asyncio)\nTimeout SLA: 5.0s | Concorrência Não-Bloqueante"]
-        UNICAST["🎯 Despacho Unicast Direto\n(Bypassa Fan-Out da Rede)"]
-        COLLECTOR["📥 Coletor de Payloads (Fan-In)\n+ Tratador de Nós Offline (Graceful Degradation)"]
-        FALLBACK_HUB["🛡️ Fallback de Resiliência (Gerado no Hub)\n{'aviso': 'Filial Posto Sul offline, dados não incluídos.'}"]
-        SYNTH["🤖 Agente Sintetizador Executivo (LLM)\n[Ranqueamento Crítico → Confortável | Economia >85% Tokens]"]
+        ROUTER{"Roteador de Escopo<br/>(Global vs Filial Específica?)"}
+        DISPATCH["⚡ Fan-Out Assíncrono (asyncio)<br/>Timeout SLA: 5.0s | Concorrência Não-Bloqueante"]
+        UNICAST["🎯 Despacho Unicast Direto<br/>(Bypassa Fan-Out da Rede)"]
+        COLLECTOR["📥 Coletor de Payloads (Fan-In)<br/>+ Tratador de Nós Offline (Graceful Degradation)"]
+        FALLBACK_HUB["🛡️ Fallback de Resiliência (Gerado no Hub)<br/>{'aviso': 'Filial Posto Sul offline, dados não incluídos.'}"]
+        SYNTH["🤖 Agente Sintetizador Executivo (LLM)<br/>[Ranqueamento Crítico -> Confortável | Economia acima de 85% Tokens]"]
     end
 
     subgraph NETWORK["🌐 REDE DISTRIBUÍDA DE FILIAIS (Edge Computing On-Premises)"]
         subgraph POSTO1["⛽ Filial 01 - Posto Centro"]
-            EDGE1["Worker Docker Local (FastAPI)\n• SQL Seguro (SELECT-only)\n• pgvector + ERP Local\n• Sanitização spaCy (LGPD)"]
-            JSON1["Payload JSON Pydantic v2\n{'filial': 'Centro', 'combustivel': 'Gasolina Comum', 'status': 'Critico', 'autonomia_horas': 14}"]
+            EDGE1["Worker Docker Local (FastAPI)<br/>- SQL Seguro (SELECT-only)<br/>- pgvector + ERP Local<br/>- Sanitização spaCy (LGPD)"]
+            JSON1["Payload JSON Pydantic v2<br/>{'filial': 'Centro', 'combustivel': 'Gasolina Comum', 'status': 'Critico', 'autonomia_horas': 14}"]
         end
 
         subgraph POSTO2["⛽ Filial 02 - Posto Norte"]
-            EDGE2["Worker Docker Local (FastAPI)\n• SQL Seguro (SELECT-only)\n• pgvector + ERP Local\n• Sanitização spaCy (LGPD)"]
-            JSON2["Payload JSON Pydantic v2\n{'filial': 'Norte', 'combustivel': 'Gasolina Comum', 'status': 'Regular', 'autonomia_horas': 96}"]
+            EDGE2["Worker Docker Local (FastAPI)<br/>- SQL Seguro (SELECT-only)<br/>- pgvector + ERP Local<br/>- Sanitização spaCy (LGPD)"]
+            JSON2["Payload JSON Pydantic v2<br/>{'filial': 'Norte', 'combustivel': 'Gasolina Comum', 'status': 'Regular', 'autonomia_horas': 96}"]
         end
 
         subgraph POSTO3["⛽ Filial 03 - Posto Sul (Link Down / Sem Internet)"]
@@ -138,24 +138,24 @@ flowchart TB
 
     USER --> MAESTRO
     MAESTRO --> ROUTER
-    ROUTER -->|Escopo Global (Toda a Rede)| DISPATCH
-    ROUTER -->|Escopo Local (Filial Única)| UNICAST
+    ROUTER -->|"Escopo Global (Toda a Rede)"| DISPATCH
+    ROUTER -->|"Escopo Local (Filial Única)"| UNICAST
 
-    DISPATCH -->|Async HTTP GET/POST| EDGE1
-    DISPATCH -->|Async HTTP GET/POST| EDGE2
-    DISPATCH -.->|Timeout 5s / Conexão Recusada| EDGE3
-    UNICAST -->|Async HTTP GET/POST| EDGE1
+    DISPATCH -->|"Async HTTP GET/POST"| EDGE1
+    DISPATCH -->|"Async HTTP GET/POST"| EDGE2
+    DISPATCH -.->|"Timeout 5s / Conexão Recusada"| EDGE3
+    UNICAST -->|"Async HTTP GET/POST"| EDGE1
 
     EDGE1 --> JSON1
     EDGE2 --> JSON2
 
     JSON1 --> COLLECTOR
     JSON2 --> COLLECTOR
-    DISPATCH -.->|Injeção no SLA Expirado| FALLBACK_HUB
+    DISPATCH -.->|"Injeção no SLA Expirado"| FALLBACK_HUB
     FALLBACK_HUB --> COLLECTOR
 
     COLLECTOR --> SYNTH
-    SYNTH -->|Relatório Gerencial Consolidado| USER
+    SYNTH -->|"Relatório Gerencial Consolidado"| USER
 ```
 
 #### Mecânica Operacional do Fluxo MapReduce:
@@ -195,16 +195,16 @@ O módulo [`SemanticRouter`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-ban
 
 ```mermaid
 flowchart LR
-    Q["Pergunta do Usuário\n('deu ruim no turno da madruga?')"] --> CACHE{"Cache em Memória\n(LRU Cache)"}
+    Q["Pergunta do Usuário<br/>('deu ruim no turno da madruga?')"] --> CACHE{"Cache em Memória<br/>(LRU Cache)"}
     
-    CACHE -->|Hit (< 0.1ms)| ROUTE_FAST["⚡ Despacho Imediato\n(0 API / 0 Banco)"]
-    CACHE -->|Miss| VEC["Embeddings 768d\n(Gemini API)"]
+    CACHE -->|"Hit (sub-0.1ms)"| ROUTE_FAST["⚡ Despacho Imediato<br/>(0 API / 0 Banco)"]
+    CACHE -->|"Miss"| VEC["Embeddings 768d<br/>(Gemini API)"]
     
-    VEC --> PG["pgvector: intencoes_vetores\nCosine Distance <=> halfvec\nLatência < 5ms"]
-    PG --> EVAL{"Similaridade >= Threshold\n(0.58)?"}
+    VEC --> PG["pgvector: intencoes_vetores<br/>Cosine Distance - halfvec<br/>Latência sub-5ms"]
+    PG --> EVAL{"Similaridade maior ou igual a 0.58?"}
     
-    EVAL -->|Sim| ROUTE_SEM["🎯 Rota Semântica Confirmada\n(auditoria_turno)"]
-    EVAL -->|Não| FB["🛡️ Fallback Gracioso\n(Heurísticas Determinísticas)"]
+    EVAL -->|"Sim"| ROUTE_SEM["🎯 Rota Semântica Confirmada<br/>(auditoria_turno)"]
+    EVAL -->|"Não"| FB["🛡️ Fallback Gracioso<br/>(Heurísticas Determinísticas)"]
 ```
 
 #### Capacidades Chave do Roteador Semântico:
@@ -223,15 +223,15 @@ O motor [`HybridRAGEngine`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banc
 
 ```mermaid
 flowchart LR
-    Q["Query do Usuário\n(Ex: 'óleo lubrax 5w30' ou '7891234567890')"] --> SPLIT{"Processador de Query"}
+    Q["Query do Usuário<br/>(Ex: 'óleo lubrax 5w30' ou '7891234567890')"] --> SPLIT{"Processador de Query"}
     
-    SPLIT -->|Embedding 768d| DENSE["Busca Densa (HNSW)\npgvector vector_cosine_ops\nef_search = 128"]
-    SPLIT -->|Stemming + Viscosidades| SPARSE["Busca Esparsa (GIN)\ntsvector / to_tsquery\nTokens e Viscosidades"]
+    SPLIT -->|"Embedding 768d"| DENSE["Busca Densa (HNSW)<br/>pgvector vector_cosine_ops<br/>ef_search = 128"]
+    SPLIT -->|"Stemming + Viscosidades"| SPARSE["Busca Esparsa (GIN)<br/>tsvector / to_tsquery<br/>Tokens e Viscosidades"]
     
-    DENSE --> RRF["RRF Calibrado em SQL Nativo\nScore = 0.5/(60+r_d) + 0.5/(60+r_s)\n+ Boost EAN/Codpro (+1.0)\n+ Boost Viscosidade (+0.08)"]
+    DENSE --> RRF["RRF Calibrado em SQL Nativo<br/>Score = 0.5/(60+r_d) + 0.5/(60+r_s)<br/>+ Boost EAN/Codpro (+1.0)<br/>+ Boost Viscosidade (+0.08)"]
     SPARSE --> RRF
     
-    RRF --> RES["Top-K Resultados Classificados\n(SKU exato + Viscosidade priorizada)"]
+    RRF --> RES["Top-K Resultados Classificados<br/>(SKU exato + Viscosidade priorizada)"]
 ```
 
 #### Calibração do RRF & Otimizações:
@@ -248,10 +248,10 @@ O módulo [`PostoTools.auditar_fechamento_turno`](file:///C:/Users/Marlon/Docume
 
 ```mermaid
 flowchart TD
-    A["Encerrantes Físicos de Pista\n(fechabomba: enclts - encltsa)"] --> TRIANG["Triangulação e Auditoria do Turno"]
-    B["Automação Companytec CBC04\n(abastecimentos: bicos e volumetria)"] --> TRIANG
-    C["Fechamento Financeiro do Caixa\n(fechacaixa + pedido / NFC-e)"] --> TRIANG
-    D["Regras Volumétricas da ANP\n(Balanço de Tanques ±0.6%)"] --> TRIANG
+    A["Encerrantes Físicos de Pista<br/>(fechabomba: enclts - encltsa)"] --> TRIANG["Triangulação e Auditoria do Turno"]
+    B["Automação Companytec CBC04<br/>(abastecimentos: bicos e volumetria)"] --> TRIANG
+    C["Fechamento Financeiro do Caixa<br/>(fechacaixa + pedido / NFC-e)"] --> TRIANG
+    D["Regras Volumétricas da ANP<br/>(Balanço de Tanques ±0.6%)"] --> TRIANG
 
     TRIANG --> DIAG["Diagnóstico Executivo Ai.la"]
     DIAG --> OUT1["✓ Faturamento Pista vs Caixa"]
@@ -319,20 +319,20 @@ flowchart LR
     end
 
     subgraph HARDWARE["📡 Concentrador Companytec CBC04"]
-        CBC["Loop de Corrente / RS485 / TCP\nCompanytec CBC04"]
+        CBC["Loop de Corrente / RS485 / TCP<br/>Companytec CBC04"]
     end
 
     subgraph ERP_DB["💾 Banco ERP Transacional"]
-        TAB_ABAST["Tabela: abastecimentos\n• bico / bomba\n• tanque\n• ei (encerrante inicial)\n• encerrante (final)\n• litros apurados\n• total faturado\n• abt_bl_venda_cancelada"]
+        TAB_ABAST["Tabela: abastecimentos<br/>- bico / bomba<br/>- tanque<br/>- ei (encerrante inicial)<br/>- encerrante (final)<br/>- litros apurados<br/>- total faturado<br/>- abt_bl_venda_cancelada"]
     end
 
     subgraph AILA["⚡ Motor de Auditoria Ai.la"]
-        AUDITOR["Triangulação Pista vs Automação:\n• Confronto CBC04 vs fechabomba\n• Detecção de Abastecimento não Digitado\n• Validação de Preço de Bomba"]
+        AUDITOR["Triangulação Pista vs Automação:<br/>- Confronto CBC04 vs fechabomba<br/>- Detecção de Abastecimento não Digitado<br/>- Validação de Preço de Bomba"]
     end
 
-    PISTA -->|Pulsadores Eletrônicos| CBC
-    CBC -->|Sincronização Serial / IP| TAB_ABAST
-    TAB_ABAST -->|SELECT Read-Only| AUDITOR
+    PISTA -->|"Pulsadores Eletrônicos"| CBC
+    CBC -->|"Sincronização Serial / IP"| TAB_ABAST
+    TAB_ABAST -->|"SELECT Read-Only"| AUDITOR
 ```
 
 #### Capacidades da Auditoria da Automação CBC04:
@@ -596,8 +596,9 @@ $$
 ### Pré-requisitos
 * **Sistema Operacional:** Windows 10/11 ou Windows Server (ambiente nativo dos PDVs).
 * **Python:** 3.11 ou 3.12 instalado.
-* **Docker Desktop:** Instalado e em execução (para o container do `pgvector`).
-* **PostgreSQL do ERP:** PostgreSQL 9.5+ rodando na porta `5433` (ou configurável no `.env`).
+* **Banco de Dados (Modo 100% Nativo Windows):** PostgreSQL 16 instalado localmente na porta `5433` com extensão `pgvector` ativa (sem dependência obrigatória de Docker ou WSL).
+* **Banco de Dados (Modo Alternativo Docker):** Caso prefira rodar o `pgvector` em contêiner, Docker Desktop na porta `5434`.
+* **Banco ERP do Posto:** PostgreSQL 9.5+ rodando na porta `5433` (ou configurável no `.env`).
 
 ### 1. Clonar o Repositório
 ```powershell
@@ -630,9 +631,9 @@ ERP_DB_NAME=posto
 ERP_DB_USER=suporte
 ERP_DB_PASSWORD=sua_senha_erp
 
-# Banco Vetorial Semântico (PostgreSQL 16 Docker pgvector)
+# Banco Vetorial Semântico (PostgreSQL 16 Windows com pgvector na porta 5433)
 VECTOR_DB_HOST=localhost
-VECTOR_DB_PORT=5434
+VECTOR_DB_PORT=5433
 VECTOR_DB_NAME=posto_ai
 VECTOR_DB_USER=postgres
 VECTOR_DB_PASSWORD=sua_senha_pgvector
@@ -642,8 +643,12 @@ DEFAULT_EMBEDDING_MODEL=models/gemini-embedding-001
 DEFAULT_LLM_MODEL=models/gemini-3.1-flash-lite
 ```
 
-### 4. Subir o Container Docker do pgvector
-Caso ainda não tenha o container criado:
+> [!NOTE]
+> Caso utilize o contêiner Docker dedicado para o `pgvector`, mantenha `VECTOR_DB_PORT=5434`.
+
+### 4. Inicialização do Banco Vetorial
+- **Modo Nativo Windows (Padrão):** O PostgreSQL 16 local já gerencia as bases `posto` e `posto_ai` na porta 5433 com `pgvector`.
+- **Modo Docker (Opcional):** Caso prefira isolar em contêiner:
 ```powershell
 docker run -d --name pgvector-posto -p 5434:5432 -e POSTGRES_DB=posto_ai -e POSTGRES_PASSWORD=sua_senha_pgvector pgvector/pgvector:pg16
 ```
@@ -658,6 +663,9 @@ Dê um duplo clique no arquivo [`iniciar_painel.bat`](file:///C:/Users/Marlon/Do
 python server.py
 ```
 *Inicia o servidor local FastAPI com Uvicorn e abre automaticamente o navegador em `http://127.0.0.1:8000`, carregando o Cockpit Operacional da Pista (tanques cilíndricos com simulação de fluido, bicos e frentistas), a Matriz de 11 Gatilhos Analíticos em 1-Clique (0 tokens LLM) e o Console Cognitivo com Streaming SSE.*
+
+> [!TIP]
+> Caso o serviço de segundo plano do Windows (`AuraBackendService`) já esteja ativo na porta 8000, tanto o `iniciar_painel.bat` quanto o `python server.py` identificam automaticamente o serviço saudável, evitam conflitos de porta e abrem imediatamente o navegador em `http://127.0.0.1:8000`.
 
 #### Opção B: Launcher CLI 1-Clique (Terminal Interativo)
 Dê um duplo clique no arquivo [`iniciar.bat`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/iniciar.bat) ou execute no PowerShell:
