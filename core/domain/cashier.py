@@ -203,6 +203,64 @@ class UniversalCashierShift(AUPSBaseModel):
         ),
         description="Diferenca apurada (declarado menos sistema; negativo indica quebra)",
     )
+    pdv: str = Field(
+        default="1",
+        validation_alias=AliasChoices("pdv", "caixa_pdv", "pos", "caixa", "codpdv"),
+        description="Identificador do PDV associado",
+    )
+    caixa_id: str = Field(
+        default="1",
+        validation_alias=AliasChoices("caixa_id", "cai_cd_caixa", "terminal_id", "terminal"),
+        description="Identificador unico da sessao ou terminal de caixa",
+    )
+    fechado: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("fechado", "is_closed", "status_fechado"),
+        description="Indica se o caixa esta fechado formalmente",
+    )
+    dinheiro_declarado_reais: float = Field(
+        default=0.0,
+        ge=0.0,
+        validation_alias=AliasChoices("dinheiro_declarado_reais", "dinheiro", "valdinh", "cash"),
+        description="Total declarado em dinheiro em especie",
+    )
+    cartao_declarado_reais: float = Field(
+        default=0.0,
+        ge=0.0,
+        validation_alias=AliasChoices("cartao_declarado_reais", "cartao", "valcart", "card"),
+        description="Total declarado em cartoes de debito e credito / TEF",
+    )
+    prazo_declarado_reais: float = Field(
+        default=0.0,
+        ge=0.0,
+        validation_alias=AliasChoices("prazo_declarado_reais", "prazo", "valnotpra", "faturado"),
+        description="Total declarado em faturado a prazo",
+    )
+    convenio_cheque_reais: float = Field(
+        default=0.0,
+        ge=0.0,
+        validation_alias=AliasChoices("convenio_cheque_reais", "convenio_cheque", "convenio", "cheque"),
+        description="Total declarado em convenio e cheques",
+    )
+    venda_combustivel_reais: float = Field(
+        default=0.0,
+        ge=0.0,
+        validation_alias=AliasChoices("venda_combustivel_reais", "venda_combustivel", "combustivel_reais"),
+        description="Total de faturamento em combustivel apurado",
+    )
+    venda_produtos_reais: float = Field(
+        default=0.0,
+        ge=0.0,
+        validation_alias=AliasChoices("venda_produtos_reais", "venda_produtos", "produtos_reais"),
+        description="Total de faturamento em produtos/conveniencia apurado",
+    )
+    litros_declarados: float = Field(
+        default=0.0,
+        ge=0.0,
+        validation_alias=AliasChoices("litros_declarados", "litros"),
+        description="Total de litros declarados",
+    )
+
 
     @property
     def usuario_id(self) -> str:
@@ -255,6 +313,13 @@ class UniversalCashierShift(AUPSBaseModel):
         "fundo_troco_reais",
         "total_declarado_reais",
         "total_sistema_reais",
+        "dinheiro_declarado_reais",
+        "cartao_declarado_reais",
+        "prazo_declarado_reais",
+        "convenio_cheque_reais",
+        "venda_combustivel_reais",
+        "venda_produtos_reais",
+        "litros_declarados",
         mode="before",
     )
     @classmethod
@@ -265,6 +330,20 @@ class UniversalCashierShift(AUPSBaseModel):
     @classmethod
     def _validate_quebra_sobra(cls, v: Any) -> float:
         return parse_float_safe(v, default=0.0, allow_negative=True)
+
+    @field_validator("pdv", "caixa_id", mode="before")
+    @classmethod
+    def _validate_shift_ids(cls, v: Any) -> str:
+        return parse_str_safe(v, default="1")
+
+    @field_validator("fechado", mode="before")
+    @classmethod
+    def _validate_fechado(cls, v: Any) -> bool:
+        if isinstance(v, str):
+            clean = v.strip().upper()
+            return clean in ("S", "SIM", "TRUE", "1", "FECHADO")
+        return bool(v) if v is not None else True
+
 
     @model_validator(mode="before")
     @classmethod

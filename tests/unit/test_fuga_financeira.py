@@ -13,6 +13,8 @@ import pytest
 from pydantic import ValidationError
 
 from core.aura_engine import AuraEngine
+from core.domain.cashier import UniversalCashierShift
+from core.domain.sales import UniversalPaymentMethod, UniversalSaleReceipt
 from core.schemas.genui import FinancialLeakAuditProps, FinancialLeakItem
 from core.semantic_router import classificar_intencao_heuristica
 from core.tools import PostoTools
@@ -32,7 +34,7 @@ def aura_engine(posto_tools):
 
 def test_auditar_fuga_financeira_fallback_offline(posto_tools):
     """Valida a execucao do motor deterministico em cenario offline/fallback calibrado."""
-    with patch("core.tools.get_erp_connection", side_effect=Exception("DB Offline")):
+    with patch.object(posto_tools.erp_adapter, "get_cashier_shifts", side_effect=Exception("DB Offline")):
         resultado = posto_tools.auditar_fuga_financeira()
 
     assert resultado["status"] == "ok"
@@ -90,42 +92,55 @@ def test_auditar_fuga_financeira_real_db_divergence(posto_tools):
 
 def test_auditar_fuga_financeira_conformidade_sem_divergencias(posto_tools):
     """Valida diagnostico de conformidade quando nao ha quebras de caixa ou descompasso TEF."""
-    mock_fechacaixa = [
-        {
-            "caixa_id": 1,
-            "pdv": "001",
-            "turno": "1",
-            "matricula": "0001",
-            "operador_nome": "OPERADOR TESTE",
-            "fechado": "S",
-            "dinheiro": 100.0,
-            "cartao": 200.0,
-            "prazo": 0.0,
-            "convenio_cheque": 0.0,
-            "total_declarado": 300.0,
-            "venda_combustivel": 300.0,
-            "venda_produtos": 0.0,
-            "litros_declarados": 50.0,
-        }
-    ]
-    mock_formas_pdv = [
-        {"pdv": "001", "forma_grupo": "DINHEIRO", "qtd": 5, "total_faturado": 100.0},
-        {"pdv": "001", "forma_grupo": "CARTAO_PIX", "qtd": 10, "total_faturado": 200.0},
+    mock_shift = UniversalCashierShift(
+        caixa_id="1",
+        pdv="001",
+        turno_descricao="1",
+        operador_id="0001",
+        operador_nome="OPERADOR TESTE",
+        fechado=True,
+        dinheiro_declarado_reais=100.0,
+        cartao_declarado_reais=200.0,
+        prazo_declarado_reais=0.0,
+        convenio_cheque_reais=0.0,
+        total_declarado_reais=300.0,
+        venda_combustivel_reais=300.0,
+        venda_produtos_reais=0.0,
+        litros_declarados=50.0,
+    )
+    mock_sales = [
+        UniversalSaleReceipt(
+            cupom_id="1",
+            pdv="001",
+            total_reais=100.0,
+            status="CONCLUIDA",
+            pagamentos=[
+                UniversalPaymentMethod(
+                    codigo_forma_pagamento="1",
+                    descricao_forma="DINHEIRO",
+                    tipo="dinheiro",
+                    valor_reais=100.0,
+                )
+            ],
+        ),
+        UniversalSaleReceipt(
+            cupom_id="2",
+            pdv="001",
+            total_reais=200.0,
+            status="CONCLUIDA",
+            pagamentos=[
+                UniversalPaymentMethod(
+                    codigo_forma_pagamento="2",
+                    descricao_forma="CARTAO_PIX",
+                    tipo="credito",
+                    valor_reais=200.0,
+                )
+            ],
+        ),
     ]
 
-    with patch("core.tools.get_erp_connection") as mock_conn:
-        mock_cur = MagicMock()
-        # Retornos: max_d, fechacaixa, fechabomba, abastecimentos, pedidos, estornos
-        mock_cur.fetchone.return_value = {"max_d": "2026-10-14"}
-        mock_cur.fetchall.side_effect = [
-            mock_fechacaixa,
-            [],  # fechabomba
-            [],  # abastecimentos
-            mock_formas_pdv,
-            [],  # estornos
-        ]
-        mock_conn.return_value.cursor.return_value.__enter__.return_value = mock_cur
-
+    with patch.object(posto_tools.erp_adapter, "get_cashier_shifts", return_value=[mock_shift]), \
+         patch.object(posto_tools.erp_adapter, "get_recent_sales", return_value=mock_sales):
         resultado = posto_tools.auditar_fuga_financeira(data="2026-10-14")
         assert resultado["status"] == "ok"
         assert resultado["fonte_dados"] == "ERP_POSTGRESQL"
@@ -139,7 +154,7 @@ def test_auditar_fuga_financeira_conformidade_sem_divergencias(posto_tools):
 
 def test_auditar_fuga_financeira_custom_tolerance(posto_tools):
     """Valida customizacao de tolerancia de quebra de caixa e teto de gaveta."""
-    with patch("core.tools.get_erp_connection", side_effect=Exception("DB Offline")):
+    with patch.object(posto_tools.erp_adapter, "get_cashier_shifts", side_effect=Exception("DB Offline")):
         resultado = posto_tools.auditar_fuga_financeira(
             cash_tolerance_reais=100.0,
             max_safe_cash_drawer=1000.0,
@@ -225,7 +240,7 @@ def test_gerar_diagnostico_mentoria_executiva_delegation(posto_tools):
         "auditoria_quebras",
         "fugas",
     ]
-    with patch("core.tools.get_erp_connection", side_effect=Exception("DB Offline")):
+    with patch.object(posto_tools.erp_adapter, "get_cashier_shifts", side_effect=Exception("DB Offline")):
         for alias in aliases:
             res = posto_tools.gerar_diagnostico_mentoria_executiva(tipo=alias)
             assert res["status"] == "ok"
@@ -260,7 +275,7 @@ def test_semantic_router_fuga_financeira():
 @pytest.mark.asyncio
 async def test_aura_engine_execute_tool_direct_and_contingency(posto_tools):
     """Valida execucao direta de ferramenta e sintese de contingencia rica no AuraEngine."""
-    with patch("core.tools.get_erp_connection", side_effect=Exception("DB Offline")):
+    with patch.object(posto_tools.erp_adapter, "get_cashier_shifts", side_effect=Exception("DB Offline")):
         engine = AuraEngine(tools=posto_tools)
 
         # 1. Execucao direta no AuraEngine
@@ -303,7 +318,7 @@ async def test_aura_engine_execute_tool_direct_and_contingency(posto_tools):
 
 
 def test_erp_read_only_access_in_tools_file():
-    """Garante que a ferramenta auditar_fuga_financeira executa exclusivamente SELECT."""
+    """Garante que a ferramenta auditar_fuga_financeira executa exclusivamente atraves do ERP Adapter."""
     import inspect
     source = inspect.getsource(PostoTools.auditar_fuga_financeira)
 
@@ -312,5 +327,7 @@ def test_erp_read_only_access_in_tools_file():
     for kw in prohibited_keywords:
         assert kw not in source.upper(), f"Palavra proibida de mutacao encontrada: {kw}"
 
-    # Verifica presenca de SELECT
-    assert "SELECT " in source.upper(), "Metodo deve realizar consultas SELECT ao ERP"
+    # Verifica desacoplamento clean-room: consumo do erp_adapter sem SQL direto
+    assert "erp_adapter" in source.lower(), "Metodo deve delegar para o erp_adapter"
+    assert "get_erp_connection" not in source, "Metodo nao deve abrir conexao SQL direta"
+    assert "SELECT " not in source.upper(), "Metodo nao deve conter queries SQL brutas"

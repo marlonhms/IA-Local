@@ -96,6 +96,9 @@ from core.adapters.erp.base import BaseERPAdapter
 from core.adapters.erp.mock_adapter import MockERPAdapter
 from core.adapters.erp.postgres_local_adapter import PostgresLocalERPAdapter
 from core.domain.sales import UniversalSaleReceipt, UniversalSaleItem
+from core.domain.cashier import UniversalCashierShift
+from core.domain.pumps import UniversalDispenserLog
+from core.domain.tanks import UniversalTankReading
 
 def get_erp_connection(timeout: Optional[int] = None):
     """
@@ -596,248 +599,162 @@ class PostoTools:
         Calcula quebras, sobras, furos e divergências de pista/caixa com conformidade LGPD.
         """
         try:
-            conn = get_erp_connection()
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # 1. Determinação da Data Alvo
-                data_param = self.normalizar_data(data)
-                aviso_data = None
-                data_alvo = None
+            # 1. Determinacao da Data Alvo
+            data_param = self.normalizar_data(data)
+            aviso_data = None
+            data_alvo = None
+            hoje_date = date.today()
 
-                cur.execute("SELECT CURRENT_DATE;")
-                data_hoje = cur.fetchone()['current_date']
-
-                if not data_param or data_param == "hoje":
-                    cur.execute("SELECT COUNT(*) as c FROM fechabomba WHERE dtmov = %s;", (data_hoje,))
-                    c_fb = cur.fetchone()['c']
-                    cur.execute("SELECT COUNT(*) as c FROM abastecimentos WHERE data = %s;", (data_hoje,))
-                    c_ab = cur.fetchone()['c']
-
-                    if c_fb > 0 or c_ab > 0:
-                        data_alvo = str(data_hoje)
-                    else:
-                        cur.execute("""
-                            SELECT GREATEST(
-                                (SELECT MAX(dtmov) FROM fechabomba),
-                                (SELECT MAX(dtmov) FROM fechacaixa),
-                                (SELECT MAX(data) FROM abastecimentos)
-                            ) as max_d;
-                        """)
-                        max_d = cur.fetchone()['max_d']
-                        if max_d:
-                            data_alvo = str(max_d)
-                            aviso_data = (
-                                f"Nenhum fechamento registrado para hoje ({data_hoje}). "
-                                f"Exibindo auditoria da data mais recente com movimentação: {data_alvo}."
-                            )
-                        else:
-                            data_alvo = str(data_hoje)
-                elif data_param == "ontem":
-                    cur.execute("SELECT (CURRENT_DATE - INTERVAL '1 day')::date as ontem;")
-                    data_alvo = str(cur.fetchone()['ontem'])
-                elif data_param == "anteontem":
-                    cur.execute("SELECT (CURRENT_DATE - INTERVAL '2 days')::date as anteontem;")
-                    data_alvo = str(cur.fetchone()['anteontem'])
+            if not data_param or data_param == "hoje":
+                shifts_hoje = self.erp_adapter.get_cashier_shifts(target_date=hoje_date, limit=10)
+                dispenses_hoje = self.erp_adapter.get_pump_dispenses(start_date=hoje_date, end_date=hoje_date, limit=10)
+                if shifts_hoje or dispenses_hoje:
+                    data_alvo = str(hoje_date)
                 else:
-                    data_alvo = data_param
+                    recent_shifts = self.erp_adapter.get_cashier_shifts(limit=10)
+                    recent_dispenses = self.erp_adapter.get_pump_dispenses(limit=10)
+                    recent_dates = []
+                    for s in recent_shifts:
+                        if s.data_movimento:
+                            recent_dates.append(s.data_movimento)
+                    for d in recent_dispenses:
+                        if d.timestamp_registro:
+                            recent_dates.append(d.timestamp_registro.date())
+                    if recent_dates:
+                        max_d = max(recent_dates)
+                        data_alvo = str(max_d)
+                        aviso_data = (
+                            f"Nenhum fechamento registrado para hoje ({hoje_date}). "
+                            f"Exibindo auditoria da data mais recente com movimentação: {data_alvo}."
+                        )
+                    else:
+                        data_alvo = str(hoje_date)
+            elif data_param == "ontem":
+                data_alvo = str(hoje_date - timedelta(days=1))
+            elif data_param == "anteontem":
+                data_alvo = str(hoje_date - timedelta(days=2))
+            else:
+                data_alvo = data_param
 
-                # 2. Determinação do Turno
-                filtro_turno_pattern, _ = self.normalizar_turno(turno)
+            # 2. Determinacao do Turno
+            filtro_turno_pattern, num_turno = self.normalizar_turno(turno)
 
-                # 3. Consulta de Encerrantes de Pista (fechabomba)
-                cur.execute("""
-                    SELECT 
-                        TRIM(fb.codbom) AS bico,
-                        TRIM(fb.codtan) AS tanque,
-                        TRIM(fb.codpro) AS codpro,
-                        COALESCE(TRIM(p.nompro), 'COMBUSTÍVEL ' || TRIM(fb.codpro)) AS nompro,
-                        COALESCE(fb.encltsa, 0)::numeric AS encerrante_inicial,
-                        COALESCE(fb.enclts, 0)::numeric AS encerrante_final,
-                        COALESCE(fb.qtdeaf, 0)::numeric AS afericao_litros,
-                        fb.preco::numeric AS preco_fechamento,
-                        p.valvenda::numeric AS preco_cadastro,
-                        fb.enc_cd_caixa,
-                        TRIM(fb.codpdv) AS pdv,
-                        TRIM(fb.turno) AS turno
-                    FROM fechabomba fb
-                    LEFT JOIN produtos p ON p.codpro = fb.codpro
-                    WHERE fb.dtmov = %s 
-                      AND (%s::text IS NULL OR fb.turno ILIKE %s)
-                    ORDER BY fb.codbom;
-                """, (data_alvo, filtro_turno_pattern, filtro_turno_pattern))
-                linhas_fechabomba = cur.fetchall()
+            def _match_turno(turno_val: Optional[str]) -> bool:
+                if not filtro_turno_pattern:
+                    return True
+                if not turno_val:
+                    return True
+                t_str = str(turno_val).lower().strip()
+                pat_clean = filtro_turno_pattern.replace("%", "").lower().strip()
+                if num_turno is not None and str(num_turno) in t_str:
+                    return True
+                return pat_clean in t_str
 
-                # 4. Consulta de Automação CBC04 (abastecimentos)
-                cur.execute("""
-                    SELECT 
-                        TRIM(a.bomba) AS bico,
-                        TRIM(a.tanque) AS tanque,
-                        TRIM(a.codpro) AS codpro,
-                        COALESCE(TRIM(p.nompro), 'COMBUSTÍVEL ' || TRIM(a.codpro)) AS nompro,
-                        COUNT(*)::int AS qtd_abastecimentos,
-                        ROUND(COALESCE(SUM(a.litros), 0)::numeric, 3) AS volume_automacao_litros,
-                        ROUND(COALESCE(SUM(a.total), 0)::numeric, 2) AS total_automacao_reais,
-                        ROUND(MIN(a.ei)::numeric, 3) AS encerrante_inicial_automacao,
-                        ROUND(MAX(a.encerrante)::numeric, 3) AS encerrante_final_automacao,
-                        TRIM(a.turno) AS turno
-                    FROM abastecimentos a
-                    LEFT JOIN produtos p ON p.codpro = a.codpro
-                    WHERE a.data = %s 
-                      AND (%s::text IS NULL OR a.turno ILIKE %s)
-                      AND (a.abt_bl_venda_cancelada IS NOT TRUE)
-                    GROUP BY a.bomba, a.tanque, a.codpro, p.nompro, a.turno
-                    ORDER BY a.bomba;
-                """, (data_alvo, filtro_turno_pattern, filtro_turno_pattern))
-                linhas_automacao = cur.fetchall()
+            # 3. Consulta de Encerrantes de Pista e Automacao via ERP Adapter
+            dispenses_raw = self.erp_adapter.get_pump_dispenses(
+                start_date=data_alvo, end_date=data_alvo, limit=200
+            )
+            dispenses = [d for d in dispenses_raw if _match_turno(d.turno_descricao)]
 
-                # 5. Consulta de Fechamento de Caixa (fechacaixa + funcionarios)
-                cur.execute("""
-                    SELECT 
-                        fc.cai_cd_caixa AS caixa_id,
-                        TRIM(fc.codpdv) AS pdv,
-                        TRIM(fc.turno) AS turno,
-                        TRIM(fc.matricula) AS matricula,
-                        COALESCE(TRIM(f.nome), 'OPERADOR NÃO INFORMADO') AS operador_nome,
-                        COALESCE(fc.fechado, 'N') AS fechado,
-                        fc.cai_ts_abertura,
-                        CASE WHEN fc.cai_ts_fechamento > '1900-01-01' THEN fc.cai_ts_fechamento ELSE NULL END AS cai_ts_fechamento,
-                        COALESCE(fc.valdinh, 0)::numeric AS dinheiro,
-                        COALESCE(fc.valcart, 0)::numeric AS cartao,
-                        COALESCE(fc.valnotpra, 0)::numeric AS prazo,
-                        (COALESCE(fc.valcheconv, 0) + COALESCE(fc.valchevis, 0) + COALESCE(fc.valchepre, 0))::numeric AS convenio_cheque,
-                        COALESCE(fc.valtot, (COALESCE(fc.valdinh, 0) + COALESCE(fc.valcart, 0) + COALESCE(fc.valnotpra, 0) + COALESCE(fc.valcheconv, 0) + COALESCE(fc.valchevis, 0) + COALESCE(fc.valchepre, 0)))::numeric AS total_declarado,
-                        COALESCE(fc.venda_combustivel, 0)::numeric AS venda_combustivel,
-                        COALESCE(fc.venda_produtos, 0)::numeric AS venda_produtos,
-                        COALESCE(fc.litros, 0)::numeric AS litros_declarados
-                    FROM fechacaixa fc
-                    LEFT JOIN funcionarios f ON f.matr = fc.matricula
-                    WHERE fc.dtmov = %s 
-                      AND (%s::text IS NULL OR fc.turno ILIKE %s)
-                    ORDER BY fc.cai_cd_caixa;
-                """, (data_alvo, filtro_turno_pattern, filtro_turno_pattern))
-                linhas_fechacaixa = cur.fetchall()
+            # 4. Consulta de Fechamento de Caixa via ERP Adapter
+            shifts_raw = self.erp_adapter.get_cashier_shifts(target_date=data_alvo, limit=50)
+            shifts = [s for s in shifts_raw if _match_turno(s.turno_descricao)]
 
-                # Se não houver movimentação em nenhuma das 3 fontes
-                if not linhas_fechabomba and not linhas_automacao and not linhas_fechacaixa:
-                    cur.execute("""
-                        SELECT GREATEST(
-                            (SELECT MAX(dtmov) FROM fechabomba),
-                            (SELECT MAX(dtmov) FROM fechacaixa),
-                            (SELECT MAX(data) FROM abastecimentos)
-                        ) as max_d;
-                    """)
-                    max_disp = cur.fetchone()['max_d']
-                    conn.close()
-                    msg = f"Nenhum registro de fechamento de bomba, caixa ou abastecimento encontrado para a data {data_alvo}."
-                    if max_disp:
-                        msg += f" Última data com movimentação registrada: {max_disp}."
-                    queried_at_iso = datetime.now().astimezone().isoformat()
-                    contrato_sem_mov = ShiftReconciliationContract(
-                        schema_version="1.0",
-                        response_id=f"reconcil-{data_alvo}-sem_movimento",
-                        intent="shift_reconciliation",
-                        context=ReconciliationContext(
-                            unit_id="posto_01",
-                            shift_id=str(turno or "todos"),
-                            queried_at=queried_at_iso,
-                            data_auditada=str(data_alvo),
-                            data_solicitada=str(data or "hoje"),
-                            turno_solicitado=str(turno or "TODOS"),
-                            period_start=None,
-                            period_end=None,
-                        ),
-                        assessment=ReconciliationAssessment(
-                            finality="no_movement",
-                            severity="normal",
-                            status_code="SEM_MOVIMENTO",
-                            title="Sem movimentação registrada",
-                            limitation="Nenhum registro de fechamento de bomba, caixa ou abastecimento na data consultada.",
-                            badge_label="Sem movimentação",
-                        ),
-                        metrics=ReconciliationMetrics(
-                            automation_revenue=0.0,
-                            automation_revenue_cents=0,
-                            pos_revenue=0.0,
-                            pos_revenue_cents=0,
-                            difference=0.0,
-                            difference_cents=0,
-                            difference_definition="pos_minus_automation",
-                            physical_volume_liters=None,
-                            physical_volume_state="not_reported",
-                            automation_volume_liters=0.0,
-                            is_provisional=False,
-                        ),
-                        pending_items=[],
-                        sources=[
-                            DataSource(id="automation", label="Automação Companytec CBC04", availability="missing"),
-                            DataSource(id="pos", label="PDV / Caixas", availability="missing"),
-                            DataSource(id="physical_readings", label="Encerrantes Físicos", availability="missing"),
-                            DataSource(id="tanks", label="Medição de Tanques", availability="missing"),
-                        ],
-                        recommended_action=RecommendedAction(
-                            label=f"Consultar data recente ({max_disp})" if max_disp else "Consultar outra data",
-                            execution="external_manual",
-                            detail=f"Última data disponível no ERP: {max_disp}" if max_disp else "Sem datas com movimentação"
-                        ),
-                        explanation=ReconciliationExplanation(text=msg),
-                    )
-                    return {
-                        "status": "sem_movimento",
-                        "data_auditada": str(data_alvo),
-                        "data_solicitada": data or "hoje",
-                        "turno_solicitado": turno or "TODOS",
-                        "ultima_data_disponivel": str(max_disp) if max_disp else None,
-                        "mensagem": msg,
-                        "schema_version": "1.0",
-                        "response_id": f"reconcil-{data_alvo}-sem_movimento",
-                        "intent": "shift_reconciliation",
-                        "context": contrato_sem_mov.context.model_dump(),
-                        "assessment": contrato_sem_mov.assessment.model_dump(),
-                        "metrics": contrato_sem_mov.metrics.model_dump(),
-                        "pending_items": [p.model_dump() for p in contrato_sem_mov.pending_items],
-                        "sources": [s.model_dump() for s in contrato_sem_mov.sources],
-                        "recommended_action": contrato_sem_mov.recommended_action.model_dump(),
-                        "explanation": contrato_sem_mov.explanation.model_dump(),
-                        "contrato": contrato_sem_mov.model_dump(),
-                    }
+            # 5. Consulta de Cupons / Pedidos do PDV via ERP Adapter
+            sales_raw = self.erp_adapter.get_recent_sales(
+                start_date=data_alvo, end_date=data_alvo, limit=1000
+            )
+            pedidos_por_pdv: Dict[str, float] = {}
+            for v in sales_raw:
+                v_pdv = str(v.pdv or "1").strip()
+                pedidos_por_pdv[v_pdv] = round(pedidos_por_pdv.get(v_pdv, 0.0) + float(v.total_reais or 0.0), 2)
+            total_pedidos_pdv = round(sum(pedidos_por_pdv.values()), 2)
 
-                # 6. Consulta de Cupons / Pedidos do PDV (para caixas abertos ou faturamento PDV)
-                cur.execute("""
-                    SELECT 
-                        TRIM(pdv) AS pdv,
-                        COUNT(DISTINCT codi)::int AS total_pedidos,
-                        ROUND(COALESCE(SUM(valortotal), 0)::numeric, 2) AS total_faturado_pedidos
-                    FROM pedido
-                    WHERE (dtem = %s OR DATE(ven_ts_venda) = %s)
-                    GROUP BY pdv;
-                """, (data_alvo, data_alvo))
-                pedidos_pdv_rows = cur.fetchall()
-                pedidos_por_pdv = {r['pdv']: float(r['total_faturado_pedidos']) for r in pedidos_pdv_rows}
-                total_pedidos_pdv = sum(float(r['total_faturado_pedidos']) for r in pedidos_pdv_rows)
+            # 6. Consulta de Tanques de Combustiveis via ERP Adapter
+            tanks = self.erp_adapter.get_tank_inventory()
 
-                # 7. Consulta de Tanques de Combustíveis (tanques)
-                cur.execute("""
-                    SELECT 
-                        TRIM(t.codtan) AS codtan,
-                        COALESCE(TRIM(t.prl_ds_produto_lmc), 'COMBUSTÍVEL ' || TRIM(t.codtan)) AS combustivel,
-                        ROUND(COALESCE(t.capacidade, 0)::numeric, 2) AS capacidade_litros,
-                        ROUND(COALESCE(t.qtdeinicioturno, t.qtdean, t.qtdeat, 0)::numeric, 2) AS saldo_inicial_litros,
-                        ROUND(COALESCE(t.tan_vl_quantidade_fim, t.qtdeat, 0)::numeric, 2) AS saldo_final_litros,
-                        ROUND(COALESCE(t.vendasturno, 0)::numeric, 2) AS vendas_registradas_tanque,
-                        (t.qtdeinicioturno IS NOT NULL OR t.tan_vl_quantidade_fim IS NOT NULL) AS tem_medicao_fisica
-                    FROM tanques t
-                    ORDER BY t.codtan;
-                """)
-                linhas_tanques = cur.fetchall()
-
-                conn.close()
+            # Se nao houver movimentacao em nenhuma das fontes
+            if not dispenses and not shifts and not sales_raw:
+                recent_shifts = self.erp_adapter.get_cashier_shifts(limit=5)
+                max_disp = recent_shifts[0].data_movimento if recent_shifts else None
+                msg = f"Nenhum registro de fechamento de bomba, caixa ou abastecimento encontrado para a data {data_alvo}."
+                if max_disp:
+                    msg += f" Última data com movimentação registrada: {max_disp}."
+                queried_at_iso = datetime.now().astimezone().isoformat()
+                contrato_sem_mov = ShiftReconciliationContract(
+                    schema_version="1.0",
+                    response_id=f"reconcil-{data_alvo}-sem_movimento",
+                    intent="shift_reconciliation",
+                    context=ReconciliationContext(
+                        unit_id="posto_01",
+                        shift_id=str(turno or "todos"),
+                        queried_at=queried_at_iso,
+                        data_auditada=str(data_alvo),
+                        data_solicitada=str(data or "hoje"),
+                        turno_solicitado=str(turno or "TODOS"),
+                        period_start=None,
+                        period_end=None,
+                    ),
+                    assessment=ReconciliationAssessment(
+                        finality="no_movement",
+                        severity="normal",
+                        status_code="SEM_MOVIMENTO",
+                        title="Sem movimentação registrada",
+                        limitation="Nenhum registro de fechamento de bomba, caixa ou abastecimento na data consultada.",
+                        badge_label="Sem movimentação",
+                    ),
+                    metrics=ReconciliationMetrics(
+                        automation_revenue=0.0,
+                        automation_revenue_cents=0,
+                        pos_revenue=0.0,
+                        pos_revenue_cents=0,
+                        difference=0.0,
+                        difference_cents=0,
+                        difference_definition="pos_minus_automation",
+                        physical_volume_liters=None,
+                        physical_volume_state="not_reported",
+                        automation_volume_liters=0.0,
+                        is_provisional=False,
+                    ),
+                    pending_items=[],
+                    sources=[
+                        DataSource(id="automation", label="Automação Companytec CBC04", availability="missing"),
+                        DataSource(id="pos", label="PDV / Caixas", availability="missing"),
+                        DataSource(id="physical_readings", label="Encerrantes Físicos", availability="missing"),
+                        DataSource(id="tanks", label="Medição de Tanques", availability="missing"),
+                    ],
+                    recommended_action=RecommendedAction(
+                        label=f"Consultar data recente ({max_disp})" if max_disp else "Consultar outra data",
+                        execution="external_manual",
+                        detail=f"Última data disponível no ERP: {max_disp}" if max_disp else "Sem datas com movimentação"
+                    ),
+                    explanation=ReconciliationExplanation(text=msg),
+                )
+                return {
+                    "status": "sem_movimento",
+                    "data_auditada": str(data_alvo),
+                    "data_solicitada": data or "hoje",
+                    "turno_solicitado": turno or "TODOS",
+                    "ultima_data_disponivel": str(max_disp) if max_disp else None,
+                    "mensagem": msg,
+                    "schema_version": "1.0",
+                    "response_id": f"reconcil-{data_alvo}-sem_movimento",
+                    "intent": "shift_reconciliation",
+                    "context": contrato_sem_mov.context.model_dump(),
+                    "assessment": contrato_sem_mov.assessment.model_dump(),
+                    "metrics": contrato_sem_mov.metrics.model_dump(),
+                    "pending_items": [p.model_dump() for p in contrato_sem_mov.pending_items],
+                    "sources": [s.model_dump() for s in contrato_sem_mov.sources],
+                    "recommended_action": contrato_sem_mov.recommended_action.model_dump(),
+                    "explanation": contrato_sem_mov.explanation.model_dump(),
+                    "contrato": contrato_sem_mov.model_dump(),
+                }
 
             # ----------------------------------------------------
-            # PROCESSAMENTO MATEMÁTICO E TRIANGULAÇÃO
+            # PROCESSAMENTO MATEMATICO E TRIANGULACAO
             # ----------------------------------------------------
 
-            # A. Triangulação de Pista: Mapear automação por bico
-            aut_map = {r['bico']: r for r in linhas_automacao}
-
+            # A. Triangulacao de Pista: Mapear por bico dispensador
             bicos_auditados = []
             tot_litros_bruto_encerrante = Decimal("0.0")
             tot_litros_faturados_encerrante = Decimal("0.0")
@@ -847,31 +764,41 @@ class PostoTools:
             tot_fat_automacao = Decimal("0.0")
             total_abast_count = 0
 
-            todos_bicos = sorted(list(set([r['bico'] for r in linhas_fechabomba] + list(aut_map.keys()))))
-            fb_map = {r['bico']: r for r in linhas_fechabomba}
+            bicos_map: Dict[str, List[UniversalDispenserLog]] = {}
+            for d in dispenses:
+                b_id = str(d.identificador_bico or d.identificador_bomba)
+                if b_id not in bicos_map:
+                    bicos_map[b_id] = []
+                bicos_map[b_id].append(d)
 
-            for bico_id in todos_bicos:
-                fb = fb_map.get(bico_id, {})
-                aut = aut_map.get(bico_id, {})
+            for bico_id in sorted(bicos_map.keys()):
+                d_list = bicos_map[bico_id]
+                first_d = d_list[0]
 
-                tanque = fb.get('tanque') or aut.get('tanque') or "N/D"
-                codpro = fb.get('codpro') or aut.get('codpro') or "N/D"
-                nompro = fb.get('nompro') or aut.get('nompro') or f"COMBUSTÍVEL {codpro}"
-                enc_ini = Decimal(str(fb.get('encerrante_inicial') or 0))
-                enc_fim = Decimal(str(fb.get('encerrante_final') or 0))
-                af = Decimal(str(fb.get('afericao_litros') or 0))
-                preco_un = Decimal(str(fb.get('preco_fechamento') or fb.get('preco_cadastro') or 0))
+                tanque = first_d.identificador_tanque or "N/D"
+                codpro = first_d.codigo_combustivel or "N/D"
+                nompro = first_d.descricao_combustivel or f"COMBUSTÍVEL {codpro}"
+
+                enc_ini = Decimal(str(min(d.encerrante_inicial_litros for d in d_list)))
+                enc_fim = Decimal(str(max(d.encerrante_final_litros for d in d_list)))
+                af = Decimal(str(sum(d.volume_aferido_litros for d in d_list)))
+                preco_un = Decimal(str(first_d.preco_unitario_reais or 0))
 
                 vol_bruto, vol_fat, status_calculo = self.calcular_volume_encerrante(enc_ini, enc_fim, af)
                 fat_enc = round(vol_fat * preco_un, 2)
 
-                vol_aut = Decimal(str(aut.get('volume_automacao_litros') or 0))
-                fat_aut = Decimal(str(aut.get('total_automacao_reais') or 0))
-                qtd_abast = int(aut.get('qtd_abastecimentos') or 0)
+                vol_aut = Decimal(str(sum(d.volume_automacao_litros for d in d_list)))
+                fat_aut = Decimal(str(sum(d.total_automacao_reais for d in d_list)))
+                qtd_abast = sum(d.qtd_abastecimentos for d in d_list)
+
+                # Se nao veio automacao separada mas encerrante esta medido
+                if vol_aut == Decimal("0.0") and vol_fat > Decimal("0.0") and not any(d.volume_automacao_litros > 0 for d in dispenses):
+                    vol_aut = vol_fat
+                    fat_aut = fat_enc
 
                 dif_litros = vol_aut - vol_fat
 
-                # Diagnóstico preciso por bico
+                # Diagnostico preciso por bico
                 if enc_ini == Decimal("0.0") and enc_fim == Decimal("0.0") and vol_aut == Decimal("0.0"):
                     status_bico = "SEM_MOVIMENTO (Sem lançamentos de encerrante ou automação no turno)"
                 elif enc_ini == Decimal("0.0") and enc_fim == Decimal("0.0") and vol_aut > Decimal("0.0"):
@@ -925,24 +852,24 @@ class PostoTools:
             tot_prazo = Decimal("0.0")
             tot_conv = Decimal("0.0")
             tot_declarado = Decimal("0.0")
-            todos_caixas_fechados = (len(linhas_fechacaixa) > 0) and all(fc['fechado'] == 'S' for fc in linhas_fechacaixa)
+            todos_caixas_fechados = (len(shifts) > 0) and all(fc.fechado for fc in shifts)
 
-            for fc in linhas_fechacaixa:
-                c_id = fc['caixa_id']
-                pdv = fc['pdv']
-                matricula = fc['matricula']
-                raw_operador = str(fc['operador_nome'] or '').strip()
+            for fc in shifts:
+                c_id = fc.caixa_id
+                pdv = fc.pdv
+                matricula = fc.operador_id
+                raw_operador = str(fc.operador_nome or '').strip()
                 if not raw_operador or 'NO' in raw_operador or 'NAO INFORMADO' in raw_operador.upper() or 'NÃO INFORMADO' in raw_operador.upper():
                     operador = 'Operador não informado'
                 else:
                     operador = raw_operador
-                fechado = (fc['fechado'] == 'S')
+                fechado = fc.fechado
 
-                dinh = Decimal(str(fc['dinheiro'] or 0))
-                cart = Decimal(str(fc['cartao'] or 0))
-                prazo = Decimal(str(fc['prazo'] or 0))
-                conv = Decimal(str(fc['convenio_cheque'] or 0))
-                declarado = Decimal(str(fc['total_declarado'] or 0))
+                dinh = Decimal(str(fc.dinheiro_declarado_reais or 0))
+                cart = Decimal(str(fc.cartao_declarado_reais or 0))
+                prazo = Decimal(str(fc.prazo_declarado_reais or 0))
+                conv = Decimal(str(fc.convenio_cheque_reais or 0))
+                declarado = Decimal(str(fc.total_declarado_reais or (dinh + cart + prazo + conv)))
 
                 pedidos_pdv_val = pedidos_por_pdv.get(pdv, 0.0)
 
@@ -952,17 +879,17 @@ class PostoTools:
                     "matricula": matricula,
                     "operador": operador,
                     "status": "FECHADO" if fechado else "EM ABERTO",
-                    "abertura": str(fc['cai_ts_abertura'] or ""),
-                    "fechamento": str(fc['cai_ts_fechamento'] or "") if fc['cai_ts_fechamento'] else None,
+                    "abertura": str(fc.timestamp_abertura or ""),
+                    "fechamento": str(fc.timestamp_fechamento or "") if fc.timestamp_fechamento else None,
                     "dinheiro": float(dinh),
                     "cartao": float(cart),
                     "prazo": float(prazo),
                     "convenio_cheque": float(conv),
                     "total_declarado": float(declarado),
                     "pedidos_faturados_pdv": pedidos_pdv_val,
-                    "venda_combustivel": float(fc.get('venda_combustivel') or 0),
-                    "venda_produtos": float(fc.get('venda_produtos') or 0),
-                    "litros_declarados": float(fc['litros_declarados'] or 0),
+                    "venda_combustivel": float(fc.venda_combustivel_reais or 0),
+                    "venda_produtos": float(fc.venda_produtos_reais or 0),
+                    "litros_declarados": float(fc.litros_declarados or 0),
                 })
 
                 tot_dinh += dinh
@@ -1005,13 +932,13 @@ class PostoTools:
             tanques_auditados = []
             tanques_fora_tolerancia = 0
 
-            for t in linhas_tanques:
-                codtan = t['codtan']
-                comb = t['combustivel']
-                cap = Decimal(str(t['capacidade_litros'] or 0))
-                s_ini = Decimal(str(t['saldo_inicial_litros'] or 0))
-                s_fim = Decimal(str(t['saldo_final_litros'] or 0))
-                tem_medicao = bool(t.get('tem_medicao_fisica'))
+            for t in tanks:
+                codtan = t.identificador_tanque
+                comb = t.combustivel or f"COMBUSTÍVEL {codtan}"
+                cap = Decimal(str(t.capacidade_nominal_litros or 0))
+                s_ini = Decimal(str(t.saldo_inicial_litros or 0))
+                s_fim = Decimal(str(t.saldo_final_litros or 0))
+                tem_medicao = bool(t.tem_medicao_fisica)
 
                 saida_bicos = saidas_bicos_por_tanque.get(codtan, Decimal("0.0"))
                 dif_estoque_fisico = s_ini - s_fim
@@ -1200,30 +1127,35 @@ class PostoTools:
                 ))
 
             # Fontes de dados
+            has_auto = any(d.volume_automacao_litros > 0 for d in dispenses)
+            has_pos = bool(shifts or sales_raw)
+            has_mech = any(d.encerrante_final_litros > 0 for d in dispenses)
+            has_tanks = bool(tanks)
+
             sources = [
                 DataSource(
                     id="automation",
                     label="Automação Companytec CBC04",
-                    availability="available" if linhas_automacao else "missing",
-                    data_as_of=str(data_alvo) if linhas_automacao else None
+                    availability="available" if has_auto else "missing",
+                    data_as_of=str(data_alvo) if has_auto else None
                 ),
                 DataSource(
                     id="pos",
                     label="PDV / Cupons Fiscais",
-                    availability="available" if (linhas_fechacaixa or pedidos_pdv_rows) else "missing",
-                    data_as_of=str(data_alvo) if (linhas_fechacaixa or pedidos_pdv_rows) else None
+                    availability="available" if has_pos else "missing",
+                    data_as_of=str(data_alvo) if has_pos else None
                 ),
                 DataSource(
                     id="physical_readings",
                     label="Encerrantes Físicos (fechabomba)",
-                    availability="missing" if encerrantes_pendentes else ("available" if linhas_fechabomba else "missing"),
-                    data_as_of=str(data_alvo) if (linhas_fechabomba and not encerrantes_pendentes) else None
+                    availability="missing" if encerrantes_pendentes else ("available" if has_mech else "missing"),
+                    data_as_of=str(data_alvo) if (has_mech and not encerrantes_pendentes) else None
                 ),
                 DataSource(
                     id="tanks",
                     label="Medição de Tanques",
-                    availability="available" if linhas_tanques else "missing",
-                    data_as_of=str(data_alvo) if linhas_tanques else None
+                    availability="available" if has_tanks else "missing",
+                    data_as_of=str(data_alvo) if has_tanks else None
                 ),
             ]
 
@@ -6220,184 +6152,119 @@ class PostoTools:
         4. Cancelamentos e estornos suspeitos de alto valor.
         Valida o resultado contra o contrato canonico FinancialLeakAuditProps.
         """
-        data_alvo = self.normalizar_data(data)
-        filtro_turno_pattern, _ = self.normalizar_turno(turno)
-        filtro_pdv_pattern = f"%{str(pdv).strip()}%" if pdv is not None else None
+        data_param = self.normalizar_data(data)
+        filtro_turno_pattern, num_turno = self.normalizar_turno(turno)
+        target_pdv = str(pdv).strip() if pdv is not None else None
 
-        conn = None
-        from_db = False
-        linhas_fechacaixa: List[Dict[str, Any]] = []
-        linhas_fechabomba: List[Dict[str, Any]] = []
-        linhas_abastecimentos: List[Dict[str, Any]] = []
-        formas_pdv_rows: List[Dict[str, Any]] = []
-        estornos_rows: List[Dict[str, Any]] = []
+        from_adapter = False
+        shifts: List[UniversalCashierShift] = []
+        sales: List[UniversalSaleReceipt] = []
 
         try:
-            conn = get_erp_connection()
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                if not data_alvo:
-                    cur.execute("""
-                        SELECT GREATEST(
-                            (SELECT MAX(dtmov) FROM fechacaixa),
-                            (SELECT MAX(dtmov) FROM fechabomba),
-                            (SELECT MAX(dtem) FROM pedido),
-                            (SELECT MAX(data) FROM abastecimentos)
-                        ) AS max_d;
-                    """)
-                    row_max = cur.fetchone()
-                    if row_max and row_max.get("max_d"):
-                        data_alvo = str(row_max["max_d"])
-                    else:
-                        data_alvo = datetime.now().strftime("%Y-%m-%d")
+            # 1. Determinacao da data alvo
+            if data_param:
+                data_alvo = data_param
+            else:
+                recent_shifts = self.erp_adapter.get_cashier_shifts(limit=5)
+                if recent_shifts and recent_shifts[0].data_movimento:
+                    data_alvo = str(recent_shifts[0].data_movimento)
+                else:
+                    data_alvo = datetime.now().strftime("%Y-%m-%d")
 
-                # 1. Fechamentos de Caixa (fechacaixa + funcionarios)
-                cur.execute("""
-                    SELECT 
-                        fc.cai_cd_caixa AS caixa_id,
-                        TRIM(fc.codpdv) AS pdv,
-                        TRIM(fc.turno) AS turno,
-                        TRIM(fc.matricula) AS matricula,
-                        COALESCE(TRIM(f.nome), 'OPERADOR NÃO INFORMADO') AS operador_nome,
-                        COALESCE(fc.fechado, 'N') AS fechado,
-                        fc.cai_ts_abertura,
-                        CASE WHEN fc.cai_ts_fechamento > '1900-01-01' THEN fc.cai_ts_fechamento ELSE NULL END AS cai_ts_fechamento,
-                        COALESCE(fc.valdinh, 0)::numeric AS dinheiro,
-                        COALESCE(fc.valcart, 0)::numeric AS cartao,
-                        COALESCE(fc.valnotpra, 0)::numeric AS prazo,
-                        (COALESCE(fc.valcheconv, 0) + COALESCE(fc.valchevis, 0) + COALESCE(fc.valchepre, 0))::numeric AS convenio_cheque,
-                        COALESCE(fc.valtot, (COALESCE(fc.valdinh, 0) + COALESCE(fc.valcart, 0) + COALESCE(fc.valnotpra, 0) + COALESCE(fc.valcheconv, 0) + COALESCE(fc.valchevis, 0) + COALESCE(fc.valchepre, 0)))::numeric AS total_declarado,
-                        COALESCE(fc.venda_combustivel, 0)::numeric AS venda_combustivel,
-                        COALESCE(fc.venda_produtos, 0)::numeric AS venda_produtos,
-                        COALESCE(fc.litros, 0)::numeric AS litros_declarados
-                    FROM fechacaixa fc
-                    LEFT JOIN funcionarios f ON f.matr = fc.matricula
-                    WHERE fc.dtmov = %s
-                      AND (%s::text IS NULL OR fc.turno ILIKE %s)
-                      AND (%s::text IS NULL OR fc.codpdv ILIKE %s)
-                    ORDER BY fc.cai_cd_caixa;
-                """, (data_alvo, filtro_turno_pattern, filtro_turno_pattern, filtro_pdv_pattern, filtro_pdv_pattern))
-                linhas_fechacaixa = cur.fetchall() or []
+            # 2. Fechamentos de Caixa via ERP Adapter
+            shifts_raw = self.erp_adapter.get_cashier_shifts(target_date=data_alvo, limit=50)
 
-                # 2. Encerrantes de Pista (fechabomba)
-                cur.execute("""
-                    SELECT 
-                        TRIM(fb.codbom) AS bico,
-                        TRIM(fb.codpdv) AS pdv,
-                        TRIM(fb.turno) AS turno,
-                        ROUND((COALESCE(fb.enclts, 0) - COALESCE(fb.encltsa, 0) - COALESCE(fb.qtdeaf, 0))::numeric, 2) AS litros_vendidos,
-                        ROUND(((COALESCE(fb.enclts, 0) - COALESCE(fb.encltsa, 0) - COALESCE(fb.qtdeaf, 0)) * COALESCE(fb.preco, 0))::numeric, 2) AS valor_fechamento_pista
-                    FROM fechabomba fb
-                    WHERE fb.dtmov = %s
-                      AND (%s::text IS NULL OR fb.turno ILIKE %s)
-                      AND (%s::text IS NULL OR fb.codpdv ILIKE %s);
-                """, (data_alvo, filtro_turno_pattern, filtro_turno_pattern, filtro_pdv_pattern, filtro_pdv_pattern))
-                linhas_fechabomba = cur.fetchall() or []
+            def _match_turno(turno_val: Optional[str]) -> bool:
+                if not filtro_turno_pattern or not turno_val:
+                    return True
+                t_str = str(turno_val).lower().strip()
+                pat_clean = filtro_turno_pattern.replace("%", "").lower().strip()
+                if num_turno is not None and str(num_turno) in t_str:
+                    return True
+                return pat_clean in t_str
 
-                # 3. Transacoes da Automacao de Pista (abastecimentos)
-                cur.execute("""
-                    SELECT 
-                        ROUND(COALESCE(SUM(a.litros), 0)::numeric, 3) AS litros_automacao,
-                        ROUND(COALESCE(SUM(a.total), 0)::numeric, 2) AS total_automacao
-                    FROM abastecimentos a
-                    WHERE a.data = %s
-                      AND (%s::text IS NULL OR a.turno ILIKE %s)
-                      AND (a.abt_bl_venda_cancelada IS NOT TRUE);
-                """, (data_alvo, filtro_turno_pattern, filtro_turno_pattern))
-                linhas_abastecimentos = cur.fetchall() or []
+            def _match_pdv(pdv_val: Optional[str]) -> bool:
+                if not target_pdv:
+                    return True
+                p_str = str(pdv_val or "").strip()
+                return p_str == target_pdv or (p_str.lstrip("0") or "0") == (target_pdv.lstrip("0") or "0")
 
-                # 4. Transacoes de Pedido / Cupons agrupados por PDV e forma de pagamento
-                cur.execute("""
-                    SELECT 
-                        TRIM(COALESCE(p.pdv, '1')) AS pdv,
-                        CASE 
-                            WHEN prz.tpprazo ILIKE '%%DIN%%' OR prz.nompra ILIKE '%%DIN%%' OR p.formapg ILIKE '%%DIN%%' OR p.formapg = '001' OR p.tipopg = '1' THEN 'DINHEIRO'
-                            WHEN prz.tpprazo ILIKE '%%CART%%' OR prz.nompra ILIKE '%%CART%%' OR prz.nompra ILIKE '%%DEB%%' OR prz.nompra ILIKE '%%CRED%%' OR prz.nompra ILIKE '%%TEF%%' OR prz.nompra ILIKE '%%PIX%%' OR p.formapg ILIKE '%%CART%%' OR p.formapg ILIKE '%%TEF%%' OR p.formapg ILIKE '%%PIX%%' OR p.formapg IN ('011', '026') OR p.tipopg IN ('2', '3') THEN 'CARTAO_PIX'
-                            WHEN prz.praven = 'P' OR p.formapg ILIKE '%%PRAZ%%' OR p.tipopg = '4' THEN 'A_PRAZO'
-                            ELSE 'OUTROS'
-                        END AS forma_grupo,
-                        COUNT(*)::int AS qtd,
-                        ROUND(COALESCE(SUM(p.valortotal), 0)::numeric, 2) AS total_faturado
-                    FROM pedido p
-                    LEFT JOIN prazos prz ON prz.codpra = p.formapg
-                    WHERE (p.dtem = %s OR DATE(p.ven_ts_venda) = %s)
-                      AND (%s::text IS NULL OR p.turno ILIKE %s)
-                      AND (%s::text IS NULL OR p.pdv ILIKE %s)
-                      AND COALESCE(p.situ, '') != 'C'
-                    GROUP BY 1, 2;
-                """, (data_alvo, data_alvo, filtro_turno_pattern, filtro_turno_pattern, filtro_pdv_pattern, filtro_pdv_pattern))
-                formas_pdv_rows = cur.fetchall() or []
+            shifts = [s for s in shifts_raw if _match_turno(s.turno_descricao) and _match_pdv(s.pdv)]
 
-                # 5. Cancelamentos e Estornos de Alto Valor (Padrao d)
-                cur.execute("""
-                    SELECT 
-                        p.codi AS pedido_id,
-                        TRIM(COALESCE(p.pdv, '1')) AS pdv,
-                        TRIM(COALESCE(p.turno, '1')) AS turno,
-                        ROUND(COALESCE(p.valortotal, 0)::numeric, 2) AS valor,
-                        p.hsmov,
-                        p.ven_ts_cancelamento,
-                        COALESCE(p.ven_tx_motivo_cancelamento, 'Cancelamento sem justificativa formal') AS motivo
-                    FROM pedido p
-                    WHERE (p.dtem = %s OR DATE(p.ven_ts_venda) = %s)
-                      AND (%s::text IS NULL OR p.turno ILIKE %s)
-                      AND (%s::text IS NULL OR p.pdv ILIKE %s)
-                      AND (p.situ = 'C' OR p.dtcanc IS NOT NULL OR p.ven_ts_cancelamento IS NOT NULL)
-                      AND p.valortotal >= 80.0
-                    ORDER BY p.valortotal DESC
-                    LIMIT 10;
-                """, (data_alvo, data_alvo, filtro_turno_pattern, filtro_turno_pattern, filtro_pdv_pattern, filtro_pdv_pattern))
-                estornos_rows = cur.fetchall() or []
+            # 3. Transacoes de Venda / Cupons via ERP Adapter (incluindo cancelados para auditoria de estornos)
+            sales_raw = self.erp_adapter.get_recent_sales(
+                start_date=data_alvo, end_date=data_alvo, limit=1000, include_cancelled=True
+            )
+            sales = [v for v in sales_raw if _match_pdv(v.pdv)]
 
-                if linhas_fechacaixa or linhas_fechabomba or formas_pdv_rows or estornos_rows or linhas_abastecimentos:
-                    from_db = True
+            if shifts or sales:
+                from_adapter = True
         except Exception:
-            from_db = False
-        finally:
-            if conn and not conn.closed:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-
-        if not data_alvo:
-            data_alvo = datetime.now().strftime("%Y-%m-%d")
+            from_adapter = False
+            if not data_param:
+                data_alvo = datetime.now().strftime("%Y-%m-%d")
+            else:
+                data_alvo = data_param
 
         leaks: List[FinancialLeakItem] = []
         audited_shift_label = turno or "Turno 01"
         cashier_label = "Equipe de Pista e Caixa"
 
-        if from_db:
-            # Processa dados reais do banco
-            if linhas_fechacaixa:
-                t_raw = str(linhas_fechacaixa[0].get("turno") or "01").strip()
-                audited_shift_label = t_raw if "turno" in t_raw.lower() else f"Turno {t_raw}"
-                cashier_label = str(linhas_fechacaixa[0].get("operador_nome") or "Operador")
+        if from_adapter and shifts:
+            first_shift = shifts[0]
+            t_raw = str(first_shift.turno_descricao or "01").strip()
+            audited_shift_label = t_raw if "turno" in t_raw.lower() else f"Turno {t_raw}"
+            cashier_label = str(first_shift.operador_nome or "Operador")
+
+            # Agrupa formas faturadas por PDV e detecta cancelamentos suspeitos
+            dinh_por_pdv: Dict[str, float] = {}
+            cart_por_pdv: Dict[str, float] = {}
+            estornos_detectados: List[Dict[str, Any]] = []
+
+            for v in sales:
+                v_pdv = str(v.pdv or "1").strip()
+                v_status = str(v.status or "").upper()
+                is_cancelled = v_status in ("CANCELADA", "C", "CANCELADO")
+
+                if is_cancelled and v.total_reais >= 80.0:
+                    estornos_detectados.append({
+                        "pedido_id": v.cupom_id,
+                        "pdv": v_pdv,
+                        "valor": v.total_reais,
+                        "motivo": getattr(v, "motivo_cancelamento", None) or "Cancelamento sem justificativa formal",
+                    })
+                elif not is_cancelled:
+                    for pm in v.pagamentos:
+                        val = float(pm.valor_reais or 0.0)
+                        tipo_norm = str(pm.tipo or "").lower()
+                        desc_norm = str(pm.descricao_forma or "").lower()
+
+                        if tipo_norm == "dinheiro" or "din" in desc_norm:
+                            dinh_por_pdv[v_pdv] = round(dinh_por_pdv.get(v_pdv, 0.0) + val, 2)
+                        elif tipo_norm in ("credito", "debito", "pix") or any(k in desc_norm for k in ("cart", "deb", "cred", "tef", "pix")):
+                            cart_por_pdv[v_pdv] = round(cart_por_pdv.get(v_pdv, 0.0) + val, 2)
 
             # A. Quebra de Caixa e Sangria Pendente por Caixa/PDV
-            for fc in linhas_fechacaixa:
-                pdv_id = fc.get("pdv") or "PDV"
-                turno_id = fc.get("turno") or "1"
-                dinh_declarado = float(fc.get("dinheiro") or 0.0)
-                cart_declarado = float(fc.get("cartao") or 0.0)
-                fechado = str(fc.get("fechado") or "N").strip().upper() == "S"
+            for fc in shifts:
+                pdv_id = fc.pdv or "1"
+                turno_id = fc.turno_descricao or "1"
+                dinh_declarado = float(fc.dinheiro_declarado_reais or 0.0)
+                cart_declarado = float(fc.cartao_declarado_reais or 0.0)
+                fechado = bool(fc.fechado)
 
                 pdv_clean = str(pdv_id).strip()
                 pdv_num = pdv_clean.lstrip("0") or "0"
 
-                def _match_pdv(row_dict: Dict[str, Any]) -> bool:
-                    r_p = str(row_dict.get("pdv") or "").strip()
-                    return r_p == pdv_clean or (r_p.lstrip("0") or "0") == pdv_num
-
                 # Busca dinheiro faturado nos pedidos desse PDV
                 dinh_pedidos = sum(
-                    float(r["total_faturado"]) for r in formas_pdv_rows
-                    if _match_pdv(r) and r.get("forma_grupo") == "DINHEIRO"
+                    val for p_k, val in dinh_por_pdv.items()
+                    if p_k == pdv_clean or (p_k.lstrip("0") or "0") == pdv_num
                 )
 
-                # Se nao encontrou por PDV exato, tenta estimar com venda_produtos + combustivel
-                if dinh_pedidos <= 0 and (float(fc.get("venda_combustivel") or 0) > 0 or float(fc.get("venda_produtos") or 0) > 0):
-                    tot_vendas = float(fc.get("venda_combustivel") or 0) + float(fc.get("venda_produtos") or 0)
-                    outras_formas = cart_declarado + float(fc.get("prazo") or 0) + float(fc.get("convenio_cheque") or 0)
+                # Se nao encontrou por PDV exato, estima com venda_produtos + combustivel
+                if dinh_pedidos <= 0 and (float(fc.venda_combustivel_reais or 0) > 0 or float(fc.venda_produtos_reais or 0) > 0):
+                    tot_vendas = float(fc.venda_combustivel_reais or 0) + float(fc.venda_produtos_reais or 0)
+                    outras_formas = cart_declarado + float(fc.prazo_declarado_reais or 0) + float(fc.convenio_cheque_reais or 0)
                     dinh_pedidos = max(0.0, tot_vendas - outras_formas)
 
                 # Avalia furo de gaveta
@@ -6440,8 +6307,8 @@ class PostoTools:
 
                 # C. Divergencia TEF Cartao
                 cart_pedidos = sum(
-                    float(r["total_faturado"]) for r in formas_pdv_rows
-                    if _match_pdv(r) and r.get("forma_grupo") == "CARTAO_PIX"
+                    val for p_k, val in cart_por_pdv.items()
+                    if p_k == pdv_clean or (p_k.lstrip("0") or "0") == pdv_num
                 )
                 if (cart_pedidos > 0 or cart_declarado > 0) and abs(cart_declarado - cart_pedidos) > 10.0:
                     diff_tef = round(abs(cart_declarado - cart_pedidos), 2)
@@ -6461,7 +6328,7 @@ class PostoTools:
                     )
 
             # D. Cancelamentos e Estornos Suspeitos
-            for est in estornos_rows:
+            for est in estornos_detectados[:10]:
                 val_est = float(est.get("valor") or 0.0)
                 cod_ped = str(est.get("pedido_id") or "0")
                 motivo_est = str(est.get("motivo") or "Sem justificativa formal")
@@ -6482,7 +6349,7 @@ class PostoTools:
                 )
 
         # Fallback calibrado caso nao haja dados no banco ou ambiente offline
-        if not from_db:
+        if not from_adapter or not shifts:
             v_quebra = max(85.00, round(cash_tolerance_reais * 1.7, 2))
             v_sangria = 250.00
             v_tef = 50.50
@@ -6557,7 +6424,7 @@ class PostoTools:
             risk_level = "baixo"
             severity = "normal"
 
-        confidence_score = 0.98 if from_db else 0.95
+        confidence_score = 0.98 if from_adapter else 0.95
 
         if total_divergence > 0:
             diagnosis = (
@@ -6675,7 +6542,7 @@ class PostoTools:
             "contrato": props_leak.model_dump(mode="json"),
             "total_divergence_reais": total_divergence,
             "risk_level": risk_level,
-            "fonte_dados": "ERP_POSTGRESQL" if from_db else "AUDITORIA_CALIBRADA",
+            "fonte_dados": "ERP_POSTGRESQL" if from_adapter else "AUDITORIA_CALIBRADA",
         }
         resultado_limpo, _ = sanitize_dict(resultado)
         return resultado_limpo

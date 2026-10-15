@@ -160,6 +160,45 @@ class UniversalTankReading(AUPSBaseModel):
         ),
         description="Taxa percentual de ocupacao do tanque (0 a 100%)",
     )
+    combustivel: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "combustivel", "descricao_combustivel", "prl_ds_produto_lmc", "nompro"
+        ),
+        description="Descricao do combustivel contido no tanque",
+    )
+    capacidade_nominal_litros: float = Field(
+        default=0.0,
+        ge=0.0,
+        validation_alias=AliasChoices(
+            "capacidade_nominal_litros", "capacidade_litros", "capacidade", "captan"
+        ),
+        description="Capacidade nominal do tanque em Litros",
+    )
+    saldo_inicial_litros: float = Field(
+        default=0.0,
+        ge=0.0,
+        validation_alias=AliasChoices(
+            "saldo_inicial_litros", "saldo_inicial", "qtdeinicioturno", "qtdean"
+        ),
+        description="Saldo no inicio do turno em Litros",
+    )
+    saldo_final_litros: float = Field(
+        default=0.0,
+        ge=0.0,
+        validation_alias=AliasChoices(
+            "saldo_final_litros", "saldo_final", "tan_vl_quantidade_fim", "qtdeat"
+        ),
+        description="Saldo no final do turno em Litros",
+    )
+    tem_medicao_fisica: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "tem_medicao_fisica", "medicao_fisica", "has_physical_measurement"
+        ),
+        description="Indica se houve medicao fisica com regua ou telemetria no turno",
+    )
+
 
     @property
     def tanque_id(self) -> str:
@@ -181,10 +220,26 @@ class UniversalTankReading(AUPSBaseModel):
     def _validate_timestamp(cls, v: Any) -> datetime:
         return parse_datetime_safe(v)
 
-    @field_validator("volume_atual_litros", "volume_agua_mm", mode="before")
+    @field_validator(
+        "volume_atual_litros",
+        "volume_agua_mm",
+        "percentual_capacidade",
+        "capacidade_nominal_litros",
+        "saldo_inicial_litros",
+        "saldo_final_litros",
+        mode="before",
+    )
     @classmethod
     def _validate_floats(cls, v: Any) -> float:
         return parse_float_safe(v, default=0.0, allow_negative=False)
+
+    @field_validator("combustivel", mode="before")
+    @classmethod
+    def _validate_combustivel(cls, v: Any) -> str | None:
+        if v is None:
+            return None
+        parsed = parse_str_safe(v, default="")
+        return parsed if parsed else None
 
     @field_validator("temperatura_celsius", mode="before")
     @classmethod
@@ -193,10 +248,12 @@ class UniversalTankReading(AUPSBaseModel):
             return None
         return parse_float_safe(v, default=0.0, allow_negative=True)
 
-    @field_validator("percentual_capacidade", mode="before")
+    @field_validator("tem_medicao_fisica", mode="before")
     @classmethod
-    def _validate_percentual(cls, v: Any) -> float:
-        return parse_float_safe(v, default=0.0, allow_negative=False)
+    def _validate_tem_medicao_fisica(cls, v: Any) -> bool:
+        return bool(v) if v is not None else False
+
+
 
     @model_validator(mode="before")
     @classmethod

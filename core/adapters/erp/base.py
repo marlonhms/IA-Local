@@ -108,6 +108,7 @@ class BaseERPAdapter(ABC):
         start_date: str | date | None = None,
         end_date: str | date | None = None,
         limit: int = 100,
+        include_cancelled: bool = False,
     ) -> list[UniversalSaleReceipt]:
         """Recupera lista de cupons de venda e itens faturados no periodo.
 
@@ -115,6 +116,7 @@ class BaseERPAdapter(ABC):
             start_date: Data inicial para filtragem (opcional).
             end_date: Data final para filtragem (opcional).
             limit: Quantidade maxima de registros retornados.
+            include_cancelled: Se True, inclui cupons cancelados ou estornados.
 
         Returns:
             Lista de transacoes de venda no formato UniversalSaleReceipt.

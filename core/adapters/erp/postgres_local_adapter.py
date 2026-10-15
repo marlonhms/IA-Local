@@ -141,23 +141,28 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
         start_date: str | date | datetime | None = None,
         end_date: str | date | datetime | None = None,
         limit: int = 100,
+        include_cancelled: bool = False,
     ) -> list[UniversalSaleReceipt]:
         """Recupera transacoes de venda e cupons do PDV mapeados para AUPS.
 
         Consulta tabelas locais: pedido, itemped, produtos e prazos.
-        Aplica filtro de nulos: COALESCE(p.situ, '') != 'C' e p.dtcanc IS NULL.
+        Aplica filtro de nulos e cancelamentos conforme include_cancelled.
         """
         if self._force_offline:
-            return self._fallback_adapter.get_recent_sales(start_date, end_date, limit)
+            return self._fallback_adapter.get_recent_sales(
+                start_date, end_date, limit, include_cancelled=include_cancelled
+            )
 
         dt_ini = normalize_date_filter(start_date)
         dt_fim = normalize_date_filter(end_date)
         lim = max(1, int(limit))
 
-        where_clauses = [
-            "COALESCE(p.situ, '') != 'C'",
-            "p.dtcanc IS NULL",
-        ]
+        where_clauses: list[str] = []
+        if not include_cancelled:
+            where_clauses.extend([
+                "COALESCE(p.situ, '') != 'C'",
+                "p.dtcanc IS NULL",
+            ])
         params: list[Any] = []
 
         if dt_ini:
@@ -167,7 +172,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
             where_clauses.append("p.dtem <= %s")
             params.append(dt_fim)
 
-        where_sql = " AND ".join(where_clauses)
+        where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
         query = f"""
             WITH sub_pedidos AS (
@@ -186,6 +191,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                 p.ven_ts_venda AS data_hora_venda,
                 ROUND(COALESCE(p.valortotal, 0)::numeric, 2) AS total_reais,
                 COALESCE(NULLIF(TRIM(p.situ), ''), 'CONCLUIDA') AS status_venda,
+                COALESCE(p.ven_tx_motivo_cancelamento, 'Cancelamento sem justificativa formal') AS motivo_cancelamento,
                 COALESCE(NULLIF(TRIM(p.vendedor), ''), NULLIF(TRIM(p.clie), ''), 'SISTEMA') AS operador,
                 TRIM(COALESCE(p.formapg, '0')) AS cod_forma,
                 COALESCE(NULLIF(TRIM(prz.nompra), ''), NULLIF(TRIM(prz.tpprazo), ''), 'OUTROS') AS desc_forma,
@@ -212,7 +218,9 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
         except (psycopg2.Error, RuntimeError, OSError, ValueError, KeyError) as exc:
             if self._fallback_on_error:
                 logger.warning("Falha em get_recent_sales no Postgres (%s): usando fallback.", exc)
-                return self._fallback_adapter.get_recent_sales(start_date, end_date, limit)
+                return self._fallback_adapter.get_recent_sales(
+                    start_date, end_date, limit, include_cancelled=include_cancelled
+                )
             raise ERPQueryError(f"Erro ao consultar vendas recentes no PostgreSQL: {exc}") from exc
 
         if not rows:
@@ -241,6 +249,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                     "pdv": str(r["pdv"]),
                     "total_reais": float(r["total_reais"]),
                     "status": str(r["status_venda"]),
+                    "motivo_cancelamento": r.get("motivo_cancelamento"),
                     "operador": str(r["operador"]),
                     "itens": [],
                     "pagamentos": [pm],
@@ -265,6 +274,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                 pdv=data["pdv"],
                 total_reais=data["total_reais"],
                 status=data["status"],
+                motivo_cancelamento=data.get("motivo_cancelamento"),
                 operador=data["operador"],
                 itens=data["itens"],
                 pagamentos=data["pagamentos"],
@@ -285,11 +295,15 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
         query = """
             SELECT 
                 TRIM(t.codtan) AS identificador_tanque,
+                COALESCE(TRIM(t.prl_ds_produto_lmc), 'COMBUSTÍVEL ' || TRIM(t.codtan)) AS combustivel,
                 COALESCE(t.ultima_leitura, CURRENT_TIMESTAMP) AS timestamp_leitura,
                 ROUND(COALESCE(t.volume, t.qtdeat, 0)::numeric, 2) AS volume_atual_litros,
                 ROUND(COALESCE(t.volume_agua, 0)::numeric, 2) AS volume_agua_mm,
                 ROUND(COALESCE(t.temperatura, 25.0)::numeric, 1) AS temperatura_celsius,
-                ROUND(COALESCE(t.capacidade, 0)::numeric, 2) AS capacidade_nominal_litros
+                ROUND(COALESCE(t.capacidade, 0)::numeric, 2) AS capacidade_nominal_litros,
+                ROUND(COALESCE(t.qtdeinicioturno, t.qtdean, t.qtdeat, 0)::numeric, 2) AS saldo_inicial_litros,
+                ROUND(COALESCE(t.tan_vl_quantidade_fim, t.qtdeat, 0)::numeric, 2) AS saldo_final_litros,
+                (t.qtdeinicioturno IS NOT NULL OR t.tan_vl_quantidade_fim IS NOT NULL) AS tem_medicao_fisica
             FROM tanques t
             ORDER BY t.codtan;
         """
@@ -310,11 +324,16 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
 
             reading = UniversalTankReading(
                 identificador_tanque=str(r["identificador_tanque"]),
+                combustivel=str(r["combustivel"]),
                 timestamp_leitura=r["timestamp_leitura"],
                 volume_atual_litros=vol,
                 volume_agua_mm=float(r["volume_agua_mm"]),
                 temperatura_celsius=float(r["temperatura_celsius"]),
                 percentual_capacidade=pct,
+                capacidade_nominal_litros=cap,
+                saldo_inicial_litros=float(r["saldo_inicial_litros"]),
+                saldo_final_litros=float(r["saldo_final_litros"]),
+                tem_medicao_fisica=bool(r["tem_medicao_fisica"]),
             )
             readings.append(reading)
 
@@ -353,12 +372,22 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
             SELECT 
                 COALESCE(TRIM(fb.ilha::text), TRIM(fb.codbom)) AS identificador_bomba,
                 TRIM(fb.codbom) AS identificador_bico,
+                TRIM(COALESCE(fb.codtan, '')) AS identificador_tanque,
+                TRIM(COALESCE(fb.codpro, '')) AS codigo_combustivel,
+                COALESCE(TRIM(p.nompro), 'COMBUSTÍVEL ' || TRIM(COALESCE(fb.codpro, ''))) AS descricao_combustivel,
+                TRIM(COALESCE(fb.turno, '')) AS turno_descricao,
+                TRIM(COALESCE(fb.codpdv, '1')) AS pdv,
                 fb.dtmov::timestamp AS timestamp_registro,
                 ROUND(COALESCE(fb.encltsa, 0)::numeric, 3) AS encerrante_inicial_litros,
                 ROUND(COALESCE(fb.enclts, 0)::numeric, 3) AS encerrante_final_litros,
                 ROUND(COALESCE(fb.qtdeaf, 0)::numeric, 3) AS volume_aferido_litros,
-                ROUND(COALESCE(fb.encdinh, ((COALESCE(fb.enclts, 0) - COALESCE(fb.encltsa, 0) - COALESCE(fb.qtdeaf, 0)) * COALESCE(fb.preco, 0)), 0)::numeric, 2) AS total_faturado_reais
+                ROUND(COALESCE(fb.preco, 0)::numeric, 3) AS preco_unitario_reais,
+                ROUND(COALESCE(fb.encdinh, ((COALESCE(fb.enclts, 0) - COALESCE(fb.encltsa, 0) - COALESCE(fb.qtdeaf, 0)) * COALESCE(fb.preco, 0)), 0)::numeric, 2) AS total_faturado_reais,
+                0 AS qtd_abastecimentos,
+                0.0 AS volume_automacao_litros,
+                0.0 AS total_automacao_reais
             FROM fechabomba fb
+            LEFT JOIN produtos p ON p.codpro = fb.codpro
             {where_fb_sql}
             ORDER BY fb.dtmov DESC, fb.codbom ASC
             LIMIT %s;
@@ -397,15 +426,25 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                 SELECT 
                     COALESCE(TRIM(b.ilha::text), TRIM(a.bomba)) AS identificador_bomba,
                     TRIM(a.bomba) AS identificador_bico,
+                    TRIM(COALESCE(a.tanque, '')) AS identificador_tanque,
+                    TRIM(COALESCE(a.codpro, '')) AS codigo_combustivel,
+                    COALESCE(TRIM(pr.nompro), 'COMBUSTÍVEL ' || TRIM(COALESCE(a.codpro, ''))) AS descricao_combustivel,
+                    TRIM(COALESCE(a.turno, '')) AS turno_descricao,
+                    '1' AS pdv,
                     COALESCE(a.abt_ts_abastecimento, (a.data + a.hora)::timestamp, a.data::timestamp) AS timestamp_registro,
                     ROUND(COALESCE(MIN(a.ei), 0)::numeric, 3) AS encerrante_inicial_litros,
                     ROUND(COALESCE(MAX(a.encerrante), 0)::numeric, 3) AS encerrante_final_litros,
                     0.0 AS volume_aferido_litros,
-                    ROUND(COALESCE(SUM(a.total), 0)::numeric, 2) AS total_faturado_reais
+                    ROUND(COALESCE(AVG(a.pu), 0)::numeric, 3) AS preco_unitario_reais,
+                    ROUND(COALESCE(SUM(a.total), 0)::numeric, 2) AS total_faturado_reais,
+                    COUNT(*)::int AS qtd_abastecimentos,
+                    ROUND(COALESCE(SUM(a.litros), 0)::numeric, 3) AS volume_automacao_litros,
+                    ROUND(COALESCE(SUM(a.total), 0)::numeric, 2) AS total_automacao_reais
                 FROM abastecimentos a
                 LEFT JOIN bombas b ON TRIM(b.codbom) = TRIM(a.bomba)
+                LEFT JOIN produtos pr ON pr.codpro = a.codpro
                 {where_ab_sql}
-                GROUP BY b.ilha, a.bomba, a.abt_ts_abastecimento, a.data, a.hora
+                GROUP BY b.ilha, a.bomba, a.tanque, a.codpro, pr.nompro, a.turno, a.abt_ts_abastecimento, a.data, a.hora
                 ORDER BY COALESCE(a.abt_ts_abastecimento, (a.data + a.hora)::timestamp, a.data::timestamp) DESC
                 LIMIT %s;
             """
@@ -424,11 +463,20 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
             log_item = UniversalDispenserLog(
                 identificador_bomba=str(r["identificador_bomba"]),
                 identificador_bico=str(r["identificador_bico"]),
+                identificador_tanque=str(r.get("identificador_tanque") or ""),
+                codigo_combustivel=str(r.get("codigo_combustivel") or ""),
+                descricao_combustivel=str(r.get("descricao_combustivel") or ""),
+                turno_descricao=str(r.get("turno_descricao") or ""),
+                pdv=str(r.get("pdv") or "1"),
                 timestamp_registro=r["timestamp_registro"],
                 encerrante_inicial_litros=float(r["encerrante_inicial_litros"]),
                 encerrante_final_litros=float(r["encerrante_final_litros"]),
                 volume_aferido_litros=float(r["volume_aferido_litros"]),
+                preco_unitario_reais=float(r.get("preco_unitario_reais") or 0.0),
                 total_faturado_reais=float(r["total_faturado_reais"]),
+                qtd_abastecimentos=int(r.get("qtd_abastecimentos") or 0),
+                volume_automacao_litros=float(r.get("volume_automacao_litros") or 0.0),
+                total_automacao_reais=float(r.get("total_automacao_reais") or 0.0),
             )
             logs.append(log_item)
 
@@ -460,6 +508,9 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
 
         query = f"""
             SELECT 
+                fc.cai_cd_caixa AS caixa_id,
+                TRIM(COALESCE(fc.codpdv, '1')) AS pdv,
+                COALESCE(fc.fechado, 'N') AS fechado,
                 TRIM(COALESCE(fc.matricula, '0')) AS operador_id,
                 COALESCE(TRIM(f.nome), 'OPERADOR NÃO INFORMADO') AS operador_nome,
                 COALESCE(TRIM(fc.turno), 'GERAL') AS turno_descricao,
@@ -470,6 +521,13 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                     ELSE NULL 
                 END AS timestamp_fechamento,
                 ROUND(COALESCE(fc.valrefcai, fc.suprimentodinheiro, 0)::numeric, 2) AS fundo_troco_reais,
+                ROUND(COALESCE(fc.valdinh, 0)::numeric, 2) AS dinheiro_declarado_reais,
+                ROUND(COALESCE(fc.valcart, 0)::numeric, 2) AS cartao_declarado_reais,
+                ROUND(COALESCE(fc.valnotpra, 0)::numeric, 2) AS prazo_declarado_reais,
+                ROUND((COALESCE(fc.valcheconv, 0) + COALESCE(fc.valchevis, 0) + COALESCE(fc.valchepre, 0))::numeric, 2) AS convenio_cheque_reais,
+                ROUND(COALESCE(fc.venda_combustivel, 0)::numeric, 2) AS venda_combustivel_reais,
+                ROUND(COALESCE(fc.venda_produtos, 0)::numeric, 2) AS venda_produtos_reais,
+                ROUND(COALESCE(fc.litros, 0)::numeric, 3) AS litros_declarados,
                 ROUND(COALESCE(fc.valtot, (COALESCE(fc.valdinh, 0) + COALESCE(fc.valcart, 0) + COALESCE(fc.valnotpra, 0) + COALESCE(fc.valcheconv, 0) + COALESCE(fc.valchevis, 0) + COALESCE(fc.valchepre, 0)))::numeric, 2) AS total_declarado_reais,
                 ROUND((COALESCE(fc.venda_combustivel, 0) + COALESCE(fc.venda_produtos, 0))::numeric, 2) AS total_sistema_reais
             FROM fechacaixa fc
@@ -494,6 +552,9 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
             quebra_sobra = round(tot_decl - tot_sist, 2)
 
             shift = UniversalCashierShift(
+                caixa_id=str(r.get("caixa_id") or "1"),
+                pdv=str(r.get("pdv") or "1"),
+                fechado=str(r.get("fechado") or "N").strip().upper() == "S",
                 operador_id=str(r["operador_id"]),
                 operador_nome=str(r["operador_nome"]),
                 turno_descricao=str(r["turno_descricao"]),
@@ -501,6 +562,13 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                 timestamp_abertura=r["timestamp_abertura"],
                 timestamp_fechamento=r["timestamp_fechamento"],
                 fundo_troco_reais=float(r["fundo_troco_reais"]),
+                dinheiro_declarado_reais=float(r["dinheiro_declarado_reais"]),
+                cartao_declarado_reais=float(r["cartao_declarado_reais"]),
+                prazo_declarado_reais=float(r["prazo_declarado_reais"]),
+                convenio_cheque_reais=float(r["convenio_cheque_reais"]),
+                venda_combustivel_reais=float(r["venda_combustivel_reais"]),
+                venda_produtos_reais=float(r["venda_produtos_reais"]),
+                litros_declarados=float(r["litros_declarados"]),
                 total_declarado_reais=tot_decl,
                 total_sistema_reais=tot_sist,
                 quebra_sobra_reais=quebra_sobra,

@@ -272,6 +272,13 @@ class UniversalSaleReceipt(AUPSBaseModel):
         validation_alias=AliasChoices("pagamentos", "payments", "formas_pagamento"),
         description="Lista de metodos de pagamento vinculados a venda",
     )
+    motivo_cancelamento: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "motivo_cancelamento", "motivo", "ven_tx_motivo_cancelamento", "justificativa_cancelamento"
+        ),
+        description="Justificativa formal do cancelamento da venda",
+    )
 
     @property
     def venda_id(self) -> str:

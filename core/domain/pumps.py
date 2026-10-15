@@ -192,6 +192,60 @@ class UniversalDispenserLog(AUPSBaseModel):
         ),
         description="Descricao amigavel do combustivel dispensado",
     )
+    identificador_tanque: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "identificador_tanque", "tanque_id", "numero_tanque", "tanque", "codtan"
+        ),
+        description="Identificador do tanque alimentador do bico",
+    )
+    preco_unitario_reais: float = Field(
+        default=0.0,
+        ge=0.0,
+        validation_alias=AliasChoices(
+            "preco_unitario_reais", "preco_unitario", "preco_fechamento", "preco", "pu", "valunit"
+        ),
+        description="Preco unitario por litro faturado no fechamento",
+    )
+    turno_descricao: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "turno_descricao", "turno", "descricao_turno", "periodo"
+        ),
+        description="Descricao do turno em que ocorreu a medicao",
+    )
+    pdv: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "pdv", "caixa_pdv", "pos", "caixa", "codpdv"
+        ),
+        description="Identificador do PDV associado a bomba",
+    )
+    qtd_abastecimentos: int = Field(
+        default=0,
+        ge=0,
+        validation_alias=AliasChoices(
+            "qtd_abastecimentos", "quantidade_abastecimentos", "abastecimentos_count"
+        ),
+        description="Quantidade de abastecimentos computados na automacao",
+    )
+    volume_automacao_litros: float = Field(
+        default=0.0,
+        ge=0.0,
+        validation_alias=AliasChoices(
+            "volume_automacao_litros", "volume_automacao", "litros_automacao"
+        ),
+        description="Volume total registrado pela automacao de pista em Litros",
+    )
+    total_automacao_reais: float = Field(
+        default=0.0,
+        ge=0.0,
+        validation_alias=AliasChoices(
+            "total_automacao_reais", "total_automacao", "faturamento_automacao"
+        ),
+        description="Total financeiro registrado pela automacao de pista em Reais",
+    )
+
 
 
     @property
@@ -225,17 +279,31 @@ class UniversalDispenserLog(AUPSBaseModel):
         "encerrante_final_litros",
         "volume_aferido_litros",
         "total_faturado_reais",
+        "preco_unitario_reais",
+        "volume_automacao_litros",
+        "total_automacao_reais",
         mode="before",
     )
     @classmethod
     def _validate_numeric_fields(cls, v: Any) -> float:
         return parse_float_safe(v, default=0.0, allow_negative=False)
 
-    @field_validator("codigo_combustivel", "descricao_combustivel", mode="before")
+    @field_validator("codigo_combustivel", "descricao_combustivel", "identificador_tanque", "turno_descricao", "pdv", mode="before")
     @classmethod
     def _validate_combustivel_info(cls, v: Any) -> str | None:
         if v is None:
             return None
         parsed = parse_str_safe(v, default="")
         return parsed if parsed else None
+
+    @field_validator("qtd_abastecimentos", mode="before")
+    @classmethod
+    def _validate_qtd_abastecimentos(cls, v: Any) -> int:
+        if v is None:
+            return 0
+        try:
+            return max(0, int(v))
+        except (ValueError, TypeError):
+            return 0
+
 
