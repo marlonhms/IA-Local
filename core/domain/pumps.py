@@ -178,6 +178,21 @@ class UniversalDispenserLog(AUPSBaseModel):
         ),
         description="Total financeiro liquidado correspondente as saidas do bico",
     )
+    codigo_combustivel: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "codigo_combustivel", "cod_combustivel", "codcomb", "fuel_code", "codpro"
+        ),
+        description="Codigo do combustivel dispensado",
+    )
+    descricao_combustivel: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "descricao_combustivel", "combustivel", "descricao", "nompro"
+        ),
+        description="Descricao amigavel do combustivel dispensado",
+    )
+
 
     @property
     def volume_vendido_litros(self) -> float:
@@ -215,3 +230,12 @@ class UniversalDispenserLog(AUPSBaseModel):
     @classmethod
     def _validate_numeric_fields(cls, v: Any) -> float:
         return parse_float_safe(v, default=0.0, allow_negative=False)
+
+    @field_validator("codigo_combustivel", "descricao_combustivel", mode="before")
+    @classmethod
+    def _validate_combustivel_info(cls, v: Any) -> str | None:
+        if v is None:
+            return None
+        parsed = parse_str_safe(v, default="")
+        return parsed if parsed else None
+

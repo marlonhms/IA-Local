@@ -46,6 +46,7 @@ from config.settings import (
 )
 from core.rag_engine import HybridRAGEngine
 from core.tools import PostoTools, get_erp_connection
+from core.adapters.erp.base import BaseERPAdapter
 from core.sanitizer import central_log_sanitizer
 from core.semantic_router import SemanticRouter, classificar_intencao_heuristica, RETRY_REGEX
 from core.schemas.idempotency import generate_tool_call_id, generate_action_id
@@ -2124,6 +2125,7 @@ class AuraEngine:
         tools: Optional[PostoTools] = None,
         router: Optional[SemanticRouter] = None,
         session_memory: Optional[AuraSessionMemory] = None,
+        erp_adapter: Optional[BaseERPAdapter] = None,
     ):
         self.tenant_id = tenant_id or "default_tenant"
         self.filial_id = filial_id or "posto_01"
@@ -2134,6 +2136,7 @@ class AuraEngine:
         self._router = router
         self._session_memory = session_memory or AuraSessionMemory()
         self._telemetry = AuraSRETelemetry.get_instance(session_memory=self._session_memory)
+        self._erp_adapter = erp_adapter
         self._dados_filial: Optional[Dict[str, Any]] = None
 
     @property
@@ -2145,7 +2148,7 @@ class AuraEngine:
     @property
     def tools(self) -> PostoTools:
         if self._tools is None:
-            self._tools = PostoTools(self.rag)
+            self._tools = PostoTools(self.rag, erp_adapter=self._erp_adapter)
         return self._tools
 
     @property

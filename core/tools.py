@@ -92,6 +92,10 @@ from core.schemas.rca import (
 )
 from core.automation_config import AutomationSettingsManager
 from core.schemas.idempotency import generate_action_id
+from core.adapters.erp.base import BaseERPAdapter
+from core.adapters.erp.mock_adapter import MockERPAdapter
+from core.adapters.erp.postgres_local_adapter import PostgresLocalERPAdapter
+from core.domain.sales import UniversalSaleReceipt, UniversalSaleItem
 
 def get_erp_connection(timeout: Optional[int] = None):
     """
@@ -124,8 +128,13 @@ def get_erp_connection(timeout: Optional[int] = None):
 class PostoTools:
     """Conjunto de ferramentas operacionais executáveis pelo Agente."""
 
-    def __init__(self, rag_engine: HybridRAGEngine):
+    def __init__(
+        self,
+        rag_engine: HybridRAGEngine,
+        erp_adapter: Optional[BaseERPAdapter] = None,
+    ):
         self.rag = rag_engine
+        self.erp_adapter = erp_adapter or PostgresLocalERPAdapter()
 
     def dados_cadastrais_filial(self) -> dict:
         """Retorna os dados cadastrais da empresa/filial do ERP ou fallback."""
@@ -185,166 +194,149 @@ class PostoTools:
 
     def consultar_analise_vendas_erp(self, tipo: str = "mais_vendidos") -> dict:
         """
-        Consulta dados analíticos de vendas e abastecimentos no banco ERP (porta 5433).
+        Consulta dados analíticos de vendas e abastecimentos através do Adaptador Universal AUPS.
         Retorna últimos produtos vendidos (conveniência e pista), faturamento geral,
         dados de hoje e ranking dos mais vendidos.
         """
         try:
-            conn = get_erp_connection()
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # 1. Últimos produtos vendidos na loja de conveniência (pedido + itemped)
-                cur.execute("""
-                    SELECT 
-                        TRIM(p.codi) AS pedido,
-                        TRIM(p.cupom) AS cupom,
-                        TRIM(p.pdv) AS pdv,
-                        COALESCE(p.ven_ts_venda, (p.dtem + p.hsmov)::timestamp) AS data_hora_venda,
-                        TRIM(i.codpec) AS codpro,
-                        TRIM(pr.nompro) AS nompro,
-                        ROUND(i.quant::numeric, 2) AS quantidade,
-                        ROUND(i.valunit::numeric, 2) AS valor_unitario,
-                        ROUND(i.valitem::numeric, 2) AS total_item,
-                        ROUND(p.valortotal::numeric, 2) AS total_pedido
-                    FROM pedido p
-                    JOIN itemped i ON TRIM(i.pedido) = TRIM(p.codi)
-                    LEFT JOIN produtos pr ON pr.codpro = i.codpec
-                    ORDER BY COALESCE(p.ven_ts_venda, (p.dtem + p.hsmov)::timestamp) DESC NULLS LAST, p.codi DESC
-                    LIMIT 10;
-                """)
-                ultimos_produtos_conveniencia = cur.fetchall()
+            # 1. Recupera vendas e cupons recentes atraves do adaptador de borda
+            vendas_recentes = self.erp_adapter.get_recent_sales(limit=50)
 
-                # 2. Últimos abastecimentos na pista (abastecimentos)
-                cur.execute("""
-                    SELECT 
-                        a.controle, 
-                        TRIM(a.bomba) AS bomba, 
-                        a.data, 
-                        a.hora, 
-                        TRIM(a.codpro) AS codpro,
-                        COALESCE(TRIM(pr.nompro), 'COMBUSTÍVEL ' || TRIM(a.codpro)) AS nompro,
-                        ROUND(a.litros::numeric, 3) AS litros, 
-                        ROUND(a.total::numeric, 2) AS total,
-                        ROUND(a.pu::numeric, 3) AS preco_unitario
-                    FROM abastecimentos a
-                    LEFT JOIN produtos pr ON pr.codpro = a.codpro
-                    ORDER BY a.data DESC, a.hora DESC
-                    LIMIT 10;
-                """)
-                ultimos_abastecimentos = cur.fetchall()
+            # 2. Transforma vendas para o formato de saida compativel
+            ultimos_produtos_conveniencia = []
+            ranking_map: Dict[str, Dict[str, Any]] = {}
+            hoje = date.today()
+            pedidos_hoje_count = 0
+            faturamento_conv_hoje = 0.0
 
-                # 3. Destaque do ÚLTIMO produto vendido em todo o sistema
-                ultimo_vendido_destaque = None
-                if ultimos_produtos_conveniencia:
-                    p_conv = ultimos_produtos_conveniencia[0]
-                    ultimo_vendido_destaque = {
-                        "origem": "Conveniência / PDV",
-                        "pedido": p_conv.get("pedido"),
-                        "produto": p_conv.get("nompro"),
-                        "codigo_sku": p_conv.get("codpro"),
-                        "data_hora": str(p_conv.get("data_hora_venda")),
-                        "quantidade": float(p_conv.get("quantidade") or 1),
-                        "valor_unitario": float(p_conv.get("valor_unitario") or 0),
-                        "valor_total": float(p_conv.get("total_item") or 0),
-                        "cupom": p_conv.get("cupom"),
-                        "pdv": p_conv.get("pdv")
-                    }
+            for venda in vendas_recentes:
+                is_hoje = venda.data_hora and venda.data_hora.date() == hoje
+                if is_hoje:
+                    pedidos_hoje_count += 1
+                    faturamento_conv_hoje += venda.total_reais
 
-                # 4. Produtos mais vendidos na conveniência (itemped)
-                cur.execute("""
-                    SELECT 
-                        TRIM(i.codpec) AS codpro,
-                        COALESCE(TRIM(pr.nompro), 'PRODUTO ' || TRIM(i.codpec)) AS nompro,
-                        COUNT(*) AS total_saidas,
-                        ROUND(SUM(i.quant)::numeric, 2) AS qtd_total,
-                        ROUND(SUM(i.valitem)::numeric, 2) AS receita_total
-                    FROM itemped i
-                    LEFT JOIN produtos pr ON pr.codpro = i.codpec
-                    GROUP BY i.codpec, pr.nompro
-                    ORDER BY qtd_total DESC
-                    LIMIT 5;
-                """)
-                produtos_mais_vendidos = cur.fetchall()
+                for item in venda.itens:
+                    sku = item.sku
+                    if len(ultimos_produtos_conveniencia) < 10:
+                        ultimos_produtos_conveniencia.append({
+                            "pedido": venda.cupom_id,
+                            "cupom": venda.cupom_id,
+                            "pdv": venda.pdv,
+                            "data_hora_venda": venda.data_hora.strftime("%Y-%m-%d %H:%M:%S") if venda.data_hora else "",
+                            "codpro": sku,
+                            "nompro": item.descricao_produto,
+                            "quantidade": item.quantidade,
+                            "valor_unitario": item.preco_unitario_reais,
+                            "total_item": item.total_item_reais,
+                            "total_pedido": venda.total_reais,
+                        })
 
-                if not produtos_mais_vendidos:
-                    cur.execute("""
-                        SELECT 
-                            TRIM(a.codpro) AS codpro,
-                            COALESCE(TRIM(p.nompro), 'PRODUTO ' || TRIM(a.codpro)) AS nompro,
-                            COUNT(*) AS total_saidas,
-                            ROUND(SUM(a.litros)::numeric, 2) AS qtd_total,
-                            ROUND(SUM(a.total)::numeric, 2) AS receita_total
-                        FROM abastecimentos a
-                        LEFT JOIN produtos p ON a.codpro = p.codpro
-                        GROUP BY a.codpro, p.nompro
-                        ORDER BY qtd_total DESC
-                        LIMIT 5;
-                    """)
-                    produtos_mais_vendidos = cur.fetchall()
+                    if sku not in ranking_map:
+                        ranking_map[sku] = {
+                            "codpro": sku,
+                            "nompro": item.descricao_produto,
+                            "total_saidas": 0,
+                            "qtd_total": 0.0,
+                            "receita_total": 0.0,
+                        }
+                    ranking_map[sku]["total_saidas"] += 1
+                    ranking_map[sku]["qtd_total"] += item.quantidade
+                    ranking_map[sku]["receita_total"] += item.total_item_reais
 
-                # 5. Abastecimentos por bomba
-                cur.execute("""
-                    SELECT 
-                        bomba,
-                        COUNT(*) AS total_abastecimentos,
-                        ROUND(SUM(litros)::numeric, 2) AS total_litros,
-                        ROUND(SUM(total)::numeric, 2) AS faturamento_bomba
-                    FROM abastecimentos
-                    GROUP BY bomba
-                    ORDER BY total_litros DESC;
-                """)
-                abastecimentos_bomba = cur.fetchall()
-
-                # 6. Resumo de Hoje (Conveniência + Combustíveis)
-                cur.execute("""
-                    SELECT 
-                        CURRENT_DATE AS data_consulta,
-                        COUNT(*) AS total_abastecimentos_hoje,
-                        ROUND(COALESCE(SUM(litros), 0)::numeric, 2) AS total_litros_hoje,
-                        ROUND(COALESCE(SUM(total), 0)::numeric, 2) AS faturamento_combustivel_hoje
-                    FROM abastecimentos
-                    WHERE data = CURRENT_DATE;
-                """)
-                resumo_abast_hoje = cur.fetchone()
-
-                cur.execute("""
-                    SELECT 
-                        COUNT(DISTINCT codi) AS total_pedidos_hoje,
-                        ROUND(COALESCE(SUM(valortotal), 0)::numeric, 2) AS faturamento_conveniencia_hoje
-                    FROM pedido
-                    WHERE dtem = CURRENT_DATE OR DATE(ven_ts_venda) = CURRENT_DATE;
-                """)
-                resumo_conv_hoje = cur.fetchone()
-
-                # 7. Resumo Geral de Abastecimentos / Vendas de Combustíveis
-                cur.execute("""
-                    SELECT 
-                        COUNT(*) AS total_abastecimentos,
-                        ROUND(SUM(litros)::numeric, 2) AS total_litros,
-                        ROUND(SUM(total)::numeric, 2) AS faturamento_total
-                    FROM abastecimentos;
-                """)
-                resumo_geral = cur.fetchone()
-
-                conn.close()
-                resposta = {
-                    "status": "ok",
-                    "ultimo_produto_vendido_destaque": ultimo_vendido_destaque,
-                    "ultimos_produtos_conveniencia": [dict(r) for r in ultimos_produtos_conveniencia],
-                    "ultimos_abastecimentos_pista": [dict(r) for r in ultimos_abastecimentos],
-                    "produtos_mais_vendidos": [dict(r) for r in produtos_mais_vendidos],
-                    "abastecimentos_por_bomba": [dict(r) for r in abastecimentos_bomba],
-                    "resumo_hoje": {
-                        "data": str(resumo_abast_hoje.get("data_consulta") if resumo_abast_hoje else ""),
-                        "abastecimentos_hoje": resumo_abast_hoje.get("total_abastecimentos_hoje") if resumo_abast_hoje else 0,
-                        "litros_hoje": float(resumo_abast_hoje.get("total_litros_hoje") or 0) if resumo_abast_hoje else 0,
-                        "faturamento_combustivel_hoje": float(resumo_abast_hoje.get("faturamento_combustivel_hoje") or 0) if resumo_abast_hoje else 0,
-                        "pedidos_conveniencia_hoje": resumo_conv_hoje.get("total_pedidos_hoje") if resumo_conv_hoje else 0,
-                        "faturamento_conveniencia_hoje": float(resumo_conv_hoje.get("faturamento_conveniencia_hoje") or 0) if resumo_conv_hoje else 0,
-                    },
-                    "resumo_geral": dict(resumo_geral) if resumo_geral else {},
+            # 3. Destaque do ultimo produto vendido
+            ultimo_vendido_destaque = None
+            if ultimos_produtos_conveniencia:
+                p_conv = ultimos_produtos_conveniencia[0]
+                ultimo_vendido_destaque = {
+                    "origem": "Conveniência / PDV",
+                    "pedido": p_conv.get("pedido"),
+                    "produto": p_conv.get("nompro"),
+                    "codigo_sku": p_conv.get("codpro"),
+                    "data_hora": str(p_conv.get("data_hora_venda")),
+                    "quantidade": float(p_conv.get("quantidade") or 1),
+                    "valor_unitario": float(p_conv.get("valor_unitario") or 0),
+                    "valor_total": float(p_conv.get("total_item") or 0),
+                    "cupom": p_conv.get("cupom"),
+                    "pdv": p_conv.get("pdv"),
                 }
-                resposta_limpa, _ = sanitize_dict(resposta)
-                return resposta_limpa
+
+            # 4. Produtos mais vendidos (ordenados por volume total)
+            produtos_mais_vendidos = sorted(
+                ranking_map.values(), key=lambda x: x["qtd_total"], reverse=True
+            )[:5]
+
+            # 5. Ultimos abastecimentos na pista e agregacao por bomba
+            dispenses = self.erp_adapter.get_pump_dispenses(limit=50)
+            ultimos_abastecimentos = []
+            bomba_agg: Dict[str, Dict[str, Any]] = {}
+            abast_hoje_count = 0
+            litros_hoje_total = 0.0
+            fat_comb_hoje_total = 0.0
+
+            for d in dispenses:
+                vol_litros = d.volume_vendido_litros if d.volume_vendido_litros > 0 else d.volume_aferido_litros
+                is_hoje = d.timestamp_registro and d.timestamp_registro.date() == hoje
+                if is_hoje:
+                    abast_hoje_count += 1
+                    litros_hoje_total += vol_litros
+                    fat_comb_hoje_total += d.total_faturado_reais
+
+                if len(ultimos_abastecimentos) < 10:
+                    ultimos_abastecimentos.append({
+                        "controle": d.identificador_bico,
+                        "bomba": d.identificador_bomba,
+                        "data": str(d.timestamp_registro.date()) if d.timestamp_registro else "",
+                        "hora": str(d.timestamp_registro.time()) if d.timestamp_registro else "",
+                        "codpro": getattr(d, "codigo_combustivel", None) or "00001",
+                        "nompro": getattr(d, "descricao_combustivel", None) or "COMBUSTIVEL",
+                        "litros": vol_litros,
+                        "total": d.total_faturado_reais,
+                        "preco_unitario": round(d.total_faturado_reais / vol_litros, 3) if vol_litros > 0 else 0.0,
+                    })
+
+                b_id = d.identificador_bomba
+                if b_id not in bomba_agg:
+                    bomba_agg[b_id] = {
+                        "bomba": b_id,
+                        "total_abastecimentos": 0,
+                        "total_litros": 0.0,
+                        "faturamento_bomba": 0.0,
+                    }
+                bomba_agg[b_id]["total_abastecimentos"] += 1
+                bomba_agg[b_id]["total_litros"] = round(bomba_agg[b_id]["total_litros"] + vol_litros, 2)
+                bomba_agg[b_id]["faturamento_bomba"] = round(bomba_agg[b_id]["faturamento_bomba"] + d.total_faturado_reais, 2)
+
+            abastecimentos_bomba = sorted(
+                bomba_agg.values(), key=lambda x: x["total_litros"], reverse=True
+            )
+
+            # 6. Resumo de Hoje e Geral
+            total_litros_geral = round(sum((d.volume_vendido_litros if d.volume_vendido_litros > 0 else d.volume_aferido_litros) for d in dispenses), 2)
+            faturamento_total_geral = round(sum(d.total_faturado_reais for d in dispenses), 2)
+
+            resposta = {
+                "status": "ok",
+                "ultimo_produto_vendido_destaque": ultimo_vendido_destaque,
+                "ultimos_produtos_conveniencia": ultimos_produtos_conveniencia,
+                "ultimos_abastecimentos_pista": ultimos_abastecimentos,
+                "produtos_mais_vendidos": produtos_mais_vendidos,
+                "abastecimentos_por_bomba": abastecimentos_bomba,
+                "resumo_hoje": {
+                    "data": str(hoje),
+                    "abastecimentos_hoje": abast_hoje_count,
+                    "litros_hoje": round(litros_hoje_total, 2),
+                    "faturamento_combustivel_hoje": round(fat_comb_hoje_total, 2),
+                    "pedidos_conveniencia_hoje": pedidos_hoje_count,
+                    "faturamento_conveniencia_hoje": round(faturamento_conv_hoje, 2),
+                },
+                "resumo_geral": {
+                    "total_abastecimentos": len(dispenses),
+                    "total_litros": total_litros_geral,
+                    "faturamento_total": faturamento_total_geral,
+                },
+            }
+            resposta_limpa, _ = sanitize_dict(resposta)
+            return resposta_limpa
         except Exception as e:
             return {
                 "status": "indisponivel",
@@ -4904,9 +4896,8 @@ class PostoTools:
         - limit: Quantidade máxima de recomendações de combos no ranking
         - data_inicio / data_fim: Intervalo opcional de datas YYYY-MM-DD
         """
-        conn = None
         from_db = False
-        linhas = []
+        vendas: List[UniversalSaleReceipt] = []
         try:
             min_lift = float(min_lift) if min_lift is not None else 1.2
             min_suporte = float(min_suporte) if min_suporte is not None else 0.005
@@ -4917,59 +4908,20 @@ class PostoTools:
             dt_fim_norm = self.normalizar_data(data_fim) if data_fim else None
 
             try:
-                conn = get_erp_connection()
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    where_clauses = [
-                        "(p.situ IS NULL OR p.situ != 'C')",
-                        "(p.dtcanc IS NULL)",
-                    ]
-                    params: List[Any] = []
+                # Valida conexao (respeita mock em testes) e consulta via Adaptador AUPS
+                conn_test = get_erp_connection(timeout=1)
+                if hasattr(conn_test, "close"):
+                    conn_test.close()
 
-                    if dt_ini_norm:
-                        if dt_ini_norm == "hoje":
-                            where_clauses.append("p.dtem = CURRENT_DATE")
-                        elif dt_ini_norm == "ontem":
-                            where_clauses.append("p.dtem = CURRENT_DATE - INTERVAL '1 day'")
-                        else:
-                            where_clauses.append("p.dtem >= %s")
-                            params.append(dt_ini_norm)
-                    if dt_fim_norm:
-                        if dt_fim_norm == "hoje":
-                            where_clauses.append("p.dtem <= CURRENT_DATE")
-                        elif dt_fim_norm == "ontem":
-                            where_clauses.append("p.dtem <= CURRENT_DATE - INTERVAL '1 day'")
-                        else:
-                            where_clauses.append("p.dtem <= %s")
-                            params.append(dt_fim_norm)
-
-                    where_sql = " AND ".join(where_clauses)
-
-                    query = f"""
-                        SELECT 
-                            TRIM(p.codi) AS pedido_id,
-                            TRIM(p.cupom) AS cupom,
-                            TRIM(p.pdv) AS pdv,
-                            p.dtem AS data_venda,
-                            ROUND(COALESCE(p.valortotal, 0)::numeric, 2) AS total_pedido,
-                            TRIM(i.codpec) AS codpro,
-                            COALESCE(NULLIF(TRIM(pr.nompro), ''), 'PRODUTO ' || TRIM(i.codpec)) AS nompro,
-                            COALESCE(NULLIF(TRIM(g.grupo), ''), 'CONVENIÊNCIA') AS grupo,
-                            ROUND(COALESCE(pr.valvenda, i.valunit, 0)::numeric, 2) AS preco_unitario,
-                            ROUND(COALESCE(i.quant, 1)::numeric, 2) AS quantidade,
-                            ROUND(COALESCE(i.valitem, 0)::numeric, 2) AS total_item
-                        FROM pedido p
-                        JOIN itemped i ON TRIM(i.pedido) = TRIM(p.codi)
-                        LEFT JOIN produtos pr ON TRIM(pr.codpro) = TRIM(i.codpec)
-                        LEFT JOIN grupos g ON TRIM(g.codi) = TRIM(pr.codgru)
-                        WHERE {where_sql}
-                        ORDER BY p.codi, i.controle;
-                    """
-                    cur.execute(query, params)
-                    linhas = cur.fetchall()
-                from_db = True
+                vendas = self.erp_adapter.get_recent_sales(
+                    start_date=dt_ini_norm,
+                    end_date=dt_fim_norm,
+                    limit=1000,
+                )
+                from_db = bool(getattr(self.erp_adapter, "is_connected", False))
             except Exception:
                 from_db = False
-                linhas = []
+                vendas = []
 
             if not from_db:
                 fallback_top_combos_raw = [
@@ -5038,26 +4990,27 @@ class PostoTools:
                     "Capacitar a equipe nos scripts de abordagem no caixa.",
                 ]
             else:
-                # Agrupa itens por pedido
+                # Agrupa itens por pedido a partir dos cupons canonicos AUPS
                 transacoes_map: Dict[str, List[Dict[str, Any]]] = {}
                 totais_pedidos: List[float] = []
                 todos_skus: Set[str] = set()
 
-                for r in linhas:
-                    ped_id = r["pedido_id"]
+                for venda in vendas:
+                    ped_id = venda.cupom_id
                     if ped_id not in transacoes_map:
                         transacoes_map[ped_id] = []
-                        totais_pedidos.append(float(r["total_pedido"] or 0.0))
+                        totais_pedidos.append(float(venda.total_reais or 0.0))
 
-                    transacoes_map[ped_id].append({
-                        "codpro": r["codpro"],
-                        "nompro": r["nompro"],
-                        "grupo": r["grupo"],
-                        "preco_unitario": float(r["preco_unitario"] or 0.0),
-                        "quantidade": float(r["quantidade"] or 1.0),
-                        "total_item": float(r["total_item"] or 0.0),
-                    })
-                    todos_skus.add(r["codpro"])
+                    for item in venda.itens:
+                        transacoes_map[ped_id].append({
+                            "codpro": item.sku,
+                            "nompro": item.descricao_produto,
+                            "grupo": item.grupo_comercial,
+                            "preco_unitario": float(item.preco_unitario_reais or 0.0),
+                            "quantidade": float(item.quantidade or 1.0),
+                            "total_item": float(item.total_item_reais or 0.0),
+                        })
+                        todos_skus.add(item.sku)
 
                 # Corrige totais de pedidos que possam ter vindo zerados do ERP
                 for idx, (ped_id, itens) in enumerate(transacoes_map.items()):
@@ -5411,12 +5364,6 @@ class PostoTools:
                 "status": "indisponivel",
                 "motivo": f"Falha na analise de Market Basket da Loja de Conveniencia no ERP: {e}",
             }
-        finally:
-            if conn and not conn.closed:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
 
     def simular_cenario_precificacao(
         self,
