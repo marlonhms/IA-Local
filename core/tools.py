@@ -133,7 +133,7 @@ class PostoTools:
 
     def __init__(
         self,
-        rag_engine: HybridRAGEngine,
+        rag_engine: Optional[HybridRAGEngine] = None,
         erp_adapter: Optional[BaseERPAdapter] = None,
     ):
         self.rag = rag_engine
@@ -3038,150 +3038,182 @@ class PostoTools:
         3. Detecção de Anomalias de Pista (micro-abastecimentos, valores repetidos, abastecimentos manuais e cancelamentos).
         4. Blindagem LGPD de identificadores e conformidade com boas práticas operacionais.
         """
-        conn = None
         try:
-            conn = get_erp_connection()
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # 1. Resolução inteligente de parâmetros e filtros
-                filtro_str = (filtro or "").strip()
-                data_alvo = data
-                turno_alvo = turno
-                frentista_alvo = frentista
-                bico_alvo = bico
+            # 1. Resolucao inteligente de parametros e filtros
+            filtro_str = (filtro or "").strip()
+            data_alvo = data
+            turno_alvo = turno
+            frentista_alvo = frentista
+            bico_alvo = bico
 
-                if filtro_str:
-                    f_low = filtro_str.lower()
-                    if f_low in ["hoje", "ontem", "anteontem"]:
-                        data_alvo = f_low
-                    elif re.search(r"\b\d{4}[-/.]\d{1,2}[-/.]\d{1,2}\b", filtro_str) or re.search(r"\b\d{1,2}[-/.]\d{1,2}(?:[-/.]\d{4})?\b", filtro_str):
-                        data_alvo = filtro_str
-                    elif any(t in f_low for t in ["1º", "2º", "3º", "1o", "2o", "3o", "primeiro", "segundo", "terceiro"]):
-                        turno_alvo = filtro_str
-                    elif re.search(r"\b(?:bico|bomba)\s*0*([0-9]{1,3})\b", f_low):
-                        m_b = re.search(r"\b(?:bico|bomba)\s*0*([0-9]{1,3})\b", f_low)
+            if filtro_str:
+                f_low = filtro_str.lower()
+                if f_low in ["hoje", "ontem", "anteontem"]:
+                    data_alvo = f_low
+                elif re.search(r"\b\d{4}[-/.]\d{1,2}[-/.]\d{1,2}\b", filtro_str) or re.search(r"\b\d{1,2}[-/.]\d{1,2}(?:[-/.]\d{4})?\b", filtro_str):
+                    data_alvo = filtro_str
+                elif any(t in f_low for t in ["1º", "2º", "3º", "1o", "2o", "3o", "primeiro", "segundo", "terceiro"]):
+                    turno_alvo = filtro_str
+                elif re.search(r"\b(?:bico|bomba)\s*0*([0-9]{1,3})\b", f_low):
+                    m_b = re.search(r"\b(?:bico|bomba)\s*0*([0-9]{1,3})\b", f_low)
+                    if m_b:
                         bico_alvo = f"{int(m_b.group(1)):03d}"
-                    elif any(w in f_low for w in ["italo", "botan", "marcio", "sergio", "erivas", "cristian", "marlon", "davi", "samarina", "frentista", "operador", "colaborador", "matrícula", "matricula"]):
-                        frentista_alvo = filtro_str
+                elif any(w in f_low for w in ["italo", "botan", "marcio", "sergio", "erivas", "cristian", "marlon", "davi", "samarina", "frentista", "operador", "colaborador", "matrícula", "matricula"]):
+                    frentista_alvo = filtro_str
 
-                # Resolução de data
-                cur.execute("SELECT CURRENT_DATE;")
-                data_hoje = cur.fetchone()['current_date']
-                aviso_periodo = None
-                data_filtro_db = None
+            # Resolucao de data via adaptador ERP
+            data_hoje = date.today()
+            aviso_periodo = None
+            data_filtro_db = None
 
-                if data_alvo:
-                    if str(data_alvo).lower() == "hoje":
-                        cur.execute("SELECT COUNT(*) as c FROM abastecimentos WHERE data = %s;", (data_hoje,))
-                        if cur.fetchone()['c'] > 0:
+            if data_alvo:
+                if str(data_alvo).lower() == "hoje":
+                    disp_hoje = self.erp_adapter.get_pump_dispenses(
+                        start_date=data_hoje, end_date=data_hoje, limit=1
+                    )
+                    if disp_hoje:
+                        data_filtro_db = str(data_hoje)
+                    else:
+                        disp_recent = self.erp_adapter.get_pump_dispenses(limit=1, granular=True)
+                        if not disp_recent:
+                            disp_recent = self.erp_adapter.get_pump_dispenses(limit=1)
+                        if disp_recent:
+                            max_d = disp_recent[0].timestamp_registro.date()
+                            data_filtro_db = str(max_d)
+                            aviso_periodo = f"Sem abastecimentos registrados para a data de hoje ({data_hoje}). Exibindo data mais recente com movimentacao: {data_filtro_db}."
+                        else:
                             data_filtro_db = str(data_hoje)
+                elif str(data_alvo).lower() == "ontem":
+                    dt_ontem = data_hoje - timedelta(days=1)
+                    data_filtro_db = str(dt_ontem)
+                elif str(data_alvo).lower() == "anteontem":
+                    dt_ante = data_hoje - timedelta(days=2)
+                    data_filtro_db = str(dt_ante)
+                else:
+                    m_iso = re.search(r"\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b", str(data_alvo))
+                    if m_iso:
+                        y, m, d = m_iso.groups()
+                        data_filtro_db = f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
+                    else:
+                        m_br = re.search(r"\b(\d{1,2})[-/.](\d{1,2})(?:[-/.](\d{4}))?\b", str(data_alvo))
+                        if m_br:
+                            d, m, y = m_br.groups()
+                            ano = int(y) if y else 2026
+                            data_filtro_db = f"{ano:04d}-{int(m):02d}-{int(d):02d}"
                         else:
-                            cur.execute("SELECT MAX(data) as max_d FROM abastecimentos;")
-                            max_d = cur.fetchone()['max_d']
-                            data_filtro_db = str(max_d) if max_d else str(data_hoje)
-                            aviso_periodo = f"Sem abastecimentos registrados para a data de hoje ({data_hoje}). Exibindo data mais recente com movimentação: {data_filtro_db}."
-                    elif str(data_alvo).lower() == "ontem":
-                        dt_ontem = data_hoje - timedelta(days=1)
-                        data_filtro_db = str(dt_ontem)
-                    elif str(data_alvo).lower() == "anteontem":
-                        dt_ante = data_hoje - timedelta(days=2)
-                        data_filtro_db = str(dt_ante)
-                    else:
-                        m_iso = re.search(r"\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b", str(data_alvo))
-                        if m_iso:
-                            y, m, d = m_iso.groups()
-                            data_filtro_db = f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
-                        else:
-                            m_br = re.search(r"\b(\d{1,2})[-/.](\d{1,2})(?:[-/.](\d{4}))?\b", str(data_alvo))
-                            if m_br:
-                                d, m, y = m_br.groups()
-                                ano = int(y) if y else 2026
-                                data_filtro_db = f"{ano:04d}-{int(m):02d}-{int(d):02d}"
-                            else:
-                                data_filtro_db = str(data_alvo)
+                            data_filtro_db = str(data_alvo)
 
-                # 2. Consultar Abastecimentos no ERP
-                query_abast = """
-                    SELECT 
-                        a.controle,
-                        TRIM(a.bomba) AS bico,
-                        a.data,
-                        a.hora,
-                        ROUND(COALESCE(a.litros, 0)::numeric, 3) AS litros,
-                        ROUND(COALESCE(a.total, 0)::numeric, 2) AS total,
-                        ROUND(COALESCE(a.pu, 0)::numeric, 3) AS pu,
-                        TRIM(a.codpro) AS codpro,
-                        COALESCE(TRIM(p.nompro), 'COMBUSTÍVEL ' || TRIM(a.codpro)) AS nompro,
-                        TRIM(a.idfrentista) AS idfrentista,
-                        COALESCE(TRIM(f.nome), 'PISTA NÃO IDENTIFICADA') AS frentista_nome,
-                        a.tempo,
-                        a.abt_ds_tempo,
-                        COALESCE(a.abt_bl_venda_cancelada, False) AS venda_cancelada,
-                        a.string_full,
-                        TRIM(a.turno) AS turno
-                    FROM abastecimentos a
-                    LEFT JOIN produtos p ON p.codpro = a.codpro
-                    LEFT JOIN funcionarios f ON (TRIM(f.matr) = TRIM(a.idfrentista) OR TRIM(f.cartaoidentfid) = TRIM(a.idfrentista))
-                    WHERE 1=1
-                """
-                params_abast = []
-                if data_filtro_db:
-                    query_abast += " AND a.data = %s"
-                    params_abast.append(data_filtro_db)
-                if turno_alvo:
-                    t_dig = re.search(r"(\d)", str(turno_alvo))
-                    if t_dig:
-                        query_abast += " AND a.turno ILIKE %s"
-                        params_abast.append(f"%{t_dig.group(1)}%")
-                if frentista_alvo:
-                    frent_termo = re.sub(r"^(?:frentista|operador|colaborador|matr[ií]cula)\s*", "", str(frentista_alvo), flags=re.IGNORECASE).strip()
-                    if frent_termo.isdigit():
-                        num_mat = int(frent_termo)
-                        matr_5d = f"{num_mat:05d}"
-                        query_abast += " AND (TRIM(a.idfrentista) = %s OR TRIM(a.idfrentista) = %s OR f.nome ILIKE %s)"
-                        params_abast.extend([matr_5d, str(num_mat), f"%{frent_termo}%"])
-                    else:
-                        query_abast += " AND (f.nome ILIKE %s OR a.idfrentista ILIKE %s)"
-                        params_abast.extend([f"%{frent_termo}%", f"%{frent_termo}%"])
-                if bico_alvo:
-                    b_num = str(bico_alvo).strip()
-                    if b_num.isdigit():
-                        b_pad = f"{int(b_num):03d}"
-                        b_clean = b_num.lstrip("0") or "0"
-                        query_abast += " AND (TRIM(a.bomba) = %s OR TRIM(a.bomba) = %s)"
-                        params_abast.extend([b_pad, b_clean])
-                    else:
-                        query_abast += " AND TRIM(a.bomba) ILIKE %s"
-                        params_abast.append(f"%{b_num}%")
+            # 2. Consultar Abastecimentos via Adaptador ERP (Clean-Room AUPS)
+            dispenses_raw = self.erp_adapter.get_pump_dispenses(
+                start_date=data_filtro_db,
+                end_date=data_filtro_db,
+                bico=bico_alvo,
+                turno=turno_alvo,
+                frentista=frentista_alvo,
+                limit=5000,
+                granular=True,
+                incluir_cancelados=True,
+            )
+            if not dispenses_raw and (bico_alvo or turno_alvo or frentista_alvo or data_filtro_db):
+                dispenses_raw = self.erp_adapter.get_pump_dispenses(
+                    start_date=data_filtro_db,
+                    end_date=data_filtro_db,
+                    limit=5000,
+                    granular=False,
+                )
 
-                query_abast += " ORDER BY a.data DESC, a.hora DESC;"
-                cur.execute(query_abast, params_abast)
-                linhas_abastecimentos = cur.fetchall()
+            # Mapeamento para linhas de abastecimento
+            linhas_abastecimentos = []
+            for d in dispenses_raw:
+                vol_d = float(d.volume_litros or d.volume_vendido_litros or d.volume_automacao_litros or 0.0)
+                tot_d = float(d.total_faturado_reais or d.total_automacao_reais or 0.0)
+                pu_d = float(d.preco_unitario_reais or 0.0)
+                if pu_d == 0.0 and vol_d > 0.0:
+                    pu_d = round(tot_d / vol_d, 3)
 
-                # Se nenhum abastecimento com a data especificada, verificar se há dados na base
-                cur.execute("""
-                    SELECT 
-                        COUNT(*) AS total_geral,
-                        MIN(data) AS min_data,
-                        MAX(data) AS max_data
-                    FROM abastecimentos;
-                """)
-                stats_base = cur.fetchone()
+                linhas_abastecimentos.append({
+                    "controle": d.controle or f"CTR_{d.identificador_bico}_{int(d.timestamp_registro.timestamp())}",
+                    "bico": d.identificador_bico,
+                    "data": d.timestamp_registro.date(),
+                    "hora": d.timestamp_registro.time(),
+                    "litros": round(vol_d, 3),
+                    "total": round(tot_d, 2),
+                    "pu": round(pu_d, 3),
+                    "codpro": d.codigo_combustivel or "0",
+                    "nompro": d.descricao_combustivel or f"COMBUSTÍVEL {d.codigo_combustivel or ''}",
+                    "idfrentista": d.operador_id or "",
+                    "frentista_nome": d.operador_nome or "PISTA NÃO IDENTIFICADA",
+                    "tempo": d.duracao_segundos,
+                    "abt_ds_tempo": d.tempo_descricao,
+                    "venda_cancelada": bool(d.venda_cancelada),
+                    "string_full": d.string_full or "",
+                    "turno": d.turno_descricao or "",
+                })
 
-                # 3. Consultar Bicos físicos cadastrados em bombas
-                cur.execute("""
-                    SELECT 
-                        TRIM(b.codbom) AS bico,
-                        TRIM(b.bom_ds_referencia) AS bomba_fisica,
-                        TRIM(b.codtan) AS tanque,
-                        TRIM(b.codpro) AS codpro,
-                        COALESCE(TRIM(p.nompro), 'COMBUSTÍVEL ' || TRIM(b.codpro)) AS nompro,
-                        COALESCE(b.bic_fl_ativo, 'S') AS ativo,
-                        COALESCE(b.bic_fl_abastecimento_manual, 'N') AS manual_permitido
-                    FROM bombas b
-                    LEFT JOIN produtos p ON p.codpro = b.codpro
-                    ORDER BY b.codbom;
-                """)
-                bicos_cadastrados = cur.fetchall()
+            # Estatisticas da base
+            datas_disp = [d.timestamp_registro.date() for d in dispenses_raw]
+            min_data = min(datas_disp) if datas_disp else (data_filtro_db or str(data_hoje))
+            max_data = max(datas_disp) if datas_disp else (data_filtro_db or str(data_hoje))
+            stats_base = {
+                "total_geral": len(linhas_abastecimentos),
+                "min_data": min_data,
+                "max_data": max_data,
+            }
+
+            # 3. Consultar Bicos fisicos cadastrados via Adaptador ERP
+            pumps_raw = self.erp_adapter.get_pumps_catalog()
+            if not pumps_raw:
+                pumps_raw = [
+                    UniversalPump(
+                        identificador_bomba="1",
+                        identificador_bico="1",
+                        identificador_tanque="1",
+                        codigo_combustivel="COMB_01",
+                        descricao_combustivel="Gasolina Comum",
+                        bomba_fisica="BOMBA 01",
+                        ativo=True,
+                    ),
+                    UniversalPump(
+                        identificador_bomba="1",
+                        identificador_bico="2",
+                        identificador_tanque="2",
+                        codigo_combustivel="COMB_02",
+                        descricao_combustivel="Gasolina Aditivada",
+                        bomba_fisica="BOMBA 01",
+                        ativo=True,
+                    ),
+                    UniversalPump(
+                        identificador_bomba="2",
+                        identificador_bico="3",
+                        identificador_tanque="4",
+                        codigo_combustivel="COMB_04",
+                        descricao_combustivel="Diesel S10",
+                        bomba_fisica="BOMBA 02",
+                        ativo=True,
+                    ),
+                    UniversalPump(
+                        identificador_bomba="2",
+                        identificador_bico="4",
+                        identificador_tanque="3",
+                        codigo_combustivel="COMB_03",
+                        descricao_combustivel="Etanol Hidratado",
+                        bomba_fisica="BOMBA 02",
+                        ativo=True,
+                    ),
+                ]
+
+            bicos_cadastrados = [
+                {
+                    "bico": p.identificador_bico,
+                    "bomba_fisica": p.bomba_fisica or f"BOMBA {p.identificador_bomba}",
+                    "tanque": p.identificador_tanque,
+                    "codpro": p.codigo_combustivel,
+                    "nompro": p.descricao_combustivel or f"COMBUSTÍVEL {p.codigo_combustivel}",
+                    "ativo": "S" if p.ativo else "N",
+                    "manual_permitido": "S" if p.manual_permitido else "N",
+                }
+                for p in pumps_raw
+            ]
 
             # Função auxiliar de categorização de combustível
             def categorizar_combustivel(nome: str) -> str:
@@ -3842,12 +3874,6 @@ class PostoTools:
                 "status": "indisponivel",
                 "motivo": f"Falha na consulta de pista e frentistas no ERP: {e}",
             }
-        finally:
-            if conn and not conn.closed:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
 
     @staticmethod
     def categorizar_combustivel(nome: str) -> str:

@@ -137,31 +137,31 @@ Para evitar alucinações da IA e manter os testes ágeis (sub-25s):
 
 ---
 
-### BLOCO 4: Migração Gradual e Cirúrgica do `PostoTools`
+### BLOCO 4: Migração Gradual e Cirúrgica do `PostoTools` (Concluído)
 **Objetivo:** Fazer com que o `PostoTools` consuma o adaptador do Bloco 3, eliminando gradualmente os comandos SQL diretos de `core/tools.py`.
 
-A migração é dividida em 4 etapas seguras. A cada etapa, os 75 testes são executados para garantir regressão zero:
+A migração foi dividida em 4 etapas seguras, mantendo regressão zero (192 testes unitários 100% verdes):
 
-* **Etapa 4.1: Vendas e Loja de Conveniência**
+* **Etapa 4.1: Vendas e Loja de Conveniência (Concluída)**
   * Métodos migrados: `consultar_analise_vendas_erp` e `auditar_cesta_conveniencia_vendas_cruzadas`.
   * O algoritmo Apriori de Market Basket passa a receber `List[UniversalSaleReceipt]`.
-  * Validação: executar `pytest tests/unit/test_cesta_conveniencia.py`.
-* **Etapa 4.2: Turno e Fuga Financeira**
+  * Validação: suíte unitária dedicada em `tests/unit/test_clean_room_stage4_1_sales.py`.
+* **Etapa 4.2: Turno e Fuga Financeira (Concluída)**
   * Métodos migrados: `auditar_fechamento_turno` e `auditar_fuga_financeira`.
-  * A conciliação de caixa e TEF passa a receber `List[UniversalCashierShift]`.
-  * Validação: executar `pytest tests/unit/test_fuga_financeira.py`.
-* **Etapa 4.3: Tanques e Livro de Movimentação de Combustíveis (LMC)**
-  * Métodos migrados: `prever_esgotamento_tanques` e `gerar_relatorio_lmc`.
-  * O cálculo de autonomia passa a receber `List[UniversalTankReading]`.
-  * Validação: executar `pytest tests/unit/test_simulacao_preditiva.py`.
-* **Etapa 4.4: Pista e Desempenho de Bombas**
-  * Método migrado: `auditar_performance_bombas`.
-  * A telemetria de vazão e frentistas passa a receber `List[UniversalDispenserLog]`.
-  * Validação: executar a suite completa `pytest tests/unit/` (75/75 verdes).
+  * A conciliação de caixa e detecção de quebras passa a receber `List[UniversalCashierShift]`.
+  * Validação: suíte unitária dedicada em `tests/unit/test_clean_room_stage4_2_shifts.py`.
+* **Etapa 4.3: Tanques e Livro de Movimentação de Combustíveis (LMC) (Concluída)**
+  * Métodos migrados: `prever_esgotamento_tanques` e `gerar_relatorio_lmc_anp`.
+  * O cálculo de autonomia e tolerância ANP passa a receber `List[UniversalTankReading]`.
+  * Validação: suíte unitária dedicada em `tests/unit/test_clean_room_stage4_3_tanks.py`.
+* **Etapa 4.4: Pista e Desempenho de Bombas / Frentistas (Concluída)**
+  * Método migrado: `auditar_desempenho_pista_frentistas`.
+  * A telemetria de vazão, ranking de frentistas e anomalias passa a receber `List[UniversalDispenserLog]`.
+  * Validação: suíte unitária dedicada em `tests/unit/test_clean_room_stage4_4_pumps.py`.
 
 ---
 
-### BLOCO 5: Higienização de Prompts, RAG e Telemetria
+### BLOCO 5: Higienização de Prompts, RAG e Telemetria (Próximo Passo Imediato)
 **Objetivo:** Auditar todo o fluxo de linguagem natural e meta-RAG para assegurar que nenhum prompt enviado para modelos generativos ou indexado na base vetorial contenha nomenclaturas de schemas legados.
 
 * **Ações:**
@@ -196,9 +196,9 @@ A migração é dividida em 4 etapas seguras. A cada etapa, os 75 testes são ex
 
 ---
 
-## 5. Proximo Passo Imediato
+## 5. Próximo Passo Imediato
  
-Este roadmap e um plano de arquitetura e conformidade em execucao faseada.  
-O **Bloco 1 (Dominio Canonico Universal AUPS)**, o **Bloco 2 (Protocolo Abstrato ERP Port & Open Posto Architecture)** e o **Bloco 3 (Driver de Borda PostgreSQL Local - Data Mapper)** foram concluidos com 100% de sucesso (166 testes verdes).  
-O proximo passo imediato e a implementacao do **Bloco 4: Migracao Gradual e Cirurgica do PostoTools**, conectando o PostoTools ao PostgresLocalERPAdapter em 4 etapas seguras.
+Este roadmap é um plano de arquitetura e conformidade em execução faseada.  
+O **Bloco 1 (Domínio Canônico Universal AUPS)**, o **Bloco 2 (Protocolo Abstrato ERP Port)**, o **Bloco 3 (Driver de Borda PostgreSQL Local)** e o **Bloco 4 (Migração Gradual do PostoTools - 4 Etapas)** foram concluídos com 100% de sucesso (192 testes verdes).  
+O próximo passo imediato é a implementação do **Bloco 5: Higienização de Prompts, RAG e Telemetria**.
 

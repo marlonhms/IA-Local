@@ -19,7 +19,7 @@ from core.adapters.erp.base import (
 )
 from core.domain.base import strip_accents
 from core.domain.cashier import UniversalCashierShift
-from core.domain.pumps import UniversalDispenserLog
+from core.domain.pumps import UniversalDispenserLog, UniversalPump
 from core.domain.sales import (
     UniversalPaymentMethod,
     UniversalSaleItem,
@@ -57,6 +57,7 @@ class MockERPAdapter(BaseERPAdapter):
         sales: list[UniversalSaleReceipt] | None = None,
         tanks: list[UniversalTankReading] | None = None,
         pumps: list[UniversalDispenserLog] | None = None,
+        pumps_catalog: list[UniversalPump] | None = None,
         shifts: list[UniversalCashierShift] | None = None,
         catalog: list[UniversalSaleItem] | None = None,
         is_connected: bool = True,
@@ -81,6 +82,11 @@ class MockERPAdapter(BaseERPAdapter):
             self._pumps = list(pumps)
         else:
             self._pumps = self._generate_default_pumps()
+
+        if pumps_catalog is not None:
+            self._pumps_catalog = list(pumps_catalog)
+        else:
+            self._pumps_catalog = self._generate_default_pumps_catalog()
 
         if shifts is not None:
             self._shifts = list(shifts)
@@ -133,6 +139,7 @@ class MockERPAdapter(BaseERPAdapter):
             self._sales = self._generate_default_sales()
             self._tanks = self._generate_default_tanks()
             self._pumps = self._generate_default_pumps()
+            self._pumps_catalog = self._generate_default_pumps_catalog()
             self._shifts = self._generate_default_shifts()
             self._catalog = self._generate_default_catalog()
 
@@ -150,6 +157,20 @@ class MockERPAdapter(BaseERPAdapter):
         """Adiciona um fechamento de bico a base em memoria."""
         with self._lock:
             self._pumps.append(dispense)
+
+    def add_pump(self, pump: UniversalPump) -> None:
+        """Adiciona uma bomba/bico ao catalogo em memoria."""
+        with self._lock:
+            self._pumps_catalog.append(pump)
+
+    def get_pumps_catalog(self) -> list[UniversalPump]:
+        """Retorna catalogo de bombas e bicos cadastrados em memoria."""
+        with self._lock:
+            if not self._is_connected:
+                raise ERPConnectionError(
+                    f"Adaptador '{self.adapter_name}' desconectado. Falha na leitura do catalogo de bombas."
+                )
+            return list(self._pumps_catalog)
 
     def add_cashier_shift(self, shift: UniversalCashierShift) -> None:
         """Adiciona um fechamento de turno de caixa a base em memoria."""
@@ -225,6 +246,11 @@ class MockERPAdapter(BaseERPAdapter):
         start_date: str | date | datetime | None = None,
         end_date: str | date | datetime | None = None,
         limit: int = 100,
+        bico: str | None = None,
+        turno: str | None = None,
+        frentista: str | None = None,
+        granular: bool = False,
+        incluir_cancelados: bool = True,
     ) -> list[UniversalDispenserLog]:
         """Consulta medicoes de encerrantes dos bicos dispensadores com filtros.
 
@@ -250,13 +276,34 @@ class MockERPAdapter(BaseERPAdapter):
             if s_date and e_date and s_date > e_date:
                 return []
 
+            bico_str = str(bico).strip() if bico is not None else None
+            bico_clean = bico_str.lstrip("0") or "0" if bico_str is not None else None
+            turno_str = str(turno).strip().lower() if turno is not None else None
+            frent_str = str(frentista).strip().lower() if frentista is not None else None
+
             filtered: list[UniversalDispenserLog] = []
             for dispense in self._pumps:
+                if not incluir_cancelados and dispense.venda_cancelada:
+                    continue
                 disp_date = _to_local_date(dispense.timestamp_registro)
                 if s_date and disp_date < s_date:
                     continue
                 if e_date and disp_date > e_date:
                     continue
+                if bico_str is not None:
+                    d_bico = str(dispense.identificador_bico).strip()
+                    d_clean = d_bico.lstrip("0") or "0"
+                    if d_bico != bico_str and d_clean != bico_clean:
+                        continue
+                if turno_str is not None:
+                    d_turno = (dispense.turno_descricao or "").strip().lower()
+                    if turno_str not in d_turno:
+                        continue
+                if frent_str is not None:
+                    d_mat = (dispense.operador_id or "").strip().lower()
+                    d_nome = (dispense.operador_nome or "").strip().lower()
+                    if frent_str not in d_mat and frent_str not in d_nome:
+                        continue
                 filtered.append(dispense)
 
             filtered.sort(
@@ -677,6 +724,12 @@ class MockERPAdapter(BaseERPAdapter):
                 qtd_abastecimentos=42,
                 volume_automacao_litros=1580.0,
                 total_automacao_reais=9306.20,
+                volume_litros=1580.0,
+                operador_id="00010",
+                operador_nome="JOAO CARLOS SILVA",
+                duracao_segundos=2520.0,
+                tempo_descricao="00:42:00",
+                controle="1001",
             ),
             UniversalDispenserLog(
                 identificador_bomba="1",
@@ -695,6 +748,12 @@ class MockERPAdapter(BaseERPAdapter):
                 qtd_abastecimentos=25,
                 volume_automacao_litros=1140.0,
                 total_automacao_reais=4548.60,
+                volume_litros=1140.0,
+                operador_id="00010",
+                operador_nome="JOAO CARLOS SILVA",
+                duracao_segundos=1800.0,
+                tempo_descricao="00:30:00",
+                controle="1002",
             ),
             UniversalDispenserLog(
                 identificador_bomba="2",
@@ -713,6 +772,12 @@ class MockERPAdapter(BaseERPAdapter):
                 qtd_abastecimentos=38,
                 volume_automacao_litros=3180.0,
                 total_automacao_reais=19557.00,
+                volume_litros=3180.0,
+                operador_id="00012",
+                operador_nome="MARCOS SOUZA",
+                duracao_segundos=4500.0,
+                tempo_descricao="01:15:00",
+                controle="1003",
             ),
             UniversalDispenserLog(
                 identificador_bomba="2",
@@ -731,6 +796,57 @@ class MockERPAdapter(BaseERPAdapter):
                 qtd_abastecimentos=20,
                 volume_automacao_litros=750.0,
                 total_automacao_reais=4612.50,
+                volume_litros=750.0,
+                operador_id="00012",
+                operador_nome="MARCOS SOUZA",
+                duracao_segundos=1200.0,
+                tempo_descricao="00:20:00",
+                controle="1004",
+            ),
+        ]
+
+    def _generate_default_pumps_catalog(self) -> list[UniversalPump]:
+        """Gera catalogo deterministico de bicos e bombas fisicas."""
+        return [
+            UniversalPump(
+                identificador_bomba="1",
+                identificador_bico="1",
+                identificador_tanque="1",
+                codigo_combustivel="COMB_01",
+                descricao_combustivel="Gasolina Comum",
+                bomba_fisica="BOMBA 01",
+                ativo=True,
+                manual_permitido=False,
+            ),
+            UniversalPump(
+                identificador_bomba="1",
+                identificador_bico="2",
+                identificador_tanque="2",
+                codigo_combustivel="COMB_02",
+                descricao_combustivel="Gasolina Aditivada",
+                bomba_fisica="BOMBA 01",
+                ativo=True,
+                manual_permitido=False,
+            ),
+            UniversalPump(
+                identificador_bomba="2",
+                identificador_bico="3",
+                identificador_tanque="4",
+                codigo_combustivel="COMB_04",
+                descricao_combustivel="Diesel S10",
+                bomba_fisica="BOMBA 02",
+                ativo=True,
+                manual_permitido=False,
+            ),
+            UniversalPump(
+                identificador_bomba="2",
+                identificador_bico="4",
+                identificador_tanque="3",
+                codigo_combustivel="COMB_03",
+                descricao_combustivel="Etanol Hidratado",
+                bomba_fisica="BOMBA 02",
+                ativo=True,
+                manual_permitido=False,
             ),
         ]
 

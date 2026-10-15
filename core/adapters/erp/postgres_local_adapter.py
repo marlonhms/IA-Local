@@ -28,7 +28,7 @@ from core.adapters.erp.base import (
 from core.adapters.erp.mock_adapter import MockERPAdapter
 from core.db_pool import get_erp_connection
 from core.domain.cashier import UniversalCashierShift
-from core.domain.pumps import UniversalDispenserLog
+from core.domain.pumps import UniversalDispenserLog, UniversalPump
 from core.domain.sales import (
     UniversalPaymentMethod,
     UniversalSaleItem,
@@ -337,7 +337,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                 c_bom = br.get("codbom")
                 if c_tan and c_bom:
                     bicos_por_tanque.setdefault(c_tan, []).append(c_bom)
-        except Exception as exc:
+        except (psycopg2.Error, RuntimeError, OSError, ValueError, KeyError) as exc:
             logger.debug("Nao foi possivel carregar bicos_conectados da tabela bombas (%s)", exc)
 
         readings: list[UniversalTankReading] = []
@@ -367,11 +367,63 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
 
         return readings
 
+    def get_pumps_catalog(self) -> list[UniversalPump]:
+        """Recupera catalogo de bombas e bicos cadastrados fisicamente no ERP.
+
+        Consulta tabelas locais: bombas e produtos.
+        Mapeia para entidades UniversalPump.
+        """
+        if self._force_offline:
+            return self._fallback_adapter.get_pumps_catalog()
+
+        query = """
+            SELECT 
+                TRIM(b.codbom) AS identificador_bico,
+                COALESCE(TRIM(b.bom_ds_referencia), TRIM(b.ilha::text), 'BOMBA ' || TRIM(b.codbom)) AS bomba_fisica,
+                COALESCE(TRIM(b.ilha::text), '1') AS identificador_bomba,
+                TRIM(COALESCE(b.codtan, '')) AS identificador_tanque,
+                TRIM(COALESCE(b.codpro, '')) AS codigo_combustivel,
+                COALESCE(TRIM(p.nompro), 'COMBUSTÍVEL ' || TRIM(COALESCE(b.codpro, ''))) AS descricao_combustivel,
+                COALESCE(b.bic_fl_ativo, 'S') = 'S' AS ativo,
+                COALESCE(b.bic_fl_abastecimento_manual, 'N') = 'S' AS manual_permitido
+            FROM bombas b
+            LEFT JOIN produtos p ON p.codpro = b.codpro
+            ORDER BY b.codbom;
+        """
+        try:
+            rows = self._execute_query(query)
+        except (psycopg2.Error, RuntimeError, OSError, ValueError, KeyError) as exc:
+            if self._fallback_on_error:
+                logger.warning("Falha em get_pumps_catalog (%s): usando fallback.", exc)
+                return self._fallback_adapter.get_pumps_catalog()
+            raise ERPQueryError(f"Erro ao consultar bombas no PostgreSQL: {exc}") from exc
+
+        pumps: list[UniversalPump] = []
+        for r in rows:
+            pump = UniversalPump(
+                identificador_bomba=str(r["identificador_bomba"]),
+                identificador_bico=str(r["identificador_bico"]),
+                identificador_tanque=str(r.get("identificador_tanque") or ""),
+                codigo_combustivel=str(r.get("codigo_combustivel") or "SEM_CODIGO"),
+                descricao_combustivel=str(r.get("descricao_combustivel") or ""),
+                bomba_fisica=str(r.get("bomba_fisica") or ""),
+                ativo=bool(r.get("ativo", True)),
+                manual_permitido=bool(r.get("manual_permitido", False)),
+            )
+            pumps.append(pump)
+
+        return pumps
+
     def get_pump_dispenses(
         self,
         start_date: str | date | None = None,
         end_date: str | date | None = None,
         limit: int = 100,
+        bico: str | None = None,
+        turno: str | None = None,
+        frentista: str | None = None,
+        granular: bool = False,
+        incluir_cancelados: bool = True,
     ) -> list[UniversalDispenserLog]:
         """Recupera medicoes de encerrantes de bicos dispensadores.
 
@@ -379,11 +431,138 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
         Garante mapeamento para UniversalDispenserLog com encerrantes e faturamento.
         """
         if self._force_offline:
-            return self._fallback_adapter.get_pump_dispenses(start_date, end_date, limit)
+            return self._fallback_adapter.get_pump_dispenses(
+                start_date=start_date,
+                end_date=end_date,
+                limit=limit,
+                bico=bico,
+                turno=turno,
+                frentista=frentista,
+                granular=granular,
+                incluir_cancelados=incluir_cancelados,
+            )
 
         dt_ini = normalize_date_filter(start_date)
         dt_fim = normalize_date_filter(end_date)
         lim = max(1, int(limit))
+
+        # Modo granular para auditoria detalhada de abastecimentos e frentistas
+        if granular or frentista is not None:
+            where_ab = []
+            params_ab: list[Any] = []
+            if not incluir_cancelados:
+                where_ab.append("a.abt_bl_venda_cancelada IS NOT TRUE")
+            if dt_ini:
+                where_ab.append("a.data >= %s")
+                params_ab.append(dt_ini)
+            if dt_fim:
+                where_ab.append("a.data <= %s")
+                params_ab.append(dt_fim)
+            if turno:
+                where_ab.append("a.turno ILIKE %s")
+                params_ab.append(f"%{turno}%")
+            if bico:
+                b_num = str(bico).strip()
+                if b_num.isdigit():
+                    b_pad = f"{int(b_num):03d}"
+                    b_clean = b_num.lstrip("0") or "0"
+                    where_ab.append("(TRIM(a.bomba) = %s OR TRIM(a.bomba) = %s)")
+                    params_ab.extend([b_pad, b_clean])
+                else:
+                    where_ab.append("TRIM(a.bomba) ILIKE %s")
+                    params_ab.append(f"%{b_num}%")
+            if frentista:
+                f_term = str(frentista).strip()
+                if f_term.isdigit():
+                    num_mat = int(f_term)
+                    matr_5d = f"{num_mat:05d}"
+                    where_ab.append("(TRIM(a.idfrentista) = %s OR TRIM(a.idfrentista) = %s OR f.nome ILIKE %s)")
+                    params_ab.extend([matr_5d, str(num_mat), f"%{f_term}%"])
+                else:
+                    where_ab.append("(f.nome ILIKE %s OR a.idfrentista ILIKE %s)")
+                    params_ab.extend([f"%{f_term}%", f"%{f_term}%"])
+
+            where_ab_sql = ("WHERE " + " AND ".join(where_ab)) if where_ab else ""
+            query_ind = f"""
+                SELECT 
+                    a.controle::text AS controle,
+                    COALESCE(TRIM(b.ilha::text), TRIM(a.bomba)) AS identificador_bomba,
+                    TRIM(a.bomba) AS identificador_bico,
+                    COALESCE(NULLIF(TRIM(a.tanque), ''), TRIM(b.codtan), '') AS identificador_tanque,
+                    TRIM(COALESCE(a.codpro, '')) AS codigo_combustivel,
+                    COALESCE(TRIM(pr.nompro), 'COMBUSTÍVEL ' || TRIM(COALESCE(a.codpro, ''))) AS descricao_combustivel,
+                    TRIM(COALESCE(a.turno, '')) AS turno_descricao,
+                    '1' AS pdv,
+                    COALESCE(a.abt_ts_abastecimento, (a.data + a.hora)::timestamp, a.data::timestamp) AS timestamp_registro,
+                    ROUND(COALESCE(a.ei, 0)::numeric, 3) AS encerrante_inicial_litros,
+                    ROUND(COALESCE(a.encerrante, 0)::numeric, 3) AS encerrante_final_litros,
+                    0.0 AS volume_aferido_litros,
+                    ROUND(COALESCE(a.pu, 0)::numeric, 3) AS preco_unitario_reais,
+                    ROUND(COALESCE(a.total, 0)::numeric, 2) AS total_faturado_reais,
+                    ROUND(COALESCE(a.litros, 0)::numeric, 3) AS volume_litros,
+                    TRIM(COALESCE(a.idfrentista, '')) AS operador_id,
+                    COALESCE(TRIM(f.nome), 'PISTA NÃO IDENTIFICADA') AS operador_nome,
+                    a.tempo::text AS duracao_segundos,
+                    a.abt_ds_tempo AS tempo_descricao,
+                    COALESCE(a.abt_bl_venda_cancelada, False) AS venda_cancelada,
+                    a.string_full,
+                    1 AS qtd_abastecimentos,
+                    ROUND(COALESCE(a.litros, 0)::numeric, 3) AS volume_automacao_litros,
+                    ROUND(COALESCE(a.total, 0)::numeric, 2) AS total_automacao_reais
+                FROM abastecimentos a
+                LEFT JOIN bombas b ON TRIM(b.codbom) = TRIM(a.bomba)
+                LEFT JOIN produtos pr ON pr.codpro = a.codpro
+                LEFT JOIN funcionarios f ON (TRIM(f.matr) = TRIM(a.idfrentista) OR TRIM(f.cartaoidentfid) = TRIM(a.idfrentista))
+                {where_ab_sql}
+                ORDER BY a.data DESC, a.hora DESC
+                LIMIT %s;
+            """
+            try:
+                rows_ind = self._execute_query(query_ind, params_ab + [lim])
+                if rows_ind:
+                    logs_ind: list[UniversalDispenserLog] = []
+                    for r in rows_ind:
+                        logs_ind.append(UniversalDispenserLog(
+                            identificador_bomba=str(r["identificador_bomba"]),
+                            identificador_bico=str(r["identificador_bico"]),
+                            identificador_tanque=str(r.get("identificador_tanque") or ""),
+                            codigo_combustivel=str(r.get("codigo_combustivel") or ""),
+                            descricao_combustivel=str(r.get("descricao_combustivel") or ""),
+                            turno_descricao=str(r.get("turno_descricao") or ""),
+                            pdv=str(r.get("pdv") or "1"),
+                            timestamp_registro=r["timestamp_registro"],
+                            encerrante_inicial_litros=float(r["encerrante_inicial_litros"]),
+                            encerrante_final_litros=float(r["encerrante_final_litros"]),
+                            volume_aferido_litros=float(r["volume_aferido_litros"]),
+                            preco_unitario_reais=float(r.get("preco_unitario_reais") or 0.0),
+                            total_faturado_reais=float(r["total_faturado_reais"]),
+                            volume_litros=float(r.get("volume_litros") or 0.0),
+                            operador_id=str(r.get("operador_id") or "") or None,
+                            operador_nome=str(r.get("operador_nome") or "") or None,
+                            duracao_segundos=float(r["duracao_segundos"]) if r.get("duracao_segundos") else None,
+                            tempo_descricao=str(r.get("tempo_descricao") or "") or None,
+                            venda_cancelada=bool(r.get("venda_cancelada", False)),
+                            string_full=str(r.get("string_full") or "") or None,
+                            controle=str(r.get("controle") or "") or None,
+                            qtd_abastecimentos=int(r.get("qtd_abastecimentos") or 1),
+                            volume_automacao_litros=float(r.get("volume_automacao_litros") or 0.0),
+                            total_automacao_reais=float(r.get("total_automacao_reais") or 0.0),
+                        ))
+                    return logs_ind
+            except (psycopg2.Error, RuntimeError, OSError, ValueError, KeyError) as exc:
+                if self._fallback_on_error:
+                    logger.warning("Falha em get_pump_dispenses granular (%s): usando fallback.", exc)
+                    return self._fallback_adapter.get_pump_dispenses(
+                        start_date=start_date,
+                        end_date=end_date,
+                        limit=limit,
+                        bico=bico,
+                        turno=turno,
+                        frentista=frentista,
+                        granular=granular,
+                        incluir_cancelados=incluir_cancelados,
+                    )
+                raise ERPQueryError(f"Erro ao consultar abastecimentos granulares no PostgreSQL: {exc}") from exc
 
         where_fb = []
         params_fb: list[Any] = []

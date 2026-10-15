@@ -68,6 +68,21 @@ class UniversalPump(AUPSBaseModel):
         description="Indica se o bico/bomba esta em operacao",
     )
 
+    bomba_fisica: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "bomba_fisica", "referencia", "bom_ds_referencia", "ilha"
+        ),
+        description="Descricao fisica ou referencia da bomba no posto",
+    )
+    manual_permitido: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "manual_permitido", "abastecimento_manual", "bic_fl_abastecimento_manual"
+        ),
+        description="Indica se o bico permite abastecimento manual no PDV",
+    )
+
     @property
     def bomba_id(self) -> str:
         """Alias de conveniencia para identificador_bomba."""
@@ -95,7 +110,7 @@ class UniversalPump(AUPSBaseModel):
     def _validate_codigo_combustivel(cls, v: Any) -> str:
         return parse_str_safe(v, default="SEM_CODIGO")
 
-    @field_validator("descricao_combustivel", mode="before")
+    @field_validator("descricao_combustivel", "bomba_fisica", mode="before")
     @classmethod
     def _validate_descricao(cls, v: Any) -> str | None:
         if v is None:
@@ -105,7 +120,16 @@ class UniversalPump(AUPSBaseModel):
     @field_validator("ativo", mode="before")
     @classmethod
     def _validate_ativo(cls, v: Any) -> bool:
+        if v is None:
+            return True
         return parse_bool_safe(v, default=True)
+
+    @field_validator("manual_permitido", mode="before")
+    @classmethod
+    def _validate_manual_permitido(cls, v: Any) -> bool:
+        if v is None:
+            return False
+        return parse_bool_safe(v, default=False)
 
 
 class UniversalDispenserLog(AUPSBaseModel):
@@ -245,13 +269,73 @@ class UniversalDispenserLog(AUPSBaseModel):
         ),
         description="Total financeiro registrado pela automacao de pista em Reais",
     )
-
-
+    controle: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "controle", "nro_abastecimento", "id_abastecimento", "transacao_id"
+        ),
+        description="Identificador unico da transacao ou controle de abastecimento",
+    )
+    volume_litros: float = Field(
+        default=0.0,
+        ge=0.0,
+        validation_alias=AliasChoices(
+            "volume_litros", "litros", "volume", "lts", "qtd_litros"
+        ),
+        description="Volume individual do abastecimento em Litros",
+    )
+    operador_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "operador_id", "idfrentista", "matricula", "frentista_id", "codfun"
+        ),
+        description="Matricula ou ID do frentista que operou o bico",
+    )
+    operador_nome: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "operador_nome", "frentista_nome", "nome_frentista", "nome", "nomfun"
+        ),
+        description="Nome do frentista responsavel pelo abastecimento",
+    )
+    duracao_segundos: float | None = Field(
+        default=None,
+        ge=0.0,
+        validation_alias=AliasChoices(
+            "duracao_segundos", "tempo", "duracao", "tempo_segundos"
+        ),
+        description="Tempo de duracao do abastecimento medido em segundos",
+    )
+    tempo_descricao: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "tempo_descricao", "abt_ds_tempo", "tempo_str"
+        ),
+        description="Descricao textual do tempo de abastecimento no concentrador",
+    )
+    venda_cancelada: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "venda_cancelada", "abt_bl_venda_cancelada", "cancelado", "is_cancelled"
+        ),
+        description="Indica se o abastecimento teve sua venda cancelada",
+    )
+    string_full: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "string_full", "raw_payload", "observacao", "log_bruto"
+        ),
+        description="Payload bruto da automacao de pista ou observacao de manual",
+    )
 
     @property
     def volume_vendido_litros(self) -> float:
-        """Calcula o volume liquido faturado (encerrante final - inicial - afericoes)."""
+        """Calcula o volume liquido faturado (encerrante final - inicial - afericoes ou volume direto)."""
         diff = self.encerrante_final_litros - self.encerrante_inicial_litros - self.volume_aferido_litros
+        if diff > 0.0:
+            return round(diff, 3)
+        if self.volume_litros > 0.0:
+            return round(self.volume_litros, 3)
         return max(0.0, round(diff, 3))
 
     @property
@@ -282,19 +366,46 @@ class UniversalDispenserLog(AUPSBaseModel):
         "preco_unitario_reais",
         "volume_automacao_litros",
         "total_automacao_reais",
+        "volume_litros",
         mode="before",
     )
     @classmethod
     def _validate_numeric_fields(cls, v: Any) -> float:
         return parse_float_safe(v, default=0.0, allow_negative=False)
 
-    @field_validator("codigo_combustivel", "descricao_combustivel", "identificador_tanque", "turno_descricao", "pdv", mode="before")
+    @field_validator("duracao_segundos", mode="before")
+    @classmethod
+    def _validate_duracao_segundos(cls, v: Any) -> float | None:
+        if v is None:
+            return None
+        return parse_float_safe(v, default=0.0, allow_negative=False)
+
+    @field_validator(
+        "codigo_combustivel",
+        "descricao_combustivel",
+        "identificador_tanque",
+        "turno_descricao",
+        "pdv",
+        "controle",
+        "operador_id",
+        "operador_nome",
+        "tempo_descricao",
+        "string_full",
+        mode="before",
+    )
     @classmethod
     def _validate_combustivel_info(cls, v: Any) -> str | None:
         if v is None:
             return None
         parsed = parse_str_safe(v, default="")
         return parsed if parsed else None
+
+    @field_validator("venda_cancelada", mode="before")
+    @classmethod
+    def _validate_venda_cancelada(cls, v: Any) -> bool:
+        if v is None:
+            return False
+        return parse_bool_safe(v, default=False)
 
     @field_validator("qtd_abastecimentos", mode="before")
     @classmethod

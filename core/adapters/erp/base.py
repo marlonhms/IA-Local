@@ -12,7 +12,7 @@ from types import TracebackType
 from typing import Any, Self
 
 from core.domain.cashier import UniversalCashierShift
-from core.domain.pumps import UniversalDispenserLog
+from core.domain.pumps import UniversalDispenserLog, UniversalPump
 from core.domain.sales import UniversalSaleItem, UniversalSaleReceipt
 from core.domain.tanks import UniversalTankReading
 
@@ -132,12 +132,25 @@ class BaseERPAdapter(ABC):
         """
         raise NotImplementedError
 
+    def get_pumps_catalog(self) -> list[UniversalPump]:
+        """Recupera catalogo de bombas e bicos cadastrados fisicamente no ERP.
+
+        Returns:
+            Lista de bicos e bombas no formato UniversalPump.
+        """
+        return []
+
     @abstractmethod
     def get_pump_dispenses(
         self,
         start_date: str | date | None = None,
         end_date: str | date | None = None,
         limit: int = 100,
+        bico: str | None = None,
+        turno: str | None = None,
+        frentista: str | None = None,
+        granular: bool = False,
+        incluir_cancelados: bool = True,
     ) -> list[UniversalDispenserLog]:
         """Recupera medicoes e diferencas de encerrantes dos bicos dispensadores.
 
@@ -145,6 +158,11 @@ class BaseERPAdapter(ABC):
             start_date: Data inicial para filtragem (opcional).
             end_date: Data final para filtragem (opcional).
             limit: Quantidade maxima de registros retornados.
+            bico: Identificador de bico especifico (opcional).
+            turno: Identificador ou descricao do turno (opcional).
+            frentista: Termo de busca por matricula ou nome do frentista (opcional).
+            granular: Se True, retorna eventos de abastecimentos individuais.
+            incluir_cancelados: Se True, inclui abastecimentos com venda cancelada.
 
         Returns:
             Lista de registros de encerrantes no formato UniversalDispenserLog.
