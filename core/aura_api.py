@@ -1290,8 +1290,51 @@ def create_aura_app(
             )
             return Response(content=svg_icon, media_type="image/svg+xml")
 
+        @app.get("/icon.svg", include_in_schema=False)
+        async def serve_icon():
+            icon_file = web_dir / "icon.svg"
+            if not icon_file.exists():
+                icon_file = web_dir / "static" / "icon.svg"
+            if icon_file.exists():
+                return FileResponse(
+                    str(icon_file),
+                    media_type="image/svg+xml",
+                )
+            return Response(
+                content='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="100" fill="#07090e"/></svg>',
+                media_type="image/svg+xml",
+            )
+
+        @app.get("/manifest.json", include_in_schema=False)
+        async def serve_manifest():
+            manifest_file = web_dir / "manifest.json"
+            if manifest_file.exists():
+                return FileResponse(
+                    str(manifest_file),
+                    media_type="application/manifest+json",
+                )
+            return Response(
+                content="{}",
+                media_type="application/manifest+json",
+            )
+
+        @app.get("/sw.js", include_in_schema=False)
+        async def serve_service_worker():
+            sw_file = web_dir / "sw.js"
+            if sw_file.exists():
+                return FileResponse(
+                    str(sw_file),
+                    media_type="application/javascript; charset=utf-8",
+                    headers={"Service-Worker-Allowed": "/"},
+                )
+            return Response(
+                content="// AURA Offline Service Worker",
+                media_type="application/javascript; charset=utf-8",
+            )
+
         @app.get("/", include_in_schema=False)
         @app.get("/dashboard", include_in_schema=False)
+        @app.get("/index.html", include_in_schema=False)
         async def serve_dashboard():
             index_file = web_dir / "index.html"
             if index_file.exists():

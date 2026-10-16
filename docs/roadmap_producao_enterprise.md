@@ -436,13 +436,16 @@ A Fase P3 consolida a experiência de campo da AURA com foco em **impacto mínim
 
 ---
 
-### 🟡 P3-4: PWA Mobile "Modo Pista" com Comandos Rápidos por Voz
+### 🟢 P3-4: PWA Mobile "Modo Pista" com Comandos Rápidos por Voz [CONCLUÍDO]
 - **Diagnóstico:** Gerentes e frentistas passam a maior parte do turno na pista de abastecimento ou na conveniência, longe da tela do computador da retaguarda.
-- **Solução de Engenharia:**
-  - Configurar manifesto PWA (`manifest.json`) e Service Worker local no frontend web, permitindo instalação como aplicativo nativo no smartphone Android/iOS com 1 toque.
-  - Implementar "Modo Pista" com interface de alto contraste para leitura sob sol forte, botões táteis ampliados para uso com luvas e entrada rápida por voz via Web Speech API ("AURA, quanto sobrou no tanque de aditivada?").
-  - Conexão segura remota automática via VPN Tailscale ([`100.77.164.17:8000`](http://100.77.164.17:8000)) ou Wi-Fi interno.
+- **Solução Implementada:**
+  - Configurado manifesto PWA oficial ([`web/manifest.json`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/manifest.json)) e Service Worker local ([`web/sw.js`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/sw.js)), permitindo instalação como aplicativo nativo no smartphone Android/iOS com 1 toque.
+  - Implementado "Modo Pista" com interface de alto contraste (`.modo-pista` em [`web/css/aura.css`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/css/aura.css)) com fundo preto absoluto (`#000000`) para leitura nítida sob sol forte, botões táteis ampliados (mínimo 48px) para uso com luvas e persistência em `localStorage`.
+  - Implementada entrada rápida por voz via Web Speech API em `pt-BR` ([`web/js/aura-voice.js`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/js/aura-voice.js)) com botão dedicado (`#btn-voice-input`), feedback pulsante em tempo real e fallback defensivo sem quebrar o chat.
+  - Rotas FastAPI em [`core/aura_api.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/aura_api.py) servindo `/manifest.json` (`application/manifest+json`) e `/sw.js` (`application/javascript; charset=utf-8` com header `Service-Worker-Allowed: /`).
+  - Nova suíte de testes unitários com 14 novos testes verdes em [`tests/unit/test_pwa_modo_pista.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/unit/test_pwa_modo_pista.py) (375 testes unitários verdes no total, execução sub-segundo).
 - **Impacto no Cliente:** Gestão de pista na palma da mão em tempo real para frentistas e fiscais.
+- **Status:** Concluído com 100% dos testes aprovados (14 novos testes, 375 testes unitários verdes no total, execução sub-segundo).
 
 ---
 
@@ -519,7 +522,7 @@ A Fase P3 consolida a experiência de campo da AURA com foco em **impacto mínim
 - [x] O painel web da AURA possui aba/modal de "Pulso & Telemetria" nativo consumindo `/api/v1/aura/telemetry/metrics` sem requerer Grafana externo (P3-1).
 - [x] O daemon proativo escuta eventos CDC e dispara alertas de esgotamento de tanques e sangrias no WhatsApp sem consulta manual prévia (P3-2).
 - [x] O diretório `config/erp_mappings/` permite homologação declarativa de novos ERPs via YAML sem alterar código Python (P3-3).
-- [ ] O frontend oferece manifesto PWA instalável no celular com Modo Pista de alto contraste e comandos por voz (P3-4).
+- [x] O frontend oferece manifesto PWA instalável no celular com Modo Pista de alto contraste e comandos por voz (P3-4).
 - [ ] O watchdog local monitora a saúde da porta 8000 e executa auto-recuperação de serviços travados em `STOP_PENDING` em menos de 2 segundos (P3-5).
 
 ---

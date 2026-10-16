@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>AURA // Assistente de Prontidão (Gerente Supervisora do Posto)</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.ico">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#06b6d4">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="AURA Pista">
+  <link rel="apple-touch-icon" href="/static/icon.svg">
+  <link rel="apple-touch-icon" sizes="192x192" href="/static/icon.svg">
   
   <!-- Tailwind CSS Local (Offline-First) -->
   <script src="/static/vendor/tailwind.min.js"></script>
@@ -234,6 +242,13 @@
             </div>
             <span id="sidebar-gpu-badge" class="px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-slate-800 text-slate-400">Desativado</span>
           </button>
+          <button id="sidebar-btn-toggle-modo-pista" role="switch" aria-checked="false" class="w-full min-h-[48px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-amber-500/30 transition-all text-left text-xs" aria-label="Alternar Modo Pista" title="Interface de alto contraste preto absoluto e botoes tateis ampliados para operacao sob sol forte">
+            <div class="flex items-center gap-3">
+              <svg class="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="4" stroke-width="2"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" stroke-width="2" stroke-linecap="round"/></svg>
+              <span>Modo Pista (Alto Contraste)</span>
+            </div>
+            <span id="sidebar-modo-pista-badge" class="px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-slate-800 text-slate-400">Desativado</span>
+          </button>
           <button id="sidebar-btn-open-automations" class="w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all text-left text-xs" aria-label="Abrir Central de Automações">
             <div class="flex items-center gap-3">
               <svg class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3" stroke-width="1.75"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke-width="1.5"/></svg>
@@ -404,6 +419,16 @@
             <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
             <span id="header-telemetry-ttft-label">Pulso</span>
           </span>
+        </button>
+
+        <!-- Botão Modo Pista (P3-4: Alto Contraste & Botões Táteis para Sol Forte) -->
+        <button id="btn-toggle-modo-pista" class="flex items-center gap-2 px-3 py-2 min-h-[48px] rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-amber-300 border border-slate-800 font-sans text-xs transition-all shadow-sm relative group" title="Alternar Modo Pista (Alto Contraste sob Sol Forte)" aria-label="Alternar Modo Pista" aria-pressed="false">
+          <svg class="w-4 h-4 text-amber-400 flex-shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <circle cx="12" cy="12" r="4" stroke-width="2"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span class="text-[11px] font-medium hidden sm:inline">Modo Pista</span>
+          <span id="modo-pista-badge" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">OFF</span>
         </button>
 
         <!-- Botão Nova Conversa (Header Superior Direito - min-h: 44px) -->
@@ -850,6 +875,13 @@
             </button>
           </div>
 
+          <!-- Indicador Pulsante de Entrada por Voz (Web Speech API) -->
+          <div id="voice-recording-indicator" class="hidden px-3.5 py-2 rounded-xl bg-rose-950/90 border border-rose-500/50 items-center gap-2.5 text-xs text-rose-200 backdrop-blur-md shadow-2xl animate-fade-in mb-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping flex-shrink-0"></span>
+            <i data-lucide="mic" class="w-4 h-4 text-rose-400 animate-pulse"></i>
+            <span id="voice-recording-label" class="font-semibold tracking-wide">Ouvindo comando de pista...</span>
+          </div>
+
           <!-- Barra de Entrada de Mensagem HUD (Refatorada Mobile-First - F4-06 & F4-07) -->
           <div class="message-composer-container glass-panel p-2 sm:p-2.5 flex items-end gap-2 rounded-2xl shadow-xl transition-all">
             <textarea 
@@ -862,9 +894,20 @@
               autocomplete="off"
             ></textarea>
 
+            <!-- Botão de Microfone / Entrada por Voz (Web Speech API pt-BR) -->
+            <button 
+              id="btn-voice-input" 
+              type="button"
+              class="min-h-[48px] min-w-[48px] p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 border border-slate-700 transition-all flex items-center justify-center shadow-md active:scale-95 flex-shrink-0"
+              aria-label="Comando por voz"
+              aria-pressed="false"
+              title="Falar comando de pista (Web Speech API)">
+              <i data-lucide="mic" class="w-4 h-4"></i>
+            </button>
+
             <button 
               id="btn-chat-send" 
-              class="min-h-[44px] min-w-[44px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-auraEmerald via-cyan-500 to-auraCyan hover:brightness-110 text-slate-950 font-bold text-sm font-sans transition-all flex items-center justify-center gap-1.5 shadow-md hover:shadow-cyan-500/20 active:scale-95 flex-shrink-0"
+              class="min-h-[48px] min-w-[48px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-auraEmerald via-cyan-500 to-auraCyan hover:brightness-110 text-slate-950 font-bold text-sm font-sans transition-all flex items-center justify-center gap-1.5 shadow-md hover:shadow-cyan-500/20 active:scale-95 flex-shrink-0"
               aria-label="Enviar mensagem"
               title="Enviar mensagem (Enter)">
               <span class="hidden sm:inline">Enviar</span>
@@ -1870,7 +1913,23 @@
   <script src="/static/js/aura-telemetry.js?v=2.10.4"></script>
   <script src="/static/js/aura-aux-panel.js?v=2.10.4"></script>
   <script src="/static/js/aura-chat.js?v=2.10.4"></script>
+  <script src="/static/js/aura-voice.js?v=2.10.4"></script>
   <script src="/static/js/aura-app.js?v=2.10.4"></script>
   <script src="/static/js/aura-fx.js?v=2.10.4"></script>
+
+  <!-- Registro Resiliente e Nao-Bloqueante do Service Worker PWA (Fase P3-4) -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .then((reg) => {
+            console.log('[AURA PWA] Service Worker registrado com sucesso:', reg.scope);
+          })
+          .catch((err) => {
+            console.warn('[AURA PWA] Falha no registro do Service Worker:', err);
+          });
+      });
+    }
+  </script>
 </body>
 </html>

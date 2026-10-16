@@ -294,6 +294,7 @@ class AuraApp {
     this.bindNavigationTabs();
     this.bindSidebarEvents();
     this.initGpuGuard();
+    this.initModoPista();
     this.startClock();
 
     // Inicializa subsistemas
@@ -658,6 +659,119 @@ class AuraApp {
     }
     if (icon) {
       icon.setAttribute('class', enabled ? 'w-4 h-4 text-emerald-400' : 'w-4 h-4 text-slate-400');
+    }
+  }
+
+  /**
+   * Inicializa o Modo Pista (Alto Contraste e Botoes Tateis Ampliados) a partir do localStorage
+   */
+  initModoPista() {
+    let saved = false;
+    try {
+      saved = localStorage.getItem('aura_modo_pista') === 'true';
+    } catch (_) {}
+    this.applyModoPista(saved);
+
+    const btnHeader = document.getElementById('btn-toggle-modo-pista');
+    if (btnHeader) {
+      btnHeader.addEventListener('click', (e) => {
+        if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+        const nextState = !this.isModoPistaActive();
+        this.applyModoPista(nextState);
+        try {
+          localStorage.setItem('aura_modo_pista', nextState ? 'true' : 'false');
+        } catch (_) {}
+        if (window.auraAudio && typeof window.auraAudio.playChime === 'function') {
+          window.auraAudio.playChime(nextState ? 880 : 440, 0.05);
+        }
+      });
+    }
+
+    const btnSidebar = document.getElementById('sidebar-btn-toggle-modo-pista');
+    if (btnSidebar) {
+      btnSidebar.addEventListener('click', (e) => {
+        if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+        const nextState = !this.isModoPistaActive();
+        this.applyModoPista(nextState);
+        try {
+          localStorage.setItem('aura_modo_pista', nextState ? 'true' : 'false');
+        } catch (_) {}
+        if (window.auraAudio && typeof window.auraAudio.playChime === 'function') {
+          window.auraAudio.playChime(nextState ? 880 : 440, 0.05);
+        }
+      });
+    }
+
+    // Atalho de teclado rapido Alt+P para alternar Modo Pista
+    window.addEventListener('keydown', (e) => {
+      if (e.altKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        const nextState = !this.isModoPistaActive();
+        this.applyModoPista(nextState);
+        try {
+          localStorage.setItem('aura_modo_pista', nextState ? 'true' : 'false');
+        } catch (_) {}
+        if (window.auraAudio && typeof window.auraAudio.playChime === 'function') {
+          window.auraAudio.playChime(nextState ? 880 : 440, 0.05);
+        }
+      }
+    });
+  }
+
+  isModoPistaActive() {
+    return document.body ? document.body.classList.contains('modo-pista') : false;
+  }
+
+  applyModoPista(enabled) {
+    const body = document.body;
+    const root = document.documentElement;
+    if (enabled) {
+      if (body) body.classList.add('modo-pista');
+      if (root) root.classList.add('modo-pista');
+    } else {
+      if (body) body.classList.remove('modo-pista');
+      if (root) root.classList.remove('modo-pista');
+    }
+
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', enabled ? '#000000' : '#06b6d4');
+    }
+
+    const btnHeader = document.getElementById('btn-toggle-modo-pista');
+    if (btnHeader) {
+      btnHeader.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+      btnHeader.title = enabled
+        ? 'Modo Pista Ativo: clique para desativar'
+        : 'Alternar Modo Pista (Alto Contraste sob Sol Forte)';
+    }
+
+    const badgeHeader = document.getElementById('modo-pista-badge');
+    if (badgeHeader) {
+      badgeHeader.textContent = enabled ? 'ON' : 'OFF';
+      badgeHeader.className = enabled
+        ? 'px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-400 text-black border border-amber-300'
+        : 'px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700';
+    }
+
+    const btnSidebar = document.getElementById('sidebar-btn-toggle-modo-pista');
+    if (btnSidebar) {
+      btnSidebar.setAttribute('aria-checked', enabled ? 'true' : 'false');
+    }
+
+    const badgeSidebar = document.getElementById('sidebar-modo-pista-badge');
+    if (badgeSidebar) {
+      badgeSidebar.textContent = enabled ? 'Ativo (Pista)' : 'Desativado';
+      badgeSidebar.className = enabled
+        ? 'px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30'
+        : 'px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-slate-800 text-slate-400';
+    }
+
+    const srAnnouncer = document.getElementById('aura-sr-announcer');
+    if (srAnnouncer) {
+      srAnnouncer.textContent = enabled
+        ? 'Modo Pista ativado: interface de alto contraste e botoes ampliados.'
+        : 'Modo Pista desativado.';
     }
   }
 
