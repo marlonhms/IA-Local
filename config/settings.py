@@ -80,6 +80,8 @@ def get_cors_origins() -> list[str]:
             "http://127.0.0.1:8000",
             "http://localhost:3000",
             "http://127.0.0.1:3000",
+            "http://100.77.164.17:8000",
+            "http://marlonh-supwp:8000",
         ]
     origins = [orig.strip() for orig in raw.split(",") if orig.strip()]
     return origins if origins else ["http://localhost:8000", "http://127.0.0.1:8000"]
