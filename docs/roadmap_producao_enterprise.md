@@ -403,6 +403,7 @@ A Fase P3 consolida a experiência de campo da AURA com foco em **impacto mínim
   - Consumir o endpoint JSON [`/api/v1/aura/telemetry/metrics`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/aura_api.py#L918) renderizando gráficos em Canvas nativo ou biblioteca ultraleve (uPlot de 12 KB).
   - Indicadores em tempo real: Velocímetro de latência TTFT (P50/P90/P99), gráfico de conexões ativas do pool PostgreSQL, consumo de memória do processo Python, taxa de bloqueios de segurança e status do último backup S3/R2.
 - **Impacto no Cliente:** Zero megabytes de memória extra no servidor do posto.
+- **Status:** Concluído com 100% dos testes aprovados.
 
 ---
 
@@ -515,7 +516,7 @@ A Fase P3 consolida a experiência de campo da AURA com foco em **impacto mínim
 - [x] Arquitetura frontend configurada com Vite e TypeScript com validação estática 1:1 de contratos ([`web-frontend/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web-frontend/)).
 
 ### 📋 Checklist Fase P3 (Inovação, Observabilidade Nativa & Autonomia)
-- [ ] O painel web da AURA possui aba/modal de "Pulso & Telemetria" nativo consumindo `/api/v1/aura/telemetry/metrics` sem requerer Grafana externo (P3-1).
+- [x] O painel web da AURA possui aba/modal de "Pulso & Telemetria" nativo consumindo `/api/v1/aura/telemetry/metrics` sem requerer Grafana externo (P3-1).
 - [ ] O daemon proativo escuta eventos CDC e dispara alertas de esgotamento de tanques e sangrias no WhatsApp sem consulta manual prévia (P3-2).
 - [ ] O diretório `config/erp_mappings/` permite homologação declarativa de novos ERPs via YAML sem alterar código Python (P3-3).
 - [ ] O frontend oferece manifesto PWA instalável no celular com Modo Pista de alto contraste e comandos por voz (P3-4).

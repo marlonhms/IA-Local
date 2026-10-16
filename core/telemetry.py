@@ -11,8 +11,11 @@ Zero travessoes em todo o arquivo.
 
 from __future__ import annotations
 
+import os
 import statistics
+import sys
 import threading
+import time
 from collections import deque
 from datetime import UTC, datetime
 from typing import Any
@@ -52,6 +55,7 @@ class AuraSRETelemetry:
         self._lock = threading.Lock()
         self.session_memory = session_memory
         self.max_samples = max_samples
+        self._start_time: float = time.time()
 
         self._ttft_samples: deque[float] = deque(maxlen=max_samples)
         self._hydration_samples: deque[float] = deque(maxlen=max_samples)
@@ -534,6 +538,18 @@ class AuraSRETelemetry:
             round(cache_hits / total_cache_lookups, 4) if total_cache_lookups > 0 else 0.0
         )
 
+        # Calculo de recursos do processo local e amostras recentes (P3-1)
+        rss_mb = 0.0
+        try:
+            import psutil
+            proc = psutil.Process(os.getpid())
+            rss_mb = round(proc.memory_info().rss / (1024 * 1024), 2)
+        except Exception:
+            pass
+
+        uptime_sec = int(time.time() - getattr(self, "_start_time", time.time()))
+        recent_ttft = [round(v, 2) for v in ttft_list[-20:]] if ttft_list else []
+
         return {
             "status": "ok",
             "timestamp": datetime.now(UTC).isoformat(),
@@ -548,6 +564,7 @@ class AuraSRETelemetry:
                 "last": round(ttft_last, 2),
                 "count": len(ttft_list),
             },
+            "recent_ttft_samples": recent_ttft,
             "hydration_ms": {
                 "avg": round(hyd_avg, 2),
                 "min": round(hyd_min, 2),
@@ -584,6 +601,12 @@ class AuraSRETelemetry:
                 "wait_ms": round(wait_ms, 2),
             },
             "tool_executions": tool_counts_snapshot,
+            "process_metrics": {
+                "rss_memory_mb": rss_mb,
+                "uptime_seconds": uptime_sec,
+                "pid": os.getpid(),
+                "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+            },
             "feature_flags": get_feature_flags(),
         }
 
