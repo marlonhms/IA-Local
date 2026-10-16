@@ -202,6 +202,7 @@ def test_terminate_pid_self_preservation_guard(sentinel: AuraWatchdogSentinel) -
 @pytest.mark.unit
 def test_terminate_pid_graceful_success(sentinel: AuraWatchdogSentinel) -> None:
     """Valida encerramento gracioso via SIGTERM / terminate()."""
+    pytest.importorskip("psutil")
     mock_proc = MagicMock()
     mock_proc.wait.return_value = None
 
@@ -217,7 +218,7 @@ def test_terminate_pid_graceful_success(sentinel: AuraWatchdogSentinel) -> None:
 @pytest.mark.unit
 def test_terminate_pid_forced_on_timeout(sentinel: AuraWatchdogSentinel) -> None:
     """Valida que processo persistente sofre taskkill / SIGKILL forcado apos timeout."""
-    import psutil
+    psutil = pytest.importorskip("psutil")
 
     mock_proc = MagicMock()
     mock_proc.wait.side_effect = psutil.TimeoutExpired(1.5)
@@ -517,7 +518,7 @@ def test_recycle_server_both_nssm_and_net_start_fail_returns_false(sentinel: Aur
 @pytest.mark.unit
 def test_terminate_pid_tree_kill_includes_children_and_taskkill_flags(sentinel: AuraWatchdogSentinel) -> None:
     """Verifica encerramento recursivo de filhos no psutil e taskkill com flag /T."""
-    import psutil
+    psutil = pytest.importorskip("psutil")
 
     mock_child = MagicMock()
     mock_proc = MagicMock()

@@ -20,7 +20,9 @@ Valida:
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -179,10 +181,14 @@ def test_powershell_script_pure_ascii_and_stages() -> None:
 
 def test_powershell_script_dry_run_execution() -> None:
     """Executa `scripts/instalar_posto.ps1 -DryRun` no PowerShell real e valida saida limpa."""
+    ps_bin = shutil.which("powershell.exe")
+    if sys.platform != "win32" or not ps_bin:
+        pytest.skip("powershell.exe nao disponivel neste ambiente de execucao (requer Windows)")
+
     ps1_path = PROJECT_ROOT / "scripts" / "instalar_posto.ps1"
     proc = subprocess.run(
         [
-            "powershell.exe",
+            ps_bin,
             "-NoProfile",
             "-ExecutionPolicy",
             "Bypass",
