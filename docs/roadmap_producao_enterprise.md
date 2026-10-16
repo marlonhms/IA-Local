@@ -1,9 +1,9 @@
 # 🚀 Roadmap de Produção Enterprise: AURA (Edge AI & Retaguarda Postos)
 
 > **Documento Oficial de Engenharia e Prontidão Operacional (Production Readiness Review)**  
-> **Versão:** 2.0.0-PRO  
-> **Data de Emissão:** 15/10/2026  
-> **Status:** Concluído Integralmente (Fases P0, P1 e P2 Homologadas com 268 Testes Unitários Verdes)  
+> **Versão:** 2.1.0-PRO  
+> **Data de Emissão:** 16/10/2026  
+> **Status:** Fases P0, P1 e P2 Concluídas Integralmente (277 Testes Unitários Verdes). Fase P3 (Inovação, Observabilidade Nativa & Autonomia) em Execução.  
 > **Branch de Referência:** `main`  
 > **Repositório:** [https://github.com/marlonhms/IA-Local](https://github.com/marlonhms/IA-Local)  
 
@@ -46,8 +46,14 @@ O plano de engenharia está estruturado em três horizontes de entrega orientado
                                          │
                                          ▼
 +-----------------------------------------------------------------------------------+
-| [FASE P2] Médio/Longo Prazo (Escala SaaS Multi-Postos)                            |
-| Foco: Migrações Alembic, CDC por eventos, backup em nuvem, Prometheus e Vite/TS   |
+| [FASE P2] Médio Prazo (Escala SaaS Multi-Postos & Blindagem Jurídica)             |
+| Foco: Migrações Alembic, CDC por eventos, backup em nuvem, RLS e Clean Room AUPS  |
++-----------------------------------------------------------------------------------+
+                                         │
+                                         ▼
++-----------------------------------------------------------------------------------+
+| [FASE P3] Atual (Inovação, Observabilidade Nativa Ultraleve & Autonomia de Pista) |
+| Foco: Cockpit SRE Nativo (0 MB RAM), Alertas CDC Proativos, PWA Mobile e Auto-Heal|
 +-----------------------------------------------------------------------------------+
 ```
 
@@ -376,6 +382,78 @@ A Fase P2 viabiliza a expansão em escala corporativa para redes com dezenas ou 
 
 ---
 
+## 🚀 2.4 Fase P3: Inovação, Observabilidade Nativa Ultraleve & Autonomia de Pista (Em Andamento)
+
+A Fase P3 consolida a experiência de campo da AURA com foco em **impacto mínimo no recurso do cliente**, transição de inteligência reativa para proativa e autonomia operacional 24/7.
+
+```
++-----------------------------------------------------------------------------------+
+| [P3-1] Cockpit Nativo de Telemetria Ultraleve (0 MB de RAM extra no Servidor)     |
+| [P3-2] Motor de Alertas Proativos de Pista (Vigilância CDC & Notificações Push)   |
+| [P3-3] Mapeador Declarativo Multi-ERP (Zero-Code YAML Data Mapper)                |
+| [P3-4] PWA Mobile "Modo Pista" com Comandos Rápidos por Voz                       |
+| [P3-5] Watchdog Sentinela de Resiliência & Auto-Healing Local no Windows          |
++-----------------------------------------------------------------------------------+
+```
+
+### 🟡 P3-1: Cockpit Nativo de Telemetria Ultraleve (0 MB de RAM Extra no Servidor)
+- **Diagnóstico:** O uso de suítes externas pesadas de observabilidade (Grafana e Docker) consome entre 500 MB e 1 GB de memória RAM, colidindo com a realidade de computadores de retaguarda e PDVs modestos de postos (estações com 4 GB a 8 GB de RAM).
+- **Solução de Engenharia:**
+  - Implementar o **Cockpit de Telemetria Nativo** embutido na aplicação web da AURA (na mesma porta HTTP 8000), sem exigir processos externos, sem Docker e sem portas adicionais.
+  - Consumir o endpoint JSON [`/api/v1/aura/telemetry/metrics`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/aura_api.py#L918) renderizando gráficos em Canvas nativo ou biblioteca ultraleve (uPlot de 12 KB).
+  - Indicadores em tempo real: Velocímetro de latência TTFT (P50/P90/P99), gráfico de conexões ativas do pool PostgreSQL, consumo de memória do processo Python, taxa de bloqueios de segurança e status do último backup S3/R2.
+- **Impacto no Cliente:** Zero megabytes de memória extra no servidor do posto.
+
+---
+
+### 🟡 P3-2: Motor de Alertas Proativos de Pista (Proactive Edge Daemon)
+- **Diagnóstico:** A AURA opera atualmente sob demanda (o gerente ou frentista precisa abrir o chat ou acionar um gatilho para saber se há problemas). Em postos movimentados, a gestão ganha valor exponencial quando a inteligência atua de forma autônoma e preventiva.
+- **Solução de Engenharia:**
+  - Acoplar ao ouvinte de eventos CDC ([`core/cdc_listener.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/cdc_listener.py)) um daemon de regras analíticas em segundo plano:
+    1. *Alerta de Ruptura Crítica de Combustível:* Dispara notificação imediata quando a estimativa de autonomia de um tanque for inferior a 24 horas, incluindo sugestão de pedido fracionado em compartimentos de 5.000 L.
+    2. *Alerta de Furo de Caixa e Sangria Pendente:* Notifica o gestor quando o saldo de dinheiro em espécie na gaveta ultrapassar o limite seguro (ex: R$ 1.500) sem sangria registrada há mais de 45 minutos.
+    3. *Despacho Noturno Consolidado:* Compila a DRE do dia e o fechamento às 22h05 e envia para o WhatsApp do proprietário via webhooks n8n / Evolution API sem necessidade de comando manual.
+- **Impacto no Cliente:** Elimina o risco de posto "seco" e fraudes de pista por omissão de monitoramento.
+
+---
+
+### 🟡 P3-3: Mapeador Declarativo Multi-ERP (Zero-Code YAML Data Mapper)
+- **Diagnóstico:** A arquitetura Clean Room e o AUPS ([`core/domain/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/domain/)) isolam o núcleo da IA, mas homologar novos softwares de postos (Linx, Petros, Rezende, Adaptive) ainda exige programar novos adaptadores Python manualmente.
+- **Solução de Engenharia:**
+  - Criar um mecanismo declarativo em YAML ([`config/erp_mappings/`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/config/)):
+    ```yaml
+    erp_name: "Linx Postos"
+    tables:
+      sales: "vendas_pdv"
+      columns:
+        receipt_id: "id_cupom"
+        total_amount: "valor_total"
+        operator_id: "cod_operador"
+    ```
+  - O adaptador universal lê o arquivo de mapeamento do posto e traduz automaticamente para o AUPS sem alterar uma única linha do código da IA.
+- **Impacto no Cliente:** Permite que qualquer técnico de campo homologue um posto com ERP diferente em 15 minutos.
+
+---
+
+### 🟡 P3-4: PWA Mobile "Modo Pista" com Comandos Rápidos por Voz
+- **Diagnóstico:** Gerentes e frentistas passam a maior parte do turno na pista de abastecimento ou na conveniência, longe da tela do computador da retaguarda.
+- **Solução de Engenharia:**
+  - Configurar manifesto PWA (`manifest.json`) e Service Worker local no frontend web, permitindo instalação como aplicativo nativo no smartphone Android/iOS com 1 toque.
+  - Implementar "Modo Pista" com interface de alto contraste para leitura sob sol forte, botões táteis ampliados para uso com luvas e entrada rápida por voz via Web Speech API ("AURA, quanto sobrou no tanque de aditivada?").
+  - Conexão segura remota automática via VPN Tailscale ([`100.77.164.17:8000`](http://100.77.164.17:8000)) ou Wi-Fi interno.
+- **Impacto no Cliente:** Gestão de pista na palma da mão em tempo real para frentistas e fiscais.
+
+---
+
+### 🟡 P3-5: Watchdog Sentinela de Resiliência & Auto-Healing Local no Windows
+- **Diagnóstico:** Em eventuais quedas de energia no posto ou reinicializações abruptas do Windows, processos podem ficar presos no estado `STOP_PENDING` ou reter portas TCP.
+- **Solução de Engenharia:**
+  - Implementar sentinela leve [`core/watchdog.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/watchdog.py) em segundo plano que executa health checks locais a cada 30 segundos.
+  - Se a porta 8000 não responder ou o processo travar, o sentinela detecta a anomalia, encerra o PID zumbi e recicla o servidor de forma atômica em menos de 2 segundos, emitindo alerta para os logs locais.
+- **Impacto no Cliente:** Auto-recuperação sem necessidade de intervenção do suporte técnico presencial.
+
+---
+
 ## 🛡️ 3. Tabela de Riscos Mitigados
 
 | Risco Identificado | Severidade Original | Fase de Mitigação | Estratégia de Engenharia Implementada | Severidade Residual |
@@ -399,6 +477,11 @@ A Fase P2 viabiliza a expansão em escala corporativa para redes com dezenas ou 
 | **Falta de visibilidade centralizada da saúde de frotas de postos** | Média | P2-4 | Exportador Prometheus (`/metrics`) integrado a painéis SRE do Grafana. | Baixa |
 | **Vazamento de dados entre filiais em ambiente multi-posto** | Alta | P2-5 | Isolamento estrito por filial com Row-Level Security (RLS) e parametrização SQL obrigatória. | Desprezível |
 | **Erros de tipo em tempo de execução no frontend** | Baixa | P2-6 | Migração gradual dos componentes para TypeScript com empacotamento Vite. | Desprezível |
+| **Sobrecarga de RAM do cliente por suítes pesadas de métricas** | Alta | P3-1 | Cockpit nativo embutido na AURA (Canvas/uPlot 12 KB) com 0 MB de RAM extra no servidor. | Desprezível |
+| **Ruptura de tanques ou fraudes por monitoramento passivo** | Alta | P3-2 | Motor de alertas proativos acoplado ao CDC com notificações automáticas no WhatsApp. | Baixa |
+| **Fricção e morosidade técnica na homologação de novos ERPs** | Média | P3-3 | Mapeador declarativo YAML zero-code para tradução automática para o AUPS universal. | Desprezível |
+| **Gerente desassistido durante rondas e vistorias na pista** | Média | P3-4 | PWA Mobile "Modo Pista" de alto contraste, botões táteis e comandos rápidos por voz. | Baixa |
+| **Serviço Windows preso em STOP_PENDING pós-falha elétrica** | Alta | P3-5 | Watchdog sentinela local de auto-healing com reciclagem atômica de processos zumbis. | Desprezível |
 
 ---
 
@@ -431,32 +514,41 @@ A Fase P2 viabiliza a expansão em escala corporativa para redes com dezenas ou 
 - [x] Políticas de RLS e validadores semânticos garantem segregação 100% estrita de dados entre filiais distintas ([`core/tenancy.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tenancy.py) e [`scripts/rls_multi_tenant.sql`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/rls_multi_tenant.sql)).
 - [x] Arquitetura frontend configurada com Vite e TypeScript com validação estática 1:1 de contratos ([`web-frontend/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web-frontend/)).
 
+### 📋 Checklist Fase P3 (Inovação, Observabilidade Nativa & Autonomia)
+- [ ] O painel web da AURA possui aba/modal de "Pulso & Telemetria" nativo consumindo `/api/v1/aura/telemetry/metrics` sem requerer Grafana externo (P3-1).
+- [ ] O daemon proativo escuta eventos CDC e dispara alertas de esgotamento de tanques e sangrias no WhatsApp sem consulta manual prévia (P3-2).
+- [ ] O diretório `config/erp_mappings/` permite homologação declarativa de novos ERPs via YAML sem alterar código Python (P3-3).
+- [ ] O frontend oferece manifesto PWA instalável no celular com Modo Pista de alto contraste e comandos por voz (P3-4).
+- [ ] O watchdog local monitora a saúde da porta 8000 e executa auto-recuperação de serviços travados em `STOP_PENDING` em menos de 2 segundos (P3-5).
+
 ---
 
-## 🏛️ 5. Arquitetura de Transição: Estado Atual vs Estado Alvo (Enterprise)
+## 🏛️ 5. Arquitetura de Transição: Estado Atual vs Estado Alvo (Enterprise P3)
 
 ```mermaid
 flowchart LR
-    subgraph ATUAL["ESTADO ATUAL (Edge Dev / Piloto Inicial)"]
+    subgraph ATUAL["ESTADO ATUAL (Piloto / Fases P0 + P1 + P2)"]
         direction TB
-        CMD["Janela de Terminal (iniciar.bat)"] --> API_OLD["FastAPI (Porta 8000 / HTTP Puro)"]
-        API_OLD --> ROUTER_OLD["SemanticRouter (Conexão Única / Sem Lock)"]
-        API_OLD --> TOOLS_OLD["Tools Analíticas (connect() por Query)"]
-        TOOLS_OLD --> ERP_OLD["ERP Postgres (Usuário: suporte)"]
-        UI_OLD["Frontend Web"] --> CDN["CDNs Externas (Tailwind / Lucide / Marked)"]
+        NSSM_OLD["Serviço Windows (AuraBackendService)"] --> API_OLD["FastAPI (Porta 8000 / HTTP & CORS)"]
+        API_OLD --> POOL_OLD["Pool Conexões (ThreadedConnectionPool)"]
+        POOL_OLD --> ERP_OLD["ERP Postgres (aura_service_ro)"]
+        API_OLD --> CDC_OLD["CDC Listener (LISTEN / NOTIFY)"]
+        UI_OLD["Frontend Web (SPA Local)"] --> ASSETS_OLD["Assets Locais (/static/vendor/)"]
     end
 
-    subgraph ENTERPRISE["ESTADO ALVO ENTERPRISE (Fases P0 + P1 + P2)"]
+    subgraph ENTERPRISE_P3["ESTADO ALVO ENTERPRISE P3 (Autonomia Total & Zero Overhead)"]
         direction TB
-        NSSM["Serviço Windows NSSM (Auto-Restart 24/7)"] --> CADDY["Proxy Reverso TLS / HTTPS + Rate Limit"]
-        CADDY --> API_NEW["FastAPI (Bearer Auth / CORS Restrito / JSON Logs)"]
-        API_NEW --> POOL["Pool Gerenciado (ThreadedConnectionPool)"]
-        POOL --> ROUTER_NEW["SemanticRouter (Thread-Safe + Cache Lock)"]
-        POOL --> TOOLS_NEW["Tools Analíticas (Pool Reutilizável)"]
-        TOOLS_NEW --> ERP_NEW["ERP Postgres (Role Dedicada: aura_service_ro)"]
-        UI_NEW["Frontend TypeScript / Vite"] --> LOCAL_ASSETS["Assets 100% Locais (/static/vendor/)"]
-        API_NEW -. "Webhooks Assíncronos" .-> N8N_EVO["n8n + Evolution API (WhatsApp)"]
-        API_NEW -. "Métricas /metrics" .-> SRE_GRAFANA["Prometheus + Grafana SRE"]
+        WATCHDOG["Watchdog Sentinela (Auto-Healing Windows)"] --> NSSM_NEW["Serviço Windows 24/7"]
+        NSSM_NEW --> API_NEW["FastAPI Core (Porta 8000)"]
+        API_NEW --> POOL_NEW["Pool Gerenciado + RLS Filiais"]
+        POOL_NEW --> ERP_MAPPER["Data Mapper Universal (YAML Declarativo)"]
+        ERP_MAPPER --> ERP_NEW["ERP Qualquer (aura_service_ro)"]
+        
+        API_NEW --> CDC_PROACTIVE["Daemon Proativo CDC (Vigilância Tanques / Caixa)"]
+        CDC_PROACTIVE -. "Alertas Automáticos" .-> WHATSAPP["WhatsApp Gestor / Comprador"]
+        
+        API_NEW --> NATIVE_SRE["Cockpit Telemetria Nativo (0 MB RAM / uPlot)"]
+        API_NEW --> PWA["PWA Mobile 'Modo Pista' (Voz + Alto Contraste)"]
     end
 ```
 
