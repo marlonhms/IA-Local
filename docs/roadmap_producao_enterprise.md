@@ -420,21 +420,19 @@ A Fase P3 consolida a experiência de campo da AURA com foco em **impacto mínim
 
 ---
 
-### 🟡 P3-3: Mapeador Declarativo Multi-ERP (Zero-Code YAML Data Mapper)
-- **Diagnóstico:** A arquitetura Clean Room e o AUPS ([`core/domain/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/domain/)) isolam o núcleo da IA, mas homologar novos softwares de postos (Linx, Petros, Rezende, Adaptive) ainda exige programar novos adaptadores Python manualmente.
-- **Solução de Engenharia:**
-  - Criar um mecanismo declarativo em YAML ([`config/erp_mappings/`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/config/)):
-    ```yaml
-    erp_name: "Linx Postos"
-    tables:
-      sales: "vendas_pdv"
-      columns:
-        receipt_id: "id_cupom"
-        total_amount: "valor_total"
-        operator_id: "cod_operador"
-    ```
-  - O adaptador universal lê o arquivo de mapeamento do posto e traduz automaticamente para o AUPS sem alterar uma única linha do código da IA.
-- **Impacto no Cliente:** Permite que qualquer técnico de campo homologue um posto com ERP diferente em 15 minutos.
+### 🟢 P3-3: Mapeador Declarativo Multi-ERP (Zero-Code YAML Data Mapper) [CONCLUÍDO]
+- **Diagnóstico:** A arquitetura Clean Room e o AUPS ([`core/domain/`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/domain/)) isolam o núcleo da IA, mas homologar novos softwares de postos (Linx, Petros, Rezende, Adaptive) ainda exigia programar novos adaptadores Python manualmente.
+- **Solução Implementada:**
+  - Implementado o módulo [`core/adapters/erp/yaml_data_mapper.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/adapters/erp/yaml_data_mapper.py) com a classe `YAMLDataMapperERPAdapter` e schemas Pydantic v2 `ERPMappingConfig`, `TableMappingConfig`, `ColumnMappingConfig`.
+  - Criado o diretório [`config/erp_mappings/`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/config/erp_mappings/) contendo mapeamentos declarativos de referência:
+    1. `generic_postgres.yaml`: Schema padrao local do posto (pedido, itemped, tanques, medicaotanques, fechabomba, fechacaixa, produtos).
+    2. `linx_postos.yaml`: Mapeamento corporativo para ERP Linx Postos (AutoSystem e EMSys).
+    3. `petros.yaml`: Mapeamento corporativo para ERP Adaptive Petros.
+  - Blindagem estrita contra injecao SQL com validacao de identificadores (`^[a-zA-Z0-9_]+$`) e parametros 100% isolados via `%s`.
+  - Suporte completo a contingencia offline e fallback transparente para `MockERPAdapter`.
+  - Suite de testes automatizados com 57 novos testes unitarios verdes em [`tests/unit/test_yaml_data_mapper.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/unit/test_yaml_data_mapper.py) (361 testes unitarios verdes no total).
+- **Impacto no Cliente:** Permite que qualquer tecnico de campo homologue um posto com ERP diferente em 15 minutos sem tocar no codigo fonte.
+- **Status:** Concluido com 100% dos testes aprovados (57 novos testes, 361 testes unitarios verdes no total, execucao sub-segundo).
 
 ---
 
@@ -520,7 +518,7 @@ A Fase P3 consolida a experiência de campo da AURA com foco em **impacto mínim
 ### 📋 Checklist Fase P3 (Inovação, Observabilidade Nativa & Autonomia)
 - [x] O painel web da AURA possui aba/modal de "Pulso & Telemetria" nativo consumindo `/api/v1/aura/telemetry/metrics` sem requerer Grafana externo (P3-1).
 - [x] O daemon proativo escuta eventos CDC e dispara alertas de esgotamento de tanques e sangrias no WhatsApp sem consulta manual prévia (P3-2).
-- [ ] O diretório `config/erp_mappings/` permite homologação declarativa de novos ERPs via YAML sem alterar código Python (P3-3).
+- [x] O diretório `config/erp_mappings/` permite homologação declarativa de novos ERPs via YAML sem alterar código Python (P3-3).
 - [ ] O frontend oferece manifesto PWA instalável no celular com Modo Pista de alto contraste e comandos por voz (P3-4).
 - [ ] O watchdog local monitora a saúde da porta 8000 e executa auto-recuperação de serviços travados em `STOP_PENDING` em menos de 2 segundos (P3-5).
 

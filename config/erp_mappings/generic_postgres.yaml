@@ -1,0 +1,119 @@
+# Mapeamento Declarativo para Generic PostgreSQL (Schema Padrao Local)
+# Compativel com as tabelas locais do posto: pedido, itemped, produtos, tanques, medicaotanques, fechabomba, fechacaixa
+
+erp_name: "Generic PostgreSQL"
+erp_version: "1.0"
+dialect: "postgres"
+description: "Mapeamento padrao retrocompativel com o schema legado de retaguarda do posto"
+
+tables:
+  sales:
+    table_name: "pedido"
+    primary_key: "codi"
+    date_column: "dtem"
+    status_column: "situ"
+    cancelled_value: "C"
+    order_by: "dtem"
+    columns:
+      cupom_id: "codi"
+      pdv: "pdv"
+      data_hora: "dtem"
+      total_reais: "valortotal"
+      status: "situ"
+      operador: "vendedor"
+      motivo_cancelamento: "ven_tx_motivo_cancelamento"
+      cod_forma: "formapg"
+
+  sales_items:
+    table_name: "itemped"
+    foreign_key: "pedido"
+    primary_key: "controle"
+    order_by: "controle"
+    columns:
+      sku: "codpec"
+      descricao_produto: "codpec"
+      preco_unitario_reais: "valunit"
+      quantidade: "quant"
+      total_item_reais: "valitem"
+
+  tanks:
+    table_name: "tanques"
+    primary_key: "codtan"
+    order_by: "codtan"
+    columns:
+      identificador_tanque: "codtan"
+      combustivel: "prl_ds_produto_lmc"
+      codigo_lmc: "codlmc"
+      timestamp_leitura: "ultima_leitura"
+      volume_atual_litros: "volume"
+      volume_agua_mm: "volume_agua"
+      temperatura_celsius: "temperatura"
+      capacidade_nominal_litros: "capacidade"
+      saldo_inicial_litros: "iniciodia"
+      saldo_final_litros: "tan_vl_quantidade_fim"
+
+  tank_readings:
+    table_name: "medicaotanques"
+    primary_key: "codtan"
+    foreign_key: "codtan"
+    date_column: "dtem"
+    order_by: "dtem"
+    columns:
+      identificador_tanque: "codtan"
+      timestamp_leitura: "dtem"
+      volume_atual_litros: "volume"
+      volume_agua_mm: "volume_agua"
+      temperatura_celsius: "temperatura"
+
+  pumps:
+    table_name: "fechabomba"
+    date_column: "dtmov"
+    order_by: "dtmov"
+    columns:
+      identificador_bomba: "ilha"
+      identificador_bico: "codbom"
+      identificador_tanque: "codtan"
+      codigo_combustivel: "codpro"
+      descricao_combustivel: "codpro"
+      turno_descricao: "turno"
+      pdv: "codpdv"
+      timestamp_registro: "dtmov"
+      encerrante_inicial_litros: "encltsa"
+      encerrante_final_litros: "enclts"
+      volume_aferido_litros: "qtdeaf"
+      preco_unitario_reais: "preco"
+      total_faturado_reais: "encdinh"
+
+  cashier:
+    table_name: "fechacaixa"
+    primary_key: "cai_cd_caixa"
+    date_column: "dtmov"
+    order_by: "dtmov"
+    columns:
+      caixa_id: "cai_cd_caixa"
+      pdv: "codpdv"
+      fechado: "fechado"
+      operador_id: "matricula"
+      operador_nome: "matricula"
+      turno_descricao: "turno"
+      data_movimento: "dtmov"
+      timestamp_abertura: "cai_ts_abertura"
+      timestamp_fechamento: "cai_ts_fechamento"
+      fundo_troco_reais: "valrefcai"
+      dinheiro_declarado_reais: "valdinh"
+      cartao_declarado_reais: "valcart"
+      prazo_declarado_reais: "valnotpra"
+      venda_combustivel_reais: "venda_combustivel"
+      venda_produtos_reais: "venda_produtos"
+      litros_declarados: "litros"
+      total_declarado_reais: "valtot"
+
+  products:
+    table_name: "produtos"
+    primary_key: "codpro"
+    order_by: "codpro"
+    columns:
+      sku: "codpro"
+      descricao_produto: "nompro"
+      grupo_comercial: "codgru"
+      preco_unitario_reais: "valvenda"

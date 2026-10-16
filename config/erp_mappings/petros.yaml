@@ -1,0 +1,122 @@
+# Mapeamento Declarativo para Adaptive Petros
+# Esquema para integracao com bases Petros em redes de postos de combustivel
+
+erp_name: "Adaptive Petros"
+erp_version: "1.0"
+dialect: "postgres"
+description: "Mapeamento declarativo para ERP Adaptive Petros"
+
+tables:
+  sales:
+    table_name: "tb_venda"
+    primary_key: "id_venda"
+    date_column: "dthr_venda"
+    status_column: "fl_situacao"
+    cancelled_value: "C"
+    order_by: "dthr_venda"
+    columns:
+      cupom_id: "id_venda"
+      pdv: "cd_pdv"
+      data_hora: "dthr_venda"
+      total_reais: "vl_total"
+      status: "fl_situacao"
+      operador: "nm_operador"
+      motivo_cancelamento: "ds_motivo_cancelamento"
+
+  sales_items:
+    table_name: "tb_venda_item"
+    foreign_key: "id_venda"
+    primary_key: "id_item"
+    order_by: "id_item"
+    columns:
+      sku: "cd_produto"
+      descricao_produto: "ds_produto"
+      grupo_comercial: "ds_grupo"
+      preco_unitario_reais: "vl_unitario"
+      quantidade: "qt_item"
+      total_item_reais: "vl_total_item"
+
+  sales_payments:
+    table_name: "tb_venda_forma"
+    foreign_key: "id_venda"
+    columns:
+      codigo_forma_pagamento: "cd_forma"
+      descricao_forma: "ds_forma"
+      tipo: "tp_forma"
+      valor_reais: "vl_forma"
+
+  tanks:
+    table_name: "tb_tanque_leitura"
+    primary_key: "cd_tanque"
+    order_by: "cd_tanque"
+    columns:
+      identificador_tanque: "cd_tanque"
+      combustivel: "ds_combustivel"
+      codigo_lmc: "cd_anp"
+      timestamp_leitura: "dthr_leitura"
+      volume_atual_litros: "qt_volume_atual"
+      volume_agua_mm: "qt_agua_mm"
+      temperatura_celsius: "vl_temperatura"
+      capacidade_nominal_litros: "qt_capacidade"
+      saldo_inicial_litros: "qt_saldo_inicial"
+      saldo_final_litros: "qt_saldo_final"
+      tem_medicao_fisica: "fl_medicao_fisica"
+
+  pumps:
+    table_name: "tb_encerrante"
+    date_column: "dt_movimento"
+    order_by: "dt_movimento"
+    columns:
+      identificador_bomba: "cd_bomba"
+      identificador_bico: "cd_bico"
+      identificador_tanque: "cd_tanque"
+      codigo_combustivel: "cd_combustivel"
+      descricao_combustivel: "ds_combustivel"
+      turno_descricao: "ds_turno"
+      pdv: "cd_pdv"
+      timestamp_registro: "dthr_registro"
+      encerrante_inicial_litros: "qt_encerrante_ini"
+      encerrante_final_litros: "qt_encerrante_fim"
+      volume_aferido_litros: "qt_afericao"
+      preco_unitario_reais: "vl_preco_unit"
+      total_faturado_reais: "vl_total_faturado"
+      qtd_abastecimentos: "qt_abastecimentos"
+      volume_automacao_litros: "qt_vol_automacao"
+      total_automacao_reais: "vl_tot_automacao"
+
+  cashier:
+    table_name: "tb_caixa_turno"
+    primary_key: "id_turno"
+    date_column: "dt_movimento"
+    order_by: "dt_movimento"
+    columns:
+      caixa_id: "id_turno"
+      pdv: "cd_pdv"
+      fechado: "fl_fechado"
+      operador_id: "cd_operador"
+      operador_nome: "nm_operador"
+      turno_descricao: "ds_turno"
+      data_movimento: "dt_movimento"
+      timestamp_abertura: "dthr_abertura"
+      timestamp_fechamento: "dthr_fechamento"
+      fundo_troco_reais: "vl_fundo_troco"
+      dinheiro_declarado_reais: "vl_dinheiro"
+      cartao_declarado_reais: "vl_cartao"
+      prazo_declarado_reais: "vl_prazo"
+      convenio_cheque_reais: "vl_convenio"
+      venda_combustivel_reais: "vl_venda_comb"
+      venda_produtos_reais: "vl_venda_prod"
+      litros_declarados: "qt_litros"
+      total_declarado_reais: "vl_total_declarado"
+      total_sistema_reais: "vl_total_sistema"
+      quebra_sobra_reais: "vl_diferenca"
+
+  products:
+    table_name: "tb_produto"
+    primary_key: "cd_produto"
+    order_by: "cd_produto"
+    columns:
+      sku: "cd_produto"
+      descricao_produto: "ds_produto"
+      grupo_comercial: "ds_grupo"
+      preco_unitario_reais: "vl_preco_venda"

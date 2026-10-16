@@ -1,0 +1,122 @@
+# Mapeamento Declarativo para Linx Postos (AutoSystem / EMSys)
+# Esquema para integracao com bases Linx em postos de combustivel
+
+erp_name: "Linx Postos"
+erp_version: "1.0"
+dialect: "postgres"
+description: "Mapeamento declarativo para ERP Linx Postos (AutoSystem e EMSys)"
+
+tables:
+  sales:
+    table_name: "vendas_pdv"
+    primary_key: "id_venda"
+    date_column: "data_venda"
+    status_column: "status"
+    cancelled_value: "CANCELADA"
+    order_by: "data_venda"
+    columns:
+      cupom_id: "id_venda"
+      pdv: "numero_pdv"
+      data_hora: "data_venda"
+      total_reais: "valor_total"
+      status: "status"
+      operador: "nome_operador"
+      motivo_cancelamento: "motivo_cancelamento"
+
+  sales_items:
+    table_name: "vendas_itens"
+    foreign_key: "id_venda"
+    primary_key: "id_item"
+    order_by: "id_item"
+    columns:
+      sku: "cod_produto"
+      descricao_produto: "descricao_produto"
+      grupo_comercial: "grupo_produto"
+      preco_unitario_reais: "preco_unitario"
+      quantidade: "quantidade"
+      total_item_reais: "valor_total"
+
+  sales_payments:
+    table_name: "vendas_pagamentos"
+    foreign_key: "id_venda"
+    columns:
+      codigo_forma_pagamento: "cod_forma"
+      descricao_forma: "forma_pagamento"
+      tipo: "tipo_forma"
+      valor_reais: "valor_pago"
+
+  tanks:
+    table_name: "tanques_medicao"
+    primary_key: "id_tanque"
+    order_by: "id_tanque"
+    columns:
+      identificador_tanque: "id_tanque"
+      combustivel: "descricao_combustivel"
+      codigo_lmc: "codigo_anp"
+      timestamp_leitura: "data_hora_medicao"
+      volume_atual_litros: "volume_litros"
+      volume_agua_mm: "agua_mm"
+      temperatura_celsius: "temperatura"
+      capacidade_nominal_litros: "capacidade_nominal"
+      saldo_inicial_litros: "saldo_abertura"
+      saldo_final_litros: "saldo_fechamento"
+      tem_medicao_fisica: "medicao_aferida"
+
+  pumps:
+    table_name: "encerrantes_bico"
+    date_column: "data_fechamento"
+    order_by: "data_fechamento"
+    columns:
+      identificador_bomba: "numero_bomba"
+      identificador_bico: "numero_bico"
+      identificador_tanque: "numero_tanque"
+      codigo_combustivel: "cod_combustivel"
+      descricao_combustivel: "combustivel"
+      turno_descricao: "turno"
+      pdv: "pdv"
+      timestamp_registro: "data_fechamento"
+      encerrante_inicial_litros: "encerrante_inicial"
+      encerrante_final_litros: "encerrante_final"
+      volume_aferido_litros: "volume_afericao"
+      preco_unitario_reais: "preco_litro"
+      total_faturado_reais: "valor_total"
+      qtd_abastecimentos: "qtd_abastecimentos"
+      volume_automacao_litros: "volume_automacao"
+      total_automacao_reais: "total_automacao"
+
+  cashier:
+    table_name: "caixa_fechamento"
+    primary_key: "id_fechamento"
+    date_column: "data_movimento"
+    order_by: "data_movimento"
+    columns:
+      caixa_id: "id_fechamento"
+      pdv: "numero_pdv"
+      fechado: "status_fechado"
+      operador_id: "id_operador"
+      operador_nome: "nome_operador"
+      turno_descricao: "descricao_turno"
+      data_movimento: "data_movimento"
+      timestamp_abertura: "data_abertura"
+      timestamp_fechamento: "data_fechamento"
+      fundo_troco_reais: "troco_inicial"
+      dinheiro_declarado_reais: "valor_dinheiro"
+      cartao_declarado_reais: "valor_cartao"
+      prazo_declarado_reais: "valor_prazo"
+      convenio_cheque_reais: "valor_convenio"
+      venda_combustivel_reais: "total_combustivel"
+      venda_produtos_reais: "total_produtos"
+      litros_declarados: "total_litros"
+      total_declarado_reais: "total_declarado"
+      total_sistema_reais: "total_sistema"
+      quebra_sobra_reais: "diferenca_caixa"
+
+  products:
+    table_name: "cad_produtos"
+    primary_key: "cod_produto"
+    order_by: "cod_produto"
+    columns:
+      sku: "cod_produto"
+      descricao_produto: "descricao"
+      grupo_comercial: "categoria"
+      preco_unitario_reais: "preco_venda"
