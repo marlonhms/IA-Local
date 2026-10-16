@@ -52,6 +52,7 @@ from core.config import (
     update_feature_flags,
 )
 from core.logger import current_client_ip, current_request_id, logger
+from core.proactive_daemon import AuraProactiveDaemon
 from core.schemas.genui import (
     ActionAuditLogRecord,
     ActionExecuteRequest,
@@ -71,6 +72,7 @@ router = APIRouter(prefix="/api/v1/aura", tags=["AURA Core Engine"])
 
 # Instância Singleton do Motor (pode ser injetada externamente)
 _engine_instance: AuraEngine | None = None
+_daemon_instance: AuraProactiveDaemon | None = None
 
 
 def get_aura_engine() -> AuraEngine:
@@ -85,6 +87,20 @@ def set_aura_engine(engine: AuraEngine):
     """Permite sobrescrever ou injetar uma instância customizada do motor."""
     global _engine_instance
     _engine_instance = engine
+
+
+def get_proactive_daemon() -> AuraProactiveDaemon:
+    """Dependency Provider para obter a instancia ativa do daemon proativo."""
+    global _daemon_instance
+    if _daemon_instance is None:
+        _daemon_instance = AuraProactiveDaemon()
+    return _daemon_instance
+
+
+def set_proactive_daemon(daemon: AuraProactiveDaemon | None) -> None:
+    """Permite sobrescrever ou injetar uma instancia customizada do daemon proativo."""
+    global _daemon_instance
+    _daemon_instance = daemon
 
 
 def verify_admin_auth(request: Request = None) -> bool:
@@ -1062,19 +1078,111 @@ async def register_compliance_opt_in_endpoint(
 
 
 # =============================================================================
+# ENDPOINTS DO MOTOR DE ALERTAS PROATIVOS (P3-2)
+# =============================================================================
+
+class ProactiveEvaluateRequest(BaseModel):
+    """Modelo de requisicao para forcar avaliacao imediata de alertas proativos."""
+    tanques: list[dict[str, Any]] | None = Field(default=None, description="Leituras customizadas de tanques")
+    caixas: list[dict[str, Any]] | None = Field(default=None, description="Sessoes customizadas de caixas")
+    turnos: list[dict[str, Any]] | None = Field(default=None, description="Fechamentos customizados de turno")
+    force: bool = Field(default=False, description="Se True, ignora cooldown e forca avaliacao")
+
+
+@router.get(
+    "/proactive/status",
+    summary="Status do Motor de Alertas Proativos de Pista (P3-2)",
+    tags=["AURA Proactive Alerts"],
+)
+async def get_proactive_daemon_status(
+    daemon: AuraProactiveDaemon = Depends(get_proactive_daemon),
+) -> dict[str, Any]:
+    """Retorna estado operacional do daemon proativo, metricas de regras e contadores."""
+    return daemon.get_status()
+
+
+@router.post(
+    "/proactive/evaluate",
+    summary="Forca Execucao Imediata de Ciclo de Avaliacao de Regras (P3-2)",
+    tags=["AURA Proactive Alerts"],
+)
+async def evaluate_proactive_rules_endpoint(
+    request: ProactiveEvaluateRequest | None = Body(default=None),
+    daemon: AuraProactiveDaemon = Depends(get_proactive_daemon),
+) -> dict[str, Any]:
+    """Forca avaliacao de regras analiticas de tanques, sangrias e turnos com retorno sincrono."""
+    tanques = request.tanques if request else None
+    caixas = request.caixas if request else None
+    turnos = request.turnos if request else None
+    force = request.force if request else False
+
+    alerts = await daemon.evaluate_rules(tanques=tanques, caixas=caixas, turnos=turnos, force=force)
+    return {
+        "success": True,
+        "alerts_generated": len(alerts),
+        "alerts": [a.to_dict() if hasattr(a, "to_dict") else a for a in alerts],
+    }
+
+
+@router.get(
+    "/proactive/alerts",
+    summary="Historico de Alertas Proativos Emitidos (P3-2)",
+    tags=["AURA Proactive Alerts"],
+)
+async def list_proactive_alerts_endpoint(
+    limit: int = Query(default=50, ge=1, le=200, description="Limite de registros retornados"),
+    offset: int = Query(default=0, ge=0, description="Deslocamento para paginacao"),
+    alert_type: str | None = Query(default=None, description="Filtro por tipo de alerta"),
+    severity: str | None = Query(default=None, description="Filtro por severidade"),
+    filial_id: str | None = Query(default=None, description="Filtro por identificador de filial"),
+    daemon: AuraProactiveDaemon = Depends(get_proactive_daemon),
+) -> dict[str, Any]:
+    """Lista alertas recentes emitidos com suporte a paginacao e filtros."""
+    alerts = daemon.get_recent_alerts(
+        limit=limit,
+        offset=offset,
+        alert_type=alert_type,
+        severity=severity,
+        filial_id=filial_id,
+    )
+    return {
+        "total": len(alerts),
+        "limit": limit,
+        "offset": offset,
+        "alerts": alerts,
+    }
+
+
+# =============================================================================
 # FACTORY DA APLICAÇÃO STANDALONE
 # =============================================================================
 
-def create_aura_app(engine: AuraEngine | None = None) -> FastAPI:
+def create_aura_app(
+    engine: AuraEngine | None = None,
+    daemon: AuraProactiveDaemon | None = None,
+) -> FastAPI:
     """Cria e configura uma instância completa da aplicação FastAPI para a AURA."""
     if engine is not None:
         set_aura_engine(engine)
+    if daemon is not None:
+        set_proactive_daemon(daemon)
 
     app = FastAPI(
         title="AURA Core Engine API",
         description="Motor Cognitivo Headless Desacoplado para Postos de Combustíveis e PDV",
         version="1.0.0",
     )
+
+    @app.on_event("startup")
+    async def startup_proactive_daemon():
+        if os.getenv("AURA_PROACTIVE_DAEMON_AUTOSTART", "0").lower() in ("1", "true", "yes"):
+            d = get_proactive_daemon()
+            await d.start()
+
+    @app.on_event("shutdown")
+    async def shutdown_proactive_daemon():
+        d = get_proactive_daemon()
+        await d.stop()
 
     # Middleware de Correlacao X-Request-ID e Logging Estruturado JSON (P1-6)
     @app.middleware("http")

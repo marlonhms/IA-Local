@@ -407,14 +407,16 @@ A Fase P3 consolida a experiência de campo da AURA com foco em **impacto mínim
 
 ---
 
-### 🟡 P3-2: Motor de Alertas Proativos de Pista (Proactive Edge Daemon)
-- **Diagnóstico:** A AURA opera atualmente sob demanda (o gerente ou frentista precisa abrir o chat ou acionar um gatilho para saber se há problemas). Em postos movimentados, a gestão ganha valor exponencial quando a inteligência atua de forma autônoma e preventiva.
-- **Solução de Engenharia:**
-  - Acoplar ao ouvinte de eventos CDC ([`core/cdc_listener.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/cdc_listener.py)) um daemon de regras analíticas em segundo plano:
-    1. *Alerta de Ruptura Crítica de Combustível:* Dispara notificação imediata quando a estimativa de autonomia de um tanque for inferior a 24 horas, incluindo sugestão de pedido fracionado em compartimentos de 5.000 L.
+### 🟢 P3-2: Motor de Alertas Proativos de Pista (Proactive Edge Daemon) [CONCLUÍDO]
+- **Diagnóstico:** A AURA operava anteriormente sob demanda (o gerente ou frentista precisava abrir o chat ou acionar um gatilho para saber se havia problemas). Em postos movimentados, a gestão ganha valor exponencial quando a inteligência atua de forma autônoma e preventiva.
+- **Solução Implementada:**
+  - Implementado o módulo [`core/proactive_daemon.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/proactive_daemon.py) com a classe `AuraProactiveDaemon`:
+    1. *Alerta de Ruptura Crítica de Combustível:* Dispara notificação imediata quando a estimativa de autonomia de um tanque for inferior a 24 horas ou volume for menor que 20% da capacidade nominal, calculando sugestão de pedido fracionado em compartimentos de 5.000 L.
     2. *Alerta de Furo de Caixa e Sangria Pendente:* Notifica o gestor quando o saldo de dinheiro em espécie na gaveta ultrapassar o limite seguro (ex: R$ 1.500) sem sangria registrada há mais de 45 minutos.
-    3. *Despacho Noturno Consolidado:* Compila a DRE do dia e o fechamento às 22h05 e envia para o WhatsApp do proprietário via webhooks n8n / Evolution API sem necessidade de comando manual.
+    3. *Deduplicação e Cooldown Inteligente:* Política anti-spam persistente em memória e SQLite local (ex: 2 horas para o mesmo tanque, 45 minutos para o mesmo caixa) evitando sobrecarga de mensagens no WhatsApp mesmo após reinicializações.
+    4. *Despacho e Histórico Resiliente:* Integração assíncrona com [`core/webhook_dispatcher.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/webhook_dispatcher.py) para tanques, sangrias e fechamento de turnos via n8n e Evolution API, escuta de eventos CDC, persistência em SQLite e endpoints FastAPI (`/status`, `/evaluate`, `/alerts`).
 - **Impacto no Cliente:** Elimina o risco de posto "seco" e fraudes de pista por omissão de monitoramento.
+- **Status:** Concluído com 100% dos testes aprovados (22 novos testes, sub-segundo de execução).
 
 ---
 
@@ -517,7 +519,7 @@ A Fase P3 consolida a experiência de campo da AURA com foco em **impacto mínim
 
 ### 📋 Checklist Fase P3 (Inovação, Observabilidade Nativa & Autonomia)
 - [x] O painel web da AURA possui aba/modal de "Pulso & Telemetria" nativo consumindo `/api/v1/aura/telemetry/metrics` sem requerer Grafana externo (P3-1).
-- [ ] O daemon proativo escuta eventos CDC e dispara alertas de esgotamento de tanques e sangrias no WhatsApp sem consulta manual prévia (P3-2).
+- [x] O daemon proativo escuta eventos CDC e dispara alertas de esgotamento de tanques e sangrias no WhatsApp sem consulta manual prévia (P3-2).
 - [ ] O diretório `config/erp_mappings/` permite homologação declarativa de novos ERPs via YAML sem alterar código Python (P3-3).
 - [ ] O frontend oferece manifesto PWA instalável no celular com Modo Pista de alto contraste e comandos por voz (P3-4).
 - [ ] O watchdog local monitora a saúde da porta 8000 e executa auto-recuperação de serviços travados em `STOP_PENDING` em menos de 2 segundos (P3-5).

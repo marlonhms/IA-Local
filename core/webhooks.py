@@ -4,6 +4,7 @@ Integra o motor cognitivo AURA com n8n e Evolution API para envio automatico
 de relatorios executivos de turno, alertas de ruptura de tanques e pedidos de combustivel.
 Zero travessoes em todo o arquivo.
 """
+# ruff: noqa: BLE001, S110
 
 from __future__ import annotations
 
@@ -60,6 +61,20 @@ class AlertaTanquePayload(BaseModel):
     autonomia_horas: float
     previsao_esgotamento: str
     urgencia: str = "ALTA"  # BAIXA, MEDIA, ALTA, CRITICA
+    compartimentos_5k: int | None = None
+    volume_sugerido_litros: float | None = None
+
+
+class AlertaSangriaPayload(BaseModel):
+    """Payload estruturado para alerta de retencao excessiva de caixa ou sangria pendente."""
+    caixa_id: str
+    filial_id: str = "posto_01"
+    saldo_dinheiro: float
+    teto_seguro: float
+    excesso_dinheiro: float
+    minutos_sem_sangria: int
+    urgencia: str = "ALTA"  # BAIXA, MEDIA, ALTA, CRITICA
+    operador_id: str | None = None
 
 
 class PedidoCombustivelPayload(BaseModel):
@@ -250,6 +265,11 @@ def format_turno_whatsapp_message(payload: TurnoResumoPayload) -> str:
 def format_alerta_tanque_whatsapp_message(payload: AlertaTanquePayload) -> str:
     """Formata alerta operacional de tanques em texto limpo e executivo."""
     pct = (payload.volume_atual_litros / payload.capacidade_total_litros * 100) if payload.capacidade_total_litros > 0 else 0.0
+    if payload.compartimentos_5k is not None and payload.compartimentos_5k > 0:
+        vol_sug = payload.volume_sugerido_litros or (payload.compartimentos_5k * 5000.0)
+        acao = f"Ação Recomendada: Autorizar pedido fracionado de {payload.compartimentos_5k} compartimento(s) de 5.000 L ({_format_litros(vol_sug)} L)."
+    else:
+        acao = "Ação Recomendada: Autorizar pedido de carreta no painel de controle."
     lines = [
         "*AURA | ALERTA OPERACIONAL DE TANQUES*",
         f"Filial: {payload.filial_id} • Tanque: {payload.tanque_id}",
@@ -260,7 +280,24 @@ def format_alerta_tanque_whatsapp_message(payload: AlertaTanquePayload) -> str:
         f"• Previsão de Esgotamento: {payload.previsao_esgotamento}",
         f"• Urgência: {payload.urgencia}",
         "",
-        "Ação Recomendada: Autorizar pedido de carreta no painel de controle.",
+        acao,
+    ]
+    return "\n".join(lines)
+
+
+def format_alerta_sangria_whatsapp_message(payload: AlertaSangriaPayload) -> str:
+    """Formata alerta operacional de sangria de caixa em texto executivo."""
+    lines = [
+        "*AURA | ALERTA OPERACIONAL DE CAIXA*",
+        f"Filial: {payload.filial_id} • Caixa: {payload.caixa_id}",
+        "",
+        f"• Saldo em Espécie: R$ {_format_brl(payload.saldo_dinheiro)}",
+        f"• Teto Seguro de Gaveta: R$ {_format_brl(payload.teto_seguro)}",
+        f"• Excesso Retido: R$ {_format_brl(payload.excesso_dinheiro)}",
+        f"• Tempo sem Sangria: {payload.minutos_sem_sangria} minutos",
+        f"• Urgência: {payload.urgencia}",
+        "",
+        "Ação Recomendada: Recolher sangria imediata para o cofre seguro de retaguarda.",
     ]
     return "\n".join(lines)
 
@@ -325,3 +362,32 @@ async def notify_alerta_tanque(
         results["evolution"] = evo_res.model_dump()
 
     return results
+
+
+async def notify_alerta_sangria(
+    payload: AlertaSangriaPayload,
+    phone: str | None = None,
+    webhook_url: str | None = None,
+) -> dict[str, Any]:
+    """
+    Despacha alerta de retencao excessiva de numerario para n8n e Evolution API.
+    """
+    results = {}
+    n8n_res = await dispatch_n8n_webhook(
+        event_type="alerta_sangria_pendente",
+        payload=payload.model_dump(),
+        webhook_url=webhook_url,
+    )
+    results["n8n"] = n8n_res.model_dump()
+
+    target_phone = phone or WHATSAPP_MANAGER_PHONE
+    if target_phone:
+        msg_text = format_alerta_sangria_whatsapp_message(payload)
+        evo_res = await dispatch_evolution_message(
+            phone=target_phone,
+            message_text=msg_text,
+        )
+        results["evolution"] = evo_res.model_dump()
+
+    return results
+

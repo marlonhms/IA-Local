@@ -2226,6 +2226,7 @@ class AuraEngine:
         session_memory: Optional[AuraSessionMemory] = None,
         erp_adapter: Optional[BaseERPAdapter] = None,
         compliance_manager: Optional[Any] = None,
+        proactive_daemon: Optional[Any] = None,
     ):
         self.tenant_id = tenant_id or "default_tenant"
         self.filial_id = filial_id or "posto_01"
@@ -2238,6 +2239,7 @@ class AuraEngine:
         self._telemetry = AuraSRETelemetry.get_instance(session_memory=self._session_memory)
         self._erp_adapter = erp_adapter
         self._compliance_manager = compliance_manager
+        self._proactive_daemon = proactive_daemon
         self._dados_filial: Optional[Dict[str, Any]] = None
 
     @property
@@ -2272,6 +2274,17 @@ class AuraEngine:
             from core.compliance_manager import ComplianceManager
             self._compliance_manager = ComplianceManager(session_memory=self._session_memory)
         return self._compliance_manager
+
+    @property
+    def proactive_daemon(self):
+        if self._proactive_daemon is None:
+            from core.proactive_daemon import AuraProactiveDaemon
+            self._proactive_daemon = AuraProactiveDaemon(
+                filial_id=self.filial_id,
+                tenant_id=self.tenant_id,
+                erp_adapter=self._erp_adapter,
+            )
+        return self._proactive_daemon
 
     def get_audit_logs(
         self,
