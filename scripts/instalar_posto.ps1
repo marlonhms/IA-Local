@@ -216,9 +216,11 @@ if ($SkipService -or $DryRun) {
             & $NssmBin set $ServiceName AppStdout (Join-Path $LogDir "service_stdout.log") | Out-Null
             & $NssmBin set $ServiceName AppStderr (Join-Path $LogDir "service_stderr.log") | Out-Null
             & $NssmBin set $ServiceName Start SERVICE_AUTO_START | Out-Null
+            Start-Service -Name $ServiceName -ErrorAction SilentlyContinue
+        } else {
+            Restart-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
         }
-        Start-Service -Name $ServiceName -ErrorAction SilentlyContinue
-        Write-Host "  [OK] Servico '$ServiceName' ativo e configurado para inicio automatico." -ForegroundColor Green
+        Write-Host "  [OK] Servico '$ServiceName' ativo, atualizado e configurado para inicio automatico." -ForegroundColor Green
     } catch {
         Write-Host "  [INFO] Verifique privilegios de Administrador para gerenciar o servico $ServiceName." -ForegroundColor Yellow
     }
