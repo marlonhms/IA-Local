@@ -36,6 +36,11 @@ from .sanitizer import (
 )
 from .telemetry import AuraSRETelemetry
 from .tools import PostoTools
+from .watchdog import (
+    AuraWatchdogSentinel,
+    WatchdogHealthResult,
+    WatchdogIncidentEvent,
+)
 
 __all__ = [
     "ENABLE_GENUI",
@@ -45,12 +50,15 @@ __all__ = [
     "AuraResponse",
     "AuraSRETelemetry",
     "AuraSessionMemory",
+    "AuraWatchdogSentinel",
     "CentralLogSanitizer",
     "ComplianceManager",
     "DataSanitizer",
     "HybridRAGEngine",
     "PostoTools",
     "StationStatus",
+    "WatchdogHealthResult",
+    "WatchdogIncidentEvent",
     "aura_router",
     "central_log_sanitizer",
     "classificar_intencao",
