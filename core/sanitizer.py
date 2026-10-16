@@ -169,7 +169,7 @@ _FORMATTED_PHONE_PATTERN = re.compile(
     r"(?:\+?55\s*)?(?:\(\d{2}\)\s*|\b\d{2}\s+)(?:9\s*)?\d{4}[-.\s]?\d{4}\b"
 )
 _FORMATTED_CPF_PATTERN = re.compile(r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b")
-_UNFORMATTED_CPF_PATTERN = re.compile(r"(?<!\d)(\d{11})(?!\d)")
+_UNFORMATTED_CPF_PATTERN = re.compile(r"(?<![0-9a-zA-Z_-])(\d{11})(?![0-9a-zA-Z_-])")
 _CNPJ_PATTERN = re.compile(
     r"\b(?:[A-Z0-9]{2}\.[A-Z0-9]{3}\.[A-Z0-9]{3}/[A-Z0-9]{4}-\d{2}|\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2})\b",
     re.IGNORECASE,
@@ -516,12 +516,15 @@ class CentralLogSanitizer:
         clean_payload = copy.deepcopy(payload)
         aggregated_counts: Dict[str, int] = {}
 
-        def _walk_and_clean(obj):
+        def _walk_and_clean(obj, key_name: Optional[str] = None):
             if isinstance(obj, dict):
-                return {k: _walk_and_clean(v) for k, v in obj.items()}
+                return {k: _walk_and_clean(v, key_name=k) for k, v in obj.items()}
             elif isinstance(obj, list):
-                return [_walk_and_clean(item) for item in obj]
+                return [_walk_and_clean(item, key_name=key_name) for item in obj]
             elif isinstance(obj, str):
+                # Preservar identificadores estruturais e metadados tecnicos de widgets
+                if key_name in ("action_id", "tool_call_id", "idempotency_key", "component_name", "client_component"):
+                    return obj
                 cleaned, counts = self.sanitize_text(obj)
                 for cat, c in counts.items():
                     aggregated_counts[cat] = aggregated_counts.get(cat, 0) + c
