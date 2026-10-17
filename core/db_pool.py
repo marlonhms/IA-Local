@@ -129,7 +129,7 @@ def _create_erp_pool(
             _last_working_erp_port = port
             logger.info(f"ERP ThreadedConnectionPool inicializado na porta {port} (min={minconn}, max={maxconn}).")
             return p
-        except (psycopg2.Error, OSError, RuntimeError) as exc:
+        except (psycopg2.Error, OSError, RuntimeError, UnicodeDecodeError) as exc:
             last_exc = exc
             continue
 
@@ -145,6 +145,7 @@ def _create_vector_pool(
 ) -> pool.ThreadedConnectionPool:
     """
     Cria pool gerenciado para o banco vetorial posto_ai (porta 5433).
+    Aplica search_path=aura_core,public e isolamento de schemas com o Sentinel (n3_sre).
     """
     config = dict(DB_VECTOR_CONFIG)
     config["connect_timeout"] = timeout
@@ -153,7 +154,10 @@ def _create_vector_pool(
         maxconn=maxconn,
         **config,
     )
-    logger.info(f"Vector ThreadedConnectionPool inicializado no posto_ai (min={minconn}, max={maxconn}).")
+    port = config.get("port", 5433)
+    logger.info(
+        f"Vector ThreadedConnectionPool inicializado no posto_ai:{port} com schema aura_core (min={minconn}, max={maxconn})."
+    )
     return p
 
 

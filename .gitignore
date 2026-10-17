@@ -63,3 +63,7 @@ local.properties
 # Binarios e servicos locais
 bin/*.exe
 !bin/.gitkeep
+dist/
+build/
+*.spec.bak
+

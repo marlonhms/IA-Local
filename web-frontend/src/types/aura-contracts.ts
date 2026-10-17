@@ -74,13 +74,14 @@ export interface ActionExecuteRequest {
   payload: Record<string, unknown>;
   operator_id?: string | null;
   operator_role?: "frentista" | "caixa" | "gerente" | "administrador" | string | null;
+  idempotency_key?: string | null;
 }
 
 export interface ActionVoucher {
   voucher_id: string;
   action_id: string;
   tool_call_id: string;
-  status: "APPROVED" | "EXECUTED";
+  status: "APPROVED" | "EXECUTED" | "ROLLED_BACK";
   timestamp: string;
   action_name: string;
   details: Record<string, unknown>;
@@ -98,7 +99,7 @@ export interface ActionAuditLogRecord {
   operator_id?: string | null;
   operator_role?: string | null;
   authorized: boolean;
-  status: "APPROVED" | "REJECTED_FORBIDDEN" | "FAILED";
+  status: "APPROVED" | "REJECTED_FORBIDDEN" | "FAILED" | "ROLLED_BACK";
   details: Record<string, unknown>;
   client_ip?: string | null;
 }

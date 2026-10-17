@@ -1,7 +1,8 @@
 """
-Esteira de Webhooks Assincronos para Notificacoes e WhatsApp (P1-7).
-Integra o motor cognitivo AURA com n8n e Evolution API para envio automatico
-de relatorios executivos de turno, alertas de ruptura de tanques e pedidos de combustivel.
+Esteira de Webhooks Assincronos para Notificacoes e WhatsApp (P1-7 / Fase 5 Outbox).
+Integra o motor cognitivo AURA com n8n, Evolution API e a Transactional Outbox (SQLite WAL)
+para envio resiliente de relatorios executivos de turno, alertas de ruptura de tanques
+e alertas de sangria mesmo durante quedas de internet no posto.
 Zero travessoes em todo o arquivo.
 """
 # ruff: noqa: BLE001, S110
@@ -22,37 +23,57 @@ from config.settings import (
     WHATSAPP_MANAGER_PHONE,
 )
 from core.logger import logger
+from core.outbox import (
+    AuraTransactionalOutbox,
+    OutboxStatus,
+    get_transactional_outbox,
+)
 
 # =============================================================================
 # CONTRATOS PYDANTIC DE PAYLOAD DE WEBHOOKS
 # =============================================================================
 
+
 class WebhookDispatchResult(BaseModel):
-    """Resultado do envio de webhook."""
+    """Resultado do envio de webhook integrado com a Transactional Outbox."""
+
     success: bool
     service: str
     target_url: str
     status_code: int | None = None
     response_body: str | None = None
     error: str | None = None
+    outbox_message_id: str | None = None
+    outbox_status: str | None = None
     timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+    def __await__(self):
+        async def _coro() -> WebhookDispatchResult:
+            return self
+
+        return _coro().__await__()
 
 
 class TurnoResumoPayload(BaseModel):
     """Payload estruturado do resumo executivo de fechamento de turno."""
+
     turno_id: str = Field(..., description="Identificador do turno ou data/horario")
     filial_id: str = Field(default="posto_01", description="Identificador da filial do posto")
     data: str = Field(default_factory=lambda: datetime.now(UTC).strftime("%Y-%m-%d"))
     faturamento_total: float = Field(..., description="Faturamento total consolidado em R$")
     litros_vendidos: float = Field(..., description="Volume total vendido em litros")
     quebra_caixa: float = Field(default=0.0, description="Divergencia ou quebra de caixa em R$")
-    status_conciliacao: str = Field(default="CONCILIADO", description="Status da auditoria (CONCILIADO, ALERTA)")
+    status_conciliacao: str = Field(
+        default="CONCILIADO",
+        description="Status da auditoria (CONCILIADO, ALERTA)",
+    )
     bicos_analisados: int = Field(default=0, description="Quantidade de bicos conferidos")
     observacoes: str | None = None
 
 
 class AlertaTanquePayload(BaseModel):
     """Payload estruturado para alerta urgente de ruptura de combustivel."""
+
     tanque_id: str
     combustivel: str
     filial_id: str = "posto_01"
@@ -67,6 +88,7 @@ class AlertaTanquePayload(BaseModel):
 
 class AlertaSangriaPayload(BaseModel):
     """Payload estruturado para alerta de retencao excessiva de caixa ou sangria pendente."""
+
     caixa_id: str
     filial_id: str = "posto_01"
     saldo_dinheiro: float
@@ -79,6 +101,7 @@ class AlertaSangriaPayload(BaseModel):
 
 class PedidoCombustivelPayload(BaseModel):
     """Payload estruturado para pedido de combustivel / carreta."""
+
     voucher_id: str
     combustivel: str
     litros: float
@@ -89,19 +112,25 @@ class PedidoCombustivelPayload(BaseModel):
 
 
 # =============================================================================
-# DESPACHADORES HTTP ASSINCRONOS
+# DESPACHADORES HTTP ASSINCRONOS COM PERSIST-BEFORE-SEND (OUTBOX)
 # =============================================================================
+
 
 async def dispatch_n8n_webhook(
     event_type: str,
     payload: dict[str, Any],
     webhook_url: str | None = None,
     timeout_seconds: float = 8.0,
+    outbox: AuraTransactionalOutbox | None = None,
+    idempotency_key: str | None = None,
+    max_attempts: int = 5,
 ) -> WebhookDispatchResult:
     """
-    Envia payload padronizado via HTTP POST para o endpoint do n8n.
+    Persiste primeiramente na Transactional Outbox (SQLite WAL) e envia payload
+    padronizado via HTTP POST para o endpoint do n8n.
+    Se a rede falhar, mantem na Outbox como FAILED_RETRY com backoff exponencial.
     """
-    url = webhook_url or N8N_WEBHOOK_URL
+    url = (webhook_url or N8N_WEBHOOK_URL or "").strip()
     if not url:
         logger.warning(
             "N8N_WEBHOOK_URL nao configurada. Disparo cancelado.",
@@ -117,35 +146,108 @@ async def dispatch_n8n_webhook(
     body = {
         "event": event_type,
         "timestamp": datetime.now(UTC).isoformat(),
-        "data": payload,
+        "data": payload.model_dump() if hasattr(payload, "model_dump") else payload,
     }
+    headers = {"Content-Type": "application/json"}
+
+    active_outbox = outbox if outbox is not None else get_transactional_outbox()
+    msg = active_outbox.enqueue(
+        event_type=event_type,
+        destination_url=url,
+        payload=body,
+        headers=headers,
+        idempotency_key=idempotency_key,
+        max_attempts=max_attempts,
+    )
+
+    if msg.status == OutboxStatus.DELIVERED.value:
+        return WebhookDispatchResult(
+            success=True,
+            service="n8n",
+            target_url=url,
+            status_code=200,
+            response_body="Mensagem ja entregue anteriormente (idempotency_key)",
+            outbox_message_id=msg.message_id,
+            outbox_status=msg.status,
+        )
+
+    if msg.status == OutboxStatus.DEAD_LETTER.value:
+        return WebhookDispatchResult(
+            success=False,
+            service="n8n",
+            target_url=url,
+            error=msg.last_error or "Mensagem em DEAD_LETTER (max_attempts esgotado)",
+            outbox_message_id=msg.message_id,
+            outbox_status=msg.status,
+        )
+
+    processing_msg = active_outbox.mark_processing(msg.message_id)
+    if processing_msg is None:
+        current = active_outbox.get_message(msg.message_id) or msg
+        if current.status == OutboxStatus.DELIVERED.value:
+            return WebhookDispatchResult(
+                success=True,
+                service="n8n",
+                target_url=url,
+                status_code=200,
+                response_body="Mensagem ja entregue anteriormente (idempotency_key)",
+                outbox_message_id=current.message_id,
+                outbox_status=current.status,
+            )
+        return WebhookDispatchResult(
+            success=False,
+            service="n8n",
+            target_url=url,
+            error=current.last_error or "Mensagem ja em processamento concorrente na Outbox",
+            outbox_message_id=current.message_id,
+            outbox_status=current.status,
+        )
 
     try:
         async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             resp = await client.post(url, json=body)
             success = 200 <= resp.status_code < 300
-            if not success:
-                logger.error(
-                    f"Falha no webhook n8n ({resp.status_code}): {resp.text}",
-                    extra={"event_type": event_type, "status_code": resp.status_code},
+            if success:
+                updated = active_outbox.mark_delivered(msg.message_id)
+                return WebhookDispatchResult(
+                    success=True,
+                    service="n8n",
+                    target_url=url,
+                    status_code=resp.status_code,
+                    response_body=resp.text[:500],
+                    outbox_message_id=msg.message_id,
+                    outbox_status=updated.status if updated else OutboxStatus.DELIVERED.value,
                 )
+
+            err_text = f"HTTP {resp.status_code}: {resp.text[:300]}"
+            logger.error(
+                f"Falha no webhook n8n ({resp.status_code}): {resp.text}",
+                extra={"event_type": event_type, "status_code": resp.status_code},
+            )
+            updated = active_outbox.mark_failed_attempt(msg.message_id, error=err_text)
             return WebhookDispatchResult(
-                success=success,
+                success=False,
                 service="n8n",
                 target_url=url,
                 status_code=resp.status_code,
                 response_body=resp.text[:500],
+                error=err_text,
+                outbox_message_id=msg.message_id,
+                outbox_status=updated.status if updated else OutboxStatus.FAILED_RETRY.value,
             )
     except Exception as exc:
         logger.error(
             f"Excecao no disparo de webhook n8n: {exc}",
             extra={"event_type": event_type, "error": str(exc)},
         )
+        updated = active_outbox.mark_failed_attempt(msg.message_id, error=str(exc))
         return WebhookDispatchResult(
             success=False,
             service="n8n",
             target_url=url,
             error=str(exc),
+            outbox_message_id=msg.message_id,
+            outbox_status=updated.status if updated else OutboxStatus.FAILED_RETRY.value,
         )
 
 
@@ -156,11 +258,16 @@ async def dispatch_evolution_message(
     api_key: str | None = None,
     instance: str | None = None,
     timeout_seconds: float = 8.0,
+    outbox: AuraTransactionalOutbox | None = None,
+    idempotency_key: str | None = None,
+    event_type: str = "whatsapp_evolution",
+    max_attempts: int = 5,
 ) -> WebhookDispatchResult:
     """
-    Envia mensagem de texto via Evolution API para WhatsApp corporativo.
+    Persiste primeiramente na Transactional Outbox (SQLite WAL) e envia mensagem
+    de texto via Evolution API para WhatsApp corporativo.
     """
-    base_url = (api_url or EVOLUTION_API_URL).rstrip("/")
+    base_url = (api_url or EVOLUTION_API_URL or "").rstrip("/")
     token = api_key or EVOLUTION_API_KEY
     inst = instance or EVOLUTION_INSTANCE
 
@@ -183,38 +290,111 @@ async def dispatch_evolution_message(
         "text": message_text,
     }
 
+    active_outbox = outbox if outbox is not None else get_transactional_outbox()
+    msg = active_outbox.enqueue(
+        event_type=event_type,
+        destination_url=endpoint,
+        payload=body,
+        headers=headers,
+        idempotency_key=idempotency_key,
+        max_attempts=max_attempts,
+    )
+
+    if msg.status == OutboxStatus.DELIVERED.value:
+        return WebhookDispatchResult(
+            success=True,
+            service="evolution_api",
+            target_url=endpoint,
+            status_code=200,
+            response_body="Mensagem ja entregue anteriormente (idempotency_key)",
+            outbox_message_id=msg.message_id,
+            outbox_status=msg.status,
+        )
+
+    if msg.status == OutboxStatus.DEAD_LETTER.value:
+        return WebhookDispatchResult(
+            success=False,
+            service="evolution_api",
+            target_url=endpoint,
+            error=msg.last_error or "Mensagem em DEAD_LETTER (max_attempts esgotado)",
+            outbox_message_id=msg.message_id,
+            outbox_status=msg.status,
+        )
+
+    processing_msg = active_outbox.mark_processing(msg.message_id)
+    if processing_msg is None:
+        current = active_outbox.get_message(msg.message_id) or msg
+        if current.status == OutboxStatus.DELIVERED.value:
+            return WebhookDispatchResult(
+                success=True,
+                service="evolution_api",
+                target_url=endpoint,
+                status_code=200,
+                response_body="Mensagem ja entregue anteriormente (idempotency_key)",
+                outbox_message_id=current.message_id,
+                outbox_status=current.status,
+            )
+        return WebhookDispatchResult(
+            success=False,
+            service="evolution_api",
+            target_url=endpoint,
+            error=current.last_error or "Mensagem ja em processamento concorrente na Outbox",
+            outbox_message_id=current.message_id,
+            outbox_status=current.status,
+        )
+
     try:
         async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             resp = await client.post(endpoint, json=body, headers=headers)
             success = 200 <= resp.status_code < 300
-            if not success:
-                logger.error(
-                    f"Falha na Evolution API ({resp.status_code}): {resp.text}",
-                    extra={"phone": phone, "status_code": resp.status_code},
+            if success:
+                updated = active_outbox.mark_delivered(msg.message_id)
+                return WebhookDispatchResult(
+                    success=True,
+                    service="evolution_api",
+                    target_url=endpoint,
+                    status_code=resp.status_code,
+                    response_body=resp.text[:500],
+                    outbox_message_id=msg.message_id,
+                    outbox_status=updated.status if updated else OutboxStatus.DELIVERED.value,
                 )
+
+            err_text = f"HTTP {resp.status_code}: {resp.text[:300]}"
+            logger.error(
+                f"Falha na Evolution API ({resp.status_code}): {resp.text}",
+                extra={"phone": phone, "status_code": resp.status_code},
+            )
+            updated = active_outbox.mark_failed_attempt(msg.message_id, error=err_text)
             return WebhookDispatchResult(
-                success=success,
+                success=False,
                 service="evolution_api",
                 target_url=endpoint,
                 status_code=resp.status_code,
                 response_body=resp.text[:500],
+                error=err_text,
+                outbox_message_id=msg.message_id,
+                outbox_status=updated.status if updated else OutboxStatus.FAILED_RETRY.value,
             )
     except Exception as exc:
         logger.error(
             f"Excecao na Evolution API: {exc}",
             extra={"phone": phone, "error": str(exc)},
         )
+        updated = active_outbox.mark_failed_attempt(msg.message_id, error=str(exc))
         return WebhookDispatchResult(
             success=False,
             service="evolution_api",
             target_url=endpoint,
             error=str(exc),
+            outbox_message_id=msg.message_id,
+            outbox_status=updated.status if updated else OutboxStatus.FAILED_RETRY.value,
         )
 
 
 # =============================================================================
 # FORMATADORES DE MENSAGENS EXECUTIVAS WHATSAPP
 # =============================================================================
+
 
 def _format_brl(val: float) -> str:
     s = f"{val:,.2f}"
@@ -264,10 +444,17 @@ def format_turno_whatsapp_message(payload: TurnoResumoPayload) -> str:
 
 def format_alerta_tanque_whatsapp_message(payload: AlertaTanquePayload) -> str:
     """Formata alerta operacional de tanques em texto limpo e executivo."""
-    pct = (payload.volume_atual_litros / payload.capacidade_total_litros * 100) if payload.capacidade_total_litros > 0 else 0.0
+    pct = (
+        (payload.volume_atual_litros / payload.capacidade_total_litros * 100)
+        if payload.capacidade_total_litros > 0
+        else 0.0
+    )
     if payload.compartimentos_5k is not None and payload.compartimentos_5k > 0:
         vol_sug = payload.volume_sugerido_litros or (payload.compartimentos_5k * 5000.0)
-        acao = f"Ação Recomendada: Autorizar pedido fracionado de {payload.compartimentos_5k} compartimento(s) de 5.000 L ({_format_litros(vol_sug)} L)."
+        acao = (
+            f"Ação Recomendada: Autorizar pedido fracionado de "
+            f"{payload.compartimentos_5k} compartimento(s) de 5.000 L ({_format_litros(vol_sug)} L)."
+        )
     else:
         acao = "Ação Recomendada: Autorizar pedido de carreta no painel de controle."
     lines = [
@@ -306,20 +493,28 @@ def format_alerta_sangria_whatsapp_message(payload: AlertaSangriaPayload) -> str
 # FUNCOES DE ALTO NIVEL PARA NOTIFICACOES INTEGRADAS
 # =============================================================================
 
+
 async def notify_fechamento_turno(
     payload: TurnoResumoPayload,
     phone: str | None = None,
     webhook_url: str | None = None,
+    outbox: AuraTransactionalOutbox | None = None,
+    idempotency_key: str | None = None,
 ) -> dict[str, Any]:
     """
-    Despacha resumo de turno para n8n e Evolution API simultaneamente.
+    Despacha resumo de turno para n8n e Evolution API simultaneamente com Outbox.
     """
-    results = {}
+    results: dict[str, Any] = {}
+    idem_n8n = f"{idempotency_key}:n8n" if idempotency_key else None
+    idem_evo = f"{idempotency_key}:whatsapp" if idempotency_key else None
+
     # 1. Envio para n8n
     n8n_res = await dispatch_n8n_webhook(
         event_type="turno_fechamento",
         payload=payload.model_dump(),
         webhook_url=webhook_url,
+        outbox=outbox,
+        idempotency_key=idem_n8n,
     )
     results["n8n"] = n8n_res.model_dump()
 
@@ -330,6 +525,9 @@ async def notify_fechamento_turno(
         evo_res = await dispatch_evolution_message(
             phone=target_phone,
             message_text=msg_text,
+            outbox=outbox,
+            idempotency_key=idem_evo,
+            event_type="fechamento_turno",
         )
         results["evolution"] = evo_res.model_dump()
 
@@ -340,15 +538,22 @@ async def notify_alerta_tanque(
     payload: AlertaTanquePayload,
     phone: str | None = None,
     webhook_url: str | None = None,
+    outbox: AuraTransactionalOutbox | None = None,
+    idempotency_key: str | None = None,
 ) -> dict[str, Any]:
     """
-    Despacha alerta de autonomia critica para n8n e Evolution API.
+    Despacha alerta de autonomia critica para n8n e Evolution API com Outbox.
     """
-    results = {}
+    results: dict[str, Any] = {}
+    idem_n8n = f"{idempotency_key}:n8n" if idempotency_key else None
+    idem_evo = f"{idempotency_key}:whatsapp" if idempotency_key else None
+
     n8n_res = await dispatch_n8n_webhook(
         event_type="alerta_tanque_critico",
         payload=payload.model_dump(),
         webhook_url=webhook_url,
+        outbox=outbox,
+        idempotency_key=idem_n8n,
     )
     results["n8n"] = n8n_res.model_dump()
 
@@ -358,6 +563,9 @@ async def notify_alerta_tanque(
         evo_res = await dispatch_evolution_message(
             phone=target_phone,
             message_text=msg_text,
+            outbox=outbox,
+            idempotency_key=idem_evo,
+            event_type="alerta_tanque",
         )
         results["evolution"] = evo_res.model_dump()
 
@@ -368,15 +576,22 @@ async def notify_alerta_sangria(
     payload: AlertaSangriaPayload,
     phone: str | None = None,
     webhook_url: str | None = None,
+    outbox: AuraTransactionalOutbox | None = None,
+    idempotency_key: str | None = None,
 ) -> dict[str, Any]:
     """
-    Despacha alerta de retencao excessiva de numerario para n8n e Evolution API.
+    Despacha alerta de retencao excessiva de numerario para n8n e Evolution API com Outbox.
     """
-    results = {}
+    results: dict[str, Any] = {}
+    idem_n8n = f"{idempotency_key}:n8n" if idempotency_key else None
+    idem_evo = f"{idempotency_key}:whatsapp" if idempotency_key else None
+
     n8n_res = await dispatch_n8n_webhook(
         event_type="alerta_sangria_pendente",
         payload=payload.model_dump(),
         webhook_url=webhook_url,
+        outbox=outbox,
+        idempotency_key=idem_n8n,
     )
     results["n8n"] = n8n_res.model_dump()
 
@@ -386,8 +601,10 @@ async def notify_alerta_sangria(
         evo_res = await dispatch_evolution_message(
             phone=target_phone,
             message_text=msg_text,
+            outbox=outbox,
+            idempotency_key=idem_evo,
+            event_type="alerta_sangria",
         )
         results["evolution"] = evo_res.model_dump()
 
     return results
-

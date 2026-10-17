@@ -351,6 +351,7 @@ class ActionExecuteRequest(BaseModel):
     payload: Dict[str, Any] = Field(default_factory=dict, description="Carga util da acao transacional")
     operator_id: Optional[str] = Field(default="operador_01", description="Identificador do operador humano")
     operator_role: Optional[str] = Field(default="gerente", description="Perfil ou permissao do operador (frentista, caixa, gerente, administrador)")
+    idempotency_key: Optional[str] = Field(default=None, description="Chave deterministica opcional de idempotencia no Command Journal")
 
     @field_validator("tool_call_id")
     @classmethod
@@ -396,7 +397,7 @@ class ActionVoucher(BaseModel):
     voucher_id: str = Field(..., description="UUID v4 do voucher gerado")
     action_id: str = Field(..., description="UUID v4 da acao transacional executada")
     tool_call_id: str = Field(..., description="UUID v4 da invocacao original")
-    status: Literal["APPROVED", "EXECUTED"] = Field(
+    status: Literal["APPROVED", "EXECUTED", "ROLLED_BACK"] = Field(
         default="APPROVED",
         description="Status oficial da transacao homologada"
     )
@@ -437,7 +438,7 @@ class ActionAuditLogRecord(BaseModel):
     operator_id: Optional[str] = Field(default="operador_01", description="Identificador do operador humano")
     operator_role: Optional[str] = Field(default="gerente", description="Perfil ou role do operador")
     authorized: bool = Field(default=True, description="Indicador se a acao foi autorizada pelo RBAC")
-    status: Literal["APPROVED", "REJECTED_FORBIDDEN", "FAILED"] = Field(
+    status: Literal["APPROVED", "REJECTED_FORBIDDEN", "FAILED", "ROLLED_BACK"] = Field(
         default="APPROVED",
         description="Status oficial da auditoria"
     )

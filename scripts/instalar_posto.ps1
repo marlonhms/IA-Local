@@ -10,7 +10,7 @@
     [4/8] Inicializacao de containers auxiliares (Docker / pgvector)
     [5/8] Aplicacao da role estritamente somente-leitura no ERP (aura_service_ro)
     [6/8] Configuracao de regra de Firewall do Windows (Porta TCP 8000 para LAN e Tailscale)
-    [7/8] Instalacao e partida do servico Windows via NSSM (AuraBackendService)
+    [7/8] Instalacao e partida do servico Windows SCM nativo via sc.exe (AuraBackendService)
     [8/8] Smoke Test de saude (/api/v1/aura/health e /metrics) e exibicao de endpoints
 #>
 
@@ -194,38 +194,32 @@ if ($SkipFirewall -or $DryRun) {
 }
 
 # ---------------------------------------------------------------------------
-# [7/8] Registro e Inicializacao do Servico Windows (NSSM)
+# [7/8] Registro e Inicializacao do Servico Windows SCM Nativo (sc.exe)
 # ---------------------------------------------------------------------------
-Write-Stage "7/8" "Configurando servico Windows resiliente ($ServiceName)..."
+Write-Stage "7/8" "Configurando servico Windows SCM nativo ($ServiceName via sc.exe)..."
 
 $LogDir = Join-Path $ProjectRoot "logs"
 if (-not (Test-Path $LogDir)) {
     New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 }
 
+$ServerScript = Join-Path $ProjectRoot "server.py"
+
 if ($SkipService -or $DryRun) {
-    Write-Host "  [SKIP] Registro de servico NSSM ignorado (-SkipService ou -DryRun)." -ForegroundColor Yellow
-} elseif (Get-Command "nssm" -ErrorAction SilentlyContinue) {
-    $NssmBin = (Get-Command "nssm").Source
-    $AppArgs = "-m uvicorn core.aura_api:app --host 0.0.0.0 --port $Port"
+    Write-Host "  [SKIP] Registro de servico SCM nativo ignorado (-SkipService ou -DryRun)." -ForegroundColor Yellow
+} else {
     try {
-        $Svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-        if (-not $Svc) {
-            & $NssmBin install $ServiceName $PythonCmd $AppArgs | Out-Null
-            & $NssmBin set $ServiceName AppDirectory $ProjectRoot | Out-Null
-            & $NssmBin set $ServiceName AppStdout (Join-Path $LogDir "service_stdout.log") | Out-Null
-            & $NssmBin set $ServiceName AppStderr (Join-Path $LogDir "service_stderr.log") | Out-Null
-            & $NssmBin set $ServiceName Start SERVICE_AUTO_START | Out-Null
-            Start-Service -Name $ServiceName -ErrorAction SilentlyContinue
+        & $PythonCmd $ServerScript --install-service
+        if ($LASTEXITCODE -eq 0) {
+            sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/10000/restart/30000 | Out-Null
+            & $PythonCmd $ServerScript --start-service | Out-Null
+            Write-Host "  [OK] Servico nativo '$ServiceName' registrado no SCM com auto-recuperacao (5s/10s/30s)." -ForegroundColor Green
         } else {
-            Restart-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+            Write-Host "  [INFO] Execute como Administrador ou use scripts\gerenciar_servico_aura.bat para registrar no SCM." -ForegroundColor Yellow
         }
-        Write-Host "  [OK] Servico '$ServiceName' ativo, atualizado e configurado para inicio automatico." -ForegroundColor Green
     } catch {
         Write-Host "  [INFO] Verifique privilegios de Administrador para gerenciar o servico $ServiceName." -ForegroundColor Yellow
     }
-} else {
-    Write-Host "  [INFO] NSSM nao encontrado no PATH. O servico pode ser iniciado via start_aura_service.bat." -ForegroundColor Yellow
 }
 
 # ---------------------------------------------------------------------------

@@ -101,6 +101,8 @@ class AuraProactiveDaemon:
         phone: str | None = None,
         webhook_url: str | None = None,
         erp_adapter: Any | None = None,
+        watchdog: Any | None = None,
+        desktop_notifier: Any | None = None,
     ) -> None:
         self.filial_id = filial_id
         self.tenant_id = tenant_id
@@ -115,6 +117,26 @@ class AuraProactiveDaemon:
         self.phone = phone
         self.webhook_url = webhook_url
         self.erp_adapter = erp_adapter
+
+        if watchdog is not None:
+            self.watchdog = watchdog
+        else:
+            try:
+                from core.resource_watchdog import get_resource_watchdog
+
+                self.watchdog = get_resource_watchdog()
+            except Exception:
+                self.watchdog = None
+
+        if desktop_notifier is not None:
+            self.desktop_notifier = desktop_notifier
+        else:
+            try:
+                from core.desktop_notifier import get_desktop_notifier
+
+                self.desktop_notifier = get_desktop_notifier()
+            except Exception:
+                self.desktop_notifier = None
 
         # Sincronizacao de threads
         self._lock = threading.RLock()
@@ -431,6 +453,19 @@ class AuraProactiveDaemon:
                 for k in to_remove:
                     self._cooldown_cache.pop(k, None)
 
+            if self.desktop_notifier is not None and hasattr(self.desktop_notifier, "clear_cooldown"):
+                try:
+                    if alert_type is None and entity_id is None:
+                        self.desktop_notifier.clear_cooldown()
+                    elif alert_type is not None and entity_id is not None:
+                        self.desktop_notifier.clear_cooldown(
+                            self._build_dedup_key(alert_type, self.filial_id, entity_id)
+                        )
+                    else:
+                        self.desktop_notifier.clear_cooldown()
+                except Exception as exc:
+                    logger.debug(f"Erro ao limpar cooldown no DesktopNotifier: {exc}")
+
             # Evita recarga imediata do banco marcando created_at no passado remoto
             try:
                 with self._connection() as conn:
@@ -445,6 +480,46 @@ class AuraProactiveDaemon:
                     conn.execute(query, tuple(params))
             except Exception as exc:
                 logger.debug(f"Erro ao limpar cooldown no SQLite: {exc}")
+
+    def _notify_desktop_alert(
+        self,
+        alert: ProactiveAlert,
+        force: bool = False,
+    ) -> dict[str, Any] | None:
+        """
+        Aciona o DesktopNotifier (WTSSendMessageW) para alertas criticos de tanque e sangria,
+        garantindo visibilidade imediata na tela do PDV (Sessao 1).
+        """
+        if self.desktop_notifier is None:
+            return None
+        try:
+            dedup_key = self._build_dedup_key(alert.alert_type, alert.filial_id, alert.entity_id)
+            if force and hasattr(self.desktop_notifier, "clear_cooldown"):
+                self.desktop_notifier.clear_cooldown(dedup_key)
+            sev = "critical" if str(alert.severity).upper() == "CRITICAL" else "warning"
+            try:
+                res = self.desktop_notifier.notify_operator(
+                    title=alert.title,
+                    message=alert.message,
+                    severity=sev,
+                    alert_key=dedup_key,
+                    force=force,
+                )
+            except TypeError:
+                res = self.desktop_notifier.notify_operator(
+                    title=alert.title,
+                    message=alert.message,
+                    severity=sev,
+                    alert_key=dedup_key,
+                )
+            if hasattr(res, "to_dict"):
+                return res.to_dict()
+            if isinstance(res, dict):
+                return res
+            return {"status": "notified", "result": str(res)}
+        except Exception as exc:
+            logger.warning(f"Falha ao acionar DesktopNotifier para {alert.alert_type}: {exc}")
+            return {"status": "error", "error": str(exc)}
 
     # =========================================================================
     # REGRAS OPERACIONAIS
@@ -742,6 +817,13 @@ class AuraProactiveDaemon:
         Executa uma rodada completa de avaliacao de regras analiticas.
         Aplica filtro de cooldown para evitar spam e despacha alertas novos.
         """
+        if not force and self.watchdog and not self.watchdog.is_heavy_operation_allowed():
+            logger.warning(
+                "AuraProactiveDaemon: Hardware Circuit Breaker OPEN (CPU/RAM elevado). "
+                "Pulando ciclo de avaliacao de regras para proteger o PDV."
+            )
+            return []
+
         with self._lock:
             self._last_evaluation_timestamp = datetime.now(UTC).isoformat()
             self._rules_evaluated_count += 3
@@ -763,6 +845,9 @@ class AuraProactiveDaemon:
                         f"Alerta {alert.alert_type} para {alert.entity_id} suprimido por cooldown."
                     )
                 else:
+                    desktop_res = await asyncio.to_thread(
+                        self._notify_desktop_alert, alert, force
+                    )
                     if self.dispatch_enabled:
                         payload = AlertaTanquePayload(
                             tanque_id=alert.entity_id,
@@ -781,11 +866,17 @@ class AuraProactiveDaemon:
                             phone=self.phone,
                             webhook_url=self.webhook_url,
                         )
+                        dispatch_data = dict(res) if isinstance(res, dict) else {"webhook": res}
+                        if desktop_res is not None:
+                            dispatch_data["desktop_notifier"] = desktop_res
                         alert.dispatched = True
-                        alert.dispatch_results = res
+                        alert.dispatch_results = dispatch_data
                     else:
                         alert.dispatched = False
-                        alert.dispatch_results = {"status": "dispatch_disabled"}
+                        dispatch_data = {"status": "dispatch_disabled"}
+                        if desktop_res is not None:
+                            dispatch_data["desktop_notifier"] = desktop_res
+                        alert.dispatch_results = dispatch_data
 
                     self.record_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
 
@@ -806,6 +897,9 @@ class AuraProactiveDaemon:
                         f"Alerta {alert.alert_type} para {alert.entity_id} suprimido por cooldown."
                     )
                 else:
+                    desktop_res = await asyncio.to_thread(
+                        self._notify_desktop_alert, alert, force
+                    )
                     if self.dispatch_enabled:
                         payload_caixa = AlertaSangriaPayload(
                             caixa_id=alert.entity_id,
@@ -822,11 +916,17 @@ class AuraProactiveDaemon:
                             phone=self.phone,
                             webhook_url=self.webhook_url,
                         )
+                        dispatch_data = dict(res) if isinstance(res, dict) else {"webhook": res}
+                        if desktop_res is not None:
+                            dispatch_data["desktop_notifier"] = desktop_res
                         alert.dispatched = True
-                        alert.dispatch_results = res
+                        alert.dispatch_results = dispatch_data
                     else:
                         alert.dispatched = False
-                        alert.dispatch_results = {"status": "dispatch_disabled"}
+                        dispatch_data = {"status": "dispatch_disabled"}
+                        if desktop_res is not None:
+                            dispatch_data["desktop_notifier"] = desktop_res
+                        alert.dispatch_results = dispatch_data
 
                     self.record_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
 
@@ -962,6 +1062,9 @@ class AuraProactiveDaemon:
     def get_status(self) -> dict[str, Any]:
         """Retorna o estado operacional corrente do daemon proativo."""
         with self._lock:
+            watchdog_metrics = (
+                self.watchdog.get_system_metrics() if self.watchdog else {}
+            )
             return {
                 "active": self._running,
                 "rules_evaluated_count": self._rules_evaluated_count,
@@ -972,4 +1075,6 @@ class AuraProactiveDaemon:
                 "filial_id": self.filial_id,
                 "status": "healthy" if (self._last_error is None) else "degraded",
                 "last_error": self._last_error,
+                "circuit_state": watchdog_metrics.get("circuit_state", "UNKNOWN"),
+                "is_heavy_allowed": watchdog_metrics.get("is_heavy_allowed", True),
             }

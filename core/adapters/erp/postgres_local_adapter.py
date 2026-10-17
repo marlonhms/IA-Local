@@ -109,7 +109,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                 cur.execute("SELECT 1;")
                 cur.fetchone()
             return True
-        except (psycopg2.Error, RuntimeError, OSError):
+        except (psycopg2.Error, RuntimeError, OSError, ValueError):
             return False
 
     def connect(self) -> bool:
@@ -121,7 +121,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                 cur.execute("SELECT 1;")
                 cur.fetchone()
             return True
-        except (psycopg2.Error, RuntimeError, OSError) as exc:
+        except (psycopg2.Error, RuntimeError, OSError, ValueError) as exc:
             if self._fallback_on_error:
                 logger.warning("Falha ao conectar no PostgreSQL local (%s): modo offline.", exc)
                 return False

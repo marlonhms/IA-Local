@@ -45,13 +45,29 @@ from core.automation_config import (
     get_automation_settings,
     update_automation_settings,
 )
+from core.command_journal import (
+    AuraCommandJournal,
+    CommandJournalStatus,
+    get_command_journal,
+)
+from core.command_journal import (
+    set_command_journal as _set_global_command_journal,
+)
 from core.config import (
     get_feature_flags,
     is_genui_enabled,
     resolve_genui_flag,
     update_feature_flags,
 )
+from core.desktop_notifier import DesktopNotifier, get_desktop_notifier
 from core.logger import current_client_ip, current_request_id, logger
+from core.outbox import (
+    AuraTransactionalOutbox,
+    get_transactional_outbox,
+)
+from core.outbox import (
+    set_transactional_outbox as _set_global_outbox,
+)
 from core.proactive_daemon import AuraProactiveDaemon
 from core.schemas.genui import (
     ActionAuditLogRecord,
@@ -73,6 +89,9 @@ router = APIRouter(prefix="/api/v1/aura", tags=["AURA Core Engine"])
 # Instância Singleton do Motor (pode ser injetada externamente)
 _engine_instance: AuraEngine | None = None
 _daemon_instance: AuraProactiveDaemon | None = None
+_desktop_notifier_instance: DesktopNotifier | None = None
+_outbox_instance: AuraTransactionalOutbox | None = None
+_command_journal_instance: AuraCommandJournal | None = None
 
 
 def get_aura_engine() -> AuraEngine:
@@ -93,7 +112,9 @@ def get_proactive_daemon() -> AuraProactiveDaemon:
     """Dependency Provider para obter a instancia ativa do daemon proativo."""
     global _daemon_instance
     if _daemon_instance is None:
-        _daemon_instance = AuraProactiveDaemon()
+        _daemon_instance = AuraProactiveDaemon(
+            desktop_notifier=get_active_desktop_notifier(),
+        )
     return _daemon_instance
 
 
@@ -101,6 +122,49 @@ def set_proactive_daemon(daemon: AuraProactiveDaemon | None) -> None:
     """Permite sobrescrever ou injetar uma instancia customizada do daemon proativo."""
     global _daemon_instance
     _daemon_instance = daemon
+    if _daemon_instance is not None and _desktop_notifier_instance is not None:
+        _daemon_instance.desktop_notifier = _desktop_notifier_instance
+
+
+def get_active_desktop_notifier() -> DesktopNotifier:
+    """Dependency Provider para obter a instancia ativa do notificador desktop HITL."""
+    if _desktop_notifier_instance is not None:
+        return _desktop_notifier_instance
+    return get_desktop_notifier()
+
+
+def set_desktop_notifier(notifier: DesktopNotifier | None) -> None:
+    """Permite sobrescrever ou injetar uma instancia customizada do notificador desktop."""
+    global _desktop_notifier_instance
+    _desktop_notifier_instance = notifier
+    if notifier is not None and _daemon_instance is not None:
+        _daemon_instance.desktop_notifier = notifier
+
+
+def get_active_outbox() -> AuraTransactionalOutbox:
+    """Dependency Provider para obter a instancia ativa da Transactional Outbox."""
+    if _outbox_instance is not None:
+        return _outbox_instance
+    return get_transactional_outbox()
+
+
+def set_transactional_outbox(outbox: AuraTransactionalOutbox | None) -> None:
+    """Permite sobrescrever ou injetar uma instancia customizada da Transactional Outbox."""
+    global _outbox_instance
+    _outbox_instance = outbox
+    _set_global_outbox(outbox)
+
+
+def get_active_command_journal() -> AuraCommandJournal:
+    """Dependency Provider para obter a instancia ativa do Persist-First Command Journal."""
+    return get_command_journal()
+
+
+def set_command_journal(journal: AuraCommandJournal | None) -> None:
+    """Permite sobrescrever ou injetar uma instancia customizada do Command Journal."""
+    global _command_journal_instance
+    _command_journal_instance = journal
+    _set_global_command_journal(journal)
 
 
 def verify_admin_auth(request: Request = None) -> bool:
@@ -572,22 +636,58 @@ def evaluate_action_permission(
     return (True, required_level, "Acao autorizada com sucesso.")
 
 
+class ActionRollbackRequest(BaseModel):
+    """Modelo de requisicao para rollback transacional de um Action Voucher (Fase 6)."""
+
+    action_id: str | None = Field(default=None, description="UUID v4 da acao transacional a estornar")
+    voucher_id: str | None = Field(default=None, description="UUID v4 opcional do voucher a estornar")
+    command_key: str | None = Field(default=None, description="Chave deterministica opcional no Command Journal")
+    idempotency_key: str | None = Field(default=None, description="Alias opcional para command_key")
+    session_id: str = Field(default="", description="Identificador da sessao conversacional")
+    tool_call_id: str | None = Field(default=None, description="UUID v4 opcional da invocacao original")
+    action_name: str = Field(default="", description="Nome opcional da acao transacional")
+    reason: str = Field(
+        default="Rollback transacional solicitado pelo operador",
+        description="Justificativa do estorno transacional",
+    )
+    motivo: str | None = Field(default=None, description="Alias em portugues para reason")
+    operator_id: str = Field(default="operador_01", description="Identificador do operador responsavel pelo estorno")
+    operator_role: str = Field(default="gerente", description="Perfil RBAC do operador")
+    payload: dict[str, Any] = Field(default_factory=dict, description="Metadados complementares de rollback")
+
+
+class JournalRecoverRequest(BaseModel):
+    """Payload opcional para recuperacao de comandos orfaos em RUNNING no Command Journal."""
+
+    stale_after_sec: float | None = Field(
+        default=None,
+        ge=0.0,
+        description="Tempo minimo em segundos para considerar um comando RUNNING como orfao (0 = todos)",
+    )
+    error_message: str | None = Field(
+        default=None,
+        description="Mensagem forense opcional a registrar nos comandos recuperados",
+    )
+
+
 @router.post(
     "/actions/execute",
     response_model=ActionVoucher,
-    summary="Execucao Transacional de Acoes GenUI (Human-in-the-Loop Gateway)",
+    summary="Execucao Transacional de Acoes GenUI com Persist-First Command Journal (Fase 6)",
     dependencies=[Depends(verify_admin_auth)],
 )
 async def execute_action_endpoint(
     req: ActionExecuteRequest,
     request: Request,
     engine: AuraEngine = Depends(get_aura_engine),
+    journal: AuraCommandJournal = Depends(get_active_command_journal),
 ):
     """
     Executa acoes transacionais autorizadas pelo operador (Camada 3 de micro-widgets GenUI).
-    Garante idempotencia estrita via action_id, valida RBAC do operador (F7-03),
-    registra o voucher auditavel assinado com HMAC-SHA256, persiste a trilha de
-    auditoria duravel no SQLite (F7-04) e injeta a confirmacao na memoria de sessao.
+    Garante protocolo Persist-First via AuraCommandJournal (gravando RUNNING no SQLite WAL
+    antes de qualquer efeito colateral), idempotencia estrita via command_key / action_id,
+    bloqueio de corrida concorrente (HTTP 409 Conflict), validacao RBAC (F7-03),
+    assinatura HMAC-SHA256 e trilha de auditoria duravel (F7-04).
     """
     mem = engine.session_memory
     client_ip = None
@@ -605,6 +705,11 @@ async def execute_action_endpoint(
     operator = req.operator_id or "operador_01"
     op_role = req.operator_role or "gerente"
     act_type = (req.action_type or "mutation").strip().lower()
+    command_key = (
+        req.idempotency_key.strip()
+        if (req.idempotency_key and req.idempotency_key.strip())
+        else f"voucher:{req.action_id}:execute"
+    )
 
     # Telemetria SRE (F9-02): Registrar solicitacao de acao transacional
     engine.telemetry.record_action_requested(action_id=req.action_id, session_id=req.session_id)
@@ -646,20 +751,82 @@ async def execute_action_endpoint(
             detail=reason,
         )
 
-    # 2. Validacao estrita de idempotencia: se action_id ja existe e operador esta autorizado, retorna voucher sem reprocessar
+    # 2. Fase 6: Persist-First Atomic Claim no AuraCommandJournal (status = RUNNING no SQLite WAL)
+    acq = journal.begin_command(
+        command_key=command_key,
+        action_id=req.action_id,
+        action_type=act_type,
+        actor=operator,
+        request_payload={
+            "session_id": req.session_id,
+            "tool_call_id": req.tool_call_id,
+            "action_id": req.action_id,
+            "action_name": action_name,
+            "action_type": act_type,
+            "operator_id": operator,
+            "operator_role": op_role,
+            "payload": payload,
+        },
+        allow_retry=True,
+    )
+
+    if acq.already_running:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Conflito de concorrencia: o comando '{command_key}' ja esta em execucao (RUNNING).",
+        )
+
+    if acq.already_rolled_back:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Acao '{req.action_id}' ('{command_key}') ja sofreu rollback (ROLLED_BACK) e nao pode ser reexecutada.",
+        )
+
+    if acq.already_completed:
+        existing_voucher = mem.get_action_voucher(req.action_id)
+        if existing_voucher is not None:
+            if existing_voucher.status == "ROLLED_BACK":
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Acao '{req.action_id}' ja sofreu rollback (ROLLED_BACK).",
+                )
+            return existing_voucher
+        if isinstance(acq.result_payload, dict) and "voucher_id" in acq.result_payload:
+            return ActionVoucher(**acq.result_payload)
+
+    # 2.1 Compatibilidade retroativa: se o voucher ja existir em AuraSessionMemory (ex: pre-populado)
     existing_voucher = mem.get_action_voucher(req.action_id)
     if existing_voucher is not None:
+        if existing_voucher.status == "ROLLED_BACK":
+            journal.mark_rolled_back(
+                command_key=command_key,
+                rollback_payload=existing_voucher.model_dump(mode="json"),
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Acao '{req.action_id}' ja sofreu rollback (ROLLED_BACK).",
+            )
+        journal.complete_command(
+            command_key=command_key,
+            result_payload=existing_voucher.model_dump(mode="json"),
+        )
         return existing_voucher
 
-    # 3. Execucao da rotina de negocio autorizada
+    # 3. Execucao da rotina de negocio autorizada (com estado RUNNING ja persistido em disco)
     try:
-        details = _dispatch_business_action(
+        details = await asyncio.to_thread(
+            _dispatch_business_action,
             action_name=action_name,
             action_type=req.action_type,
             payload=payload,
             operator_id=operator,
         )
     except Exception as exc:
+        journal.fail_command(
+            command_key=command_key,
+            error_message=str(exc),
+            result_payload={"error": str(exc), "action_id": req.action_id},
+        )
         # F9-02: Registrar rollback transacional na telemetria
         engine.telemetry.record_action_rolled_back(
             action_id=req.action_id,
@@ -676,7 +843,7 @@ async def execute_action_endpoint(
             operator_role=op_role,
             authorized=True,
             status="FAILED",
-            details={"error": str(exc), "payload": payload},
+            details={"error": str(exc), "payload": payload, "command_key": command_key},
             client_ip=client_ip,
         )
         raise HTTPException(
@@ -706,13 +873,17 @@ async def execute_action_endpoint(
         signature=signature,
     )
 
-    # 5. Persistencia do Voucher no SQLite (garantia de idempotencia duravel)
+    # 5. Persistencia do Voucher no SQLite e transicao RUNNING -> COMPLETED no Command Journal
     mem.save_action_voucher(
         voucher=voucher,
         session_id=req.session_id,
         operator_id=operator,
         action_type=req.action_type,
         payload=payload,
+    )
+    journal.complete_command(
+        command_key=command_key,
+        result_payload=voucher.model_dump(mode="json"),
     )
 
     # 6. F5-02: Injecao direta de mensagem canonica com role: 'tool' no historico da sessao
@@ -736,7 +907,8 @@ async def execute_action_endpoint(
                 "operator_role": op_role,
                 "signature": signature,
                 "action_type": req.action_type,
-            }
+                "command_key": command_key,
+            },
         )
 
     # 7. F7-04: Persistencia da execucao homologada na trilha de auditoria
@@ -752,6 +924,7 @@ async def execute_action_endpoint(
         status="APPROVED",
         details={
             "voucher_id": voucher.voucher_id,
+            "command_key": command_key,
             "business_details": details,
             "payload": payload,
         },
@@ -762,6 +935,260 @@ async def execute_action_endpoint(
     engine.telemetry.record_action_approved(action_id=req.action_id, session_id=req.session_id)
 
     return voucher
+
+
+@router.post(
+    "/actions/rollback",
+    summary="Rollback Transacional de Action Voucher e Atualizacao do Command Journal (Fase 6)",
+    dependencies=[Depends(verify_admin_auth)],
+)
+async def rollback_action_endpoint(
+    req: ActionRollbackRequest,
+    request: Request,
+    engine: AuraEngine = Depends(get_aura_engine),
+    journal: AuraCommandJournal = Depends(get_active_command_journal),
+) -> dict[str, Any]:
+    """
+    Estorna um Action Voucher previamente homologado, atualizando o estado para ROLLED_BACK
+    tanto no AuraCommandJournal quanto em AuraSessionMemory, re-assinando o voucher
+    com HMAC-SHA256 e registrando a operacao na trilha de auditoria e telemetria.
+    """
+    mem = engine.session_memory
+    client_ip = None
+    if request is not None:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            client_ip = forwarded.split(",")[0].strip()
+        elif request.headers.get("x-real-ip"):
+            client_ip = request.headers.get("x-real-ip").strip()
+        elif getattr(request, "client", None) is not None:
+            client_ip = request.client.host
+
+    operator = (req.operator_id or "operador_01").strip()
+    op_role = (req.operator_role or "gerente").strip().lower()
+    eff_reason = (
+        req.motivo.strip()
+        if (req.motivo and req.motivo.strip())
+        else (req.reason or "Rollback transacional solicitado pelo operador").strip()
+    )
+
+    existing_voucher = None
+    if req.action_id:
+        existing_voucher = mem.get_action_voucher(req.action_id)
+    if existing_voucher is None and req.voucher_id:
+        existing_voucher = mem.get_action_voucher_by_voucher_id(req.voucher_id)
+
+    eff_action_id = (
+        req.action_id
+        or (existing_voucher.action_id if existing_voucher is not None else "")
+        or ""
+    ).strip()
+
+    candidate_key = (
+        (req.command_key or req.idempotency_key or "").strip()
+        or (f"voucher:{eff_action_id}:execute" if eff_action_id else "")
+    )
+    journal_entry = journal.get_entry(candidate_key) if candidate_key else None
+    if journal_entry is None and eff_action_id:
+        journal_entry = journal.get_entry_by_action_id(eff_action_id)
+    if not eff_action_id and journal_entry is not None:
+        eff_action_id = journal_entry.action_id
+
+    act_name = (
+        req.action_name
+        or (existing_voucher.action_name if existing_voucher is not None else "")
+        or (journal_entry.action_type if journal_entry is not None else "")
+        or "pedido_combustivel"
+    )
+
+    is_authorized, _, auth_reason = evaluate_action_permission(
+        action_name=act_name,
+        action_type="mutation",
+        operator_role=op_role,
+    )
+    if not is_authorized:
+        engine.telemetry.record_security_block(
+            reason=auth_reason,
+            session_id=req.session_id,
+            tool_call_id=req.tool_call_id or "call_rollback",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=auth_reason,
+        )
+
+    if existing_voucher is None and journal_entry is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Voucher ou comando para action_id '{eff_action_id or candidate_key}' nao encontrado para rollback.",
+        )
+
+    if journal_entry is not None and journal_entry.status not in (
+        CommandJournalStatus.COMPLETED.value,
+        CommandJournalStatus.ROLLED_BACK.value,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Nao e possivel realizar rollback de comando no status '{journal_entry.status}'.",
+        )
+
+    rolled_back_voucher = (
+        mem.rollback_action_voucher(
+            action_id=eff_action_id,
+            reason=eff_reason,
+            operator_id=operator,
+        )
+        if existing_voucher is not None
+        else None
+    )
+
+    ts_now = datetime.now(UTC).isoformat()
+    rollback_meta: dict[str, Any] = {
+        "action_id": eff_action_id,
+        "reason": eff_reason,
+        "rolled_back_by": operator,
+        "operator_role": op_role,
+        "rolled_back_at": ts_now,
+        **(req.payload or {}),
+    }
+    if rolled_back_voucher is not None:
+        rollback_meta["voucher_id"] = rolled_back_voucher.voucher_id
+        rollback_meta["signature"] = rolled_back_voucher.signature
+
+    if journal_entry is not None:
+        journal_entry = journal.mark_rolled_back(
+            command_key=journal_entry.command_key,
+            rollback_payload=rollback_meta,
+        )
+
+    engine.telemetry.record_action_rolled_back(
+        action_id=eff_action_id,
+        session_id=req.session_id,
+        reason=eff_reason,
+    )
+
+    eff_tool_call_id = (
+        req.tool_call_id
+        or (rolled_back_voucher.tool_call_id if rolled_back_voucher is not None else None)
+        or "call_00000000-0000-4000-8000-000000000000"
+    )
+    mem.save_audit_log(
+        session_id=req.session_id,
+        tool_call_id=eff_tool_call_id,
+        action_id=eff_action_id,
+        action_name=act_name,
+        action_type="mutation",
+        operator_id=operator,
+        operator_role=op_role,
+        authorized=True,
+        status="ROLLED_BACK",
+        details=rollback_meta,
+        client_ip=client_ip,
+    )
+
+    return {
+        "status": "ROLLED_BACK",
+        "success": True,
+        "rolled_back": True,
+        "action_id": eff_action_id,
+        "voucher_id": (
+            rolled_back_voucher.voucher_id
+            if rolled_back_voucher is not None
+            else (journal_entry.journal_id if journal_entry is not None else "")
+        ),
+        "tool_call_id": eff_tool_call_id,
+        "action_name": act_name,
+        "command_key": journal_entry.command_key if journal_entry is not None else candidate_key,
+        "journal_status": journal_entry.status if journal_entry is not None else "ROLLED_BACK",
+        "journal_id": journal_entry.journal_id if journal_entry is not None else None,
+        "reason": eff_reason,
+        "operator_id": operator,
+        "timestamp": rolled_back_voucher.timestamp if rolled_back_voucher is not None else ts_now,
+        "details": rolled_back_voucher.details if rolled_back_voucher is not None else rollback_meta,
+        "signature": rolled_back_voucher.signature if rolled_back_voucher is not None else "",
+        "voucher": rolled_back_voucher.model_dump(mode="json") if rolled_back_voucher is not None else None,
+        "journal_entry": journal_entry.to_dict() if journal_entry is not None else None,
+    }
+
+
+@router.get(
+    "/actions/journal",
+    summary="Auditoria e Estatisticas do Persist-First Command Journal (Fase 6)",
+    tags=["AURA Command Journal"],
+    dependencies=[Depends(verify_admin_auth)],
+)
+async def actions_journal_endpoint(
+    action_id: str | None = Query(default=None, description="Filtro opcional por action_id"),
+    status: str | None = Query(
+        default=None,
+        description="Filtro opcional por status: RUNNING, COMPLETED, FAILED, ROLLED_BACK, INTERRUPTED_BY_CRASH",
+    ),
+    limit: int = Query(default=50, ge=1, le=500, description="Limite maximo de entradas retornadas"),
+    journal: AuraCommandJournal = Depends(get_active_command_journal),
+) -> dict[str, Any]:
+    """
+    Retorna as entradas recentes do Command Journal e as estatisticas consolidadas:
+    running, completed, failed, rolled_back, interrupted_by_crash, total.
+    """
+    entries = await asyncio.to_thread(
+        journal.list_entries,
+        action_id=action_id,
+        status=status,
+        limit=limit,
+    )
+    stats = await asyncio.to_thread(journal.get_stats)
+    return {
+        "status": "ok",
+        **stats,
+        "count": len(entries),
+        "limit": limit,
+        "action_id_filter": action_id,
+        "status_filter": status,
+        "stats": stats,
+        "entries": entries,
+        "items": entries,
+    }
+
+
+@router.post(
+    "/actions/journal/recover",
+    summary="Crash Recovery de Comandos Orfaos em RUNNING no Command Journal (Fase 6)",
+    tags=["AURA Command Journal"],
+    dependencies=[Depends(verify_admin_auth)],
+)
+async def actions_journal_recover_endpoint(
+    req: JournalRecoverRequest | None = Body(default=None),
+    stale_after_sec: float | None = Query(
+        default=None,
+        ge=0.0,
+        description="Tempo minimo em segundos para considerar RUNNING como orfao",
+    ),
+    journal: AuraCommandJournal = Depends(get_active_command_journal),
+) -> dict[str, Any]:
+    """
+    Executa recover_interrupted_commands() no Command Journal, transitando comandos orfaos
+    em RUNNING para INTERRUPTED_BY_CRASH e retornando a quantidade recuperada.
+    """
+    eff_stale = (
+        req.stale_after_sec
+        if (req is not None and req.stale_after_sec is not None)
+        else stale_after_sec
+    )
+    eff_msg = req.error_message if req is not None else None
+    recovered = await asyncio.to_thread(
+        journal.recover_interrupted_commands,
+        stale_after_sec=eff_stale,
+        error_message=eff_msg,
+    )
+    stats = await asyncio.to_thread(journal.get_stats)
+    return {
+        "status": "recovered",
+        "success": True,
+        "recovered_count": recovered,
+        "recovered": recovered,
+        "stats": stats,
+        "timestamp": datetime.now(UTC).isoformat(),
+    }
 
 
 @router.get(
@@ -1154,18 +1581,258 @@ async def list_proactive_alerts_endpoint(
 
 
 # =============================================================================
+# ENDPOINTS DO NOTIFICADOR DESKTOP HITL SESSAO 0 -> SESSAO 1 (FASE 4)
+# =============================================================================
+
+
+class DesktopNotifyRequest(BaseModel):
+    """Payload de requisicao para disparo de notificacao modal desktop (WTSSendMessageW)."""
+
+    title: str = Field(..., min_length=1, description="Titulo da notificacao desktop")
+    message: str = Field(..., min_length=1, description="Mensagem exibida no modal do caixa")
+    severity: str = Field(
+        default="warning",
+        description="Severidade visual: info, warning, critical ou error",
+    )
+    timeout_sec: int = Field(
+        default=15,
+        ge=1,
+        le=300,
+        description="Tempo limite do modal em segundos",
+    )
+    alert_key: str | None = Field(
+        default=None,
+        description="Chave opcional de deduplicacao e cooldown anti-spam",
+    )
+    force: bool = Field(
+        default=False,
+        description="Se True, ignora a janela de cooldown para este disparo",
+    )
+
+
+class DesktopConfirmRequest(BaseModel):
+    """Payload de requisicao para confirmacao HITL [Sim / Nao] no desktop do operador."""
+
+    title: str = Field(..., min_length=1, description="Titulo do dialogo de confirmacao HITL")
+    message: str = Field(..., min_length=1, description="Pergunta exibida ao operador do caixa")
+    timeout_sec: int = Field(
+        default=30,
+        ge=1,
+        le=300,
+        description="Tempo limite em segundos para resposta humana",
+    )
+    action_key: str | None = Field(
+        default=None,
+        description="Identificador opcional da acao transacional",
+    )
+
+
+@router.post(
+    "/desktop/notify",
+    summary="Dispara Notificacao Modal Desktop Sessao 0 -> Sessao 1 (WTSSendMessageW)",
+    tags=["AURA Desktop Notifier HITL"],
+)
+async def desktop_notify_endpoint(
+    req: DesktopNotifyRequest,
+    notifier: DesktopNotifier = Depends(get_active_desktop_notifier),
+) -> dict[str, Any]:
+    """Dispara notificacao desktop (ou simulada em fallback) e retorna o resultado estruturado."""
+    res = await asyncio.to_thread(
+        notifier.notify_operator,
+        title=req.title,
+        message=req.message,
+        severity=req.severity,
+        timeout_sec=req.timeout_sec,
+        alert_key=req.alert_key,
+        force=req.force,
+    )
+    return res.to_dict()
+
+
+@router.post(
+    "/desktop/confirm",
+    summary="Solicita Confirmacao HITL [Sim/Nao] ao Operador na Sessao 1 (WTSSendMessageW)",
+    tags=["AURA Desktop Notifier HITL"],
+)
+async def desktop_confirm_endpoint(
+    req: DesktopConfirmRequest,
+    notifier: DesktopNotifier = Depends(get_active_desktop_notifier),
+) -> dict[str, Any]:
+    """Solicita confirmacao HITL [Sim/Nao] ao operador e retorna a decisao em tempo real."""
+    res = await asyncio.to_thread(
+        notifier.request_operator_confirmation,
+        title=req.title,
+        message=req.message,
+        timeout_sec=req.timeout_sec,
+        action_key=req.action_key,
+    )
+    return res.to_dict()
+
+
+@router.get(
+    "/desktop/history",
+    summary="Historico Recente de Notificacoes e Confirmacoes Desktop (Fase 4)",
+    tags=["AURA Desktop Notifier HITL"],
+)
+async def desktop_history_endpoint(
+    limit: int = Query(default=50, ge=1, le=200, description="Limite de eventos retornados"),
+    event_type: str | None = Query(
+        default=None,
+        description="Filtro opcional por tipo: notification ou confirmation",
+    ),
+    notifier: DesktopNotifier = Depends(get_active_desktop_notifier),
+) -> dict[str, Any]:
+    """Retorna historico recente de notificacoes e confirmacoes desktop emitidas."""
+    items = notifier.get_history(limit=limit, event_type=event_type)
+    return {
+        "total": len(items),
+        "limit": limit,
+        "history": items,
+        "items": items,
+    }
+
+
+# =============================================================================
+# ENDPOINTS DA TRANSACTIONAL OUTBOX (SQLITE WAL - FASE 5)
+# =============================================================================
+
+
+class OutboxFlushRequest(BaseModel):
+    """Payload opcional para drenagem manual imediata da Outbox."""
+
+    limit: int | None = Field(default=None, ge=1, le=500, description="Quantidade maxima de mensagens no lote")
+    force: bool | None = Field(
+        default=None,
+        description="Se True, processa imediatamente mesmo mensagens aguardando backoff",
+    )
+
+
+class OutboxRequeueRequest(BaseModel):
+    """Payload opcional para reenfileiramento de mensagens Dead Letter (DLQ)."""
+
+    limit: int | None = Field(default=None, ge=1, le=500, description="Quantidade maxima de mensagens reabilitadas")
+
+
+@router.get(
+    "/outbox/stats",
+    summary="Estatisticas Consolidadas da Transactional Outbox (Fase 5)",
+    tags=["AURA Transactional Outbox"],
+)
+async def outbox_stats_endpoint(
+    outbox: AuraTransactionalOutbox = Depends(get_active_outbox),
+) -> dict[str, Any]:
+    """
+    Retorna as estatisticas da fila Outbox:
+    pending, processing, delivered, failed_retry, dead_letter, total.
+    """
+    stats = await asyncio.to_thread(outbox.get_stats)
+    return {
+        "status": "ok",
+        **stats,
+    }
+
+
+@router.get(
+    "/outbox/messages",
+    summary="Lista Mensagens da Transactional Outbox (Fase 5)",
+    tags=["AURA Transactional Outbox"],
+)
+async def outbox_messages_endpoint(
+    status: str | None = Query(
+        default=None,
+        description="Filtro opcional por status: PENDING, PROCESSING, DELIVERED, FAILED_RETRY, DEAD_LETTER",
+    ),
+    limit: int = Query(default=50, ge=1, le=500, description="Limite maximo de mensagens retornadas"),
+    outbox: AuraTransactionalOutbox = Depends(get_active_outbox),
+) -> dict[str, Any]:
+    """Lista mensagens persistidas na Outbox com filtro opcional por status."""
+    items = await asyncio.to_thread(outbox.list_messages, status=status, limit=limit)
+    return {
+        "total": len(items),
+        "limit": limit,
+        "status_filter": status,
+        "messages": items,
+        "items": items,
+    }
+
+
+@router.post(
+    "/outbox/flush",
+    summary="Processa Imediatamente um Lote Pendente da Outbox (Fase 5)",
+    tags=["AURA Transactional Outbox"],
+)
+async def outbox_flush_endpoint(
+    req: OutboxFlushRequest | None = Body(default=None),
+    limit: int = Query(default=20, ge=1, le=500, description="Limite do lote"),
+    force: bool = Query(default=True, description="Ignorar agendamento de backoff para flush imediato"),
+    outbox: AuraTransactionalOutbox = Depends(get_active_outbox),
+) -> dict[str, Any]:
+    """Drena imediatamente um lote pendente (process_pending_batch) e retorna o resumo."""
+    eff_limit = req.limit if (req is not None and req.limit is not None) else limit
+    eff_force = req.force if (req is not None and req.force is not None) else force
+    batch_res = await asyncio.to_thread(
+        outbox.process_pending_batch,
+        limit=eff_limit,
+        force=eff_force,
+    )
+    return {
+        "status": "flushed",
+        "success": True,
+        **batch_res.to_dict(),
+    }
+
+
+@router.post(
+    "/outbox/requeue-dlq",
+    summary="Reenfileira Mensagens da Dead Letter Queue para PENDING (Fase 5)",
+    tags=["AURA Transactional Outbox"],
+)
+async def outbox_requeue_dlq_endpoint(
+    req: OutboxRequeueRequest | None = Body(default=None),
+    limit: int = Query(default=50, ge=1, le=500, description="Limite de mensagens reabilitadas"),
+    outbox: AuraTransactionalOutbox = Depends(get_active_outbox),
+) -> dict[str, Any]:
+    """Move mensagens com status DEAD_LETTER de volta para PENDING com attempt_count=0."""
+    eff_limit = req.limit if (req is not None and req.limit is not None) else limit
+    requeued = await asyncio.to_thread(outbox.requeue_dead_letters, limit=eff_limit)
+    return {
+        "status": "requeued",
+        "success": True,
+        "requeued_count": requeued,
+        "requeued": requeued,
+    }
+
+
+# =============================================================================
 # FACTORY DA APLICAÇÃO STANDALONE
 # =============================================================================
 
 def create_aura_app(
     engine: AuraEngine | None = None,
     daemon: AuraProactiveDaemon | None = None,
+    desktop_notifier: DesktopNotifier | None = None,
+    outbox: AuraTransactionalOutbox | None = None,
+    command_journal: AuraCommandJournal | None = None,
 ) -> FastAPI:
     """Cria e configura uma instância completa da aplicação FastAPI para a AURA."""
     if engine is not None:
         set_aura_engine(engine)
     if daemon is not None:
         set_proactive_daemon(daemon)
+    if desktop_notifier is not None:
+        set_desktop_notifier(desktop_notifier)
+    if outbox is not None:
+        set_transactional_outbox(outbox)
+    if command_journal is not None:
+        set_command_journal(command_journal)
+    elif (
+        engine is not None
+        and getattr(engine, "_session_memory", None) is not None
+        and getattr(engine.session_memory, "db_path", None) == ":memory:"
+        and not os.getenv("AURA_COMMAND_JOURNAL_DB_PATH")
+        and _command_journal_instance is None
+    ):
+        _set_global_command_journal(AuraCommandJournal(db_path=":memory:"))
 
     app = FastAPI(
         title="AURA Core Engine API",

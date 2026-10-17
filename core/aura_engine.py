@@ -79,6 +79,54 @@ from core.schemas.genui import (
 )
 from core.config import is_genui_enabled
 from core.telemetry import AuraSRETelemetry
+from core.resource_watchdog import (
+    HardwareCircuitBreaker,
+    get_resource_watchdog,
+    PROTECTION_MESSAGE as CIRCUIT_BREAKER_PROTECTION_MESSAGE,
+)
+
+# Conjunto de ferramentas e intencoes analiticas pesadas sujeitas ao Circuit Breaker de Hardware
+HEAVY_ANALYTICAL_TOOLS: set[str] = {
+    "conveniencia_vendas_cruzadas",
+    "auditar_cesta_conveniencia_vendas_cruzadas",
+    "cesta",
+    "market_basket",
+    "vendas_cruzadas",
+    "conveniencia",
+    "combos",
+    "cesta_compras",
+    "basket_upsell",
+    "cross_selling",
+    "cross_sell",
+    "auditoria_fuga_financeira",
+    "fuga_financeira",
+    "fugas",
+    "fugas_financeiras",
+    "auditoria_quebras",
+    "furo_caixa",
+    "furo_gaveta",
+    "auditar_fuga_financeira",
+    "diagnostico_mentoria_executiva",
+    "mentoria_decisao",
+    "executive_briefing",
+    "analise_margem",
+    "cenario_preditivo",
+    "simulacao_preditiva",
+    "simular_cenario_precificacao",
+    "simular_cenario",
+    "simular_preco",
+    "what_if",
+    "what-if",
+    "precificacao_dinamica",
+    "benchmark_comparativo",
+    "comparar_benchmark_concorrencia",
+    "benchmark",
+    "comparativo_concorrencia",
+    "comparativo_mercado",
+    "benchmark_postos",
+    "posicionamento_competitivo",
+    "comparativo_turnos",
+}
 
 # =============================================================================
 # CONTRATOS PYDANTIC & ENUMS DA AURA
@@ -493,6 +541,8 @@ class AuraSessionMemory:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(action_id) DO UPDATE SET
                     status = excluded.status,
+                    timestamp = excluded.timestamp,
+                    details = excluded.details,
                     signature = excluded.signature;
             """, (
                 voucher.voucher_id,
@@ -540,6 +590,81 @@ class AuraSessionMemory:
             details=details_dict,
             signature=row["signature"],
         )
+
+    def get_action_voucher_by_voucher_id(self, voucher_id: str) -> Optional[ActionVoucher]:
+        """Recupera um Action Voucher pelo voucher_id."""
+        with self._connection() as conn:
+            cur = conn.execute("""
+                SELECT voucher_id, action_id, tool_call_id, status, timestamp, action_name, details, signature
+                FROM aura_action_vouchers
+                WHERE voucher_id = ?;
+            """, (voucher_id,))
+            row = cur.fetchone()
+
+        if not row:
+            return None
+
+        details_dict = {}
+        if row["details"]:
+            try:
+                details_dict = json.loads(row["details"])
+            except Exception:
+                details_dict = {}
+
+        return ActionVoucher(
+            voucher_id=row["voucher_id"],
+            action_id=row["action_id"],
+            tool_call_id=row["tool_call_id"],
+            status=row["status"],
+            timestamp=str(row["timestamp"]),
+            action_name=row["action_name"],
+            details=details_dict,
+            signature=row["signature"],
+        )
+
+    def rollback_action_voucher(
+        self,
+        action_id: str,
+        reason: str = "Rollback solicitado pelo operador",
+        operator_id: str = "operador_01",
+    ) -> Optional[ActionVoucher]:
+        """Transita um Action Voucher para ROLLED_BACK e gera nova assinatura HMAC-SHA256."""
+        existing = self.get_action_voucher(action_id)
+        if existing is None:
+            existing = self.get_action_voucher_by_voucher_id(action_id)
+        if existing is None:
+            return None
+
+        ts_now = datetime.now(timezone.utc).isoformat()
+        updated_details = dict(existing.details or {})
+        updated_details["status"] = "ROLLED_BACK"
+        updated_details["rollback_reason"] = reason
+        updated_details["rolled_back_by"] = operator_id
+        updated_details["rolled_back_at"] = ts_now
+
+        new_sig = generate_action_voucher_signature(
+            voucher_id=existing.voucher_id,
+            action_id=existing.action_id,
+            tool_call_id=existing.tool_call_id,
+            status="ROLLED_BACK",
+            timestamp=ts_now,
+        )
+
+        rolled_back_voucher = ActionVoucher(
+            voucher_id=existing.voucher_id,
+            action_id=existing.action_id,
+            tool_call_id=existing.tool_call_id,
+            status="ROLLED_BACK",
+            timestamp=ts_now,
+            action_name=existing.action_name,
+            details=updated_details,
+            signature=new_sig,
+        )
+        self.save_action_voucher(
+            voucher=rolled_back_voucher,
+            operator_id=operator_id,
+        )
+        return rolled_back_voucher
 
     def get_action_vouchers_for_session(self, session_id: str) -> List[ActionVoucher]:
         """Recupera todos os vouchers homologados em uma determinada sessao."""
@@ -2227,6 +2352,7 @@ class AuraEngine:
         erp_adapter: Optional[BaseERPAdapter] = None,
         compliance_manager: Optional[Any] = None,
         proactive_daemon: Optional[Any] = None,
+        watchdog: Optional[Any] = None,
     ):
         self.tenant_id = tenant_id or "default_tenant"
         self.filial_id = filial_id or "posto_01"
@@ -2240,6 +2366,7 @@ class AuraEngine:
         self._erp_adapter = erp_adapter
         self._compliance_manager = compliance_manager
         self._proactive_daemon = proactive_daemon
+        self._watchdog = watchdog
         self._dados_filial: Optional[Dict[str, Any]] = None
 
     @property
@@ -2269,6 +2396,17 @@ class AuraEngine:
         return self._telemetry
 
     @property
+    def watchdog(self) -> HardwareCircuitBreaker:
+        if self._watchdog is None:
+            self._watchdog = get_resource_watchdog()
+        return self._watchdog
+
+    def _is_heavy_tool(self, tool_name: str) -> bool:
+        """Determina se a ferramenta ou intencao e analitica pesada para protecao do PDV."""
+        norm = (tool_name or "").strip().lower().replace("-", "_").replace(" ", "_")
+        return norm in HEAVY_ANALYTICAL_TOOLS or (tool_name or "").strip().lower() in HEAVY_ANALYTICAL_TOOLS
+
+    @property
     def compliance_manager(self):
         if self._compliance_manager is None:
             from core.compliance_manager import ComplianceManager
@@ -2283,6 +2421,7 @@ class AuraEngine:
                 filial_id=self.filial_id,
                 tenant_id=self.tenant_id,
                 erp_adapter=self._erp_adapter,
+                watchdog=self.watchdog,
             )
         return self._proactive_daemon
 
@@ -2420,6 +2559,24 @@ class AuraEngine:
         p = params or {}
         norm_name = tool_name.strip().lower().replace("-", "_").replace(" ", "_")
         t0 = time.perf_counter()
+
+        # Protecao de Hardware do PDV (Fase 3: Circuit Breaker)
+        if self._is_heavy_tool(norm_name) and not self.watchdog.is_heavy_operation_allowed():
+            logger.warning(
+                "Hardware Circuit Breaker OPEN: adiando execucao de ferramenta pesada '%s'",
+                norm_name,
+            )
+            return {
+                "status": "circuit_open",
+                "tool_name": norm_name,
+                "latency_ms": 0.0,
+                "data": {
+                    "circuit_open": True,
+                    "circuit_state": "OPEN",
+                    "message": CIRCUIT_BREAKER_PROTECTION_MESSAGE,
+                    "system_metrics": self.watchdog.get_system_metrics(),
+                },
+            }
 
         def _run_sync():
             # Mapeamento universal de nomes de intenções e ferramentas
@@ -2589,6 +2746,8 @@ class AuraEngine:
         try:
             result_data = await asyncio.to_thread(_run_sync)
             lat_ms = (time.perf_counter() - t0) * 1000
+            if self._is_heavy_tool(norm_name):
+                self.watchdog.record_execution_impact(lat_ms / 1000.0)
             return {
                 "status": "success",
                 "tool_name": norm_name,
@@ -2658,6 +2817,22 @@ class AuraEngine:
         resultado_bruto = None
         telemetria_retrieval = None
         cache_hit = False
+
+        # Protecao de Hardware do PDV (Fase 3: Circuit Breaker)
+        if self._is_heavy_tool(intencao) and not self.watchdog.is_heavy_operation_allowed():
+            logger.warning(
+                "Hardware Circuit Breaker OPEN para intencao '%s': ativando sintese de protecao do PDV",
+                intencao,
+            )
+            msg_protecao = CIRCUIT_BREAKER_PROTECTION_MESSAGE
+            resultado_bruto = {
+                "status": "circuit_open",
+                "circuit_open": True,
+                "circuit_state": "OPEN",
+                "message": msg_protecao,
+                "system_metrics": self.watchdog.get_system_metrics(),
+            }
+            return msg_protecao, resultado_bruto, None, False, (time.perf_counter() - t0) * 1000
 
         try:
             if intencao == "ajuda_sistema":
@@ -2851,6 +3026,8 @@ class AuraEngine:
             contexto_extra = f"Aviso de execução da ferramenta ({intencao}): Indisponibilidade técnica ao consultar dados ({str(e)}).\n"
 
         tool_lat_ms = (time.perf_counter() - t0) * 1000
+        if self._is_heavy_tool(intencao):
+            self.watchdog.record_execution_impact(tool_lat_ms / 1000.0)
         return contexto_extra, resultado_bruto, telemetria_retrieval, cache_hit, tool_lat_ms
 
     def _gerar_sintese_contingencia_ferramenta(
@@ -2866,6 +3043,10 @@ class AuraEngine:
         garantindo que o gestor receba o diagnóstico operacional e projeção diretamente
         dos dados apurados no ERP/banco local sem atraso nem travamento.
         """
+        # 0.0 PROTECAO DE HARDWARE DO PDV (CIRCUIT BREAKER OPEN)
+        if isinstance(resultado_bruto, dict) and resultado_bruto.get("circuit_open"):
+            return resultado_bruto.get("message") or CIRCUIT_BREAKER_PROTECTION_MESSAGE
+
         # 0.0 PREVENCAO DE AMNESIA CONTEXTUAL (F5-03)
         p_lower = (pergunta or "").lower()
         is_asking_status = any(w in p_lower for w in ["status", "como ficou", "foi feito", "confirmado", "aprovado", "andamento"]) and any(w in p_lower for w in ["pedido", "combustivel", "combustível", "acao", "ação", "carreta"])
@@ -3462,9 +3643,11 @@ class AuraEngine:
             session_id=sess_id,
         )
 
-        # Se intenção mapeada no catálogo GenUI e GenUI estiver ativo, emite ui_skeleton precursor (<100ms)
+        # Se intencao mapeada no catalogo GenUI e GenUI estiver ativo, emite ui_skeleton precursor (<100ms)
+        # exceto se o Circuit Breaker de Hardware estiver OPEN (evita skeleton loader travado no frontend)
         genui_meta = GENUI_COMPONENT_REGISTRY_MAP.get(intencao)
-        if genui_meta and genui_active:
+        circuit_blocked_early = self._is_heavy_tool(intencao) and not self.watchdog.is_heavy_operation_allowed()
+        if genui_meta and genui_active and not circuit_blocked_early:
             t_skeleton_emitted = time.perf_counter()
             yield AuraChunk(
                 chunk_type=AuraChunkType.UI_SKELETON,
@@ -3568,6 +3751,45 @@ class AuraEngine:
             },
             session_id=sess_id,
         )
+
+        # Se o Circuit Breaker estiver OPEN, retorna sintese leve imediata sem sobrecarregar a LLM
+        if isinstance(resultado_bruto, dict) and resultado_bruto.get("circuit_open"):
+            msg_protecao = resultado_bruto.get("message") or CIRCUIT_BREAKER_PROTECTION_MESSAGE
+            yield AuraChunk(
+                chunk_type=AuraChunkType.DELTA,
+                text=msg_protecao,
+                session_id=sess_id,
+            )
+            self.session_memory.save_message(
+                session_id=sess_id,
+                role="user",
+                content=q_limpa,
+                intent=intencao,
+                tenant_id=t_id,
+                filial_id=f_id,
+                metadata={"circuit_open": True},
+            )
+            self.session_memory.save_message(
+                session_id=sess_id,
+                role="assistant",
+                content=msg_protecao,
+                intent=intencao,
+                tenant_id=t_id,
+                filial_id=f_id,
+                metadata={"circuit_open": True},
+            )
+            yield AuraChunk(
+                chunk_type=AuraChunkType.DONE,
+                text=msg_protecao,
+                data={
+                    "session_id": sess_id,
+                    "intent": intencao,
+                    "circuit_open": True,
+                    "circuit_state": "OPEN",
+                },
+                session_id=sess_id,
+            )
+            return
 
         # 4. Blindagem LGPD e Sanitização de Contexto e Pergunta
         # Se houver contexto extra injetado pelo chamador (perfil, canal, etc), anexa ao contexto

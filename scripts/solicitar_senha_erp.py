@@ -61,7 +61,16 @@ def obter_config_erp() -> dict:
 
 
 def obter_senha_atual() -> str:
-    """Retorna a última senha registrada em backups ou .env."""
+    """Retorna a ultima senha registrada no cofre DPAPI, backups ou .env."""
+    try:
+        from core.identity_vault import get_vault_secret
+
+        vault_pass = get_vault_secret("erp_password")
+        if vault_pass:
+            return vault_pass
+    except Exception:
+        pass
+
     if BACKUP_PASS_PATH.exists():
         try:
             with open(BACKUP_PASS_PATH, "r", encoding="utf-8-sig") as f:
@@ -77,7 +86,7 @@ def obter_senha_atual() -> str:
                 for line in f:
                     if line.startswith("ERP_DB_PASSWORD="):
                         val = line.split("=", 1)[1].strip()
-                        if val:
+                        if val and val != "DPAPI_ENCRYPTED":
                             return val
         except Exception:
             pass
@@ -86,29 +95,58 @@ def obter_senha_atual() -> str:
 
 
 def salvar_senha(senha: str):
-    """Atualiza a senha em backups/erp_password.txt e no .env."""
-    BACKUP_PASS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(BACKUP_PASS_PATH, "w", encoding="utf-8") as f:
-        f.write(senha.strip() + "\n")
+    """Salva a senha no cofre criptografico DPAPI, grava DPAPI_ENCRYPTED no .env e expurga arquivos legados."""
+    clean_pass = senha.strip()
 
+    # 1. Salva no cofre DPAPI protegido por hardware
+    try:
+        from core.identity_vault import store_vault_secret
+
+        store_vault_secret("erp_password", clean_pass)
+        print(" [*] Credencial criptografada no cofre DPAPI de maquina com sucesso.")
+    except Exception as exc:
+        print(f" [!] Aviso ao gravar no cofre DPAPI: {exc}")
+
+    # 2. Atualiza .env com marcador seguro (sem texto claro)
     if ENV_PATH.exists():
         try:
             with open(ENV_PATH, "r", encoding="utf-8") as f:
                 lines = f.readlines()
-            updated = False
+            updated_db = False
+            updated_svc = False
             new_lines = []
             for line in lines:
                 if line.startswith("ERP_DB_PASSWORD="):
-                    new_lines.append(f"ERP_DB_PASSWORD={senha.strip()}\n")
-                    updated = True
+                    new_lines.append("ERP_DB_PASSWORD=DPAPI_ENCRYPTED\n")
+                    updated_db = True
+                elif line.startswith("ERP_SERVICE_PASS="):
+                    new_lines.append("ERP_SERVICE_PASS=DPAPI_ENCRYPTED\n")
+                    updated_svc = True
                 else:
                     new_lines.append(line)
-            if not updated:
-                new_lines.append(f"\nERP_DB_PASSWORD={senha.strip()}\n")
+            if not updated_db:
+                new_lines.append("ERP_DB_PASSWORD=DPAPI_ENCRYPTED\n")
+            if not updated_svc:
+                new_lines.append("ERP_SERVICE_PASS=DPAPI_ENCRYPTED\n")
             with open(ENV_PATH, "w", encoding="utf-8") as f:
                 f.writelines(new_lines)
+            print(" [*] Arquivo .env atualizado com ERP_DB_PASSWORD=DPAPI_ENCRYPTED.")
         except Exception as e:
             print(f" [!] Aviso ao atualizar .env: {e}")
+
+    # 3. Expurgar arquivos em texto claro para conformidade de seguranca
+    candidatos_remover = [
+        BACKUP_PASS_PATH,
+        ROOT_DIR / "erp_password.txt",
+        ROOT_DIR.parent / "erp_password.txt",
+    ]
+    for c in candidatos_remover:
+        try:
+            if c.exists():
+                c.unlink(missing_ok=True)
+                print(f" [OK] Arquivo em texto claro expurgado com sucesso: {c.name}")
+        except Exception as exc:
+            print(f" [!] Aviso ao expurgar {c}: {exc}")
 
 
 def testar_conexao_erp(cfg: dict, senha: str) -> tuple[bool, str]:
@@ -177,7 +215,7 @@ def solicitar_senha_interativa():
         if ok:
             salvar_senha(senha_candidata)
             print("  [OK] Conectado e autenticado com sucesso no banco ERP!")
-            print("  [SALVO] Senha registrada em 'backups/erp_password.txt' e '.env'.")
+            print("  [SALVO] Senha registrada no cofre DPAPI e '.env'.")
             print("=" * 75 + "\n")
             sys.exit(0)
         else:
