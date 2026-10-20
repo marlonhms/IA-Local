@@ -99,6 +99,19 @@ class AlertaSangriaPayload(BaseModel):
     operador_id: str | None = None
 
 
+class AlertaLMCCompliancePayload(BaseModel):
+    """Payload estruturado para alerta de conformidade volumetrica LMC (Portaria ANP 26/1992)."""
+
+    tanque_id: str
+    combustivel: str
+    filial_id: str = "posto_01"
+    variacao_volumetrica_pct: float
+    tolerancia_legal_pct: float = 0.60
+    tipo_variacao: str = "Perda fisica excessiva (quebra)"
+    urgencia: str = "CRITICA"
+    sugestao: str | None = None
+
+
 class PedidoCombustivelPayload(BaseModel):
     """Payload estruturado para pedido de combustivel / carreta."""
 
@@ -489,6 +502,23 @@ def format_alerta_sangria_whatsapp_message(payload: AlertaSangriaPayload) -> str
     return "\n".join(lines)
 
 
+def format_alerta_lmc_whatsapp_message(payload: AlertaLMCCompliancePayload) -> str:
+    """Formata alerta de conformidade volumetrica LMC (Portaria ANP 26/1992) para WhatsApp."""
+    sinal = "+" if payload.variacao_volumetrica_pct >= 0 else ""
+    lines = [
+        "*AURA | ALERTA CRITICO DE CONFORMIDADE LMC*",
+        f"Filial: {payload.filial_id} • Tanque: {payload.tanque_id} ({payload.combustivel})",
+        "",
+        f"• Variacao Volumetrica: {sinal}{payload.variacao_volumetrica_pct:.2f}%",
+        f"• Limite Legal ANP: +-0.60% (Portaria ANP 26/1992)",
+        f"• Diagnostico: {payload.tipo_variacao}",
+        f"• Urgencia: {payload.urgencia}",
+        "",
+        f"Acao Recomendada: {payload.sugestao or 'Vistoriar estanqueidade e agendar afericao de bicos medidores (Portaria INMETRO 559/2016).'}",
+    ]
+    return "\n".join(lines)
+
+
 # =============================================================================
 # FUNCOES DE ALTO NIVEL PARA NOTIFICACOES INTEGRADAS
 # =============================================================================
@@ -604,6 +634,44 @@ async def notify_alerta_sangria(
             outbox=outbox,
             idempotency_key=idem_evo,
             event_type="alerta_sangria",
+        )
+        results["evolution"] = evo_res.model_dump()
+
+    return results
+
+
+async def notify_alerta_lmc(
+    payload: AlertaLMCCompliancePayload,
+    phone: str | None = None,
+    webhook_url: str | None = None,
+    outbox: AuraTransactionalOutbox | None = None,
+    idempotency_key: str | None = None,
+) -> dict[str, Any]:
+    """
+    Despacha alerta critico de nao-conformidade LMC para n8n e Evolution API com Outbox.
+    """
+    results: dict[str, Any] = {}
+    idem_n8n = f"{idempotency_key}:n8n" if idempotency_key else None
+    idem_evo = f"{idempotency_key}:whatsapp" if idempotency_key else None
+
+    n8n_res = await dispatch_n8n_webhook(
+        event_type="alerta_lmc_critico",
+        payload=payload.model_dump(),
+        webhook_url=webhook_url,
+        outbox=outbox,
+        idempotency_key=idem_n8n,
+    )
+    results["n8n"] = n8n_res.model_dump()
+
+    target_phone = phone or WHATSAPP_MANAGER_PHONE
+    if target_phone:
+        msg_text = format_alerta_lmc_whatsapp_message(payload)
+        evo_res = await dispatch_evolution_message(
+            phone=target_phone,
+            message_text=msg_text,
+            outbox=outbox,
+            idempotency_key=idem_evo,
+            event_type="alerta_lmc",
         )
         results["evolution"] = evo_res.model_dump()
 

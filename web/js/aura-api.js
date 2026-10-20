@@ -290,6 +290,17 @@ class AuraApiClient {
           }
         }
 
+        // 6. Chunks de Alerta Proativo In-App da AURA
+        else if (effectiveEvent === 'proactive_alert' || chunkData.chunk_type === 'proactive_alert') {
+          const alertData = chunkData.data || chunkData;
+          if (typeof opts.onProactiveAlert === 'function') {
+            opts.onProactiveAlert(alertData, chunkData);
+          }
+          if (typeof window !== 'undefined' && window.auraChat && typeof window.auraChat.handleProactiveAlert === 'function') {
+            window.auraChat.handleProactiveAlert(alertData);
+          }
+        }
+
         // Despacho universal para observadores gerais / retrocompatibilidade
         if (onChunk) {
           onChunk({
@@ -621,6 +632,95 @@ class AuraApiClient {
       throw new Error(errDetail.detail?.error || `Falha ao registrar opt-in: HTTP ${resp.status}`);
     }
     return await resp.json();
+  }
+
+  /**
+   * Obtem alertas proativos in-app emitidos pelo motor de monitoramento.
+   * Alertas ocorrem exclusivamente no ecossistema in-app da AURA.
+   * @param {Object} params - Filtros opcionais (limit, offset, alert_type, severity, filial_id, unread_only)
+   * @returns {Promise<Object>}
+   */
+  async getProactiveAlerts(params = {}) {
+    const searchParams = new URLSearchParams();
+    if (params.limit) searchParams.set('limit', String(params.limit));
+    if (params.offset) searchParams.set('offset', String(params.offset));
+    if (params.alert_type) searchParams.set('alert_type', String(params.alert_type));
+    if (params.severity) searchParams.set('severity', String(params.severity));
+    if (params.filial_id) searchParams.set('filial_id', String(params.filial_id));
+    if (params.unread_only) searchParams.set('unread_only', 'true');
+    const queryStr = searchParams.toString();
+    const url = `${this.baseUrl}/api/v1/aura/proactive/alerts${queryStr ? '?' + queryStr : ''}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Falha ao obter alertas proativos: HTTP ${res.status}`);
+    return await res.json();
+  }
+
+  /**
+   * Consulta status operacional do motor de alertas proativos.
+   * @returns {Promise<Object>}
+   */
+  async getProactiveStatus() {
+    const res = await fetch(`${this.baseUrl}/api/v1/aura/proactive/status`);
+    if (!res.ok) throw new Error(`Falha ao consultar status proativo: HTTP ${res.status}`);
+    return await res.json();
+  }
+
+  /**
+   * Confirma e marca alertas proativos in-app como lidos na AURA.
+   * @param {string|null} alertId - ID do alerta especifico ou null para marcar todos
+   * @returns {Promise<Object>}
+   */
+  async ackProactiveAlert(alertId = null) {
+    const res = await fetch(`${this.baseUrl}/api/v1/aura/proactive/alerts/ack`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alert_id: alertId || null }),
+    });
+    if (!res.ok) throw new Error(`Falha ao confirmar alerta proativo: HTTP ${res.status}`);
+    return await res.json();
+  }
+
+  /**
+   * Assina o canal SSE de alertas proativos em tempo real na interface da AURA.
+   * @param {Function} onAlertCallback - Callback acionado a cada alerta recebido
+   * @param {string|null} filialId - Filtro opcional por filial
+   * @returns {EventSource}
+   */
+  subscribeProactiveStream(onAlertCallback, filialId = null) {
+    const query = filialId ? `?filial_id=${encodeURIComponent(filialId)}` : '';
+    const url = `${this.baseUrl}/api/v1/aura/proactive/stream${query}`;
+    const es = new EventSource(url);
+    es.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload && (payload.chunk_type === 'proactive_alert' || payload.event === 'proactive_alert')) {
+          const alertData = payload.data || payload;
+          if (typeof onAlertCallback === 'function') {
+            onAlertCallback(alertData, payload);
+          }
+          if (typeof window !== 'undefined' && window.auraChat && typeof window.auraChat.handleProactiveAlert === 'function') {
+            window.auraChat.handleProactiveAlert(alertData);
+          }
+        }
+      } catch (e) {
+        // Ignora heartbeats ou payloads nao JSON
+      }
+    };
+    es.addEventListener('proactive_alert', (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        const alertData = (payload && payload.data) || payload;
+        if (typeof onAlertCallback === 'function') {
+          onAlertCallback(alertData, payload);
+        }
+        if (typeof window !== 'undefined' && window.auraChat && typeof window.auraChat.handleProactiveAlert === 'function') {
+          window.auraChat.handleProactiveAlert(alertData);
+        }
+      } catch (e) {
+        console.warn('[AuraAPI] Erro ao processar evento proactive_alert:', e);
+      }
+    });
+    return es;
   }
 }
 

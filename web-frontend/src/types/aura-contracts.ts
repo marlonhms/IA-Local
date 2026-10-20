@@ -213,6 +213,7 @@ export interface BenchmarkComparisonProps {
   comparison_items: BenchmarkComparisonItem[];
   limitations: string[];
   suggested_actions: GenUIActionOption[];
+  ranking_postos_anp?: Record<string, unknown> | null;
 }
 
 export interface FinancialLeakItem {
@@ -431,3 +432,74 @@ export interface TelemetrySLISnapshot {
   tool_executions: Record<string, { success: number; error: number }>;
   feature_flags: Record<string, boolean>;
 }
+
+
+// =============================================================================
+// BLOCOS MODULARES GENERATIVOS (LEGO BLOCKS UI - FASE 7+)
+// =============================================================================
+
+export interface LegoKpiItem {
+  label: string;
+  value: string;
+  delta?: string | null;
+  trend?: string | null;
+  status?: string;
+  subtext?: string | null;
+}
+
+export interface LegoComparisonRow {
+  name: string;
+  primary_value: string;
+  secondary_value: string;
+  gap?: string | null;
+  status?: string;
+  observation?: string | null;
+}
+
+export interface LegoRankingItem {
+  rank: number;
+  title: string;
+  subtitle?: string | null;
+  value: string;
+  tag?: string | null;
+  status?: string;
+}
+
+export interface LegoTimelineEvent {
+  timestamp: string;
+  title: string;
+  description?: string | null;
+  badge?: string | null;
+  status?: string;
+}
+
+export interface LegoAlertItem {
+  title: string;
+  message: string;
+  severity?: string;
+  action_label?: string | null;
+}
+
+export interface LegoBlock {
+  block_id: string;
+  block_type: string;
+  title?: string | null;
+  subtitle?: string | null;
+  kpis?: LegoKpiItem[];
+  comparison_rows?: LegoComparisonRow[];
+  ranking_items?: LegoRankingItem[];
+  timeline_events?: LegoTimelineEvent[];
+  alert?: LegoAlertItem | null;
+  custom_content?: string | null;
+}
+
+export interface GenerativeModularProps {
+  title: string;
+  subtitle?: string | null;
+  diagnosis: string;
+  confidence_score: number;
+  blocks: LegoBlock[];
+  limitations: string[];
+  suggested_actions: GenUIActionOption[];
+}
+

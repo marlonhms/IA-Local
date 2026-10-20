@@ -76,6 +76,7 @@ from core.schemas.genui import (
     BasketUpsellStrategyProps,
     ComplianceStatusProps,
     CompliancePillarItem,
+    GenerativeModularProps,
 )
 from core.config import is_genui_enabled
 from core.telemetry import AuraSRETelemetry
@@ -1381,9 +1382,29 @@ GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
         "title": "Executando perícia forense de causa-raiz (RCA)...",
     },
     "lmc_anp": {
-        "component_name": "render_LMCReportUI",
-        "client_component": "LMCReportWidget",
-        "title": "Verificando conformidade do LMC (Portaria ANP nº 26)...",
+        "component_name": "render_LMCComplianceReportUI",
+        "client_component": "LMCComplianceReportUI",
+        "title": "Auditando conformidade regulatória do LMC e perdas volumétricas...",
+    },
+    "lmc_compliance": {
+        "component_name": "render_LMCComplianceReportUI",
+        "client_component": "LMCComplianceReportUI",
+        "title": "Auditando conformidade regulatória do LMC e perdas volumétricas...",
+    },
+    "auditar_conformidade_lmc_anp": {
+        "component_name": "render_LMCComplianceReportUI",
+        "client_component": "LMCComplianceReportUI",
+        "title": "Auditando conformidade regulatória do LMC e perdas volumétricas...",
+    },
+    "custo_estoque_macro": {
+        "component_name": "render_MacroeconomicInventoryCostUI",
+        "client_component": "MacroeconomicInventoryCostUI",
+        "title": "Analisando custo financeiro Selic e pauta fiscal CONFAZ...",
+    },
+    "analisar_custo_estoque_macroeconomico": {
+        "component_name": "render_MacroeconomicInventoryCostUI",
+        "client_component": "MacroeconomicInventoryCostUI",
+        "title": "Analisando custo financeiro Selic e pauta fiscal CONFAZ...",
     },
     "desempenho_pista_frentistas": {
         "component_name": "render_PumpPerformanceUI",
@@ -1465,6 +1486,21 @@ GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
         "client_component": "ComplianceStatusUI",
         "title": "Aferindo blindagem de driver e isolamento Clean Room AUPS...",
     },
+    "diagnostico_modular": {
+        "component_name": "render_GenerativeModularCardUI",
+        "client_component": "GenerativeModularCardUI",
+        "title": "AURA Intelligent UI: Compondo diagnostico modular dinamico...",
+    },
+    "generative_modular_card": {
+        "component_name": "render_GenerativeModularCardUI",
+        "client_component": "GenerativeModularCardUI",
+        "title": "AURA Intelligent UI: Compondo diagnostico modular dinamico...",
+    },
+    "modular_lego_card": {
+        "component_name": "render_GenerativeModularCardUI",
+        "client_component": "GenerativeModularCardUI",
+        "title": "AURA Intelligent UI: Compondo diagnostico modular dinamico...",
+    },
 }
 
 
@@ -1516,10 +1552,13 @@ def build_canonical_genui_envelope(
         FinancialLeakAuditProps,
         BasketUpsellStrategyProps,
         ComplianceStatusProps,
+        GenerativeModularProps,
     )):
         props = resultado_bruto.model_dump(mode="json")
     elif isinstance(resultado_bruto, dict) and "props" in resultado_bruto and isinstance(resultado_bruto["props"], dict):
         props = dict(resultado_bruto["props"])
+        if "ranking_postos_anp" in resultado_bruto and "ranking_postos_anp" not in props:
+            props["ranking_postos_anp"] = resultado_bruto["ranking_postos_anp"]
     elif isinstance(resultado_bruto, dict):
         props = dict(resultado_bruto)
     elif resultado_bruto is not None:
@@ -2282,6 +2321,124 @@ def build_canonical_genui_envelope(
             ]
         props["suggested_actions"] = [a.model_dump(mode="json") if hasattr(a, "model_dump") else a for a in actions]
 
+    elif comp_name == "render_LMCComplianceReportUI" or intencao in (
+        "lmc_anp", "lmc_compliance", "auditar_conformidade_lmc_anp", "livro_movimentacao_combustiveis"
+    ):
+        if not actions:
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="Exportar LMC Formatado",
+                    action_type="mutation",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": intencao, "operacao": "exportar_lmc"},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="Agendar Afericao INMETRO 20L",
+                    action_type="mutation",
+                    variant="secondary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": intencao, "operacao": "agendar_afericao_20l"},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="Inspecionar Calibracao",
+                    action_type="inspection",
+                    variant="ghost",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"intent": intencao, "perspective": "calibracao_tanques"},
+                )
+            )
+        props["tolerancia_legal_pct"] = float(props.get("tolerancia_legal_pct") or 0.60)
+        props["status_conformidade"] = props.get("status_conformidade") or "CONFORME"
+        props["diagnosis"] = props.get("diagnosis") or executive_summary or "Auditoria de conformidade volumetrica LMC (Portaria ANP 26/1992)."
+        props["confidence_score"] = float(props.get("confidence_score") or 0.98)
+        props["variacao_volumetrica_pct"] = float(props.get("variacao_volumetrica_pct") or 0.0)
+        props["total_vendas_litros"] = float(props.get("total_vendas_litros") or 0.0)
+        props["total_estoque_fisico_litros"] = float(props.get("total_estoque_fisico_litros") or 0.0)
+        props["total_estoque_contabil_litros"] = float(props.get("total_estoque_contabil_litros") or 0.0)
+        props["total_variacao_litros"] = float(props.get("total_variacao_litros") or 0.0)
+        props["suggested_actions"] = [a.model_dump(mode="json") if hasattr(a, "model_dump") else a for a in actions]
+
+    elif comp_name == "render_MacroeconomicInventoryCostUI" or intencao in (
+        "custo_estoque_macro", "analisar_custo_estoque_macroeconomico", "macro_combustiveis"
+    ):
+        if not actions:
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="Simular Pedido Fracionado",
+                    action_type="mutation",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": intencao, "operacao": "simular_pedido_fracionado"},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="Auditar Pauta Fiscal CONFAZ",
+                    action_type="inspection",
+                    variant="secondary",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"intent": intencao, "perspective": "pauta_confaz"},
+                )
+            )
+        props["diagnosis"] = props.get("diagnosis") or executive_summary or "Custo financeiro de carregamento de estoque calculado com taxa Selic oficial."
+        props["confidence_score"] = float(props.get("confidence_score") or 0.95)
+        props["volume_total_litros"] = float(props.get("volume_total_litros") or 0.0)
+        props["custo_medio_litro"] = float(props.get("custo_medio_litro") or 0.0)
+        props["capital_imobilizado_reais"] = float(props.get("capital_imobilizado_reais") or 0.0)
+        props["taxa_selic_anual_pct"] = float(props.get("taxa_selic_anual_pct") or 11.25)
+        props["taxa_cambio_ptax"] = float(props.get("taxa_cambio_ptax") or 5.50)
+        props["custo_diario_carregamento_reais"] = float(props.get("custo_diario_carregamento_reais") or 0.0)
+        props["custo_mensal_carregamento_reais"] = float(props.get("custo_mensal_carregamento_reais") or 0.0)
+        props["suggested_actions"] = [a.model_dump(mode="json") if hasattr(a, "model_dump") else a for a in actions]
+
+    elif comp_name == "render_GenerativeModularCardUI" or intencao in (
+        "diagnostico_modular", "generative_modular_card", "modular_lego_card"
+    ):
+        if not actions:
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="Aplicar Ajuste Operacional",
+                    action_type="mutation",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": intencao, "operacao": "aplicar_ajuste"},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="Projetar no Companion Canvas",
+                    action_type="inspection",
+                    variant="secondary",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"intent": intencao, "perspective": "modular"},
+                )
+            )
+        props["title"] = props.get("title") or "Diagnostico Executivo Modular"
+        props["subtitle"] = props.get("subtitle") or "Composicao generativa de blocos de dados em tempo real"
+        props["confidence_score"] = float(props.get("confidence_score") or 0.95)
+        props["diagnosis"] = props.get("diagnosis") or executive_summary or "Diagnostico modular composto sob demanda."
+        props["blocks"] = props.get("blocks") or []
+        props["suggested_actions"] = [a.model_dump(mode="json") if hasattr(a, "model_dump") else a for a in actions]
+
     else:
         if not actions:
             actions.append(
@@ -2740,6 +2897,39 @@ class AuraEngine:
                 cnpj_target = p.get("cnpj") or p.get("loja_cnpj")
                 return self.check_compliance_opt_in(cnpj_target)
 
+            elif norm_name in (
+                "auditar_conformidade_lmc_anp", "lmc_anp", "lmc_compliance", "lmc", "auditoria_lmc"
+            ):
+                return self.tools.auditar_conformidade_lmc_anp(
+                    data=p.get("data"),
+                    tanque=p.get("tanque"),
+                    combustivel=p.get("combustivel") or p.get("produto"),
+                )
+
+            elif norm_name in (
+                "analisar_custo_estoque_macroeconomico", "custo_estoque_macro", "macro_combustiveis"
+            ):
+                return self.tools.analisar_custo_estoque_macroeconomico(
+                    volume_total_litros=float(p["volume_total_litros"]) if p.get("volume_total_litros") is not None else None,
+                    custo_medio_litro=float(p["custo_medio_litro"]) if p.get("custo_medio_litro") is not None else None,
+                    uf=p.get("uf"),
+                    produto=p.get("produto") or "GASOLINA COMUM",
+                )
+
+            elif norm_name in (
+                "diagnostico_modular", "compor_diagnostico_modular", "generative_modular_card",
+                "modular_lego_card", "blocos_lego", "lego_card"
+            ):
+                return self.tools.compor_diagnostico_modular(
+                    titulo=p.get("titulo") or p.get("title"),
+                    subtitulo=p.get("subtitulo") or p.get("subtitle"),
+                    diagnostico=p.get("diagnostico") or p.get("diagnosis"),
+                    confidence_score=float(p.get("confidence_score", 0.95)),
+                    blocos=p.get("blocos") or p.get("blocks"),
+                    suggested_actions=p.get("suggested_actions") or p.get("acoes"),
+                    limitacoes=p.get("limitacoes") or p.get("limitations"),
+                )
+
             else:
                 raise ValueError(f"Ferramenta desconhecida ou não suportada: '{tool_name}'")
 
@@ -2788,6 +2978,7 @@ class AuraEngine:
         contexto_sanitizado: str,
         historico_formatado: str,
         intencao: Optional[str] = None,
+        genui_active: bool = False,
     ) -> str:
         dados_filial = self.get_dados_filial()
         return build_system_prompt(
@@ -2796,6 +2987,7 @@ class AuraEngine:
             historico_formatado=historico_formatado,
             dados_filial=dados_filial,
             intencao=intencao,
+            genui_active=genui_active,
         )
 
     # -------------------------------------------------------------------------
@@ -2889,8 +3081,32 @@ class AuraEngine:
 
             elif intencao in ("benchmark_comparativo", "comparativo_turnos"):
                 data_p, turno_p = extrair_data_turno(pergunta)
-                resultado_bruto = self.tools.comparar_benchmark_concorrencia(data=data_p, turno=turno_p)
+                comb_p = extrair_combustivel(pergunta)
+                resultado_bruto = self.tools.comparar_benchmark_concorrencia(
+                    data=data_p,
+                    turno=turno_p,
+                    produto=comb_p,
+                )
                 contexto_extra = f"Benchmark Comparativo de Performance & Concorrência (GenUI):\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+
+            elif intencao in ("auditar_conformidade_lmc_anp", "lmc_anp", "lmc_compliance", "lmc"):
+                data_p, _ = extrair_data_turno(pergunta)
+                comb_p = extrair_combustivel(pergunta)
+                resultado_bruto = self.tools.auditar_conformidade_lmc_anp(data=data_p, combustivel=comb_p)
+                contexto_extra = f"Auditoria de Conformidade LMC ANP (Portaria 26/1992):\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+
+            elif intencao in ("custo_estoque_macro", "analisar_custo_estoque_macroeconomico"):
+                comb_p = extrair_combustivel(pergunta) or "GASOLINA COMUM"
+                resultado_bruto = self.tools.analisar_custo_estoque_macroeconomico(produto=comb_p)
+                contexto_extra = f"Custo de Carregamento de Estoque & Indicadores Macro (BACEN/CONFAZ):\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+
+            elif intencao in ("diagnostico_modular", "generative_modular_card", "modular_lego_card"):
+                resultado_bruto = self.tools.compor_diagnostico_modular(
+                    titulo="Diagnostico Executivo Modular",
+                    subtitulo="Composicao generativa de blocos em tempo real",
+                    diagnostico="Diagnostico operacional estruturado em blocos modulares deterministico.",
+                )
+                contexto_extra = f"Diagnostico Executivo Modular (Blocos Lego UI):\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
 
             elif intencao in ("compliance_status", "conformidade_legal", "termo_interoperabilidade", "blindagem_juridica"):
                 resultado_bruto = self.check_compliance_opt_in()
@@ -3036,6 +3252,7 @@ class AuraEngine:
         resultado_bruto: Any,
         pergunta: str,
         session_id: Optional[str] = None,
+        genui_active: bool = False,
     ) -> Optional[str]:
         """
         Síntese executiva determinística de alta fidelidade para contingência.
@@ -3127,6 +3344,90 @@ class AuraEngine:
             ])
             return "\n".join(linhas)
 
+        # DIAGNOSTICO MODULAR GENERATIVO (BLOCOS LEGO)
+        if intencao in ("diagnostico_modular", "generative_modular_card", "modular_lego_card"):
+            res_dict = resultado_bruto.get("props") if isinstance(resultado_bruto, dict) and "props" in resultado_bruto else (resultado_bruto if isinstance(resultado_bruto, dict) else {})
+            title = res_dict.get("title") or "Diagnostico Executivo Modular"
+            diag = res_dict.get("diagnosis") or "Diagnostico analitico estruturado em blocos modulares generativos."
+            conf = float(res_dict.get("confidence_score") or 0.95) * 100
+            blocos_list = res_dict.get("blocks") or []
+            num_blocks = len(blocos_list)
+
+            # Modo Intelligent UI: Briefing executivo enxuto sem duplicar a densidade do canvas lateral
+            if genui_active:
+                return (
+                    f"### {title}\n\n"
+                    f"**Diagnostico:** {diag}\n\n"
+                    f"- **Confiabilidade:** [verde]{conf:.0f}%[/verde] (Validacao Deterministica)\n"
+                    f"- **Composicao Modular:** {num_blocks} blocos generativos integrados (KPIs, tabelas, alertas e rankings).\n\n"
+                    f"*A visualizacao completa dos blocos e os controles de acao estao disponiveis no **painel interativo ao lado**.*"
+                )
+
+            linhas = [
+                f"### {title}",
+                "",
+                f"**Diagnostico:** {diag}",
+                f"- **Confiabilidade:** {conf:.0f}%",
+                "",
+                f"**Blocos Modulares Ativos ({num_blocks}):**",
+            ]
+            for b in blocos_list[:5]:
+                b_title = b.get("title") or b.get("block_type", "Bloco")
+                b_type = b.get("block_type", "dados")
+                linhas.append(f"- **{b_title}** (tipo: `{b_type}`)")
+            linhas.extend([
+                "",
+                "*Acoes e ajustes operacionais estao disponiveis na Camada 3 do card modular.*"
+            ])
+            return "\n".join(linhas)
+
+        # LMC COMPLIANCE REPORT (Portaria ANP 26/1992)
+        if intencao in ("auditar_conformidade_lmc_anp", "lmc_anp", "lmc_compliance", "lmc"):
+            props = resultado_bruto.get("props") or resultado_bruto
+            status_conf = props.get("status_conformidade") or "CONFORME"
+            var_pct = float(props.get("variacao_volumetrica_pct") or 0.0)
+            tol = float(props.get("tolerancia_legal_pct") or 0.60)
+            vendas = float(props.get("total_vendas_litros") or 0.0)
+            var_litros = float(props.get("total_variacao_litros") or 0.0)
+            diag = props.get("diagnosis") or f"Status: {status_conf}"
+
+            status_str = "CONFORME ANP" if abs(var_pct) <= tol else "CRITICO ANP"
+            cor = "[verde]" if abs(var_pct) <= tol else "[vermelho]"
+            cor_f = "[/verde]" if abs(var_pct) <= tol else "[/vermelho]"
+
+            linhas = [
+                "### 📋 Auditoria de Conformidade LMC ANP (Portaria 26/1992)",
+                "",
+                f"**Diagnóstico:** {diag}",
+                f"- **Status:** {cor}{status_str}{cor_f} (Tolerância legal: +-0.60%)",
+                f"- **Variação Volumétrica:** {cor}{var_pct:+.2f}%{cor_f} ({var_litros:+.1f} L sobre {vendas:,.0f} L vendidos)",
+            ]
+            return "\n".join(linhas)
+
+        # CUSTO DE ESTOQUE MACROECONOMICO (BACEN & CONFAZ)
+        if intencao in ("custo_estoque_macro", "analisar_custo_estoque_macroeconomico"):
+            props = resultado_bruto.get("props") or resultado_bruto
+            diag = props.get("diagnosis") or "Diagnostico financeiro de carregamento de estoque."
+            cap = float(props.get("capital_imobilizado_reais") or 0.0)
+            selic = float(props.get("taxa_selic_anual_pct") or 11.25)
+            c_diario = float(props.get("custo_diario_carregamento_reais") or 0.0)
+            c_mensal = float(props.get("custo_mensal_carregamento_reais") or 0.0)
+            spread = float(props.get("spread_pmpf_reais") or 0.0)
+            cap_str = f"R$ {cap:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            c_diario_str = f"R$ {c_diario:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            c_mensal_str = f"R$ {c_mensal:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            spread_str = f"R$ {spread:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            linhas = [
+                "### 📊 Analise Macroeconomica de Custo de Estoque (BACEN/CONFAZ)",
+                "",
+                f"**Diagnóstico:** {diag}",
+                f"- **Capital Imobilizado:** {cap_str}",
+                f"- **Taxa Selic Anual:** {selic:.2f}% a.a.",
+                f"- **Custo de Carregamento Diário:** {c_diario_str} (Mensal: {c_mensal_str})",
+                f"- **Spread vs PMPF ICMS-ST:** {spread_str}",
+            ]
+            return "\n".join(linhas)
+
         # 0b. BENCHMARK COMPARATIVO & CONCORRÊNCIA (MICRO-WIDGET F6-03)
         if intencao in ("benchmark_comparativo", "comparativo_turnos"):
             props = resultado_bruto.get("props") or resultado_bruto
@@ -3161,6 +3462,56 @@ class AuraEngine:
                     cor_f = "[/verde]" if st == "success" else ("[/vermelho]" if st == "danger" else "[/amarelo]")
                     gap_str = f" ({gap})" if gap else ""
                     linhas.append(f"- **{kpi}:** {cor}{fil}{cor_f} vs Benchmark {bm}{gap_str}")
+
+            ranking_postos = resultado_bruto.get("ranking_postos_anp") or {}
+            f_alvo = "gasolina_comum"
+            p_low = (pergunta or "").lower()
+            if "etanol" in p_low:
+                f_alvo = "etanol"
+            elif "aditivada" in p_low:
+                f_alvo = "gasolina_aditivada"
+            elif "diesel" in p_low:
+                f_alvo = "diesel_s10"
+
+            postos_lista = ranking_postos.get(f_alvo) or []
+            if not postos_lista and ranking_postos:
+                for k, v in ranking_postos.items():
+                    if v:
+                        postos_lista = v
+                        f_alvo = k
+                        break
+
+            # Modo Intelligent UI: Briefing executivo enxuto sem duplicar a densidade do canvas lateral
+            if genui_active:
+                score_cor = "[verde]" if comp_score >= 80 else ("[amarelo]" if comp_score >= 60 else "[vermelho]")
+                score_cor_f = "[/verde]" if comp_score >= 80 else ("[/amarelo]" if comp_score >= 60 else "[/vermelho]")
+
+                destaque_lider = ""
+                if postos_lista:
+                    lider = postos_lista[0]
+                    l_nome = lider.get("posto") or "Revenda líder"
+                    l_preco = float(lider.get("preco", 0.0))
+                    l_band = lider.get("bandeira") or "Branca"
+                    destaque_lider = f" O concorrente mais agressivo da cidade é **{l_nome}** ({l_band}) a [verde]R$ {l_preco:.2f}[/verde]."
+
+                return (
+                    f"### 📊 Benchmark de Mercado & Concorrência\n\n"
+                    f"**Diagnóstico:** {diag}\n\n"
+                    f"- **Score Competitivo:** {score_cor}{comp_score:.0f}/100{score_cor_f} ({market_pos})\n"
+                    f"- **Confronto:** **{entity}** vs **{group}**.{destaque_lider}\n\n"
+                    f"👉 *O ranking nominal dos postos, os indicadores confrontados e os botões de ação imediata estão disponíveis no **painel interativo ao lado**.*"
+                )
+
+            if postos_lista:
+                nome_comb = f_alvo.replace("_", " ").title()
+                linhas.append(f"\n**🏆 Postos Mais Baratos da Cidade ({nome_comb} - Base ANP):**")
+                for idx, pst in enumerate(postos_lista[:3], 1):
+                    p_nome = pst.get("posto") or "Revenda"
+                    p_band = pst.get("bandeira") or "Branca"
+                    p_val = float(pst.get("preco", 0.0))
+                    p_dt = pst.get("data_coleta") or ""
+                    dt_str = f" ({p_dt})" if p_dt else ""
+                    linhas.append(f"{idx}. **{p_nome}** ({p_band}): [verde]R$ {p_val:.2f}[/verde]{dt_str}")
 
             linhas.extend([
                 "",
@@ -3550,6 +3901,27 @@ class AuraEngine:
             ]
             return "\n".join(linhas)
 
+        elif intencao in ("catalogo_produtos", "produtos_pesquisa", "produtos_catalogo"):
+            itens = []
+            if isinstance(resultado_bruto, list):
+                itens = resultado_bruto
+            elif isinstance(resultado_bruto, dict):
+                itens = resultado_bruto.get("produtos") or resultado_bruto.get("itens") or resultado_bruto.get("data") or []
+            linhas = ["### 📦 Consulta ao Catálogo de Produtos", ""]
+            if itens:
+                linhas.append(f"Foram identificados **{len(itens)}** itens no catálogo:")
+                for it in itens[:6]:
+                    desc = it.get("descricao") or it.get("nome") or it.get("produto") or "Produto"
+                    val = it.get("valvenda") or it.get("preco") or it.get("valor") or 0.0
+                    try:
+                        f_val = f"R$ {float(val):.2f}"
+                    except Exception:
+                        f_val = str(val)
+                    linhas.append(f"- **{desc}:** [verde]{f_val}[/verde]")
+            else:
+                linhas.append(f"Consulta ao catálogo executada para: '{pergunta}'. Nenhum item específico com saldo em estoque no momento.")
+            return "\n".join(linhas)
+
         # Fallback genérico para qualquer ferramenta com dados válidos
         if isinstance(resultado_bruto, dict) and len(resultado_bruto) > 0:
             linhas = [f"### 📋 Resumo Operacional ({intencao.replace('_', ' ').title()})", ""]
@@ -3791,6 +4163,44 @@ class AuraEngine:
             )
             return
 
+        # 3.5. Emissao Imediata do Envelope Canonico GenUI (ui_complete) para Hidratacao Sub-segundo (<1s)
+        ui_complete_emitted = False
+        if genui_meta and genui_active:
+            diag_summary = ""
+            if isinstance(resultado_bruto, dict):
+                diag_summary = (
+                    resultado_bruto.get("props", {}).get("diagnosis")
+                    or resultado_bruto.get("diagnosis")
+                    or ""
+                )
+            envelope = build_canonical_genui_envelope(
+                intencao=intencao,
+                tool_call_id=tool_call_id,
+                resultado_bruto=resultado_bruto,
+                executive_summary=diag_summary,
+                telemetry=self.telemetry,
+            )
+            if envelope:
+                envelope_payload = envelope.to_sse_payload()
+                if t_skeleton_emitted is not None:
+                    backend_hydration_ms = (time.perf_counter() - t_skeleton_emitted) * 1000
+                    self.telemetry.record_hydration(
+                        ms=backend_hydration_ms,
+                        session_id=sess_id,
+                        tool_call_id=tool_call_id,
+                        details={"source": "backend"},
+                    )
+                yield AuraChunk(
+                    chunk_type=AuraChunkType.UI_COMPLETE,
+                    tool_call_id=tool_call_id,
+                    component_name=genui_meta["component_name"],
+                    title=genui_meta.get("title"),
+                    envelope=envelope_payload,
+                    data=envelope_payload,
+                    session_id=sess_id,
+                )
+                ui_complete_emitted = True
+
         # 4. Blindagem LGPD e Sanitização de Contexto e Pergunta
         # Se houver contexto extra injetado pelo chamador (perfil, canal, etc), anexa ao contexto
         if context:
@@ -3821,6 +4231,7 @@ class AuraEngine:
             contexto_sanitizado=contexto_sanitizado,
             historico_formatado=historico_formatado,
             intencao=intencao,
+            genui_active=(genui_meta is not None and genui_active),
         )
 
         # 7. Streaming com Google Gemini e Fallback Resiliente
@@ -3829,14 +4240,16 @@ class AuraEngine:
         texto_completo: List[str] = []
         sucesso_llm = False
 
-        for m_name in FALLBACK_MODELS:
+        for m_name in FALLBACK_MODELS[:1]:
             try:
                 model = genai.GenerativeModel(m_name)
-                # Invoca streaming assíncrono nativo
-                response_stream = await model.generate_content_async(
-                    prompt_sistema,
-                    stream=True,
-                    request_options={"timeout": 15},
+                # Invoca streaming assincrono com timeout agil de 5 segundos
+                response_stream = await asyncio.wait_for(
+                    model.generate_content_async(
+                        prompt_sistema,
+                        stream=True,
+                    ),
+                    timeout=5.0,
                 )
 
                 async for chunk in response_stream:
@@ -3864,7 +4277,7 @@ class AuraEngine:
                     break
 
             except Exception:
-                # Fallback para o próximo modelo da lista
+                # Fallback para o proximo modelo da lista ou sintese deterministica imediata
                 continue
 
         total_llm_ms = (time.perf_counter() - t_llm_start) * 1000
@@ -3877,6 +4290,7 @@ class AuraEngine:
                 resultado_bruto=resultado_bruto,
                 pergunta=pergunta_efetiva,
                 session_id=sess_id,
+                genui_active=(genui_meta is not None and genui_active),
             )
             if sintese_contingencia:
                 resposta_final = normalize_aura_color_markup(sintese_contingencia)
@@ -3897,8 +4311,8 @@ class AuraEngine:
                     session_id=sess_id,
                 )
 
-        # 7.5. Emissão do Envelope Canônico GenUI (ui_complete) para a Camada 2 & 3
-        if genui_meta and genui_active:
+        # 7.5. Emissao do Envelope Canonico GenUI se ainda nao emitido na etapa 3.5
+        if genui_meta and genui_active and not ui_complete_emitted:
             envelope = build_canonical_genui_envelope(
                 intencao=intencao,
                 tool_call_id=tool_call_id,

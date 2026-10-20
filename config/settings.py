@@ -22,7 +22,7 @@ else:
 # Google Gemini API
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+    genai.configure(api_key=GEMINI_API_KEY, transport="rest")
 
 
 def get_erp_password() -> str:
@@ -164,6 +164,6 @@ DEFAULT_LLM_MODEL = os.getenv("DEFAULT_LLM_MODEL", "models/gemini-3.5-flash-lite
 FALLBACK_MODELS = [
     DEFAULT_LLM_MODEL,
     "models/gemini-3.5-flash-lite",
-    "models/gemini-3.1-flash-lite-preview",
-    "models/gemini-3.1-flash-lite",
+    "models/gemini-flash-latest",
+    "models/gemini-2.5-flash",
 ]

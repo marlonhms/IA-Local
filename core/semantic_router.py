@@ -314,6 +314,10 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
             "Comparar preços de combustíveis com o mercado",
             "Estamos mais caros ou mais baratos que a concorrência?",
             "Comparativo de turnos e benchmark de mercado",
+            "Quais são os 3 postos mais baratos de Gasolina Comum na minha cidade?",
+            "Quais são os postos mais baratos da cidade?",
+            "Qual posto tem o menor preço de gasolina?",
+            "Ranking dos postos concorrentes com menor preço",
         ]
     },
     "compliance_status": {
@@ -324,6 +328,40 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
             "O posto esta conforme com a LGPD e lei de software?",
             "Status da blindagem juridica e driver shield",
             "Mostrar termo de conformidade e opt-in",
+        ]
+    },
+    "custo_estoque_macro": {
+        "descricao": "Custo de oportunidade e carregamento de estoque de combustiveis contra Selic BACEN, PTAX e pauta fiscal PMPF CONFAZ",
+        "exemplos": [
+            "Qual o custo de carregamento do estoque?",
+            "Quanto custa manter o estoque parado com a taxa Selic?",
+            "Análise do custo de oportunidade do estoque de combustíveis",
+            "Custo financeiro diário e mensal do estoque",
+            "Comparar custo do estoque com pauta PMPF do CONFAZ",
+            "Vale a pena comprar carreta fechada ou fracionado com a Selic atual?",
+            "Capital imobilizado nos tanques de combustível",
+            "Impacto da taxa Selic e PTAX no estoque",
+            "Spread do combustível frente ao PMPF da SEFAZ",
+            "Custo financeiro de manter tanque cheio",
+            "Análise macroeconômica do estoque de combustíveis",
+            "Pauta fiscal PMPF e custo de aquisição",
+        ]
+    },
+    "auditar_conformidade_lmc_anp": {
+        "descricao": "Auditoria de conformidade metrologica e volumetrica do LMC frente a tolerancia legal de +-0.60% (Portaria ANP 26/1992 e Resolucao ANP 894/2022)",
+        "exemplos": [
+            "Auditar conformidade do LMC",
+            "Auditoria de conformidade volumétrica da ANP",
+            "Verificar tolerância de 0.60% da ANP no LMC",
+            "Auditar variação volumétrica dos tanques",
+            "Conferência regulamentar do LMC Resolução 894",
+            "Verificar estanqueidade e tolerância de quebra/sobra da ANP",
+            "Relatório de conformidade regulatória do LMC",
+            "Auditar conformidade ANP",
+            "LMC compliance e tolerância legal de 0,6%",
+            "Auditoria volumétrica ANP nos tanques",
+            "Verificar se a quebra do LMC passou de 0.60%",
+            "Auditar tanques críticos fora da margem da ANP",
         ]
     },
 }
@@ -388,6 +426,70 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     if RETRY_REGEX.match(p) or p in CONVERSATIONAL_WORDS:
         return "catalogo_produtos"
 
+    # -1.8 Diagnostico Modular Generativo (Blocos Lego UI)
+    termos_modular = [
+        "diagnostico modular", "diagnostico generativo", "componente modular",
+        "blocos lego", "bloco lego", "lego blocks", "painel modular",
+        "visao modular", "dashboard modular", "componente generativo modular",
+        "diagnostico_modular", "generative_modular_card", "modular_lego_card"
+    ]
+    if any(t in p for t in termos_modular) or (("bloco" in p or "blocos" in p or "lego" in p or "modular" in p) and any(w in p for w in ["diagnostico", "componente", "card", "painel", "tela", "lego"])):
+        return "diagnostico_modular"
+
+    # -1.5 Auditoria de Conformidade LMC ANP (Portaria 26/1992 e Resolucao 894/2022)
+    termos_lmc_compliance = [
+        "auditar conformidade do lmc", "auditar conformidade lmc", "auditoria de conformidade lmc",
+        "audite a conformidade do lmc", "audite conformidade do lmc", "audite a conformidade",
+        "conformidade do lmc", "conformidade lmc",
+        "auditar conformidade anp", "conformidade volumetrica lmc", "conformidade volumétrica lmc",
+        "auditoria lmc anp", "auditar lmc anp", "lmc compliance", "relatorio de conformidade lmc",
+        "relatório de conformidade lmc", "auditoria volumetrica anp", "auditoria volumétrica anp",
+        "estanqueidade e lmc", "calibracao de bicos lmc", "calibração de bicos lmc",
+        "tolerancia anp", "tolerância anp", "tolerancia_anp",
+        "perda 060", "perda 0.60", "perda 0,60", "perda_060",
+        "tolerancia 0.60", "tolerância 0,60", "tolerancia 0.6", "tolerância 0,6",
+        "tolerancia de 0.60%", "tolerância de 0,60%", "tolerancia de 0.6%", "tolerância de 0,6%",
+        "auditoria lmc", "auditoria de lmc", "auditar lmc", "auditoria_lmc",
+        "livro movimentacao combustiveis", "livro_movimentacao_combustiveis",
+    ]
+    if any(t in p for t in termos_lmc_compliance):
+        return "auditar_conformidade_lmc_anp"
+
+    if "conformidade" in p and any(w in p for w in ["lmc", "tanque", "tanques", "anp", "volumetrica", "volumétrica"]):
+        return "auditar_conformidade_lmc_anp"
+
+    if ("tolerancia" in p or "tolerância" in p or "perda" in p or "sobra" in p or "quebra" in p) and any(w in p for w in ["0.6", "0,6", "0.60", "0,60", "060", "anp"]) and any(w in p for w in ["tanque", "tanques", "lmc", "combustivel", "combustível", "pista"]):
+        return "auditar_conformidade_lmc_anp"
+
+    # -1.2 Custo de Carregamento de Estoque & Indicadores Macroeconomicos (BACEN Selic, PTAX e PMPF CONFAZ)
+    termos_macro_exatos = [
+        "custo de carregamento", "custo de carregamento do estoque", "custo de oportunidade do estoque",
+        "custo financeiro do estoque", "capital imobilizado", "capital imobilizado nos tanques",
+        "custo de manter estoque", "custo de manter o estoque", "custo diário de carregamento",
+        "custo diario de carregamento", "custo mensal de carregamento", "taxa selic",
+        "selic no estoque", "impacto da selic", "impacto do dólar no estoque",
+        "impacto do dolar no estoque", "pauta fiscal pmpf", "pauta pmpf", "pmpf confaz",
+        "pauta confaz", "pauta da confaz", "spread pmpf", "pauta icms-st", "pauta icms st",
+        "pauta icms", "comprar carreta ou fracionado", "carreta fechada ou fracionada",
+        "compra fracionada vs carreta", "ato cotepe", "indicadores macro",
+        "indicadores macroeconômicos do posto", "indicadores macroeconomicos do posto",
+        "indicadores macro do posto", "custo estoque selic", "custo de estoque selic",
+        "custo_estoque_selic", "indicadores_macro_posto", "pauta_icms_st", "pmpf_confaz",
+        "custo selic", "custo selic do meu combustível nos estoques", "custo selic do meu combustivel nos estoques",
+    ]
+    if any(t in p for t in termos_macro_exatos):
+        return "custo_estoque_macro"
+
+    if any(w in p for w in ["selic", "ptax", "pmpf", "cotepe", "confaz", "icms-st", "icms st", "macro"]) and any(w in p for w in ["estoque", "tanque", "tanques", "custo", "carregamento", "combustível", "combustivel", "pauta", "gasolina", "diesel", "etanol", "posto", "bacen"]):
+        return "custo_estoque_macro"
+
+    if ("custo" in p or "capital" in p) and any(w in p for w in ["carregamento", "imobilizado", "oportunidade"]) and any(w in p for w in ["estoque", "tanque", "tanques", "combustível", "combustivel", "litros"]):
+        return "custo_estoque_macro"
+
+    # -0.8 Benchmark Comparativo ANP Municipal (Levantamento Semanal de Preços)
+    if "anp" in p and any(w in p for w in ["preço", "preco", "preços", "precos", "comparado", "comparar", "comparativo", "cidade", "municipio", "município"]):
+        return "benchmark_comparativo"
+
     # -1. Livro de Movimentação de Combustíveis (LMC Oficial ANP Portaria 26/1992)
     if any(t in p for t in TERMOS_LMC_EXATOS):
         return "lmc_anp"
@@ -397,7 +499,7 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
 
     if "anp" in p and any(w in p for w in [
         "livro", "tolerância", "tolerancia", "tanque", "tanques", "combustível", "combustivel",
-        "perda", "sobra", "variação", "variacao", "conformidade", "fiscal", "0.6", "0,6", "margem",
+        "perda", "sobra", "variação", "variacao", "fiscal", "0.6", "0,6", "margem",
         "quebra", "ganho", "regulamentar"
     ]):
         return "lmc_anp"
@@ -436,7 +538,7 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     if re.search(r"\b(se\s+(?:eu\s+)?(?:subir|aumentar|baixar|reduzir|elevar|reajustar)|o\s+que\s+acontece\s+se)\b", p):
         return "cenario_preditivo"
 
-    # F6-03: Micro-Widget BenchmarkComparisonUI
+# F6-03: Micro-Widget BenchmarkComparisonUI
     termos_benchmark_exatos = [
         "benchmark comparativo", "comparativo de turnos", "comparar turnos", "comparação de turnos",
         "comparacao de turnos", "turno a vs turno b", "comparativo de concorrentes", "comparar com a concorrência",
@@ -448,11 +550,32 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
         "frente ao mercado", "comparar com mercado", "comparativo com o mercado", "pesquisa de concorrência",
         "pesquisa de concorrencia", "pesquisa de mercado", "score competitivo", "score de competitividade",
         "concorrentes vizinhos", "postos vizinhos", "mais caro que a concorrência", "mais barato que a concorrência",
+        "postos mais baratos", "posto mais barato", "postos mais caros", "posto mais caro",
+        "mais baratos de gasolina", "mais baratos de etanol", "mais baratos de diesel",
+        "menor preço na cidade", "menor preco na cidade", "menor preço da cidade", "menor preco da cidade",
+        "maior preço na cidade", "maior preco na cidade", "ranking de postos", "ranking dos postos",
+        "postos da cidade", "postos na minha cidade", "preço na minha cidade", "preco na minha cidade",
+        "preços na cidade", "precos na cidade", "quem vende mais barato", "quem tem o menor preço",
     ]
     if any(t in p for t in termos_benchmark_exatos):
         return "benchmark_comparativo"
 
     if "benchmark" in p:
+        return "benchmark_comparativo"
+
+    if re.search(r"\bpostos?\b.*?\b(?:menor\s+pre[cç]o|mais\s+barat[oa]s?|mais\s+em\s+conta|mais\s+car[oa]s?)\b", p):
+        return "benchmark_comparativo"
+
+    if re.search(r"\b(?:menor\s+pre[cç]o|mais\s+barat[oa]s?|mais\s+em\s+conta|mais\s+car[oa]s?)\b.*?\bpostos?\b", p):
+        return "benchmark_comparativo"
+
+    if re.search(r"\bpostos?\s+(?:mais\s+)?(?:baratos?|caros?|em\s+conta)\b", p):
+        return "benchmark_comparativo"
+
+    if re.search(r"\b(?:menor|maior|melhor)\s+pre[cç]o\s+(?:de\s+\w+\s+)?(?:na|da)\s+(?:minha\s+)?cidade\b", p):
+        return "benchmark_comparativo"
+
+    if re.search(r"\bpostos?\s+(?:na|da)\s+(?:minha\s+)?cidade\b", p) and any(w in p for w in ["preço", "preco", "preços", "precos", "gasolina", "diesel", "etanol", "combustivel", "combustível", "barato", "caro"]):
         return "benchmark_comparativo"
 
     if ("concorrência" in p or "concorrencia" in p or "concorrentes" in p or "mercado" in p) and any(w in p for w in ["preço", "preco", "preços", "precos", "comparar", "comparativo", "raio", "vizinhos", "frente", "como"]):
@@ -1118,7 +1241,7 @@ class SemanticRouter:
                 last_similarity = similarity
                 intencao_detectada = melhor_match["intencao"]
 
-                # Priorizacao deterministica de Micro-Widgets GenUI e Mentoria Executiva (Fase 3 e Fase 6)
+                # Priorizacao deterministica de Micro-Widgets GenUI, Mentoria Executiva e Dados Publicos
                 intencao_h = classificar_intencao_heuristica(query_text)
                 if intencao_h in (
                     "mentoria_decisao",
@@ -1129,10 +1252,14 @@ class SemanticRouter:
                     "compliance_status",
                     "analise_margem",
                     "investigar_causa_raiz",
+                    "auditar_conformidade_lmc_anp",
+                    "custo_estoque_macro",
+                    "analisar_custo_estoque_macroeconomico",
+                    "diagnostico_modular",
                 ):
                     intencao_detectada = intencao_h
                     similarity = max(similarity, 0.95)
-                elif intencao_detectada not in ("lmc_anp", "ajuda_sistema"):
+                elif intencao_detectada not in ("lmc_anp", "ajuda_sistema", "auditar_conformidade_lmc_anp"):
                     if any(t in query_norm for t in TERMOS_LMC_EXATOS) or re.search(r"\blmc\b", query_norm):
                         intencao_detectada = "lmc_anp"
                         similarity = max(similarity, 0.88)

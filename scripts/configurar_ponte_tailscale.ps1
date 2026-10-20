@@ -99,11 +99,7 @@ foreach ($r in $rules) {
     $existing = Get-NetFirewallRule -Name $r.Name -ErrorAction SilentlyContinue
     if ($existing) {
         Write-Host "   [OK] Atualizando regra existente: $($r.DisplayName)" -ForegroundColor Green
-        if ($interfaceAlias) {
-            Set-NetFirewallRule -Name $r.Name -Enabled True -Action Allow -RemoteAddress "100.64.0.0/10" -InterfaceAlias $interfaceAlias -ErrorAction SilentlyContinue
-        } else {
-            Set-NetFirewallRule -Name $r.Name -Enabled True -Action Allow -RemoteAddress "100.64.0.0/10" -ErrorAction SilentlyContinue
-        }
+        Set-NetFirewallRule -Name $r.Name -Enabled True -Action Allow -RemoteAddress "100.64.0.0/10" -Profile Any -ErrorAction SilentlyContinue
     } else {
         $firewallParams = @{
             Name = $r.Name
@@ -117,12 +113,16 @@ foreach ($r in $rules) {
             Profile = "Any"
             ErrorAction = "SilentlyContinue"
         }
-        if ($interfaceAlias) {
-            $firewallParams["InterfaceAlias"] = $interfaceAlias
-        }
         New-NetFirewallRule @firewallParams | Out-Null
         Write-Host "   [CRIADA] Nova regra liberada: $($r.DisplayName) (Porta $($r.Port), Origem 100.64.0.0/10)" -ForegroundColor Green
     }
+}
+
+# 3.1 Limpar eventuais processos legados de servicos presos (STOP_PENDING)
+$stuckNssm = Get-Process -Name "nssm" -ErrorAction SilentlyContinue
+if ($stuckNssm) {
+    Write-Host "   [*] Encerrando processo travado nssm (PID: $($stuckNssm.Id))..." -ForegroundColor Yellow
+    Stop-Process -InputObject $stuckNssm -Force -ErrorAction SilentlyContinue
 }
 
 # 4. Verificar e Iniciar Servico PostgreSQL 16 (Porta 5433)

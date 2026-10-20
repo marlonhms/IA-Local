@@ -637,6 +637,7 @@ class BenchmarkComparisonProps(BaseModel):
     comparison_items: List[BenchmarkComparisonItem] = Field(default_factory=list, description="Lista de indicadores comparados")
     limitations: List[str] = Field(default_factory=list, description="Limitações da coleta de dados de concorrentes")
     suggested_actions: List[GenUIActionOption] = Field(default_factory=list, description="Ações táticas de ajuste")
+    ranking_postos_anp: Optional[Dict[str, Any]] = Field(default=None, description="Ranking dos postos mais baratos da ANP")
 
     @field_validator("diagnosis", "entity_name", "benchmark_group")
     @classmethod
@@ -983,5 +984,157 @@ class ComplianceStatusProps(BaseModel):
     suggested_actions: List[GenUIActionOption] = Field(default_factory=list, description="Acoes HITL executivas")
 
 
+class LMCTankComplianceItem(BaseModel):
+    """Fechamento e auditoria volumetrica por tanque no LMC (Portaria ANP 26/1992)."""
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
 
+    tanque: str = Field(..., description="Identificador do tanque")
+    combustivel: str = Field(..., description="Nome do combustivel")
+    capacidade_litros: float = Field(default=0.0, description="Capacidade maxima nominal em litros")
+    estoque_abertura_litros: float = Field(default=0.0, description="Estoque de abertura em litros")
+    recebimentos_descargas_litros: float = Field(default=0.0, description="Volume recebido via DFE/DANFE em litros")
+    vendas_bicos_litros: float = Field(default=0.0, description="Volume vendido registrado nos bicos em litros")
+    estoque_contabil_litros: float = Field(default=0.0, description="Estoque escriturado/contabil apurado em litros")
+    estoque_fisico_medido_litros: float = Field(default=0.0, description="Estoque fisico apurado em regua ou sonda em litros")
+    variacao_litros: float = Field(default=0.0, description="Variacao volumetrica liquida (fisico - contabil) em litros")
+    variacao_pct: float = Field(default=0.0, description="Variacao volumetrica percentual sobre as vendas (%)")
+    tolerancia_max_pct: float = Field(default=0.60, description="Tolerancia legal maxima da ANP (+-0.60%)")
+    tolerancia_max_litros: float = Field(default=0.0, description="Volume maximo tolerado em litros")
+    status: str = Field(default="CONFORME", description="CONFORME ou CRITICO")
+    diagnostico: str = Field(default="", description="Parecer operacional e regulatorio do tanque")
+
+
+class LMCComplianceProps(BaseModel):
+    """Propriedades do Micro-Widget LMCComplianceReportUI (Portaria ANP 26/1992 e Resolucao ANP 894/2022)."""
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
+
+    diagnosis: str = Field(..., description="Diagnostico regulatorio consolidado do LMC")
+    status: str = Field(default="CONFORME", description="Status geral: CONFORME ou CRITICO")
+    confidence_score: float = Field(default=0.98, ge=0.0, le=1.0, description="Confianca na auditoria volumetrica")
+    data_analise: str = Field(..., description="Data de referencia analisada (YYYY-MM-DD)")
+    variacao_geral_pct: float = Field(default=0.0, description="Variacao percentual consolidada sobre o total de vendas (%)")
+    tolerancia_legal_pct: float = Field(default=0.60, description="Tolerancia regulamentar maxima da ANP (0.60%)")
+    total_vendas_litros: float = Field(default=0.0, description="Volume total vendido atraves dos bicos (L)")
+    total_recebimentos_litros: float = Field(default=0.0, description="Volume total recebido de descargas (L)")
+    total_estoque_contabil_litros: float = Field(default=0.0, description="Estoque contabil escriturado total (L)")
+    total_estoque_fisico_litros: float = Field(default=0.0, description="Estoque fisico total medido em regua/telemetria (L)")
+    total_variacao_litros: float = Field(default=0.0, description="Variacao volumetrica liquida consolidada (L)")
+    tanques: List[LMCTankComplianceItem] = Field(default_factory=list, description="Detalhamento individualizado por tanque")
+    tanques_criticos: List[Dict[str, Any]] = Field(default_factory=list, description="Lista de tanques com variacao fora de +-0.60%")
+    parecer_regulatorio: str = Field(..., description="Parecer juridico-regulatorio fundamentado na Portaria ANP 26/1992")
+    suggested_actions: List[GenUIActionOption] = Field(default_factory=list, description="Acoes HITL interativas recomendadas")
+
+
+class MacroeconomicInventoryCostProps(BaseModel):
+    """Propriedades do Micro-Widget MacroeconomicInventoryCostUI (BACEN Selic, PTAX e PMPF CONFAZ)."""
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
+
+    diagnosis: str = Field(..., description="Diagnostico executivo de custo de oportunidade de estoque e pauta fiscal")
+    confidence_score: float = Field(default=0.95, ge=0.0, le=1.0, description="Confianca estatistica dos indicadores")
+    volume_total_litros: float = Field(..., description="Volume total estocado nos tanques em litros")
+    custo_medio_litro: float = Field(..., description="Custo medio de aquisicao por litro em R$")
+    capital_imobilizado_reais: float = Field(..., description="Total de capital financeiro imobilizado nos tanques em R$")
+    taxa_selic_anual_pct: float = Field(..., description="Taxa Selic anualizada oficial do BACEN (Serie 11 SGS)")
+    taxa_cambio_ptax: float = Field(default=0.0, description="Taxa de cambio PTAX Dolar comercial de venda do BACEN")
+    custo_diario_carregamento_reais: float = Field(..., description="Custo financeiro diario de carregamento (Selic/252)")
+    custo_mensal_carregamento_reais: float = Field(..., description="Custo financeiro mensal de carregamento (21 dias uteis)")
+    uf_referencia: str = Field(default="SP", description="UF de referencia da tributacao")
+    produto_referencia: str = Field(default="GASOLINA COMUM", description="Produto analisado na pauta fiscal")
+    pmpf_vigente_reais: Optional[float] = Field(default=None, description="Preco Medio Ponderado a Consumidor Final (PMPF) CONFAZ")
+    spread_pmpf_reais: Optional[float] = Field(default=None, description="Spread em R$/L entre o custo do posto e a pauta PMPF")
+    spread_pmpf_pct: Optional[float] = Field(default=None, description="Spread percentual frente ao custo do posto (%)")
+    ato_cotepe: Optional[str] = Field(default=None, description="Ato COTEPE publicador da pauta PMPF")
+    vigencia_pmpf: Optional[str] = Field(default=None, description="Data de vigencia inicial da pauta PMPF")
+    recomendacao_compra: str = Field(..., description="Orientacao executiva para compra fracionada vs carreta fechada")
+    suggested_actions: List[GenUIActionOption] = Field(default_factory=list, description="Acoes HITL estrategicas recomendadas")
+
+
+# =============================================================================
+# BLOCOS MODULARES GENERATIVOS (LEGO BLOCKS UI - FASE 7+)
+# =============================================================================
+
+class LegoKpiItem(BaseModel):
+    """Item individual de indicador/metrica para grid modular."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    label: str = Field(..., description="Nome do indicador (ex: Faturamento, Volume, Margem)")
+    value: str = Field(..., description="Valor formatado (ex: R$ 42.500,00, 15.200 L, +18.5%)")
+    delta: Optional[str] = Field(default=None, description="Variacao frente ao periodo anterior ou meta (ex: +5.2%)")
+    trend: Optional[str] = Field(default="neutral", description="Tendencia: up, down ou neutral")
+    status: str = Field(default="neutral", description="Status semantico: success, warning, danger, neutral")
+    subtext: Optional[str] = Field(default=None, description="Texto complementar de contexto (ex: Meta: R$ 40k)")
+
+
+class LegoComparisonRow(BaseModel):
+    """Linha de confronto comparativo entre entidades (ex: Filial vs Mercado ou Turno A vs Turno B)."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    name: str = Field(..., description="Nome do item ou parametro comparado")
+    primary_value: str = Field(..., description="Valor principal (ex: Filial)")
+    secondary_value: str = Field(..., description="Valor de referencia (ex: Mercado ou Meta)")
+    gap: Optional[str] = Field(default=None, description="Diferenca apurada (ex: +R$ 0,15, -2,1 pp)")
+    status: str = Field(default="neutral", description="Status semantico: success, warning, danger, neutral")
+    observation: Optional[str] = Field(default=None, description="Observacao executiva da linha")
+
+
+class LegoRankingItem(BaseModel):
+    """Item ranqueado com posicao e medalha (ex: Top Postos, Ranking de Bicos ou Frentistas)."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    rank: int = Field(..., ge=1, description="Posicao no ranking (1, 2, 3...)")
+    title: str = Field(..., description="Titulo ou nome da entidade (ex: Posto Alpha, Bico 03)")
+    subtitle: Optional[str] = Field(default=None, description="Subtitulo ou bandeira (ex: Shell, Pista Central)")
+    value: str = Field(..., description="Valor principal em destaque (ex: R$ 5,39, 4.250 L)")
+    tag: Optional[str] = Field(default=None, description="Tag ou classificacao (ex: 1º Quartil, Lider)")
+    status: str = Field(default="neutral", description="Status: success, warning, danger, neutral")
+
+
+class LegoTimelineEvent(BaseModel):
+    """Evento em linha do tempo (ex: marcos do turno, afericoes, alertas historicos)."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    timestamp: str = Field(..., description="Horario ou data do evento (ex: 14:32 ou 2026-10-18)")
+    title: str = Field(..., description="Titulo do evento")
+    description: Optional[str] = Field(default=None, description="Descricao detalhada")
+    badge: Optional[str] = Field(default=None, description="Badge descritivo")
+    status: str = Field(default="neutral", description="Status: success, warning, danger, neutral")
+
+
+class LegoAlertItem(BaseModel):
+    """Callout de alerta ou diagnostico critico."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    title: str = Field(..., description="Titulo do alerta")
+    message: str = Field(..., description="Mensagem analitica do alerta")
+    severity: str = Field(default="info", description="Severidade: info, warning, critical, success")
+    action_label: Optional[str] = Field(default=None, description="Rotulo de acao rapida opcional")
+
+
+class LegoBlock(BaseModel):
+    """Bloco modular generativo empilhavel."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    block_id: str = Field(..., description="Identificador unico do bloco")
+    block_type: str = Field(..., description="Tipo do bloco: kpi_grid, comparison_table, ranking_list, timeline_feed, alert_callout, custom_content")
+    title: Optional[str] = Field(default=None, description="Titulo do bloco")
+    subtitle: Optional[str] = Field(default=None, description="Subtitulo explicativo")
+    kpis: List[LegoKpiItem] = Field(default_factory=list, description="Lista de KPIs (para block_type=kpi_grid)")
+    comparison_rows: List[LegoComparisonRow] = Field(default_factory=list, description="Linhas de confronto (para block_type=comparison_table)")
+    ranking_items: List[LegoRankingItem] = Field(default_factory=list, description="Itens de ranking (para block_type=ranking_list)")
+    timeline_events: List[LegoTimelineEvent] = Field(default_factory=list, description="Eventos de timeline (para block_type=timeline_feed)")
+    alert: Optional[LegoAlertItem] = Field(default=None, description="Item de alerta (para block_type=alert_callout)")
+    custom_content: Optional[str] = Field(default=None, description="Conteudo textual ou markdown customizado")
+
+
+class GenerativeModularProps(BaseModel):
+    """Propriedades do Micro-Widget GenerativeModularCardUI (Blocos Lego Generativos)."""
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
+
+    title: str = Field(..., description="Titulo executivo do card generativo")
+    subtitle: Optional[str] = Field(default=None, description="Subtitulo de contexto")
+    diagnosis: str = Field(..., description="Diagnostico executivo consolidado")
+    confidence_score: float = Field(default=0.95, ge=0.0, le=1.0, description="Confianca estatistica (0.0 a 1.0)")
+    blocks: List[LegoBlock] = Field(default_factory=list, description="Lista ordenada de blocos modulares lego a renderizar")
+    limitations: List[str] = Field(default_factory=list, description="Limitacoes ou avisos amostrais")
+    suggested_actions: List[GenUIActionOption] = Field(default_factory=list, description="Acoes transacionais HITL")
 

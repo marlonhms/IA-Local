@@ -1394,6 +1394,27 @@
       const marketPos = p.market_position || null;
       const limitations = Array.isArray(p.limitations) ? p.limitations : [];
 
+      let rankingList = [];
+      let rankingFuelName = 'Gasolina Comum';
+      if (p.ranking_postos_anp) {
+        if (Array.isArray(p.ranking_postos_anp)) {
+          rankingList = p.ranking_postos_anp;
+        } else if (typeof p.ranking_postos_anp === 'object') {
+          if (Array.isArray(p.ranking_postos_anp.gasolina_comum) && p.ranking_postos_anp.gasolina_comum.length > 0) {
+            rankingList = p.ranking_postos_anp.gasolina_comum;
+            rankingFuelName = 'Gasolina Comum';
+          } else {
+            for (const [k, v] of Object.entries(p.ranking_postos_anp)) {
+              if (Array.isArray(v) && v.length > 0) {
+                rankingList = v;
+                rankingFuelName = k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                break;
+              }
+            }
+          }
+        }
+      }
+
       return `
         <div class="genui-layer genui-layer-2 mb-4 space-y-3">
           ${marketPos ? `
@@ -1431,6 +1452,46 @@
               `;
             }).join('')}
           </div>
+
+          ${rankingList.length > 0 ? `
+            <!-- Ranking de Concorrentes Mais Baratos (Base Oficial ANP) -->
+            <div class="p-3 rounded-xl bg-slate-950/60 border border-emerald-500/30 space-y-2">
+              <div class="flex items-center justify-between text-xs font-mono">
+                <span class="text-emerald-400 font-bold uppercase flex items-center gap-1.5">
+                  <span>🏆</span>
+                  <span>Top Postos Mais Baratos (${escapeHtml(rankingFuelName)} - Base ANP)</span>
+                </span>
+                <span class="text-[10px] text-emerald-300/80 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/20">Oficial ANP</span>
+              </div>
+              <div class="space-y-1.5 pt-1">
+                ${rankingList.slice(0, 5).map((st, idx) => {
+                  const rankNum = idx + 1;
+                  const postoNome = escapeHtml(st.posto || st.revenda || 'Posto Concorrente');
+                  const bandeira = escapeHtml(st.bandeira || 'Branca');
+                  const preco = Number(st.preco || st.valor_venda || 0).toFixed(2).replace('.', ',');
+                  const dataColeta = st.data_coleta ? escapeHtml(String(st.data_coleta).substring(0, 10)) : '';
+                  const medalha = rankNum === 1 ? '🥇 1º' : (rankNum === 2 ? '🥈 2º' : (rankNum === 3 ? '🥉 3º' : `${rankNum}º`));
+
+                  return `
+                    <div class="p-2 rounded-lg bg-slate-900/80 border border-white/5 flex items-center justify-between gap-2 text-xs">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <span class="font-mono font-bold text-amber-300 text-[11px] whitespace-nowrap">${medalha}</span>
+                        <div class="min-w-0">
+                          <div class="font-semibold text-slate-100 truncate">${postoNome}</div>
+                          <div class="text-[10px] text-slate-400 font-mono">
+                            Bandeira: <span class="text-slate-300">${bandeira}</span>${dataColeta ? ` • Coleta: ${dataColeta}` : ''}
+                          </div>
+                        </div>
+                      </div>
+                      <div class="text-right flex-shrink-0">
+                        <span class="font-mono font-bold text-emerald-400 text-sm">R$ ${preco}</span>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          ` : ''}
 
           ${limitations.length > 0 ? `
             <div class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200">
@@ -2238,6 +2299,256 @@
     }
   }
 
+
+  // =========================================================================
+  // 9. MICRO-WIDGET MODULAR GENERATIVO: GenerativeModularCardUI (Blocos Lego)
+  // =========================================================================
+
+  class GenerativeModularCardUI extends BaseGenUIWidget {
+    constructor(payload = {}) {
+      super(payload, 'diagnostico_modular', 'render_GenerativeModularCardUI');
+      this.cardClass = 'genui-modular-lego-card';
+      this.ariaLabel = 'Diagnostico Executivo Modular Generativo AURA';
+    }
+
+    renderLayer1() {
+      const p = this.props || {};
+      const title = p.title || 'AURA Diagnóstico Modular Generativo';
+      const subtitle = p.subtitle || 'Composição Dinâmica em Blocos Lego';
+      const scoreRaw = p.confidence_score !== undefined ? Number(p.confidence_score) : 0.95;
+      const scorePct = Math.round(scoreRaw * 100);
+      const diagnosisText = p.diagnosis || this.summary || 'Diagnóstico operacional construído dinamicamente a partir dos blocos analíticos.';
+
+      const scoreColor = scorePct >= 90
+        ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10'
+        : (scorePct >= 75 ? 'text-amber-300 border-amber-500/40 bg-amber-500/10' : 'text-slate-300 border-slate-600 bg-slate-800/40');
+
+      return `
+        <div class="genui-layer genui-layer-1 mb-4 pb-3 border-b border-white/10">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse flex-shrink-0"></span>
+              <h4 class="text-xs font-mono font-bold tracking-wider text-cyan-300 uppercase">
+                ${escapeHtml(title)}
+              </h4>
+              <span class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">
+                ${escapeHtml(this.toolCallId.substring(0, 14))}...
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full border ${scoreColor} font-semibold flex items-center gap-1">
+                <svg class="w-3 h-3 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>${scorePct}% Confiança</span>
+              </span>
+            </div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
+            <div class="flex items-center justify-between text-[10px] font-mono">
+              <span class="text-cyan-400 font-bold uppercase">${escapeHtml(subtitle)}</span>
+              <span class="text-slate-400">Intelligent UI : Blocos Lego</span>
+            </div>
+            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+              ${escapeHtml(diagnosisText)}
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const p = this.props || {};
+      const blocks = Array.isArray(p.blocks) ? p.blocks : [];
+      const limitations = Array.isArray(p.limitations) ? p.limitations : [];
+
+      if (blocks.length === 0) {
+        return `
+          <div class="genui-layer genui-layer-2 mb-4 p-4 rounded-xl bg-slate-950/40 border border-white/5 text-center text-xs text-slate-400">
+            Nenhum bloco analítico registrado para esta consulta.
+          </div>
+        `;
+      }
+
+      return `
+        <div class="genui-layer genui-layer-2 mb-4 space-y-3.5">
+          ${blocks.map(b => this.renderSingleLegoBlock(b)).join('')}
+
+          ${limitations.length > 0 ? `
+            <div class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200">
+              <span class="font-mono font-bold text-amber-300 uppercase">Avisos Operacionais: </span>
+              <span>${limitations.map(l => escapeHtml(l)).join(' • ')}</span>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    renderSingleLegoBlock(b = {}) {
+      const bType = b.block_type || 'custom_content';
+      const bTitle = b.title ? escapeHtml(b.title) : null;
+      const bSubtitle = b.subtitle ? escapeHtml(b.subtitle) : null;
+
+      let icon = '📌';
+      if (bType === 'kpi_grid') icon = '📊';
+      else if (bType === 'comparison_table') icon = '⚖️';
+      else if (bType === 'ranking_list') icon = '🏆';
+      else if (bType === 'timeline_feed') icon = '⏱️';
+      else if (bType === 'alert_callout') icon = '🚨';
+
+      const headerHtml = bTitle ? `
+        <div class="flex items-center justify-between text-xs border-b border-white/5 pb-1.5 mb-2.5">
+          <span class="font-bold text-slate-100 flex items-center gap-1.5">
+            <span>${icon}</span>
+            <span>${bTitle}</span>
+          </span>
+          ${bSubtitle ? `<span class="text-[10px] text-slate-400 font-mono">${bSubtitle}</span>` : ''}
+        </div>
+      ` : '';
+
+      let bodyHtml = '';
+
+      if (bType === 'kpi_grid') {
+        const kpis = Array.isArray(b.kpis) ? b.kpis : [];
+        bodyHtml = `
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            ${kpis.map(k => {
+              const st = k.status || 'neutral';
+              const statusBorder = st === 'success' ? 'border-emerald-500/30' : (st === 'danger' ? 'border-rose-500/30' : (st === 'warning' ? 'border-amber-500/30' : 'border-white/5'));
+              const valueColor = st === 'success' ? 'text-emerald-400' : (st === 'danger' ? 'text-rose-400' : (st === 'warning' ? 'text-amber-300' : 'text-cyan-300'));
+              const trendArrow = k.trend === 'up' ? '↗' : (k.trend === 'down' ? '↘' : '→');
+              return `
+                <div class="p-2.5 rounded-lg bg-slate-950/60 border ${statusBorder} flex flex-col justify-between">
+                  <div class="text-[11px] text-slate-400 truncate">${escapeHtml(k.label || 'Métrica')}</div>
+                  <div class="font-mono font-bold text-base ${valueColor} my-0.5">${escapeHtml(String(k.value || '0'))}</div>
+                  <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                    ${k.delta ? `<span class="text-slate-300">${trendArrow} ${escapeHtml(k.delta)}</span>` : '<span></span>'}
+                    ${k.subtext ? `<span class="truncate ml-1 text-slate-400">${escapeHtml(k.subtext)}</span>` : ''}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      } else if (bType === 'comparison_table') {
+        const rows = Array.isArray(b.comparison_rows) ? b.comparison_rows : [];
+        bodyHtml = `
+          <div class="space-y-1.5">
+            ${rows.map(r => {
+              const st = r.status || 'neutral';
+              const badge = st === 'success'
+                ? '<span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">Vantagem</span>'
+                : (st === 'danger' ? '<span class="px-1.5 py-0.5 rounded text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/30">Atenção</span>' : '');
+              return `
+                <div class="p-2 rounded-lg bg-slate-950/50 border border-white/5 flex items-center justify-between gap-2 text-xs">
+                  <div class="min-w-0">
+                    <div class="font-bold text-slate-200 truncate">${escapeHtml(r.name || 'Item')}</div>
+                    <div class="text-[10px] text-slate-400 font-mono">
+                      Filial: <span class="text-slate-100 font-semibold">${escapeHtml(String(r.primary_value ?? '-'))}</span> • Ref: ${escapeHtml(String(r.secondary_value ?? '-'))}
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1.5 flex-shrink-0">
+                    ${r.gap ? `<span class="font-mono text-[11px] font-bold text-cyan-300">${escapeHtml(r.gap)}</span>` : ''}
+                    ${badge}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      } else if (bType === 'ranking_list') {
+        const items = Array.isArray(b.ranking_items) ? b.ranking_items : [];
+        bodyHtml = `
+          <div class="space-y-1.5">
+            ${items.map((item, idx) => {
+              const rankNum = item.rank || (idx + 1);
+              const medal = rankNum === 1 ? '🥇 1º' : (rankNum === 2 ? '🥈 2º' : (rankNum === 3 ? '🥉 3º' : `${rankNum}º`));
+              return `
+                <div class="p-2 rounded-lg bg-slate-950/50 border border-white/5 flex items-center justify-between gap-2 text-xs">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="font-mono font-bold text-amber-300 text-[11px]">${medal}</span>
+                    <div class="min-w-0">
+                      <div class="font-semibold text-slate-100 truncate">${escapeHtml(item.title || 'Entidade')}</div>
+                      ${item.subtitle ? `<div class="text-[10px] text-slate-400 font-mono truncate">${escapeHtml(item.subtitle)}</div>` : ''}
+                    </div>
+                  </div>
+                  <div class="text-right flex-shrink-0">
+                    <div class="font-mono font-bold text-emerald-400 text-sm">${escapeHtml(String(item.value || ''))}</div>
+                    ${item.tag ? `<span class="text-[9px] text-slate-400 font-mono bg-slate-800 px-1 py-0.5 rounded">${escapeHtml(item.tag)}</span>` : ''}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      } else if (bType === 'timeline_feed') {
+        const events = Array.isArray(b.timeline_events) ? b.timeline_events : [];
+        bodyHtml = `
+          <div class="space-y-2 border-l border-cyan-500/30 pl-3 ml-1.5 pt-1">
+            ${events.map(ev => `
+              <div class="relative">
+                <span class="absolute -left-[17px] top-1 w-2 h-2 rounded-full bg-cyan-400 ring-2 ring-slate-950"></span>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="font-semibold text-slate-200">${escapeHtml(ev.title || 'Evento')}</span>
+                  <span class="font-mono text-[10px] text-slate-400">${escapeHtml(ev.timestamp || '')}</span>
+                </div>
+                ${ev.description ? `<p class="text-[11px] text-slate-400 mt-0.5">${escapeHtml(ev.description)}</p>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else if (bType === 'alert_callout' && b.alert) {
+        const sev = b.alert.severity || 'warning';
+        const alertBorder = sev === 'critical' ? 'border-rose-500/40' : (sev === 'warning' ? 'border-amber-500/40' : (sev === 'success' ? 'border-emerald-500/40' : 'border-cyan-500/40'));
+        const alertBg = sev === 'critical' ? 'bg-rose-500/10' : (sev === 'warning' ? 'bg-amber-500/10' : (sev === 'success' ? 'bg-emerald-500/10' : 'bg-cyan-500/10'));
+        const alertText = sev === 'critical' ? 'text-rose-300' : (sev === 'warning' ? 'text-amber-300' : (sev === 'success' ? 'text-emerald-300' : 'text-cyan-300'));
+        const alIcon = sev === 'critical' ? '🚨' : (sev === 'warning' ? '⚠️' : (sev === 'success' ? '✅' : 'ℹ️'));
+        bodyHtml = `
+          <div class="p-3 rounded-xl border ${alertBorder} ${alertBg} text-xs space-y-1">
+            <div class="font-bold flex items-center gap-1.5 ${alertText}">
+              <span>${alIcon}</span>
+              <span>${escapeHtml(b.alert.title || 'Alerta')}</span>
+            </div>
+            <p class="text-[11px] text-slate-300 leading-relaxed">${escapeHtml(b.alert.message || '')}</p>
+            ${b.alert.action_label ? `<div class="pt-1 text-[10px] font-mono text-cyan-300 font-semibold">${escapeHtml(b.alert.action_label)}</div>` : ''}
+          </div>
+        `;
+      } else {
+        bodyHtml = `
+          <div class="text-xs text-slate-300 leading-relaxed">
+            ${escapeHtml(b.custom_content || '')}
+          </div>
+        `;
+      }
+
+      return `
+        <div class="p-3.5 rounded-xl bg-slate-900/70 border border-white/5 space-y-2" data-block-id="${escapeHtml(b.block_id || 'blk')}">
+          ${headerHtml}
+          ${bodyHtml}
+        </div>
+      `;
+    }
+
+    getDefaultActionsHtml() {
+      const shouldDisable = this.state.isLocked || this.isExpired();
+      return `
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-blue-500 to-cyan-600 text-slate-950 font-bold hover:brightness-110 ${shouldDisable ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
+                data-action-id="act_modular_aplicar"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}"
+                ${shouldDisable ? 'disabled' : ''}>
+          <span>⚡ Aplicar Recomendação</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-cyan-200 border border-cyan-500/30 hover:bg-slate-700"
+                data-action-id="act_modular_canvas"
+                data-action-type="inspection"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>🔍 Inspecionar no Canvas</span>
+        </button>
+      `;
+    }
+  }
+
   const ExecutiveBriefingWidget = ExecutiveDecisionMentorUI;
   const MarginProfitabilityWidget = MarginAnalysisUI;
   const PredictiveScenarioWidget = PredictiveScenarioUI;
@@ -2307,6 +2618,12 @@
         cls: ComplianceStatusUI,
         aliases: ['ComplianceStatusUI', 'ComplianceStatusWidget', 'render_ComplianceUI'],
         intent: 'compliance_status'
+      },
+      {
+        name: 'render_GenerativeModularCardUI',
+        cls: GenerativeModularCardUI,
+        aliases: ['GenerativeModularCardUI', 'DynamicLegoCardUI', 'render_ModularLegoCardUI'],
+        intent: 'diagnostico_modular'
       }
     ];
 
@@ -2439,6 +2756,7 @@
     window.AuraGenUI.BasketUpsellStrategyUI = BasketUpsellStrategyUI;
     window.AuraGenUI.BasketUpsellWidget = BasketUpsellWidget;
     window.AuraGenUI.ComplianceStatusUI = ComplianceStatusUI;
+    window.AuraGenUI.GenerativeModularCardUI = GenerativeModularCardUI;
     window.AuraGenUI.ComplianceStatusWidget = ComplianceStatusWidget;
     window.AuraGenUI.ShiftReconciliationUI = ShiftReconciliationUI;
     window.AuraGenUI.ShiftReconciliationWidget = ShiftReconciliationWidget;

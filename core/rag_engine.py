@@ -468,16 +468,18 @@ class HybridRAGEngine:
         fetch_limit = min(50, top_k * 10)
 
         t_db_start = time.perf_counter()
+        retrieval_mode = "hybrid_hnsw_rrf" if query_vector is not None else "sparse_fts_fallback"
+        results = []
 
-        with self._get_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        try:
+            with self._get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
                 if query_vector is not None:
                     sql_rrf = f"""
                     SET LOCAL hnsw.ef_search = {ef};
 
                     WITH dense_search AS (
                         SELECT 
-                            id, modulo, topico, titulo, subtitulo, conteudo, elementos_ui, ui_action, tags,
+                            id, modulo, topico, titulo, subtitulo, conteudo, metadados, elementos_ui, ui_action, tags,
                             1 - (embedding <=> %s::halfvec) AS cosine_similarity,
                             ROW_NUMBER() OVER (ORDER BY embedding <=> %s::halfvec) AS dense_rank
                         FROM aura_conhecimento_vetores
@@ -487,7 +489,7 @@ class HybridRAGEngine:
                     ),
                     sparse_search AS (
                         SELECT 
-                            id, modulo, topico, titulo, subtitulo, conteudo, elementos_ui, ui_action, tags,
+                            id, modulo, topico, titulo, subtitulo, conteudo, metadados, elementos_ui, ui_action, tags,
                             CASE 
                                 WHEN %s <> '' AND to_tsquery('portuguese', %s) IS NOT NULL THEN
                                     ts_rank_cd(tsv, to_tsquery('portuguese', %s))
@@ -518,6 +520,7 @@ class HybridRAGEngine:
                         COALESCE(d.titulo, s.titulo) AS titulo,
                         COALESCE(d.subtitulo, s.subtitulo) AS subtitulo,
                         COALESCE(d.conteudo, s.conteudo) AS conteudo,
+                        COALESCE(d.metadados, s.metadados) AS metadados,
                         COALESCE(d.elementos_ui, s.elementos_ui) AS elementos_ui,
                         COALESCE(d.ui_action, s.ui_action) AS ui_action,
                         COALESCE(d.tags, s.tags) AS tags,
@@ -556,7 +559,7 @@ class HybridRAGEngine:
                     # Recuperação esparsa ultra-rápida (sub-1ms) em fallback
                     sql_sparse = f"""
                     SELECT 
-                        id, modulo, topico, titulo, subtitulo, conteudo, elementos_ui, ui_action, tags,
+                        id, modulo, topico, titulo, subtitulo, conteudo, metadados, elementos_ui, ui_action, tags,
                         0.0 AS cosine_similarity,
                         CASE 
                             WHEN %s <> '' AND to_tsquery('portuguese', %s) IS NOT NULL THEN
@@ -607,7 +610,7 @@ class HybridRAGEngine:
                 if not results:
                     cur.execute("""
                         SELECT 
-                            id, modulo, topico, titulo, subtitulo, conteudo, elementos_ui, ui_action, tags,
+                            id, modulo, topico, titulo, subtitulo, conteudo, metadados, elementos_ui, ui_action, tags,
                             0.0 AS cosine_similarity, 0.0 AS fts_score, NULL::bigint AS dense_rank, 1::bigint AS sparse_rank,
                             0.04762 AS rrf_score
                         FROM aura_conhecimento_vetores
@@ -615,6 +618,40 @@ class HybridRAGEngine:
                         LIMIT 1;
                     """)
                     results = cur.fetchall()
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Falha ao consultar banco vetorial: %s. Ativando fallback em memoria.", e)
+            retrieval_mode = "offline_memory_fallback"
+            try:
+                from scripts.seed_aura_conhecimento import CONHECIMENTO_SEEDS
+                q_words = [w for w in re.findall(r"[\w]+", q_clean.lower()) if len(w) > 2]
+                scored = []
+                for seed in CONHECIMENTO_SEEDS:
+                    text_blob = f"{seed['titulo']} {seed.get('subtitulo', '')} {seed['topico']} {seed['modulo']} {seed['conteudo']} {' '.join(seed.get('tags', []))}".lower()
+                    score = sum(1 for w in q_words if w in text_blob)
+                    if score > 0:
+                        scored.append((score, seed))
+                scored.sort(key=lambda x: x[0], reverse=True)
+                if scored:
+                    for s in scored[:top_k]:
+                        item = dict(s[1])
+                        item.setdefault("id", None)
+                        item.setdefault("cosine_similarity", 0.0)
+                        item.setdefault("fts_score", 0.0)
+                        item.setdefault("dense_rank", None)
+                        item.setdefault("sparse_rank", 1)
+                        item.setdefault("rrf_score", 0.04762)
+                        results.append(item)
+                else:
+                    item = dict(CONHECIMENTO_SEEDS[0])
+                    item.setdefault("id", None)
+                    item.setdefault("cosine_similarity", 0.0)
+                    item.setdefault("fts_score", 0.0)
+                    item.setdefault("dense_rank", None)
+                    item.setdefault("sparse_rank", 1)
+                    item.setdefault("rrf_score", 0.04762)
+                    results.append(item)
+            except Exception:  # noqa: BLE001
+                results = []
 
         db_latency_ms = (time.perf_counter() - t_db_start) * 1000
         total_latency_ms = (time.perf_counter() - t0) * 1000
@@ -629,7 +666,7 @@ class HybridRAGEngine:
             "rrf_k": self.rrf_k,
             "top_k": top_k,
             "results_count": len(results),
-            "retrieval_mode": "hybrid_hnsw_rrf" if query_vector is not None else "sparse_fts_fallback",
+            "retrieval_mode": retrieval_mode,
         }
 
         return {

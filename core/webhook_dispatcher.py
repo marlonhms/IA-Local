@@ -38,6 +38,7 @@ from core.outbox import (
     get_transactional_outbox,
 )
 from core.webhooks import (
+    AlertaLMCCompliancePayload,
     AlertaSangriaPayload,
     AlertaTanquePayload,
     PedidoCombustivelPayload,
@@ -45,9 +46,11 @@ from core.webhooks import (
     WebhookDispatchResult,
     dispatch_evolution_message,
     dispatch_n8n_webhook,
+    format_alerta_lmc_whatsapp_message,
     format_alerta_sangria_whatsapp_message,
     format_alerta_tanque_whatsapp_message,
     format_turno_whatsapp_message,
+    notify_alerta_lmc,
     notify_alerta_sangria,
     notify_alerta_tanque,
     notify_fechamento_turno,
@@ -523,6 +526,7 @@ def set_webhook_dispatcher(dispatcher: AuraWebhookDispatcher | None) -> None:
 
 
 __all__ = [
+    "AlertaLMCCompliancePayload",
     "AlertaSangriaPayload",
     "AlertaTanquePayload",
     "AuraWebhookDispatcher",
@@ -531,10 +535,12 @@ __all__ = [
     "WebhookDispatchResult",
     "dispatch_evolution_message",
     "dispatch_n8n_webhook",
+    "format_alerta_lmc_whatsapp_message",
     "format_alerta_sangria_whatsapp_message",
     "format_alerta_tanque_whatsapp_message",
     "format_turno_whatsapp_message",
     "get_webhook_dispatcher",
+    "notify_alerta_lmc",
     "notify_alerta_sangria",
     "notify_alerta_tanque",
     "notify_fechamento_turno",

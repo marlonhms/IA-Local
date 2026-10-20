@@ -1075,8 +1075,50 @@ class AuraAuxPanel {
       fields: []
     };
 
+    // MÓDULO 0-A: DIAGNÓSTICO MODULAR GENERATIVO (BLOCOS LEGO)
+    if (effectiveIntent === 'diagnostico_modular' || effectiveIntent === 'modular_card' || toolName === 'render_GenerativeModularCardUI' || toolName === 'GenerativeModularCardUI') {
+      title = c.title || data?.props?.title || data?.title || '🧩 Diagnóstico Executivo Modular';
+      subtitle = c.diagnosis || c.subtitle || data?.props?.diagnosis || data?.subtitle || 'Métricas & Prioridades de Gestão em Blocos';
+      const score = c.confidence_score !== undefined ? Math.round(Number(c.confidence_score) * 100) : (data?.props?.confidence_score !== undefined ? Math.round(Number(data.props.confidence_score) * 100) : 98);
+      statusChip = {
+        label: ${score}% Confiança Analítica,
+        severity: score >= 90 ? 'success' : 'attention'
+      };
+
+      const metricsList = c.metrics || data?.props?.metrics || data?.metrics || [];
+      records = metricsList.map(m => ({
+        'Indicador Executivo': m.label || '-',
+        'Valor Atual': m.current_value !== undefined ? String(m.current_value) : '-',
+        'Benchmark / Meta': m.benchmark_value !== undefined ? String(m.benchmark_value) : '-',
+        'Tendência': m.trend === 'up' ? '▲ Alta' : (m.trend === 'down' ? '▼ Queda' : '▬ Neutro'),
+        'Status': m.status === 'success' ? '✔ Conforme' : (m.status === 'danger' ? '✖ Crítico' : (m.status === 'warning' ? '⚠ Atenção' : 'Neutro'))
+      }));
+
+      summaryKpis = [
+        { label: 'Score Confiança', value: ${score}%, sub: 'Auditado Determinístico' },
+        { label: 'Métricas Apuradas', value: ${records.length}, sub: 'Indicadores chave' },
+        { label: 'Diagnóstico', value: 'Ativo', sub: 'Visão Integrada' }
+      ];
+
+      schemaInfo = {
+        source: 'PostgreSQL 16 • ERP & Telemetria Consolidada (Porta 5433)',
+        table: 'view_generative_modular_card',
+        recordCount: records.length,
+        fields: [
+          { field: 'diagnosis', type: 'TEXT', sample: c.diagnosis || 'Diagnóstico operacional' },
+          { field: 'confidence_score', type: 'NUMERIC(3,2)', sample: c.confidence_score || 0.98 },
+          { field: 'metrics', type: 'JSONB', sample: records.length }
+        ]
+      };
+
+      auditRules = [
+        { title: 'Decomposição Modular de Pista & Estoque', tag: 'Gestão Integrada', formula: 'Consolidação = Tanques + Caixa + Margem', description: 'Cruza telemetria física dos tanques com fechamento de caixa e margem de bicos.' },
+        { title: 'Score de Confiança Analítica', tag: 'Metodologia', formula: 'Score = Confianca_Fontes * Determinismo_Matematico', description: 'Calculado com base na completude dos dados das últimas 24h sem extrapolações.' }
+      ];
+    }
+
     // MÓDULO 0: MENTOR DE DECISÕES EXECUTIVO (GENUI FASE 3)
-    if (effectiveIntent === 'mentoria_decisao' || effectiveIntent === 'executive_briefing' || toolName === 'render_ExecutiveDecisionMentorUI' || toolName === 'render_ExecutiveBriefingUI' || toolName === 'ExecutiveDecisionMentorUI') {
+    else if (effectiveIntent === 'mentoria_decisao' || effectiveIntent === 'executive_briefing' || toolName === 'render_ExecutiveDecisionMentorUI' || toolName === 'render_ExecutiveBriefingUI' || toolName === 'ExecutiveDecisionMentorUI') {
       title = '🎯 Mentor de Decisões Executivo';
       subtitle = 'Diagnóstico de Rentabilidade, Gaps & Ações em 1 Toque';
       const score = c.confidence_score !== undefined ? Math.round(Number(c.confidence_score) * 100) : 96;
@@ -1490,6 +1532,16 @@ class AuraAuxPanel {
       ];
     }
 
+    // Sobrescrita inteligente se props ou contrato trouxerem titulo/subtitulo executivo explicito
+    const explicitTitle = data?.props?.title || c?.title || data?.title;
+    if (explicitTitle && typeof explicitTitle === 'string' && !explicitTitle.startsWith('render_')) {
+      title = explicitTitle;
+    }
+    const explicitSubtitle = data?.props?.diagnosis || data?.props?.subtitle || c?.diagnosis || c?.subtitle || data?.subtitle;
+    if (explicitSubtitle && typeof explicitSubtitle === 'string') {
+      subtitle = explicitSubtitle;
+    }
+
     return {
       intent: effectiveIntent,
       title,
@@ -1637,9 +1689,14 @@ class AuraAuxPanel {
 
   formatToolTitle(name) {
     if (!name) return 'Consulta Analítica';
-    return name
+    const clean = String(name)
+      .replace(/^render_/i, '')
+      .replace(/(CardUI|UI|Widget|Card)$/i, '')
       .replace(/_/g, ' ')
-      .replace(/\b\w/g, l => l.toUpperCase());
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .trim();
+    if (!clean) return 'Consulta Analítica';
+    return clean.replace(/\b\w/g, l => l.toUpperCase());
   }
 
   formatColumnHeader(col) {

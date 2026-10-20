@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sqlite3
 import threading
 import time
@@ -30,9 +31,11 @@ from typing import Any
 from config.settings import BASE_DIR
 from core.logger import logger
 from core.webhook_dispatcher import (
+    AlertaLMCCompliancePayload,
     AlertaSangriaPayload,
     AlertaTanquePayload,
     TurnoResumoPayload,
+    notify_alerta_lmc,
     notify_alerta_sangria,
     notify_alerta_tanque,
     notify_fechamento_turno,
@@ -42,6 +45,8 @@ DEFAULT_COOLDOWN_SECONDS: dict[str, float] = {
     "TANQUE_CRITICO": 7200.0,     # 2 horas de cooldown para o mesmo tanque
     "SANGRIA_PENDENTE": 2700.0,   # 45 minutos de cooldown para o mesmo caixa
     "FECHAMENTO_TURNO": 3600.0,   # 1 hora de cooldown para resumo de turno
+    "LMC_CONFORMIDADE": 14400.0,  # 4 horas de cooldown para o mesmo tanque no LMC
+    "PUBLIC_DATA_STALENESS": 86400.0,  # 24 horas de cooldown para defasagem de dados publicos
 }
 
 
@@ -72,11 +77,14 @@ class ProactiveAlert:
     payload: dict[str, Any] = field(default_factory=dict)
     dispatched: bool = False
     dispatch_results: dict[str, Any] = field(default_factory=dict)
+    channel: str = "AURA_IN_APP"
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
-        """Converte a entidade para dicionario serializavel."""
-        return asdict(self)
+        """Converte a entidade para dicionario serializavel com timestamp compativel."""
+        d = asdict(self)
+        d["timestamp"] = self.created_at
+        return d
 
 
 class AuraProactiveDaemon:
@@ -103,6 +111,7 @@ class AuraProactiveDaemon:
         erp_adapter: Any | None = None,
         watchdog: Any | None = None,
         desktop_notifier: Any | None = None,
+        desktop_notify: bool | None = None,
     ) -> None:
         self.filial_id = filial_id
         self.tenant_id = tenant_id
@@ -128,15 +137,26 @@ class AuraProactiveDaemon:
             except Exception:
                 self.watchdog = None
 
+        # Alertas ocorrem no ecossistema da AURA (in-app) por padrao.
+        # DesktopNotifier (popups nativos do Windows WTSSendMessageW) permanece desativado por padrao.
+        desktop_env_val = os.getenv("AURA_DESKTOP_NOTIFY_ENABLED", "false").strip().lower()
+        desktop_env_enabled = desktop_env_val in ("1", "true", "yes", "on")
+        if desktop_notify is not None:
+            self.desktop_notify = bool(desktop_notify)
+        else:
+            self.desktop_notify = desktop_env_enabled
+
         if desktop_notifier is not None:
             self.desktop_notifier = desktop_notifier
-        else:
+        elif self.desktop_notify:
             try:
                 from core.desktop_notifier import get_desktop_notifier
 
                 self.desktop_notifier = get_desktop_notifier()
             except Exception:
                 self.desktop_notifier = None
+        else:
+            self.desktop_notifier = None
 
         # Sincronizacao de threads
         self._lock = threading.RLock()
@@ -149,10 +169,16 @@ class AuraProactiveDaemon:
         self._active_alerts_count: int = 0
         self._last_error: str | None = None
 
+        # Fila de eventos e alertas in-app da AURA
+        self._unread_alerts_count: int = 0
+        self._unread_in_app_alerts: list[dict[str, Any]] = []
+        self._alert_subscribers: set[asyncio.Queue] = set()
+
         # Cache de cooldown em memoria: dedup_key -> timestamp float
         self._cooldown_cache: dict[str, float] = {}
         # Historico em memoria limitado aos ultimos 500 registros
         self._alerts_memory: list[dict[str, Any]] = []
+        self._recent_alerts: list[dict[str, Any]] = self._alerts_memory
 
         # Inicializacao do SQLite
         if db_path is None:
@@ -212,9 +238,14 @@ class AuraProactiveDaemon:
                     payload_json TEXT NOT NULL,
                     dispatched INTEGER NOT NULL,
                     dispatch_results_json TEXT,
+                    channel TEXT DEFAULT 'AURA_IN_APP',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
+            try:
+                conn.execute("ALTER TABLE aura_proactive_alerts ADD COLUMN channel TEXT DEFAULT 'AURA_IN_APP';")
+            except sqlite3.OperationalError:
+                pass
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_proactive_type 
                 ON aura_proactive_alerts(alert_type);
@@ -229,12 +260,24 @@ class AuraProactiveDaemon:
             """)
 
     def _save_alert(self, alert: ProactiveAlert) -> None:
-        """Salva alerta gerado no SQLite e no buffer rapido em memoria."""
+        """Salva alerta gerado no SQLite, no buffer rapido em memoria e despacha para ouvintes in-app."""
         alert_dict = alert.to_dict()
         with self._lock:
             self._alerts_memory.insert(0, alert_dict)
             if len(self._alerts_memory) > 500:
                 self._alerts_memory.pop()
+
+            self._unread_in_app_alerts.insert(0, alert_dict)
+            if len(self._unread_in_app_alerts) > 100:
+                self._unread_in_app_alerts.pop()
+            self._unread_alerts_count += 1
+
+            alert_dict = alert.to_dict() if hasattr(alert, "to_dict") else alert
+            for q in list(self._alert_subscribers):
+                try:
+                    q.put_nowait(alert_dict)
+                except Exception:
+                    pass
 
         try:
             with self._connection() as conn:
@@ -252,8 +295,9 @@ class AuraProactiveDaemon:
                         payload_json,
                         dispatched,
                         dispatch_results_json,
+                        channel,
                         created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         alert.alert_id,
@@ -267,11 +311,60 @@ class AuraProactiveDaemon:
                         json.dumps(alert.payload, ensure_ascii=False),
                         1 if alert.dispatched else 0,
                         json.dumps(alert.dispatch_results, ensure_ascii=False),
+                        getattr(alert, "channel", "AURA_IN_APP"),
                         alert.created_at,
                     ),
                 )
         except Exception as exc:
             logger.error(f"Erro ao salvar alerta proativo no SQLite: {exc}", exc_info=True)
+
+    def subscribe_in_app_alerts(self) -> asyncio.Queue:
+        """Registra uma fila de escuta para streaming SSE de alertas proativos in-app."""
+        q: asyncio.Queue = asyncio.Queue()
+        with self._lock:
+            self._alert_subscribers.add(q)
+        return q
+
+    def unsubscribe_in_app_alerts(self, q: asyncio.Queue) -> None:
+        """Remove fila de escuta in-app."""
+        with self._lock:
+            self._alert_subscribers.discard(q)
+
+    def get_unread_in_app_alerts(
+        self,
+        filial_id: str | None = None,
+        mark_read: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Retorna lista de alertas in-app pendentes ou recentes."""
+        with self._lock:
+            alerts = list(self._unread_in_app_alerts)
+            if filial_id:
+                alerts = [a for a in alerts if a.get("filial_id") == str(filial_id).strip()]
+            if mark_read:
+                self._unread_in_app_alerts.clear()
+                self._unread_alerts_count = 0
+            return alerts
+
+    def mark_alerts_as_read(self, alert_id: str | None = None) -> int:
+        """Marca alerta(s) como lidos na interface da AURA."""
+        with self._lock:
+            if alert_id is None:
+                count = len(self._unread_in_app_alerts)
+                self._unread_in_app_alerts.clear()
+                self._unread_alerts_count = 0
+                return count
+            initial = len(self._unread_in_app_alerts)
+            self._unread_in_app_alerts = [
+                a for a in self._unread_in_app_alerts if a.get("alert_id") != str(alert_id)
+            ]
+            removed = initial - len(self._unread_in_app_alerts)
+            self._unread_alerts_count = max(0, self._unread_alerts_count - removed)
+            return removed
+
+    def get_unread_count(self) -> int:
+        """Retorna contagem de alertas nao lidos na interface da AURA."""
+        with self._lock:
+            return self._unread_alerts_count
 
     def get_recent_alerts(
         self,
@@ -317,6 +410,12 @@ class AuraProactiveDaemon:
                 except Exception:
                     d_val = {}
 
+                channel_val = "AURA_IN_APP"
+                try:
+                    channel_val = row["channel"] or "AURA_IN_APP"
+                except (IndexError, KeyError):
+                    pass
+
                 result.append({
                     "alert_id": row["alert_id"],
                     "alert_type": row["alert_type"],
@@ -329,7 +428,9 @@ class AuraProactiveDaemon:
                     "payload": p_val,
                     "dispatched": bool(row["dispatched"]),
                     "dispatch_results": d_val,
+                    "channel": channel_val,
                     "created_at": row["created_at"],
+                    "timestamp": row["created_at"],
                 })
             return result
         except Exception as exc:
@@ -342,7 +443,13 @@ class AuraProactiveDaemon:
                 filtered = [a for a in filtered if a.get("severity") == severity.upper().strip()]
             if filial_id:
                 filtered = [a for a in filtered if a.get("filial_id") == filial_id.strip()]
-            return filtered[offset : offset + limit]
+            out: list[dict[str, Any]] = []
+            for a in filtered[offset : offset + limit]:
+                item = dict(a)
+                item["timestamp"] = item.get("created_at") or item.get("timestamp")
+                item["channel"] = item.get("channel", "AURA_IN_APP")
+                out.append(item)
+            return out
 
     # =========================================================================
     # DEDUPLICACAO E COOLDOWN
@@ -487,10 +594,10 @@ class AuraProactiveDaemon:
         force: bool = False,
     ) -> dict[str, Any] | None:
         """
-        Aciona o DesktopNotifier (WTSSendMessageW) para alertas criticos de tanque e sangria,
-        garantindo visibilidade imediata na tela do PDV (Sessao 1).
+        Aciona o DesktopNotifier (WTSSendMessageW) apenas se desktop_notify estiver explicitamente habilitado.
+        Por padrao desativado para garantir que alertas ocorram 100% in-app na AURA.
         """
-        if self.desktop_notifier is None:
+        if not self.desktop_notify or self.desktop_notifier is None:
             return None
         try:
             dedup_key = self._build_dedup_key(alert.alert_type, alert.filial_id, alert.entity_id)
@@ -528,6 +635,7 @@ class AuraProactiveDaemon:
     def evaluate_tank_rules(
         self,
         tanques: list[dict[str, Any] | Any] | None = None,
+        desktop_notify: bool = False,
     ) -> list[ProactiveAlert]:
         """
         Avalia criticidade volumetrica e autonomia de tanques de combustivel.
@@ -655,9 +763,12 @@ class AuraProactiveDaemon:
 
         return alerts
 
+    _evaluate_tank_critical_rules = evaluate_tank_rules
+
     def evaluate_cashier_rules(
         self,
         caixas: list[dict[str, Any] | Any] | None = None,
+        desktop_notify: bool = False,
     ) -> list[ProactiveAlert]:
         """
         Avalia caixas abertos e retencao excessiva de numerario em gaveta.
@@ -720,6 +831,8 @@ class AuraProactiveDaemon:
                 alerts.append(alert)
 
         return alerts
+
+    _evaluate_cashier_rules = evaluate_cashier_rules
 
     def evaluate_turn_rules(
         self,
@@ -802,6 +915,216 @@ class AuraProactiveDaemon:
 
         return alerts
 
+    def _evaluate_lmc_compliance_rules(
+        self,
+        tanques_lmc: list[dict[str, Any] | Any] | None = None,
+        desktop_notify: bool = False,
+    ) -> list[ProactiveAlert]:
+        """
+        Avalia periodicamente se algum tanque do posto esta com variacao volumetrica fisica
+        acumulada superior a +-0,60% (limite regulatorio da Portaria ANP 26/1992).
+        Em caso de quebra ou sobra excessiva (> 0,60%), emite alerta proativo estruturado
+        de severidade 'critical' com sugestao de afericao de bicos (Portaria INMETRO 559/2016).
+        """
+        alerts: list[ProactiveAlert] = []
+        data_to_eval = tanques_lmc
+
+        if data_to_eval is None and self.erp_adapter is not None:
+            if hasattr(self.erp_adapter, "get_lmc_compliance"):
+                try:
+                    data_to_eval = self.erp_adapter.get_lmc_compliance()
+                except Exception as exc:
+                    logger.debug(f"Erro ao buscar conformidade LMC via erp_adapter: {exc}")
+                    data_to_eval = []
+
+        if data_to_eval is None:
+            try:
+                from core.tools import PostoTools
+
+                pt = PostoTools()
+                res = pt.auditar_conformidade_lmc_anp()
+                if isinstance(res, dict):
+                    data_to_eval = res.get("tanques") or []
+            except Exception as exc:
+                logger.debug(f"Erro ao buscar conformidade LMC via PostoTools: {exc}")
+                data_to_eval = []
+
+        if not data_to_eval:
+            return alerts
+
+        def _safe_float(v: Any) -> float | None:
+            if v is None:
+                return None
+            try:
+                if isinstance(v, (int, float)):
+                    return float(v)
+                s = str(v).replace("%", "").replace(",", ".").strip()
+                return float(s)
+            except (ValueError, TypeError):
+                return None
+
+        for item in data_to_eval:
+            try:
+                if hasattr(item, "model_dump"):
+                    d = item.model_dump()
+                elif isinstance(item, dict):
+                    d = dict(item)
+                else:
+                    d = getattr(item, "__dict__", {})
+
+                tanque_id = str(d.get("tanque_id") or d.get("tanque") or d.get("codtan") or d.get("id") or "01").strip()
+                combustivel = str(d.get("combustivel") or d.get("produto") or d.get("nompro") or f"COMBUSTIVEL {tanque_id}").strip()
+                filial = str(d.get("filial_id") or self.filial_id).strip()
+
+                variacao_pct = None
+                if d.get("variacao_pct") is not None:
+                    variacao_pct = _safe_float(d["variacao_pct"])
+                elif d.get("variacao_volumetrica_pct") is not None:
+                    variacao_pct = _safe_float(d["variacao_volumetrica_pct"])
+                else:
+                    fisico = _safe_float(d.get("estoque_fisico")) or 0.0
+                    escriturado = _safe_float(d.get("estoque_escriturado")) or _safe_float(d.get("estoque_contabil")) or 0.0
+                    vendas = _safe_float(d.get("vendas")) or _safe_float(d.get("total_saidas")) or 0.0
+                    if vendas > 0.0:
+                        variacao_pct = round(((fisico - escriturado) / vendas) * 100.0, 2)
+
+                if variacao_pct is None:
+                    continue
+
+                limite_legal_pct = 0.60
+                if abs(variacao_pct) > limite_legal_pct:
+                    tipo_variacao = (
+                        "Perda fisica excessiva (quebra de tanque)"
+                        if variacao_pct < 0
+                        else "Sobra fisica excessiva (possivel afericao nao retornada)"
+                    )
+                    sugestao = (
+                        f"Vistoriar estanqueidade do tanque {tanque_id} e realizar afericao "
+                        f"dos bicos medidores com medida de 20L lacrada (Portaria INMETRO 559/2016)."
+                    )
+                    title = f"Conformidade LMC Critica: Tanque {tanque_id} ({combustivel})"
+                    message = (
+                        f"Tanque {tanque_id} ({combustivel}): variacao volumetrica de {variacao_pct:+.2f}% "
+                        f"excede o teto regulatorio de +-{limite_legal_pct:.2f}% da Portaria ANP 26/1992. {sugestao}"
+                    )
+
+                    alert = ProactiveAlert(
+                        alert_id=str(uuid.uuid4()),
+                        alert_type="LMC_CONFORMIDADE",
+                        filial_id=filial,
+                        entity_id=tanque_id,
+                        severity="CRITICAL",
+                        title=title,
+                        message=message,
+                        suggested_action=sugestao,
+                        payload={
+                            "tanque_id": tanque_id,
+                            "combustivel": combustivel,
+                            "variacao_volumetrica_pct": variacao_pct,
+                            "tolerancia_legal_pct": limite_legal_pct,
+                            "tipo_variacao": tipo_variacao,
+                            "urgencia": "CRITICA",
+                            "norma_anp": "Portaria ANP 26/1992",
+                            "norma_inmetro": "Portaria INMETRO 559/2016",
+                            "sugestao": sugestao,
+                        },
+                    )
+                    alerts.append(alert)
+            except Exception as item_exc:
+                logger.debug(f"Erro ao processar conformidade do item LMC: {item_exc}")
+
+        return alerts
+
+    evaluate_lmc_rules = _evaluate_lmc_compliance_rules
+
+    async def _evaluate_public_data_staleness(
+        self,
+        repository: Any | None = None,
+        max_staleness_days: int = 7,
+        auto_sync: bool = True,
+        desktop_notify: bool = False,
+    ) -> list[ProactiveAlert]:
+        """
+        Verifica a data da ultima coleta da ANP ou do CONFAZ no PublicDataRepository.
+        Se os dados estiverem defasados (> 7 dias) e o Circuit Breaker estiver CLOSED,
+        agenda sincronizacao nao-bloqueante em background e emite alerta proativo.
+        """
+        alerts: list[ProactiveAlert] = []
+        try:
+            from core.integrations.public_data import (
+                CircuitState,
+                get_public_data_repository,
+            )
+            from scripts.sync_public_data import get_default_connectors, sync_public_data
+
+            repo = repository or get_public_data_repository()
+            anp_con, confaz_con, _ = get_default_connectors()
+
+            sources_to_check = [("anp", anp_con), ("confaz", confaz_con)]
+
+            for fonte, connector in sources_to_check:
+                circuit_closed = (connector.circuit_breaker.state == CircuitState.CLOSED)
+                circuit_state_str = connector.circuit_breaker.state.value
+                staleness_info = repo.check_data_staleness(fonte=fonte, max_age_days=max_staleness_days)
+
+                if staleness_info.get("is_stale"):
+                    age = staleness_info.get("age_days", 999)
+                    last_dt = staleness_info.get("last_date") or "Nenhuma coleta registrada"
+                    fonte_nome = "ANP (Precos Semanais)" if fonte == "anp" else "CONFAZ (Pautas PMPF)"
+                    title = f"Defasagem de Dados Publicos: {fonte.upper()}"
+                    sugestao = (
+                        f"Disparar sincronizacao em background da base governamental da {fonte.upper()}."
+                        if circuit_closed
+                        else f"Aguardar cooldown do Circuit Breaker ({circuit_state_str}) da {fonte.upper()}."
+                    )
+                    status_note = (
+                        "Circuit Breaker em estado CLOSED. Sincronizacao em background agendada."
+                        if circuit_closed
+                        else f"Circuit Breaker em estado {circuit_state_str}. Sincronizacao automatica suspensa."
+                    )
+                    message = (
+                        f"Base publica da {fonte_nome} esta defasada ({age} dias desde {last_dt}, limite: {max_staleness_days} dias). "
+                        f"{status_note}"
+                    )
+
+                    alert = ProactiveAlert(
+                        alert_id=str(uuid.uuid4()),
+                        alert_type="PUBLIC_DATA_STALENESS",
+                        filial_id=self.filial_id,
+                        entity_id=fonte.upper(),
+                        severity="WARNING",
+                        title=title,
+                        message=message,
+                        suggested_action=sugestao,
+                        payload={
+                            "fonte": fonte,
+                            "dias_defasagem": age,
+                            "ultima_coleta": last_dt,
+                            "limite_dias": max_staleness_days,
+                            "circuit_state": circuit_state_str,
+                            "urgencia": "MEDIA",
+                        },
+                    )
+                    alerts.append(alert)
+
+                    is_mock_repo = getattr(repo, "_is_mock", False) or "Mock" in type(repo).__name__
+                    if circuit_closed and auto_sync and not is_mock_repo:
+                        try:
+                            asyncio.create_task(
+                                asyncio.to_thread(
+                                    sync_public_data,
+                                    source=fonte,
+                                    repository=repo,
+                                )
+                            )
+                        except Exception as sync_exc:
+                            logger.debug(f"Nao foi possivel disparar sync assincrono para {fonte}: {sync_exc}")
+
+        except Exception as exc:
+            logger.debug(f"Erro ao avaliar defasagem de dados publicos: {exc}")
+
+        return alerts
+
     # =========================================================================
     # CICLO PRINCIPAL DE AVALIACAO E DESPACHO
     # =========================================================================
@@ -811,11 +1134,15 @@ class AuraProactiveDaemon:
         tanques: list[dict[str, Any] | Any] | None = None,
         caixas: list[dict[str, Any] | Any] | None = None,
         turnos: list[dict[str, Any] | Any] | None = None,
+        tanques_lmc: list[dict[str, Any] | Any] | None = None,
         force: bool = False,
+        public_data_repo: Any | None = None,
+        desktop_notify: bool | None = None,
     ) -> list[ProactiveAlert]:
         """
         Executa uma rodada completa de avaliacao de regras analiticas.
         Aplica filtro de cooldown para evitar spam e despacha alertas novos.
+        Canal padrao estrito: AURA_IN_APP (sem popups do Windows).
         """
         if not force and self.watchdog and not self.watchdog.is_heavy_operation_allowed():
             logger.warning(
@@ -823,6 +1150,12 @@ class AuraProactiveDaemon:
                 "Pulando ciclo de avaliacao de regras para proteger o PDV."
             )
             return []
+
+        should_desktop_notify = self.desktop_notify if desktop_notify is None else bool(desktop_notify)
+        is_targeted = any(
+            x is not None
+            for x in (tanques, caixas, turnos, tanques_lmc, public_data_repo)
+        )
 
         with self._lock:
             self._last_evaluation_timestamp = datetime.now(UTC).isoformat()
@@ -832,148 +1165,252 @@ class AuraProactiveDaemon:
 
         try:
             # 1. Regra de tanques
-            tank_alerts = self.evaluate_tank_rules(tanques=tanques)
-            for alert in tank_alerts:
-                in_cooldown = self.is_in_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
-                if not force and in_cooldown:
-                    alert.dispatched = False
-                    alert.dispatch_results = {
-                        "status": "cooldown_suppressed",
-                        "reason": f"Alerta recente para tanque {alert.entity_id} em cooldown.",
-                    }
-                    logger.debug(
-                        f"Alerta {alert.alert_type} para {alert.entity_id} suprimido por cooldown."
-                    )
-                else:
-                    desktop_res = await asyncio.to_thread(
-                        self._notify_desktop_alert, alert, force
-                    )
-                    if self.dispatch_enabled:
-                        payload = AlertaTanquePayload(
-                            tanque_id=alert.entity_id,
-                            combustivel=alert.payload.get("combustivel", "COMBUSTIVEL"),
-                            filial_id=alert.filial_id,
-                            volume_atual_litros=alert.payload.get("volume_atual_litros", 0.0),
-                            capacidade_total_litros=alert.payload.get("capacidade_total_litros", 0.0),
-                            autonomia_horas=alert.payload.get("autonomia_horas", 0.0),
-                            previsao_esgotamento=alert.payload.get("previsao_esgotamento", ""),
-                            urgencia=alert.payload.get("urgencia", "ALTA"),
-                            compartimentos_5k=alert.payload.get("compartimentos_5k"),
-                            volume_sugerido_litros=alert.payload.get("volume_sugerido_litros"),
-                        )
-                        res = await notify_alerta_tanque(
-                            payload=payload,
-                            phone=self.phone,
-                            webhook_url=self.webhook_url,
-                        )
-                        dispatch_data = dict(res) if isinstance(res, dict) else {"webhook": res}
-                        if desktop_res is not None:
-                            dispatch_data["desktop_notifier"] = desktop_res
-                        alert.dispatched = True
-                        alert.dispatch_results = dispatch_data
-                    else:
+            if not is_targeted or tanques is not None:
+                tank_alerts = self.evaluate_tank_rules(tanques=tanques, desktop_notify=should_desktop_notify)
+                for alert in tank_alerts:
+                    in_cooldown = self.is_in_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
+                    if not force and in_cooldown:
                         alert.dispatched = False
-                        dispatch_data = {"status": "dispatch_disabled"}
-                        if desktop_res is not None:
-                            dispatch_data["desktop_notifier"] = desktop_res
-                        alert.dispatch_results = dispatch_data
+                        alert.dispatch_results = {
+                            "status": "cooldown_suppressed",
+                            "channel": "AURA_IN_APP",
+                            "reason": f"Alerta recente para tanque {alert.entity_id} em cooldown.",
+                        }
+                        logger.debug(
+                            f"Alerta {alert.alert_type} para {alert.entity_id} suprimido por cooldown."
+                        )
+                    else:
+                        desktop_res = None
+                        if should_desktop_notify and self.desktop_notifier is not None:
+                            desktop_res = await asyncio.to_thread(
+                                self._notify_desktop_alert, alert, force
+                            )
+                        if self.dispatch_enabled:
+                            payload = AlertaTanquePayload(
+                                tanque_id=alert.entity_id,
+                                combustivel=alert.payload.get("combustivel", "COMBUSTIVEL"),
+                                filial_id=alert.filial_id,
+                                volume_atual_litros=alert.payload.get("volume_atual_litros", 0.0),
+                                capacidade_total_litros=alert.payload.get("capacidade_total_litros", 0.0),
+                                autonomia_horas=alert.payload.get("autonomia_horas", 0.0),
+                                previsao_esgotamento=alert.payload.get("previsao_esgotamento", ""),
+                                urgencia=alert.payload.get("urgencia", "ALTA"),
+                                compartimentos_5k=alert.payload.get("compartimentos_5k"),
+                                volume_sugerido_litros=alert.payload.get("volume_sugerido_litros"),
+                            )
+                            res = await notify_alerta_tanque(
+                                payload=payload,
+                                phone=self.phone,
+                                webhook_url=self.webhook_url,
+                            )
+                            dispatch_data = dict(res) if isinstance(res, dict) else {"webhook": res}
+                            dispatch_data["channel"] = "AURA_IN_APP"
+                            if desktop_res is not None:
+                                dispatch_data["desktop_notifier"] = desktop_res
+                            alert.dispatched = True
+                            alert.dispatch_results = dispatch_data
+                        else:
+                            alert.dispatched = False
+                            dispatch_data = {"status": "dispatch_disabled", "channel": "AURA_IN_APP"}
+                            if desktop_res is not None:
+                                dispatch_data["desktop_notifier"] = desktop_res
+                            alert.dispatch_results = dispatch_data
 
-                    self.record_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
+                        self.record_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
 
-                self._save_alert(alert)
-                generated_alerts.append(alert)
+                    self._save_alert(alert)
+                    generated_alerts.append(alert)
 
             # 2. Regra de sangrias de caixa
-            cashier_alerts = self.evaluate_cashier_rules(caixas=caixas)
-            for alert in cashier_alerts:
-                in_cooldown = self.is_in_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
-                if not force and in_cooldown:
-                    alert.dispatched = False
-                    alert.dispatch_results = {
-                        "status": "cooldown_suppressed",
-                        "reason": f"Alerta recente para caixa {alert.entity_id} em cooldown.",
-                    }
-                    logger.debug(
-                        f"Alerta {alert.alert_type} para {alert.entity_id} suprimido por cooldown."
-                    )
-                else:
-                    desktop_res = await asyncio.to_thread(
-                        self._notify_desktop_alert, alert, force
-                    )
-                    if self.dispatch_enabled:
-                        payload_caixa = AlertaSangriaPayload(
-                            caixa_id=alert.entity_id,
-                            filial_id=alert.filial_id,
-                            saldo_dinheiro=alert.payload.get("saldo_dinheiro", 0.0),
-                            teto_seguro=alert.payload.get("teto_seguro", 0.0),
-                            excesso_dinheiro=alert.payload.get("excesso_dinheiro", 0.0),
-                            minutos_sem_sangria=alert.payload.get("minutos_sem_sangria", 0),
-                            urgencia=alert.payload.get("urgencia", "ALTA"),
-                            operador_id=alert.payload.get("operador_id"),
-                        )
-                        res = await notify_alerta_sangria(
-                            payload=payload_caixa,
-                            phone=self.phone,
-                            webhook_url=self.webhook_url,
-                        )
-                        dispatch_data = dict(res) if isinstance(res, dict) else {"webhook": res}
-                        if desktop_res is not None:
-                            dispatch_data["desktop_notifier"] = desktop_res
-                        alert.dispatched = True
-                        alert.dispatch_results = dispatch_data
-                    else:
+            if not is_targeted or caixas is not None:
+                cashier_alerts = self.evaluate_cashier_rules(caixas=caixas, desktop_notify=should_desktop_notify)
+                for alert in cashier_alerts:
+                    in_cooldown = self.is_in_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
+                    if not force and in_cooldown:
                         alert.dispatched = False
-                        dispatch_data = {"status": "dispatch_disabled"}
-                        if desktop_res is not None:
-                            dispatch_data["desktop_notifier"] = desktop_res
-                        alert.dispatch_results = dispatch_data
+                        alert.dispatch_results = {
+                            "status": "cooldown_suppressed",
+                            "channel": "AURA_IN_APP",
+                            "reason": f"Alerta recente para caixa {alert.entity_id} em cooldown.",
+                        }
+                        logger.debug(
+                            f"Alerta {alert.alert_type} para {alert.entity_id} suprimido por cooldown."
+                        )
+                    else:
+                        desktop_res = None
+                        if should_desktop_notify and self.desktop_notifier is not None:
+                            desktop_res = await asyncio.to_thread(
+                                self._notify_desktop_alert, alert, force
+                            )
+                        if self.dispatch_enabled:
+                            payload_caixa = AlertaSangriaPayload(
+                                caixa_id=alert.entity_id,
+                                filial_id=alert.filial_id,
+                                saldo_dinheiro=alert.payload.get("saldo_dinheiro", 0.0),
+                                teto_seguro=alert.payload.get("teto_seguro", 0.0),
+                                excesso_dinheiro=alert.payload.get("excesso_dinheiro", 0.0),
+                                minutos_sem_sangria=alert.payload.get("minutos_sem_sangria", 0),
+                                urgencia=alert.payload.get("urgencia", "ALTA"),
+                                operador_id=alert.payload.get("operador_id"),
+                            )
+                            res = await notify_alerta_sangria(
+                                payload=payload_caixa,
+                                phone=self.phone,
+                                webhook_url=self.webhook_url,
+                            )
+                            dispatch_data = dict(res) if isinstance(res, dict) else {"webhook": res}
+                            dispatch_data["channel"] = "AURA_IN_APP"
+                            if desktop_res is not None:
+                                dispatch_data["desktop_notifier"] = desktop_res
+                            alert.dispatched = True
+                            alert.dispatch_results = dispatch_data
+                        else:
+                            alert.dispatched = False
+                            dispatch_data = {"status": "dispatch_disabled", "channel": "AURA_IN_APP"}
+                            if desktop_res is not None:
+                                dispatch_data["desktop_notifier"] = desktop_res
+                            alert.dispatch_results = dispatch_data
 
-                    self.record_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
+                        self.record_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
 
-                self._save_alert(alert)
-                generated_alerts.append(alert)
+                    self._save_alert(alert)
+                    generated_alerts.append(alert)
 
             # 3. Regra de fechamento de turno
-            turn_alerts = self.evaluate_turn_rules(turnos=turnos)
-            for alert in turn_alerts:
-                in_cooldown = self.is_in_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
-                if not force and in_cooldown:
-                    alert.dispatched = False
-                    alert.dispatch_results = {
-                        "status": "cooldown_suppressed",
-                        "reason": f"Alerta recente para turno {alert.entity_id} em cooldown.",
-                    }
-                    logger.debug(
-                        f"Alerta {alert.alert_type} para {alert.entity_id} suprimido por cooldown."
-                    )
-                else:
-                    if self.dispatch_enabled:
-                        payload_turno = TurnoResumoPayload(
-                            turno_id=alert.entity_id,
-                            filial_id=alert.filial_id,
-                            data=alert.payload.get("data", datetime.now(UTC).strftime("%Y-%m-%d")),
-                            faturamento_total=alert.payload.get("faturamento_total", 0.0),
-                            litros_vendidos=alert.payload.get("litros_vendidos", 0.0),
-                            quebra_caixa=alert.payload.get("quebra_caixa", 0.0),
-                            status_conciliacao=alert.payload.get("status_conciliacao", "CONCILIADO"),
-                            bicos_analisados=alert.payload.get("bicos_analisados", 0),
-                            observacoes=alert.payload.get("observacoes"),
-                        )
-                        res = await notify_fechamento_turno(
-                            payload=payload_turno,
-                            phone=self.phone,
-                            webhook_url=self.webhook_url,
-                        )
-                        alert.dispatched = True
-                        alert.dispatch_results = res
-                    else:
+            if not is_targeted or turnos is not None:
+                turn_alerts = self.evaluate_turn_rules(turnos=turnos)
+                for alert in turn_alerts:
+                    in_cooldown = self.is_in_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
+                    if not force and in_cooldown:
                         alert.dispatched = False
-                        alert.dispatch_results = {"status": "dispatch_disabled"}
+                        alert.dispatch_results = {
+                            "status": "cooldown_suppressed",
+                            "channel": "AURA_IN_APP",
+                            "reason": f"Alerta recente para turno {alert.entity_id} em cooldown.",
+                        }
+                        logger.debug(
+                            f"Alerta {alert.alert_type} para {alert.entity_id} suprimido por cooldown."
+                        )
+                    else:
+                        if self.dispatch_enabled:
+                            payload_turno = TurnoResumoPayload(
+                                turno_id=alert.entity_id,
+                                filial_id=alert.filial_id,
+                                data=alert.payload.get("data", datetime.now(UTC).strftime("%Y-%m-%d")),
+                                faturamento_total=alert.payload.get("faturamento_total", 0.0),
+                                litros_vendidos=alert.payload.get("litros_vendidos", 0.0),
+                                quebra_caixa=alert.payload.get("quebra_caixa", 0.0),
+                                status_conciliacao=alert.payload.get("status_conciliacao", "CONCILIADO"),
+                                bicos_analisados=alert.payload.get("bicos_analisados", 0),
+                                observacoes=alert.payload.get("observacoes"),
+                            )
+                            res = await notify_fechamento_turno(
+                                payload=payload_turno,
+                                phone=self.phone,
+                                webhook_url=self.webhook_url,
+                            )
+                            dispatch_data = dict(res) if isinstance(res, dict) else {"webhook": res}
+                            dispatch_data["channel"] = "AURA_IN_APP"
+                            alert.dispatched = True
+                            alert.dispatch_results = dispatch_data
+                        else:
+                            alert.dispatched = False
+                            alert.dispatch_results = {"status": "dispatch_disabled", "channel": "AURA_IN_APP"}
 
-                    self.record_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
+                        self.record_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
 
-                self._save_alert(alert)
-                generated_alerts.append(alert)
+                    self._save_alert(alert)
+                    generated_alerts.append(alert)
+
+            # 4. Regra de conformidade de LMC (Portaria ANP 26/1992)
+            if not is_targeted or tanques_lmc is not None:
+                lmc_alerts = self._evaluate_lmc_compliance_rules(tanques_lmc=tanques_lmc, desktop_notify=should_desktop_notify)
+                for alert in lmc_alerts:
+                    in_cooldown = self.is_in_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
+                    if not force and in_cooldown:
+                        alert.dispatched = False
+                        alert.dispatch_results = {
+                            "status": "cooldown_suppressed",
+                            "channel": "AURA_IN_APP",
+                            "reason": f"Alerta recente para tanque LMC {alert.entity_id} em cooldown.",
+                        }
+                        logger.debug(
+                            f"Alerta {alert.alert_type} para {alert.entity_id} suprimido por cooldown."
+                        )
+                    else:
+                        desktop_res = None
+                        if should_desktop_notify and self.desktop_notifier is not None:
+                            desktop_res = await asyncio.to_thread(
+                                self._notify_desktop_alert, alert, force
+                            )
+                        if self.dispatch_enabled:
+                            payload_lmc = AlertaLMCCompliancePayload(
+                                tanque_id=alert.entity_id,
+                                combustivel=alert.payload.get("combustivel", "COMBUSTIVEL"),
+                                filial_id=alert.filial_id,
+                                variacao_pct=alert.payload.get("variacao_volumetrica_pct", 0.0),
+                                tolerancia_legal_pct=alert.payload.get("tolerancia_legal_pct", 0.60),
+                                tipo_variacao=alert.payload.get("tipo_variacao", "Perda/Sobra"),
+                                sugestao=alert.payload.get("sugestao", alert.suggested_action or ""),
+                                urgencia=alert.payload.get("urgencia", "CRITICA"),
+                            )
+                            res = await notify_alerta_lmc(
+                                payload=payload_lmc,
+                                phone=self.phone,
+                                webhook_url=self.webhook_url,
+                            )
+                            dispatch_data = dict(res) if isinstance(res, dict) else {"webhook": res}
+                            dispatch_data["channel"] = "AURA_IN_APP"
+                            if desktop_res is not None:
+                                dispatch_data["desktop_notifier"] = desktop_res
+                            alert.dispatched = True
+                            alert.dispatch_results = dispatch_data
+                        else:
+                            alert.dispatched = False
+                            dispatch_data = {"status": "dispatch_disabled", "channel": "AURA_IN_APP"}
+                            if desktop_res is not None:
+                                dispatch_data["desktop_notifier"] = desktop_res
+                            alert.dispatch_results = dispatch_data
+
+                        self.record_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
+
+                    self._save_alert(alert)
+                    generated_alerts.append(alert)
+
+            # 5. Regra de defasagem de dados publicos (ANP / CONFAZ)
+            if not is_targeted or public_data_repo is not None:
+                stale_alerts = await self._evaluate_public_data_staleness(repository=public_data_repo, desktop_notify=should_desktop_notify)
+                for alert in stale_alerts:
+                    in_cooldown = self.is_in_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
+                    if not force and in_cooldown:
+                        alert.dispatched = False
+                        alert.dispatch_results = {
+                            "status": "cooldown_suppressed",
+                            "channel": "AURA_IN_APP",
+                            "reason": f"Alerta recente para dados publicos {alert.entity_id} em cooldown.",
+                        }
+                        logger.debug(
+                            f"Alerta {alert.alert_type} para {alert.entity_id} suprimido por cooldown."
+                        )
+                    else:
+                        desktop_res = None
+                        if should_desktop_notify and self.desktop_notifier is not None:
+                            desktop_res = await asyncio.to_thread(
+                                self._notify_desktop_alert, alert, force
+                            )
+                        dispatch_data = {
+                            "status": "dispatched" if self.dispatch_enabled else "dispatch_disabled",
+                            "channel": "AURA_IN_APP",
+                        }
+                        if desktop_res is not None:
+                            dispatch_data["desktop_notifier"] = desktop_res
+                        alert.dispatched = self.dispatch_enabled
+                        alert.dispatch_results = dispatch_data
+
+                        self.record_cooldown(alert.alert_type, alert.entity_id, alert.filial_id)
+
+                    self._save_alert(alert)
+                    generated_alerts.append(alert)
 
             with self._lock:
                 self._active_alerts_count = sum(
@@ -1007,6 +1444,8 @@ class AuraProactiveDaemon:
             return await self.evaluate_rules(caixas=[payload] if payload else None)
         elif table in ("turnos", "fechamento_turno", "dre"):
             return await self.evaluate_rules(turnos=[payload] if payload else None)
+        elif table in ("lmc", "lmc_tanques", "movimentacao_tanques", "livro_lmc"):
+            return await self.evaluate_rules(tanques_lmc=[payload] if payload else None)
         else:
             return await self.evaluate_rules()
 
@@ -1070,6 +1509,10 @@ class AuraProactiveDaemon:
                 "rules_evaluated_count": self._rules_evaluated_count,
                 "last_evaluation_timestamp": self._last_evaluation_timestamp,
                 "active_alerts_count": self._active_alerts_count,
+                "unread_alerts_count": self._unread_alerts_count,
+                "in_app_subscribers_count": len(self._alert_subscribers),
+                "channel": "AURA_IN_APP",
+                "desktop_notify_enabled": self.desktop_notify,
                 "cooldown_cache_size": len(self._cooldown_cache),
                 "evaluation_interval_seconds": self.evaluation_interval_seconds,
                 "filial_id": self.filial_id,

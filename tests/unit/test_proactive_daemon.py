@@ -12,8 +12,9 @@ Valida:
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -689,7 +690,138 @@ def test_api_proactive_evaluate_with_turnos(api_client: TestClient) -> None:
 
 
 # =============================================================================
-# 13. REGRA INEFAVEL: ZERO TRAVESSOES
+# 13. TESTES DE CANAL IN-APP EXCLUSIVO DA AURA (SEM POPUPS DO WINDOWS)
+# =============================================================================
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_proactive_daemon_defaults_to_in_app_no_windows_popups() -> None:
+    """Valida que o daemon nao dispara WTSSendMessageW por padrao e usa estritamente canal AURA_IN_APP."""
+    mock_notifier = MagicMock()
+    mock_notifier.notify_operator.return_value = {"status": "mocked"}
+
+    daemon = AuraProactiveDaemon(
+        db_path=":memory:",
+        filial_id="posto_in_app_01",
+        desktop_notifier=mock_notifier,
+    )
+    assert daemon.desktop_notify is False
+
+    tanques = [
+        {
+            "tanque_id": "TQ-CRIT-01",
+            "combustivel": "GASOLINA COMUM",
+            "capacidade_total_litros": 20000.0,
+            "volume_atual_litros": 1000.0,
+            "autonomia_horas": 4.0,
+        }
+    ]
+
+    with patch("core.proactive_daemon.notify_alerta_tanque", new_callable=AsyncMock) as mock_notify:
+        mock_notify.return_value = {"success": True}
+        alerts = await daemon.evaluate_rules(tanques=tanques, force=True)
+
+    assert len(alerts) == 1
+    assert alerts[0].channel == "AURA_IN_APP"
+    # Notificador desktop do Windows NAO deve ter sido invocado
+    assert mock_notifier.notify_operator.call_count == 0
+    # dispatch_results deve ter canal AURA_IN_APP e nenhuma entrega desktop
+    assert alerts[0].dispatch_results.get("channel") == "AURA_IN_APP"
+    assert "desktop_notifier" not in alerts[0].dispatch_results
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_proactive_daemon_in_app_subscribers_and_unread_lifecycle() -> None:
+    """Valida ciclo de vida dos alertas in-app: unread count, queue streaming e acknowledge."""
+    daemon = AuraProactiveDaemon(db_path=":memory:", filial_id="posto_sub_01")
+    queue = daemon.subscribe_in_app_alerts()
+    assert daemon.get_unread_count() == 0
+
+    tanques = [
+        {
+            "tanque_id": "TQ-SUB-01",
+            "combustivel": "ETANOL",
+            "capacidade_total_litros": 15000.0,
+            "volume_atual_litros": 800.0,
+            "autonomia_horas": 3.0,
+        }
+    ]
+
+    with patch("core.proactive_daemon.notify_alerta_tanque", new_callable=AsyncMock) as mock_notify:
+        mock_notify.return_value = {"success": True}
+        alerts = await daemon.evaluate_rules(tanques=tanques, force=True)
+
+    assert len(alerts) == 1
+    assert daemon.get_unread_count() == 1
+
+    # Fila de subscriber SSE recebeu o alerta
+    streamed = await asyncio.wait_for(queue.get(), timeout=1.0)
+    assert streamed["entity_id"] == "TQ-SUB-01"
+    assert streamed["channel"] == "AURA_IN_APP"
+
+    # Leitura pendente sem marcar como lido
+    pending = daemon.get_unread_in_app_alerts(mark_read=False)
+    assert len(pending) == 1
+    assert daemon.get_unread_count() == 1
+
+    # Validacao de persistencia no historico in-app _recent_alerts
+    assert len(daemon._recent_alerts) == 1
+    assert daemon._recent_alerts[0]["entity_id"] == "TQ-SUB-01"
+    assert daemon._recent_alerts[0]["channel"] == "AURA_IN_APP"
+
+    # Confirmacao / acknowledge
+    ack_count = daemon.mark_alerts_as_read(alerts[0].alert_id)
+    assert ack_count == 1
+    assert daemon.get_unread_count() == 0
+
+    daemon.unsubscribe_in_app_alerts(queue)
+
+
+@pytest.mark.unit
+def test_api_proactive_unread_and_ack_endpoints(api_client: TestClient) -> None:
+    """Valida endpoints HTTP /proactive/alerts?unread_only=true e /proactive/alerts/ack."""
+    # 1. Avalia alerta para popular fila in-app
+    eval_resp = api_client.post(
+        "/api/v1/aura/proactive/evaluate",
+        json={
+            "tanques": [
+                {
+                    "tanque_id": "TQ-API-UNREAD",
+                    "combustivel": "DIESEL",
+                    "capacidade_total_litros": 30000.0,
+                    "volume_atual_litros": 1200.0,
+                    "autonomia_horas": 5.0,
+                }
+            ],
+            "force": True,
+        },
+    )
+    assert eval_resp.status_code == 200
+    alert_id = eval_resp.json()["alerts"][0]["alert_id"]
+
+    # 2. Consulta alertas nao lidos via GET /proactive/alerts?unread_only=true
+    list_resp = api_client.get("/api/v1/aura/proactive/alerts?unread_only=true")
+    assert list_resp.status_code == 200
+    list_data = list_resp.json()
+    assert list_data["channel"] == "AURA_IN_APP"
+    assert list_data["unread_count"] >= 1
+    assert any(a["alert_id"] == alert_id for a in list_data["alerts"])
+
+    # 3. Faz acknowledge via POST /proactive/alerts/ack
+    ack_resp = api_client.post(
+        "/api/v1/aura/proactive/alerts/ack",
+        json={"alert_id": alert_id},
+    )
+    assert ack_resp.status_code == 200
+    ack_data = ack_resp.json()
+    assert ack_data["success"] is True
+    assert ack_data["acknowledged_count"] >= 1
+    assert ack_data["channel"] == "AURA_IN_APP"
+
+
+# =============================================================================
+# 14. REGRA INEFAVEL: ZERO TRAVESSOES
 # =============================================================================
 
 @pytest.mark.unit
@@ -701,8 +833,14 @@ def test_zero_travessoes_in_proactive_modules() -> None:
         BASE_DIR / "core" / "webhooks.py",
         BASE_DIR / "core" / "aura_api.py",
         BASE_DIR / "core" / "aura_engine.py",
+        BASE_DIR / "web" / "js" / "aura-api.js",
+        BASE_DIR / "web" / "js" / "aura-chat.js",
+        BASE_DIR / "web" / "index.html",
         BASE_DIR / "docs" / "roadmap_producao_enterprise.md",
+        BASE_DIR / "docs" / "guia_operacional_apis_publicas.md",
+        BASE_DIR / "docs" / "roadmap_integracao_apis_publicas.md",
         BASE_DIR / "tests" / "unit" / "test_proactive_daemon.py",
+        BASE_DIR / "tests" / "unit" / "test_public_data_e2e_api.py",
     ]
 
     for file_path in files_to_check:

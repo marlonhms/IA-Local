@@ -565,6 +565,7 @@ class TestDaemonAndFastAPIIntegration:
             filial_id="posto_01",
             dispatch_enabled=False,
             desktop_notifier=notifier,
+            desktop_notify=True,
         )
 
         tanques = [

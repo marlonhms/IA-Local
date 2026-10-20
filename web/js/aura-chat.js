@@ -128,6 +128,20 @@ class AuraChatController {
         window.setInterval(() => this.expireStaleWidgets(), 60000);
       } catch (_) {}
     }
+    this.initProactiveStream();
+  }
+
+  initProactiveStream() {
+    if (typeof window === 'undefined' || typeof EventSource === 'undefined') return;
+    try {
+      if (window.auraApi && typeof window.auraApi.subscribeProactiveStream === 'function') {
+        window.auraApi.subscribeProactiveStream((alertData) => {
+          this.handleProactiveAlert(alertData);
+        });
+      }
+    } catch (e) {
+      console.debug('[AuraChat] Stream proativo indisponivel no momento:', e);
+    }
   }
 
   bindEvents() {
@@ -794,8 +808,9 @@ class AuraChatController {
     if (hydratedNode || hydratedHtml) {
       const widgetContentHtml = hydratedHtml || (hydratedNode ? (hydratedNode.outerHTML || '') : '');
       const artifactId = 'art_genui_' + (toolCallId || Date.now());
-      const artifactTitle = this.formatToolDisplayName(envelopeData.component_name || envelopeData.intent);
-      const artifactSubtitle = envelopeData.executive_summary || 'Resultado estruturado e auditável gerado pela AURA';
+      const p = envelopeData.props || envelopeData.data || {};
+      let artifactTitle = p.title || envelopeData.title || this.formatToolDisplayName(envelopeData.intent || envelopeData.component_name);
+      let artifactSubtitle = p.diagnosis || p.subtitle || envelopeData.executive_summary || 'Resultado estruturado e auditável gerado pela AURA';
 
       // No Desktop, o widget inline no chat inicia recolhido para não duplicar com o Companion Canvas aberto.
       // No Mobile, inicia expandido para leitura natural no feed sem depender de split canvas.
@@ -805,7 +820,7 @@ class AuraChatController {
       // 1. Projeta no Companion Canvas se habilitado (abre no Desktop, não abre no mobile)
       if (typeof window !== 'undefined' && window.auraAuxPanel && typeof window.auraAuxPanel.projectArtifact === 'function') {
         try {
-          window.auraAuxPanel.projectArtifact({
+          const art = window.auraAuxPanel.projectArtifact({
             id: artifactId,
             containerId: containerId,
             toolName: envelopeData.component_name,
@@ -814,6 +829,10 @@ class AuraChatController {
             html: widgetContentHtml,
             autoOpen: !isMobile
           });
+          if (art) {
+            if (art.title) artifactTitle = art.title;
+            if (art.subtitle) artifactSubtitle = art.subtitle;
+          }
         } catch (_) {}
       }
 
@@ -1284,21 +1303,55 @@ class AuraChatController {
   }
 
   updateIntentChip(containerId, intentData) {
-    const ids = [containerId + '-intent-chip', containerId + '-split-intent-chip'];
-    const name = intentData.intent || intentData.name || 'desconhecido';
-    const conf = intentData.confidence ? ` ${(intentData.confidence * 100).toFixed(0)}%` : '';
+    // Chips tecnicos de intencao ficam ocultos para o usuario final (mantidos apenas se modo debug ativo)
+    if (typeof window !== 'undefined' && window.AURA_DEBUG) {
+      const ids = [containerId + '-intent-chip', containerId + '-split-intent-chip'];
+      const name = intentData.intent || intentData.name || 'desconhecido';
+      const conf = intentData.confidence ? ` ${(intentData.confidence * 100).toFixed(0)}%` : '';
 
-    ids.forEach(id => {
-      const chip = document.getElementById(id);
-      if (chip) {
-        chip.innerHTML = `${CHAT_ICONS.target} ${name}${conf}`;
-        chip.classList.remove('hidden');
-      }
-    });
+      ids.forEach(id => {
+        const chip = document.getElementById(id);
+        if (chip) {
+          chip.innerHTML = `${CHAT_ICONS.target} ${name}${conf}`;
+          chip.classList.remove('hidden');
+        }
+      });
+    }
   }
 
   formatToolDisplayName(toolName) {
+    if (!toolName) return 'Diagnóstico Executivo';
     const map = {
+      'render_GenerativeModularCardUI': 'Diagnóstico Executivo Modular',
+      'GenerativeModularCardUI': 'Diagnóstico Executivo Modular',
+      'diagnostico_modular': 'Diagnóstico Executivo Modular',
+      'modular_card': 'Diagnóstico Executivo Modular',
+      'render_ExecutiveDecisionMentorUI': 'Mentor de Decisões Executivo',
+      'ExecutiveDecisionMentorUI': 'Mentor de Decisões Executivo',
+      'diagnostico_mentoria_executiva': 'Mentor de Decisões Executivo',
+      'mentoria_decisao': 'Mentor de Decisões Executivo',
+      'mentoria_executiva': 'Mentor de Decisões Executivo',
+      'executive_briefing': 'Briefing Executivo',
+      'render_ExecutiveBriefingUI': 'Briefing Executivo',
+      'auditoria_fuga_financeira': 'Auditoria de Fuga Financeira',
+      'render_FinancialLeakAuditUI': 'Auditoria de Fuga Financeira',
+      'FinancialLeakAuditUI': 'Auditoria de Fuga Financeira',
+      'comparativo_concorrencia': 'Benchmark de Preços ANP',
+      'comparar_benchmark_concorrencia': 'Benchmark de Preços ANP',
+      'render_BenchmarkComparisonUI': 'Benchmark de Preços ANP',
+      'BenchmarkComparisonUI': 'Benchmark de Preços ANP',
+      'auditar_conformidade_lmc_anp': 'Auditoria LMC ANP',
+      'render_LMCComplianceReportUI': 'Auditoria LMC ANP',
+      'LMCComplianceReportUI': 'Auditoria LMC ANP',
+      'analisar_custo_estoque_macroeconomico': 'Custo de Estoque & Selic',
+      'render_MacroeconomicInventoryCostUI': 'Custo de Estoque & Selic',
+      'MacroeconomicInventoryCostUI': 'Custo de Estoque & Selic',
+      'render_TankRunOutPredictionUI': 'Tanques & Autonomia',
+      'TankRunOutPredictionUI': 'Tanques & Autonomia',
+      'render_ShiftReconciliationUI': 'Conciliação de Turno & Caixa',
+      'ShiftReconciliationUI': 'Conciliação de Turno & Caixa',
+      'render_BasketUpsellStrategyUI': 'Combos & Cross-Selling',
+      'BasketUpsellStrategyUI': 'Combos & Cross-Selling',
       'previsao_tanques': 'Tanques & Autonomia',
       'run_out': 'Tanques & Autonomia',
       'lmc_anp': 'LMC ANP Oficial',
@@ -1315,7 +1368,17 @@ class AuraChatController {
       'ajuda_sistema': 'Guia & Auto-Conhecimento',
       'conhecimento_aura': 'Guia & Auto-Conhecimento',
     };
-    return map[toolName] || toolName;
+    if (map[toolName]) return map[toolName];
+
+    let cleanName = String(toolName)
+      .replace(/^render_/i, '')
+      .replace(/(CardUI|UI|Widget|Card)$/i, '')
+      .replace(/_/g, ' ')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .trim();
+
+    if (!cleanName) return 'Diagnóstico Executivo';
+    return cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
   }
 
   /**
@@ -1404,19 +1467,8 @@ class AuraChatController {
     ids.forEach(id => {
       const chip = typeof document !== 'undefined' ? document.getElementById(id) : null;
       if (chip) {
-        if (success) {
-          chip.className = 'chip-cognitive-step px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5 transition-all';
-          chip.innerHTML = `
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-            <span class="cognitive-step-label">Diagnóstico executivo concluído</span>
-          `;
-        } else {
-          chip.className = 'chip-cognitive-step px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1.5 transition-all';
-          chip.innerHTML = `
-            <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-            <span class="cognitive-step-label">Processamento interrompido</span>
-          `;
-        }
+        // Oculta o chip transitorio de processamento ao finalizar para manter o header limpo e executivo
+        chip.classList.add('hidden');
       }
     });
   }
@@ -1456,12 +1508,19 @@ class AuraChatController {
     chipIds.forEach(id => {
       const chip = document.getElementById(id);
       if (chip) {
-        if (isUnavail) {
-          chip.innerHTML = `${CHAT_ICONS.alert} ${this.escapeHtml(displayName)} indisponível`;
-          chip.className = 'chip-intent text-rose-300 border-rose-500/30 bg-rose-500/10';
+        // Oculto para o usuario final, visivel somente em modo debug
+        if (typeof window !== 'undefined' && window.AURA_DEBUG) {
+          if (isUnavail) {
+            chip.innerHTML = `${CHAT_ICONS.alert} ${this.escapeHtml(displayName)} indisponível`;
+            chip.className = 'chip-intent text-rose-300 border-rose-500/30 bg-rose-500/10';
+            chip.classList.remove('hidden');
+          } else {
+            chip.innerHTML = `${CHAT_ICONS.check} ${this.escapeHtml(displayName)} apurado`;
+            chip.className = 'chip-intent text-emerald-300 border-emerald-500/30 bg-emerald-500/10';
+            chip.classList.remove('hidden');
+          }
         } else {
-          chip.innerHTML = `${CHAT_ICONS.check} ${this.escapeHtml(displayName)} apurado`;
-          chip.className = 'chip-intent text-emerald-300 border-emerald-500/30 bg-emerald-500/10';
+          chip.classList.add('hidden');
         }
       }
     });
@@ -1485,8 +1544,9 @@ class AuraChatController {
 
     if (widgetHtml) {
       let artifactId = 'art_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
-      let artifactTitle = this.formatToolDisplayName(toolName);
-      let artifactSubtitle = 'Resultado estruturado e auditável gerado pela AURA';
+      const p = resultData?.props || resultData?.data || resultData?.contrato || resultData || {};
+      let artifactTitle = p.title || resultData?.title || this.formatToolDisplayName(resultData?.intent || toolName);
+      let artifactSubtitle = p.diagnosis || p.subtitle || resultData?.executive_summary || 'Resultado estruturado e auditável gerado pela AURA';
 
       if (typeof window !== 'undefined' && window.auraAuxPanel && typeof window.auraAuxPanel.projectArtifact === 'function') {
         try {
@@ -5441,6 +5501,98 @@ class AuraChatController {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  /**
+   * Processa e exibe alertas proativos in-app na interface da AURA (P3-2).
+   * Alertas ocorrem estritamente in-app (sem popups nativos do Windows).
+   * @param {Object} alertData - Dados do alerta proativo
+   */
+  handleProactiveAlert(alertData) {
+    if (!alertData) return;
+    const title = alertData.title || 'Alerta Proativo AURA';
+    const message = alertData.message || '';
+    const severity = (alertData.severity || 'warning').toLowerCase();
+    const alertId = alertData.alert_id || null;
+    const suggestedAction = alertData.suggested_action || '';
+    const alertType = alertData.alert_type || '';
+
+    // 1. Notificacao Toast In-App
+    const toastType = severity === 'critical' ? 'error' : (severity === 'high' ? 'attention' : 'info');
+    if (typeof window !== 'undefined' && window.auraFx && typeof window.auraFx.showToast === 'function') {
+      window.auraFx.showToast({
+        title: title,
+        message: message,
+        type: toastType,
+      });
+    }
+
+    // 2. Renderizacao no container in-app de alertas da coluna de chat
+    if (typeof document !== 'undefined') {
+      const container = document.getElementById('aura-in-app-alerts-container');
+      if (container) {
+        if (alertId && container.querySelector(`[data-alert-id="${alertId}"]`)) {
+          return;
+        }
+
+        const card = document.createElement('div');
+        card.setAttribute('data-alert-id', alertId || 'temp_' + Date.now());
+        const isCritical = severity === 'critical';
+        const isHigh = severity === 'high';
+        const borderClass = isCritical ? 'border-rose-500/50 bg-rose-950/40 text-rose-200' : (isHigh ? 'border-amber-500/50 bg-amber-950/40 text-amber-200' : 'border-cyan-500/50 bg-slate-900/90 text-cyan-200');
+        const badgeBg = isCritical ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' : (isHigh ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40');
+
+        card.className = `p-3.5 rounded-xl border backdrop-blur-md shadow-lg transition-all animate-fade-in ${borderClass} flex flex-col gap-2`;
+
+        let actionPrompt = '';
+        if (alertType.includes('TANQUE')) {
+          actionPrompt = 'Qual a situação e autonomia de cada tanque agora?';
+        } else if (alertType.includes('SANGRIA') || alertType.includes('CAIXA')) {
+          actionPrompt = 'Como está o fechamento de caixa e sangrias pendentes?';
+        } else if (alertType.includes('LMC')) {
+          actionPrompt = 'Audite a conformidade do LMC dos tanques de combustível';
+        } else if (alertType.includes('PUBLIC')) {
+          actionPrompt = 'Como está o preço dos combustíveis comparado com a ANP?';
+        } else {
+          actionPrompt = `Analise este alerta: ${title}`;
+        }
+
+        const safeTitle = this.escapeHtml(title);
+        const safeMessage = this.escapeHtml(message);
+        const safeAction = this.escapeHtml(suggestedAction);
+        const safePrompt = this.escapeHtml(actionPrompt).replace(/'/g, "\\'");
+
+        const entityId = alertData.entity_id || '';
+        const safeEntity = this.escapeHtml(entityId).replace(/'/g, "\\'");
+        const isLmc = alertType.includes('LMC') || title.toUpperCase().includes('LMC');
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="w-2 h-2 rounded-full ${isCritical ? 'bg-rose-400' : (isHigh ? 'bg-amber-400' : 'bg-cyan-400')} animate-pulse flex-shrink-0"></span>
+              <span class="font-bold text-xs text-white truncate">${safeTitle}</span>
+            </div>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold border flex-shrink-0 ${badgeBg}">${severity.toUpperCase()}</span>
+          </div>
+          <div class="text-xs text-slate-200 leading-relaxed font-sans">${safeMessage}</div>
+          ${safeAction ? `<div class="text-[11px] text-slate-300 font-sans italic border-l-2 border-white/20 pl-2">Sugestão: ${safeAction}</div>` : ''}
+          <div class="flex items-center justify-end gap-2 pt-1 border-t border-white/10">
+            <button type="button" class="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors cursor-pointer" onclick="if (window.auraApi) { window.auraApi.ackProactiveAlert('${alertId}'); } const c = this.closest('[data-alert-id]'); if (c) c.remove();">
+              Ignorar
+            </button>
+            ${isLmc ? `<button type="button" class="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 transition-colors flex items-center gap-1 cursor-pointer" onclick="if (window.auraChat) { window.auraChat.sendUserPrompt('Agendar aferição INMETRO de 20L dos bicos do tanque ${safeEntity}'); } if (window.auraApi) { window.auraApi.ackProactiveAlert('${alertId}'); } const c = this.closest('[data-alert-id]'); if (c) c.remove();">
+              <span>Agendar Aferição</span>
+            </button>` : ''}
+            <button type="button" class="px-3 py-1 text-[11px] font-semibold rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/40 transition-colors flex items-center gap-1 cursor-pointer" onclick="if (window.auraChat) { window.auraChat.sendUserPrompt('${safePrompt}'); } if (window.auraApi) { window.auraApi.ackProactiveAlert('${alertId}'); } const c = this.closest('[data-alert-id]'); if (c) c.remove();">
+              <span>Ver no Chat</span>
+              <svg class="w-3 h-3 text-cyan-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        `;
+
+        container.appendChild(card);
+      }
+    }
   }
 }
 

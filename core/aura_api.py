@@ -38,6 +38,8 @@ from pydantic import BaseModel, Field
 
 from config.settings import AURA_API_KEY, get_cors_origins
 from core.aura_engine import (
+    AuraChunk,
+    AuraChunkType,
     AuraEngine,
     StationStatus,
 )
@@ -92,6 +94,7 @@ _daemon_instance: AuraProactiveDaemon | None = None
 _desktop_notifier_instance: DesktopNotifier | None = None
 _outbox_instance: AuraTransactionalOutbox | None = None
 _command_journal_instance: AuraCommandJournal | None = None
+_public_data_repo_instance: Any | None = None
 
 
 def get_aura_engine() -> AuraEngine:
@@ -113,7 +116,8 @@ def get_proactive_daemon() -> AuraProactiveDaemon:
     global _daemon_instance
     if _daemon_instance is None:
         _daemon_instance = AuraProactiveDaemon(
-            desktop_notifier=get_active_desktop_notifier(),
+            desktop_notifier=None,
+            desktop_notify=False,
         )
     return _daemon_instance
 
@@ -165,6 +169,22 @@ def set_command_journal(journal: AuraCommandJournal | None) -> None:
     global _command_journal_instance
     _command_journal_instance = journal
     _set_global_command_journal(journal)
+
+
+def get_active_public_data_repo() -> Any:
+    """Dependency Provider para obter o repositorio ativo de dados publicos."""
+    global _public_data_repo_instance
+    if _public_data_repo_instance is not None:
+        return _public_data_repo_instance
+    from core.integrations.public_data import get_public_data_repository
+
+    return get_public_data_repository()
+
+
+def set_public_data_repository(repo: Any | None) -> None:
+    """Permite sobrescrever ou injetar instancia customizada do repositorio de dados publicos."""
+    global _public_data_repo_instance
+    _public_data_repo_instance = repo
 
 
 def verify_admin_auth(request: Request = None) -> bool:
@@ -278,6 +298,23 @@ async def chat_endpoint(
 
     if should_stream:
         async def event_generator():
+            # Despacho de alertas proativos pendentes in-app da AURA
+            try:
+                daemon_inst = get_proactive_daemon()
+                pending = daemon_inst.get_unread_in_app_alerts(filial_id=req.filial_id, mark_read=False)
+                for palert in pending:
+                    alert_dict = palert if isinstance(palert, dict) else palert.to_dict()
+                    chunk = AuraChunk(
+                        chunk_type=AuraChunkType.PROACTIVE_ALERT,
+                        data=alert_dict,
+                        title=alert_dict.get("title"),
+                        text=alert_dict.get("message"),
+                        session_id=req.session_id,
+                    )
+                    yield chunk.to_sse()
+            except Exception as exc:
+                logger.debug(f"AuraAPI: Nenhum alerta proativo no stream POST: {exc}")
+
             async for chunk in engine.ask_stream(
                 query=req.query,
                 context=req.context,
@@ -331,6 +368,23 @@ async def chat_stream_get_endpoint(
     )
 
     async def event_generator():
+        # Despacho de alertas proativos pendentes in-app da AURA
+        try:
+            daemon_inst = get_proactive_daemon()
+            pending = daemon_inst.get_unread_in_app_alerts(filial_id=filial_id, mark_read=False)
+            for palert in pending:
+                alert_dict = palert if isinstance(palert, dict) else palert.to_dict()
+                chunk = AuraChunk(
+                    chunk_type=AuraChunkType.PROACTIVE_ALERT,
+                    data=alert_dict,
+                    title=alert_dict.get("title"),
+                    text=alert_dict.get("message"),
+                    session_id=session_id,
+                )
+                yield chunk.to_sse()
+        except Exception as exc:
+            logger.debug(f"AuraAPI: Nenhum alerta proativo no stream GET: {exc}")
+
         async for chunk in engine.ask_stream(
             query=query,
             session_id=session_id,
@@ -1562,22 +1616,117 @@ async def list_proactive_alerts_endpoint(
     alert_type: str | None = Query(default=None, description="Filtro por tipo de alerta"),
     severity: str | None = Query(default=None, description="Filtro por severidade"),
     filial_id: str | None = Query(default=None, description="Filtro por identificador de filial"),
+    unread_only: bool = Query(default=False, description="Se True, retorna apenas alertas in-app nao lidos"),
     daemon: AuraProactiveDaemon = Depends(get_proactive_daemon),
 ) -> dict[str, Any]:
     """Lista alertas recentes emitidos com suporte a paginacao e filtros."""
-    alerts = daemon.get_recent_alerts(
-        limit=limit,
-        offset=offset,
-        alert_type=alert_type,
-        severity=severity,
-        filial_id=filial_id,
-    )
+    if unread_only:
+        alerts = daemon.get_unread_in_app_alerts(filial_id=filial_id)
+    else:
+        alerts = daemon.get_recent_alerts(
+            limit=limit,
+            offset=offset,
+            alert_type=alert_type,
+            severity=severity,
+            filial_id=filial_id,
+        )
     return {
         "total": len(alerts),
         "limit": limit,
         "offset": offset,
+        "unread_count": daemon.get_unread_count(),
+        "channel": "AURA_IN_APP",
         "alerts": alerts,
     }
+
+
+class ProactiveAlertAckRequest(BaseModel):
+    """Requisicao para confirmacao (acknowledge) de alertas proativos in-app."""
+
+    alert_id: str | None = Field(
+        default=None,
+        description="ID do alerta especifico a ser confirmado ou None para marcar todos como lidos",
+    )
+
+
+@router.post(
+    "/proactive/alerts/ack",
+    summary="Confirma e Marca Alertas Proativos In-App como Lidos na AURA",
+    tags=["AURA Proactive Alerts"],
+)
+async def acknowledge_proactive_alerts_endpoint(
+    request: ProactiveAlertAckRequest | None = Body(default=None),
+    daemon: AuraProactiveDaemon = Depends(get_proactive_daemon),
+) -> dict[str, Any]:
+    """Marca alerta(s) proativo(s) in-app como lidos, decrementando contador na AURA."""
+    alert_id = request.alert_id if request else None
+    acknowledged = daemon.mark_alerts_as_read(alert_id=alert_id)
+    return {
+        "success": True,
+        "acknowledged_count": acknowledged,
+        "unread_remaining": daemon.get_unread_count(),
+        "channel": "AURA_IN_APP",
+    }
+
+
+@router.get(
+    "/proactive/stream",
+    summary="Streaming SSE de Alertas Proativos em Tempo Real na AURA",
+    tags=["AURA Proactive Alerts"],
+)
+async def proactive_stream_endpoint(
+    request: Request,
+    filial_id: str | None = Query(None, description="Filtro opcional por filial"),
+    daemon: AuraProactiveDaemon = Depends(get_proactive_daemon),
+):
+    """
+    Canal SSE dedicado para a interface da AURA receber notificacoes proativas em tempo real.
+    Emite alertas pendentes imediatamente e novos alertas gerados pelo daemon.
+    """
+    queue = daemon.subscribe_in_app_alerts()
+
+    async def event_generator():
+        try:
+            # 1. Envia alertas pendentes no momento da conexao
+            pending = daemon.get_unread_in_app_alerts(filial_id=filial_id, mark_read=False)
+            for alert in pending:
+                chunk = AuraChunk(
+                    chunk_type=AuraChunkType.PROACTIVE_ALERT,
+                    data=alert,
+                    title=alert.get("title"),
+                    text=alert.get("message"),
+                )
+                yield chunk.to_sse()
+
+            # 2. Aguarda novos alertas na fila
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    alert = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    if filial_id and alert.get("filial_id") and alert.get("filial_id") != str(filial_id).strip():
+                        continue
+                    chunk = AuraChunk(
+                        chunk_type=AuraChunkType.PROACTIVE_ALERT,
+                        data=alert,
+                        title=alert.get("title"),
+                        text=alert.get("message"),
+                    )
+                    yield chunk.to_sse()
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"
+        finally:
+            daemon.unsubscribe_in_app_alerts(queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # =============================================================================
@@ -1804,6 +1953,127 @@ async def outbox_requeue_dlq_endpoint(
 
 
 # =============================================================================
+# ENDPOINTS DE DADOS PUBLICOS E DADOS ABERTOS GOVERNAMENTAIS (PILAR 6 - FASE 5)
+# =============================================================================
+
+@router.get(
+    "/public-data/health",
+    summary="Health Check de Conectores e Circuit Breakers de Dados Publicos (Fase 5)",
+    tags=["AURA Public Data"],
+)
+async def public_data_health_endpoint() -> dict[str, Any]:
+    """
+    Retorna o estado de saude operacional dos conectores publicos (ANP, CONFAZ, BACEN),
+    o estado atual dos Circuit Breakers e a prontidao do repositorio local.
+    """
+    try:
+        from core.integrations.public_data import (
+            CircuitState,
+            get_public_data_repository,
+        )
+        from scripts.sync_public_data import get_default_connectors
+
+        repo = get_active_public_data_repo()
+        anp_con, confaz_con, bacen_con = get_default_connectors()
+
+        breakers = {
+            "anp": {
+                "state": anp_con.circuit_breaker.state.value,
+                "consecutive_failures": anp_con.circuit_breaker.consecutive_failures,
+                "failure_count": anp_con.circuit_breaker.consecutive_failures,
+                "failure_threshold": anp_con.circuit_breaker.failure_threshold,
+                "cooldown_seconds": anp_con.circuit_breaker.cooldown_seconds,
+            },
+            "confaz": {
+                "state": confaz_con.circuit_breaker.state.value,
+                "consecutive_failures": confaz_con.circuit_breaker.consecutive_failures,
+                "failure_count": confaz_con.circuit_breaker.consecutive_failures,
+                "failure_threshold": confaz_con.circuit_breaker.failure_threshold,
+                "cooldown_seconds": confaz_con.circuit_breaker.cooldown_seconds,
+            },
+            "bacen": {
+                "state": bacen_con.circuit_breaker.state.value,
+                "consecutive_failures": bacen_con.circuit_breaker.consecutive_failures,
+                "failure_count": bacen_con.circuit_breaker.consecutive_failures,
+                "failure_threshold": bacen_con.circuit_breaker.failure_threshold,
+                "cooldown_seconds": bacen_con.circuit_breaker.cooldown_seconds,
+            },
+        }
+
+        all_closed = all(b["state"] == CircuitState.CLOSED.value for b in breakers.values())
+        overall_status = "healthy" if all_closed else "degraded"
+
+        return {
+            "status": "success",
+            "overall_status": overall_status,
+            "circuit_breakers": breakers,
+            "repository": {
+                "status": "connected",
+                "use_sqlite_fallback": getattr(repo, "use_sqlite", False),
+            },
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+    except Exception as exc:
+        logger.error(f"Erro ao consultar health de dados publicos: {exc}", exc_info=True)
+        return {
+            "status": "error",
+            "overall_status": "unhealthy",
+            "error": str(exc),
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+
+
+@router.get(
+    "/public-data/telemetry",
+    summary="Telemetria e Auditoria de Defasagem de Dados Publicos (Fase 5)",
+    tags=["AURA Public Data"],
+)
+async def public_data_telemetry_endpoint(
+    fonte: str | None = Query(None, description="Filtro opcional por fonte: anp, confaz, bacen"),
+    limit: int = Query(default=20, ge=1, le=100, description="Limite de registros de historico"),
+    max_staleness_days: int = Query(default=7, ge=1, le=30, description="Tolerancia maxima de dias"),
+) -> dict[str, Any]:
+    """
+    Retorna o historico recente de sincronizacoes, data da ultima coleta por fonte
+    e diagnostico de defasagem (staleness) com base no limiar configurado.
+    """
+    try:
+        repo = get_active_public_data_repo()
+        history = repo.get_telemetry_history(fonte=fonte, limit=limit)
+
+        staleness_anp = repo.check_data_staleness(fonte="anp", max_age_days=max_staleness_days)
+        staleness_confaz = repo.check_data_staleness(fonte="confaz", max_age_days=max_staleness_days)
+        staleness_bacen = repo.check_data_staleness(fonte="bacen", max_age_days=max_staleness_days)
+
+        latest_collections = {
+            "anp": repo.get_latest_collection_date(fonte="anp"),
+            "confaz": repo.get_latest_collection_date(fonte="confaz"),
+            "bacen": repo.get_latest_collection_date(fonte="bacen"),
+        }
+
+        return {
+            "status": "success",
+            "total_records": len(history),
+            "telemetry_history": history,
+            "staleness": {
+                "anp": staleness_anp,
+                "confaz": staleness_confaz,
+                "bacen": staleness_bacen,
+            },
+            "latest_collections": latest_collections,
+            "max_staleness_days": max_staleness_days,
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+    except Exception as exc:
+        logger.error(f"Erro ao consultar telemetria de dados publicos: {exc}", exc_info=True)
+        return {
+            "status": "error",
+            "error": str(exc),
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+
+
+# =============================================================================
 # FACTORY DA APLICAÇÃO STANDALONE
 # =============================================================================
 
@@ -1813,6 +2083,7 @@ def create_aura_app(
     desktop_notifier: DesktopNotifier | None = None,
     outbox: AuraTransactionalOutbox | None = None,
     command_journal: AuraCommandJournal | None = None,
+    public_data_repo: Any | None = None,
 ) -> FastAPI:
     """Cria e configura uma instância completa da aplicação FastAPI para a AURA."""
     if engine is not None:
@@ -1825,6 +2096,9 @@ def create_aura_app(
         set_transactional_outbox(outbox)
     if command_journal is not None:
         set_command_journal(command_journal)
+    if public_data_repo is not None:
+        set_public_data_repository(public_data_repo)
+
     elif (
         engine is not None
         and getattr(engine, "_session_memory", None) is not None
