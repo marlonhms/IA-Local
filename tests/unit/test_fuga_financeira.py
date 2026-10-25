@@ -278,25 +278,26 @@ async def test_aura_engine_execute_tool_direct_and_contingency(posto_tools):
     with patch.object(posto_tools.erp_adapter, "get_cashier_shifts", side_effect=Exception("DB Offline")):
         engine = AuraEngine(tools=posto_tools)
 
-        # 1. Execucao direta no AuraEngine
-        res = await engine.execute_tool_direct(
-            tool_name="auditoria_fuga_financeira",
-            params={"cash_tolerance_reais": 40.0},
-        )
-        assert res["status"] == "success"
-        assert res["tool_name"] == "auditoria_fuga_financeira"
-        assert "data" in res
-        data_res = res["data"]
-        assert data_res["client_component"] == "FinancialLeakAuditUI"
-        assert data_res["total_divergence_reais"] > 0.0
-
-        # 2. Aliases em execute_tool_direct
-        for alias in ["fuga_financeira", "furo_caixa", "auditoria_quebras"]:
-            res_alias = await engine.execute_tool_direct(
-                tool_name=alias,
-                params={},
+        # 1. Execucao direta no AuraEngine (protegido contra picos de CPU do host de teste)
+        with patch.object(engine.watchdog, "is_heavy_operation_allowed", return_value=True):
+            res = await engine.execute_tool_direct(
+                tool_name="auditoria_fuga_financeira",
+                params={"cash_tolerance_reais": 40.0},
             )
-            assert res_alias["status"] == "success"
+            assert res["status"] == "success"
+            assert res["tool_name"] == "auditoria_fuga_financeira"
+            assert "data" in res
+            data_res = res["data"]
+            assert data_res["client_component"] == "FinancialLeakAuditUI"
+            assert data_res["total_divergence_reais"] > 0.0
+
+            # 2. Aliases em execute_tool_direct
+            for alias in ["fuga_financeira", "furo_caixa", "auditoria_quebras"]:
+                res_alias = await engine.execute_tool_direct(
+                    tool_name=alias,
+                    params={},
+                )
+                assert res_alias["status"] == "success"
 
         # 3. Sintese executiva de contingencia rica
         sintese = engine._gerar_sintese_contingencia_ferramenta(

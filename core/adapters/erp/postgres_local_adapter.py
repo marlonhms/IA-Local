@@ -63,7 +63,19 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
         self._fallback_adapter = fallback_adapter or MockERPAdapter()
         self._fallback_on_error = fallback_on_error
         self._force_offline = force_offline
+        self._last_offline_incident: float = 0.0
+        self._offline_cooldown_sec: float = 15.0
         self._db_role = ERP_USER
+
+    @property
+    def is_temporarily_offline(self) -> bool:
+        """Indica se o adaptador esta forcado offline ou em cooldown por falha recente de conexao."""
+        if self._force_offline:
+            return True
+        if self._last_offline_incident > 0.0:
+            if (time.monotonic() - self._last_offline_incident) < self._offline_cooldown_sec:
+                return True
+        return False
 
     @property
     def adapter_name(self) -> str:
@@ -136,10 +148,14 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
         params: tuple[Any, ...] | list[Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Executa consulta SQL estritamente somente-leitura com RealDictCursor."""
-        with get_erp_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(query, params or ())
-            rows = cur.fetchall()
-            return [dict(r) for r in rows]
+        try:
+            with get_erp_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(query, params or ())
+                rows = cur.fetchall()
+                return [dict(r) for r in rows]
+        except Exception:
+            self._last_offline_incident = time.monotonic()
+            raise
 
     def get_recent_sales(
         self,
@@ -153,7 +169,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
         Consulta tabelas locais: pedido, itemped, produtos e prazos.
         Aplica filtro de nulos e cancelamentos conforme include_cancelled.
         """
-        if self._force_offline:
+        if self.is_temporarily_offline:
             return self._fallback_adapter.get_recent_sales(
                 start_date, end_date, limit, include_cancelled=include_cancelled
             )
@@ -294,7 +310,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
         Consulta tabelas locais: tanques e medicaotanques.
         Calcula capacidade, volume atual, nivel de agua, temperatura e percentual.
         """
-        if self._force_offline:
+        if self.is_temporarily_offline:
             return self._fallback_adapter.get_tank_inventory()
 
         query = """
@@ -435,7 +451,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
         Consulta tabelas locais: fechabomba e abastecimentos.
         Garante mapeamento para UniversalDispenserLog com encerrantes e faturamento.
         """
-        if self._force_offline:
+        if self.is_temporarily_offline:
             return self._fallback_adapter.get_pump_dispenses(
                 start_date=start_date,
                 end_date=end_date,
@@ -704,7 +720,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
         Consulta tabelas locais: fechacaixa e funcionarios.
         Mapeia operador, turno, fundo de troco, total declarado, sistema e quebra/sobra.
         """
-        if self._force_offline:
+        if self.is_temporarily_offline:
             return self._fallback_adapter.get_cashier_shifts(target_date, limit)
 
         dt_alvo = normalize_date_filter(target_date)
@@ -800,7 +816,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
         Consulta tabelas locais: produtos e grupos.
         Filtra por termo de busca no SKU/nome ou grupo comercial.
         """
-        if self._force_offline:
+        if self.is_temporarily_offline:
             return self._fallback_adapter.get_product_catalog(filter_term, category, limit)
 
         lim = max(1, int(limit))

@@ -158,14 +158,14 @@ Write-Host "`n[5/5] Resumo de Conexao para o PC de Casa:" -ForegroundColor Cyan
 Write-Host "----------------------------------------------------------------------" -ForegroundColor DarkGray
 if ($tailscaleIP) {
     Write-Host " No arquivo .env do seu Computador de Casa, configure:" -ForegroundColor White
-    Write-Host "   ERP_DB_HOST=$tailscaleIP  (ou use o MagicDNS: marlonh-supwp)" -ForegroundColor Green
+    Write-Host "   ERP_DB_HOST=$tailscaleIP  (ou use o MagicDNS: aura-edge-node01)" -ForegroundColor Green
     Write-Host "   ERP_DB_PORT=5433" -ForegroundColor Green
-    Write-Host "   VECTOR_DB_HOST=$tailscaleIP  (ou use o MagicDNS: marlonh-supwp)" -ForegroundColor Green
+    Write-Host "   VECTOR_DB_HOST=$tailscaleIP  (ou use o MagicDNS: aura-edge-node01)" -ForegroundColor Green
     Write-Host "   VECTOR_DB_PORT=5433  (pgvector nativo migrado, sem Docker)" -ForegroundColor Green
     Write-Host "`n Para abrir o Painel Web da AURA no navegador do PC de Casa:" -ForegroundColor White
-    Write-Host "   http://$tailscaleIP`:8000  (ou http://marlonh-supwp:8000)" -ForegroundColor Cyan
+    Write-Host "   http://$tailscaleIP`:8000  (ou http://aura-edge-node01:8000)" -ForegroundColor Cyan
 } else {
-    Write-Host " Configure ERP_DB_HOST e VECTOR_DB_HOST com o IP Tailscale deste notebook (ou marlonh-supwp)." -ForegroundColor Yellow
+    Write-Host " Configure ERP_DB_HOST e VECTOR_DB_HOST com o IP Tailscale deste notebook (ou aura-edge-node01)." -ForegroundColor Yellow
 }
 Write-Host "----------------------------------------------------------------------" -ForegroundColor DarkGray
 Write-Host "`n[OK] Configuracao da Ponte concluida com sucesso!" -ForegroundColor Cyan

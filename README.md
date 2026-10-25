@@ -1,4 +1,4 @@
-# ⛽ Ai.la : Inteligência Artificial Local Especialista em Postos de Combustíveis & PDV
+# ⛽ AURA : Inteligência Artificial Operacional e Cockpit de Prontidão para Postos de Combustíveis & PDV
 
 <div align="center">
 
@@ -10,6 +10,11 @@
 [![LGPD Compliant](https://img.shields.io/badge/LGPD-24%20Categorias%20Sanitizadas-28A745?style=for-the-badge)](#blindagem-lgpd)
 [![ANP Ready](https://img.shields.io/badge/ANP-Toler%C3%A2ncia%20Volum%C3%A9trica%20%C2%B10.6%25-FF6F00?style=for-the-badge)](#conciliacao-turnos)
 [![Companytec CBC04](https://img.shields.io/badge/Hardware-Companytec%20CBC04-0052CC?style=for-the-badge)](#automação-companytec-cbc04)
+[![Android App](https://img.shields.io/badge/Mobile-Android%20Jetpack%20Compose-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#app-mobile-nativo-android)
+[![Windows SCM](https://img.shields.io/badge/Windows-SCM%20Supervisor--Worker-0078D6?style=for-the-badge&logo=windows&logoColor=white)](#arquitetura-sentinel-aura-missao-critica)
+[![Circuit Breaker](https://img.shields.io/badge/PDV%20Shield-Hardware%20Circuit%20Breaker-E11D48?style=for-the-badge)](#arquitetura-sentinel-aura-missao-critica)
+[![Public APIs](https://img.shields.io/badge/Governo-ANP%20%7C%20CONFAZ%20%7C%20INMETRO%20%7C%20BACEN-059669?style=for-the-badge)](#hub-apis-publicas)
+[![Test Suite](https://img.shields.io/badge/Testes-%2B400%20Testes%20100%25%20Verdes-10B981?style=for-the-badge)](#validação-e-testes-automatizados)
 
 **Edge AI On-Premises para Operação de Pista, Gestão de Turnos, Catálogo Inteligente e Observabilidade de Postos e Redes de Varejo.**
 
@@ -19,6 +24,11 @@
 [Recursos e Módulos](#módulos-e-capacidades-do-sistema) •
 [Fórmulas e Concatenações](#fórmulas-e-concatenações-de-dados) •
 [Automação CBC04](#automação-companytec-cbc04) •
+[App Android Nativo](#app-mobile-nativo-android) •
+[Arquitetura Sentinel-AURA](#arquitetura-sentinel-aura-missao-critica) •
+[Hub APIs Públicas (ANP/BACEN)](#hub-apis-publicas) •
+[Mapeador Multi-ERP YAML](#mapeador-declarativo-multi-erp) •
+[PWA Modo Pista & Voz](#pwa-modo-pista) •
 [Início Rápido](#guia-de-inicialização-rápida) •
 [Estrutura de Pastas](#estrutura-do-projeto) •
 [Roadmap de Fases](#roadmap-de-evolução) •
@@ -191,7 +201,7 @@ flowchart TB
 <a id="roteador-semantico"></a>
 ### 🔀 0. Roteador Semântico Vetorial (Semantic Intent Router com pgvector)
 
-O módulo [`SemanticRouter`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/semantic_router.py) substitui classificações rígidas baseadas exclusivamente em expressões regulares por roteamento semântico de alta precisão em **PostgreSQL 16 + pgvector**, com busca vetorial de cosseno sub-5ms em representações densas de 768 dimensões (`halfvec`):
+O módulo [`SemanticRouter`](./core/semantic_router.py) substitui classificações rígidas baseadas exclusivamente em expressões regulares por roteamento semântico de alta precisão em **PostgreSQL 16 + pgvector**, com busca vetorial de cosseno sub-5ms em representações densas de 768 dimensões (`halfvec`):
 
 ```mermaid
 flowchart LR
@@ -219,7 +229,7 @@ flowchart LR
 <a id="busca-hibrida"></a>
 ### 🔍 1. Mecanismo de Busca Híbrida: Dual Retrieval + Native RRF Calibrado
 
-O motor [`HybridRAGEngine`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/rag_engine.py) combina busca vetorial densa com busca textual esparsa utilizando uma única transação SQL no PostgreSQL 16 com **Reciprocal Rank Fusion (RRF) Calibrado**:
+O motor [`HybridRAGEngine`](./core/rag_engine.py) combina busca vetorial densa com busca textual esparsa utilizando uma única transação SQL no PostgreSQL 16 com **Reciprocal Rank Fusion (RRF) Calibrado**:
 
 ```mermaid
 flowchart LR
@@ -244,7 +254,7 @@ flowchart LR
 <a id="conciliacao-turnos"></a>
 ### 📊 2. Motor de Conciliação de Turnos & Auditoria de Pista
 
-O módulo [`PostoTools.auditar_fechamento_turno`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py) realiza a triangulação contábil e operacional completa entre os diferentes registros do posto:
+O módulo [`PostoTools.auditar_fechamento_turno`](./core/tools.py) realiza a triangulação contábil e operacional completa entre os diferentes registros do posto:
 
 ```mermaid
 flowchart TD
@@ -287,7 +297,7 @@ $$
 <a id="blindagem-lgpd"></a>
 ### 🛡️ 3. Blindagem LGPD & Segurança OWASP GenAI
 
-O módulo [`CentralLogSanitizer`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/sanitizer.py) executa higienização determinística com **24 categorias de proteção de dados sensíveis e segurança**:
+O módulo [`CentralLogSanitizer`](./core/sanitizer.py) executa higienização determinística com **24 categorias de proteção de dados sensíveis e segurança**:
 
 | Categoria | Regra de Detecção / Validação | Padrão / Marcador |
 | :--- | :--- | :--- |
@@ -590,8 +600,148 @@ $$
 
 ---
 
+
+---
+
+<a id="app-mobile-nativo-android"></a>
+### 📱 6. App Mobile Nativo Android (Jetpack Compose & Obsidian Aurora)
+
+O ecossistema conta com o aplicativo nativo oficial [`Aura Assistance Android`](./Aura%20Assistance%20Android) (localizado no repositório), desenvolvido em **Kotlin, Jetpack Compose, Material 3, Room Database e Dagger Hilt**:
+
+* **Design System Obsidian Aurora:**
+  * Modo Noturno puro AMOLED (`#07090E` e `#030407`) de altíssimo contraste e economia de bateria.
+  * Tipografia editorial mista: **Newsreader** para métricas e títulos executivos; **Geist** para números, tabelas e interface.
+  * Superfícies em vidro translúcido multicamadas (*Glassmorphism*) com destaque especular superior (*top highlight*).
+* **Componentes Gráficos Exclusivos:**
+  * **Cilindros de Combustível com Líquido Animado (`TankTile`):** Colunas volumétricas com renderização no `Canvas`, animação senoidal suave de fluido, linha de reserva crítica de 15% e cálculo instantâneo de autonomia.
+  * **Cockpit de Chat & GenUI Nativo:** Renderização em tempo real de cartões preditivos (Run-Out de Tanques, LMC ANP, Conciliação de Turnos, Vendas Cruzadas) com micro-interações táteis e botões de decisão HITL (*Human-In-The-Loop*).
+  * **Composer Flutuante Deluxe:** Barra de digitação com brilho ciano em foco, micro-escala amortecida no botão de envio, carrossel expansível de sugestões rápidas e indicador de raciocínio da IA com status sanitizado.
+* **Conectividade de Borda:**
+  * Conexão em 1 toque via **Tailscale** (`100.77.164.17:8000`), botão de escaneamento de rede Wi-Fi com efeito radar e campo manual com foco neon.
+  * Streaming SSE (*Server-Sent Events*) ultraleve com auto-reconexão e persistência de histórico local em SQLite Room.
+
+---
+
+<a id="arquitetura-sentinel-aura-missao-critica"></a>
+### 🛡️ 7. Arquitetura Sentinel-AURA de Missão Crítica para PDV Windows
+
+Para operar com segurança máxima no computador principal do caixa (PDV do posto) sem risco de travamento de hardware ou vazamento de senhas:
+
+```mermaid
+flowchart TD
+    subgraph PDV["🖥️ COMPUTADOR DO CAIXA / PDV (Windows 10/11 / Windows Server)"]
+        direction TB
+        
+        subgraph SCM["⚙️ Windows Service Control Manager (SCM)"]
+            SUPERVISOR["🛡️ AuraSupervisorService<br/>(Processo Guardião Leve - Sessão 0)"]
+            WORKER["⚡ AuraWorkerProcess<br/>(Processo Filho Operacional - Uvicorn / FastAPI)"]
+            HEARTBEAT["💓 Watchdog IPC de Heartbeat<br/>(Recuperação Sub-2s em Falhas)"]
+            SUPERVISOR -->|"Monitora / Auto-Heal"| WORKER
+            WORKER <-->|"Ping / Pong a cada 5s"| HEARTBEAT
+        end
+        
+        subgraph VAULT["🔐 Cofre Criptográfico DPAPI (core/identity_vault.py)"]
+            DPAPI["Windows Data Protection API<br/>(Criptografia atrelada à máquina local)"]
+            SECRETS["Senhas de ERP, PostgreSQL e Chaves de API<br/>(Zero Texto Plano em Disco)"]
+            DPAPI <--> SECRETS
+        end
+        
+        subgraph CIRCUIT["⚡ Hardware Circuit Breaker (core/resource_watchdog.py)"]
+            HW_MON["Monitor Win32 Nativo via ctypes<br/>(GlobalMemoryStatusEx + GetSystemTimes)"]
+            BREAKER{"Uso de CPU ou RAM > 80%?"}
+            HW_MON --> BREAKER
+            BREAKER -->|"Sim (Circuito Aberto)"| THROTTLE["🛑 Bloqueio Protetor de Queries Pesadas<br/>(Prioriza Emissão de Cupons e Liberação de Bicos)"]
+            BREAKER -->|"Não (Circuito Fechado)"| ALLOW["✅ Execução Normal de Ferramentas Analíticas"]
+        end
+
+        subgraph OUTBOX["📦 Mensageria Resiliente (core/outbox.py)"]
+            SQLITE_WAL["SQLite em Modo WAL Local<br/>(Persist-Before-Send)"]
+            RETRY["Exponential Backoff com Jitter<br/>(Zero Perda em Quedas de Internet)"]
+            SQLITE_WAL --> RETRY
+        end
+        
+        subgraph NOTIFIER["🔔 Notificador Desktop & In-App (core/desktop_notifier.py)"]
+            WTS["WTSSendMessageW<br/>(Projeção Sessão 0 -> Sessão 1)"]
+            INAPP["Alertas Proativos In-App no Chat e SSE"]
+        end
+    end
+```
+
+* **Serviço Windows SCM Supervisor-Worker (`core/windows_service.py`):** Arquitetura com separação estrita de processos. O Supervisor opera como guardião residente com footprint mínimo (< 15 MB RAM) e reinicia o Worker em menos de 2 segundos em caso de falha.
+* **Cofre Criptográfico DPAPI (`core/identity_vault.py`):** As credenciais de conexão do ERP e chaves de API são cifradas com chaves derivadas do próprio hardware da máquina pelo Windows kernel (`CryptProtectData`), eliminando senhas em arquivos de texto plano.
+* **Hardware Circuit Breaker para PDV (`core/resource_watchdog.py`):** Monitoramento contínuo de CPU e memória RAM nativo via `ctypes` sem dependências externas. Se o PDV atingir carga elevada (> 80%), o circuito se abre e adia análises pesadas de conveniência ou LMC para que o operador de caixa nunca enfrente lentidão na emissão de NFC-e.
+* **Mensageria Resiliente com Transactional Outbox (`core/outbox.py`):** Mensagens para n8n, WhatsApp e fechamentos de turno são persistidas em SQLite local em modo `WAL` antes de qualquer envio. Se a internet do posto cair, as notificações ficam enfileiradas e são despachadas automaticamente assim que a conexão retornar.
+* **Alertas Proativos In-App e Notificador Desktop:** Avisos de quebra de caixa, sangrias pendentes ou tanques críticos exibidos diretamente no console da AURA ou via janelas modais nativas `WTSSendMessageW`.
+
+---
+
+<a id="hub-apis-publicas"></a>
+### 🌐 8. Hub de Conectores de Dados Abertos e APIs Públicas Governamentais
+
+A AURA integra um subsistema modular em [`core/integrations/public_data/`](./core/integrations/public_data) que conecta o posto a fontes oficiais do governo brasileiro, com cache relacional local para operação 100% offline durante as consultas:
+
+1. **ANP (Agência Nacional do Petróleo):**
+   * Coleta em streaming de séries históricas de preços de combustíveis de revendedores concorrentes por município e bairro.
+   * Cálculo estatístico de média municipal, preços mínimo e máximo, mediana e quartis (Q1 e Q3), informando o posicionamento competitivo exato do posto.
+2. **CONFAZ (Conselho Nacional de Política Fazendária):**
+   * Extração e normalização de Atos COTEPE PMPF (Preço Médio Ponderado ao Consumidor Final) por Unidade Federativa.
+   * Auditoria de margens e pautas fiscais de substituição tributária (ICMS-ST).
+3. **INMETRO (Instituto Nacional de Metrologia):**
+   * Normas da Portaria INMETRO 559/2016 integradas: tolerância metrológica de vazão de bicos (erro máximo admissível de $\pm 100\text{ ml}$ a cada $20\text{ litros}$).
+   * Recomendações e botões de agendamento automático de aferições com medida-padrão lacrada.
+4. **BACEN (Banco Central do Brasil):**
+   * API de Séries Temporais (SGS): Taxa Selic Diária Anualizada (Série 11), Câmbio PTAX Dólar Venda (Série 10813) e Inflação IPCA (Série 433).
+   * Cálculo do custo de oportunidade financeiro de carregamento de estoque parado nos tanques.
+5. **RAG Normativo Local & Cache em Banco:**
+   * Legislação oficial completa (Portaria ANP 26/1992, Resolução ANP 894/2022, Portaria INMETRO 559/2016) indexada com embeddings em `aura_core.aura_conhecimento_vetores`.
+   * Tabelas relacionais locais (`aura_core.anp_precos_semanais`, `aura_core.confaz_pmpf`, `aura_core.bacen_series_historicas`) sincronizadas em background via [`scripts/sync_public_data.py`](./scripts/sync_public_data.py).
+
+---
+
+<a id="mapeador-declarativo-multi-erp"></a>
+### 🔄 9. Mapeador Declarativo Multi-ERP via YAML (Zero-Code Data Mapper)
+
+Para permitir a instalação imediata da AURA em postos com diferentes softwares de gestão (Linx Postos, Petros, Rezende, Adaptive, etc.) sem alterar o código-fonte da aplicação:
+
+* **Arquitetura Clean Room & AUPS (`core/domain/`):** Isolamento total entre as entidades de inteligência da AURA (*Aura Universal Protocol Schema*) e os bancos relacionais dos ERPs.
+* **Mapeamentos Declarativos YAML (`config/erp_mappings/`):**
+  * `linx_postos.yaml`: Mapeamento das tabelas e colunas do ERP Linx.
+  * `petros.yaml`: Mapeamento para o ERP Petros.
+  * `generic_postgres.yaml`: Mapeamento padrão para bancos PostgreSQL de retaguarda.
+* **Adaptador `YAMLDataMapperERPAdapter` (`core/adapters/erp/`):**
+  * Lê a configuração declarativa e constrói consultas SQL parametrizadas de leitura com proteção rigorosa contra injeção SQL.
+  * Converte automaticamente registros físicos para entidades puras do AUPS (`UniversalSaleReceipt`, `UniversalTankReading`, `UniversalDispenserLog`, `UniversalCashierShift`).
+
+---
+
+<a id="pwa-modo-pista"></a>
+### 🎙️ 10. PWA Mobile "Modo Pista" com Comandos Rápidos por Voz
+
+* **Progressive Web App Offline-First:** Arquivos `web/manifest.json` e `web/sw.js` com estratégia de cache local sem qualquer dependência de CDNs externas.
+* **Modo Pista de Alto Contraste:** Interface com fundo preto absoluto (`#000000`), alvos de toque táteis ampliados (mínimo de 48px) para frentistas e gerentes operando sob luz solar forte ou utilizando luvas de proteção.
+* **Entrada Rápida por Voz (Web Speech API):** Botão de microfone dedicado com reconhecimento nativo em português (`pt-BR`) e feedback visual pulsante, permitindo ditar consultas operacionais em movimento na pista.
+
+---
+
+<a id="frontend-typescript-vite"></a>
+### 💻 11. Frontend TypeScript, Bundler Vite & Vitrine Interativa
+
+* **Arquitetura Modular TypeScript (`web-frontend/`):** Contratos tipados estaticamente em `web-frontend/src/types/aura-contracts.ts` sincronizados 1:1 com os schemas Pydantic da API.
+* **Bundler Vite:** Compilação ultrarrápida, minificação e empacotamento com *tree-shaking*.
+* **Vitrine Executiva Interativa (`web/showcase.html`):** Mini-chat interativo, visualização do grafo de raciocínio da IA em tempo real com animação de contorno dinâmico (*edge glow*) e cartões executivos de alto impacto visual.
+
+---
 <a id="guia-de-inicialização-rápida"></a>
 ## ⚡ Guia de Inicialização Rápida
+
+### 0. Instalação Automatizada em 1-Clique para Windows (Recomendado)
+Para instalar ou atualizar a AURA em um computador de posto de combustível sem configurações manuais complexas:
+1. Clique com o botão direito em [`INSTALAR_POSTO_1_CLIQUE.bat`](./INSTALAR_POSTO_1_CLIQUE.bat) e selecione **"Executar como Administrador"**.
+2. O assistente PowerShell ([`scripts/instalar_posto.ps1`](./scripts/instalar_posto.ps1)) cuidará de:
+   * Validação dos pré-requisitos de hardware e portas (8000, 5433).
+   * Configuração do cofre criptográfico DPAPI do Windows.
+   * Registro dos serviços de supervisor e worker no Windows SCM.
+   * Criação dos atalhos de inicialização rápida na Área de Trabalho.
 
 ### Pré-requisitos
 * **Sistema Operacional:** Windows 10/11 ou Windows Server (ambiente nativo dos PDVs).
@@ -656,7 +806,7 @@ docker run -d --name pgvector-posto -p 5434:5432 -e POSTGRES_DB=posto_ai -e POST
 ### 5. Iniciar a Aplicação
 
 #### Opção A: Painel Web Próprio da AURA (Cockpit Operacional & Console Cognitivo)
-Dê um duplo clique no arquivo [`iniciar_painel.bat`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/iniciar_painel.bat) ou execute no PowerShell:
+Dê um duplo clique no arquivo [`iniciar_painel.bat`](./iniciar_painel.bat) ou execute no PowerShell:
 ```powershell
 .\iniciar_painel.bat
 # ou via Python direto
@@ -668,7 +818,7 @@ python server.py
 > Caso o serviço de segundo plano do Windows (`AuraBackendService`) já esteja ativo na porta 8000, tanto o `iniciar_painel.bat` quanto o `python server.py` identificam automaticamente o serviço saudável, evitam conflitos de porta e abrem imediatamente o navegador em `http://127.0.0.1:8000`.
 
 #### Opção B: Launcher CLI 1-Clique (Terminal Interativo)
-Dê um duplo clique no arquivo [`iniciar.bat`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/iniciar.bat) ou execute no PowerShell:
+Dê um duplo clique no arquivo [`iniciar.bat`](./iniciar.bat) ou execute no PowerShell:
 ```powershell
 .\iniciar.bat
 # ou
@@ -692,9 +842,9 @@ Se você desenvolve a partir de outra máquina (ex: Computador de Casa) e deseja
 2. **No PC de Casa (Estação de Desenvolvimento):**
    Clone o repositório, instale as dependências e configure o `.env` apontando para o IP Tailscale ou hostname MagicDNS do Notebook:
    ```ini
-   ERP_DB_HOST=100.77.164.17       # ou use o MagicDNS: marlonh-supwp
+   ERP_DB_HOST=100.77.164.17       # ou use o MagicDNS: aura-edge-node01
    ERP_DB_PORT=5433
-   VECTOR_DB_HOST=100.77.164.17    # ou use o MagicDNS: marlonh-supwp
+   VECTOR_DB_HOST=100.77.164.17    # ou use o MagicDNS: aura-edge-node01
    VECTOR_DB_PORT=5434
    ```
 
@@ -703,10 +853,10 @@ Se você desenvolve a partir de outra máquina (ex: Computador de Casa) e deseja
    ```powershell
    python scripts/test_ponte_tailscale.py
    # Ou testando diretamente via CLI:
-   python scripts/test_ponte_tailscale.py marlonh-supwp
+   python scripts/test_ponte_tailscale.py aura-edge-node01
    ```
 
-> 📖 **Guia Passo a Passo Completo:** Consulte o [`docs/guia_ponte_desenvolvimento_remoto_tailscale.md`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/guia_ponte_desenvolvimento_remoto_tailscale.md) para o comparativo detalhado entre **Git Clone Local** vs **VS Code Remote Tunnels / SSH**.
+> 📖 **Guia Passo a Passo Completo:** Consulte o [`docs/guia_ponte_desenvolvimento_remoto_tailscale.md`](./docs/guia_ponte_desenvolvimento_remoto_tailscale.md) para o comparativo detalhado entre **Git Clone Local** vs **VS Code Remote Tunnels / SSH**.
 
 ---
 
@@ -719,43 +869,98 @@ ia-banco-local/
 ├── .gitignore                # Proteção rigorosa contra vazamento de credenciais e dumps
 ├── requirements.txt          # Dependências do projeto (psycopg2, google-generativeai, spacy, etc.)
 ├── README.md                 # Documentação técnica e guia do sistema
+├── INSTALAR_POSTO_1_CLIQUE.bat # Instalador assistido Windows 1-clique com UAC
 ├── iniciar.bat               # Launcher operacional Windows 1-clique (Docker + Postgres + CLI)
-├── iniciar.ps1               # Launcher PowerShell alternativo
+├── iniciar_painel.bat        # Launcher do Cockpit Web da AURA na porta 8000
 ├── main.py                   # CLI interativo principal com streaming token-a-token
+├── server.py                 # Servidor de API FastAPI + Uvicorn na porta 8000
 │
-├── config/                   # Módulo de configurações centralizadas
-│   ├── __init__.py
-│   └── settings.py           # Gestão de credenciais, portas e parâmetros de IA
+├── Aura Assistance Android/  # 📱 Aplicativo Nativo Android (Jetpack Compose + Room + Hilt)
+│   ├── app/src/main/java/    # Código Kotlin, Design System Obsidian Aurora, Telas e GenUI
+│   ├── app/src/main/res/     # Tipografia Newsreader, Geist e recursos visuais
+│   └── app/src/test/         # Testes unitários JUnit de markup e parsing GenUI
 │
-├── core/                     # Núcleo analítico e motor agêntico
+├── config/                   # Configurações centralizadas e mapeamentos
 │   ├── __init__.py
+│   ├── settings.py           # Gestão de credenciais, portas e parâmetros de IA
+│   └── erp_mappings/         # Mapeamentos declarativos Zero-Code Multi-ERP (YAML)
+│       ├── linx_postos.yaml  # Mapeamento oficial para ERP Linx
+│       ├── petros.yaml       # Mapeamento para ERP Petros
+│       └── generic_postgres.yaml # Mapeamento padrão PostgreSQL
+│
+├── core/                     # Núcleo analítico, agêntico e de missão crítica
+│   ├── __init__.py
+│   ├── aura_engine.py        # Motor orquestrador cognitivo da AURA
+│   ├── aura_api.py           # Rotas REST, streaming SSE e endpoints de telemetria
 │   ├── rag_engine.py         # Motor HybridRAGEngine (HNSW + FTS GIN + RRF calibrado em SQL)
 │   ├── sanitizer.py          # CentralLogSanitizer (LGPD 24 categorias + OWASP GenAI)
 │   ├── semantic_router.py    # SemanticRouter (pgvector halfvec 768d + fallback determinístico)
-│   ├── schemas/              # Contratos Pydantic v2 para rede e microsserviços
-│   │   ├── __init__.py
-│   │   └── network.py        # Schemas de Fan-Out, Fan-In, Payloads e Resiliência
-│   └── tools.py              # PostoTools (Auditoria de Turnos, Automação CBC04, PDV, Tanques)
+│   ├── db_pool.py            # Connection pool gerenciado thread-safe
+│   ├── proactive_daemon.py   # Motor de alertas proativos de pista 24/7 (tanques, caixa, LMC)
+│   ├── windows_service.py    # Supervisor-Worker nativo do Windows Service Control Manager (SCM)
+│   ├── identity_vault.py     # Cofre criptográfico DPAPI do Windows para credenciais
+│   ├── resource_watchdog.py  # Hardware Circuit Breaker Win32 para proteção do PDV de caixa
+│   ├── outbox.py             # Transactional Outbox resiliente em SQLite WAL (zero perda)
+│   ├── desktop_notifier.py   # Notificador HITL Desktop WTSSendMessageW e In-App
+│   ├── watchdog.py           # Sentinela de auto-healing e reciclagem de processos
+│   ├── telemetry.py          # Exportador oficial de métricas Prometheus (/metrics)
+│   ├── tenancy.py            # Multi-tenancy com Row-Level Security (RLS) PostgreSQL
+│   ├── compliance_manager.py # Gestor de consentimento e auditoria LGPD com hash SHA-256
+│   ├── tools.py              # PostoTools (Auditoria, CBC04, PDV, LMC, Vendas Cruzadas, Benchmark)
+│   ├── adapters/erp/         # Arquitetura Clean Room de adaptadores de ERP
+│   │   ├── base.py           # Classe abstrata BaseERPAdapter
+│   │   ├── postgres_adapter.py # Adaptador direto PostgreSQL legado
+│   │   └── yaml_data_mapper.py # Adaptador declarativo Zero-Code YAML
+│   ├── domain/               # AUPS (Aura Universal Protocol Schema) - Entidades puras
+│   ├── integrations/public_data/ # Hub de conectores de dados governamentais
+│   │   ├── anp_connector.py  # Conector de preços e quartis municipais ANP
+│   │   ├── confaz_connector.py # Conector de pautas COTEPE PMPF CONFAZ
+│   │   ├── bacen_connector.py # Conector de séries Selic/Dólar/IPCA BACEN SGS
+│   │   └── repository.py     # Cache relacional local e RAG normativo oficial
+│   └── schemas/              # Contratos Pydantic v2 (GenUI, vouchers, rede, compliance)
 │
-├── scripts/                  # Scripts de automação, manutenção e testes
-│   ├── __init__.py
-│   ├── index_produtos.py     # Pipeline ETL de indexação vetorial com CDC Delta Hash MD5
-│   ├── sync_daemon.py        # Daemon de sincronização contínua ERP -> pgvector com CDC
-│   ├── benchmark_rag.py      # Benchmark comparativo de precisão, recall e latência
-│   ├── test_sanitizer.py     # Suíte de testes da blindagem LGPD e sanitização
-│   ├── test_conciliacao_turno.py # Suíte de testes do motor de conciliação de turnos
-│   ├── test_previsao_tanques.py  # Suíte de testes do motor preditivo de esgotamento e carretas
-│   ├── test_desempenho_frentistas.py # Suíte de testes da auditoria de pista e frentistas
-│   ├── test_rag_hierarquico.py   # Suíte de testes do RAG Hierárquico Multi-Filial & MapReduce
-│   ├── test_semantic_router.py   # Suíte de testes do Roteador Semântico Vetorial e CDC Delta Hash
-│   ├── test_lmc_anp.py           # Suíte de testes da automação do LMC oficial da ANP
-│   ├── seed_conveniencia_vendas.py # Carga controlada de transações de conveniência no ERP
-│   └── test_conveniencia_vendas_cruzadas.py # Suíte de testes de Market Basket Analysis e vendas cruzadas
+├── web/                      # Interface Web da AURA, Cockpit Operacional e PWA
+│   ├── index.html            # Cockpit gerencial com streaming e componentes GenUI
+│   ├── showcase.html         # Vitrine executiva interativa com visual Obsidian de luxo
+│   ├── manifest.json         # Manifesto PWA com suporte a Modo Pista
+│   └── sw.js                 # Service Worker 100% offline-first
 │
-├── docs/                               # Documentação de arquitetura e roadmap
-│   ├── dossie_tecnico.md               # Dossiê técnico completo de infraestrutura e SRE
-│   ├── roadmap_aila.md                 # Roadmap estratégico e planejamento das fases de evolução
-│   └── roadmap_producao_enterprise.md  # Roadmap de produção enterprise e prontidão operacional
+├── web-frontend/             # Frontend moderno em TypeScript e bundler Vite
+│   ├── src/types/aura-contracts.ts # Contratos TypeScript estáticos alinhados 1:1 à AURA
+│   ├── src/api/aura-client.ts # Cliente tipado REST e SSE
+│   └── vite.config.ts        # Bundler com tree-shaking e compilação minificada
+│
+├── scripts/                  # Scripts de automação, manutenção e SRE
+│   ├── instalar_posto.ps1    # Assistente de instalação de 1-clique no Windows
+│   ├── sync_public_data.py   # Worker de sincronização de dados ANP/CONFAZ/BACEN
+│   ├── seed_aura_conhecimento.py # Carga do RAG normativo no pgvector
+│   ├── watchdog_sentinel.py  # CLI sentinela autônomo para Windows
+│   └── test_*.py             # Suítes de diagnóstico de conectividade e pontes
+│
+├── tests/unit/               # 🧪 +400 Testes Unitários Automatizados (100% Verdes)
+│   ├── test_windows_scm_service.py # Testes do Supervisor-Worker Windows SCM
+│   ├── test_identity_vault_dpapi.py # Testes do cofre DPAPI do Windows
+│   ├── test_hardware_circuit_breaker.py # Testes do Hardware Circuit Breaker
+│   ├── test_transactional_outbox.py # Testes do Transactional Outbox SQLite WAL
+│   ├── test_desktop_notifier_wts.py # Testes do notificador WTSSendMessageW
+│   ├── test_public_data_connectors.py # Testes dos conectores ANP, CONFAZ e BACEN
+│   ├── test_public_data_sync.py # Testes do cache relacional local e sincronização
+│   ├── test_ferramentas_cognitivas_publicas.py # Testes das ferramentas cognitivas com dados públicos
+│   ├── test_rag_normativo_publico.py # Testes do RAG normativo oficial
+│   ├── test_public_data_e2e_api.py # Testes de integração ponta a ponta na API
+│   ├── test_yaml_data_mapper.py # Testes do mapeador declarativo multi-ERP
+│   ├── test_prometheus_metrics.py # Testes do exportador /metrics e dashboard Grafana
+│   ├── test_frontend_typescript_contracts.py # Testes dos contratos estáticos TypeScript
+│   ├── test_proactive_daemon.py # Testes do motor de alertas proativos 24/7
+│   ├── test_watchdog_sentinel.py # Testes do sentinela de resiliência e auto-healing
+│   └── test_pwa_modo_pista.py # Testes do PWA e Modo Pista
+│
+├── docs/                     # Documentação de arquitetura, manuais e roadmaps
+│   ├── roadmap_producao_enterprise.md # Roadmap industrial enterprise (Fases P0 a P3 concluídas)
+│   ├── ROADMAP_SENTINEL_AURA.md # Roadmap de missão crítica para PDV (Fases 1 a 5 concluídas)
+│   ├── roadmap_integracao_apis_publicas.md # Roadmap de dados abertos (Fases 1 a 5 concluídas)
+│   ├── guia_operacional_apis_publicas.md # Manual operacional do revendedor
+│   └── roadmap_blindagem_juridica_clean_room.md # Dossiê de arquitetura Clean Room e AUPS
 │
 └── backups/                  # Diretório protegido para rotinas de backup locais
     └── .gitkeep              # Estrutura mantida no Git (dumps .backup são ignorados)
@@ -837,9 +1042,54 @@ Valida a conectividade TCP pura de socket dual-stack, autenticação no PostgreS
 python scripts/test_ponte_tailscale.py
 
 # Ou testa um IP/hostname remoto diretamente via CLI:
-python scripts/test_ponte_tailscale.py marlonh-supwp
+python scripts/test_ponte_tailscale.py aura-edge-node01
 ```
 *Resultado: **100% aprovado (latência ~50ms no ERP e ~25ms no pgvector, SLA Excelente)**.*
+
+### 11. Testes de Missão Crítica Sentinel-AURA & PDV Shield
+Valida a integridade do Supervisor-Worker Windows SCM (`core/windows_service.py`), cofre criptográfico DPAPI (`core/identity_vault.py`), proteção do PDV com Hardware Circuit Breaker (`core/resource_watchdog.py`), Transactional Outbox em SQLite WAL (`core/outbox.py`) e notificador desktop `WTSSendMessageW`:
+```powershell
+pytest tests/unit/test_windows_scm_service.py tests/unit/test_identity_vault_dpapi.py tests/unit/test_hardware_circuit_breaker.py tests/unit/test_transactional_outbox.py tests/unit/test_desktop_notifier_wts.py -v
+```
+*Resultado: **100% dos testes aprovados**.*
+
+### 12. Testes de Conectores Governamentais e Cache de APIs Públicas
+Valida o download em streaming de dados da ANP com cálculo de quartis e médias municipais, parsing de Atos COTEPE PMPF do CONFAZ, consumo de séries SGS do BACEN (Selic diária, Dólar PTAX, IPCA), proteção de rede via Circuit Breaker e persistência no banco relacional local:
+```powershell
+pytest tests/unit/test_public_data_connectors.py tests/unit/test_public_data_sync.py tests/unit/test_rag_normativo_publico.py tests/unit/test_ferramentas_cognitivas_publicas.py tests/unit/test_public_data_e2e_api.py -v
+```
+*Resultado: **100% dos testes aprovados**.*
+
+### 13. Testes do Mapeador Declarativo Multi-ERP YAML & Clean Room
+Valida o carregamento e validação de configurações YAML para Linx Postos, Petros e PostgreSQL genérico, a geração de queries parametrizadas anti-SQL injection e o mapeamento para as entidades canônicas do AUPS:
+```powershell
+pytest tests/unit/test_yaml_data_mapper.py -v
+```
+*Resultado: **100% dos testes aprovados**.*
+
+### 14. Testes de Contratos Estáticos TypeScript e PWA Mobile
+Valida o alinhamento estrito 1:1 entre os schemas Pydantic da AURA e as interfaces TypeScript de `web-frontend/src/types/aura-contracts.ts`, além dos manifestos e service workers do PWA Modo Pista:
+```powershell
+pytest tests/unit/test_frontend_typescript_contracts.py tests/unit/test_pwa_modo_pista.py tests/unit/test_prometheus_metrics.py -v
+```
+*Resultado: **100% dos testes aprovados**.*
+
+### 15. Execução Completa da Suíte de Testes Automatizados (+400 Testes)
+Executa a totalidade dos testes unitários e de integração do backend:
+```powershell
+pytest tests/unit/ -v
+```
+*Resultado: **Mais de 400 testes unitários aprovados com 100% de sucesso**.*
+
+### 16. Testes Unitários do App Nativo Android (JUnit & Kotlin)
+Valida a formatação de tags personalizadas de markup (`AuraMarkupFormatter`), tratamento de tolerâncias, cores semânticas e o parser de envelopes GenUI (`GenUiParser`):
+```powershell
+cd "Aura Assistance Android"
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+.\gradlew.bat testDebugUnitTest --no-daemon
+```
+*Resultado: **100% dos testes aprovados**.*
+
 
 ---
 
@@ -851,22 +1101,23 @@ O desenvolvimento do **Ai.la** segue um cronograma rigoroso de engenharia focado
 | Fase | Título & Foco | Status | Entregáveis Principais |
 | :---: | :--- | :---: | :--- |
 | **Fase 1** | **Blindagem LGPD & Sanitização de Dados** | ✅ Concluída | `core/sanitizer.py`, 24 categorias de PII ofuscadas, testes automatizados 100%. |
-| **Fase 2** | **Motor de Conciliação de Turnos & Pista** | ✅ Concluída | Triangulação `fechabomba` $\leftrightarrow$ `fechacaixa` $\leftrightarrow$ CBC04, rollover, ANP $\pm 0.6\%$. |
-| **Fase 6.1** | **Previsão de Esgotamento de Tanques (Run-Out)** | ✅ Concluída | Autonomia em horas/dias, projeção de estoque zero, espaço de descarga (*ullage*), compra em múltiplos de 5.000 L. |
-| **Fase 6.2** | **Auditoria de Pista & Desempenho de Frentistas** | ✅ Concluída | Vazão hidráulica (L/min) com alerta de filtro sujo, conversão de aditivada $\ge 25\%$, anomalias de pista. |
-| **Fase 6.3** | **Automação do LMC Oficial da ANP (Portaria 26/1992)** | ✅ Concluída | Balanço escriturado vs físico, tolerância $\pm 0.6\%$, diagnóstico de quebras/sobras, 10ª rota semântica. |
-| **Fase 6.4** | **Inteligência de Conveniência & Vendas Cruzadas** | ✅ Concluída | Market Basket Analysis, métricas de associação (Suporte, Confiança, Lift $\ge 2.0$, Convicção), scripts de caixa, 11ª rota semântica. |
-| **Fase 2.5** | **Esteira de Deploy Automatizado & Onboarding** | 🚀 Próxima | `docker-compose.yml`, `scripts/deploy_posto.ps1` (1-clique), validação de portas. |
-| **Fase 3** | **Desacoplamento MCP & LangGraph Local** | 🔌 Próxima | Servidor MCP Python local, FastAPI assíncrono (SSE streaming), StateGraph local. |
-| **Fase 3.5** | **Escalabilidade Multi-Filial (RAG Hierárquico MapReduce)** | 🌐 Planejada | Maestro Fan-Out assíncrono (`asyncio`), Edge Workers Docker (JSON Pydantic), resiliência 5s e Síntese Executiva LLM. |
-| **Fase 4** | **Canal WhatsApp & Notificações Proativas** | 📱 Planejada | n8n + Evolution API, relatórios automáticos pós-turno (06h, 14h, 22h), áudio/voz. |
-| **Fase 5** | **Dashboard Web & PWA Mobile** | 💻 Planejada | Painel gerencial responsivo, visão gráfica dos tanques, monitor de frentistas em tempo real. |
+| **Fase 2** | **Motor de Conciliação de Turnos & Pista** | ✅ Concluída | Triangulação `fechabomba` <-> `fechacaixa` <-> CBC04, rollover, ANP ±0.6%. |
+| **Fase 6.1** | **Previsão de Esgotamento de Tanques (Run-Out)** | ✅ Concluída | Autonomia em horas/dias, projeção de estoque zero, espaço livre (*ullage*), compra em múltiplos de 5.000 L. |
+| **Fase 6.2** | **Auditoria de Pista & Desempenho de Frentistas** | ✅ Concluída | Vazão hidráulica (L/min) com alerta de filtro sujo, conversão de aditivada >= 25%, anomalias de pista. |
+| **Fase 6.3** | **Automação do LMC Oficial da ANP (Portaria 26/1992)** | ✅ Concluída | Balanço escriturado vs físico, tolerância ±0.6%, diagnóstico de quebras/sobras, 10ª rota semântica. |
+| **Fase 6.4** | **Inteligência de Conveniência & Vendas Cruzadas** | ✅ Concluída | Market Basket Analysis, métricas de associação (Suporte, Confiança, Lift >= 2.0, Convicção), scripts de caixa, 11ª rota. |
+| **P0 Enterprise** | **Prontidão Imediata para Piloto & Segurança** | ✅ Concluída | Vouchers HMAC parametrizados, expurgo de segredos, connection pool gerenciado (`core/db_pool.py`), frontend offline-first. |
+| **P1 Enterprise** | **Robustez de Dados & Blindagem Operacional** | ✅ Concluída | Migrações Alembic (`core/migrations.py`), backup AES-256-GCM (`core/backup_manager.py`), CDC em background (`core/cdc_listener.py`). |
+| **P2 Enterprise** | **Multi-Tenancy & Observabilidade SRE** | ✅ Concluída | Multi-tenancy com RLS PostgreSQL (`core/tenancy.py`), exportador Prometheus `/metrics` (`core/telemetry.py`), contratos TypeScript. |
+| **P3 Enterprise** | **Autonomia Operacional & Experiência de Borda** | ✅ Concluída | Cockpit nativo de telemetria ultraleve, motor de alertas proativos de pista (`core/proactive_daemon.py`), mapeador multi-ERP YAML, PWA Modo Pista por voz, watchdog auto-healing Windows. |
+| **Sentinel-AURA** | **Engenharia de Missão Crítica para PDV** | ✅ Concluída | Serviço Windows SCM Supervisor-Worker, Cofre DPAPI (`core/identity_vault.py`), Hardware Circuit Breaker (`core/resource_watchdog.py`), Notificador HITL Desktop, Transactional Outbox SQLite WAL (`core/outbox.py`). |
+| **APIs Públicas** | **Hub de Conectores & Legislação Normativa** | ✅ Concluída | Conectores ANP (preços e quartis), CONFAZ (Atos COTEPE PMPF), INMETRO (Portaria 559/2016), BACEN (SGS Selic/Dólar/IPCA), cache relacional local e RAG normativo oficial. |
+| **Aura Mobile** | **Aplicativo Nativo Android Deluxe** | ✅ Concluída | App Android nativo em Kotlin e Jetpack Compose, design system Obsidian Aurora AMOLED, telemetria de tanques com líquido animado, streaming SSE e cartões GenUI HITL. |
 | **Fase 6.5+** | **Módulo Fiscal Avançado (Agent SEFAZ)** | 📈 Planejada | Auditoria contínua de NFC-e com Reforma Tributária (IBS/CBS) e conformidade NCM/CEST. |
-
-> *Para o plano detalhado de prontidao industrial e engenharia de missao critica (Fases P0, P1 e P2), consulte o [`docs/roadmap_producao_enterprise.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap_producao_enterprise.md).*  
+> *Para o plano detalhado de prontidao industrial e engenharia de missao critica (Fases P0, P1 e P2), consulte o [`docs/roadmap_producao_enterprise.md`](./docs/roadmap_producao_enterprise.md).*  
 > *Fase P0 (Go-Live Piloto) homologada: expurgo de segredos hardcoded, vouchers HMAC parametrizados, thread-safety no SemanticRouter, connection pool gerenciado (core/db_pool.py), frontend 100% offline-first e servico nativo Windows via NSSM (`scripts/iniciar_servico_nssm.bat`).*  
-> *Para o detalhamento arquitetural dos motores cognitivos e fases de inteligencia analitica, consulte o [`docs/roadmap_aila.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap_aila.md).*  
-> *Para a evolucao de UI/UX e design system conversacional, consulte o [`docs/roadmap.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap.md).*
+> *Para o detalhamento arquitetural dos motores cognitivos e fases de inteligencia analitica, consulte o [`docs/roadmap_aila.md`](./docs/roadmap_aila.md).*  
+> *Para a evolucao de UI/UX e design system conversacional, consulte o [`docs/roadmap.md`](./docs/roadmap.md).*
 
 ---
 

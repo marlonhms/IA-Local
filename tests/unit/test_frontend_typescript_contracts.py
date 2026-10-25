@@ -20,10 +20,12 @@ from core.schemas.genui import (
     ActionAuditLogRecord,
     ActionExecuteRequest,
     ActionVoucher,
+    ActionableDirectivePayload,
     BasketUpsellStrategyProps,
     BenchmarkComparisonProps,
     ComplianceStatusProps,
     ExecutiveDecisionProps,
+    ExecutiveExceptionCard,
     FinancialLeakAuditProps,
     GenUIActionOption,
     GenUIEnvelope,
@@ -99,6 +101,7 @@ def test_pydantic_to_typescript_contract_parity() -> None:
         "ShiftReconciliationProps",
         "TankRunOutPredictionProps",
         "TelemetrySLISnapshot",
+        "LiveSecurityTelemetry",
     ]
     for req_iface in required_custom_interfaces:
         assert req_iface in ts_interfaces, f"Interface TypeScript {req_iface} ausente"
@@ -110,6 +113,8 @@ def test_pydantic_to_typescript_contract_parity() -> None:
         "ActionVoucher": ActionVoucher,
         "ActionAuditLogRecord": ActionAuditLogRecord,
         "ExecutiveDecisionProps": ExecutiveDecisionProps,
+        "ExecutiveExceptionCard": ExecutiveExceptionCard,
+        "ActionableDirectivePayload": ActionableDirectivePayload,
         "MarginAnalysisProps": MarginAnalysisProps,
         "PredictiveScenarioProps": PredictiveScenarioProps,
         "BenchmarkComparisonProps": BenchmarkComparisonProps,
@@ -145,7 +150,11 @@ def test_aura_client_and_sdk_entrypoint() -> None:
     assert "/api/v1/aura/actions/execute" in client_src
     assert "/api/v1/aura/compliance/status" in client_src
     assert "/api/v1/aura/chat/stream" in client_src
+    assert "/api/v1/cockpit/zero-click-feed" in client_src
+    assert "/api/v1/aura/security/telemetry" in client_src
     assert "/metrics" in client_src
+    assert "getZeroClickFeed" in client_src
+    assert "getLiveSecurityTelemetry" in client_src
     assert "isValidGenUIEnvelope" in client_src
     assert "isValidActionVoucher" in client_src
 

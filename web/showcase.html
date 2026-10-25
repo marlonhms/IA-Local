@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#07090e">
   <title>AURA // Apresentação & Showcase Executivo (Simulação Autônoma em Tempo Real)</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/static/icon.svg">
 
   <!-- Tipografia Editorial & Executiva de Alta Precisão (Geist + Newsreader / Editorial Serif - Padrão Harness.io Offline-First) -->
 
@@ -61,13 +62,19 @@
   </script>
 
   <!-- Folha de Estilos Oficial do Design System AURA -->
-  <link rel="stylesheet" href="/static/css/aura.css">
+  <link rel="stylesheet" href="/static/css/aura.css?v=2.10.22">
+  <!-- Arquitetura de Seguranca Auditavel (Fase 2) -->
+  <script src="/static/js/aura-security-architecture.js" defer></script>
   <script>
     if (window.location.protocol === 'file:') {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = 'css/aura.css';
+      link.href = 'css/aura.css?v=2.10.22';
       document.head.appendChild(link);
+
+      const secScript = document.createElement('script');
+      secScript.src = 'js/aura-security-architecture.js';
+      document.head.appendChild(secScript);
     }
   </script>
 
@@ -83,6 +90,20 @@
       --font-serif: 'Newsreader', 'Stkbureauserif Book', 'Instrument Serif', Georgia, 'Times New Roman', serif;
       --font-sans: 'Geist', Verdana, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    /* Alinhamento Numerico Tabular (Fase 1: Lovable 2026 Offline-First) */
+    .tabular-nums,
+    [data-tabular-nums="true"],
+    .font-mono,
+    .metric-value,
+    .metric-number,
+    .kpi-value,
+    .currency-value,
+    .table-data-cell {
+      font-variant-numeric: tabular-nums;
+      -webkit-font-feature-settings: "tnum" 1;
+      font-feature-settings: "tnum" 1;
     }
 
     body {
@@ -683,7 +704,7 @@
                 100% LGPD
               </span>
             </div>
-            <p class="text-[10px] text-slate-400 font-sans hidden sm:block">Plataforma de Inteligência Autônoma para Postos, Lojas, Bares, Padarias & Varejo</p>
+            <p class="text-[10px] text-slate-400 font-sans hidden sm:block">Copiloto Universal de Dados & Inteligência Operacional para Qualquer Negócio</p>
           </div>
         </a>
       </div>
@@ -693,6 +714,9 @@
         <button onclick="window.auraTour.scrollToSection('sec-chat-graph')" class="px-2.5 py-1.5 rounded-lg text-cyan-300 hover:text-white hover:bg-white/[0.04] transition-colors font-medium flex items-center gap-1.5">
           <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
           <span>Ao Vivo</span>
+        </button>
+        <button onclick="window.auraTour.scrollToSection('sec-compatibilidade')" class="px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.04] transition-colors">
+          Bancos & ERPs
         </button>
         <button onclick="window.auraTour.scrollToSection('sec-blindagem')" class="px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.04] transition-colors">
           Escudo LGPD
@@ -713,6 +737,11 @@
 
       <!-- Botões de Ação Direta -->
       <div class="flex items-center gap-2.5">
+        <button id="btn-open-security-showcase" onclick="if(window.auraSecurityArchitecture) window.auraSecurityArchitecture.openModal();" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 hover:text-white border border-emerald-500/30 text-xs transition-colors" title="Arquitetura de Confiança e SQL Auditável">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span class="hidden sm:inline text-[11px] font-medium">SQL Auditável</span>
+        </button>
+
         <button id="btn-toggle-sfx-showcase" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/10 text-xs transition-colors" title="Alternar Efeitos Sonoros">
           <i data-lucide="volume-2" id="icon-sfx" class="w-3.5 h-3.5 text-cyan-400"></i>
           <span class="hidden sm:inline text-[11px]">Áudio</span>
@@ -735,35 +764,56 @@
     <!-- Hero Split: Proposta de Valor (Esquerda) vs Cockpit Holográfico da AURA (Direita) -->
     <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center min-h-[62vh] sm:min-h-[70vh] py-6 scroll-reveal scroll-reveal-visible" id="hero-cockpit-split">
       
-      <!-- Coluna Esquerda: Proposta de Valor Executiva -->
+      <!-- Coluna Esquerda: Proposta de Valor Executiva Universal -->
       <div class="lg:col-span-7 space-y-6 text-left">
         <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-xs font-sans text-cyan-300">
           <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-          <span class="font-semibold tracking-wider uppercase text-[10px]">Arquitetura Universal: Postos • Padarias • Bares • Lojas • Franquias</span>
+          <span class="font-semibold tracking-wider uppercase text-[10px]">Plataforma Universal de Dados: Varejo • Comércio • Franquias • Postos • Distribuição • Bares & Padarias</span>
         </div>
 
-        <h1 class="text-3xl sm:text-5xl lg:text-[50px] font-normal tracking-[-0.02em] text-white leading-[1.14] font-display-title">
-          O Cérebro Operacional de Qualquer Comércio ou Ponto de Venda. <br>
-          <span class="bg-gradient-to-r from-cyan-400 via-emerald-300 to-purple-400 bg-clip-text text-transparent">
-            Proteção Absoluta de Dados & 100% LGPD.
+        <h1 class="text-3xl sm:text-4xl lg:text-[40px] font-normal tracking-[-0.015em] text-white leading-[1.2] font-display-title [text-wrap:balance]">
+          Perdas financeiras invisíveis, furos de caixa e desvios de estoque custam caro para o seu negócio. <br>
+          <span class="block mt-2 text-[0.8em] leading-[1.25] bg-gradient-to-r from-cyan-300 to-emerald-300 bg-clip-text text-transparent">
+            AURA resolve isso em segundos, conectando a qualquer banco de dados sem trocar o seu sistema atual.
           </span>
         </h1>
 
+        <!-- Sub-headline com 3 Badges de Autoridade Tecnica -->
+        <div class="flex flex-wrap items-center gap-2 pt-1">
+          <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-xs font-sans text-emerald-300">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <span class="font-medium">Zero gravação no sistema de gestão (100% somente leitura)</span>
+          </div>
+          <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/25 text-xs font-sans text-purple-300">
+            <i data-lucide="trending-down" class="w-3.5 h-3.5 text-purple-400"></i>
+            <span class="font-medium">Economia de até 95% em custos de IA</span>
+          </div>
+          <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/25 text-xs font-sans text-cyan-300">
+            <i data-lucide="zap" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span class="font-medium">Resposta local sub-100ms na rede da sua empresa</span>
+          </div>
+        </div>
+
         <p class="body-regular home_agents-feature-desc text-slate-300 text-[15px] sm:text-base leading-relaxed max-w-xl">
-          Acompanhe como a AURA funciona na prática: role a página para ver a pergunta sendo analisada, os dados confidenciais protegidos na hora e a resposta executiva sendo gerada em segundos.
+          O copiloto executivo universal que se conecta a qualquer banco de dados em minutos. Conexão simbiótica 100% não-invasiva e somente-leitura com o ERP, o PDV ou o banco de dados que a sua empresa já usa, transformando dados brutos em diagnósticos de lucro, caixa e estoque em segundos.
         </p>
 
-        <!-- Indicador de Rolagem e Métricas Rápidas -->
-        <div class="pt-2 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <button onclick="window.auraTour.scrollToSection('sec-chat-graph')" class="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-slate-900 border border-cyan-500/30 text-cyan-300 hover:text-white hover:border-cyan-400 text-xs font-semibold transition-all group btn-aura-exec">
-            <span>Role para ver o fluxo em tempo real</span>
-            <i data-lucide="arrow-down" class="w-4 h-4 group-hover:translate-y-0.5 transition-transform text-cyan-400"></i>
+        <!-- CTAs Duplos: Diagnostico ao Vivo e Inspecionar Script SQL Auditavel -->
+        <div class="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <button onclick="window.auraTour.scrollToSection('sec-chat-graph')" class="inline-flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 text-xs font-bold transition-all shadow-lg shadow-cyan-500/20 active:scale-[0.98] cursor-pointer" id="btn-hero-live-diag">
+            <i data-lucide="play" class="w-4 h-4 fill-slate-950"></i>
+            <span>Testar Diagnóstico ao Vivo</span>
           </button>
-          
-          <div class="flex items-center gap-2 text-[11px] font-sans text-slate-400">
-            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-            <span>Demonstração Autônoma Sincronizada ao Scroll • Zero Cliques Forçados</span>
-          </div>
+
+          <button onclick="if(window.auraSecurityArchitecture) window.auraSecurityArchitecture.openModal();" class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white border border-white/10 hover:border-emerald-500/40 text-xs font-medium transition-all cursor-pointer" id="btn-hero-inspect-sql">
+            <i data-lucide="code-2" class="w-4 h-4 text-emerald-400"></i>
+            <span>Inspecionar Script SQL Auditável</span>
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2 text-[11px] font-sans text-slate-400">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span>Role para ver o fluxo em tempo real (demonstração autônoma sincronizada ao scroll)</span>
         </div>
 
         <!-- Três Micro-Destaques de Engenharia no Rodapé da Coluna Esquerda -->
@@ -885,9 +935,9 @@
             </div>
 
             <div class="p-2.5 rounded-xl bg-slate-950/60 border border-white/[0.06] space-y-1">
-              <div class="text-[10px] text-slate-400">Auditoria ANP</div>
-              <div class="text-xs font-bold text-cyan-300 font-mono">+0.28% LMC</div>
-              <div class="text-[9px] text-slate-400">Portaria 26 OK</div>
+              <div class="text-[10px] text-slate-400">Auditoria Fiscal</div>
+              <div class="text-xs font-bold text-cyan-300 font-mono">100% Conforme</div>
+              <div class="text-[9px] text-slate-400">Regras & Fiscal OK</div>
             </div>
 
             <div class="p-2.5 rounded-xl bg-slate-950/60 border border-white/[0.06] space-y-1">
@@ -901,7 +951,7 @@
           <div class="p-2 rounded-lg bg-black/40 border border-white/[0.04] text-[10px] font-mono text-slate-400 flex items-center justify-between">
             <div class="flex items-center gap-1.5 truncate">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              <span class="truncate">PDV Conciliado • Tanques com telemetria ativa • Zero vazamentos</span>
+              <span class="truncate">PDVs & Caixas Conciliados • Estoques com telemetria ativa • Zero divergências fiscais</span>
             </div>
             <span class="text-cyan-400 flex-shrink-0 ml-2">Sub-100ms</span>
           </div>
@@ -909,6 +959,124 @@
         </div>
       </div>
 
+    </section>
+
+    <!-- =========================================================================
+         BLOCO DE COMPATIBILIDADE UNIVERSAL & SIMBIOSE COM ERPS E BANCOS
+         ========================================================================= -->
+    <section id="sec-compatibilidade" class="obsidian-card p-6 sm:p-8 rounded-3xl space-y-6 scroll-reveal">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/[0.08] pb-6">
+        <div>
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[10px] font-mono uppercase tracking-wider mb-2">
+            <i data-lucide="database" class="w-3.5 h-3.5"></i>
+            <span>Compatibilidade Universal • Simbiose com ERPs de Mercado</span>
+          </div>
+          <h2 class="text-2xl sm:text-3xl font-sans font-semibold text-white tracking-tight">
+            Comunicação Universal com Qualquer Banco de Dados ou Negócio
+          </h2>
+          <p class="body-regular text-slate-300 text-sm max-w-3xl leading-relaxed mt-1">
+            A AURA não substitui, não compete e não altera o software que sua empresa já utiliza. Ela opera como um copiloto e parceiro simbiótico de alta performance que se conecta em minutos a qualquer banco de dados relacional ou ERP.
+          </p>
+        </div>
+        <div class="flex flex-wrap lg:flex-col items-start lg:items-end gap-2 flex-shrink-0">
+          <span class="px-3 py-1 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1.5 font-mono">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+            <span>100% Somente Leitura (Read-Only)</span>
+          </span>
+          <span class="px-3 py-1 rounded-xl text-xs font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 inline-flex items-center gap-1.5 font-mono">
+            <i data-lucide="check" class="w-3.5 h-3.5"></i>
+            <span>Zero Migração de Dados</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Grid de 3 Pilares de Conectividade Universal -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        
+        <!-- Card 1: Qualquer Banco de Dados -->
+        <div class="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.08] space-y-3 flex flex-col justify-between">
+          <div class="space-y-3">
+            <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 flex items-center justify-center">
+              <i data-lucide="database" class="w-5 h-5"></i>
+            </div>
+            <div class="space-y-1">
+              <h3 class="font-sans font-semibold text-white text-base tracking-tight">
+                Qualquer Banco de Dados Relacional
+              </h3>
+              <p class="text-slate-300 text-xs leading-relaxed">
+                Mapeamento de esquema instantâneo e suporte nativo a bancos SQL transacionais (MySQL, SQL Server, Oracle, MariaDB, Firebird) e APIs REST de sistemas legados ou em nuvem.
+              </p>
+            </div>
+          </div>
+          <div class="pt-3 border-t border-white/[0.05] flex flex-wrap gap-1.5">
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">MySQL</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">SQL Server</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">Oracle</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">APIs REST</span>
+          </div>
+        </div>
+
+        <!-- Card 2: Simbiose com ERPs de Mercado -->
+        <div class="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.08] space-y-3 flex flex-col justify-between">
+          <div class="space-y-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 flex items-center justify-center">
+              <i data-lucide="handshake" class="w-5 h-5"></i>
+            </div>
+            <div class="space-y-1">
+              <h3 class="font-sans font-semibold text-white text-base tracking-tight">
+                Simbiose Total com ERPs de Mercado
+              </h3>
+              <p class="text-slate-300 text-xs leading-relaxed">
+                Seu sistema de gestão continua sendo a fonte da verdade. A AURA não o substitui: lê os dados com segurança e entrega a camada de inteligência executiva que complementa o que você já tem.
+              </p>
+            </div>
+          </div>
+          <div class="pt-3 border-t border-white/[0.05] flex flex-wrap gap-1.5">
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">ERP de gestão</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">PDV e frente de caixa</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">Banco SQL</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">API REST</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">Sistemas legados</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Qualquer Negócio ou Segmento -->
+        <div class="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.08] space-y-3 flex flex-col justify-between">
+          <div class="space-y-3">
+            <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/25 text-purple-400 flex items-center justify-center">
+              <i data-lucide="store" class="w-5 h-5"></i>
+            </div>
+            <div class="space-y-1">
+              <h3 class="font-sans font-semibold text-white text-base tracking-tight">
+                Multi-Setorial por Natureza
+              </h3>
+              <p class="text-slate-300 text-xs leading-relaxed">
+                Auditoria de quebras de caixa, prevenção de desvios e controle de margem configuráveis para qualquer operação: varejo, lojas, franquias, farmácias, padarias, restaurantes, serviços ou postos.
+              </p>
+            </div>
+          </div>
+          <div class="pt-3 border-t border-white/[0.05] flex flex-wrap gap-1.5">
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20">Varejo & Lojas</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20">Franquias</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20">Alimentos</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20">Serviços</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Barra de Segmentos Atendidos -->
+      <div class="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span class="text-slate-300 font-sans">
+            Segmentos Homologados: <strong class="text-white">Varejo • Lojas • Franquias • Comércio Geral • Supermercados • Padarias • Bares • Postos & Conveniência • Distribuidoras</strong>
+          </span>
+        </div>
+        <div class="text-[11px] font-mono text-cyan-300 flex-shrink-0">
+          Arquitetura Universal Agnostica
+        </div>
+      </div>
     </section>
 
     <!-- =========================================================================
@@ -967,21 +1135,21 @@
               <span class="text-cyan-400 text-[10px] font-mono" id="sim-status-badge">PRONTO</span>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-1 text-[11px]">
-              <button onclick="window.auraTour.selectChatScenario('posto')" id="scenario-btn-posto" class="px-2 py-1.5 rounded-lg bg-cyan-500/15 text-cyan-200 border border-cyan-500/35 font-semibold truncate transition-all text-left flex items-center gap-1">
-                <span>⛽</span>
-                <span class="truncate">Postos</span>
-              </button>
-              <button onclick="window.auraTour.selectChatScenario('varejo')" id="scenario-btn-varejo" class="px-2 py-1.5 rounded-lg bg-slate-900/80 text-slate-300 hover:text-white border border-white/10 truncate transition-all text-left flex items-center gap-1">
+              <button onclick="window.auraTour.selectChatScenario('varejo')" id="scenario-btn-varejo" class="px-2 py-1.5 rounded-lg bg-cyan-500/15 text-cyan-200 border border-cyan-500/35 font-semibold truncate transition-all text-left flex items-center gap-1">
                 <span>🏪</span>
-                <span class="truncate">Padaria / Bar</span>
+                <span class="truncate">Varejo & Franquias</span>
               </button>
               <button onclick="window.auraTour.selectChatScenario('loja')" id="scenario-btn-loja" class="px-2 py-1.5 rounded-lg bg-slate-900/80 text-slate-300 hover:text-white border border-white/10 truncate transition-all text-left flex items-center gap-1">
                 <span>🏬</span>
-                <span class="truncate">Loja & Varejo</span>
+                <span class="truncate">Comércio & Lojas</span>
+              </button>
+              <button onclick="window.auraTour.selectChatScenario('posto')" id="scenario-btn-posto" class="px-2 py-1.5 rounded-lg bg-slate-900/80 text-slate-300 hover:text-white border border-white/10 truncate transition-all text-left flex items-center gap-1">
+                <span>⛽</span>
+                <span class="truncate">Postos & Conveniência</span>
               </button>
               <button onclick="window.auraTour.selectChatScenario('fiscal')" id="scenario-btn-fiscal" class="px-2 py-1.5 rounded-lg bg-slate-900/80 text-slate-300 hover:text-white border border-white/10 truncate transition-all text-left flex items-center gap-1">
                 <span>⚖️</span>
-                <span class="truncate">Auditoria Fiscal</span>
+                <span class="truncate">Auditoria Fiscal & Conformidade</span>
               </button>
             </div>
           </div>
@@ -1071,7 +1239,7 @@
                         <div class="text-[9px] text-slate-400">Caixas 100% conferidos</div>
                       </div>
                       <div class="p-2 rounded-lg bg-white/[0.02] border border-white/5">
-                        <div class="text-[10px] text-slate-400">Conformidade ANP (LMC)</div>
+                        <div class="text-[10px] text-slate-400">Conformidade Regulatória</div>
                         <div class="font-extrabold text-emerald-400 text-xs">+0.28%</div>
                         <div class="text-[9px] text-slate-400">Tolerância Portaria 26 (±0.60%)</div>
                       </div>
@@ -1176,7 +1344,7 @@
               </svg>
             </div>
 
-            <!-- NÓ 2: Busca Operacional de Borda (Telemetria & Concentrador) -->
+            <!-- NÓ 2: Busca Operacional de Borda (Telemetria Universal & Concentrador) -->
             <div id="pipe-node-1" class="pipeline-node graph-node p-3 rounded-xl bg-slate-900/90 border border-cyan-500/25 flex items-center justify-between hover:bg-slate-800 transition-all shadow-sm cursor-pointer" onclick="window.auraTour.inspectNode('pista')">
               <div class="flex items-center gap-3">
                 <div class="w-8 h-8 rounded-lg bg-cyan-500/15 text-cyan-300 flex items-center justify-center font-bold flex-shrink-0">
@@ -1184,10 +1352,10 @@
                 </div>
                 <div>
                   <h4 class="card-title-serif font-serif text-[15px] sm:text-base font-normal text-white flex items-center gap-2">
-                    <span>2. Telemetria de Pista & Concentrador de PDV</span>
+                    <span>2. Telemetria de Pista, PDVs & Concentrador de Dados</span>
                     <span class="px-1.5 py-0.2 rounded text-[9px] bg-cyan-500/15 text-cyan-300 font-mono">Borda Local</span>
                   </h4>
-                  <p class="card-desc-geist text-[11px] sm:text-xs text-slate-400">Leitura direta de encerrantes, bicos, tanques e estoques físicos da loja</p>
+                  <p class="card-desc-geist text-[11px] sm:text-xs text-slate-400">Leitura direta de terminais PDV, estoques físicos, gôndolas e telemetria da operação</p>
                 </div>
               </div>
               <div class="flex items-center gap-2">
@@ -1843,7 +2011,7 @@
             <div class="kg-context-item p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] text-slate-300 flex items-center justify-between cursor-pointer hover:bg-white/[0.04] transition-colors" onclick="window.auraTour.highlightKnowledgeNode('regras')" id="kg-item-regras">
               <div class="flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-purple-400"></span>
-                <span class="font-medium text-[11px]">Regras Fiscais & ANP</span>
+                <span class="font-medium text-[11px]">Regras Fiscais & Setoriais</span>
               </div>
               <span class="text-[9px] font-mono text-slate-400">Portaria 26</span>
             </div>
@@ -1932,11 +2100,11 @@
                   <text class="homepage-knowledge-graph-v3_node-tag" y="21.5" opacity="0.80">Estoque Físico</text>
                 </g>
 
-                <!-- Nó 4: Regras ANP & Fiscais -->
+                <!-- Nó 4: Regras Setoriais & Fiscais -->
                 <g class="homepage-knowledge-graph-v3_node" style="--node-x: 340.53652314749695px; --node-y: 234.9342219125179px;" onclick="window.auraTour.highlightKnowledgeNode('regras')" id="kg-node-regras">
                   <circle class="homepage-knowledge-graph-v3_node-halo" r="10" opacity="0.18"></circle>
                   <circle class="homepage-knowledge-graph-v3_node-core" r="4.5" opacity="0.95"></circle>
-                  <text class="homepage-knowledge-graph-v3_node-tag" y="21.5" opacity="0.80">Regras ANP</text>
+                  <text class="homepage-knowledge-graph-v3_node-tag" y="21.5" opacity="0.80">Regras Setoriais</text>
                 </g>
 
                 <!-- Nó 5: Tolerâncias & Perdas -->
@@ -1977,7 +2145,7 @@
             </div>
 
             <div class="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[10px] space-y-0.5">
-              <div class="font-bold">✓ Conformidade Legal ANP</div>
+              <div class="font-bold">✓ Conformidade Legal</div>
               <div>Variação volumétrica: +0.28% (Limite: ±0.60%)</div>
             </div>
           </div>
@@ -2074,7 +2242,7 @@
             </div>
             <div class="flex items-center justify-between text-[9px] text-slate-400 font-mono">
               <span>Estoque Tanque: 4.820 L</span>
-              <span class="text-emerald-400">Conforme ANP</span>
+              <span class="text-emerald-400">Conforme Regras</span>
             </div>
           </div>
 
@@ -2442,7 +2610,7 @@
         stepStartTime: 0,
         soundEnabled: true,
         userInteracted: false,
-        currentScenario: 'posto',
+        currentScenario: 'varejo',
         hasAutoStarted: false,
         isSimulating: false
       };
@@ -2895,7 +3063,7 @@
       // Simulação Autônoma Mestre: Chat (Esquerda) vs Backend (Direita)
       function runAutonomousShowcase(scenarioKey = null) {
         if (scenarioKey) tourState.currentScenario = scenarioKey;
-        const scenario = chatScenarios[tourState.currentScenario] || chatScenarios.posto;
+        const scenario = chatScenarios[tourState.currentScenario] || chatScenarios.varejo;
         tourState.isSimulating = true;
 
         clearAllSimulations();
@@ -3074,7 +3242,7 @@
       function simulateChatActionClick() {
         tourState.userInteracted = true;
         playActionSound();
-        const scenario = chatScenarios[tourState.currentScenario] || chatScenarios.posto;
+        const scenario = chatScenarios[tourState.currentScenario] || chatScenarios.varejo;
         const toast = document.getElementById('mini-chat-action-toast');
         const msg = document.getElementById('mini-chat-toast-message');
         if (toast && msg) {
@@ -3172,7 +3340,7 @@
       }
 
       function simulateStep1Question() {
-        runAutonomousShowcase('posto');
+        runAutonomousShowcase('varejo');
       }
 
       // Funções de Interação com o Knowledge Graph
@@ -3228,7 +3396,7 @@
             text: 'Tanque 02 em 16% de capacidade. Vazão estimada em 245 L/h com autonomia segura de 18.4 horas. Reposição sugerida.'
           },
           regras: {
-            readout: 'Nó Selecionado: Regras ANP & Fiscais • Portaria 26/1992 em conformidade.',
+            readout: 'Nó Selecionado: Regras Setoriais & Fiscais • normas do setor em conformidade.',
             title: 'Escrituração LMC Sem Inconformidades',
             text: 'Variação apurada de +0.28% dentro do corredor regulatório de ±0.60%. Risco de autuação fiscal nulo.'
           },
@@ -3252,7 +3420,7 @@
 
       // Funções de Compatibilidade com Métodos Anteriores
       function goToStep(s) {
-        if (s === 1) selectChatScenario('posto');
+        if (s === 1) selectChatScenario('varejo');
         else if (s === 2) triggerDustDisintegration(true);
         else if (s === 3) inspectGraphNode('motor');
         else if (s === 4) {
@@ -3266,7 +3434,7 @@
       function pauseTour() { clearAllSimulations(); }
       function restartTour() {
         hasStartedForCurrentView = true;
-        runAutonomousShowcase('posto');
+        runAutonomousShowcase('varejo');
       }
 
       // =========================================================================
@@ -3430,7 +3598,7 @@
           document.querySelectorAll('.roi-table-bar').forEach(tb => tb.classList.add('revealed'));
           document.querySelectorAll('.cost-bar-item').forEach(b => b.classList.add('revealed'));
           setTimeout(() => {
-            runAutonomousShowcase('posto');
+            runAutonomousShowcase('varejo');
           }, 600);
         }
       });
@@ -3463,5 +3631,141 @@
 
     })();
   </script>
+
+  <!-- =========================================================================
+       AURA MODAL ARQUITETURA DE CONFIANÇA & SCRIPT SQL AUDITÁVEL (FASE 2)
+       ========================================================================= -->
+  <div id="aura-security-architecture-modal" class="palette-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="sec-modal-title">
+    <div class="palette-modal-container max-w-4xl w-full p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+      
+      <!-- Topo do Modal -->
+      <div class="flex items-center justify-between border-b border-white/10 pb-4">
+        <div class="flex items-center gap-3">
+          <div class="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
+            <i data-lucide="shield-check" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 id="sec-modal-title" class="font-display-title font-bold text-lg text-white">Arquitetura de Confiança & Script SQL Auditável</h3>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold">
+                Clean Room Read-Only
+              </span>
+            </div>
+            <p class="text-xs text-slate-400 font-sans">Isolamento matemático de 3 camadas com blindagem transacional estrita (Zero Escritas no ERP)</p>
+          </div>
+        </div>
+        <button onclick="if(window.auraSecurityArchitecture) window.auraSecurityArchitecture.closeModal();" class="p-2 rounded-xl bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-white/10 transition-colors cursor-pointer" title="Fechar (Esc)" aria-label="Fechar Modal">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Barra de Telemetria ao Vivo -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="glass-subcard p-3 rounded-xl border border-white/5 bg-slate-900/60">
+          <div class="flex items-center justify-between text-[11px] text-slate-400 font-sans mb-1">
+            <span>Sessão SQL de Gestão</span>
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          </div>
+          <div id="sec-pg-status" class="text-xs font-mono text-emerald-300 font-semibold">ON (Read-Only)</div>
+          <div id="sec-pg-options" class="text-[10px] font-mono text-slate-400 truncate mt-0.5" title="statement_timeout=4000ms lock_timeout=1000ms">timeout: 4000ms | lock: 1000ms</div>
+        </div>
+
+        <div class="glass-subcard p-3 rounded-xl border border-white/5 bg-slate-900/60">
+          <div class="flex items-center justify-between text-[11px] text-slate-400 font-sans mb-1">
+            <span>Circuit Breaker</span>
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          </div>
+          <div id="sec-cb-state" class="text-xs font-mono text-emerald-300 font-semibold">FECHADO_SEGURO</div>
+          <div id="sec-cb-cpu-ram" class="text-[10px] font-mono text-slate-400 mt-0.5">CPU &lt; 80% | RAM &lt; 85%</div>
+        </div>
+
+        <div class="glass-subcard p-3 rounded-xl border border-white/5 bg-slate-900/60">
+          <div class="flex items-center justify-between text-[11px] text-slate-400 font-sans mb-1">
+            <span>Privacidade LGPD</span>
+            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+          </div>
+          <div id="sec-pii-count" class="text-xs font-mono text-cyan-300 font-semibold">24 Categorias Ativas</div>
+          <div class="text-[10px] font-mono text-slate-400 mt-0.5">CentralLogSanitizer</div>
+        </div>
+
+        <div class="glass-subcard p-3 rounded-xl border border-white/5 bg-slate-900/60">
+          <div class="flex items-center justify-between text-[11px] text-slate-400 font-sans mb-1">
+            <span>Termo Clean Room</span>
+            <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+          </div>
+          <div class="text-xs font-mono text-purple-300 font-semibold">SHA-256 Ativo</div>
+          <div id="sec-term-hash" class="text-[10px] font-mono text-slate-400 truncate mt-0.5" title="Hash SHA-256 do termo ativo">Validado</div>
+        </div>
+      </div>
+
+      <!-- Diagrama de 3 Camadas -->
+      <div class="glass-subcard p-4 rounded-xl border border-white/10 bg-slate-900/40 space-y-3">
+        <h4 class="text-xs font-bold font-sans uppercase tracking-wider text-slate-300 flex items-center gap-2">
+          <i data-lucide="layers" class="w-4 h-4 text-cyan-400"></i>
+          <span>Diagrama Arquitetural de 3 Camadas (Isolamento de Borda)</span>
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div class="p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-950/20 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300">CAMADA 1</span>
+              <span class="text-[10px] text-slate-400 font-mono">Porta 5432/5433</span>
+            </div>
+            <h5 class="text-xs font-bold text-white">Banco Local do ERP</h5>
+            <p class="text-[11px] text-slate-300 font-sans leading-relaxed">
+              Banco transacional do posto permanece 100% intacto. Nenhum trigger ou gravacao e permitida.
+            </p>
+          </div>
+
+          <div class="p-3.5 rounded-xl border border-cyan-500/20 bg-cyan-950/20 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300">CAMADA 2</span>
+              <span class="text-[10px] text-slate-400 font-mono">Role aura_service_ro</span>
+            </div>
+            <h5 class="text-xs font-bold text-white">Borda Clean Room Read-Only</h5>
+            <p class="text-[11px] text-slate-300 font-sans leading-relaxed">
+              Sessao read-only forçada, timeout estrito de 4.000ms e lock timeout de 1.000ms. Zero mutacoes.
+            </p>
+          </div>
+
+          <div class="p-3.5 rounded-xl border border-purple-500/20 bg-purple-950/20 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300">CAMADA 3</span>
+              <span class="text-[10px] text-slate-400 font-mono">GenUI Engine</span>
+            </div>
+            <h5 class="text-xs font-bold text-white">Motor Prescritivo AURA</h5>
+            <p class="text-[11px] text-slate-300 font-sans leading-relaxed">
+              Feed Zero-Click com diagnostico causal, prova matematica e acoes executivas HITL em 1-clique.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Script SQL Auditavel da Role -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="code-2" class="w-4 h-4 text-emerald-400"></i>
+            <h4 class="text-xs font-bold font-sans uppercase tracking-wider text-slate-300">
+              Script SQL Exato da Role aura_service_ro (Auditável)
+            </h4>
+          </div>
+          <button id="btn-copy-sec-sql" onclick="if(window.auraSecurityArchitecture) window.auraSecurityArchitecture.copySqlScript();" class="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span>Copiar Script SQL</span>
+          </button>
+        </div>
+        <pre class="p-4 rounded-xl bg-slate-950 border border-white/10 text-emerald-300 font-mono text-xs overflow-x-auto leading-relaxed"><code id="sec-sql-code">-- Carregando telemetria de seguranca...</code></pre>
+      </div>
+
+      <!-- Rodape do Modal -->
+      <div class="pt-3 border-t border-white/10 flex items-center justify-between text-xs text-slate-400 font-sans">
+        <span>Conformidade Legal: LGPD Art. 7, Marco Civil da Internet e Lei de Software</span>
+        <button onclick="if(window.auraSecurityArchitecture) window.auraSecurityArchitecture.closeModal();" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs transition-colors">
+          Fechar
+        </button>
+      </div>
+
+    </div>
+  </div>
 </body>
 </html>

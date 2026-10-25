@@ -9,5 +9,7 @@ data class ChatMessageEntity(
     val sessionId: String = "default",
     val text: String,
     val isFromUser: Boolean,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    /** Envelope GenUI (JSON) associado a mensagem da AURA, quando houver card estruturado. */
+    val envelopeJson: String? = null
 )

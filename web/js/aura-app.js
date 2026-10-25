@@ -356,7 +356,8 @@ class AuraApp {
       if (e.key === 'Tab') {
         const drawer = document.getElementById('aura-sidebar-drawer');
         if (!drawer) return;
-        const focusables = drawer.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex="-1"]), a[href]');
+        const focusables = Array.from(drawer.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex="-1"]), a[href], input:not([disabled])'))
+          .filter(el => el.offsetParent !== null && window.getComputedStyle(el).display !== 'none');
         if (focusables.length === 0) return;
         const first = focusables[0];
         const last = focusables[focusables.length - 1];
@@ -419,6 +420,61 @@ class AuraApp {
         this.syncSfxButtons(isMuted);
       });
     }
+
+    // Busca Rapida no Drawer Lateral (Fase 2 Lovable: Filtro Instantaneo com Normalizacao)
+    const quickSearch = document.getElementById('sidebar-quick-search');
+    if (quickSearch) {
+      const normalizeText = (str) => {
+        return (str || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .trim();
+      };
+
+      const handleQuickSearch = (e) => {
+        const query = normalizeText(e.target ? e.target.value : quickSearch.value);
+        const navItems = document.querySelectorAll('#aura-sidebar-drawer .sidebar-nav-item');
+        let matchCount = 0;
+
+        navItems.forEach((item) => {
+          if (!query) {
+            item.style.display = '';
+            matchCount++;
+            return;
+          }
+          const text = normalizeText(item.textContent);
+          const title = normalizeText(item.getAttribute('title'));
+          const ariaLabel = normalizeText(item.getAttribute('aria-label'));
+          if (text.includes(query) || title.includes(query) || ariaLabel.includes(query)) {
+            item.style.display = '';
+            matchCount++;
+          } else {
+            item.style.display = 'none';
+          }
+        });
+
+        // Atualiza visibilidade dos clusters semanticos para evitar cabecalhos orfaos
+        const clusters = document.querySelectorAll('#aura-sidebar-drawer [data-cluster]');
+        clusters.forEach((cluster) => {
+          if (!query) {
+            cluster.style.display = '';
+            return;
+          }
+          const visibleItems = cluster.querySelectorAll('.sidebar-nav-item:not([style*="display: none"])');
+          cluster.style.display = visibleItems.length > 0 ? '' : 'none';
+        });
+
+        // Feedback de busca vazia
+        const emptyState = document.getElementById('sidebar-search-empty');
+        if (emptyState) {
+          emptyState.classList.toggle('hidden', matchCount > 0 || !query);
+        }
+      };
+
+      quickSearch.addEventListener('input', handleQuickSearch);
+      quickSearch.addEventListener('search', handleQuickSearch);
+    }
   }
 
   openSidebar() {
@@ -430,9 +486,12 @@ class AuraApp {
     if (overlay) overlay.classList.add('open');
     window.auraAudio.playChime(660, 0.05);
 
-    // Foco inicial no botão fechar para acessibilidade
+    // Foco inicial no campo de busca rapida ou no botao fechar
+    const quickSearch = document.getElementById('sidebar-quick-search');
     const btnClose = document.getElementById('btn-close-sidebar');
-    if (btnClose) {
+    if (quickSearch) {
+      setTimeout(() => quickSearch.focus(), 60);
+    } else if (btnClose) {
       setTimeout(() => btnClose.focus(), 50);
     }
   }
@@ -443,6 +502,24 @@ class AuraApp {
     const overlay = document.getElementById('aura-sidebar-overlay');
     if (drawer) drawer.classList.remove('open');
     if (overlay) overlay.classList.remove('open');
+
+    // Limpa filtro de busca do drawer ao fechar
+    const quickSearch = document.getElementById('sidebar-quick-search');
+    if (quickSearch && quickSearch.value) {
+      quickSearch.value = '';
+      const navItems = document.querySelectorAll('#aura-sidebar-drawer .sidebar-nav-item');
+      navItems.forEach((item) => {
+        item.style.display = '';
+      });
+      const clusters = document.querySelectorAll('#aura-sidebar-drawer [data-cluster]');
+      clusters.forEach((cluster) => {
+        cluster.style.display = '';
+      });
+      const emptyState = document.getElementById('sidebar-search-empty');
+      if (emptyState) {
+        emptyState.classList.add('hidden');
+      }
+    }
 
     // Devolve o foco ao acionador
     if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {

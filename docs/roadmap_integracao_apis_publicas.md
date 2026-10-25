@@ -6,21 +6,21 @@
 > **Data de Emissão:** Outubro de 2026  
 > **Status:** [HOMOLOGADO EM PRODUÇÃO - 100% CONCLUÍDO]  
 > **Classificação:** Arquitetura de Borda (Edge AI) / Clean Room / Dados Abertos Governamentais  
-> **Repositório:** [`ia-banco-local`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local)  
+> **Repositório:** [`ia-banco-local`](./)  
 > **Arquivos Relacionados do Repositório:**  
-> - [`core/rag_engine.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/rag_engine.py)  
-> - [`core/proactive_daemon.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/proactive_daemon.py)  
-> - [`core/tools.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py)  
-> - [`core/schemas/genui.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/schemas/genui.py)  
-> - [`core/schemas/lmc_report.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/schemas/lmc_report.py)  
-> - [`core/schemas/reconciliation.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/schemas/reconciliation.py)  
-> - [`scripts/init_posto_database.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/init_posto_database.py)  
-> - [`scripts/seed_aura_conhecimento.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/seed_aura_conhecimento.py)  
-> - [`scripts/sync_public_data.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/sync_public_data.py)  
-> - [`core/integrations/public_data/`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/integrations/public_data/)  
-> - [`tests/unit/test_public_data_connectors.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/unit/test_public_data_connectors.py)  
-> - [`tests/unit/test_benchmark_comparativo.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/unit/test_benchmark_comparativo.py)  
-> - [`web/js/aura-genui-widgets.js`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/js/aura-genui-widgets.js)  
+> - [`core/rag_engine.py`](./core/rag_engine.py)  
+> - [`core/proactive_daemon.py`](./core/proactive_daemon.py)  
+> - [`core/tools.py`](./core/tools.py)  
+> - [`core/schemas/genui.py`](./core/schemas/genui.py)  
+> - [`core/schemas/lmc_report.py`](./core/schemas/lmc_report.py)  
+> - [`core/schemas/reconciliation.py`](./core/schemas/reconciliation.py)  
+> - [`scripts/init_posto_database.py`](./scripts/init_posto_database.py)  
+> - [`scripts/seed_aura_conhecimento.py`](./scripts/seed_aura_conhecimento.py)  
+> - [`scripts/sync_public_data.py`](./scripts/sync_public_data.py)  
+> - [`core/integrations/public_data/`](./core/integrations/public_data/)  
+> - [`tests/unit/test_public_data_connectors.py`](./tests/unit/test_public_data_connectors.py)  
+> - [`tests/unit/test_benchmark_comparativo.py`](./tests/unit/test_benchmark_comparativo.py)  
+> - [`web/js/aura-genui-widgets.js`](./web/js/aura-genui-widgets.js)  
 
 ---
 
@@ -58,7 +58,7 @@ O ecossistema público mapeado é composto por quatro fontes governamentais prim
 A implementação do Hub de Dados Públicos obedece estritamente aos princípios de engenharia de missão crítica da AURA:
 
 1. **Offline-First Absoluto (Zero Dependência Síncrona de Rede):**
-   - O Core cognitivo da AURA, as ferramentas de inferência ([`core/tools.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py)), os endpoints da API ([`core/aura_api.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/aura_api.py)) e a interface gráfica GenUI jamais executam requisições HTTP externas no caminho síncrono do usuário.
+   - O Core cognitivo da AURA, as ferramentas de inferência ([`core/tools.py`](./core/tools.py)), os endpoints da API ([`core/aura_api.py`](./core/aura_api.py)) e a interface gráfica GenUI jamais executam requisições HTTP externas no caminho síncrono do usuário.
    - Toda consulta analítica sobre médias de preços da ANP, pautas do CONFAZ ou taxas do BACEN consome exclusivamente tabelas de cache relacional locais no PostgreSQL (`posto_ai:5433`).
    - Se o link de internet do posto for interrompido por intempéries ou falhas de operadora, a AURA continua operando sem qualquer degradação funcional, utilizando o último snapshot sincronizado e informando a data/hora da base de referência no badge visual.
 2. **Zero Disruption no ERP e nos Recursos da Estação:**
@@ -140,14 +140,14 @@ O aspecto de segurança jurídica e proteção de dados é um requisito inegoci�
 ### 2.1 Visão em Camadas
 O Hub de Dados Públicos está estruturado em quatro camadas estritamente desacopladas:
 
-1. **Camada de Conectores Externos ([`core/integrations/public_data/`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/integrations/public_data/)):**
+1. **Camada de Conectores Externos ([`core/integrations/public_data/`](./core/integrations/public_data/)):**
    - Módulos adaptadores responsáveis por interagir com os protocolos específicos de cada fonte governamental (REST/JSON para BACEN SGS, CKAN API / CSV para ANP, extração tabular estruturada para CONFAZ).
    - Isolamento total da rede externa: nenhuma outra camada do sistema possui permissão para invocar clientes HTTP diretamente.
 2. **Camada de Domínio Canônico Universal (`core/domain/public_data.py`):**
    - Entidades Pydantic v2 imutáveis (`frozen=True`) que representam as informações públicas limpas, tipadas e validadas, independentes da forma física dos arquivos originais.
 3. **Camada de Persistência e Cache Relacional (`aura_core.public_*`):**
    - Tabelas locais no banco PostgreSQL da estação com chaves primárias compostas determinísticas, garantindo versionamento temporal das séries e buscas instantâneas.
-4. **Camada de Consumo Analítico ([`core/tools.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py) e [`core/rag_engine.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/rag_engine.py)):**
+4. **Camada de Consumo Analítico ([`core/tools.py`](./core/tools.py) e [`core/rag_engine.py`](./core/rag_engine.py)):**
    - Funções analíticas de alto nível que cruzam os dados do ERP local com as tabelas de cache público para gerar diagnósticos preditivos e contratos GenUI.
 
 ### 2.2 Matriz de Fontes, Protocolos, Periodicidade e Destino
@@ -165,7 +165,7 @@ O Hub de Dados Públicos está estruturado em quatro camadas estritamente desaco
 ## 📚 3. Fase 1: Ingestão de Legislação e Normas Técnicas no RAG Local
 
 ### 3.1 Corpus Normativo Selecionado
-A AURA deve possuir conhecimento nativo e instantâneo sobre as regras que regem a fiscalização e a operação metrológica e fiscal de um posto revendedor. A primeira fase do projeto foca na ingestão desse corpus no mecanismo de Hybrid RAG da AURA ([`core/rag_engine.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/rag_engine.py)), indexando-o na tabela `aura_core.aura_conhecimento_vetores`.
+A AURA deve possuir conhecimento nativo e instantâneo sobre as regras que regem a fiscalização e a operação metrológica e fiscal de um posto revendedor. A primeira fase do projeto foca na ingestão desse corpus no mecanismo de Hybrid RAG da AURA ([`core/rag_engine.py`](./core/rag_engine.py)), indexando-o na tabela `aura_core.aura_conhecimento_vetores`.
 
 O acervo compreende:
 1. **Portaria ANP nº 26/1992:**
@@ -191,7 +191,7 @@ O acervo compreende:
    - Cálculo do ponto ótimo de compra de combustível (Economic Order Quantity adaptado para compartimentos padrão de 5.000 litros).
 
 ### 3.2 Estratégia de Chunking e Enriquecimento Semântico
-Para garantir que o mecanismo de busca híbrida da AURA ([`HybridRAGEngine`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/rag_engine.py)) encontre com exatidão a resposta em menos de 5ms, os textos normativos serão decompostos em chunks semânticos atômicos com os seguintes atributos:
+Para garantir que o mecanismo de busca híbrida da AURA ([`HybridRAGEngine`](./core/rag_engine.py)) encontre com exatidão a resposta em menos de 5ms, os textos normativos serão decompostos em chunks semânticos atômicos com os seguintes atributos:
 * **Tamanho do Chunk:** Entre 150 e 350 palavras, focados em uma única regra de negócio prática.
 * **Metadados Estruturados:** Módulo (`legislacao_posto`), Tópico (`anp_lmc`, `inmetro_bombas`, `tributario_icms`, `bacen_financeiro`), Título curto e descritivo, Subtítulo contextual.
 * **Tags Normativas:** Palavras-chave técnicas em português (`["LMC", "ANP 26/1992", "tolerancia 0.6%", "perda tanque", "sobra fisica"]`).
@@ -199,7 +199,7 @@ Para garantir que o mecanismo de busca híbrida da AURA ([`HybridRAGEngine`](fil
 * **Vetorização Densa:** Embeddings gerados com dimensões canônicas de 768d no tipo `halfvec` do PostgreSQL, indexados via HNSW com operadores de similaridade de cosseno (`halfvec_cosine_ops`).
 
 ### 3.3 DDL Declarativo Completo no pgvector (`aura_core.aura_conhecimento_vetores`)
-A estrutura da tabela vetorial já está provisionada no banco convergente `posto_ai:5433` pelo script [`scripts/init_posto_database.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/init_posto_database.py). Abaixo o DDL declarativo completo, incluindo a coluna gerada `tsv` e índices HNSW e GIN:
+A estrutura da tabela vetorial já está provisionada no banco convergente `posto_ai:5433` pelo script [`scripts/init_posto_database.py`](./scripts/init_posto_database.py). Abaixo o DDL declarativo completo, incluindo a coluna gerada `tsv` e índices HNSW e GIN:
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -259,8 +259,8 @@ A tabela a seguir define a carga inicial que será inserida via script de seed:
 | **RAG-PUB-10** | `macroeconomia` | `bacen_financeiro` | Paridade de Importação e Sensibilidade ao Câmbio PTAX | O preço de refinaria dos combustíveis no Brasil acompanha a paridade internacional do petróleo Brent e a cotação do Dólar PTAX divulgada pelo BACEN. Flutuações acumuladas de câmbio superiores a 3% antecipam reajustes de preço da Petrobras em um horizonte de 7 a 14 dias. | `render_BenchmarkComparisonUI` / Projeção de Mercado |
 
 ### 3.5 Procedimento de Seed e Busca Híbrida RRF
-A carga será adicionada ao arquivo [`scripts/seed_aura_conhecimento.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/seed_aura_conhecimento.py) de forma idempotente via delta hashing MD5 (`ON CONFLICT (modulo, topico) DO UPDATE`).
-A recuperação das normas em tempo de execução utiliza o método [`HybridRAGEngine.search_hybrid_conhecimento()`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/rag_engine.py):
+A carga será adicionada ao arquivo [`scripts/seed_aura_conhecimento.py`](./scripts/seed_aura_conhecimento.py) de forma idempotente via delta hashing MD5 (`ON CONFLICT (modulo, topico) DO UPDATE`).
+A recuperação das normas em tempo de execução utiliza o método [`HybridRAGEngine.search_hybrid_conhecimento()`](./core/rag_engine.py):
 
 ```python
 # Invocação nativa da busca híbrida de legislação
@@ -275,11 +275,11 @@ resultado_rag = rag_engine.search_hybrid_conhecimento(
 O método combina o ranking vetorial HNSW (`dense_rank`) com a busca textual exata em português (`sparse_rank` via `ts_rank_cd`), aplicando Reciprocal Rank Fusion com `k = 60` para garantir resposta em menos de 5ms no PostgreSQL local.
 
 ### 3.6 Checklist de Execucao e Homologacao da Fase 1 (Concluida em 19/10/2026)
-- [x] **Ingestao Canonica e Metadados:** Ingestao de 11 chunks normativos e macroeconomicos canonicos (ANP, INMETRO, CONFAZ, BACEN) em [`scripts/seed_aura_conhecimento.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/seed_aura_conhecimento.py) totalizando 26 chunks no catalogo com metadados estruturados (orgao emissor, norma, tolerancia numerica, protocolo de recusa de combustivel fora de especificacao, ensaios de vazao nominal/reduzida e tela de aplicacao).
+- [x] **Ingestao Canonica e Metadados:** Ingestao de 11 chunks normativos e macroeconomicos canonicos (ANP, INMETRO, CONFAZ, BACEN) em [`scripts/seed_aura_conhecimento.py`](./scripts/seed_aura_conhecimento.py) totalizando 26 chunks no catalogo com metadados estruturados (orgao emissor, norma, tolerancia numerica, protocolo de recusa de combustivel fora de especificacao, ensaios de vazao nominal/reduzida e tela de aplicacao).
 - [x] **DDL Idempotente e Compatibilidade Multi-Schema:** Correcao e extensao DDL para os schemas `aura_core` e `public` com colunas `metadados JSONB`, `hash_md5 VARCHAR(32)`, coluna gerada `tsv tsvector GENERATED ALWAYS AS (...) STORED` e restricao de unicidade `(modulo, topico)`.
 - [x] **Fallback Deterministico e Resiliencia Offline:** Funcao `gerar_embedding_deterministico` com hashing SHA-256 e normalizacao L2 suportando 768d e 1536d, garantindo execucao hermetica mesmo sem API externa de embeddings ativa.
-- [x] **Evolucao do Motor RAG:** Atualizacao de [`HybridRAGEngine.search_hybrid_conhecimento()`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/rag_engine.py) com recuperacao de metadados estruturados, correcao do fallback esparso em banco sem correspondencia e fallback transparente em memoria (`offline_memory_fallback`) caso a conexao com PostgreSQL local falhe.
-- [x] **Suite de Testes Automatizados:** Implementacao de [`tests/unit/test_rag_normativo_publico.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/unit/test_rag_normativo_publico.py) com 13 testes unitarios dedicados cobrindo integridade dos seeds, buscas hibridas e esparsas, tolerancia metrologica de bombas (±100 ml em 20L), limites de perdas LMC (0,60%), protocolo de recusa de combustivel adulterado, regras fiscais ICMS/PMPF, custo Selic e latencia sub-segundo.
+- [x] **Evolucao do Motor RAG:** Atualizacao de [`HybridRAGEngine.search_hybrid_conhecimento()`](./core/rag_engine.py) com recuperacao de metadados estruturados, correcao do fallback esparso em banco sem correspondencia e fallback transparente em memoria (`offline_memory_fallback`) caso a conexao com PostgreSQL local falhe.
+- [x] **Suite de Testes Automatizados:** Implementacao de [`tests/unit/test_rag_normativo_publico.py`](./tests/unit/test_rag_normativo_publico.py) com 13 testes unitarios dedicados cobrindo integridade dos seeds, buscas hibridas e esparsas, tolerancia metrologica de bombas (±100 ml em 20L), limites de perdas LMC (0,60%), protocolo de recusa de combustivel adulterado, regras fiscais ICMS/PMPF, custo Selic e latencia sub-segundo.
 - [x] **Homologacao e Analise Estatica:** 100% dos testes aprovados via pytest (22 testes verdes incluindo benchmark comparativo) e 100% de conformidade com ruff check sem advertencias.
 
 ---
@@ -287,7 +287,7 @@ O método combina o ranking vetorial HNSW (`dense_rank`) com a busca textual exa
 ## 🔌 4. Fase 2: Hub de Conectores de Dados Abertos (`core/integrations/public_data/`)
 
 ### 4.1 Arquitetura do Módulo e Árvore de Diretórios
-A integração com fontes públicas será implementada no novo pacote modular sob [`core/integrations/public_data/`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/integrations/public_data/), respeitando os princípios de responsabilidade única e desacoplamento:
+A integração com fontes públicas será implementada no novo pacote modular sob [`core/integrations/public_data/`](./core/integrations/public_data/), respeitando os princípios de responsabilidade única e desacoplamento:
 
 ```
 ia-banco-local/core/integrations/public_data/
@@ -559,19 +559,19 @@ class UniversalMacroIndicators(BaseModel):
 ```
 
 ### 4.7 Utilitário de Resiliência: Rate Limiter e Circuit Breaker (`rate_limiter.py`)
-O utilitário [`core/integrations/public_data/rate_limiter.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/integrations/public_data/rate_limiter.py) implementará o padrão Circuit Breaker de 3 estados:
+O utilitário [`core/integrations/public_data/rate_limiter.py`](./core/integrations/public_data/rate_limiter.py) implementará o padrão Circuit Breaker de 3 estados:
 * **CLOSED (Operação Normal):** Requisições fluem com espaçamento mínimo de 2 segundos entre chamadas (`PublicDataRateLimiter`).
 * **OPEN (Circuito Aberto por Falha):** Se ocorrerem 3 falhas consecutivas de rede (timeout ou HTTP 5xx), o conector suspende novas requisições externas por 60 minutos, preservando os recursos da máquina e evitando bloqueio de IP.
 * **HALF-OPEN (Verificação Canário):** Após o período de resfriamento, o conector dispara uma única requisição leve de teste (ex: `health_check`). Se for bem-sucedida, o circuito retorna a CLOSED; se falhar, retorna a OPEN por mais 120 minutos.
 
 ### 4.8 Checklist de Execucao e Homologacao da Fase 2 (Concluida em 19/10/2026)
-- [x] **Arquitetura Modular de Conectores:** Criacao de [`core/integrations/__init__.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/integrations/__init__.py) e [`core/integrations/public_data/__init__.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/integrations/public_data/__init__.py) exportando `BasePublicDataConnector`, `AnpPublicDataConnector`, `ConfazPmpfConnector`, `BacenSgsConnector`, `PublicDataCircuitBreaker`, `CircuitState` e `ConnectorFetchResult`.
-- [x] **Contrato Base e Circuit Breaker Nativo:** Implementacao em [`core/integrations/public_data/base.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/integrations/public_data/base.py) do padrao de 3 estados (CLOSED, OPEN, HALF_OPEN) com monitoramento de falhas consecutivas, bloqueio por cooldown e recuperacao canario transparente.
-- [x] **Conector ANP (Precos Semanais e SICOP):** Implementacao em [`core/integrations/public_data/anp_connector.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/integrations/public_data/anp_connector.py) com parsing em streaming de 64 KB, suporte a delimitadores `;` e `,`, fallback de encoding latin1/utf-8 e filtragem in-flight por municipio/UF com teto de memoria e tempo sub-100ms para 10.000 linhas.
-- [x] **Conector CONFAZ (Atos COTEPE e PMPF):** Implementacao em [`core/integrations/public_data/confaz_connector.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/integrations/public_data/confaz_connector.py) com parsing estruturado por UF para as 27 UFs brasileiras, normalizacao de produtos canonicos e conversao de decimais monetarios em reais.
-- [x] **Conector BACEN SGS:** Implementacao em [`core/integrations/public_data/bacen_connector.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/integrations/public_data/bacen_connector.py) das series 11 (Selic), 10813 (PTAX USD) e 433 (IPCA), consolidacao de snapshot financeiro e calculo de custo de carregamento de estoques subterraneos com fail-fast.
+- [x] **Arquitetura Modular de Conectores:** Criacao de [`core/integrations/__init__.py`](./core/integrations/__init__.py) e [`core/integrations/public_data/__init__.py`](./core/integrations/public_data/__init__.py) exportando `BasePublicDataConnector`, `AnpPublicDataConnector`, `ConfazPmpfConnector`, `BacenSgsConnector`, `PublicDataCircuitBreaker`, `CircuitState` e `ConnectorFetchResult`.
+- [x] **Contrato Base e Circuit Breaker Nativo:** Implementacao em [`core/integrations/public_data/base.py`](./core/integrations/public_data/base.py) do padrao de 3 estados (CLOSED, OPEN, HALF_OPEN) com monitoramento de falhas consecutivas, bloqueio por cooldown e recuperacao canario transparente.
+- [x] **Conector ANP (Precos Semanais e SICOP):** Implementacao em [`core/integrations/public_data/anp_connector.py`](./core/integrations/public_data/anp_connector.py) com parsing em streaming de 64 KB, suporte a delimitadores `;` e `,`, fallback de encoding latin1/utf-8 e filtragem in-flight por municipio/UF com teto de memoria e tempo sub-100ms para 10.000 linhas.
+- [x] **Conector CONFAZ (Atos COTEPE e PMPF):** Implementacao em [`core/integrations/public_data/confaz_connector.py`](./core/integrations/public_data/confaz_connector.py) com parsing estruturado por UF para as 27 UFs brasileiras, normalizacao de produtos canonicos e conversao de decimais monetarios em reais.
+- [x] **Conector BACEN SGS:** Implementacao em [`core/integrations/public_data/bacen_connector.py`](./core/integrations/public_data/bacen_connector.py) das series 11 (Selic), 10813 (PTAX USD) e 433 (IPCA), consolidacao de snapshot financeiro e calculo de custo de carregamento de estoques subterraneos com fail-fast.
 - [x] **Blindagem por Circuit Breaker:** Integracao transparente do Circuit Breaker em todos os conectores para tratar quedas HTTP 5xx e timeouts sem quebrar a aplicacao.
-- [x] **Suite de Testes Unitarios:** Implementacao de [`tests/unit/test_public_data_connectors.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/unit/test_public_data_connectors.py) com 9 testes automatizados cobrindo transicoes de circuito, falha em half-open, streaming CSV, eficiencia de memoria (10k linhas < 100ms), extracao COTEPE, series BACEN, integracao de falhas de rede, health check e verificacao estrita de zero travessoes Unicode.
+- [x] **Suite de Testes Unitarios:** Implementacao de [`tests/unit/test_public_data_connectors.py`](./tests/unit/test_public_data_connectors.py) com 9 testes automatizados cobrindo transicoes de circuito, falha em half-open, streaming CSV, eficiencia de memoria (10k linhas < 100ms), extracao COTEPE, series BACEN, integracao de falhas de rede, health check e verificacao estrita de zero travessoes Unicode.
 - [x] **Homologacao e Conformidade:** 100% dos testes aprovados (22/22 testes verdes no pytest cobrindo conectores e RAG normativo) e 100% de conformidade com ruff check sem advertencias.
 
 ---
@@ -670,7 +670,7 @@ CREATE TABLE IF NOT EXISTS aura_core.public_sync_journal (
 );
 ```
 
-### 5.2 Script de Ingestão e Sincronização em Lote ([`scripts/sync_public_data.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/sync_public_data.py))
+### 5.2 Script de Ingestão e Sincronização em Lote ([`scripts/sync_public_data.py`](./scripts/sync_public_data.py))
 Será desenvolvido um script de automação modular e idempotente:
 * **Parâmetros da CLI:**
   - `--source {all, anp, confaz, bacen}`: Especifica a fonte a sincronizar;
@@ -682,7 +682,7 @@ Será desenvolvido um script de automação modular e idempotente:
   - Streaming direto do arquivo de dados sem carregar múltiplos megabytes em arrays Python.
   - Gravação em lotes (batch chunks de 1.000 linhas) utilizando `psycopg2.extras.execute_values()` com transações atômicas isoladas e cláusula `ON CONFLICT DO UPDATE`.
 
-### 5.3 Agendamento e Autonomia no Daemon Proativo ([`core/proactive_daemon.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/proactive_daemon.py))
+### 5.3 Agendamento e Autonomia no Daemon Proativo ([`core/proactive_daemon.py`](./core/proactive_daemon.py))
 O motor de vigilância contínua da AURA (`AuraProactiveDaemon`) incorporará avaliações periódicas integradas à sua suíte de regras:
 * **Horários Agendados (Time Windows):**
   - **BACEN SGS:** Execução diária às 06:30 da manhã (dados de fechamento do dia anterior e PTAX consolidada).
@@ -698,13 +698,13 @@ O motor de vigilância contínua da AURA (`AuraProactiveDaemon`) incorporará av
 * Com os índices parciais e compostos propostos, a leitura do preço médio da concorrência e do PMPF consome entre 1ms e 4ms no PostgreSQL, garantindo que o tempo total da inferência cognitiva da IA permaneça inferior a 100ms.
 
 ### 5.5 Checklist de Execucao e Homologacao da Fase 3 (Concluida em 19/10/2026)
-- [x] **DDL Declarativo e Idempotente (`aura_core` e `public`):** Criacao de [`scripts/init_public_data_cache.sql`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/init_public_data_cache.sql) com tabelas relacionais dedicadas `aura_core.anp_precos_semanais`, `aura_core.confaz_pmpf`, `aura_core.bacen_series_historicas` e `aura_core.public_sync_telemetry`, indices compostos e views equivalentes em `public`.
-- [x] **Repositorio de Cache Relacional Local:** Implementacao de [`PublicDataRepository`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/integrations/public_data/repository.py) com suporte a pool de conexao do PostgreSQL (`get_vector_connection`) e fallback em memoria / SQLite isolado para execucao hermetica offline.
+- [x] **DDL Declarativo e Idempotente (`aura_core` e `public`):** Criacao de [`scripts/init_public_data_cache.sql`](./scripts/init_public_data_cache.sql) com tabelas relacionais dedicadas `aura_core.anp_precos_semanais`, `aura_core.confaz_pmpf`, `aura_core.bacen_series_historicas` e `aura_core.public_sync_telemetry`, indices compostos e views equivalentes em `public`.
+- [x] **Repositorio de Cache Relacional Local:** Implementacao de [`PublicDataRepository`](./core/integrations/public_data/repository.py) com suporte a pool de conexao do PostgreSQL (`get_vector_connection`) e fallback em memoria / SQLite isolado para execucao hermetica offline.
 - [x] **Persistencia Idempotente por UPSERT:** Ingestao em lote com clausulas `ON CONFLICT DO UPDATE` prevenindo duplicacoes em coletas repetidas de precos semanais da ANP, pautas fiscais PMPF e series SGS.
 - [x] **Consultas Analiticas de Alta Performance (Sub-50ms):** Metodos `get_preco_benchmark_anp()`, `get_pmpf_atual()` e `get_indicadores_economicos_recentes()` com calculo de media, mediana, quartis, desvio padrao e postos amostrados.
-- [x] **Worker CLI e Sincronizador de Retaguarda:** Script [`scripts/sync_public_data.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/sync_public_data.py) com streaming de baixo footprint (< 80 MB RAM), protecao por Circuit Breaker, modos daemon e mock para CI/CD.
+- [x] **Worker CLI e Sincronizador de Retaguarda:** Script [`scripts/sync_public_data.py`](./scripts/sync_public_data.py) com streaming de baixo footprint (< 80 MB RAM), protecao por Circuit Breaker, modos daemon e mock para CI/CD.
 - [x] **Auditoria e Telemetria em Tempo Real:** Registro transacional de cada rodada de sincronizacao em `public_sync_telemetry` com metricas de latencia, contagem de registros e diagnostico de erros.
-- [x] **Suite de Testes Unitarios e Homologacao:** Criacao de [`tests/unit/test_public_data_sync.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/unit/test_public_data_sync.py) com 8 testes cobrindo idempotencia, UPSERT, pautas fiscais, series BACEN, auditoria e fluxo mock.
+- [x] **Suite de Testes Unitarios e Homologacao:** Criacao de [`tests/unit/test_public_data_sync.py`](./tests/unit/test_public_data_sync.py) com 8 testes cobrindo idempotencia, UPSERT, pautas fiscais, series BACEN, auditoria e fluxo mock.
 - [x] **Aprovacao Integral:** 100% dos testes aprovados (30/30 testes verdes no pytest cobrindo fases 1, 2 e 3) e 100% de conformidade com ruff check sem advertencias.
 
 ---
@@ -712,7 +712,7 @@ O motor de vigilância contínua da AURA (`AuraProactiveDaemon`) incorporará av
 ## 🧠 6. Fase 4: Integração Cognitiva nas Ferramentas Analíticas da AURA
 
 ### 6.1 `PostoTools.comparar_benchmark_concorrencia` e `BenchmarkComparisonUI`
-No arquivo [`core/tools.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py), a ferramenta de benchmark existente será expandida para cruzar a precificação real da pista com os dados públicos locais da ANP, mantendo rigorosa retrocompatibilidade com a assinatura e contratos existentes:
+No arquivo [`core/tools.py`](./core/tools.py), a ferramenta de benchmark existente será expandida para cruzar a precificação real da pista com os dados públicos locais da ANP, mantendo rigorosa retrocompatibilidade com a assinatura e contratos existentes:
 
 ```python
 def comparar_benchmark_concorrencia(
@@ -740,10 +740,10 @@ def comparar_benchmark_concorrencia(
   - Cálculo do **Posicionamento Relativo no Mix**: classificação do posto como "Líder de Preço", "Alinhado à Média" ou "Premium/Margem Alta".
   - Identificação da dispersão de preços (desvio padrão) na microrregião para aferir se o mercado está agressivo ou estável.
 * **Renderização Visual via GenUI:**
-  - Alimenta diretamente o contrato Pydantic `BenchmarkComparisonProps` ([`core/schemas/genui.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/schemas/genui.py)), renderizando no frontend o componente interativo [`BenchmarkComparisonUI`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/web/js/aura-genui-widgets.js) com barras comparativas e botões de ação tática (`Ajustar Preço de Bomba`, `Manter Estratégia de Margem`).
+  - Alimenta diretamente o contrato Pydantic `BenchmarkComparisonProps` ([`core/schemas/genui.py`](./core/schemas/genui.py)), renderizando no frontend o componente interativo [`BenchmarkComparisonUI`](./web/js/aura-genui-widgets.js) com barras comparativas e botões de ação tática (`Ajustar Preço de Bomba`, `Manter Estratégia de Margem`).
 
 ### 6.2 `PostoTools.auditar_conformidade_lmc_anp` e `LMCReportContract`
-O ecossistema disponibiliza o método oficial de auditoria regulatória do LMC, construído sobre a engine [`PostoTools.gerar_relatorio_lmc_anp()`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py) e o contrato [`LMCReportContract`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/schemas/lmc_report.py):
+O ecossistema disponibiliza o método oficial de auditoria regulatória do LMC, construído sobre a engine [`PostoTools.gerar_relatorio_lmc_anp()`](./core/tools.py) e o contrato [`LMCReportContract`](./core/schemas/lmc_report.py):
 
 ```python
 def auditar_conformidade_lmc_anp(
@@ -769,7 +769,7 @@ def auditar_conformidade_lmc_anp(
   - A AURA redige automaticamente a justificativa técnica pronta para anexação no Livro de Movimentação de Combustíveis, citando a Portaria ANP 26/1992 e os registros de temperatura e aferições do período.
 
 ### 6.3 Auditoria Metrológica de Bombas e Bicos no `ShiftReconciliationUI`
-Na conciliação de fechamento de turnos (`PostoTools.auditar_fechamento_turno` e contrato [`ShiftReconciliationContract`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/schemas/reconciliation.py)):
+Na conciliação de fechamento de turnos (`PostoTools.auditar_fechamento_turno` e contrato [`ShiftReconciliationContract`](./core/schemas/reconciliation.py)):
 * **Auditoria de Aferições Diárias com Tolerância INMETRO 559/2016:**
   - Todo volume retirado da bomba para fins de aferição matinal deve corresponder estritamente a múltiplos de 20 litros (amostra do balde aferidor padrão).
   - O desvio tolerado entre o medidor da bomba e o padrão aferido é fixado em no máximo **±100 ml a cada 20L (±0,50%)**.
@@ -784,12 +784,12 @@ Cruzamento da posição volumétrica dos tanques com a taxa Selic do BACEN:
   - Fornece ao proprietário do posto uma recomendação clara: "Seu capital empatado em 45.000L de Gasolina Comum gera um custo Selic de R$ 38,40 por dia. O pedido ótimo para reposição deve ocorrer em até 4 dias úteis".
 
 ### 6.5 Entregáveis Concluídos da Fase 4 (Pilar 5)
-- [x] **Enriquecimento Cognitivo do Benchmark Municipal:** Integração em [`PostoTools.comparar_benchmark_concorrencia()`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py) consultando o cache local da ANP (`PublicDataRepository.get_preco_benchmark_anp`), calculando quartis (Q1, Mediana, Q3), valores minimos e maximos, gap exato em R$ e % frente a media da cidade, posicionamento competitivo e fallback 100% compativel com o contrato canônico `BenchmarkComparisonProps`.
-- [x] **Auditoria Volumétrica de Conformidade LMC ANP:** Implementacao do metodo [`PostoTools.auditar_conformidade_lmc_anp()`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py) fundamentado na Portaria ANP 26/1992 e Resolucao ANP 894/2022, auditando variacao volumetrica contra a tolerancia legal de +-0.60%, classificando tanques em CONFORME ou CRITICO e retornando o micro-widget GenUI `LMCComplianceReportUI` com 3 acoes HITL interativas ("📄 Exportar LMC Formatado", "📏 Agendar Aferição INMETRO 20L", "🔍 Inspecionar Calibração do Tanque").
-- [x] **Analise Macroeconomica de Custo de Estoque e Pauta CONFAZ:** Implementacao de [`PostoTools.analisar_custo_estoque_macroeconomico()`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py) calculando custo de carregamento diario e mensal via taxa Selic anualizada do BACEN SGS (convencao de 252 d.u.), cambio PTAX e spread fiscal frente a pauta PMPF do CONFAZ (ICMS-ST) via contrato `MacroeconomicInventoryCostProps`.
-- [x] **Registro e Despacho no Motor da AURA:** Mapeamento completo em [`core/aura_engine.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/aura_engine.py) em `GENUI_COMPONENT_REGISTRY_MAP`, despacho direto em `execute_tool_direct`, resolucao de contexto em `_resolver_contexto_ferramenta`, sintese de contingencia deterministica rica e envelopes canônicos GenUI.
-- [x] **Roteamento Semântico e Heurístico Enriquecido:** Atualizacao de [`core/semantic_router.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/semantic_router.py) com catalogacao de exemplares em `INTENT_EXEMPLARS` para `custo_estoque_macro` e `auditar_conformidade_lmc_anp`, alem de regras heuristicas sub-milissegundo para variacoes de LMC, tolerancia de 0.60%, pautas COTEPE/PMPF e indicadores macroeconomicos.
-- [x] **Suite de Testes Unitarios e Homologacao:** Criacao e aprovacao integral de [`tests/unit/test_ferramentas_cognitivas_publicas.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/unit/test_ferramentas_cognitivas_publicas.py) com testes cobrindo ANP, LMC, Macro, despacho direto com `PostoTools` real, fallback offline e zero travessoes Unicode.
+- [x] **Enriquecimento Cognitivo do Benchmark Municipal:** Integração em [`PostoTools.comparar_benchmark_concorrencia()`](./core/tools.py) consultando o cache local da ANP (`PublicDataRepository.get_preco_benchmark_anp`), calculando quartis (Q1, Mediana, Q3), valores minimos e maximos, gap exato em R$ e % frente a media da cidade, posicionamento competitivo e fallback 100% compativel com o contrato canônico `BenchmarkComparisonProps`.
+- [x] **Auditoria Volumétrica de Conformidade LMC ANP:** Implementacao do metodo [`PostoTools.auditar_conformidade_lmc_anp()`](./core/tools.py) fundamentado na Portaria ANP 26/1992 e Resolucao ANP 894/2022, auditando variacao volumetrica contra a tolerancia legal de +-0.60%, classificando tanques em CONFORME ou CRITICO e retornando o micro-widget GenUI `LMCComplianceReportUI` com 3 acoes HITL interativas ("📄 Exportar LMC Formatado", "📏 Agendar Aferição INMETRO 20L", "🔍 Inspecionar Calibração do Tanque").
+- [x] **Analise Macroeconomica de Custo de Estoque e Pauta CONFAZ:** Implementacao de [`PostoTools.analisar_custo_estoque_macroeconomico()`](./core/tools.py) calculando custo de carregamento diario e mensal via taxa Selic anualizada do BACEN SGS (convencao de 252 d.u.), cambio PTAX e spread fiscal frente a pauta PMPF do CONFAZ (ICMS-ST) via contrato `MacroeconomicInventoryCostProps`.
+- [x] **Registro e Despacho no Motor da AURA:** Mapeamento completo em [`core/aura_engine.py`](./core/aura_engine.py) em `GENUI_COMPONENT_REGISTRY_MAP`, despacho direto em `execute_tool_direct`, resolucao de contexto em `_resolver_contexto_ferramenta`, sintese de contingencia deterministica rica e envelopes canônicos GenUI.
+- [x] **Roteamento Semântico e Heurístico Enriquecido:** Atualizacao de [`core/semantic_router.py`](./core/semantic_router.py) com catalogacao de exemplares em `INTENT_EXEMPLARS` para `custo_estoque_macro` e `auditar_conformidade_lmc_anp`, alem de regras heuristicas sub-milissegundo para variacoes de LMC, tolerancia de 0.60%, pautas COTEPE/PMPF e indicadores macroeconomicos.
+- [x] **Suite de Testes Unitarios e Homologacao:** Criacao e aprovacao integral de [`tests/unit/test_ferramentas_cognitivas_publicas.py`](./tests/unit/test_ferramentas_cognitivas_publicas.py) com testes cobrindo ANP, LMC, Macro, despacho direto com `PostoTools` real, fallback offline e zero travessoes Unicode.
 
 ---
 
@@ -815,12 +815,12 @@ Para garantir confiabilidade total, cada conjunto de dados públicos possui uma 
     `status_referencia: "Dados ANP de 08/10/2026 (Cache Local: Conexão Externa Pendente)"`.
 
 ### 7.3 Mecanismo de Rate Limiting e Circuit Breaker
-O utilitário [`core/integrations/public_data/rate_limiter.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/integrations/public_data/rate_limiter.py) implementará o padrão Circuit Breaker:
+O utilitário [`core/integrations/public_data/rate_limiter.py`](./core/integrations/public_data/rate_limiter.py) implementará o padrão Circuit Breaker:
 * **CLOSED (Operação Normal):** Requisições fluem com espaçamento mínimo de 2 segundos entre chamadas.
 * **OPEN (Circuito Aberto por Falha):** Se ocorrerem 3 falhas consecutivas de rede (timeout ou HTTP 5xx), o conector interrompe qualquer tentativa de chamada externa por 60 minutos, preservando os recursos da máquina e evitando penalizações de rede.
 * **HALF-OPEN (Verificação Canário):** Após o período de resfriamento, o conector dispara uma única requisição leve de teste (ex: `health_check`). Se for bem-sucedida, o circuito retorna a CLOSED; se falhar, retorna a OPEN por mais 120 minutos.
 
-### 7.4 Plano e Estrutura da Suíte de Testes Unitários ([`tests/unit/test_public_data_connectors.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/unit/test_public_data_connectors.py))
+### 7.4 Plano e Estrutura da Suíte de Testes Unitários ([`tests/unit/test_public_data_connectors.py`](./tests/unit/test_public_data_connectors.py))
 Nenhum conector público dependerá de rede ativa para a execução da suíte de testes automatizados (`pytest`). Todos os testes serão 100% determinísticos e herméticos utilizando mocks e fixtures locais:
 
 * **Casos de Teste Essenciais da Suíte:**
@@ -829,14 +829,14 @@ Nenhum conector público dependerá de rede ativa para a execução da suíte de
   3. `test_bacen_sgs_json_normalization`: Verificação de conversão de datas no formato DD/MM/AAAA para objetos `date` ISO e parsing de taxas flutuantes.
   4. `test_confaz_cotepe_table_extraction`: Validação da captura de pautas de PMPF por estado para Etanol e GNV.
   5. `test_circuit_breaker_transition_open_and_recovery`: Simulação de falhas de conexão consecutivas e validação da abertura do circuito com suspensão de requisições.
-  6. `test_cache_resilience_offline_fallback`: Validação de que as ferramentas analíticas ([`PostoTools.comparar_benchmark_concorrencia`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py)) retornam dados válidos do cache local mesmo com mock de rede offline absoluto.
+  6. `test_cache_resilience_offline_fallback`: Validação de que as ferramentas analíticas ([`PostoTools.comparar_benchmark_concorrencia`](./core/tools.py)) retornam dados válidos do cache local mesmo com mock de rede offline absoluto.
   7. `test_pydantic_contracts_validation_error_quarantine`: Garantia de que registros públicos mal formatados são descartados para quarentena sem derrubar a aplicação.
 
 ### 7.5 Entregáveis Concluídos da Fase 5 (Pilar 6: Homologação em Produção e E2E)
-- [x] **Daemon Proativo com Alertas LMC e Staleness de Dados Públicos:** Monitoramento contínuo em [`core/proactive_daemon.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/proactive_daemon.py) avaliando variação volumétrica de tanques (> +-0.60%) e defasagem governamental (> 7 dias) com smart cooldown (4h LMC, 24h staleness), integração CDC e despacho multi-canal in-app na AURA (chat stream SSE, container de alertas na UI, toasts in-app, webhooks e WhatsApp; popups nativos do Windows desativados por padrão).
-- [x] **Endpoints HTTP de Telemetria e Health de Dados Abertos:** Exposição de `GET /api/v1/aura/public-data/health` (inspeção de Circuit Breakers e conexão) e `GET /api/v1/aura/public-data/telemetry` (histórico de syncs, staleness e datas de coleta) em [`core/aura_api.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/aura_api.py).
-- [x] **Validação E2E com Consultas Reais de Revendedores:** Suíte [`tests/unit/test_public_data_e2e_api.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/unit/test_public_data_e2e_api.py) validando os 3 fluxos conversacionais prioritários do revendedor via `/api/v1/aura/chat` (benchmark ANP municipal, auditoria LMC e custo Selic de estoques).
-- [x] **Guia Operacional e Manual de Borda:** Documentação completa em [`docs/guia_operacional_apis_publicas.md`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/guia_operacional_apis_publicas.md) cobrindo rotinas de fiscalização, benchmarks de quartis, auditoria metrológica, carrying cost, comandos CLI e conformidade LGPD.
+- [x] **Daemon Proativo com Alertas LMC e Staleness de Dados Públicos:** Monitoramento contínuo em [`core/proactive_daemon.py`](./core/proactive_daemon.py) avaliando variação volumétrica de tanques (> +-0.60%) e defasagem governamental (> 7 dias) com smart cooldown (4h LMC, 24h staleness), integração CDC e despacho multi-canal in-app na AURA (chat stream SSE, container de alertas na UI, toasts in-app, webhooks e WhatsApp; popups nativos do Windows desativados por padrão).
+- [x] **Endpoints HTTP de Telemetria e Health de Dados Abertos:** Exposição de `GET /api/v1/aura/public-data/health` (inspeção de Circuit Breakers e conexão) e `GET /api/v1/aura/public-data/telemetry` (histórico de syncs, staleness e datas de coleta) em [`core/aura_api.py`](./core/aura_api.py).
+- [x] **Validação E2E com Consultas Reais de Revendedores:** Suíte [`tests/unit/test_public_data_e2e_api.py`](./tests/unit/test_public_data_e2e_api.py) validando os 3 fluxos conversacionais prioritários do revendedor via `/api/v1/aura/chat` (benchmark ANP municipal, auditoria LMC e custo Selic de estoques).
+- [x] **Guia Operacional e Manual de Borda:** Documentação completa em [`docs/guia_operacional_apis_publicas.md`](./docs/guia_operacional_apis_publicas.md) cobrindo rotinas de fiscalização, benchmarks de quartis, auditoria metrológica, carrying cost, comandos CLI e conformidade LGPD.
 
 ---
 
@@ -901,8 +901,8 @@ Para que a integração de dados públicos seja considerada concluída e pronta 
 
 | Fase | Pilar / Escopo | Status | Data de Conclusão | Entregáveis Principais |
 | :--- | :--- | :---: | :---: | :--- |
-| **Fase 1** | Pilar 2: RAG Técnico Normativo e Regulatório Local (ANP, INMETRO, CONFAZ, BACEN) | `CONCLUÍDA` | 19/10/2026 | [`scripts/seed_aura_conhecimento.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/seed_aura_conhecimento.py), [`core/rag_engine.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/rag_engine.py), [`tests/unit/test_rag_normativo_publico.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/unit/test_rag_normativo_publico.py). 26 chunks indexados, busca híbrida HNSW + FTS com metadados, protocolo de recusa de cargas fora de especificação e fallback de memória offline. 22/22 testes unitários verdes. |
-| **Fase 2** | Pilar 1: Hub de Conectores de Dados Abertos (`core/integrations/public_data/`) | `CONCLUÍDA` | 19/10/2026 | [`core/integrations/public_data/`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/integrations/public_data/), [`tests/unit/test_public_data_connectors.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/unit/test_public_data_connectors.py). Conectores ANP, CONFAZ e BACEN SGS, Circuit Breaker nativo de 3 estados, parsing em streaming de 64 KB, eficiencia sub-100ms em 10.000 linhas e 22/22 testes unitarios 100% verdes. |
-| **Fase 3** | Pilar 3: Cache Relacional Local e Sincronizacao em Segundo Plano | `CONCLUÍDA` | 19/10/2026 | [`scripts/init_public_data_cache.sql`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/init_public_data_cache.sql), [`core/integrations/public_data/repository.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/integrations/public_data/repository.py), [`scripts/sync_public_data.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/sync_public_data.py), [`tests/unit/test_public_data_sync.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/unit/test_public_data_sync.py). DDLs idempotentes em `aura_core` e `public`, UPSERT de precos e pautas, consultas sub-50ms, worker CLI em streaming e 30/30 testes verdes. |
-| **Fase 4** | Pilar 4: Enriquecimento das Ferramentas Analíticas e GenUI | `CONCLUÍDA` | 20/10/2026 | [`core/tools.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py), [`core/aura_engine.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/aura_engine.py), [`core/semantic_router.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/semantic_router.py), [`tests/unit/test_ferramentas_cognitivas_publicas.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/unit/test_ferramentas_cognitivas_publicas.py). Enriquecimento de benchmark com estatisticas e quartis ANP, auditoria de conformidade LMC (+-0.60%) com micro-widget LMCComplianceReportUI, analise de custo de oportunidade Selic (252 d.u.) e pauta PMPF CONFAZ com MacroeconomicInventoryCostUI, despacho direto Headless, sintese de contingencia e 35/35 testes verdes. |
-| **Fase 5** | Pilar 6: Homologação Geral, Testes E2E e Documentação Operacional | `CONCLUÍDA` | 20/10/2026 | [`core/proactive_daemon.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/proactive_daemon.py), [`core/aura_api.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/aura_api.py), [`tests/unit/test_public_data_e2e_api.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/tests/unit/test_public_data_e2e_api.py), [`docs/guia_operacional_apis_publicas.md`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/guia_operacional_apis_publicas.md). Integracao do daemon com alertas LMC (+-0.60%) e staleness com smart cooldown, rotas de health e telemetria publica, teste E2E das 3 perguntas operacionais do revendedor, guia operacional completo e suíte 100% verde sub-segundo. |
+| **Fase 1** | Pilar 2: RAG Técnico Normativo e Regulatório Local (ANP, INMETRO, CONFAZ, BACEN) | `CONCLUÍDA` | 19/10/2026 | [`scripts/seed_aura_conhecimento.py`](./scripts/seed_aura_conhecimento.py), [`core/rag_engine.py`](./core/rag_engine.py), [`tests/unit/test_rag_normativo_publico.py`](./tests/unit/test_rag_normativo_publico.py). 26 chunks indexados, busca híbrida HNSW + FTS com metadados, protocolo de recusa de cargas fora de especificação e fallback de memória offline. 22/22 testes unitários verdes. |
+| **Fase 2** | Pilar 1: Hub de Conectores de Dados Abertos (`core/integrations/public_data/`) | `CONCLUÍDA` | 19/10/2026 | [`core/integrations/public_data/`](./core/integrations/public_data/), [`tests/unit/test_public_data_connectors.py`](./tests/unit/test_public_data_connectors.py). Conectores ANP, CONFAZ e BACEN SGS, Circuit Breaker nativo de 3 estados, parsing em streaming de 64 KB, eficiencia sub-100ms em 10.000 linhas e 22/22 testes unitarios 100% verdes. |
+| **Fase 3** | Pilar 3: Cache Relacional Local e Sincronizacao em Segundo Plano | `CONCLUÍDA` | 19/10/2026 | [`scripts/init_public_data_cache.sql`](./scripts/init_public_data_cache.sql), [`core/integrations/public_data/repository.py`](./core/integrations/public_data/repository.py), [`scripts/sync_public_data.py`](./scripts/sync_public_data.py), [`tests/unit/test_public_data_sync.py`](./tests/unit/test_public_data_sync.py). DDLs idempotentes em `aura_core` e `public`, UPSERT de precos e pautas, consultas sub-50ms, worker CLI em streaming e 30/30 testes verdes. |
+| **Fase 4** | Pilar 4: Enriquecimento das Ferramentas Analíticas e GenUI | `CONCLUÍDA` | 20/10/2026 | [`core/tools.py`](./core/tools.py), [`core/aura_engine.py`](./core/aura_engine.py), [`core/semantic_router.py`](./core/semantic_router.py), [`tests/unit/test_ferramentas_cognitivas_publicas.py`](./tests/unit/test_ferramentas_cognitivas_publicas.py). Enriquecimento de benchmark com estatisticas e quartis ANP, auditoria de conformidade LMC (+-0.60%) com micro-widget LMCComplianceReportUI, analise de custo de oportunidade Selic (252 d.u.) e pauta PMPF CONFAZ com MacroeconomicInventoryCostUI, despacho direto Headless, sintese de contingencia e 35/35 testes verdes. |
+| **Fase 5** | Pilar 6: Homologação Geral, Testes E2E e Documentação Operacional | `CONCLUÍDA` | 20/10/2026 | [`core/proactive_daemon.py`](./core/proactive_daemon.py), [`core/aura_api.py`](./core/aura_api.py), [`tests/unit/test_public_data_e2e_api.py`](./tests/unit/test_public_data_e2e_api.py), [`docs/guia_operacional_apis_publicas.md`](./docs/guia_operacional_apis_publicas.md). Integracao do daemon com alertas LMC (+-0.60%) e staleness com smart cooldown, rotas de health e telemetria publica, teste E2E das 3 perguntas operacionais do revendedor, guia operacional completo e suíte 100% verde sub-segundo. |

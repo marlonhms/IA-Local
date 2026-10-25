@@ -1,20 +1,19 @@
 """AUPS Dominio de Vendas e Loja de Conveniencia.
 
-AURA Universal Posto Schema (AUPS): Dominio Canonico Desacoplado.
+AURA Universal Posto Schema (AUPS) e AUDS: Dominio Canonico Desacoplado.
 Entidades imutaveis para cupons, itens faturados e formas de pagamento.
+Zero travessoes em todo o modulo.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import AliasChoices, ConfigDict, Field, field_validator, model_validator
 
 from core.domain.base import (
     AUPSBaseModel,
     extract_first_present,
-    parse_datetime_safe,
     parse_float_safe,
     parse_str_safe,
     strip_accents,
@@ -214,193 +213,28 @@ class UniversalSaleItem(AUPSBaseModel):
         return data
 
 
-class UniversalSaleReceipt(AUPSBaseModel):
-    """Cupom fiscal ou pedido de venda fechado no PDV."""
-
-    model_config = ConfigDict(
-        frozen=True,
-        extra="ignore",
-        populate_by_name=True,
+if TYPE_CHECKING:
+    from core.domain.universal_entities import (
+        UniversalSaleReceipt,
+        UniversalSaleTransaction,
     )
 
-    cupom_id: str = Field(
-        default="SEM_ID",
-        validation_alias=AliasChoices(
-            "cupom_id", "venda_id", "id", "id_cupom", "numcupom", "numped", "id_pedido", "sale_id"
-        ),
-        description="Identificador unico da transacao ou cupom de venda",
-    )
-    data_hora: datetime = Field(
-        default_factory=datetime.now,
-        validation_alias=AliasChoices(
-            "data_hora", "timestamp", "data", "dataped", "horaped", "datetime", "data_venda"
-        ),
-        description="Data e hora de emissao da venda",
-    )
-    pdv: str = Field(
-        default="1",
-        validation_alias=AliasChoices("pdv", "caixa_pdv", "pos", "caixa", "numpdv"),
-        description="Identificador do Ponto de Venda (PDV)",
-    )
-    total_reais: float = Field(
-        default=0.0,
-        ge=0.0,
-        validation_alias=AliasChoices(
-            "total_reais", "total", "total_venda", "valped", "valor_total"
-        ),
-        description="Valor monetario total da venda em Reais",
-    )
-    status: str = Field(
-        default="CONCLUIDA",
-        validation_alias=AliasChoices("status", "situacao", "situ", "status_venda", "estado"),
-        description="Status operacional da venda (ex: CONCLUIDA, CANCELADA)",
-    )
-    operador: str = Field(
-        default="SISTEMA",
-        validation_alias=AliasChoices(
-            "operador", "frentista", "operador_nome", "usuario", "codfren", "nome_operador"
-        ),
-        description="Identificador ou nome do operador/frentista responsavel",
-    )
-    itens: list[UniversalSaleItem] = Field(
-        default_factory=list,
-        validation_alias=AliasChoices("itens", "items", "produtos"),
-        description="Lista de itens constituintes da venda",
-    )
-    pagamentos: list[UniversalPaymentMethod] = Field(
-        default_factory=list,
-        validation_alias=AliasChoices("pagamentos", "payments", "formas_pagamento"),
-        description="Lista de metodos de pagamento vinculados a venda",
-    )
-    motivo_cancelamento: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices(
-            "motivo_cancelamento", "motivo", "ven_tx_motivo_cancelamento", "justificativa_cancelamento"
-        ),
-        description="Justificativa formal do cancelamento da venda",
-    )
 
-    @property
-    def venda_id(self) -> str:
-        """Alias de conveniencia para cupom_id."""
-        return self.cupom_id
+def __getattr__(name: str) -> Any:
+    if name in ("UniversalSaleReceipt", "UniversalSaleTransaction"):
+        from core.domain.universal_entities import UniversalSaleTransaction
+        return UniversalSaleTransaction
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
-    @property
-    def id(self) -> str:
-        """Alias de conveniencia universal para cupom_id."""
-        return self.cupom_id
 
-    @property
-    def id_cupom(self) -> str:
-        """Alias de conveniencia para cupom_id."""
-        return self.cupom_id
+def __dir__() -> list[str]:
+    return list(__all__)
 
-    @property
-    def id_pedido(self) -> str:
-        """Alias de conveniencia para cupom_id."""
-        return self.cupom_id
 
-    @property
-    def pedido_id(self) -> str:
-        """Alias de conveniencia para cupom_id."""
-        return self.cupom_id
-
-    @field_validator("cupom_id", mode="before")
-    @classmethod
-    def _validate_cupom_id(cls, v: Any) -> str:
-        return parse_str_safe(v, default="SEM_ID")
-
-    @field_validator("pdv", mode="before")
-    @classmethod
-    def _validate_pdv(cls, v: Any) -> str:
-        return parse_str_safe(v, default="1")
-
-    @field_validator("status", mode="before")
-    @classmethod
-    def _validate_status(cls, v: Any) -> str:
-        return parse_str_safe(v, default="CONCLUIDA")
-
-    @field_validator("operador", mode="before")
-    @classmethod
-    def _validate_operador(cls, v: Any) -> str:
-        return parse_str_safe(v, default="SISTEMA")
-
-    @field_validator("data_hora", mode="before")
-    @classmethod
-    def _validate_data_hora(cls, v: Any) -> datetime:
-        return parse_datetime_safe(v)
-
-    @field_validator("total_reais", mode="before")
-    @classmethod
-    def _validate_total_reais(cls, v: Any) -> float:
-        return parse_float_safe(v, default=0.0, allow_negative=False)
-
-    @model_validator(mode="before")
-    @classmethod
-    def _reconcile_receipt_totals_before(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            tot_raw = extract_first_present(
-                data,
-                ("total_reais", "total", "total_venda", "valped", "valor_total"),
-            )
-            tot = parse_float_safe(tot_raw, default=0.0, allow_negative=False)
-            if tot == 0.0:
-                itens = data.get("itens") or data.get("items") or data.get("produtos")
-                calc_total = 0.0
-                if itens and isinstance(itens, list):
-                    for item in itens:
-                        if isinstance(item, dict):
-                            item_tot = extract_first_present(
-                                item,
-                                ("total_item_reais", "total_item", "valor_total", "total", "valitem"),
-                            )
-                            if item_tot is not None:
-                                calc_total += parse_float_safe(item_tot, default=0.0, allow_negative=False)
-                            else:
-                                prc = parse_float_safe(
-                                    extract_first_present(
-                                        item,
-                                        ("preco_unitario_reais", "preco_unitario", "valor_unitario", "unit_price", "prcpec", "preco"),
-                                    ),
-                                    default=0.0,
-                                    allow_negative=False,
-                                )
-                                qtd = parse_float_safe(
-                                    extract_first_present(
-                                        item,
-                                        ("quantidade", "qtd", "quantity", "qtde", "qtditem"),
-                                    ),
-                                    default=1.0,
-                                    allow_negative=False,
-                                )
-                                calc_total += round(prc * qtd, 2)
-                        elif hasattr(item, "total_item_reais"):
-                            calc_total += float(item.total_item_reais)
-                if calc_total == 0.0:
-                    pagamentos = data.get("pagamentos") or data.get("payments") or data.get("formas_pagamento")
-                    if pagamentos and isinstance(pagamentos, list):
-                        for pay in pagamentos:
-                            if isinstance(pay, dict):
-                                pay_val = extract_first_present(
-                                    pay,
-                                    ("valor_reais", "valor", "total_pago", "amount", "valpra"),
-                                )
-                                calc_total += parse_float_safe(pay_val, default=0.0, allow_negative=False)
-                            elif hasattr(pay, "valor_reais"):
-                                calc_total += float(pay.valor_reais)
-                if calc_total > 0:
-                    data["total_reais"] = round(calc_total, 2)
-        return data
-
-    @model_validator(mode="after")
-    def _reconcile_receipt_totals_after(self) -> UniversalSaleReceipt:
-        if self.total_reais == 0.0:
-            if self.itens:
-                calc_total = round(sum(item.total_item_reais for item in self.itens), 2)
-                if calc_total > 0:
-                    object.__setattr__(self, "total_reais", calc_total)
-            elif self.pagamentos:
-                calc_total = round(sum(pay.valor_reais for pay in self.pagamentos), 2)
-                if calc_total > 0:
-                    object.__setattr__(self, "total_reais", calc_total)
-        return self
+__all__ = [
+    "PaymentType",
+    "UniversalPaymentMethod",
+    "UniversalSaleItem",
+    "UniversalSaleReceipt",
+    "UniversalSaleTransaction",
+]

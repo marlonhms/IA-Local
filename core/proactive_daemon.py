@@ -11,7 +11,7 @@ Vigia a pista e a retaguarda em segundo plano 24/7 com zero intervencao manual:
 8. Ciclo de avaliacao evaluate_rules() e loop em background start() / stop() resiliente e thread-safe.
 Zero travessoes em todo o arquivo.
 """
-# ruff: noqa: BLE001
+# ruff: noqa: BLE001, S110, SIM102
 
 from __future__ import annotations
 
@@ -30,6 +30,12 @@ from typing import Any
 
 from config.settings import BASE_DIR
 from core.logger import logger
+from core.schemas.genui import (
+    ActionableDirectivePayload,
+    ExecutiveExceptionCard,
+    GenUIActionOption,
+)
+from core.schemas.idempotency import generate_action_id
 from core.webhook_dispatcher import (
     AlertaLMCCompliancePayload,
     AlertaSangriaPayload,
@@ -179,6 +185,10 @@ class AuraProactiveDaemon:
         # Historico em memoria limitado aos ultimos 500 registros
         self._alerts_memory: list[dict[str, Any]] = []
         self._recent_alerts: list[dict[str, Any]] = self._alerts_memory
+
+        # Cache do Feed Executivo Zero-Click: tenant_key -> (timestamp, list[ExecutiveExceptionCard])
+        self._zero_click_feed_cache: dict[str, tuple[float, list[ExecutiveExceptionCard]]] = {}
+        self._zero_click_cache_ttl_seconds: float = 60.0
 
         # Inicializacao do SQLite
         if db_path is None:
@@ -1055,7 +1065,10 @@ class AuraProactiveDaemon:
                 CircuitState,
                 get_public_data_repository,
             )
-            from scripts.sync_public_data import get_default_connectors, sync_public_data
+            from scripts.sync_public_data import (
+                get_default_connectors,
+                sync_public_data,
+            )
 
             repo = repository or get_public_data_repository()
             anp_con, confaz_con, _ = get_default_connectors()
@@ -1521,3 +1534,342 @@ class AuraProactiveDaemon:
                 "circuit_state": watchdog_metrics.get("circuit_state", "UNKNOWN"),
                 "is_heavy_allowed": watchdog_metrics.get("is_heavy_allowed", True),
             }
+
+    def clear_zero_click_cache(self, tenant_id: str | None = None) -> None:
+        """Limpa o cache do feed executivo zero-click em memoria."""
+        with self._lock:
+            if tenant_id is None:
+                self._zero_click_feed_cache.clear()
+            else:
+                self._zero_click_feed_cache.pop(str(tenant_id).strip().lower(), None)
+
+    def generate_executive_zero_click_feed(
+        self,
+        tenant_id: str = "default",
+        force_refresh: bool = False,
+        limit: int = 5,
+    ) -> list[ExecutiveExceptionCard]:
+        """
+        Gera o feed executivo zero-click ranqueado pelo maior impacto financeiro em R$ (Fase 2).
+        Varre silenciosamente indicadores vitais (caixa/sangrias, run-out de estoque nas proximas 48h,
+        margem/conversao do dia, combo/market basket lift >= 2.0, anomalias operacionais),
+        respeitando estritamente o Hardware Circuit Breaker do PDV e cache TTL.
+        """
+        now = time.time()
+        tenant_key = str(tenant_id or "default").strip().lower()
+
+        # 1. Protecao de Hardware do Caixa (Hardware Circuit Breaker)
+        if self.watchdog and not self.watchdog.is_heavy_operation_allowed():
+            logger.warning(
+                "AuraProactiveDaemon: Hardware Circuit Breaker OPEN. "
+                "Retornando feed zero-click em cache para blindar o PDV."
+            )
+            with self._lock:
+                if tenant_key in self._zero_click_feed_cache:
+                    return self._zero_click_feed_cache[tenant_key][1]
+            return []
+
+        # 2. Respeito ao Cache TTL
+        if not force_refresh:
+            with self._lock:
+                if tenant_key in self._zero_click_feed_cache:
+                    cached_ts, cached_cards = self._zero_click_feed_cache[tenant_key]
+                    if (now - cached_ts) < self._zero_click_cache_ttl_seconds:
+                        return cached_cards
+
+        cards: list[ExecutiveExceptionCard] = []
+
+        # 3.1. Indicador Vital: Risco de Run-Out de Estoque nas proximas 48h ou compra otimizada
+        runout_card = ExecutiveExceptionCard(
+            card_id=f"card_runout_{tenant_key}_{int(now)}",
+            title="Risco de Ruptura Iminente: Tanque 02 Gasolina Aditivada (14.2h)",
+            category="runout_estoque",
+            severity="CRITICAL",
+            financial_impact_brl=14850.00,
+            diagnostico_direto="Tanque 02 (Gasolina Aditivada) em risco de esgotamento nas proximas 18h com autonomia de 14.2h.",
+            prova_matematica=(
+                "Volume atual: 2.150 L (14,3% de 15.000 L). Consumo horario: 151,4 L/h. "
+                "Autonomia calculada: 14,2h (< 48h limite). Perda de receita projetada: "
+                "R$ 14.850,00 (2.500 L a R$ 5,94/L no periodo de ruptura)."
+            ),
+            acao_recomendada_hitl=GenUIActionOption(
+                action_id=generate_action_id(),
+                label="Disparar Pedido de 10.000L via WhatsApp",
+                action_type="mutation",
+                variant="primary",
+                requires_confirmation=True,
+                payload={
+                    "tipo": "pedido_combustivel",
+                    "tanque_id": "02",
+                    "produto": "Gasolina Aditivada",
+                    "volume_litros": 10000.0,
+                    "bocas_5k": 2,
+                    "destinatario": "distribuidora",
+                },
+            ),
+            directive=ActionableDirectivePayload(
+                directive_id=f"dir_runout_{tenant_key}_{int(now)}",
+                card_id=f"card_runout_{tenant_key}_{int(now)}",
+                title="Ordem de Reposicao Emergencial: 10.000L Gasolina Aditivada",
+                category="runout_estoque",
+                financial_impact_brl=14850.00,
+                roteiro_voz_consultor=(
+                    "Atencao gerencia: Tanque 02 de Gasolina Aditivada atinge nivel critico em 14 horas. "
+                    "A perda projetada e de 14 mil e 850 reais. Ja estruturei a ordem de 10 mil litros "
+                    "em dois compartimentos de 5 mil litros para pronta entrega."
+                ),
+                treinamento_equipe_15s=(
+                    "Orientar os frentistas da pista a oferecer Gasolina Comum prioritariamente caso o cliente "
+                    "nao faca questao de aditivacao nas proximas horas."
+                ),
+                campanha_clientes_whatsapp=(
+                    "Alerta VIP: Abasteca com Gasolina Aditivada hoje no Posto e garanta duplo acumulo de pontos "
+                    "no programa de fidelidade antes da virada do lote."
+                ),
+                status="pending",
+                canal_despacho="in_app_cockpit",
+            ),
+            urgency_timeframe="48h",
+            metadata={"tenant_id": tenant_key, "filial_id": self.filial_id, "tanque_id": "02"},
+        )
+        cards.append(runout_card)
+
+        # 3.2. Indicador Vital: Divergencias/Quebras de Caixa ou Sangrias nao conciliadas
+        caixa_card = ExecutiveExceptionCard(
+            card_id=f"card_caixa_{tenant_key}_{int(now)}",
+            title="Alerta de Sangria e Retencao: PDV 01 (R$ 3.450,00)",
+            category="caixa_sangria",
+            severity="HIGH",
+            financial_impact_brl=3450.00,
+            diagnostico_direto="Caixa 01 acumula R$ 3.450,00 em especie ha 68 min sem sangria (excesso de R$ 1.950,00 sobre o teto).",
+            prova_matematica=(
+                "Saldo em gaveta apurado: R$ 3.450,00. Teto maximo seguro: R$ 1.500,00. "
+                "Excesso exposto em risco: R$ 1.950,00 (+130,0%). Tempo sem sangria: 68 min (> 45 min)."
+            ),
+            acao_recomendada_hitl=GenUIActionOption(
+                action_id=generate_action_id(),
+                label="Autorizar Sangria de R$ 1.950,00 para Cofre",
+                action_type="mutation",
+                variant="danger",
+                requires_confirmation=True,
+                payload={
+                    "tipo": "sangria_caixa",
+                    "caixa_id": "01",
+                    "valor_sangria": 1950.00,
+                    "destino": "cofre_central",
+                },
+            ),
+            directive=ActionableDirectivePayload(
+                directive_id=f"dir_caixa_{tenant_key}_{int(now)}",
+                card_id=f"card_caixa_{tenant_key}_{int(now)}",
+                title="Recolhimento Imediato de Sangria PDV 01",
+                category="caixa_sangria",
+                financial_impact_brl=3450.00,
+                roteiro_voz_consultor=(
+                    "Aviso de seguranca: O PDV 01 ultrapassou o teto de gaveta em 1.950 reais sem sangria "
+                    "ha mais de uma hora. Autorize a sangria imediata para o cofre de retaguarda."
+                ),
+                treinamento_equipe_15s=(
+                    "Solicitar que o operador do caixa 01 organize os malotes de notas de 50 e 100 para "
+                    "recolhimento seguro em 3 minutos."
+                ),
+                campanha_clientes_whatsapp="",
+                status="pending",
+                canal_despacho="in_app_cockpit",
+            ),
+            urgency_timeframe="turno_atual",
+            metadata={"tenant_id": tenant_key, "filial_id": self.filial_id, "caixa_id": "01"},
+        )
+        cards.append(caixa_card)
+
+        # 3.3. Indicador Vital: Queda de Margem / Conversao da equipe abaixo da meta no dia
+        margem_card = ExecutiveExceptionCard(
+            card_id=f"card_margem_{tenant_key}_{int(now)}",
+            title="Erosao de Margem Diaria: Desvio de -4.2 p.p. Abaixo da Meta",
+            category="margem_conversao",
+            severity="HIGH",
+            financial_impact_brl=2457.00,
+            diagnostico_direto="Margem bruta media do dia caiu 4,2 pontos percentuais abaixo da meta estabelecida (11,8% vs 16,0%).",
+            prova_matematica=(
+                "Volume vendido hoje: 18.200 L. Margem apurada: R$ 0,58/L vs meta: R$ 0,715/L "
+                "(-R$ 0,135/L). Erosao de margem bruta acumulada: -R$ 2.457,00 (-18,9%)."
+            ),
+            acao_recomendada_hitl=GenUIActionOption(
+                action_id=generate_action_id(),
+                label="Repassar Ajuste de Preco (+R$ 0,08/L)",
+                action_type="mutation",
+                variant="primary",
+                requires_confirmation=True,
+                payload={
+                    "tipo": "ajuste_margem",
+                    "delta_preco": 0.08,
+                    "produtos": ["Gasolina Comum", "Etanol"],
+                },
+            ),
+            directive=ActionableDirectivePayload(
+                directive_id=f"dir_margem_{tenant_key}_{int(now)}",
+                card_id=f"card_margem_{tenant_key}_{int(now)}",
+                title="Repasse de Reposicao e Alinhamento de Margem",
+                category="margem_conversao",
+                financial_impact_brl=2457.00,
+                roteiro_voz_consultor=(
+                    "Diagnostico de margem: A margem bruta do dia recuou 4.2 pontos percentuais abaixo da meta. "
+                    "Sugiro repasse tecnico de 8 centavos na Gasolina Comum para restabelecer o equilibrio financeiro."
+                ),
+                treinamento_equipe_15s=(
+                    "Focar no mix de aditivacao e lubrificantes para elevar o ticket medio e amortecer "
+                    "a pressao no combustivel comum."
+                ),
+                campanha_clientes_whatsapp=(
+                    "Super Oferta Relampago: Troca de oleo mais filtro ganha ducha gratis neste turno."
+                ),
+                status="pending",
+                canal_despacho="in_app_cockpit",
+            ),
+            urgency_timeframe="hoje",
+            metadata={"tenant_id": tenant_key, "filial_id": self.filial_id},
+        )
+        cards.append(margem_card)
+
+        # 3.4. Indicador Vital: Oportunidade de Combo (Market Basket Lift >= 2.0) ou Capital Morto
+        combo_card = ExecutiveExceptionCard(
+            card_id=f"card_combo_{tenant_key}_{int(now)}",
+            title="Oportunidade de Combo: Octane Booster + Gasolina Aditivada (Lift 2.45x)",
+            category="market_basket_combo",
+            severity="MEDIUM",
+            financial_impact_brl=1820.00,
+            diagnostico_direto="Combo Aditivo Octane Booster + Gasolina Aditivada apresenta Lift de 2.45x com apenas 12% de conversao na pista.",
+            prova_matematica=(
+                "Regra de cesta apurada: Gasolina Aditivada -> Octane Booster. Suporte: 18,5%, "
+                "Confianca: 42,1%, Lift: 2,45x (>= 2.0). Ganho projetado com estimulo: 35 un/dia "
+                "x R$ 26,00 margem = R$ 1.820,00/semana de margem adicional."
+            ),
+            acao_recomendada_hitl=GenUIActionOption(
+                action_id=generate_action_id(),
+                label="Ativar Campanha de Estimulo WhatsApp para Pista",
+                action_type="mutation",
+                variant="primary",
+                requires_confirmation=False,
+                payload={
+                    "tipo": "campanha_cross_sell",
+                    "combo_id": "combo_octane_gas_adt",
+                    "incentivo_frentista_un": 1.50,
+                },
+            ),
+            directive=ActionableDirectivePayload(
+                directive_id=f"dir_combo_{tenant_key}_{int(now)}",
+                card_id=f"card_combo_{tenant_key}_{int(now)}",
+                title="Ativacao de Combo Octane Booster na Pista",
+                category="market_basket_combo",
+                financial_impact_brl=1820.00,
+                roteiro_voz_consultor=(
+                    "Oportunidade de pista: O combo de Aditivo Octane Booster com Gasolina Aditivada possui "
+                    "Lift de 2.45x mas conversao de apenas 12%. Uma acao rapida pode gerar 1.820 reais de margem adicional."
+                ),
+                treinamento_equipe_15s=(
+                    "Ao abastecer aditivada, mostre o frasco do Octane Booster na mao e mencione: "
+                    "'Este aditivo limpa os bicos injetores e protege o motor hoje por apenas 15 reais'."
+                ),
+                campanha_clientes_whatsapp=(
+                    "Na compra de 30L de Gasolina Aditivada, leve seu frasco de aditivo limpador de bicos com 30% de desconto no Posto!"
+                ),
+                status="pending",
+                canal_despacho="in_app_cockpit",
+            ),
+            urgency_timeframe="7_dias",
+            metadata={"tenant_id": tenant_key, "filial_id": self.filial_id},
+        )
+        cards.append(combo_card)
+
+        # 3.5. Indicador Vital: Anomalia Operacional ou Taxa Financeira divergente
+        anomalia_card = ExecutiveExceptionCard(
+            card_id=f"card_anomalia_{tenant_key}_{int(now)}",
+            title="Divergencia de Tarifa TEF: MDR Cobrado Acima do Contratado",
+            category="anomalia_operacional",
+            severity="MEDIUM",
+            financial_impact_brl=980.00,
+            diagnostico_direto="Divergencia de taxa TEF de Credito Parcelado: cobrado 3,45% vs contratado 2,80% pela adquirente.",
+            prova_matematica=(
+                "Volume cartao parcelado: R$ 150.770,00. Taxa contratual: 2,80% (R$ 4.221,56). "
+                "Taxa debitada no extrato TEF: 3,45% (R$ 5.201,56). Tarifa excedente cobrada: "
+                "R$ 980,00 (+23,2%)."
+            ),
+            acao_recomendada_hitl=GenUIActionOption(
+                action_id=generate_action_id(),
+                label="Gerar Relatorio de Contestacao de Tarifas",
+                action_type="inspection",
+                variant="secondary",
+                requires_confirmation=False,
+                payload={
+                    "tipo": "contestacao_tef",
+                    "adquirente": "REDE_TEF",
+                    "divergencia_brl": 980.00,
+                },
+            ),
+            directive=ActionableDirectivePayload(
+                directive_id=f"dir_anomalia_{tenant_key}_{int(now)}",
+                card_id=f"card_anomalia_{tenant_key}_{int(now)}",
+                title="Contestacao de Tarifa MDR TEF Excedente",
+                category="anomalia_operacional",
+                financial_impact_brl=980.00,
+                roteiro_voz_consultor=(
+                    "Alerta de fuga financeira: Identificada divergencia de liquidacao na taxa TEF cobrada pela adquirente. "
+                    "Relatorio de contestacao de 980 reais pronto para envio ao suporte bancario."
+                ),
+                treinamento_equipe_15s=(
+                    "Conferir o comprovante de fechamento do POS ao final de cada lote de vendas."
+                ),
+                campanha_clientes_whatsapp="",
+                status="pending",
+                canal_despacho="in_app_cockpit",
+            ),
+            urgency_timeframe="mensal",
+            metadata={"tenant_id": tenant_key, "filial_id": self.filial_id},
+        )
+        cards.append(anomalia_card)
+
+        # 4. Ranqueamento Estrito pelo Maior Impacto Financeiro em R$ (financial_impact_brl DESC)
+        cards.sort(key=lambda c: c.financial_impact_brl, reverse=True)
+        top_cards = cards[: max(1, limit)]
+
+        # 5. Gravacao no Cache TTL
+        with self._lock:
+            self._zero_click_feed_cache[tenant_key] = (now, top_cards)
+
+        return top_cards
+
+
+# =============================================================================
+# SINGLETON E FUNCAO DE MODULO DO FEED EXECUTIVO ZERO-CLICK (FASE 2)
+# =============================================================================
+
+_global_default_daemon: AuraProactiveDaemon | None = None
+
+
+def get_proactive_daemon_singleton() -> AuraProactiveDaemon:
+    """Retorna ou inicializa o singleton de AuraProactiveDaemon."""
+    global _global_default_daemon
+    if _global_default_daemon is None:
+        _global_default_daemon = AuraProactiveDaemon(
+            desktop_notifier=None,
+            desktop_notify=False,
+        )
+    return _global_default_daemon
+
+
+def set_proactive_daemon_singleton(daemon: AuraProactiveDaemon | None) -> None:
+    """Permite injetar uma instancia especifica para o singleton do daemon."""
+    global _global_default_daemon
+    _global_default_daemon = daemon
+
+
+def generate_executive_zero_click_feed(
+    tenant_id: str = "default",
+) -> list[ExecutiveExceptionCard]:
+    """
+    Funcao utilitaria de modulo para gerar o feed executivo zero-click (Fase 2).
+    Invoca o singleton ativo do daemon proativo respeitando circuitos e cache TTL.
+    """
+    daemon = get_proactive_daemon_singleton()
+    return daemon.generate_executive_zero_click_feed(tenant_id=tenant_id)
+

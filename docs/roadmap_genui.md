@@ -5,7 +5,7 @@
 - **Data de Criação:** 07/10/2026  
 - **Versão do Documento:** 2.5.0 (Automação de Gatilhos Externos, n8n, Evolution API & Visão Executiva Limpa)  
 - **Status:** Fases 0 a 9 Concluídas com Sucesso; Fases 10 e 11 Especificadas no Roadmap Operacional  
-- **Documento de Referência Arquitetural:** [`docs/Arquitetura GenUI para Edge AI.md`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/Arquitetura%20GenUI%20para%20Edge%20AI.md)  
+- **Documento de Referência Arquitetural:** [`docs/Arquitetura GenUI para Edge AI.md`](./docs/Arquitetura%20GenUI%20para%20Edge%20AI.md)  
 - **Repositório:** `C:\Users\Marlon\Documents\Agent PC\ia-banco-local`  
 - **Público-alvo:** Diretoria Executiva, Engenharia de Software, Arquitetura de IA e Gestores de Negócio B2B  
 
@@ -307,7 +307,7 @@ O plano de entrega está dividido em 10 fases incrementais (Fase 0 a Fase 9), pr
 **Objetivo:** Estabelecer o contrato formal do protocolo GenUI, configurar os identificadores de rastreabilidade e isolar o ambiente sem tocar nas rotas ativas de produção.
 
 - [x] **F0-01: Especificação Formal do Protocolo de Streaming GenUI:**  
-  Documentação formal homologada em [`docs/protocolo_streaming_genui.md`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/protocolo_streaming_genui.md). Mapeados e especificados os tipos canônicos de chunks SSE: `delta` (Resumo Executivo), `ui_skeleton` (placeholder sub-100ms), `ui_delta` (streaming de props), `ui_complete` (envelope canônico validado) e `ui_action_feedback` (confirmação com Action Voucher assinado).
+  Documentação formal homologada em [`docs/protocolo_streaming_genui.md`](./docs/protocolo_streaming_genui.md). Mapeados e especificados os tipos canônicos de chunks SSE: `delta` (Resumo Executivo), `ui_skeleton` (placeholder sub-100ms), `ui_delta` (streaming de props), `ui_complete` (envelope canônico validado) e `ui_action_feedback` (confirmação com Action Voucher assinado).
 - [x] **F0-02: Criação do Registro Centralizado de Componentes no Frontend (`web/js/aura-genui.js`):**  
   Implementado `window.AuraGenUI` e `window.SecureComponentRegistry` com arquitetura Zero-Bundler (nativa para navegador e `module.exports` para Node.js). Inclui `registerComponent`, `resolveComponent` (mitigação estrita de OWASP LLM03 - Agência Excessiva), `escapeHtml` (mitigação de OWASP LLM01 - XSS) e integração no shell `web/index.html` com atributo `defer` e cache-buster.
 - [x] **F0-03: Padronização de IDs de Idempotência Criptográfica:**  

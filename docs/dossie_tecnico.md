@@ -1,4 +1,4 @@
-# 📋 DOSSIÊ TÉCNICO DE INTEGRAÇÃO — IA AGÊNTICA & SRE (SENTINEL)
+# 📋 DOSSIÊ TÉCNICO DE INTEGRAÇÃO: IA AGÊNTICA & SRE (SENTINEL)
 
 **Data de Emissão:** 04/09/2026  
 **Destinatário:** Agente Sentinel (Servidor SRE / Observabilidade)  
@@ -219,10 +219,10 @@ Para futuras integrações de consultas a clientes (cadastro, fidelidade, fatura
 
 ## 7. 📁 MAPEAMENTO DOS ARQUIVOS NO REPOSITÓRIO LOCAL
 
-- [`core/rag_engine.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/rag_engine.py): Módulo core com a classe `HybridRAGEngine` (HNSW + GIN FTS + RRF) e cache semântico.
-- [`core/tools.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/tools.py): Ferramentas operacionais do agente (`PostoTools`), incluindo `auditar_fechamento_turno()` e `prever_esgotamento_tanques()`.
-- [`core/sanitizer.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/sanitizer.py): Blindagem LGPD de 24 categorias e defesa OWASP GenAI 2026.
-- [`main.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/main.py): CLI operacional com Intent Classifier e Streaming de tokens com Gemini.
-- [`scripts/test_previsao_tanques.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/test_previsao_tanques.py): Suíte de testes do motor preditivo e sugestão de compras.
-- [`scripts/test_conciliacao_turno.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/test_conciliacao_turno.py): Suíte de testes de conciliação e auditoria de pista.
-- [`scripts/test_sanitizer.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/test_sanitizer.py): Suíte de testes de sanitização e proteção de dados.
+- [`core/rag_engine.py`](./core/rag_engine.py): Módulo core com a classe `HybridRAGEngine` (HNSW + GIN FTS + RRF) e cache semântico.
+- [`core/tools.py`](./core/tools.py): Ferramentas operacionais do agente (`PostoTools`), incluindo `auditar_fechamento_turno()` e `prever_esgotamento_tanques()`.
+- [`core/sanitizer.py`](./core/sanitizer.py): Blindagem LGPD de 24 categorias e defesa OWASP GenAI 2026.
+- [`main.py`](./main.py): CLI operacional com Intent Classifier e Streaming de tokens com Gemini.
+- [`scripts/test_previsao_tanques.py`](./scripts/test_previsao_tanques.py): Suíte de testes do motor preditivo e sugestão de compras.
+- [`scripts/test_conciliacao_turno.py`](./scripts/test_conciliacao_turno.py): Suíte de testes de conciliação e auditoria de pista.
+- [`scripts/test_sanitizer.py`](./scripts/test_sanitizer.py): Suíte de testes de sanitização e proteção de dados.

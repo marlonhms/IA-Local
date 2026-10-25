@@ -103,7 +103,7 @@ def get_cors_origins() -> list[str]:
             "http://localhost:3000",
             "http://127.0.0.1:3000",
             "http://100.77.164.17:8000",
-            "http://marlonh-supwp:8000",
+            "http://aura-edge-node01:8000",
         ]
     origins = [orig.strip() for orig in raw.split(",") if orig.strip()]
     return origins if origins else ["http://localhost:8000", "http://127.0.0.1:8000"]
@@ -151,8 +151,8 @@ DB_VECTOR_CONFIG = {
     "host": os.getenv("VECTOR_DB_HOST", "localhost"),
     "port": int(os.getenv("VECTOR_DB_PORT", "5433")),
     "dbname": os.getenv("VECTOR_DB_NAME", "posto_ai"),
-    "user": os.getenv("VECTOR_DB_USER", "postgres"),
-    "password": os.getenv("VECTOR_DB_PASSWORD", "123456"),
+    "user": os.getenv("VECTOR_DB_USER", "suporte"),
+    "password": os.getenv("VECTOR_DB_PASSWORD") or get_erp_password(),
     "connect_timeout": int(os.getenv("VECTOR_DB_CONNECT_TIMEOUT", "5")),
     "options": VECTOR_DB_DRIVER_OPTIONS,
 }

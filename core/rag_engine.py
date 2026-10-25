@@ -100,13 +100,14 @@ class HybridRAGEngine:
             pass
         return conn
 
-    def gerar_embedding(self, texto: str, task_type: str = "retrieval_query") -> List[float]:
-        """Gera embedding de 768 dimensões com o Gemini."""
+    def gerar_embedding(self, texto: str, task_type: str = "retrieval_query", timeout_sec: float = 2.5) -> List[float]:
+        """Gera embedding de 768 dimensoes com o Gemini com timeout agil para operacao de borda."""
         res = genai.embed_content(
             model=self.embedding_model,
             content=texto,
             output_dimensionality=768,
             task_type=task_type,
+            request_options={"timeout": timeout_sec},
         )
         return res["embedding"]
 

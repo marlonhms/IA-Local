@@ -8,12 +8,13 @@ Conectores:
 3. GET  /api/v1/aura/stations: Lista filiais homologadas e status de conexão ERP/pgvector
 4. GET  /api/v1/aura/health: Health check de prontidão operacional
 """
-# ruff: noqa: B008, BLE001, RUF059, TRY201
+# ruff: noqa: B008, BLE001, RUF059, TRY201, PLW0602, UP041
 
 from __future__ import annotations
 
 import asyncio
 import json
+import math
 import os
 import time
 import uuid
@@ -87,6 +88,7 @@ from core.webhooks import (
 
 # Router oficial da AURA
 router = APIRouter(prefix="/api/v1/aura", tags=["AURA Core Engine"])
+cockpit_router = APIRouter(prefix="/api/v1/cockpit", tags=["AURA Cockpit Zero-Click"])
 
 # Instância Singleton do Motor (pode ser injetada externamente)
 _engine_instance: AuraEngine | None = None
@@ -404,6 +406,76 @@ async def chat_stream_get_endpoint(
             "X-GenUI-Enabled": "1" if effective_genui else "0",
         },
     )
+
+
+@router.get(
+    "/sessions",
+    summary="Listagem de Sessoes Recentes e Conversas Arquivadas (Local Cache)",
+)
+async def list_sessions_endpoint(
+    limit: int = Query(30, ge=1, le=100, description="Limite de sessoes a retornar"),
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """Retorna a lista de sessoes registradas no SQLite duravel (aura_sessions.db)."""
+    sessions = await asyncio.to_thread(engine.session_memory.list_sessions, limit)
+    return {
+        "status": "success",
+        "total": len(sessions),
+        "sessions": sessions,
+    }
+
+
+@router.get(
+    "/sessions/{session_id}",
+    summary="Recupera o Historico Completo de Mensagens de uma Sessao",
+)
+async def get_session_history_endpoint(
+    session_id: str,
+    limit: int = Query(100, ge=1, le=500, description="Limite de mensagens a retornar"),
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """Retorna todas as mensagens da sessao para reidratacao do frontend e reabertura de widgets."""
+    messages = await asyncio.to_thread(
+        engine.session_memory.get_session_messages, session_id, limit
+    )
+    return {
+        "status": "success",
+        "session_id": session_id,
+        "total_messages": len(messages),
+        "messages": messages,
+    }
+
+
+@router.delete(
+    "/sessions",
+    summary="Limpa Todo o Historico de Sessoes e Conversas Locais",
+)
+async def clear_all_sessions_endpoint(
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """Exclui todas as sessoes e mensagens do banco duravel SQLite."""
+    await asyncio.to_thread(engine.session_memory.clear_all_sessions)
+    return {
+        "status": "success",
+        "cleared_all": True,
+    }
+
+
+@router.delete(
+    "/sessions/{session_id}",
+    summary="Remove ou Arquiva uma Sessao e suas Mensagens",
+)
+async def delete_session_endpoint(
+    session_id: str,
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """Exclui a sessao especificada do banco duravel SQLite."""
+    await asyncio.to_thread(engine.session_memory.delete_session, session_id)
+    return {
+        "status": "success",
+        "session_id": session_id,
+        "deleted": True,
+    }
 
 
 @router.post("/execute-intent", summary="Execução Direta de Ferramenta Analítica")
@@ -1559,6 +1631,39 @@ async def register_compliance_opt_in_endpoint(
 
 
 # =============================================================================
+# ENDPOINTS DE SEGURANCA AUDITAVEL & CLEAN ROOM (FASE 2)
+# =============================================================================
+
+@router.get(
+    "/security/telemetry",
+    summary="Telemetria de Seguranca Auditavel e Status de Protecao Clean Room (Fase 2)",
+    tags=["AURA Security & Compliance"],
+)
+async def get_security_telemetry_endpoint(
+    engine: AuraEngine = Depends(get_aura_engine),
+) -> dict[str, Any]:
+    """
+    Retorna em tempo real o status da sessao PostgreSQL read-only, Hardware Circuit Breaker,
+    contador de entidades PII sanitizadas e hash SHA-256 do termo clean room ativo.
+    """
+    return await asyncio.to_thread(engine.compliance_manager.get_live_security_telemetry)
+
+
+@router.get(
+    "/compliance/security/telemetry",
+    summary="Alias para Telemetria de Seguranca Auditavel",
+    tags=["AURA Security & Compliance"],
+    include_in_schema=False,
+)
+async def get_compliance_security_telemetry_alias(
+    engine: AuraEngine = Depends(get_aura_engine),
+) -> dict[str, Any]:
+    """Alias compativel com rotas sob /compliance."""
+    return await asyncio.to_thread(engine.compliance_manager.get_live_security_telemetry)
+
+
+
+# =============================================================================
 # ENDPOINTS DO MOTOR DE ALERTAS PROATIVOS (P3-2)
 # =============================================================================
 
@@ -1727,6 +1832,231 @@ async def proactive_stream_endpoint(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# =============================================================================
+# FEED EXECUTIVO ZERO-CLICK (O ANTI-DASHBOARD ESTATICO - FASE 2)
+# =============================================================================
+
+@cockpit_router.get(
+    "/zero-click-feed",
+    summary="Feed Executivo Zero-Click da AURA (Fase 2)",
+    tags=["AURA Cockpit Zero-Click"],
+)
+async def get_cockpit_zero_click_feed(
+    request: Request,
+    tenant_id: str = Query(default="default", description="Identificador do tenant/unidade"),
+    limit: int = Query(default=5, ge=1, le=20, description="Quantidade maxima de cards"),
+    force_refresh: bool = Query(default=False, description="Se True, ignora cache TTL"),
+    stream: bool = Query(default=False, description="Se True, transmite cards via Server-Sent Events (SSE)"),
+    daemon: AuraProactiveDaemon = Depends(get_proactive_daemon),
+):
+    """
+    Retorna o Feed Executivo Zero-Click com cards de excecao e oportunidade financeira
+    ranqueados em ordem decrescente pelo impacto financeiro em R$ (financial_impact_brl).
+    Suporta retorno JSON imediato e streaming SSE (text/event-stream).
+    """
+    cards = await asyncio.to_thread(
+        daemon.generate_executive_zero_click_feed,
+        tenant_id=tenant_id,
+        force_refresh=force_refresh,
+        limit=limit,
+    )
+
+    accept_header = request.headers.get("accept", "")
+    if stream or "text/event-stream" in accept_header:
+        async def event_generator():
+            try:
+                for card in cards:
+                    if await request.is_disconnected():
+                        break
+                    card_data = card.model_dump()
+                    payload = json.dumps(card_data, ensure_ascii=False)
+                    yield f"event: zero_click_card\ndata: {payload}\n\n"
+                    await asyncio.sleep(0.01)
+                if not await request.is_disconnected():
+                    yield "event: done\ndata: {}\n\n"
+            except (asyncio.CancelledError, GeneratorExit):
+                pass
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
+    return {
+        "status": "success",
+        "tenant_id": tenant_id,
+        "total_cards": len(cards),
+        "cards": [c.model_dump() for c in cards],
+    }
+
+
+@router.get(
+    "/cockpit/zero-click-feed",
+    summary="Feed Executivo Zero-Click da AURA via Router Principal (Fase 2)",
+    tags=["AURA Cockpit Zero-Click"],
+    include_in_schema=False,
+)
+async def get_cockpit_zero_click_feed_alias(
+    request: Request,
+    tenant_id: str = Query(default="default"),
+    limit: int = Query(default=5, ge=1, le=20),
+    force_refresh: bool = Query(default=False),
+    stream: bool = Query(default=False),
+    daemon: AuraProactiveDaemon = Depends(get_proactive_daemon),
+):
+    return await get_cockpit_zero_click_feed(
+        request=request,
+        tenant_id=tenant_id,
+        limit=limit,
+        force_refresh=force_refresh,
+        stream=stream,
+        daemon=daemon,
+    )
+
+
+# =============================================================================
+# LOOP FECHADO DE ACAO: ACTIONABLE DIRECTIVES & OUTBOX (FASE 4)
+# =============================================================================
+
+class DirectiveDispatchRequest(BaseModel):
+    """Payload de requisicao para disparo de Diretiva Acionavel (Loop Fechado de Acao - Fase 4)."""
+    directive_id: str | None = Field(default=None, description="ID unico da diretiva")
+    card_id: str | None = Field(default=None, description="Card ID de origem")
+    title: str = Field(..., min_length=1, description="Titulo executivo da diretiva")
+    category: str = Field(default="operacao", description="Categoria funcional")
+    financial_impact_brl: float = Field(default=0.0, description="Impacto financeiro apurado em R$")
+    roteiro_voz_consultor: str = Field(..., min_length=1, description="Texto para sintese de voz")
+    treinamento_equipe_15s: str = Field(..., min_length=1, description="Instrucao tatica de pista")
+    campanha_clientes_whatsapp: str = Field(default="", description="Campanha segmentada de recuperacao")
+    canal_despacho: str = Field(default="outbox_webhook", description="Canal de despacho primario")
+    idempotency_key: str | None = Field(default=None, description="Chave de idempotencia")
+    destination_url: str | None = Field(default=None, description="URL de webhook de destino")
+    operator_id: str = Field(default="gerente_01", description="Operador que autorizou a acao")
+
+
+_recent_directives_history: list[dict[str, Any]] = []
+
+
+@router.post(
+    "/directives/dispatch",
+    summary="Despacho Transacional de Diretiva de Acao em 1-Clique na Outbox (Fase 4)",
+    tags=["AURA Actionable Directives"],
+)
+async def dispatch_actionable_directive_endpoint(
+    req: DirectiveDispatchRequest,
+    outbox: AuraTransactionalOutbox = Depends(get_active_outbox),
+):
+    """
+    Grava a diretiva acionavel com Persist-First na Transactional Outbox (SQLite WAL)
+    antes de qualquer envio externo, garantindo idempotencia e rastreabilidade total.
+    """
+    directive_id = req.directive_id or f"dir_{uuid.uuid4().hex[:12]}"
+    idem_key = req.idempotency_key or f"idem_dir_{directive_id}"
+    dest_url = (
+        req.destination_url
+        or os.getenv("AURA_DIRECTIVE_WEBHOOK_URL")
+        or "http://127.0.0.1:8000/api/v1/aura/directives/webhook-receiver"
+    )
+
+    payload = {
+        "directive_id": directive_id,
+        "card_id": req.card_id,
+        "title": req.title,
+        "category": req.category,
+        "financial_impact_brl": req.financial_impact_brl,
+        "roteiro_voz_consultor": req.roteiro_voz_consultor,
+        "treinamento_equipe_15s": req.treinamento_equipe_15s,
+        "campanha_clientes_whatsapp": req.campanha_clientes_whatsapp,
+        "canal_despacho": req.canal_despacho,
+        "operator_id": req.operator_id,
+        "dispatched_at": datetime.now(UTC).isoformat(),
+    }
+
+    outbox_msg = outbox.enqueue(
+        event_type="actionable_directive",
+        destination_url=dest_url,
+        payload=payload,
+        idempotency_key=idem_key,
+    )
+
+    result_entry = {
+        "success": True,
+        "directive_id": directive_id,
+        "card_id": req.card_id,
+        "title": req.title,
+        "category": req.category,
+        "financial_impact_brl": req.financial_impact_brl,
+        "outbox_message_id": outbox_msg.message_id,
+        "outbox_status": str(getattr(outbox_msg.status, "value", outbox_msg.status)),
+        "canal_despacho": req.canal_despacho,
+        "operator_id": req.operator_id,
+        "timestamp": datetime.now(UTC).isoformat(),
+        "roteiro_voz_consultor": req.roteiro_voz_consultor,
+        "treinamento_equipe_15s": req.treinamento_equipe_15s,
+        "campanha_clientes_whatsapp": req.campanha_clientes_whatsapp,
+    }
+
+    _recent_directives_history.insert(0, result_entry)
+    if len(_recent_directives_history) > 50:
+        del _recent_directives_history[50:]
+
+    return result_entry
+
+
+@router.get(
+    "/directives/recent",
+    summary="Lista Diretivas Acionaveis Recentes Despachadas (Fase 4)",
+    tags=["AURA Actionable Directives"],
+)
+async def get_recent_directives_endpoint(
+    limit: int = Query(default=20, ge=1, le=100),
+):
+    """Retorna historico em memoria e outbox de diretivas despachadas."""
+    return {
+        "status": "success",
+        "total": len(_recent_directives_history[:limit]),
+        "directives": _recent_directives_history[:limit],
+    }
+
+
+@router.get(
+    "/directives/{directive_id}/audio-waveform",
+    summary="Gera Simulacao de Audio e Waveform para Roteiro de Voz da Diretiva (Fase 4)",
+    tags=["AURA Actionable Directives"],
+)
+async def get_directive_audio_waveform_endpoint(
+    directive_id: str,
+):
+    """
+    Retorna pontos deterministas de waveform visual (SVG) e duracao estimada
+    para o player de audio executivo da diretiva.
+    """
+    found = next((d for d in _recent_directives_history if d.get("directive_id") == directive_id), None)
+    script_text = found.get("roteiro_voz_consultor", "") if found else "Briefing executivo AURA pronto para execucao."
+
+    word_count = len(script_text.split())
+    estimated_duration_sec = max(10, min(120, int(word_count * 0.45)))
+
+    waveform = []
+    base_seed = sum(ord(c) for c in directive_id) % 100
+    for i in range(36):
+        height = 20 + int(70 * abs(math.sin((i + base_seed) * 0.35)))
+        waveform.append(max(15, min(95, height)))
+
+    return {
+        "directive_id": directive_id,
+        "estimated_duration_sec": estimated_duration_sec,
+        "formatted_duration": f"{estimated_duration_sec // 60}:{estimated_duration_sec % 60:02d}",
+        "waveform_bars": waveform,
+        "script_text": script_text,
+    }
 
 
 # =============================================================================
@@ -1969,7 +2299,6 @@ async def public_data_health_endpoint() -> dict[str, Any]:
     try:
         from core.integrations.public_data import (
             CircuitState,
-            get_public_data_repository,
         )
         from scripts.sync_public_data import get_default_connectors
 
@@ -2184,7 +2513,7 @@ def create_aura_app(
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
-        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|100\.\d{1,3}\.\d{1,3}\.\d{1,3}|.*\.ts\.net|marlonh-supwp)(:\d+)?$",
+        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|100\.\d{1,3}\.\d{1,3}\.\d{1,3}|.*\.ts\.net|aura-edge-node01)(:\d+)?$",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -2192,6 +2521,7 @@ def create_aura_app(
 
     # Registra rotas da API
     app.include_router(router)
+    app.include_router(cockpit_router)
 
     @app.get(
         "/metrics",
@@ -2218,15 +2548,23 @@ def create_aura_app(
         if vendor_dir.exists():
             app.mount("/static/vendor", StaticFiles(directory=str(vendor_dir)), name="static_vendor")
             app.mount("/vendor", StaticFiles(directory=str(vendor_dir)), name="vendor")
+        fonts_dir = web_dir / "static" / "fonts"
+        if fonts_dir.exists():
+            app.mount("/static/fonts", StaticFiles(directory=str(fonts_dir)), name="static_fonts")
+            app.mount("/fonts", StaticFiles(directory=str(fonts_dir)), name="fonts")
         app.mount("/static", StaticFiles(directory=str(web_dir)), name="static")
 
         @app.get("/favicon.ico", include_in_schema=False)
         async def serve_favicon():
             svg_icon = (
                 '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
-                '<circle cx="16" cy="16" r="14" fill="#07090e" stroke="#06b6d4" stroke-width="2"/>'
-                '<circle cx="16" cy="16" r="6" fill="#10b981"/>'
-                '<path d="M16 4 L16 10 M16 22 L16 28 M4 16 L10 16 M22 16 L28 16" stroke="#7c3aed" stroke-width="2"/>'
+                '<rect width="32" height="32" rx="7" fill="#07090e"/>'
+                '<polygon points="16,4 26,10 26,22 16,28 6,22 6,10" fill="none" stroke="#06b6d4" stroke-width="1.8" stroke-linejoin="round"/>'
+                '<polygon points="16,4 26,10 16,16 6,10" fill="rgba(6,182,212,0.3)"/>'
+                '<polygon points="16,16 26,10 26,22 16,28" fill="rgba(16,185,129,0.25)"/>'
+                '<polygon points="16,16 16,28 6,22 6,10" fill="rgba(124,58,237,0.2)"/>'
+                '<circle cx="16" cy="16" r="3.5" fill="#10b981"/>'
+                '<circle cx="16" cy="16" r="1.5" fill="#ffffff"/>'
                 '</svg>'
             )
             return Response(content=svg_icon, media_type="image/svg+xml")

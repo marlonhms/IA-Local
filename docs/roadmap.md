@@ -1,4 +1,4 @@
-# Roadmap — AURA Precision Glass
+# Roadmap - AURA Precision Glass
 
 > Evolução UI/UX para um cockpit de decisão conversacional premium, mobile-first e orientado à confiança.
 
@@ -49,14 +49,14 @@ As estimativas são faixas preliminares de esforço em dias úteis para uma pess
 
 | Fase | Prioridade | Resultado | Dependências | Esforço proposto |
 |---|---|---|---|---|
-| 0 — Inventário e baseline | P0 | Arquitetura real e problemas confirmados | Nenhuma | 1–2 dias |
-| 1 — Semântica e contrato | P0 | Dados e estados confiáveis | 0 | 2–4 dias |
-| 2 — Design system | P1 | Tokens e componentes-base | 0; estados da 1 | 2–4 dias |
-| 3 — Conciliação piloto | P0 | Primeiro fluxo completo | 1 e 2 | 3–5 dias |
-| 4 — Shell e mobile | P1 | Navegação e conversa consistentes | 2 e 3 | 3–5 dias |
-| 5 — Respostas especializadas | P2 | Expansão controlada dos módulos | Aprovação do piloto | 4–8 dias |
-| 6 — Qualidade e validação | P0 | Evidências para lançamento | Incremental desde 1 | 3–5 dias finais |
-| 7 — Rollout e acompanhamento | P1 | Publicação reversível | 6 | 1–2 dias + acompanhamento |
+| 0 - Inventário e baseline | P0 | Arquitetura real e problemas confirmados | Nenhuma | 1-2 dias |
+| 1 - Semântica e contrato | P0 | Dados e estados confiáveis | 0 | 2-4 dias |
+| 2 - Design system | P1 | Tokens e componentes-base | 0; estados da 1 | 2-4 dias |
+| 3 - Conciliação piloto | P0 | Primeiro fluxo completo | 1 e 2 | 3-5 dias |
+| 4 - Shell e mobile | P1 | Navegação e conversa consistentes | 2 e 3 | 3-5 dias |
+| 5 - Respostas especializadas | P2 | Expansão controlada dos módulos | Aprovação do piloto | 4-8 dias |
+| 6 - Qualidade e validação | P0 | Evidências para lançamento | Incremental desde 1 | 3-5 dias finais |
+| 7 - Rollout e acompanhamento | P1 | Publicação reversível | 6 | 1-2 dias + acompanhamento |
 
 Acessibilidade, segurança e testes são transversais. A fase 6 consolida a validação; não é o início desses trabalhos.
 
@@ -73,7 +73,7 @@ Acessibilidade, segurança e testes são transversais. A fase 6 consolida a vali
 
 Entregar primeiro as fases 0, 1, 2 e 3 com validação de qualidade aplicada ao piloto. Não aguardar todos os módulos para testar a nova experiência. A navegação antiga pode permanecer temporariamente se não impedir o uso correto do fluxo.
 
-## 3. Fase 0 — Inventário e baseline
+## 3. Fase 0 - Inventário e baseline
 
 ### Objetivo
 
@@ -81,16 +81,16 @@ Conhecer o código real, reproduzir os fluxos existentes e estabelecer evidênci
 
 ### Tarefas
 
-- [ ] F0-01 — Localizar frontend, estilos, templates, endpoints, streaming e renderização de respostas.
-- [ ] F0-02 — Identificar stack, dependências, comandos de execução e testes realmente disponíveis.
-- [ ] F0-03 — Mapear navegação, composer, histórico, consultas rápidas e visão integrada.
-- [ ] F0-04 — Identificar a origem dos badges, percentuais e estados mostrados na conciliação.
-- [ ] F0-05 — Verificar o significado de Caixa 007, Caixa 56 e Caixa 57; documentar cada identificador.
-- [ ] F0-06 — Capturar baseline nos estados parcial, conciliado, divergente e indisponível.
-- [ ] F0-07 — Medir carregamento, resposta percebida, rolagem e peso do frontend nos dispositivos-alvo.
-- [ ] F0-08 — Separar problemas confirmados de hipóteses visuais e registrar prioridades.
-- [ ] F0-09 — Definir responsáveis por produto, frontend, backend e validação operacional.
-- [ ] F0-10 — Definir branch ou mecanismo equivalente para implementação isolada e reversível.
+- [ ] F0-01 - Localizar frontend, estilos, templates, endpoints, streaming e renderização de respostas.
+- [ ] F0-02 - Identificar stack, dependências, comandos de execução e testes realmente disponíveis.
+- [ ] F0-03 - Mapear navegação, composer, histórico, consultas rápidas e visão integrada.
+- [ ] F0-04 - Identificar a origem dos badges, percentuais e estados mostrados na conciliação.
+- [ ] F0-05 - Verificar o significado de Caixa 007, Caixa 56 e Caixa 57; documentar cada identificador.
+- [ ] F0-06 - Capturar baseline nos estados parcial, conciliado, divergente e indisponível.
+- [ ] F0-07 - Medir carregamento, resposta percebida, rolagem e peso do frontend nos dispositivos-alvo.
+- [ ] F0-08 - Separar problemas confirmados de hipóteses visuais e registrar prioridades.
+- [ ] F0-09 - Definir responsáveis por produto, frontend, backend e validação operacional.
+- [ ] F0-10 - Definir branch ou mecanismo equivalente para implementação isolada e reversível.
 
 ### Entregáveis
 
@@ -106,7 +106,7 @@ Conhecer o código real, reproduzir os fluxos existentes e estabelecer evidênci
 - [ ] Estão documentados os dispositivos, navegadores e comandos usados na validação.
 - [ ] Nenhuma migração tecnológica foi iniciada por suposição.
 
-## 4. Fase 1 — Semântica e contrato
+## 4. Fase 1 - Semântica e contrato
 
 ### Objetivo
 
@@ -114,18 +114,18 @@ Eliminar ambiguidades e criar uma fronteira clara entre cálculo, explicação e
 
 ### Tarefas
 
-- [ ] F1-01 — Criar um dicionário de estados e rótulos aprovados pelo negócio.
-- [ ] F1-02 — Separar finalização da análise, severidade e disponibilidade das fontes.
-- [ ] F1-03 — Representar ausência de encerrantes sem converter ausência em zero.
-- [ ] F1-04 — Definir rótulos humanos para identificadores de caixa, operador, unidade e turno.
-- [ ] F1-05 — Definir significado, origem e critérios dos percentuais atuais.
-- [ ] F1-06 — Remover percentuais sem significado operacional da camada executiva.
-- [ ] F1-07 — Criar contrato estruturado versionado para respostas operacionais.
-- [ ] F1-08 — Validar o contrato no backend e tratar versões desconhecidas no frontend.
-- [ ] F1-09 — Manter texto gerado pela IA separado de valores financeiros e estados oficiais.
-- [ ] F1-10 — Criar fixtures sintéticas e testes para os estados do piloto.
-- [ ] F1-11 — Garantir contexto da consulta por unidade, turno e período.
-- [ ] F1-12 — Sanitizar mensagens e renderizar conteúdo sem execução de HTML arbitrário.
+- [ ] F1-01 - Criar um dicionário de estados e rótulos aprovados pelo negócio.
+- [ ] F1-02 - Separar finalização da análise, severidade e disponibilidade das fontes.
+- [ ] F1-03 - Representar ausência de encerrantes sem converter ausência em zero.
+- [ ] F1-04 - Definir rótulos humanos para identificadores de caixa, operador, unidade e turno.
+- [ ] F1-05 - Definir significado, origem e critérios dos percentuais atuais.
+- [ ] F1-06 - Remover percentuais sem significado operacional da camada executiva.
+- [ ] F1-07 - Criar contrato estruturado versionado para respostas operacionais.
+- [ ] F1-08 - Validar o contrato no backend e tratar versões desconhecidas no frontend.
+- [ ] F1-09 - Manter texto gerado pela IA separado de valores financeiros e estados oficiais.
+- [ ] F1-10 - Criar fixtures sintéticas e testes para os estados do piloto.
+- [ ] F1-11 - Garantir contexto da consulta por unidade, turno e período.
+- [ ] F1-12 - Sanitizar mensagens e renderizar conteúdo sem execução de HTML arbitrário.
 
 ### Regras de apresentação
 
@@ -210,7 +210,7 @@ Regras do contrato:
 - [ ] Valores, unidade e período permanecem consistentes entre resumo e evidências.
 - [ ] O ERP continua com acesso somente leitura.
 
-## 5. Fase 2 — Design system
+## 5. Fase 2 - Design system
 
 ### Objetivo
 
@@ -218,15 +218,15 @@ Criar a base visual AURA Precision Glass sem depender de estilos isolados por re
 
 ### Tarefas
 
-- [ ] F2-01 — Centralizar tokens de cor, tipografia, espaçamento, elevação e movimento.
-- [ ] F2-02 — Definir uma única família de ícones compatível com a stack existente.
-- [ ] F2-03 — Criar estados de foco, hover, pressionado, desabilitado e carregamento.
-- [ ] F2-04 — Criar componentes-base de status, valor, comparação, divisória e ação.
-- [ ] F2-05 — Usar números tabulares e formatação pt-BR em métricas.
-- [ ] F2-06 — Reservar monoespaçada para código, fórmulas e identificadores.
-- [ ] F2-07 — Definir versões sem blur e com movimento reduzido.
-- [ ] F2-08 — Validar contraste nos fundos compostos reais, não somente nos tokens isolados.
-- [ ] F2-09 — Criar uma página de demonstração local com todos os estados dos componentes.
+- [ ] F2-01 - Centralizar tokens de cor, tipografia, espaçamento, elevação e movimento.
+- [ ] F2-02 - Definir uma única família de ícones compatível com a stack existente.
+- [ ] F2-03 - Criar estados de foco, hover, pressionado, desabilitado e carregamento.
+- [ ] F2-04 - Criar componentes-base de status, valor, comparação, divisória e ação.
+- [ ] F2-05 - Usar números tabulares e formatação pt-BR em métricas.
+- [ ] F2-06 - Reservar monoespaçada para código, fórmulas e identificadores.
+- [ ] F2-07 - Definir versões sem blur e com movimento reduzido.
+- [ ] F2-08 - Validar contraste nos fundos compostos reais, não somente nos tokens isolados.
+- [ ] F2-09 - Criar uma página de demonstração local com todos os estados dos componentes.
 
 ### Tokens iniciais propostos
 
@@ -262,7 +262,7 @@ Esses valores são pontos de partida, não certificação de acessibilidade nem 
 
 - Uma superfície principal por resposta, evitando card dentro de card dentro de card.
 - Vidro discreto no shell e em overlays; conteúdo financeiro em superfície estável.
-- Gradiente ciano–violeta reservado à identidade e a poucos detalhes.
+- Gradiente ciano-violeta reservado à identidade e a poucos detalhes.
 - Verde para validação real; âmbar para pendências; coral para divergência confirmada.
 - Estado deve ter texto ou ícone além da cor.
 - Uma ação primária por bloco de decisão.
@@ -273,11 +273,11 @@ Esses valores são pontos de partida, não certificação de acessibilidade nem 
 
 - [ ] Componentes usam tokens compartilhados.
 - [ ] Texto comum atende contraste mínimo de 4,5:1; texto grande, 3:1.
-- [ ] Controles principais têm meta de 44–48 px de área interativa.
+- [ ] Controles principais têm meta de 44-48 px de área interativa.
 - [ ] Foco visível não fica cortado por overflow ou overlays.
 - [ ] A informação continua compreensível sem cores, blur ou animação.
 
-## 6. Fase 3 — Conciliação piloto
+## 6. Fase 3 - Conciliação piloto
 
 ### Objetivo
 
@@ -295,18 +295,18 @@ Entregar a primeira resposta completa e validar a direção antes de expandir o 
 
 ### Tarefas
 
-- [ ] F3-01 — Implementar DecisionCard usando o contrato validado.
-- [ ] F3-02 — Destacar diferença provisória antes dos detalhes técnicos.
-- [ ] F3-03 — Mostrar comparativos compactos sem repetir todos os números em texto.
-- [ ] F3-04 — Implementar PendingItems com pendências verificáveis.
-- [ ] F3-05 — Implementar EvidencePanel lateral no desktop e amplo no mobile.
-- [ ] F3-06 — Incluir fórmula/definição da diferença e recorte dos dados nas evidências.
-- [ ] F3-07 — Exibir modelo e tempo de resposta apenas em detalhes técnicos.
-- [ ] F3-08 — Implementar ações “Ver pendências” e “Como foi calculado”.
-- [ ] F3-09 — Não oferecer “Fechar caixa” ou “Lançar encerrantes” como escrita na AURA.
-- [ ] F3-10 — Testar rótulos longos, valores grandes, negativos e fontes parciais.
-- [ ] F3-11 — Capturar comparação antes/depois com a mesma fixture.
-- [ ] F3-12 — Fazer uma primeira rodada de avaliação com usuários antes da expansão.
+- [ ] F3-01 - Implementar DecisionCard usando o contrato validado.
+- [ ] F3-02 - Destacar diferença provisória antes dos detalhes técnicos.
+- [ ] F3-03 - Mostrar comparativos compactos sem repetir todos os números em texto.
+- [ ] F3-04 - Implementar PendingItems com pendências verificáveis.
+- [ ] F3-05 - Implementar EvidencePanel lateral no desktop e amplo no mobile.
+- [ ] F3-06 - Incluir fórmula/definição da diferença e recorte dos dados nas evidências.
+- [ ] F3-07 - Exibir modelo e tempo de resposta apenas em detalhes técnicos.
+- [ ] F3-08 - Implementar ações “Ver pendências” e “Como foi calculado”.
+- [ ] F3-09 - Não oferecer “Fechar caixa” ou “Lançar encerrantes” como escrita na AURA.
+- [ ] F3-10 - Testar rótulos longos, valores grandes, negativos e fontes parciais.
+- [ ] F3-11 - Capturar comparação antes/depois com a mesma fixture.
+- [ ] F3-12 - Fazer uma primeira rodada de avaliação com usuários antes da expansão.
 
 ### Estados obrigatórios
 
@@ -330,7 +330,7 @@ Entregar a primeira resposta completa e validar a direção antes de expandir o 
 - [ ] Drawer/painel devolve o foco ao acionador quando fechado.
 - [ ] Todos os estados possuem fixtures e evidências de validação.
 
-## 7. Fase 4 — Shell, navegação e mobile
+## 7. Fase 4 - Shell, navegação e mobile
 
 ### Objetivo
 
@@ -355,22 +355,22 @@ Esses nomes descrevem responsabilidades; não pressupõem React, Vue ou uma estr
 
 ### Tarefas
 
-- [ ] F4-01 — Simplificar header: identidade, contexto de unidade/turno e controles essenciais.
-- [ ] F4-02 — Remover horário com segundos se não servir a uma tarefa real.
-- [ ] F4-03 — Organizar navegação em Assistente, Panorama e Consultas rápidas.
-- [ ] F4-04 — Manter Nova conversa visível e mover efeitos sonoros para Preferências.
-- [ ] F4-05 — Adicionar conversas recentes somente se a persistência já existir ou for aprovada.
-- [ ] F4-06 — Reduzir o destaque simultâneo de borda, faixa, fundo e glow do item ativo.
-- [ ] F4-07 — Mostrar até três sugestões contextuais e um acesso a mais consultas.
-- [ ] F4-08 — Implementar drawer mobile com gerenciamento de foco e fechamento por Escape.
-- [ ] F4-09 — Garantir composer utilizável com teclado virtual e safe area.
-- [ ] F4-10 — Definir Enter para enviar e Shift+Enter para nova linha, se compatível com o input.
-- [ ] F4-11 — Evitar envio duplicado e definir cancelamento apenas se houver suporte real.
-- [ ] F4-12 — Não forçar autoscroll se o usuário estiver lendo mensagens anteriores.
-- [ ] F4-13 — Adicionar botão para voltar à mensagem recente quando necessário.
-- [ ] F4-14 — Exibir estados de streaming a partir de eventos reais do backend.
-- [ ] F4-15 — Não apresentar conexão ativa como garantia de dados atualizados.
-- [ ] F4-16 — Adaptar visão integrada sem torná-la obrigatória para abrir evidências.
+- [ ] F4-01 - Simplificar header: identidade, contexto de unidade/turno e controles essenciais.
+- [ ] F4-02 - Remover horário com segundos se não servir a uma tarefa real.
+- [ ] F4-03 - Organizar navegação em Assistente, Panorama e Consultas rápidas.
+- [ ] F4-04 - Manter Nova conversa visível e mover efeitos sonoros para Preferências.
+- [ ] F4-05 - Adicionar conversas recentes somente se a persistência já existir ou for aprovada.
+- [ ] F4-06 - Reduzir o destaque simultâneo de borda, faixa, fundo e glow do item ativo.
+- [ ] F4-07 - Mostrar até três sugestões contextuais e um acesso a mais consultas.
+- [ ] F4-08 - Implementar drawer mobile com gerenciamento de foco e fechamento por Escape.
+- [ ] F4-09 - Garantir composer utilizável com teclado virtual e safe area.
+- [ ] F4-10 - Definir Enter para enviar e Shift+Enter para nova linha, se compatível com o input.
+- [ ] F4-11 - Evitar envio duplicado e definir cancelamento apenas se houver suporte real.
+- [ ] F4-12 - Não forçar autoscroll se o usuário estiver lendo mensagens anteriores.
+- [ ] F4-13 - Adicionar botão para voltar à mensagem recente quando necessário.
+- [ ] F4-14 - Exibir estados de streaming a partir de eventos reais do backend.
+- [ ] F4-15 - Não apresentar conexão ativa como garantia de dados atualizados.
+- [ ] F4-16 - Adaptar visão integrada sem torná-la obrigatória para abrir evidências.
 
 ### Referências responsivas de teste
 
@@ -389,7 +389,7 @@ Os breakpoints de implementação devem seguir o comportamento do conteúdo, nã
 - [ ] Rolagem durante streaming respeita a posição de leitura.
 - [ ] Identificadores de unidade e turno permanecem claros durante troca de contexto.
 
-## 8. Fase 5 — Respostas especializadas
+## 8. Fase 5 - Respostas especializadas
 
 ### Objetivo
 
@@ -399,23 +399,23 @@ Criar originalidade funcional reaproveitando a linguagem do piloto.
 
 1. Autonomia de tanques.
 2. Vazão e desempenho dos bicos.
-3. Conciliação físico–contábil do LMC.
+3. Conciliação físico-contábil do LMC.
 4. Associações e combos de conveniência.
 
 Repriorizar conforme frequência de uso real e disponibilidade de contratos confiáveis.
 
 ### Tarefas
 
-- [ ] F5-01 — Criar registro de renderizadores por intenção, sem HTML arbitrário gerado pela IA.
-- [ ] F5-02 — Reutilizar diagnóstico, limitação, proveniência e ações em todos os módulos.
-- [ ] F5-03 — Tanques: apresentar horizonte estimado, saldo e premissas disponíveis.
-- [ ] F5-04 — Diferenciar autonomia até reserva crítica e autonomia até esgotamento, se ambas existirem.
-- [ ] F5-05 — Bicos: mostrar valor medido, unidade, período e regra usada na avaliação.
-- [ ] F5-06 — LMC: apresentar valores físicos/contábeis, recorte e regra vigente já validada.
-- [ ] F5-07 — Não tratar textos legais do README como validação de vigência regulatória.
-- [ ] F5-08 — Conveniência: apresentar associação, suporte/amostra e limitações; não prometer ganho garantido.
-- [ ] F5-09 — Garantir alternativa textual para gráficos e representação sem dados.
-- [ ] F5-10 — Criar fixtures e testes por módulo antes de ativá-lo.
+- [ ] F5-01 - Criar registro de renderizadores por intenção, sem HTML arbitrário gerado pela IA.
+- [ ] F5-02 - Reutilizar diagnóstico, limitação, proveniência e ações em todos os módulos.
+- [ ] F5-03 - Tanques: apresentar horizonte estimado, saldo e premissas disponíveis.
+- [ ] F5-04 - Diferenciar autonomia até reserva crítica e autonomia até esgotamento, se ambas existirem.
+- [ ] F5-05 - Bicos: mostrar valor medido, unidade, período e regra usada na avaliação.
+- [ ] F5-06 - LMC: apresentar valores físicos/contábeis, recorte e regra vigente já validada.
+- [ ] F5-07 - Não tratar textos legais do README como validação de vigência regulatória.
+- [ ] F5-08 - Conveniência: apresentar associação, suporte/amostra e limitações; não prometer ganho garantido.
+- [ ] F5-09 - Garantir alternativa textual para gráficos e representação sem dados.
+- [ ] F5-10 - Criar fixtures e testes por módulo antes de ativá-lo.
 
 ### Critérios de aceite
 
@@ -424,7 +424,7 @@ Repriorizar conforme frequência de uso real e disponibilidade de contratos conf
 - [ ] Nenhuma regra de negócio ou tolerância foi alterada pela refatoração visual.
 - [ ] Gráficos não são a única forma de acessar informação relevante.
 
-## 9. Fase 6 — Qualidade e validação
+## 9. Fase 6 - Qualidade e validação
 
 ### Objetivo
 
@@ -432,17 +432,17 @@ Aprovar funcionalidade, usabilidade, acessibilidade, privacidade e desempenho co
 
 ### Tarefas
 
-- [x] F6-01 — Executar os testes de domínio existentes identificados na fase 0.
-- [x] F6-02 — Testar contratos, estados, null/zero, formatação e contexto.
-- [x] F6-03 — Testar teclado, foco, leitores de tela e anúncios durante carregamento.
-- [x] F6-04 — Evitar anunciar cada token do streaming ao leitor de tela; definir anúncio estável.
-- [x] F6-05 — Testar contraste, zoom, reflow, movimento reduzido e fallback sem blur.
-- [x] F6-06 — Testar desconexão, timeout, payload inválido e fonte indisponível.
-- [x] F6-07 — Testar mensagens maliciosas e sanitização do conteúdo renderizado.
-- [x] F6-08 — Confirmar ausência de texto livre, PII e dados financeiros em telemetria de UX.
-- [x] F6-09 — Comparar desempenho com baseline usando condições equivalentes.
-- [x] F6-10 — Avaliar com 3–5 usuários operacionais disponíveis; registrar limites da amostra.
-- [x] F6-11 — Corrigir bloqueadores antes do lançamento, independentemente do acabamento visual.
+- [x] F6-01 - Executar os testes de domínio existentes identificados na fase 0.
+- [x] F6-02 - Testar contratos, estados, null/zero, formatação e contexto.
+- [x] F6-03 - Testar teclado, foco, leitores de tela e anúncios durante carregamento.
+- [x] F6-04 - Evitar anunciar cada token do streaming ao leitor de tela; definir anúncio estável.
+- [x] F6-05 - Testar contraste, zoom, reflow, movimento reduzido e fallback sem blur.
+- [x] F6-06 - Testar desconexão, timeout, payload inválido e fonte indisponível.
+- [x] F6-07 - Testar mensagens maliciosas e sanitização do conteúdo renderizado.
+- [x] F6-08 - Confirmar ausência de texto livre, PII e dados financeiros em telemetria de UX.
+- [x] F6-09 - Comparar desempenho com baseline usando condições equivalentes.
+- [x] F6-10 - Avaliar com 3-5 usuários operacionais disponíveis; registrar limites da amostra.
+- [x] F6-11 - Corrigir bloqueadores antes do lançamento, independentemente do acabamento visual.
 
 ### Roteiro de avaliação
 
@@ -478,7 +478,7 @@ Separar latência de backend, chegada do primeiro evento, renderização e concl
 - [x] Nenhum dado sensível foi adicionado à telemetria.
 - [x] Rollback da interface foi ensaiado.
 
-## 10. Fase 7 — Rollout e acompanhamento
+## 10. Fase 7 - Rollout e acompanhamento
 
 ### Objetivo
 
@@ -486,15 +486,15 @@ Publicar de forma controlada, reversível e sem impacto nos processos do posto.
 
 ### Tarefas
 
-- [ ] F7-01 — Ativar o novo renderizador para conciliação em ambiente de teste.
-- [ ] F7-02 — Usar toggle de configuração ou mecanismo equivalente para voltar à interface anterior.
-- [ ] F7-03 — Se payloads mudarem, manter compatibilidade documentada durante a transição.
-- [ ] F7-04 — Publicar para um grupo piloto antes de expandir.
-- [ ] F7-05 — Registrar feedback de interpretação, navegação e mobile.
-- [ ] F7-06 — Monitorar falhas de renderização, erro de contrato e fallback sem capturar conteúdo sensível.
-- [ ] F7-07 — Expandir módulo por módulo após aprovação.
-- [ ] F7-08 — Remover componentes antigos apenas após estabilização e revisão das dependências.
-- [ ] F7-09 — Atualizar README, guia operacional e registro de decisões.
+- [ ] F7-01 - Ativar o novo renderizador para conciliação em ambiente de teste.
+- [ ] F7-02 - Usar toggle de configuração ou mecanismo equivalente para voltar à interface anterior.
+- [ ] F7-03 - Se payloads mudarem, manter compatibilidade documentada durante a transição.
+- [ ] F7-04 - Publicar para um grupo piloto antes de expandir.
+- [ ] F7-05 - Registrar feedback de interpretação, navegação e mobile.
+- [ ] F7-06 - Monitorar falhas de renderização, erro de contrato e fallback sem capturar conteúdo sensível.
+- [ ] F7-07 - Expandir módulo por módulo após aprovação.
+- [ ] F7-08 - Remover componentes antigos apenas após estabilização e revisão das dependências.
+- [ ] F7-09 - Atualizar README, guia operacional e registro de decisões.
 
 ### Gatilhos de rollback
 
@@ -589,12 +589,12 @@ Uma tarefa só pode ser marcada como concluída quando houver evidência corresp
 
 | ID | Fase | Status | Responsável | Evidência | Bloqueio |
 |---|---|---|---|---|---|
-| M0 | Inventário | Concluído | Antigravity | Baseline catalogado | — |
-| M1 | Contrato | Concluído | Antigravity | test_contrato_conciliacao.py (100% OK) | — |
-| M2 | Conciliação piloto | Concluído | Antigravity | Precision Glass v1.0 aprovado | — |
-| M3 | Shell e mobile | Concluído | Antigravity | test_phase4_shell_navigation.py (100% OK) | — |
-| M4 | Módulos especializados | Concluído | Antigravity | test_phase5_specialized_responses.py (100% OK) | — |
-| M5 | Lançamento & Qualidade | Concluído | Antigravity | test_phase6_quality_resilience.py (100% OK) | — |
+| M0 | Inventário | Concluído | Antigravity | Baseline catalogado | - |
+| M1 | Contrato | Concluído | Antigravity | test_contrato_conciliacao.py (100% OK) | - |
+| M2 | Conciliação piloto | Concluído | Antigravity | Precision Glass v1.0 aprovado | - |
+| M3 | Shell e mobile | Concluído | Antigravity | test_phase4_shell_navigation.py (100% OK) | - |
+| M4 | Módulos especializados | Concluído | Antigravity | test_phase5_specialized_responses.py (100% OK) | - |
+| M5 | Lançamento & Qualidade | Concluído | Antigravity | test_phase6_quality_resilience.py (100% OK) | - |
 
 ### Decisões pendentes
 
@@ -613,13 +613,13 @@ Uma tarefa só pode ser marcada como concluída quando houver evidência corresp
 | Data | Versão | Alteração |
 |---|---|---|
 | 05/10/2026 | 1.0 | Roadmap inicial baseado no README e na revisão UI/UX da conversa |
-| 06/10/2026 | 1.1 | Conclusão da Fase 6 — Qualidade, Resiliência a Falhas & Auditoria de Lançamento (17 cenários da Seção 11 validados com 100% de sucesso) |
+| 06/10/2026 | 1.1 | Conclusão da Fase 6 - Qualidade, Resiliência a Falhas & Auditoria de Lançamento (17 cenários da Seção 11 validados com 100% de sucesso) |
 | 13/10/2026 | 1.2 | Vinculação com o Roadmap de Produção Enterprise cobrindo prontidão operacional de campo (Fases P0, P1 e P2) |
 
 ---
 
 ### Relação com os Demais Roadmaps Técnicos
 
-- **Roadmap de Produção Enterprise (Missão Crítica & Infraestrutura):** Para diretrizes de segurança, pool de conexões, resiliência offline, serviço Windows nativo (NSSM) e observabilidade SRE, consulte [`docs/roadmap_producao_enterprise.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap_producao_enterprise.md).
-- **Roadmap Estratégico & Engenharia de Execução:** Para arquitetura do motor cognitivo, RAG híbrido e ferramentas de inteligência analítica, consulte [`docs/roadmap_aila.md`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/roadmap_aila.md).
+- **Roadmap de Produção Enterprise (Missão Crítica & Infraestrutura):** Para diretrizes de segurança, pool de conexões, resiliência offline, serviço Windows nativo (NSSM) e observabilidade SRE, consulte [`docs/roadmap_producao_enterprise.md`](./docs/roadmap_producao_enterprise.md).
+- **Roadmap Estratégico & Engenharia de Execução:** Para arquitetura do motor cognitivo, RAG híbrido e ferramentas de inteligência analítica, consulte [`docs/roadmap_aila.md`](./docs/roadmap_aila.md).
 

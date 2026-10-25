@@ -6,7 +6,7 @@ de ponta a ponta nas portas 5433 (ERP) e 5434 (Docker pgvector).
 Suporta passagem direta de host via CLI:
     python scripts/test_ponte_tailscale.py
     python scripts/test_ponte_tailscale.py 100.77.164.17
-    python scripts/test_ponte_tailscale.py marlonh-supwp
+    python scripts/test_ponte_tailscale.py aura-edge-node01
     python scripts/test_ponte_tailscale.py --host 100.77.164.17 --erp-port 5433 --vec-port 5434
 """
 
@@ -207,7 +207,7 @@ def main():
         "target_host",
         nargs="?",
         default=None,
-        help="Host alvo opcional (ex: 100.77.164.17 ou marlonh-supwp). Se omitido, usa o definido no .env.",
+        help="Host alvo opcional (ex: 100.77.164.17 ou aura-edge-node01). Se omitido, usa o definido no .env.",
     )
     parser.add_argument("--host", default=None, help="Host alvo (sinônimo do argumento posicional)")
     parser.add_argument("--erp-port", type=int, default=None, help="Porta do ERP (padrão: 5433)")

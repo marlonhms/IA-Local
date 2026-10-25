@@ -1,0 +1,62 @@
+# Domain Pack: Distribuidoras e Comercio Atacadista
+# Define vocabulario, regras de giro de estoque, inadimplencia e curva ABC.
+# Zero travessoes em todo o arquivo.
+
+pack_id: "wholesale_distribution"
+pack_name: "Distribuidoras e Comercio Atacadista"
+vertical: "wholesale_distribution"
+version: "1.0.0"
+description: "Domain Pack para centros de distribuicao, atacados e atacarejos B2B."
+
+vocabulary:
+  inventory_node: "deposito_galpao"
+  inventory_node_plural: "depositos_galpoes"
+  equipment: "terminal_separacao"
+  equipment_plural: "terminais_separacao"
+  component: "doca_carregamento"
+  component_plural: "docas_carregamento"
+  operator: "vendedor_b2b"
+  operator_plural: "vendedores_b2b"
+  cashier_session: "conciliacao_faturamento_diario"
+  stock_alert: "giro_estoque_baixo"
+  stock_unit: "CX"
+  flow_unit: "paletes/hora"
+
+tolerances:
+  default_lot_multiple: 100.0  # Lote minimo de faturamento em fardos ou caixas masters (100 unidades)
+  default_credit_term_days: 28  # Prazo medio contratual de faturamento a prazo (D+28 dias)
+  overdue_tolerance_pct: 2.0  # Limite maximo aceitavel de inadimplencia da carteira (%)
+  min_order_value_reais: 500.0  # Valor monetario minimo por pedido faturado (R$)
+  target_inventory_turnover_days: 45  # Giro meta maximo de estoque em dias
+  target_ebitda_margin_pct: 14.0  # Margem operacional meta para distribuicao atacadista (%)
+
+intent_mappings:
+  auditoria_turno_caixa: "conciliacao_faturamento_diario"
+  previsao_runout_estoque: "giro_estoque_reposicao_cd"
+  desempenho_equipe_conversao: "metas_carteira_vendedores"
+  market_basket_cross_sell: "mix_ideal_curva_abc"
+  erosao_financeira_tef_selic: "arbitragem_capital_giro_selic"
+  raio_x_causal_margem: "analise_margem_canais_b2b"
+
+specific_intents:
+  - id: "inadimplencia_carteira_clientes"
+    descricao: "Gestao de risco de credito, titulos vencidos e inadimplencia por cliente"
+    keywords:
+      - "inadimplencia clientes"
+      - "titulos vencidos faturado"
+      - "duplicatas em atraso"
+      - "limite de credito bloqueado"
+  - id: "curva_abc_produtos_clientes"
+    descricao: "Classificacao Pareto Curva ABC de produtos por margem e faturamento"
+    keywords:
+      - "curva abc produtos"
+      - "itens classe a faturamento"
+      - "concentracao de receita clientes"
+      - "curva abc estoque"
+  - id: "otimizacao_carga_frete"
+    descricao: "Otimizacao de cubagem e roteirizacao de carga por frota de entrega"
+    keywords:
+      - "ocupacao de caminhao frete"
+      - "carga fracionada vs fechada"
+      - "custo de frete por pedido"
+      - "roteirizacao de entregas"

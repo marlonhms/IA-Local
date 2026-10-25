@@ -13,7 +13,7 @@
 A **AURA** foi projetada para operar diretamente na retaguarda física de postos de combustíveis e lojas de conveniência sem exigir substituição ou upgrade no ERP legado do cliente.
 
 ### 🛡️ Princípio Inegociável Zero-Disruption
-- **ERP Legado Intacto:** O banco transacional do posto (PostgreSQL 9.5 a 16) permanece operando na sua porta original (`5432` ou `5433`), acessado pela AURA em modo **estritamente somente-leitura** através da role técnica [`aura_service_ro`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/provisionar_usuario_leitura_erp.sql).
+- **ERP Legado Intacto:** O banco transacional do posto (PostgreSQL 9.5 a 16) permanece operando na sua porta original (`5432` ou `5433`), acessado pela AURA em modo **estritamente somente-leitura** através da role técnica [`aura_service_ro`](./scripts/provisionar_usuario_leitura_erp.sql).
 - **Banco Vetorial Isolado:** A base de embeddings, RAG híbrido e classificador semântico opera em uma instância dedicada de PostgreSQL 16 com a extensão `pgvector` na **porta 5434**, provisionada automaticamente via container Docker Compose ou serviço nativo.
 - **Zero Locks e Zero Writes:** Risco zero de travar bombas, bicos Companytec CBC04 ou emissão de notas fiscais (NFC-e).
 
@@ -62,11 +62,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\deploy_posto.ps1 -SkipDocker 
 ```
 
 O script executa automaticamente as seguintes 6 etapas:
-1. **Ambiente Python:** Detecta interpretador e instala dependências de [`requirements.txt`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/requirements.txt).
+1. **Ambiente Python:** Detecta interpretador e instala dependências de [`requirements.txt`](./requirements.txt).
 2. **Segurança:** Cria o arquivo `.env` com chaves HMAC aleatórias de 32 bytes para blindagem de vouchers e API Key.
-3. **Banco Vetorial:** Sobe o contêiner [`docker-compose.yml`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docker-compose.yml) (`pgvector/pgvector:pg16`) na porta isolada `5434`.
+3. **Banco Vetorial:** Sobe o contêiner [`docker-compose.yml`](./docker-compose.yml) (`pgvector/pgvector:pg16`) na porta isolada `5434`.
 4. **Conectividade:** Testa a comunicação TCP com o ERP legado.
-5. **Migração:** Executa [`scripts/init_posto_database.py`](file:///C:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/scripts/init_posto_database.py), instalando a extensão `vector` e criando as tabelas com índices HNSW.
+5. **Migração:** Executa [`scripts/init_posto_database.py`](./scripts/init_posto_database.py), instalando a extensão `vector` e criando as tabelas com índices HNSW.
 6. **Finalização:** Exibe o banner executivo de prontidão operacional.
 
 ---

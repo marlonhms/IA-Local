@@ -5,11 +5,14 @@ Define contratos Pydantic v2 para micro-widgets de 3 camadas:
 - Camada 2: Visualização Rica (props determinísticas)
 - Camada 3: Action Sheets Transacionais (actions tipadas com idempotência)
 """
+# ruff: noqa: UP006, UP007, UP012, UP017, UP035, UP045, I001, B009, F401
 
 from __future__ import annotations
 
+import math
 import os
 import re
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator, AliasChoices
@@ -1137,4 +1140,369 @@ class GenerativeModularProps(BaseModel):
     blocks: List[LegoBlock] = Field(default_factory=list, description="Lista ordenada de blocos modulares lego a renderizar")
     limitations: List[str] = Field(default_factory=list, description="Limitacoes ou avisos amostrais")
     suggested_actions: List[GenUIActionOption] = Field(default_factory=list, description="Acoes transacionais HITL")
+
+
+# =============================================================================
+# LOOP FECHADO DE ACAO (ACTIONABLE DIRECTIVE PAYLOAD - FASE 4)
+# =============================================================================
+
+class ActionableDirectivePayload(BaseModel):
+    """
+    Envelope canonico de Diretiva de Acao em 1-Clique (Loop Fechado de Acao - Fase 4).
+    Padroniza acoes executivas acionaveis com roteiro de voz, instrucao tatica de pista
+    e campanha segmentada de recuperacao para despacho via outbox local.
+    """
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
+
+    directive_id: str = Field(
+        default_factory=lambda: f"dir_{uuid.uuid4().hex[:12]}",
+        description="UUID unico da diretiva de acao executiva",
+    )
+    card_id: Optional[str] = Field(
+        default=None,
+        description="Identificador do card de excecao de origem (se aplicavel)",
+    )
+    title: str = Field(..., description="Titulo executivo conciso da acao prescrita")
+    category: str = Field(
+        default="operacao",
+        description="Categoria: caixa_sangria, runout_estoque, margem_conversao, market_basket_combo, anomalia_operacional",
+    )
+    financial_impact_brl: float = Field(
+        default=0.0,
+        description="Impacto financeiro apurado ou projetado em Reais (R$)",
+    )
+    roteiro_voz_consultor: str = Field(
+        ...,
+        description="Texto natural humanizado pronto para sintese de voz (TTS / Briefing Executivo)",
+    )
+    treinamento_equipe_15s: str = Field(
+        ...,
+        description="Instrucao tatica direta para o gerente/equipe de pista em 15 segundos",
+    )
+    campanha_clientes_whatsapp: str = Field(
+        default="",
+        description="Mensagem persuasiva segmentada para clientes ou recuperacao operacional",
+    )
+    status: Literal["pending", "queued", "dispatched", "executed", "cancelled"] = Field(
+        default="pending",
+        description="Status do ciclo de vida da diretiva acionavel",
+    )
+    canal_despacho: Literal["outbox_webhook", "in_app_cockpit", "notificador_desktop"] = Field(
+        default="in_app_cockpit",
+        description="Canal de despacho primario da acao",
+    )
+    idempotency_key: Optional[str] = Field(
+        default=None,
+        description="Chave de idempotencia para persistencia e despacho seguro",
+    )
+    created_at: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        description="Timestamp ISO-8601 de criacao",
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Metadados contextuais adicionais",
+    )
+
+    @field_validator("title")
+    @classmethod
+    def check_title(cls, v: str) -> str:
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("title nao pode ser vazio")
+        return v.strip()
+
+    @field_validator("roteiro_voz_consultor")
+    @classmethod
+    def check_roteiro(cls, v: str) -> str:
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("roteiro_voz_consultor nao pode ser vazio")
+        return v.strip()
+
+
+# =============================================================================
+# FEED EXECUTIVO ZERO-CLICK (O ANTI-DASHBOARD ESTATICO - FASE 2)
+# =============================================================================
+
+class ExecutiveExceptionCard(BaseModel):
+    """
+    Contrato Pydantic v2 para Cards de Excecao e Oportunidade do Feed Zero-Click (Fase 2).
+    Apresenta diagnostico direto, prova matematica deterministica, impacto financeiro em R$
+    e acao HITL em 1-clique para decisao imediata.
+    """
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
+
+    card_id: str = Field(..., description="Identificador unico deterministico do card (ex: card_runout_01)")
+    title: str = Field(..., description="Titulo executivo conciso do alerta ou oportunidade")
+    category: str = Field(
+        ...,
+        description="Categoria: caixa_sangria, runout_estoque, margem_conversao, market_basket_combo, anomalia_operacional",
+    )
+    severity: Literal["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] = Field(
+        default="HIGH",
+        description="Nivel de severidade do impacto",
+    )
+    financial_impact_brl: float = Field(
+        ...,
+        description="Impacto financeiro apurado ou projetado em Reais (R$)",
+    )
+    diagnostico_direto: str = Field(
+        ...,
+        description="1 linha executiva com severidade clara sem ruido gerativo",
+    )
+    prova_matematica: Union[str, Dict[str, Any]] = Field(
+        ...,
+        description="Memoria de calculo deterministica, impacto em R$ e comparativo percentual",
+    )
+    acao_recomendada_hitl: Union[GenUIActionOption, Dict[str, Any]] = Field(
+        ...,
+        description="Payload estruturado para decisao e execucao imediata em 1-clique",
+    )
+    urgency_timeframe: Optional[str] = Field(
+        default=None,
+        description="Janela temporal de urgencia (ex: 48h, imediato, turno_atual)",
+    )
+    directive: Optional[ActionableDirectivePayload] = Field(
+        default=None,
+        description="Diretiva acionavel de loop fechado estruturada para execucao em 1-clique (Fase 4)",
+    )
+    created_at: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        description="Timestamp ISO-8601 da geracao",
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Metadados operacionais complementares (filial_id, tenant_id, etc.)",
+    )
+
+    @field_validator("title")
+    @classmethod
+    def check_title(cls, v: str) -> str:
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("title nao pode ser vazio")
+        return v.strip()
+
+    @field_validator("diagnostico_direto")
+    @classmethod
+    def check_diagnostico(cls, v: str) -> str:
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("diagnostico_direto nao pode ser vazio")
+        return v.strip()
+
+    @field_validator("financial_impact_brl")
+    @classmethod
+    def check_financial_impact(cls, v: float) -> float:
+        if math.isnan(v) or math.isinf(v):
+            raise ValueError("financial_impact_brl deve ser um numero finito valido")
+        if v < 0:
+            raise ValueError("financial_impact_brl deve ser maior ou igual a zero")
+        return round(float(v), 2)
+
+
+# =============================================================================
+# MOTORES COGNITIVOS PRESCRITIVOS (FASE 3: SUPERANDO O BI DESCRITIVO)
+# =============================================================================
+
+class ErosionModalityItem(BaseModel):
+    """Item analitico por modalidade de pagamento na auditoria de erosao financeira."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    modalidade: str = Field(..., description="Nome da modalidade (ex: PIX, Dinheiro, Cartao Debito, Credito Vista, Credito Parcelado, Voucher Frota)")
+    volume_reais: float = Field(..., ge=0.0, description="Volume bruto vendido na modalidade em R$")
+    taxa_contratada_pct: float = Field(..., ge=0.0, description="Taxa MDR contratada com a adquirente (%)")
+    taxa_efetiva_descontada_pct: float = Field(..., ge=0.0, description="Taxa media real descontada na liquidacao (%)")
+    divergencia_taxa_pct: float = Field(default=0.0, description="Divergencia entre taxa real e contratada (pp)")
+    perda_divergencia_reais: float = Field(default=0.0, ge=0.0, description="Prejuizo direto por cobranca a maior em R$")
+    prazo_liquidacao_dias: int = Field(default=0, ge=0, description="Prazo medio de recebimento em dias corridos/uteis")
+    vpl_recebimento_reais: float = Field(..., description="Valor Presente Liquido (VPL) descontado pela Selic diaria")
+    custo_carregamento_selic_reais: float = Field(default=0.0, ge=0.0, description="Custo de oportunidade Selic ate a liquidacao em R$")
+
+
+class FinancialErosionProps(BaseModel):
+    """Propriedades do Micro-Widget FinancialErosionUI (Motor 1: Erosao Financeira e Arbitragem Selic)."""
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
+
+    diagnosis: str = Field(..., description="Diagnostico executivo da erosao financeira e taxas TEF")
+    confidence_score: float = Field(default=0.96, ge=0.0, le=1.0, description="Score de confianca estatistica (0.0 a 1.0)")
+    total_vendas_reais: float = Field(..., ge=0.0, description="Faturamento total auditado no periodo em R$")
+    total_taxas_contratadas_reais: float = Field(default=0.0, ge=0.0, description="Total de taxas orcadas pelo contrato em R$")
+    total_taxas_reais_descontadas: float = Field(default=0.0, ge=0.0, description="Total de taxas efetivamente descontadas em R$")
+    total_divergencia_taxas_reais: float = Field(..., ge=0.0, description="Perda total por cobrancas a maior das adquirentes em R$")
+    total_custo_carregamento_selic_reais: float = Field(default=0.0, ge=0.0, description="Custo financeiro de espera ate a liquidacao em R$")
+    taxa_selic_anual_pct: float = Field(..., description="Taxa Selic anualizada oficial (BACEN SGS Serie 11)")
+    taxa_selic_diaria_pct: float = Field(..., description="Taxa Selic diaria util equivalente (%)")
+    necessidade_caixa_72h_reais: float = Field(default=0.0, ge=0.0, description="Compromissos e boletos a liquidar em 72h em R$")
+    estrategia_cobertura_otima: str = Field(..., description="Estrategia prescritiva de menor custo financeiro para cobrir o caixa")
+    economia_estimada_reais: float = Field(default=0.0, ge=0.0, description="Economia projetada ao aplicar a prescricao em R$")
+    modalidades: List[ErosionModalityItem] = Field(default_factory=list, description="Detalhamento individual por meio de pagamento")
+    acoes_prescritivas: List[str] = Field(default_factory=list, description="Diretrizes operacionais acionaveis")
+    suggested_actions: List[GenUIActionOption] = Field(default_factory=list, description="Acoes transacionais HITL")
+
+
+class DeadCapitalItem(BaseModel):
+    """Item com capital financeiro imobilizado sem giro (Capital Morto)."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    produto_sku: str = Field(..., description="Codigo ou SKU do produto")
+    produto_nome: str = Field(..., description="Descricao do produto")
+    categoria: str = Field(default="conveniencia", description="Categoria do produto")
+    saldo_estoque: float = Field(..., ge=0.0, description="Quantidade estocada parada")
+    custo_unitario_reais: float = Field(..., ge=0.0, description="Custo unitario de aquisicao em R$")
+    capital_imobilizado_reais: float = Field(..., ge=0.0, description="Capital financeiro parado em R$")
+    dias_sem_giro: int = Field(..., ge=0, description="Dias consecutivos sem nenhuma venda")
+    custo_oportunidade_selic_reais: float = Field(..., ge=0.0, description="Corrosao Selic acumulada do capital imobilizado")
+    combo_apriori_sugerido: Optional[Dict[str, Any]] = Field(default=None, description="Pareamento estrategico Apriori (produto parceiro, lift, sugestao de desconto)")
+
+
+class GhostStockoutItem(BaseModel):
+    """Item de Curva A em ruptura fantasma (saldo positivo no ERP mas zero vendas no pico)."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    produto_sku: str = Field(..., description="Codigo ou SKU do produto")
+    produto_nome: str = Field(..., description="Descricao do produto")
+    categoria: str = Field(default="curva_a", description="Classificacao de curva do produto")
+    saldo_erp: float = Field(..., ge=0.0, description="Saldo positivo registrado no ERP")
+    velocidade_historica_hora: float = Field(..., ge=0.0, description="Velocidade media de vendas por hora em horario de pico")
+    horas_sem_venda_pico: int = Field(..., ge=1, description="Horas consecutivas com zero vendas durante pico")
+    perda_faturamento_estimada_reais: float = Field(..., ge=0.0, description="Estimativa de vendas perdidas por gondola vazia em R$")
+    alerta_gondola: str = Field(..., description="Orientacao de reposicao fisica imediata")
+
+
+class DeadCapitalOpportunityProps(BaseModel):
+    """Propriedades do Micro-Widget DeadCapitalOpportunityUI (Motor 2: Capital Morto e Ruptura Fantasma)."""
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
+
+    diagnosis: str = Field(..., description="Diagnostico executivo de capital imobilizado e rupturas invisiveis")
+    confidence_score: float = Field(default=0.95, ge=0.0, le=1.0, description="Score de confianca estatistica (0.0 a 1.0)")
+    total_capital_morto_imobilizado_reais: float = Field(..., ge=0.0, description="Total de capital financeiro parado em itens sem giro em R$")
+    total_custo_selic_acumulado_reais: float = Field(..., ge=0.0, description="Custo de oportunidade Selic total acumulado no estoque parado em R$")
+    taxa_selic_anual_pct: float = Field(..., description="Taxa Selic anual utilizada no calculo")
+    itens_capital_morto: List[DeadCapitalItem] = Field(default_factory=list, description="Lista de itens encalhados com oportunidade de liquidacao")
+    itens_ruptura_fantasma: List[GhostStockoutItem] = Field(default_factory=list, description="Lista de itens de Curva A com provavel gondola vazia")
+    plano_acao_desova: str = Field(..., description="Plano de desova estrategica pareada com produtos de alto giro")
+    suggested_actions: List[GenUIActionOption] = Field(default_factory=list, description="Acoes transacionais HITL")
+
+
+class WaterfallStepItem(BaseModel):
+    """Etapa individual do grafico causal Waterfall de margem."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    step_name: str = Field(..., description="Nome da etapa (ex: Margem Anterior, Efeito Reposicao, Margem Atual)")
+    category: Literal["start", "effect", "end"] = Field(..., description="Categoria da etapa")
+    impact_reais: float = Field(..., description="Impacto em R$ (+ ganho, - reducao, ou valor total)")
+    cumulative_reais: float = Field(..., description="Valor acumulado resultante da margem em R$")
+    description: str = Field(..., description="Explicacao causal do fator de impacto")
+
+
+class MarginWaterfallProps(BaseModel):
+    """Propriedades do Micro-Widget MarginWaterfallUI (Motor 3: Decomposicao Causal Waterfall de Margem)."""
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
+
+    diagnosis: str = Field(..., description="Diagnostico causal da variacao de margem e lucro bruto")
+    confidence_score: float = Field(default=0.97, ge=0.0, le=1.0, description="Score de confianca do modelo causal (0.0 a 1.0)")
+    periodo_atual: str = Field(..., description="Periodo de referencia atual analisado")
+    periodo_anterior: str = Field(..., description="Periodo anterior de confronto")
+    margem_inicial_reais: float = Field(..., description="Margem bruta/liquida do periodo anterior em R$")
+    margem_final_reais: float = Field(..., description="Margem bruta/liquida do periodo atual em R$")
+    delta_margem_total_reais: float = Field(..., description="Variacao liquida total apurada em R$")
+    delta_margem_pct: float = Field(..., description="Variacao percentual da margem (%)")
+    efeito_custo_reposicao_reais: float = Field(..., description="Efeito Custo de Reposicao / CMV nao repassado no PDV em R$")
+    efeito_mix_conversao_reais: float = Field(..., description="Efeito Mix de Produtos e Conversao de Aditivadas em R$")
+    efeito_volume_puro_reais: float = Field(..., description="Efeito Volume Puro de Clientes e Fluxo em R$")
+    efeito_perdas_descontos_reais: float = Field(..., description="Efeito Perdas Fisicas, Descontos de Caixa e Afericoes em R$")
+    horas_defasagem_preco_medio: float = Field(default=0.0, ge=0.0, description="Tempo medio em horas que o posto demorou para repassar o novo CMV")
+    steps: List[WaterfallStepItem] = Field(default_factory=list, description="Lista ordenada de degraus da cascata Waterfall")
+    suggested_actions: List[GenUIActionOption] = Field(default_factory=list, description="Acoes transacionais HITL")
+
+
+class BatchSimulationScenario(BaseModel):
+    """Cenario simulado de elasticidade de demanda para lote de compra."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    nome: str = Field(..., description="Nome do cenario (ex: Cenario Base, Micro-Promocao R$ 0,05, Campanha WhatsApp R$ 0,08)")
+    reducao_preco_reais: float = Field(..., ge=0.0, description="Reducao no preco de venda por litro em R$")
+    preco_promocional_reais: float = Field(..., ge=0.0, description="Preco resultante na bomba em R$")
+    aceleracao_vendas_pct: float = Field(..., description="Aumento percentual estimado na queima horaria (%)")
+    horas_para_abrir_espaco: float = Field(..., ge=0.0, description="Horas estimadas para abrir o espaco do lote minimo")
+    custo_promocao_reais: float = Field(..., ge=0.0, description="Custo financeiro da reducao de margem no volume promocional em R$")
+    ganho_desconto_fornecedor_reais: float = Field(..., ge=0.0, description="Ganho financeiro bruto obtido pelo desconto de lote fechado em R$")
+    resultado_liquido_reais: float = Field(..., description="Lucro liquido incremental gerado pela operacao em R$")
+    viavel: bool = Field(..., description="Indica se a operacao gera resultado positivo antes do lote")
+
+
+class ElasticityBatchSimulatorProps(BaseModel):
+    """Propriedades do Micro-Widget ElasticityBatchSimulatorUI (Motor 4: Elasticidade e Otimizador de Lote)."""
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
+
+    diagnosis: str = Field(..., description="Diagnostico executivo da simulacao de lote e espaco de tanque")
+    confidence_score: float = Field(default=0.95, ge=0.0, le=1.0, description="Score de confianca estatistica (0.0 a 1.0)")
+    produto: str = Field(..., description="Combustivel ou produto analisado")
+    municipio: str = Field(..., description="Municipio de referencia para benchmark da ANP")
+    tanque_capacidade_litros: float = Field(..., ge=0.0, description="Capacidade nominal do tanque em litros")
+    estoque_atual_litros: float = Field(..., ge=0.0, description="Estoque fisico atual no tanque em litros")
+    espaco_livre_ullage_litros: float = Field(..., ge=0.0, description="Espaco fisico disponivel no tanque (Ullage) em litros")
+    lote_minimo_compra_litros: float = Field(..., ge=0.0, description="Lote minimo exigido pelo fornecedor (ex: 5.000L compartimento)")
+    capacidade_recebimento_imediata: bool = Field(..., description="True se Ullage >= Lote Minimo, False se faltar espaco")
+    litros_faltantes_para_lote: float = Field(default=0.0, ge=0.0, description="Litros que faltam ser consumidos para caber o lote")
+    desconto_lote_reais_litro: float = Field(..., ge=0.0, description="Desconto logistico oferecido pela distribuidora por litro em R$")
+    economia_potencial_lote_reais: float = Field(..., ge=0.0, description="Economia bruta total ao comprar o lote fechado em R$")
+    preco_venda_atual_reais: float = Field(..., ge=0.0, description="Preco de venda atual praticado no posto em R$")
+    benchmark_anp_municipio: Dict[str, Any] = Field(default_factory=dict, description="Estatisticas de preco da ANP no municipio (media, q1, q2, q3)")
+    elasticidade_preco_estimada: float = Field(default=-1.8, description="Coeficiente de elasticidade preco da demanda adotado")
+    cenarios: List[BatchSimulationScenario] = Field(default_factory=list, description="Lista de cenarios simulados de aceleracao de demanda")
+    cenario_recomendado: str = Field(..., description="Parecer e cenario ideal recomendado para maximizar o ganho liquido")
+    suggested_actions: List[GenUIActionOption] = Field(default_factory=list, description="Acoes transacionais HITL")
+
+
+class PaymentMethodBreakdownItem(BaseModel):
+    """Item consolidado de forma de pagamento no fechamento do dia."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    modalidade: str = Field(..., description="Nome da forma de pagamento (Dinheiro, Cartao de Debito, PIX, etc.)")
+    codigo_forma: str = Field(default="", description="Codigo interno da forma de pagamento no ERP")
+    total_reais: float = Field(..., description="Valor total faturado nesta modalidade em R$")
+    total_transacoes: int = Field(default=0, description="Quantidade de transacoes/cupons")
+    percentual: float = Field(default=0.0, description="Percentual sobre o faturamento total (%)")
+    ticket_medio: float = Field(default=0.0, description="Ticket medio em R$")
+
+
+class CashierOperatorPaymentItem(BaseModel):
+    """Detalhamento financeiro por caixa (terminal PDV) e operador responsavel."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    caixa: str = Field(..., description="Identificacao do caixa ou terminal PDV (ex: Caixa 007)")
+    caixa_raw: str = Field(default="", description="Codigo bruto do PDV")
+    operador_matricula: str = Field(default="", description="Matricula do operador no ERP")
+    operador_nome: str = Field(..., description="Nome do operador ou funcionario responsavel")
+    turno: str = Field(default="1º TURNO", description="Turno de trabalho do operador")
+    dinheiro_reais: float = Field(default=0.0, description="Total em Dinheiro (R$)")
+    cartao_debito_reais: float = Field(default=0.0, description="Total em Cartao de Debito (R$)")
+    cartao_credito_reais: float = Field(default=0.0, description="Total em Cartao de Credito (R$)")
+    cartao_total_reais: float = Field(default=0.0, description="Total consolidado em Cartoes (R$)")
+    pix_reais: float = Field(default=0.0, description="Total em PIX (R$)")
+    prazo_convenio_reais: float = Field(default=0.0, description="Total em Prazo/Convenio (R$)")
+    outros_reais: float = Field(default=0.0, description="Outros meios de pagamento em R$")
+    total_caixa_reais: float = Field(..., description="Total geral apurado no caixa em R$")
+    total_cupons: int = Field(default=0, description="Quantidade de cupons emitidos")
+
+
+class PaymentMethodsBreakdownProps(BaseModel):
+    """Propriedades do Micro-Widget PaymentMethodsBreakdownUI (Formas de Pagamento por Caixa e Operador)."""
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
+
+    title: str = Field(default="Formas de Pagamento & Caixas", description="Titulo executivo do card")
+    subtitle: str = Field(default="Detalhamento por Terminal PDV, Operador & Modalidade", description="Subtitulo descritivo")
+    data_referencia: str = Field(..., description="Data de referencia analisada (DD/MM/AAAA)")
+    aviso_data: Optional[str] = Field(default=None, description="Aviso caso tenha sido selecionada a ultima data com movimento")
+    total_geral_reais: float = Field(..., description="Faturamento total consolidado em R$")
+    total_transacoes: int = Field(default=0, description="Total de transacoes apuradas")
+    ticket_medio_geral: float = Field(default=0.0, description="Ticket medio geral em R$")
+    total_caixas_ativos: int = Field(default=0, description="Quantidade de caixas com movimento")
+    total_operadores_ativos: int = Field(default=0, description="Quantidade de operadores com movimento")
+    maior_modalidade: Optional[str] = Field(default=None, description="Modalidade com maior representatividade")
+    modalidades: List[PaymentMethodBreakdownItem] = Field(default_factory=list, description="Lista de formas de pagamento")
+    caixas_operadores: List[CashierOperatorPaymentItem] = Field(default_factory=list, description="Detalhamento por caixa e operador")
+    diagnosis: str = Field(default="", description="Diagnostico executivo conciso")
+    suggested_actions: List[GenUIActionOption] = Field(default_factory=list, description="Acoes transacionais HITL")
+
+
 

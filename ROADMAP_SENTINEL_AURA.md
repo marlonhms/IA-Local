@@ -5,7 +5,7 @@
 **Origem dos Padrões**: Projeto Sentinel (RAG WP)  
 **Data**: 16 de Outubro de 2026  
 **Versão**: 2.0.0-PROD  
-**Localização Completa**: [docs/ROADMAP_SENTINEL_AURA.md](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/docs/ROADMAP_SENTINEL_AURA.md)
+**Localização Completa**: [docs/ROADMAP_SENTINEL_AURA.md](./docs/ROADMAP_SENTINEL_AURA.md)
 
 ---
 

@@ -25,12 +25,12 @@ Essa evolução representa o primeiro passo concreto no desacoplamento do projet
 └──────────────────────────────┬──────────────────────────────┘
                                │
             🔒 Rede Mesh Tailscale (100.64.0.0/10)
-            🚀 Suporte a MagicDNS (ex: marlonh-supwp)
+            🚀 Suporte a MagicDNS (ex: aura-edge-node01)
                                │
 ┌──────────────────────────────▼──────────────────────────────┐
 │                    NOTEBOOK (Database Host)                 │
 │                 IP Tailscale: 100.77.164.17                 │
-│                 Hostname Tailscale: marlonh-supwp           │
+│                 Hostname Tailscale: aura-edge-node01           │
 │                                                             │
 │   • PostgreSQL 16 ERP (Windows Service)  ───► Porta 5433    │
 │   • pgvector Nativo (Base posto_ai)      ───► Porta 5433    │
@@ -74,7 +74,7 @@ Todas as configurações de escuta e segurança foram implementadas e validadas 
 ### 2.4. Exposição do Docker `pgvector-posto`
 - **Container**: `pgvector-posto` (imagem `pgvector/pgvector:pg16`).
 - **Mapeamento**: `0.0.0.0:5434->5432/tcp`.
-- **Status**: O container escuta em modo dual-stack em todas as interfaces, estando 100% acessível pelo IP Tailscale `100.77.164.17:5434` ou pelo MagicDNS `marlonh-supwp:5434`.
+- **Status**: O container escuta em modo dual-stack em todas as interfaces, estando 100% acessível pelo IP Tailscale `100.77.164.17:5434` ou pelo MagicDNS `aura-edge-node01:5434`.
 
 ### 2.5. Liberação do Firewall do Windows no Notebook
 Para garantir que o Firewall do Windows não descarte pacotes vindos do PC de casa, criamos scripts automatizados de liberação no repositório:
@@ -119,7 +119,7 @@ No Notebook, abra o PowerShell ou terminal e execute:
 tailscale ip -4
 # Exemplo retornado: 100.77.164.17
 ```
-> 💡 **Dica MagicDNS**: Você também pode utilizar o hostname Tailscale do notebook diretamente: `marlonh-supwp`.
+> 💡 **Dica MagicDNS**: Você também pode utilizar o hostname Tailscale do notebook diretamente: `aura-edge-node01`.
 
 ### Passo 2: Clonar o Repositório no PC de Casa
 No Computador de Casa, abra o PowerShell e execute:
@@ -144,7 +144,7 @@ Copie o `.env.example` para `.env`:
 ```powershell
 Copy-Item .env.example .env
 ```
-Edite o arquivo `.env` para apontar os hosts para o IP do Notebook (`100.77.164.17` ou `marlonh-supwp`):
+Edite o arquivo `.env` para apontar os hosts para o IP do Notebook (`100.77.164.17` ou `aura-edge-node01`):
 ```ini
 # Google Gemini API
 GEMINI_API_KEY=sua_chave_gemini_aqui
@@ -170,7 +170,7 @@ DEFAULT_EMBEDDING_MODEL=models/gemini-embedding-001
 DEFAULT_LLM_MODEL=models/gemini-3.1-flash-lite
 ```
 
-*(Nota: Você pode substituir `100.77.164.17` por `marlonh-supwp` caso o MagicDNS esteja ativo).*
+*(Nota: Você pode substituir `100.77.164.17` por `aura-edge-node01` caso o MagicDNS esteja ativo).*
 
 ### Passo 5: Testar a Conexão com o Diagnóstico Automático
 Execute o script de teste de conectividade no PC de Casa. Você pode testar sem argumentos (usando o `.env`) ou passando o host diretamente pela linha de comando:
@@ -181,7 +181,7 @@ python scripts/test_ponte_tailscale.py
 # Opção B: Testando um IP ou hostname diretamente via CLI
 python scripts/test_ponte_tailscale.py 100.77.164.17
 # ou:
-python scripts/test_ponte_tailscale.py marlonh-supwp
+python scripts/test_ponte_tailscale.py aura-edge-node01
 ```
 **Resultado Esperado**:
 ```
@@ -207,7 +207,7 @@ python scripts/test_ponte_tailscale.py marlonh-supwp
 
 ### Passo 6: Acessar o Painel Web da AURA no PC de Casa
 Se você iniciar o painel no notebook via `iniciar_painel.bat`, você pode abrir diretamente o navegador no PC de Casa e acessar:
-- **Painel Executivo da AURA**: `http://100.77.164.17:8000` (ou `http://marlonh-supwp:8000`)
+- **Painel Executivo da AURA**: `http://100.77.164.17:8000` (ou `http://aura-edge-node01:8000`)
 - **Documentação Swagger/OpenAPI**: `http://100.77.164.17:8000/docs`
 
 ### Passo 7: Executar a AURA / Ai.la no PC de Casa
@@ -246,7 +246,7 @@ Se você não quiser instalar Python, bibliotecas ou clonar nada no PC de casa, 
    tailscale set --ssh
    ```
 3. No PC de Casa, no VS Code, instale a extensão **Remote - SSH**.
-4. Conecte via SSH no endereço `marlon@100.77.164.17` (ou `marlon@marlonh-supwp`).
+4. Conecte via SSH no endereço `aura@100.77.164.17` (ou `aura@aura-edge-node01`).
 
 ---
 
@@ -277,7 +277,7 @@ Se algum teste falhar, siga este checklist rápido:
   ```
 
 ### 5. Mudança de IP do Tailscale
-- **Observação**: Os IPs do Tailscale (`100.x.y.z`) são **estáticos** para cada nó da sua conta Tailscale. Além disso, o hostname MagicDNS (`marlonh-supwp`) resolve automaticamente para o IP correto independente de trocas de rede.
+- **Observação**: Os IPs do Tailscale (`100.x.y.z`) são **estáticos** para cada nó da sua conta Tailscale. Além disso, o hostname MagicDNS (`aura-edge-node01`) resolve automaticamente para o IP correto independente de trocas de rede.
 
 ---
 

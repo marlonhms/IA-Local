@@ -1,0 +1,62 @@
+# Domain Pack: Varejo Geral, Supermercados e Farmacias
+# Define vocabulario, regras de ruptura de gondola, perecibilidade e margem por secao.
+# Zero travessoes em todo o arquivo.
+
+pack_id: "retail_supermarket"
+pack_name: "Varejo Geral, Supermercados e Farmacias"
+vertical: "supermarket_retail"
+version: "1.0.0"
+description: "Domain Pack para supermercados, mercearias, hortifruti e farmacias."
+
+vocabulary:
+  inventory_node: "gondola"
+  inventory_node_plural: "gondolas"
+  equipment: "checkout"
+  equipment_plural: "checkouts"
+  component: "leitor_balanca"
+  component_plural: "leitores_balancas"
+  operator: "operador_caixa"
+  operator_plural: "operadores_caixa"
+  cashier_session: "fechamento_caixa_pdv"
+  stock_alert: "ruptura_gondola"
+  stock_unit: "UN"
+  flow_unit: "itens/min"
+
+tolerances:
+  default_lot_multiple: 12.0  # Lote padrao de reposicao em caixas fechadas com 12 unidades
+  inventory_shrinkage_tolerance_pct: 0.50  # Quebra e perda operacional aceitavel (% sobre faturamento)
+  perishability_alert_days: 3  # Alerta antecipado para produtos proximos ao vencimento (dias)
+  min_shelf_availability_pct: 95.0  # Nivel de servico minimo de disponibilidade em gondola (%)
+  cash_tolerance_reais: 15.0  # Tolerancia de diferenca de fechamento de caixa por operador (R$)
+  target_markup_margin_pct: 28.5  # Margem bruta media meta para a operacao de varejo (%)
+
+intent_mappings:
+  auditoria_turno_caixa: "fechamento_checkout_varejo"
+  previsao_runout_estoque: "ruptura_gondola_perecibilidade"
+  desempenho_equipe_conversao: "produtividade_operadores_caixa"
+  market_basket_cross_sell: "combos_encarte_cross_merchandising"
+  erosao_financeira_tef_selic: "auditoria_taxas_cartao_pix"
+  raio_x_causal_margem: "decomposicao_margem_secoes"
+
+specific_intents:
+  - id: "ruptura_invisivel_gondola"
+    descricao: "Deteccao de ruptura fantasma (estoque virtual no sistema vs gondola vazia)"
+    keywords:
+      - "ruptura de gondola"
+      - "estoque virtual zero vendas"
+      - "gondola vazia"
+      - "falta de produto na prateleira"
+  - id: "perdas_por_vencimento"
+    descricao: "Controle preventivo de perecibilidade e produtos proximos ao vencimento"
+    keywords:
+      - "vencimento de mercadorias"
+      - "pereciveis validade"
+      - "desconto de liquidacao vencimento"
+      - "perdas por validade"
+  - id: "rentabilidade_por_secao"
+    descricao: "Analise de margem contributiva por secao (acougue, padaria, hortifruti, mercearia)"
+    keywords:
+      - "margem por secao"
+      - "rentabilidade hortifruti"
+      - "margem padaria"
+      - "cmv mercearia"

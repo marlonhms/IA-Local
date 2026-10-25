@@ -18,12 +18,14 @@ Garantias e Recursos:
 4. Compressão Inteligente de Contexto:
    - Redução de volume de logs e dados para transmissão via streaming e economia de tokens no Google Gemini.
 """
+# ruff: noqa: UP006, UP035, UP045, C414, BLE001
 
 from __future__ import annotations
 
 import copy
 import logging
 import re
+import threading
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 try:
@@ -285,6 +287,9 @@ class CentralLogSanitizer:
 
     def __init__(self, policy_version: str = POLICY_VERSION):
         self.policy_version = policy_version
+        self._total_sanitized_count: int = 0
+        self._category_counts: Dict[str, int] = {}
+        self._lock = threading.Lock()
 
     def sanitize_text(self, text: str) -> Tuple[str, Dict[str, int]]:
         """
@@ -491,6 +496,13 @@ class CentralLogSanitizer:
 
         result = _BASE64_PATTERN.sub(_sub_b64, result)
 
+        total_found = sum(counts.values())
+        if total_found > 0:
+            with self._lock:
+                self._total_sanitized_count += total_found
+                for cat, count in counts.items():
+                    self._category_counts[cat] = self._category_counts.get(cat, 0) + count
+
         return result, counts
 
     def sanitize_lines(self, lines: List[str]) -> Tuple[List[str], Dict[str, int]]:
@@ -549,6 +561,37 @@ class CentralLogSanitizer:
             "redacted_counts": dict(sorted(counts.items())),
             "total_sanitized": sum(counts.values()),
         }
+
+    def get_total_sanitized_count(self) -> int:
+        """Retorna o numero total acumulado de entidades PII sanitizadas na sessao."""
+        with self._lock:
+            return self._total_sanitized_count
+
+    def get_category_counts(self) -> Dict[str, int]:
+        """Retorna contadores de PII por categoria na sessao."""
+        with self._lock:
+            return dict(self._category_counts)
+
+    def reset_counters(self) -> None:
+        """Reseta os contadores de PII sanitizadas da sessao."""
+        with self._lock:
+            self._total_sanitized_count = 0
+            self._category_counts.clear()
+
+    @classmethod
+    def get_session_sanitized_count(cls) -> int:
+        """Metodo de classe para obter total de PII sanitizadas na sessao."""
+        return central_log_sanitizer.get_total_sanitized_count()
+
+    @classmethod
+    def get_session_category_counts(cls) -> Dict[str, int]:
+        """Metodo de classe para obter contagens de PII por categoria na sessao."""
+        return central_log_sanitizer.get_category_counts()
+
+    @classmethod
+    def reset_session_counters(cls) -> None:
+        """Metodo de classe para resetar contadores de PII na sessao."""
+        central_log_sanitizer.reset_counters()
 
 
 # Instância Singleton Centralizada

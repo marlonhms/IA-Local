@@ -12,7 +12,7 @@ class ServerConfig @Inject constructor(
     private val prefs = context.getSharedPreferences("aura_config", Context.MODE_PRIVATE)
 
     var serverIp: String
-        get() = prefs.getString("server_ip", "127.0.0.1:8000") ?: "127.0.0.1:8000"
+        get() = prefs.getString("server_ip", "100.77.164.17:8000") ?: "100.77.164.17:8000"
         set(value) {
             prefs.edit().putString("server_ip", value.trim()).apply()
         }

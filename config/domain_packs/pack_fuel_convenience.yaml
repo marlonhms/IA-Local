@@ -1,0 +1,63 @@
+# Domain Pack: Postos de Combustiveis e Lojas de Conveniencia
+# Define vocabulario, tolerancias e intencoes especificas para postos e conveniencia.
+# Zero travessoes em todo o arquivo.
+
+pack_id: "fuel_convenience"
+pack_name: "Postos de Combustiveis e Lojas de Conveniencia"
+vertical: "fuel_retail"
+version: "1.0.0"
+description: "Domain Pack para postos de servicos, combustiveis automotivos e lojas de conveniencia."
+
+vocabulary:
+  inventory_node: "tanque"
+  inventory_node_plural: "tanques"
+  equipment: "bomba"
+  equipment_plural: "bombas"
+  component: "bico"
+  component_plural: "bicos"
+  operator: "frentista"
+  operator_plural: "frentistas"
+  cashier_session: "turno_caixa"
+  stock_alert: "runout_tanque"
+  stock_unit: "L"
+  flow_unit: "L/min"
+
+tolerances:
+  regulatory_volume_tolerance_pct: 0.60  # Portaria ANP 26/1992 e Resolucao ANP 894/2022 (+-0.6%)
+  default_lot_multiple: 5000.0  # Lote minimo de descarga de carreta (multiplos de 5.000L)
+  min_pump_flow_rate_lpm: 20.0  # Vazao minima esperada em bico de combustivel (L/min)
+  water_alert_threshold_mm: 5.0  # Nivel maximo de agua no fundo do tanque antes de emitir alerta (mm)
+  cash_tolerance_reais: 20.0  # Tolerancia de quebra de caixa aceitavel por turno (R$)
+  critical_ullage_threshold_litros: 10000.0  # Espaco minimo livre para receber compartimento duplo
+
+intent_mappings:
+  auditoria_turno_caixa: "auditoria_turno"
+  previsao_runout_estoque: "previsao_tanques"
+  desempenho_equipe_conversao: "desempenho_pista_frentistas"
+  market_basket_cross_sell: "conveniencia_vendas_cruzadas"
+  erosao_financeira_tef_selic: "auditoria_fuga_financeira"
+  raio_x_causal_margem: "investigar_causa_raiz"
+
+specific_intents:
+  - id: "lmc_anp"
+    descricao: "Livro de Movimentacao de Combustiveis ANP e balanco escriturado vs medicao fisica"
+    keywords:
+      - "lmc"
+      - "livro de combustiveis"
+      - "portaria anp 26"
+      - "tolerancia anp"
+      - "balanco escriturado"
+  - id: "auditar_conformidade_lmc_anp"
+    descricao: "Auditoria regulamentar e analise de estanqueidade de tanques"
+    keywords:
+      - "conformidade anp"
+      - "auditoria lmc"
+      - "estanqueidade tanque"
+      - "variacao volumetrica anp"
+  - id: "custo_estoque_macro"
+    descricao: "Custo de oportunidade do estoque de combustiveis contra Selic e PMPF"
+    keywords:
+      - "custo estoque selic"
+      - "carregamento estoque combustivel"
+      - "pauta fiscal pmpf"
+      - "spread combustivel"

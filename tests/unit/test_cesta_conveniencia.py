@@ -218,32 +218,33 @@ async def test_aura_engine_execute_tool_direct_basket(posto_tools):
     """Valida a execucao direta de ferramenta no AuraEngine para cesta de compras e seus aliases."""
     engine = AuraEngine(tools=posto_tools)
 
-    # 1. Execucao direta com nome oficial
-    res = await engine.execute_tool_direct(
-        tool_name="conveniencia_vendas_cruzadas",
-        params={"min_lift": 1.2, "limit": 5},
-    )
-    assert res["status"] == "success"
-    assert res["tool_name"] == "conveniencia_vendas_cruzadas"
-    assert "data" in res
-    data_res = res["data"]
-    assert data_res["component_name"] == "render_BasketUpsellStrategyUI"
-    assert data_res["client_component"] == "BasketUpsellStrategyUI"
-    assert "props" in data_res
+    # 1. Execucao direta com nome oficial (protegido contra picos de CPU do host de teste)
+    with patch.object(engine.watchdog, "is_heavy_operation_allowed", return_value=True):
+        res = await engine.execute_tool_direct(
+            tool_name="conveniencia_vendas_cruzadas",
+            params={"min_lift": 1.2, "limit": 5},
+        )
+        assert res["status"] == "success"
+        assert res["tool_name"] == "conveniencia_vendas_cruzadas"
+        assert "data" in res
+        data_res = res["data"]
+        assert data_res["component_name"] == "render_BasketUpsellStrategyUI"
+        assert data_res["client_component"] == "BasketUpsellStrategyUI"
+        assert "props" in data_res
 
-    # 2. Execucao de todos os aliases registrados
-    aliases = [
-        "market_basket",
-        "cesta_compras",
-        "basket_upsell",
-        "cross_selling",
-        "auditar_cesta_conveniencia_vendas_cruzadas",
-        "vendas_cruzadas",
-    ]
-    for alias in aliases:
-        res_alias = await engine.execute_tool_direct(tool_name=alias, params={})
-        assert res_alias["status"] == "success"
-        assert res_alias["data"]["component_name"] == "render_BasketUpsellStrategyUI"
+        # 2. Execucao de todos os aliases registrados
+        aliases = [
+            "market_basket",
+            "cesta_compras",
+            "basket_upsell",
+            "cross_selling",
+            "auditar_cesta_conveniencia_vendas_cruzadas",
+            "vendas_cruzadas",
+        ]
+        for alias in aliases:
+            res_alias = await engine.execute_tool_direct(tool_name=alias, params={})
+            assert res_alias["status"] == "success"
+            assert res_alias["data"]["component_name"] == "render_BasketUpsellStrategyUI"
 
 
 def test_aura_engine_sintese_contingencia_and_build_response_text(posto_tools):
@@ -393,6 +394,7 @@ def test_basket_upsell_raw_dict_and_model_validate():
 def test_build_canonical_genui_envelope_legacy_preserves_kpis():
     """Valida que build_canonical_genui_envelope propaga os KPIs sinteticos mesmo a partir de payloads legados."""
     import uuid
+
     from core.aura_engine import build_canonical_genui_envelope
 
     legacy_payload = {

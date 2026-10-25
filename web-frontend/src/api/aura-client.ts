@@ -7,9 +7,12 @@
 import type {
   ActionExecuteRequest,
   ActionVoucher,
+  ActionableDirectivePayload,
   ComplianceVerificationResult,
+  ExecutiveExceptionCard,
   GenUIEnvelope,
   GenUIEvent,
+  LiveSecurityTelemetry,
   TelemetrySLISnapshot,
 } from "../types/aura-contracts";
 
@@ -168,4 +171,72 @@ export class AuraApiClient {
 
     return source;
   }
+
+  public async getZeroClickFeed(
+    tenantId = "default",
+    limit = 5,
+    forceRefresh = false,
+  ): Promise<ExecutiveExceptionCard[]> {
+    const params = new URLSearchParams({
+      tenant_id: tenantId,
+      limit: String(limit),
+      force_refresh: forceRefresh ? "true" : "false",
+    });
+    const response = await fetch(`${this.baseUrl}/api/v1/cockpit/zero-click-feed?${params.toString()}`, {
+      method: "GET",
+      headers: this.buildHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Falha ao consultar Feed Zero-Click (${response.status})`);
+    }
+    const data = (await response.json()) as { cards?: ExecutiveExceptionCard[] };
+    return data.cards ?? [];
+  }
+
+  public async getLiveSecurityTelemetry(): Promise<LiveSecurityTelemetry> {
+    const response = await fetch(`${this.baseUrl}/api/v1/aura/security/telemetry`, {
+      method: "GET",
+      headers: this.buildHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Falha ao consultar telemetria de seguranca (${response.status})`);
+    }
+    return (await response.json()) as LiveSecurityTelemetry;
+  }
+
+  public async dispatchActionableDirective(
+    directive: ActionableDirectivePayload,
+    destinationUrl?: string,
+  ): Promise<{ success: boolean; directive_id: string; outbox_message_id: string; status: string }> {
+    const response = await fetch(`${this.baseUrl}/api/v1/aura/directives/dispatch`, {
+      method: "POST",
+      headers: this.buildHeaders(),
+      body: JSON.stringify({
+        ...directive,
+        destination_url: destinationUrl,
+        operator_id: this.config.operatorId ?? "gerente_01",
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Falha ao despachar diretiva de acao na outbox (${response.status})`);
+    }
+    return (await response.json()) as { success: boolean; directive_id: string; outbox_message_id: string; status: string };
+  }
+
+  public async getRecentDirectives(limit = 20): Promise<ActionableDirectivePayload[]> {
+    const response = await fetch(`${this.baseUrl}/api/v1/aura/directives/recent?limit=${limit}`, {
+      method: "GET",
+      headers: this.buildHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Falha ao listar diretivas recentes (${response.status})`);
+    }
+    const data = (await response.json()) as { directives?: ActionableDirectivePayload[] };
+    return data.directives ?? [];
+  }
 }
+

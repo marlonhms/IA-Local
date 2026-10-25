@@ -187,3 +187,7 @@ class AUPSBaseModel(BaseModel):
         extra="ignore",
         populate_by_name=True,
     )
+
+
+# Alias de generalizacao universal para AUDS
+AUDSBaseModel = AUPSBaseModel

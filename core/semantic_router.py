@@ -43,7 +43,31 @@ TERMOS_LMC_EXATOS = [
     "tolerancia regulamentar"
 ]
 
-# Catálogo canônico das 11 intenções operacionais do sistema
+# Mapeamento bidirecional canonico de intencoes universais AUDS (Fase 1.3)
+UNIVERSAL_TO_LEGACY_INTENTS: Dict[str, str] = {
+    "auditoria_turno_caixa": "auditoria_turno",
+    "previsao_runout_estoque": "previsao_tanques",
+    "desempenho_equipe_conversao": "desempenho_pista_frentistas",
+    "market_basket_cross_sell": "conveniencia_vendas_cruzadas",
+    "erosao_financeira_tef_selic": "auditoria_fuga_financeira",
+    "raio_x_causal_margem": "investigar_causa_raiz",
+}
+
+LEGACY_TO_UNIVERSAL_INTENTS: Dict[str, str] = {
+    "auditoria_turno": "auditoria_turno_caixa",
+    "previsao_tanques": "previsao_runout_estoque",
+    "desempenho_pista_frentistas": "desempenho_equipe_conversao",
+    "conveniencia_vendas_cruzadas": "market_basket_cross_sell",
+    "auditoria_fuga_financeira": "erosao_financeira_tef_selic",
+    "investigar_causa_raiz": "raio_x_causal_margem",
+}
+
+ALL_INTENT_ALIASES: Dict[str, str] = {
+    **UNIVERSAL_TO_LEGACY_INTENTS,
+    **LEGACY_TO_UNIVERSAL_INTENTS,
+}
+
+# Catalogo canonico das 11 intencoes operacionais do sistema e extensoes AUDS
 INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
     "lmc_anp": {
         "descricao": "Livro de Movimentação de Combustíveis (LMC Oficial ANP Portaria 26/1992), balanço escriturado vs físico e tolerância de ±0.6%",
@@ -364,6 +388,98 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
             "Auditar tanques críticos fora da margem da ANP",
         ]
     },
+    "auditoria_turno_caixa": {
+        "descricao": "Auditoria universal de fechamento de turno, reconciliacao de caixa, sangrias, suprimentos e quebras operacionais",
+        "exemplos": [
+            "Auditoria de fechamento de caixa",
+            "Auditoria de turno de caixa",
+            "Conferencia de sangrias e suprimentos do turno",
+            "Quebra ou sobra de caixa no fechamento",
+            "Auditoria de fechamento operacional de terminal",
+            "Reconciliacao de turno e caixa",
+            "Conferencia de caixa e faturamento do dia",
+        ],
+    },
+    "previsao_runout_estoque": {
+        "descricao": "Previsao universal de esgotamento e runout de estoque fisico, dias de autonomia e sugestao de lote de reposicao",
+        "exemplos": [
+            "Previsao de runout de estoque",
+            "Quando vai esgotar o estoque?",
+            "Qual produto tem risco de runout?",
+            "Autonomia de estoque e reposicao",
+            "Sugestao de compra e lote de reposicao",
+            "Dias restantes de estoque de mercadoria",
+            "Previsao de desabastecimento de produtos",
+        ],
+    },
+    "desempenho_equipe_conversao": {
+        "descricao": "Desempenho de equipe comercial, operadores, produtividade, ticket medio e taxa de conversao",
+        "exemplos": [
+            "Desempenho da equipe de vendas",
+            "Produtividade dos operadores de caixa",
+            "Ranking de conversao da equipe",
+            "Qual operador tem melhor ticket medio?",
+            "Metas e produtividade dos colaboradores",
+            "Eficiencia da equipe de atendimento",
+            "Conversao de produtos premium pela equipe",
+        ],
+    },
+    "market_basket_cross_sell": {
+        "descricao": "Analise de cesta de compras (Market Basket Analysis), regras de associacao e vendas cruzadas (Cross-Sell)",
+        "exemplos": [
+            "Market basket de vendas cruzadas",
+            "Quais produtos vendem juntos na cesta?",
+            "Sugestoes de cross-sell e combos",
+            "Oportunidades de combo para elevar ticket medio",
+            "Associacao de itens e cross merchandising",
+            "Analise de afinidade de compras no checkout",
+            "Produtos comprados juntos com frequencia",
+        ],
+    },
+    "erosao_financeira_tef_selic": {
+        "descricao": "Auditoria de erosao financeira, taxas de cartoes/TEF contratadas vs reais e custo Selic de recebiveis",
+        "exemplos": [
+            "Auditoria de taxas de cartao e TEF",
+            "Erosao financeira de taxas de adquirentes",
+            "Divergencia de taxa MDR contratada",
+            "Custo financeiro de recebiveis e Selic",
+            "Auditoria de recebiveis e taxas descontadas",
+            "Perda financeira em taxas de cartao de credito",
+            "Conciliacao de taxas de cartao e adquirentes",
+        ],
+    },
+    "raio_x_causal_margem": {
+        "descricao": "Investigacao de causa-raiz (RCA) e decomposicao causal de margem, perdas financeiras e efeito mix",
+        "exemplos": [
+            "Raio-X causal de sangria de margem",
+            "Investigar causa raiz da quebra de margem",
+            "Por que a margem caiu?",
+            "Decomposicao de margem e efeito mix",
+            "Diagnostico causal de perdas financeiras",
+            "Analise causal de queda de rentabilidade",
+            "Raio-X de variacao de lucro bruto",
+        ],
+    },
+    "formas_pagamento": {
+        "descricao": "Detalhamento de vendas e recebimentos por forma de pagamento (dinheiro, debito, credito, pix, prazo), agrupados por caixa e operador",
+        "exemplos": [
+            "Quais foram as formas de pagamento do dia?",
+            "Formas de pagamento de hoje",
+            "Quais os meios de pagamento recebidos hoje?",
+            "Vendas por forma de pagamento",
+            "Quanto entrou em dinheiro e cartao no caixa?",
+            "Detalhamento de pagamentos por caixa",
+            "Formas de pagamento por operador",
+            "Quanto vendeu no pix e no debito hoje?",
+            "Relatorio de formas de pagamento do dia",
+            "Fechamento de pagamentos por frentista",
+            "Quanto foi recebido em dinheiro hoje?",
+            "Resumo de pagamentos por PDV",
+            "Total de pix do dia",
+            "Cartao de credito e debito por caixa",
+            "Formas de pagamento por funcionario",
+        ],
+    },
 }
 
 
@@ -425,6 +541,31 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     # -2. Comandos de repetição / saudações neutras não devem disparar ferramentas operacionais
     if RETRY_REGEX.match(p) or p in CONVERSATIONAL_WORDS:
         return "catalogo_produtos"
+
+    # -1.9 Formas de Pagamento & Caixas por Operador
+    termos_pagamento_exatos = [
+        "forma de pagamento", "formas de pagamento", "meio de pagamento", "meios de pagamento",
+        "tipo de pagamento", "tipos de pagamento", "modalidade de pagamento", "modalidades de pagamento",
+        "recebimento por caixa", "recebimentos por caixa", "pagamentos por caixa", "pagamento por caixa",
+        "pagamentos do dia", "pagamento do dia", "formas de pagamento do dia", "formas de pagamento de hoje",
+        "quais foram as formas de pagamento", "quais as formas de pagamento", "vendas por forma de pagamento",
+        "vendas por meio de pagamento", "pagamento por operador", "pagamentos por operador",
+        "pagamento por funcionario", "pagamentos por funcionario", "pagamento por frentista",
+        "pix do dia", "pix de hoje", "cartao do dia", "cartão do dia", "dinheiro no caixa hoje",
+        "dinheiro do dia", "dinheiro e cartao", "dinheiro e cartão", "recebido em dinheiro",
+        "recebimento em pix", "recebimentos em pix", "vendas em cartao", "vendas em cartão",
+        "vendas em pix", "vendas em dinheiro", "fechamento de pagamentos", "resumo de pagamentos",
+        "formas de pgto", "forma de pgto"
+    ]
+    if any(t in p for t in termos_pagamento_exatos):
+        return "formas_pagamento"
+
+    if ("pagamento" in p or "pagamentos" in p or "recebimento" in p or "recebimentos" in p) and any(w in p for w in ["forma", "formas", "meio", "meios", "tipo", "tipos", "modalidade", "modalidades", "caixa", "caixas", "operador", "operadores", "funcionario", "funcionarios", "frentista", "dia", "hoje"]):
+        return "formas_pagamento"
+
+    if ("pix" in p or "cartão" in p or "cartao" in p or "débito" in p or "debito" in p or "crédito" in p or "credito" in p or "dinheiro" in p) and any(w in p for w in ["caixa", "caixas", "operador", "operadores", "funcionario", "funcionarios", "dia", "hoje", "quanto", "total", "recebido", "vendeu", "faturou", "entrou"]):
+        if not any(k in p for k in ["taxa", "taxas", "mdr", "adesão", "adesao", "tarifa", "selic"]):
+            return "formas_pagamento"
 
     # -1.8 Diagnostico Modular Generativo (Blocos Lego UI)
     termos_modular = [
@@ -885,6 +1026,12 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     return "catalogo_produtos"
 
 
+def classificar_intencao_universal(pergunta: str) -> str:
+    """Classifica a intencao deterministicamente e retorna no padrao canonico universal AUDS."""
+    leg = classificar_intencao_heuristica(pergunta)
+    return LEGACY_TO_UNIVERSAL_INTENTS.get(leg, leg)
+
+
 class SemanticRouter:
     """
     Roteador Semântico Vetorial utilizando PostgreSQL 16 + pgvector.
@@ -929,6 +1076,32 @@ class SemanticRouter:
             "total_pgvector_latency_ms": 0.0,
             "total_routing_latency_ms": 0.0,
         }
+
+        # Cartucho de Dominio Ativo (AUDS Domain Pack)
+        self.active_domain_pack: Any | None = None
+
+    def load_domain_pack(self, pack_or_id: Any) -> Any:
+        """Carrega e associa um Domain Pack YAML ao roteador semantico."""
+        from core.domain.domain_pack_loader import DomainPackConfig, load_domain_pack
+        if isinstance(pack_or_id, DomainPackConfig):
+            self.active_domain_pack = pack_or_id
+        else:
+            self.active_domain_pack = load_domain_pack(pack_or_id)
+        return self.active_domain_pack
+
+    def resolve_universal_intent(self, intent: str) -> str:
+        """Mapeia qualquer rota legada para seu nome canonico universal."""
+        return LEGACY_TO_UNIVERSAL_INTENTS.get(intent, intent)
+
+    def resolve_legacy_intent(self, intent: str) -> str:
+        """Mapeia uma intencao universal para sua rota legada canonica original."""
+        return UNIVERSAL_TO_LEGACY_INTENTS.get(intent, intent)
+
+    def resolve_active_pack_intent(self, intent: str) -> str:
+        """Resolve a intencao de acordo com o Domain Pack ativo, se houver."""
+        if self.active_domain_pack:
+            return self.active_domain_pack.resolve_intent(intent)
+        return intent
 
     def _get_connection(self):
         """
@@ -1256,10 +1429,11 @@ class SemanticRouter:
                     "custo_estoque_macro",
                     "analisar_custo_estoque_macroeconomico",
                     "diagnostico_modular",
+                    "formas_pagamento",
                 ):
                     intencao_detectada = intencao_h
                     similarity = max(similarity, 0.95)
-                elif intencao_detectada not in ("lmc_anp", "ajuda_sistema", "auditar_conformidade_lmc_anp"):
+                elif intencao_detectada not in ("lmc_anp", "ajuda_sistema", "auditar_conformidade_lmc_anp", "formas_pagamento"):
                     if any(t in query_norm for t in TERMOS_LMC_EXATOS) or re.search(r"\blmc\b", query_norm):
                         intencao_detectada = "lmc_anp"
                         similarity = max(similarity, 0.88)

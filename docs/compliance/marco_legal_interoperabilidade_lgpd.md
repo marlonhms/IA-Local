@@ -13,7 +13,7 @@ A solução **AURA** opera em conformidade com o ordenamento jurídico brasileir
 
 Este documento tem por objetivo:
 1. Demonstrar a legalidade estrita do acesso de leitura aos bancos de dados locais utilizados pelos postos revendedores;
-2. Descrever a operação técnica do conector de borda ([`PostgresLocalERPAdapter`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/adapters/erp/postgres_local_adapter.py));
+2. Descrever a operação técnica do conector de borda ([`PostgresLocalERPAdapter`](./core/adapters/erp/postgres_local_adapter.py));
 3. Fornecer cláusulas contratuais padronizadas prontas para inclusão em Contratos de Prestação de Serviços, Termos de Adesão (SaaS) e Acordos de Nível de Serviço (SLA).
 
 ---
@@ -53,7 +53,7 @@ O artigo 6º da Lei de Software define expressamente as hipóteses em que a util
 
 ## 3. Arquitetura Técnica do ERP Adapter e Segurança de Borda
 
-O conector [`PostgresLocalERPAdapter`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/adapters/erp/postgres_local_adapter.py) opera rigorosamente sob as melhores práticas mundiais de engenharia de software e isolamento de segurança:
+O conector [`PostgresLocalERPAdapter`](./core/adapters/erp/postgres_local_adapter.py) opera rigorosamente sob as melhores práticas mundiais de engenharia de software e isolamento de segurança:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -86,9 +86,9 @@ O conector [`PostgresLocalERPAdapter`](file:///c:/Users/Marlon/Documents/Agent%2
 2. **Sem Engenharia Reversa de Binários:**  
    A AURA não efetua descompilação de executáveis (.exe), bibliotecas (.dll) ou scripts criptografados de terceiros. A comunicação é realizada unicamente por meio de comandos padrão SQL (`SELECT`), exatamente da mesma forma que ferramentas oficiais da Microsoft (Power BI, Excel) ou drivers ODBC universais.
 3. **Isolamento de Sala Limpa (Clean Room):**  
-   Os nomes internos de tabelas e colunas locais do posto são restritos a um único arquivo de borda ([`core/adapters/erp/postgres_local_adapter.py`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/adapters/erp/postgres_local_adapter.py)). A IA, as chamadas a modelos de linguagem, os embeddings do RAG e o banco vetorial **não conhecem e não registram schemas de terceiros**.
+   Os nomes internos de tabelas e colunas locais do posto são restritos a um único arquivo de borda ([`core/adapters/erp/postgres_local_adapter.py`](./core/adapters/erp/postgres_local_adapter.py)). A IA, as chamadas a modelos de linguagem, os embeddings do RAG e o banco vetorial **não conhecem e não registram schemas de terceiros**.
 4. **Contingência Zero-Downtime:**  
-   Caso o banco local esteja temporariamente indisponível ou inacessível, o adaptador aciona automaticamente o fallback determinístico ([`MockERPAdapter`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local/core/adapters/erp/mock_adapter.py)), garantindo a continuidade dos serviços sem interrupção.
+   Caso o banco local esteja temporariamente indisponível ou inacessível, o adaptador aciona automaticamente o fallback determinístico ([`MockERPAdapter`](./core/adapters/erp/mock_adapter.py)), garantindo a continuidade dos serviços sem interrupção.
 
 ---
 

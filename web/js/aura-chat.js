@@ -40,7 +40,9 @@ const CHAT_ICONS = {
 
 class AuraChatController {
   constructor() {
-    this.sessionId = this.generateSessionId();
+    this.sessionId = (typeof window !== 'undefined' && window.AuraStorage && typeof window.AuraStorage.getActiveSessionId === 'function')
+      ? window.AuraStorage.getActiveSessionId()
+      : this.generateSessionId();
     this.isStreaming = false;
     this.isSubmitting = false;
     this.abortController = null;
@@ -107,6 +109,99 @@ class AuraChatController {
     textarea.style.height = `${newHeight}px`;
   }
 
+  /**
+   * Restaura o historico local de mensagens da sessao ativa (IndexedDB / Backend).
+   */
+  async restoreChatHistory() {
+    const feed = document.getElementById('chat-feed-container');
+    if (typeof window === 'undefined' || !window.AuraStorage) {
+      if (feed && !feed.firstElementChild) {
+        this.addWelcomeMessage();
+      }
+      return;
+    }
+
+    try {
+      let msgs = await window.AuraStorage.getMessages(this.sessionId);
+
+      // Fallback: se local estiver vazio, busca historico no backend duravel SQLite
+      if ((!msgs || msgs.length === 0) && typeof fetch !== 'undefined') {
+        try {
+          const resp = await fetch(`/api/v1/aura/sessions/${this.sessionId}`);
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.status === 'success' && Array.isArray(data.messages) && data.messages.length > 0) {
+              msgs = [];
+              for (const m of data.messages) {
+                const item = {
+                  role: m.role === 'user' ? 'user' : 'assistant',
+                  text: m.content || '',
+                  intent: m.intent ? { intent: m.intent } : null,
+                  genuiEnvelope: (m.metadata && m.metadata.envelope) ? m.metadata.envelope : null,
+                  timestamp: m.created_at ? new Date(m.created_at).getTime() : Date.now()
+                };
+                msgs.push(item);
+                await window.AuraStorage.saveMessage(this.sessionId, item);
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (!msgs || msgs.length === 0) {
+        if (feed && !feed.firstElementChild) {
+          this.addWelcomeMessage();
+        }
+        return;
+      }
+
+      if (feed) feed.innerHTML = '';
+      let lastEnvelope = null;
+
+      for (let i = 0; i < msgs.length; i++) {
+        const msg = msgs[i];
+        if (msg.role === 'user') {
+          this.appendUserMessage(msg.text);
+        } else if (msg.role === 'assistant' || msg.role === 'aura') {
+          const containerId = msg.id || ('aura-hist-msg-' + i);
+          this.createAuraMessageBubble(containerId);
+          if (msg.intent) {
+            this.updateIntentChip(containerId, typeof msg.intent === 'string' ? { intent: msg.intent } : msg.intent);
+          }
+          if (msg.genuiEnvelope) {
+            lastEnvelope = msg.genuiEnvelope;
+            this.handleUIComplete(containerId, msg.genuiEnvelope);
+          } else if (msg.toolName && msg.toolResult) {
+            this.updateToolResultCard(containerId, msg.toolName, msg.toolResult, true);
+          }
+          if (msg.text) {
+            this.updateAuraText(containerId, msg.text, false);
+          }
+          this.finalizeCognitiveStep(containerId, false);
+        }
+      }
+
+      // Se havia um widget GenUI no final, reidrata o Companion Canvas se houver auxPanel
+      if (lastEnvelope && window.auraAuxPanel && typeof window.auraAuxPanel.open === 'function') {
+        const artId = lastEnvelope.client_component || lastEnvelope.component_name || 'artifact';
+        try {
+          window.auraAuxPanel.open(artId);
+        } catch (_) {}
+      } else if (!lastEnvelope && window.auraAuxPanel && typeof window.auraAuxPanel.clearArtifacts === 'function') {
+        try {
+          window.auraAuxPanel.clearArtifacts();
+        } catch (_) {}
+      }
+
+      this.scrollToBottom(false);
+    } catch (e) {
+      console.warn('[AuraChat] Erro ao restaurar historico de conversa:', e);
+      if (feed && !feed.firstElementChild) {
+        this.addWelcomeMessage();
+      }
+    }
+  }
+
   init() {
     if (window.marked && typeof window.marked.setOptions === 'function') {
       try {
@@ -118,10 +213,7 @@ class AuraChatController {
     }
     this.bindEvents();
     this.renderSessionId();
-    const feed = document.getElementById('chat-feed-container');
-    if (!feed || !feed.firstElementChild) {
-      this.addWelcomeMessage();
-    }
+    this.restoreChatHistory();
     this.expireStaleWidgets();
     if (typeof window !== 'undefined' && typeof window.setInterval === 'function') {
       try {
@@ -274,18 +366,37 @@ class AuraChatController {
 
   renderSessionId() {
     const el = document.getElementById('chat-session-badge');
-    if (el) el.textContent = `Sessão: ${this.sessionId}`;
+    if (el) el.textContent = `Sessao: ${this.sessionId}`;
+
+    const titleEl = document.getElementById('chat-current-session-title');
+    if (titleEl) {
+      if (this.sessionId && window.AuraStorage && typeof window.AuraStorage.listSessions === 'function') {
+        window.AuraStorage.listSessions(100).then((sessions) => {
+          const current = (sessions || []).find(s => s.session_id === this.sessionId);
+          if (current && current.title && current.title !== 'Nova Conversa') {
+            titleEl.textContent = current.title;
+          } else {
+            titleEl.textContent = 'Nova Conversa';
+          }
+        }).catch(() => {
+          titleEl.textContent = 'Conversa Atual';
+        });
+      } else {
+        titleEl.textContent = 'Conversa Atual';
+      }
+    }
   }
 
   addWelcomeMessage() {
+    // Fase 3: Cockpit de Prontidao (skeleton imediato; dados reais carregam de forma assincrona)
+    const cockpitApi = (typeof window !== 'undefined') ? window.AuraWelcomeCockpit : null;
+    const cockpitHtml = (cockpitApi && typeof cockpitApi.shellHtml === 'function') ? cockpitApi.shellHtml() : '';
     const welcomeHtml = `
       <div class="space-y-3 font-sans text-slate-200 leading-relaxed text-sm">
         <p>
-          Olá! Sou a <strong>AURA</strong>, sua assistente executiva para operações de pista, conveniência e gestão do posto.
+          Olá! Sou a <strong>AURA</strong>. Este é o resumo do seu posto antes mesmo de você perguntar.
         </p>
-        <p class="text-slate-300 text-xs sm:text-sm">
-          Estou conectada e pronta para apoiar suas decisões. Você pode me perguntar sobre a autonomia dos combustíveis, auditar o fechamento de turno e caixa, verificar a conformidade do LMC com a ANP ou analisar as vendas da loja.
-        </p>
+        ${cockpitHtml}
       </div>
       <!-- Rodapé do Card de Boas-Vindas: Sugestões Executivas Ancoradas na Base -->
       <div id="welcome-suggestions-container" class="welcome-card-footer mt-auto !mt-auto pt-4 border-t border-white/10 space-y-2.5">
@@ -297,10 +408,10 @@ class AuraChatController {
           <button onclick="window.auraChat.sendUserPrompt('Qual o diagnóstico executivo do meu negócio hoje?')" class="quick-prompt-chip !border-cyan-500/40 text-cyan-200 hover:text-white" aria-label="Consultar Mentor de Decisões Executivo">
             <svg class="w-3.5 h-3.5 text-cyan-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg> <span>Mentor de Decisões</span>
           </button>
-          <button onclick="window.auraChat.sendUserPrompt('Como fechou o último turno? Teve furo de caixa?')" class="quick-prompt-chip" aria-label="Consultar Fechamento de Turno e Caixa">
+          <button onclick="window.auraChat.sendUserPrompt('Como fechou o último turno? Teve furo de caixa?')" class="quick-prompt-chip" data-welcome-chip="turno" aria-label="Consultar Fechamento de Turno e Caixa">
             <svg class="w-3.5 h-3.5 text-cyan-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="6" width="20" height="12" rx="2" stroke-width="1.75"/><circle cx="12" cy="12" r="3" stroke-width="1.75"/><path d="M6 12h.01M18 12h.01" stroke-width="2"/></svg> <span>Fechamento & Caixa</span>
           </button>
-          <button onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" class="quick-prompt-chip" aria-label="Consultar Autonomia de Tanques">
+          <button onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" class="quick-prompt-chip" data-welcome-chip="tanques" aria-label="Consultar Autonomia de Tanques">
             <svg class="w-3.5 h-3.5 text-emerald-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="11" height="18" rx="2" stroke-width="1.75"/><line x1="2" y1="21" x2="15" y2="21" stroke-width="1.75"/><path d="M14 8h2.5a2 2 0 0 1 2 2v6.5a1.5 1.5 0 0 0 3 0V9l-2-2" stroke-width="1.5"/></svg> <span>Autonomia dos Tanques</span>
           </button>
           <button onclick="window.auraGlance ? window.auraGlance.openCommandPalette() : document.getElementById('btn-open-palette').click()" class="quick-prompt-chip !border-purple-500/30 text-purple-300 hover:text-purple-200" aria-label="Abrir mais consultas rápidas">
@@ -310,6 +421,9 @@ class AuraChatController {
       </div>
     `;
     this.appendAuraMessage(welcomeHtml, { isWelcome: true });
+    if (cockpitHtml && window.auraWelcomeCockpit && typeof window.auraWelcomeCockpit.mount === 'function') {
+      window.auraWelcomeCockpit.mount();
+    }
   }
 
   /**
@@ -351,6 +465,11 @@ class AuraChatController {
       welcomeSuggestions.remove();
     }
 
+    // Fase 3: Invalida leituras pendentes do Cockpit de Prontidao ao iniciar a conversa
+    if (typeof window !== 'undefined' && window.auraWelcomeCockpit && typeof window.auraWelcomeCockpit.dismiss === 'function') {
+      window.auraWelcomeCockpit.dismiss();
+    }
+
     // Adapta o card de boas-vindas para altura natural após iniciar a conversa
     const feed = typeof document !== 'undefined' ? document.getElementById('chat-feed-container') : null;
     const welcomeBubble = typeof document !== 'undefined' ? (document.getElementById('welcome-message-bubble') || (feed && feed.children && feed.children[0])) : null;
@@ -380,8 +499,15 @@ class AuraChatController {
 
     this.setStreamingState(true);
 
-    // 1. Adiciona a mensagem do usuário na tela
+    // 1. Adiciona a mensagem do usuário na tela e persiste no cache local
     this.appendUserMessage(query);
+    if (typeof window !== 'undefined' && window.AuraStorage) {
+      window.AuraStorage.saveMessage(this.sessionId, {
+        role: 'user',
+        text: query,
+        timestamp: Date.now()
+      });
+    }
 
     // 2. Prepara contêiner para a resposta da AURA
     const messageContainerId = 'aura-msg-' + Date.now();
@@ -402,6 +528,9 @@ class AuraChatController {
     let currentToolResult = null;
     let currentToolName = null;
     let uiCompleteReceived = false;
+    let lastGenUIEnvelope = null;
+    let pendingGenUIEnvelope = null;
+    let pendingFallbackTool = null;
     let telemetryData = null;
     let hasStreamError = false;
 
@@ -409,16 +538,54 @@ class AuraChatController {
 
     const handleDoneReconciliation = () => {
       if (hasStreamError) return;
-      if (!uiCompleteReceived && currentToolResult) {
-        // Fallback gracioso: o backend executou a ferramenta mas não emitiu GenUIEnvelope.
-        // Remove o slot de esqueleto e renderiza o card legado de ferramenta para não perder os dados.
-        this.cleanupSkeletonSlots(messageContainerId);
-        this.updateToolResultCard(messageContainerId, currentToolName || 'ferramenta', currentToolResult, true /* force */);
+      this.updateAuraText(messageContainerId, fullResponseText, false);
+      this.finalizeCognitiveStep(messageContainerId, true);
+
+      const scheduleMount = (callback) => {
+        // Micro-pausa de 160ms para ritmo de leitura executiva: o texto fixa primeiro, e o card emerge depois com efeito WOW
+        setTimeout(() => {
+          this.cleanupSkeletonSlots(messageContainerId);
+          callback();
+          this.scrollToBottom();
+        }, 160);
+      };
+
+      if (pendingGenUIEnvelope) {
+        const envToMount = pendingGenUIEnvelope;
+        pendingGenUIEnvelope = null;
+        scheduleMount(() => {
+          this.handleUIComplete(messageContainerId, envToMount, { animated: true });
+        });
+      } else if (pendingFallbackTool) {
+        const toolInfo = pendingFallbackTool;
+        pendingFallbackTool = null;
+        scheduleMount(() => {
+          this.updateToolResultCard(messageContainerId, toolInfo.name, toolInfo.result, true, { animated: true });
+        });
+      } else if (!uiCompleteReceived && currentToolResult) {
+        // Fallback gracioso: o backend executou a ferramenta mas nao emitiu GenUIEnvelope
+        const tName = currentToolName || 'ferramenta';
+        const tResult = currentToolResult;
+        scheduleMount(() => {
+          this.updateToolResultCard(messageContainerId, tName, tResult, true, { animated: true });
+        });
       } else {
         this.cleanupSkeletonSlots(messageContainerId);
       }
-      this.updateAuraText(messageContainerId, fullResponseText, false);
-      this.finalizeCognitiveStep(messageContainerId, true);
+
+      if (typeof window !== 'undefined' && window.AuraStorage) {
+        window.AuraStorage.saveMessage(this.sessionId, {
+          id: messageContainerId,
+          role: 'assistant',
+          text: fullResponseText,
+          intent: currentIntent,
+          genuiEnvelope: lastGenUIEnvelope,
+          toolName: currentToolName,
+          toolResult: currentToolResult,
+          telemetry: telemetryData,
+          timestamp: Date.now()
+        });
+      }
       this.setStreamingState(false);
       this.scrollToBottom(false);
       this.expireStaleWidgets();
@@ -447,13 +614,27 @@ class AuraChatController {
             if (!window.AuraGenUI.isEnabled()) {
               // GenUI desativado no cliente: fallback transparente para DecisionCards legados
               if (currentToolResult) {
-                this.updateToolResultCard(messageContainerId, currentToolName || envelopeData.component_name || 'ferramenta', currentToolResult, true);
+                pendingFallbackTool = {
+                  name: currentToolName || envelopeData.component_name || 'ferramenta',
+                  result: currentToolResult
+                };
               }
               return;
             }
           }
           uiCompleteReceived = true;
-          this.handleUIComplete(messageContainerId, envelopeData);
+          lastGenUIEnvelope = envelopeData;
+          if (this.isStreaming) {
+            // Em streaming ativo: aguarda conclusao do texto para emergir com efeito WOW
+            pendingGenUIEnvelope = envelopeData;
+          } else {
+            // Texto ja concluiu: emerge imediatamente com animacao WOW
+            setTimeout(() => {
+              this.cleanupSkeletonSlots(messageContainerId);
+              this.handleUIComplete(messageContainerId, envelopeData, { animated: true });
+              this.scrollToBottom();
+            }, 120);
+          }
         },
         onActionFeedback: (feedbackData) => {
           this.handleUIActionFeedback(messageContainerId, feedbackData);
@@ -490,7 +671,7 @@ class AuraChatController {
             const toolName = chunk.data?.tool_name || chunk.data?.intent || chunk.tool_name || chunk.intent || 'ferramenta';
             currentToolName = toolName;
             currentToolResult = chunk.data?.result || chunk.data || {};
-            this.updateToolResultCard(messageContainerId, toolName, currentToolResult);
+            // Registra os dados da ferramenta sem abrir card prematuro antes do texto
             this.updateCognitiveStep(messageContainerId, 'Confrontando dados e regras de negócio...', 'purple');
           } 
           else if (
@@ -589,62 +770,9 @@ class AuraChatController {
       ? performance.now()
       : Date.now();
 
-    const componentName = skeletonData.component_name || 'GenericGenUIWidget';
     const rawTitle = skeletonData.title || 'Analisando indicadores executivos...';
-    
-    // Micro-copy contextual informando a etapa em execução
-    const microCopy = rawTitle.toLowerCase().startsWith('aura engine')
-      ? rawTitle
-      : `AURA Engine: ${rawTitle}`;
-
-    // Atualiza chip cognitivo no header da mensagem
+    // Atualiza chip cognitivo no header da mensagem sem abrir card prematuro antes do texto
     this.updateCognitiveStep(containerId, rawTitle, 'cyan');
-
-    // Se já existir slot para este toolCallId, não duplica
-    const existingSlot = (typeof document.getElementById === 'function')
-      ? document.getElementById('genui-skeleton-' + toolCallId)
-      : null;
-    if (existingSlot) return;
-
-    let toolCard = (typeof document.getElementById === 'function')
-      ? document.getElementById(containerId + '-tool-card')
-      : null;
-    if (!toolCard && typeof document.getElementById === 'function') {
-      toolCard = document.getElementById(containerId);
-    }
-    if (!toolCard) return;
-
-    // Constrói o HTML do SkeletonPulse no padrão AURA Precision Glass
-    const skeletonHtml = `
-      <div id="genui-skeleton-${this.escapeHtml(toolCallId)}" 
-           class="genui-skeleton-slot p-4 rounded-xl border border-cyan-500/20 bg-slate-900/60 backdrop-blur-md animate-fade-in my-2"
-           data-tool-call-id="${this.escapeHtml(toolCallId)}"
-           data-component="${this.escapeHtml(componentName)}">
-        <div class="flex items-center gap-3">
-          <div class="w-3 h-3 rounded-full bg-cyan-400 animate-ping flex-shrink-0"></div>
-          <span class="text-xs font-mono text-cyan-300 tracking-wide uppercase font-semibold">
-            ${this.escapeHtml(microCopy)}
-          </span>
-        </div>
-        <div class="mt-3 space-y-2">
-          <div class="h-4 bg-slate-800/80 rounded w-3/4 animate-pulse"></div>
-          <div class="h-8 bg-slate-800/60 rounded w-full animate-pulse"></div>
-        </div>
-      </div>
-    `;
-
-    toolCard.innerHTML = skeletonHtml;
-    toolCard.classList.remove('hidden');
-
-    const splitCard = (typeof document.getElementById === 'function')
-      ? document.getElementById(containerId + '-split-tool-card')
-      : null;
-    if (splitCard) {
-      splitCard.innerHTML = skeletonHtml.replace(`id="genui-skeleton-${toolCallId}"`, `id="genui-skeleton-${toolCallId}-split"`);
-      splitCard.classList.remove('hidden');
-    }
-
-    this.scrollToBottom();
   }
 
   /**
@@ -678,7 +806,7 @@ class AuraChatController {
    * Substitui o slot genui-skeleton-[tool_call_id] pelo componente hidratado via
    * SecureComponentRegistry com transição suave de 150ms fade-in.
    */
-  handleUIComplete(containerId, envelopeData) {
+  handleUIComplete(containerId, envelopeData, options = {}) {
     if (!envelopeData || typeof document === 'undefined') return;
 
     // Feature Flag F9-01: Se GenUI desativado no cliente, ignora envelope
@@ -785,9 +913,10 @@ class AuraChatController {
         );
 
         if (inlineWidget) {
+          const entranceClass = options.animated ? 'genui-wow-entrance' : 'animate-fade-in';
           hydratedHtml = `
             <div id="genui-card-${this.escapeHtml(toolCallId || 'default')}" 
-                 class="genui-hydrated-card animate-fade-in my-2"
+                 class="genui-hydrated-card ${entranceClass} my-2"
                  data-tool-call-id="${this.escapeHtml(toolCallId || '')}"
                  data-component="${this.escapeHtml(envelopeData.component_name || '')}">
               ${inlineWidget}
@@ -809,7 +938,8 @@ class AuraChatController {
       const widgetContentHtml = hydratedHtml || (hydratedNode ? (hydratedNode.outerHTML || '') : '');
       const artifactId = 'art_genui_' + (toolCallId || Date.now());
       const p = envelopeData.props || envelopeData.data || {};
-      let artifactTitle = p.title || envelopeData.title || this.formatToolDisplayName(envelopeData.intent || envelopeData.component_name);
+      const rawTitle = p.title || envelopeData.title;
+      let artifactTitle = this.sanitizeExecutiveTitle(rawTitle, envelopeData.intent || envelopeData.component_name);
       let artifactSubtitle = p.diagnosis || p.subtitle || envelopeData.executive_summary || 'Resultado estruturado e auditável gerado pela AURA';
 
       // No Desktop, o widget inline no chat inicia recolhido para não duplicar com o Companion Canvas aberto.
@@ -830,7 +960,7 @@ class AuraChatController {
             autoOpen: !isMobile
           });
           if (art) {
-            if (art.title) artifactTitle = art.title;
+            if (art.title) artifactTitle = this.sanitizeExecutiveTitle(art.title, envelopeData.intent || envelopeData.component_name);
             if (art.subtitle) artifactSubtitle = art.subtitle;
           }
         } catch (_) {}
@@ -843,7 +973,8 @@ class AuraChatController {
         artifactSubtitle,
         containerId,
         widgetHtml: widgetContentHtml,
-        startExpanded: startExpanded
+        startExpanded: startExpanded,
+        animated: !!options.animated
       });
 
       const toolCard = (containerId && typeof document.getElementById === 'function')
@@ -1155,8 +1286,18 @@ class AuraChatController {
       input.value = '';
       input.style.height = 'auto';
     }
-    this.sessionId = this.generateSessionId();
-    this.renderSessionId();
+    if (typeof window !== 'undefined' && window.AuraStorage && typeof window.AuraStorage.startNewSession === 'function') {
+      window.AuraStorage.startNewSession().then((newId) => {
+        this.sessionId = newId;
+        this.renderSessionId();
+        if (window.auraHistoryDrawer && typeof window.auraHistoryDrawer.renderHistory === 'function') {
+          window.auraHistoryDrawer.renderHistory();
+        }
+      });
+    } else {
+      this.sessionId = this.generateSessionId();
+      this.renderSessionId();
+    }
     const feed = document.getElementById('chat-feed-container');
     if (feed) feed.innerHTML = '';
     if (typeof window !== 'undefined' && window.auraAuxPanel && typeof window.auraAuxPanel.clearArtifacts === 'function') {
@@ -1252,13 +1393,13 @@ class AuraChatController {
           </div>
         </div>
 
-        <!-- Card de Resultado da Ferramenta Estruturada (se houver) -->
-        <div id="${containerId}-tool-card" class="hidden w-full"></div>
-
         <!-- Texto em Streaming -->
         <div id="${containerId}-text" class="prose-aura typing-cursor">
           <span class="text-slate-400 text-xs font-sans">Processando consulta analítica...</span>
         </div>
+
+        <!-- Card de Resultado da Ferramenta Estruturada (emerge com efeito WOW apos o texto) -->
+        <div id="${containerId}-tool-card" class="hidden w-full pt-2"></div>
 
         <!-- Métricas e Confirmação da Resposta -->
         <div id="${containerId}-telemetry" class="hidden pt-2 border-t border-slate-800/80 text-[10px] font-sans text-slate-400">
@@ -1319,66 +1460,156 @@ class AuraChatController {
     }
   }
 
-  formatToolDisplayName(toolName) {
-    if (!toolName) return 'Diagnóstico Executivo';
+  sanitizeExecutiveTitle(rawTitle, fallbackIntent = null) {
+    const raw = String(rawTitle || fallbackIntent || '').trim();
+    if (!raw) return 'Diagnóstico Executivo';
+
     const map = {
       'render_GenerativeModularCardUI': 'Diagnóstico Executivo Modular',
       'GenerativeModularCardUI': 'Diagnóstico Executivo Modular',
       'diagnostico_modular': 'Diagnóstico Executivo Modular',
       'modular_card': 'Diagnóstico Executivo Modular',
+      'modular_lego_card': 'Diagnóstico Executivo Modular',
       'render_ExecutiveDecisionMentorUI': 'Mentor de Decisões Executivo',
       'ExecutiveDecisionMentorUI': 'Mentor de Decisões Executivo',
       'diagnostico_mentoria_executiva': 'Mentor de Decisões Executivo',
       'mentoria_decisao': 'Mentor de Decisões Executivo',
       'mentoria_executiva': 'Mentor de Decisões Executivo',
-      'executive_briefing': 'Briefing Executivo',
-      'render_ExecutiveBriefingUI': 'Briefing Executivo',
+      'executive_briefing': 'Briefing Executivo do Negócio',
+      'render_ExecutiveBriefingUI': 'Briefing Executivo do Negócio',
+      'ExecutiveBriefingUI': 'Briefing Executivo do Negócio',
       'auditoria_fuga_financeira': 'Auditoria de Fuga Financeira',
+      'fuga_financeira': 'Auditoria de Fuga Financeira',
+      'fugas': 'Auditoria de Fuga Financeira',
+      'fugas_financeiras': 'Auditoria de Fuga Financeira',
+      'furo_caixa': 'Auditoria de Fuga Financeira',
+      'furo_gaveta': 'Auditoria de Fuga Financeira',
+      'auditar_fuga_financeira': 'Auditoria de Fuga Financeira',
       'render_FinancialLeakAuditUI': 'Auditoria de Fuga Financeira',
       'FinancialLeakAuditUI': 'Auditoria de Fuga Financeira',
       'comparativo_concorrencia': 'Benchmark de Preços ANP',
       'comparar_benchmark_concorrencia': 'Benchmark de Preços ANP',
+      'benchmark_comparativo': 'Benchmark de Preços ANP',
       'render_BenchmarkComparisonUI': 'Benchmark de Preços ANP',
       'BenchmarkComparisonUI': 'Benchmark de Preços ANP',
-      'auditar_conformidade_lmc_anp': 'Auditoria LMC ANP',
-      'render_LMCComplianceReportUI': 'Auditoria LMC ANP',
-      'LMCComplianceReportUI': 'Auditoria LMC ANP',
+      'auditar_conformidade_lmc_anp': 'Auditoria LMC ANP Oficial',
+      'lmc_anp': 'Auditoria LMC ANP Oficial',
+      'lmc_compliance': 'Auditoria LMC ANP Oficial',
+      'render_LMCComplianceReportUI': 'Auditoria LMC ANP Oficial',
+      'LMCComplianceReportUI': 'Auditoria LMC ANP Oficial',
       'analisar_custo_estoque_macroeconomico': 'Custo de Estoque & Selic',
+      'custo_estoque_macro': 'Custo de Estoque & Selic',
       'render_MacroeconomicInventoryCostUI': 'Custo de Estoque & Selic',
       'MacroeconomicInventoryCostUI': 'Custo de Estoque & Selic',
-      'render_TankRunOutPredictionUI': 'Tanques & Autonomia',
-      'TankRunOutPredictionUI': 'Tanques & Autonomia',
+      'render_TankRunOutPredictionUI': 'Posição de Estoque & Autonomia',
+      'render_TankRunOutForecastUI': 'Posição de Estoque & Autonomia',
+      'TankRunOutPredictionUI': 'Posição de Estoque & Autonomia',
+      'TankForecastWidget': 'Posição de Estoque & Autonomia',
+      'previsao_tanques': 'Posição de Estoque & Autonomia',
+      'estoque_posicao': 'Posição de Estoque & Autonomia',
+      'run_out': 'Posição de Estoque & Autonomia',
+      'render_PaymentMethodsBreakdownUI': 'Formas de Pagamento & Caixas',
+      'PaymentMethodsBreakdownUI': 'Formas de Pagamento & Caixas',
+      'PaymentMethodsBreakdownWidget': 'Formas de Pagamento & Caixas',
+      'formas_pagamento': 'Formas de Pagamento & Caixas',
+      'consultar_formas_pagamento_detalhado': 'Formas de Pagamento & Caixas',
+      'pagamentos_caixa': 'Formas de Pagamento & Caixas',
       'render_ShiftReconciliationUI': 'Conciliação de Turno & Caixa',
       'ShiftReconciliationUI': 'Conciliação de Turno & Caixa',
-      'render_BasketUpsellStrategyUI': 'Combos & Cross-Selling',
-      'BasketUpsellStrategyUI': 'Combos & Cross-Selling',
-      'previsao_tanques': 'Tanques & Autonomia',
-      'run_out': 'Tanques & Autonomia',
-      'lmc_anp': 'LMC ANP Oficial',
+      'ShiftReconciliationWidget': 'Conciliação de Turno & Caixa',
       'auditoria_turno': 'Conciliação de Turno & Caixa',
       'conciliacao_turno': 'Conciliação de Turno & Caixa',
-      'conveniencia_vendas_cruzadas': 'Combos & Cross-Selling',
-      'desempenho_pista_frentistas': 'Performance da Pista',
+      'shift_reconciliation': 'Conciliação de Turno & Caixa',
+      'render_BasketUpsellStrategyUI': 'Combos & Cross-Selling (Loja)',
+      'BasketUpsellStrategyUI': 'Combos & Cross-Selling (Loja)',
+      'conveniencia_vendas_cruzadas': 'Combos & Cross-Selling (Loja)',
+      'vendas_cruzadas': 'Combos & Cross-Selling (Loja)',
+      'cesta_compras': 'Combos & Cesta de Compras',
+      'market_basket': 'Combos & Cesta de Compras',
+      'basket_upsell': 'Combos & Cross-Selling (Loja)',
+      'render_MarginAnalysisUI': 'Análise de Margens & Lucro',
+      'MarginAnalysisUI': 'Análise de Margens & Lucro',
+      'analise_margem': 'Análise de Margens & Lucro',
+      'vendas_analitico': 'Histórico de Vendas & Rentabilidade',
+      'render_PredictiveScenarioUI': 'Cenários Preditivos & Elasticidade',
+      'PredictiveScenarioUI': 'Cenários Preditivos & Elasticidade',
+      'cenario_preditivo': 'Cenários Preditivos & Elasticidade',
+      'simulacao_preditiva': 'Cenários Preditivos & Elasticidade',
+      'render_RootCauseAnalysisUI': 'Perícia de Causa-Raiz (RCA)',
+      'RootCauseAnalysisUI': 'Perícia de Causa-Raiz (RCA)',
+      'investigar_causa_raiz': 'Perícia de Causa-Raiz (RCA)',
+      'render_PumpPerformanceUI': 'Performance da Pista & Frentistas',
+      'PumpPerformanceUI': 'Performance da Pista & Frentistas',
+      'desempenho_pista_frentistas': 'Performance da Pista & Frentistas',
+      'render_ComplianceStatusUI': 'Blindagem Jurídica & Compliance',
+      'ComplianceStatusUI': 'Blindagem Jurídica & Compliance',
+      'compliance_status': 'Blindagem Jurídica & Compliance',
+      'conformidade_legal': 'Blindagem Jurídica & Compliance',
+      'termo_interoperabilidade': 'Termo de Interoperabilidade',
+      'blindagem_juridica': 'Blindagem Jurídica AUPS',
+      'render_FinancialErosionUI': 'Auditoria de Taxas TEF & Recebíveis',
+      'FinancialErosionUI': 'Auditoria de Taxas TEF & Recebíveis',
+      'erosao_financeira': 'Auditoria de Taxas TEF & Recebíveis',
+      'taxas_tef': 'Auditoria de Taxas TEF & Recebíveis',
+      'render_DeadCapitalOpportunityUI': 'Capital Imobilizado & Rupturas',
+      'DeadCapitalOpportunityUI': 'Capital Imobilizado & Rupturas',
+      'capital_morto': 'Capital Imobilizado & Rupturas',
+      'ruptura_invisivel': 'Capital Imobilizado & Rupturas',
+      'render_MarginWaterfallUI': 'Análise de Margem & Waterfall',
+      'MarginWaterfallUI': 'Análise de Margem & Waterfall',
+      'raio_x_causal_margem': 'Análise de Margem & Waterfall',
+      'render_ElasticityBatchSimulatorUI': 'Simulador de Lote de Compra',
+      'ElasticityBatchSimulatorUI': 'Simulador de Lote de Compra',
+      'simular_elasticidade_e_lote_compra': 'Simulador de Lote de Compra',
       'catalogo_produtos': 'Catálogo de Produtos',
-      'vendas_analitico': 'Histórico de Vendas',
-      'estoque_posicao': 'Posição de Estoque',
       'clientes_ranking': 'Ranking de Clientes',
       'dados_filial': 'Dados da Filial',
-      'sre_metricas': 'Diagnóstico Operacional',
-      'ajuda_sistema': 'Guia & Auto-Conhecimento',
-      'conhecimento_aura': 'Guia & Auto-Conhecimento',
+      'sre_metricas': 'Diagnóstico Operacional SRE',
+      'render_SRETelemetryUI': 'Diagnóstico Operacional SRE',
+      'ajuda_sistema': 'Guia da Plataforma AURA',
+      'conhecimento_aura': 'Guia & Conhecimento AURA',
     };
-    if (map[toolName]) return map[toolName];
 
-    let cleanName = String(toolName)
+    if (map[raw]) return map[raw];
+
+    let clean = raw
       .replace(/^render_/i, '')
       .replace(/(CardUI|UI|Widget|Card)$/i, '')
       .replace(/_/g, ' ')
       .replace(/([a-z])([A-Z])/g, '$1 $2')
       .trim();
 
-    if (!cleanName) return 'Diagnóstico Executivo';
-    return cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+    const englishToPt = {
+      'Executive Decision Mentor': 'Mentor de Decisões Executivo',
+      'Executive Briefing': 'Briefing Executivo do Negócio',
+      'Tank Run Out Forecast': 'Posição de Estoque & Autonomia',
+      'Tank Run Out Prediction': 'Posição de Estoque & Autonomia',
+      'Financial Leak Audit': 'Auditoria de Fuga Financeira',
+      'Shift Reconciliation': 'Conciliação de Turno & Caixa',
+      'Basket Upsell Strategy': 'Combos & Vendas Cruzadas (Loja)',
+      'Benchmark Comparison': 'Benchmark de Preços ANP',
+      'L M C Compliance Report': 'Auditoria LMC ANP Oficial',
+      'LMC Compliance Report': 'Auditoria LMC ANP Oficial',
+      'Macroeconomic Inventory Cost': 'Custo de Estoque & Selic',
+      'Margin Analysis': 'Análise de Margens & Lucro',
+      'Predictive Scenario': 'Cenários Preditivos & Elasticidade',
+      'Root Cause Analysis': 'Perícia de Causa-Raiz (RCA)',
+      'Pump Performance': 'Performance da Pista & Frentistas',
+      'Compliance Status': 'Blindagem Jurídica & Compliance',
+      'Financial Erosion': 'Auditoria de Taxas TEF & Recebíveis',
+      'Dead Capital Opportunity': 'Capital Imobilizado & Rupturas',
+      'Margin Waterfall': 'Análise de Margem & Waterfall',
+      'Elasticity Batch Simulator': 'Simulador de Lote de Compra',
+      'Generative Modular': 'Diagnóstico Executivo Modular',
+    };
+
+    if (englishToPt[clean]) return englishToPt[clean];
+    if (!clean) return 'Diagnóstico Executivo';
+    return clean.charAt(0).toUpperCase() + clean.slice(1);
+  }
+
+  formatToolDisplayName(toolName) {
+    return this.sanitizeExecutiveTitle(toolName);
   }
 
   /**
@@ -1488,18 +1719,17 @@ class AuraChatController {
 
     this.updateCognitiveStep(containerId, `Consultando telemetria de ${displayName}...`, 'cyan');
 
-    // Renderiza card de skeleton dinâmico simulando a estrutura do DecisionCard
-    const skeletonHtml = this.renderDecisionCardSkeleton(toolName);
+    // Card estruturado permanece oculto durante a consulta para o texto emergir primeiro
     cardIds.forEach(id => {
       const cardEl = typeof document !== 'undefined' ? document.getElementById(id) : null;
       if (cardEl) {
-        cardEl.innerHTML = skeletonHtml;
-        cardEl.classList.remove('hidden');
+        cardEl.innerHTML = '';
+        cardEl.classList.add('hidden');
       }
     });
   }
 
-  updateToolResultCard(containerId, toolName, resultData, force = false) {
+  updateToolResultCard(containerId, toolName, resultData, force = false, options = {}) {
     const cardIds = [containerId + '-tool-card', containerId + '-split-tool-card'];
     const chipIds = [containerId + '-tool-chip', containerId + '-split-tool-chip'];
     const displayName = this.formatToolDisplayName(toolName);
@@ -1545,7 +1775,8 @@ class AuraChatController {
     if (widgetHtml) {
       let artifactId = 'art_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
       const p = resultData?.props || resultData?.data || resultData?.contrato || resultData || {};
-      let artifactTitle = p.title || resultData?.title || this.formatToolDisplayName(resultData?.intent || toolName);
+      const rawTitle = p.title || resultData?.title;
+      let artifactTitle = this.sanitizeExecutiveTitle(rawTitle, resultData?.intent || toolName);
       let artifactSubtitle = p.diagnosis || p.subtitle || resultData?.executive_summary || 'Resultado estruturado e auditável gerado pela AURA';
 
       if (typeof window !== 'undefined' && window.auraAuxPanel && typeof window.auraAuxPanel.projectArtifact === 'function') {
@@ -1561,7 +1792,7 @@ class AuraChatController {
           });
           if (art && art.id) {
             artifactId = art.id;
-            if (art.title) artifactTitle = art.title;
+            if (art.title) artifactTitle = this.sanitizeExecutiveTitle(art.title, resultData?.intent || toolName);
             if (art.subtitle) artifactSubtitle = art.subtitle;
           }
         } catch (_) {}
@@ -1572,7 +1803,8 @@ class AuraChatController {
         artifactTitle,
         artifactSubtitle,
         containerId,
-        widgetHtml
+        widgetHtml,
+        animated: !!options.animated
       });
 
       cardIds.forEach(id => {
@@ -1638,13 +1870,15 @@ class AuraChatController {
    * - Mobile (<768px): Exibe SOMENTE "Ver no Chat ▾" (card desdobra inline no chat)
    * - PC / Desktop (>=768px): Exibe SOMENTE "Ver no Painel" (destaca o canvas lateral)
    */
-  renderCompanionPortalCard({ artifactId, artifactTitle, artifactSubtitle, containerId, widgetHtml, startExpanded = false }) {
+  renderCompanionPortalCard({ artifactId, artifactTitle, artifactSubtitle, containerId, widgetHtml, startExpanded = false, animated = false }) {
     const isHiddenClass = startExpanded ? '' : 'hidden';
     const labelText = startExpanded ? 'Esconder Widget ▴' : 'Ver no Chat ▾';
     const ariaExpanded = startExpanded ? 'true' : 'false';
+    const displayTitle = this.sanitizeExecutiveTitle(artifactTitle);
 
+    const entranceClass = animated ? 'genui-wow-entrance' : 'animate-fade-in';
     return `
-      <div class="aux-companion-portal-banner aux-artifact-portal-card mb-3 p-3.5 rounded-2xl bg-slate-900/90 border border-cyan-500/30 flex flex-col gap-2.5 shadow-lg backdrop-blur-md">
+      <div class="aux-companion-portal-banner aux-artifact-portal-card mb-3 p-3.5 rounded-2xl bg-slate-900/90 border border-cyan-500/30 flex flex-col gap-2.5 shadow-lg backdrop-blur-md ${entranceClass}">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div class="flex items-center gap-3 min-w-0">
             <div class="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0 shadow-inner">
@@ -1656,7 +1890,7 @@ class AuraChatController {
             </div>
             <div class="min-w-0">
               <div class="text-xs font-bold text-white flex items-center gap-1.5 truncate font-sans">
-                <span>${this.escapeHtml(artifactTitle)}</span>
+                <span>${this.escapeHtml(displayTitle)}</span>
                 <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Canvas</span>
               </div>
               <p class="text-[11px] text-slate-400 font-sans truncate">${this.escapeHtml(artifactSubtitle)}</p>
@@ -1674,7 +1908,7 @@ class AuraChatController {
               <span id="${containerId}-btn-toggle-pc-label">${labelText}</span>
             </button>
             <!-- PC / Desktop: Somente Ver no Painel lateral -->
-            <button type="button" onclick="window.auraAuxPanel && window.auraAuxPanel.open('${artifactId}')" id="${containerId}-btn-open-panel" class="aux-btn-view-panel hidden md:inline-flex px-3 py-1.5 min-h-[36px] rounded-xl bg-gradient-to-r from-cyan-500/20 to-purple-500/20 hover:from-cyan-500/30 hover:to-purple-500/30 text-cyan-200 hover:text-white border border-cyan-500/40 text-xs font-semibold items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer" title="Abrir no Painel Auxiliar">
+            <button type="button" onclick="window.auraAuxPanel && window.auraAuxPanel.open('${artifactId}', true, this)" id="${containerId}-btn-open-panel" class="aux-btn-view-panel hidden md:inline-flex px-3 py-1.5 min-h-[36px] rounded-xl bg-gradient-to-r from-cyan-500/20 to-purple-500/20 hover:from-cyan-500/30 hover:to-purple-500/30 text-cyan-200 hover:text-white border border-cyan-500/40 text-xs font-semibold items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer" title="Abrir no Painel Auxiliar">
               <span>Ver no Painel</span>
               <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
@@ -4983,7 +5217,7 @@ class AuraChatController {
   sanitizeAndTransformTags(input) {
     if (!input) return '';
 
-    const allowedClasses = /^(?:text-(?:emerald|amber|rose|cyan|purple|red|yellow|green)|badge-(?:emerald|amber|rose|cyan|purple|red|yellow|green)|aura-(?:hl|badge|text)-(?:emerald|amber|rose|cyan|purple|red)|aura-underline|\s)+$/i;
+    const allowedClasses = /^(?:text-(?:emerald|amber|rose|cyan|purple|red|yellow|green)|badge-(?:emerald|amber|rose|cyan|purple|red|yellow|green)|aura-(?:hl|badge|text)-(?:emerald|amber|rose|cyan|purple|red)|aura-underline|underline|\s)+$/i;
 
     // 1. Escapa comentários HTML e declarações <! ... >
     let text = input.replace(/<![\s\S]*?>/g, (match) => {
@@ -5025,6 +5259,9 @@ class AuraChatController {
         if (classMatch) {
           const cls = classMatch[2].trim();
           if (allowedClasses.test(cls)) {
+            if (cls.includes('underline')) {
+              return '<u class="aura-underline">';
+            }
             return `<span class="${cls}">`;
           }
         }
@@ -5073,7 +5310,7 @@ class AuraChatController {
     };
 
     const allColors = Object.keys(colorMap).join('|');
-    const allTags = `(?:badge-)?(?:${allColors})|u`;
+    const allTags = `(?:badge-)?(?:${allColors})|u|sublinhado|underline`;
 
     // 4.1. Normaliza fechamentos quebrados e tolerantes de BBCode (ex: [cor]texto /cor ou [cor]texto[/ cor])
     text = text.replace(
@@ -5113,8 +5350,8 @@ class AuraChatController {
       });
     });
 
-    // 4.5. Transforma BBCode de sublinhado: [u]...[/u]
-    text = text.replace(/\[u\]([\s\S]*?)\[\/u\]/gi, (match, content) => {
+    // 4.5. Transforma BBCode de sublinhado: [u]...[/u], [sublinhado]...[/sublinhado], [underline]...[/underline]
+    text = text.replace(/\[(?:u|sublinhado|underline)\]([\s\S]*?)\[\/(?:u|sublinhado|underline)\]/gi, (match, content) => {
       if (!content.trim()) return '';
       return `<u class="aura-underline">${content}</u>`;
     });

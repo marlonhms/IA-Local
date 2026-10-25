@@ -4,7 +4,7 @@
  * Regra inegociavel: ZERO referencias a CDNs externas e ZERO travessoes.
  */
 
-const CACHE_NAME = 'aura-pwa-v1';
+const CACHE_NAME = 'aura-pwa-v18';
 
 const PRECACHE_ASSETS = [
   '/',
@@ -14,11 +14,16 @@ const PRECACHE_ASSETS = [
   '/icon.svg',
   '/static/icon.svg',
   '/static/css/aura.css',
+  '/static/fonts/geist_variable.ttf',
+  '/static/fonts/newsreader_variable.ttf',
   '/static/vendor/tailwind.min.js',
   '/static/vendor/marked.min.js',
   '/static/vendor/lucide.min.js',
   '/static/js/aura-api.js',
   '/static/js/aura-app.js',
+  '/static/js/aura-storage.js',
+  '/static/js/aura-history-drawer.js',
+  '/static/js/aura-welcome-cockpit.js',
   '/static/js/aura-chat.js',
   '/static/js/aura-cockpit.js',
   '/static/js/aura-aux-panel.js',
@@ -29,6 +34,7 @@ const PRECACHE_ASSETS = [
   '/static/js/aura-genui.js',
   '/static/js/aura-genui-widgets.js',
   '/static/js/aura-state-manager.js',
+  '/static/js/aura-security-architecture.js',
   '/static/js/aura-fx.js',
   '/static/js/aura-voice.js'
 ];

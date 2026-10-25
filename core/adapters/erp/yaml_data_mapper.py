@@ -1,8 +1,8 @@
 """Mapeador Declarativo Multi-ERP via YAML (Zero-Code YAML Data Mapper).
 
-AURA Universal Posto Schema (AUPS): Bloco 4 (Declarative Multi-ERP Gateway).
-Permite a homologacao rapida de novos softwares de postos (Linx, Petros, Rezende, Adaptive)
-atraves de arquivos declarativos YAML, traduzindo automaticamente para entidades canonicas AUPS.
+AURA Universal Posto Schema (AUPS) & AUDS: Bloco 4 (Declarative Multi-ERP Gateway).
+Permite a homologacao rapida de novos sistemas de gestao (ERPs relacionais e PDVs de mercado)
+atraves de arquivos declarativos YAML, traduzindo automaticamente para entidades canonicas AUPS / AUDS.
 Inclui tratamento estrito contra injecao SQL, queries parametrizadas (%s) e fallback gracioso.
 Zero travessoes em todo o modulo.
 """

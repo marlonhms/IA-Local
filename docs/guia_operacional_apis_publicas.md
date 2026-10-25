@@ -5,7 +5,7 @@
 > **Versão:** 1.0.0-PRO  
 > **Data:** Outubro de 2026  
 > **Status:** Homologado para Operação em Borda  
-> **Repositório:** [`ia-banco-local`](file:///c:/Users/Marlon/Documents/Agent%20PC/ia-banco-local)  
+> **Repositório:** [`ia-banco-local`](./)  
 > **Regra de Estilo:** Zero travessões em todo o documento.  
 
 ---

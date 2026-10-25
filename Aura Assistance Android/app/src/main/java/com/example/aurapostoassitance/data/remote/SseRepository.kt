@@ -48,7 +48,7 @@ class SseRepository @Inject constructor(
         val eventSourceListener = object : EventSourceListener() {
             override fun onOpen(eventSource: EventSource, response: Response) {
                 Log.d("SSE", "Connection Opened")
-                trySend(SseEvent.StatusUpdate("⚡ Conectado à AURA, processando..."))
+                trySend(SseEvent.StatusUpdate("Conectado à AURA, processando..."))
             }
 
             override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
@@ -71,16 +71,23 @@ class SseRepository @Inject constructor(
                                 "ajuda_sistema" -> "Atendimento AURA"
                                 else -> intentName
                             }
-                            trySend(SseEvent.StatusUpdate("🎯 Roteando para: $friendlyName..."))
+                            trySend(SseEvent.StatusUpdate("Roteando para: $friendlyName..."))
                         }
                         "tool_start" -> {
                             val msg = jsonObj["text"]?.jsonPrimitive?.content ?: "Executando ferramenta do posto..."
-                            trySend(SseEvent.StatusUpdate("⚙️ $msg"))
+                            trySend(SseEvent.StatusUpdate("$msg"))
                         }
                         "delta" -> {
                             val textDelta = jsonObj["text"]?.jsonPrimitive?.content
                             if (!textDelta.isNullOrEmpty()) {
                                 trySend(SseEvent.TextDelta(textDelta))
+                            }
+                        }
+                        "ui_complete" -> {
+                            val envelope = jsonObj["envelope"]?.takeIf { it is kotlinx.serialization.json.JsonObject }
+                                ?: jsonObj["data"]?.takeIf { it is kotlinx.serialization.json.JsonObject }
+                            if (envelope != null) {
+                                trySend(SseEvent.UiComplete(envelope.toString()))
                             }
                         }
                         "error" -> {
@@ -92,7 +99,9 @@ class SseRepository @Inject constructor(
                         }
                         else -> {
                             val textDelta = jsonObj["text"]?.jsonPrimitive?.content
-                            if (!textDelta.isNullOrEmpty() && chunkType != "telemetry" && chunkType != "cache_hit" && chunkType != "tool_result") {
+                            val isInternalChunk = chunkType == "telemetry" || chunkType == "cache_hit" ||
+                                chunkType == "tool_result" || chunkType.startsWith("ui_")
+                            if (!textDelta.isNullOrEmpty() && !isInternalChunk) {
                                 trySend(SseEvent.TextDelta(textDelta))
                             }
                         }

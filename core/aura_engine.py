@@ -77,6 +77,13 @@ from core.schemas.genui import (
     ComplianceStatusProps,
     CompliancePillarItem,
     GenerativeModularProps,
+    FinancialErosionProps,
+    DeadCapitalOpportunityProps,
+    MarginWaterfallProps,
+    ElasticityBatchSimulatorProps,
+    PaymentMethodsBreakdownProps,
+    PaymentMethodBreakdownItem,
+    CashierOperatorPaymentItem,
 )
 from core.config import is_genui_enabled
 from core.telemetry import AuraSRETelemetry
@@ -127,6 +134,18 @@ HEAVY_ANALYTICAL_TOOLS: set[str] = {
     "benchmark_postos",
     "posicionamento_competitivo",
     "comparativo_turnos",
+    "auditar_erosao_financeira_e_recebiveis",
+    "erosao_financeira",
+    "erosao_financeira_tef_selic",
+    "diagnosticar_capital_morto_e_ruptura_invisivel",
+    "capital_morto",
+    "capital_morto_selic",
+    "diagnosticar_variacao_margem_causal",
+    "raio_x_causal_margem",
+    "margem_causal_waterfall",
+    "simular_elasticidade_e_lote_compra",
+    "elasticidade_lote_compra",
+    "simulador_elasticidade",
 }
 
 # =============================================================================
@@ -906,6 +925,60 @@ class AuraSessionMemory:
             conn.execute("DELETE FROM aura_sessions WHERE session_id = ?;", (session_id,))
             conn.commit()
 
+    def list_sessions(self, limit: int = 30) -> List[Dict[str, Any]]:
+        """Lista sessoes com contagem de mensagens, primeira pergunta e data de atualizacao."""
+        with self._connection() as conn:
+            cur = conn.execute("""
+                SELECT 
+                    s.session_id,
+                    s.tenant_id,
+                    s.filial_id,
+                    s.created_at,
+                    s.updated_at,
+                    COUNT(m.id) as message_count,
+                    (SELECT content FROM aura_messages WHERE session_id = s.session_id AND role = 'user' ORDER BY id ASC LIMIT 1) as first_query,
+                    (SELECT intent FROM aura_messages WHERE session_id = s.session_id AND intent IS NOT NULL ORDER BY id DESC LIMIT 1) as last_intent
+                FROM aura_sessions s
+                LEFT JOIN aura_messages m ON s.session_id = m.session_id
+                GROUP BY s.session_id
+                ORDER BY s.updated_at DESC
+                LIMIT ?;
+            """, (limit,))
+            rows = cur.fetchall()
+
+        result = []
+        for r in rows:
+            title = r["first_query"] or r["last_intent"] or "Nova Conversa"
+            if title and len(title) > 60:
+                title = title[:57] + "..."
+            result.append({
+                "session_id": r["session_id"],
+                "title": title or "Nova Conversa",
+                "message_count": r["message_count"] or 0,
+                "created_at": r["created_at"],
+                "updated_at": r["updated_at"],
+                "tenant_id": r["tenant_id"],
+                "filial_id": r["filial_id"],
+            })
+        return result
+
+    def get_session_messages(self, session_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+        """Retorna todas as mensagens da sessao com seus metadados e envelopes GenUI associados."""
+        return self.get_history(session_id, limit=limit)
+
+    def delete_session(self, session_id: str) -> bool:
+        """Remove duravelmente uma sessao e seus registros associados."""
+        self.clear_session(session_id)
+        return True
+
+    def clear_all_sessions(self) -> bool:
+        """Limpa duravelmente todas as sessoes e mensagens registradas no SQLite."""
+        with self._connection() as conn:
+            conn.execute("DELETE FROM aura_messages;")
+            conn.execute("DELETE FROM aura_sessions;")
+            conn.commit()
+        return True
+
 
 # =============================================================================
 # EXTRATORES DE PARÂMETROS E CLASSIFICAÇÃO (COMPATIBILIDADE PLENA)
@@ -1295,7 +1368,74 @@ def classificar_intencao(pergunta: str, router: Optional[SemanticRouter] = None)
 # MAPEAMENTO DO CATÁLOGO DE COMPONENTES GENUI & BUILDER CANÔNICO
 # =============================================================================
 
+CANONICAL_EXECUTIVE_TITLES: Dict[str, str] = {
+    "formas_pagamento": "Formas de Pagamento & Caixas",
+    "consultar_formas_pagamento_detalhado": "Formas de Pagamento & Caixas",
+    "pagamentos_caixa": "Formas de Pagamento & Caixas",
+    "render_PaymentMethodsBreakdownUI": "Formas de Pagamento & Caixas",
+    "PaymentMethodsBreakdownUI": "Formas de Pagamento & Caixas",
+    "mentoria_decisao": "Mentor de Decisões Executivo",
+    "executive_briefing": "Briefing Executivo do Negócio",
+    "previsao_tanques": "Posição de Estoque & Autonomia",
+    "estoque_posicao": "Posição de Estoque & Autonomia",
+    "auditoria_turno": "Conciliação de Turno & Caixa",
+    "conciliacao_turno": "Conciliação de Turno & Caixa",
+    "auditoria_fuga_financeira": "Auditoria de Fuga Financeira",
+    "fuga_financeira": "Auditoria de Fuga Financeira",
+    "furo_caixa": "Auditoria de Fuga Financeira",
+    "furo_gaveta": "Auditoria de Fuga Financeira",
+    "comparativo_concorrencia": "Benchmark de Preços ANP",
+    "comparar_benchmark_concorrencia": "Benchmark de Preços ANP",
+    "benchmark_comparativo": "Benchmark de Preços ANP",
+    "auditar_conformidade_lmc_anp": "Auditoria LMC ANP Oficial",
+    "lmc_anp": "Auditoria LMC ANP Oficial",
+    "lmc_compliance": "Auditoria LMC ANP Oficial",
+    "analisar_custo_estoque_macroeconomico": "Custo Financeiro de Estoque & Selic",
+    "custo_estoque_macro": "Custo Financeiro de Estoque & Selic",
+    "conveniencia_vendas_cruzadas": "Combos & Vendas Cruzadas (Loja)",
+    "vendas_cruzadas": "Combos & Vendas Cruzadas (Loja)",
+    "cesta_compras": "Combos & Cesta de Compras",
+    "basket_upsell": "Combos & Cross-Selling (PDV)",
+    "analise_margem": "Análise de Margens & Lucro",
+    "vendas_analitico": "Histórico de Vendas & Rentabilidade",
+    "cenario_preditivo": "Cenários Preditivos & Elasticidade",
+    "simulacao_preditiva": "Cenários Preditivos & Elasticidade",
+    "desempenho_pista_frentistas": "Performance da Pista & Frentistas",
+    "investigar_causa_raiz": "Perícia de Causa-Raiz (RCA)",
+    "compliance_status": "Blindagem Jurídica & Compliance",
+    "conformidade_legal": "Blindagem Jurídica & Compliance",
+    "termo_interoperabilidade": "Termo de Interoperabilidade",
+    "blindagem_juridica": "Blindagem Jurídica AUPS",
+    "diagnostico_modular": "Diagnóstico Executivo Modular",
+    "generative_modular_card": "Diagnóstico Executivo Modular",
+    "modular_lego_card": "Diagnóstico Executivo Modular",
+    "erosao_financeira": "Auditoria de Taxas TEF & Recebíveis",
+    "taxas_tef": "Auditoria de Taxas TEF & Recebíveis",
+    "capital_morto": "Capital Imobilizado & Rupturas",
+    "ruptura_invisivel": "Capital Imobilizado & Rupturas",
+    "raio_x_causal_margem": "Análise de Margem & Waterfall",
+    "simular_elasticidade_e_lote_compra": "Simulador de Lote de Compra",
+    "sre_metricas": "Diagnóstico Operacional SRE",
+    "ajuda_sistema": "Guia da Plataforma AURA",
+    "conhecimento_aura": "Guia & Conhecimento AURA",
+}
+
 GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
+    "formas_pagamento": {
+        "component_name": "render_PaymentMethodsBreakdownUI",
+        "client_component": "PaymentMethodsBreakdownUI",
+        "title": "Consolidando formas de pagamento por caixa e operador...",
+    },
+    "consultar_formas_pagamento_detalhado": {
+        "component_name": "render_PaymentMethodsBreakdownUI",
+        "client_component": "PaymentMethodsBreakdownUI",
+        "title": "Consolidando formas de pagamento por caixa e operador...",
+    },
+    "pagamentos_caixa": {
+        "component_name": "render_PaymentMethodsBreakdownUI",
+        "client_component": "PaymentMethodsBreakdownUI",
+        "title": "Consolidando formas de pagamento por caixa e operador...",
+    },
     "mentoria_decisao": {
         "component_name": "render_ExecutiveDecisionMentorUI",
         "client_component": "ExecutiveDecisionMentorUI",
@@ -1501,6 +1641,76 @@ GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
         "client_component": "GenerativeModularCardUI",
         "title": "AURA Intelligent UI: Compondo diagnostico modular dinamico...",
     },
+    "erosao_financeira": {
+        "component_name": "render_FinancialErosionUI",
+        "client_component": "FinancialErosionUI",
+        "title": "Auditando erosao financeira, taxas TEF e arbitragem Selic...",
+    },
+    "auditar_erosao_financeira_e_recebiveis": {
+        "component_name": "render_FinancialErosionUI",
+        "client_component": "FinancialErosionUI",
+        "title": "Auditando erosao financeira, taxas TEF e arbitragem Selic...",
+    },
+    "erosao_financeira_tef_selic": {
+        "component_name": "render_FinancialErosionUI",
+        "client_component": "FinancialErosionUI",
+        "title": "Auditando erosao financeira, taxas TEF e arbitragem Selic...",
+    },
+    "taxas_tef": {
+        "component_name": "render_FinancialErosionUI",
+        "client_component": "FinancialErosionUI",
+        "title": "Auditando erosao financeira, taxas TEF e arbitragem Selic...",
+    },
+    "capital_morto": {
+        "component_name": "render_DeadCapitalOpportunityUI",
+        "client_component": "DeadCapitalOpportunityUI",
+        "title": "Identificando capital imobilizado (Selic) e rupturas invisiveis de gondola...",
+    },
+    "diagnosticar_capital_morto_e_ruptura_invisivel": {
+        "component_name": "render_DeadCapitalOpportunityUI",
+        "client_component": "DeadCapitalOpportunityUI",
+        "title": "Identificando capital imobilizado (Selic) e rupturas invisiveis de gondola...",
+    },
+    "capital_morto_selic": {
+        "component_name": "render_DeadCapitalOpportunityUI",
+        "client_component": "DeadCapitalOpportunityUI",
+        "title": "Identificando capital imobilizado (Selic) e rupturas invisiveis de gondola...",
+    },
+    "ruptura_invisivel": {
+        "component_name": "render_DeadCapitalOpportunityUI",
+        "client_component": "DeadCapitalOpportunityUI",
+        "title": "Identificando capital imobilizado (Selic) e rupturas invisiveis de gondola...",
+    },
+    "raio_x_causal_margem": {
+        "component_name": "render_MarginWaterfallUI",
+        "client_component": "MarginWaterfallUI",
+        "title": "Decompondo variacao de margem e lucro bruto via causalidade Waterfall...",
+    },
+    "diagnosticar_variacao_margem_causal": {
+        "component_name": "render_MarginWaterfallUI",
+        "client_component": "MarginWaterfallUI",
+        "title": "Decompondo variacao de margem e lucro bruto via causalidade Waterfall...",
+    },
+    "margem_causal_waterfall": {
+        "component_name": "render_MarginWaterfallUI",
+        "client_component": "MarginWaterfallUI",
+        "title": "Decompondo variacao de margem e lucro bruto via causalidade Waterfall...",
+    },
+    "simular_elasticidade_e_lote_compra": {
+        "component_name": "render_ElasticityBatchSimulatorUI",
+        "client_component": "ElasticityBatchSimulatorUI",
+        "title": "Simulando elasticidade de demanda e otimizador de lote de compra...",
+    },
+    "elasticidade_lote_compra": {
+        "component_name": "render_ElasticityBatchSimulatorUI",
+        "client_component": "ElasticityBatchSimulatorUI",
+        "title": "Simulando elasticidade de demanda e otimizador de lote de compra...",
+    },
+    "simulador_elasticidade": {
+        "component_name": "render_ElasticityBatchSimulatorUI",
+        "client_component": "ElasticityBatchSimulatorUI",
+        "title": "Simulando elasticidade de demanda e otimizador de lote de compra...",
+    },
 }
 
 
@@ -1553,6 +1763,11 @@ def build_canonical_genui_envelope(
         BasketUpsellStrategyProps,
         ComplianceStatusProps,
         GenerativeModularProps,
+        FinancialErosionProps,
+        DeadCapitalOpportunityProps,
+        MarginWaterfallProps,
+        ElasticityBatchSimulatorProps,
+        PaymentMethodsBreakdownProps,
     )):
         props = resultado_bruto.model_dump(mode="json")
     elif isinstance(resultado_bruto, dict) and "props" in resultado_bruto and isinstance(resultado_bruto["props"], dict):
@@ -1563,6 +1778,13 @@ def build_canonical_genui_envelope(
         props = dict(resultado_bruto)
     elif resultado_bruto is not None:
         props = {"data": resultado_bruto}
+
+    # Injeta titulo executivo canonico se ausente ou tecnico
+    comp_target = mapping.get("component_name", "")
+    exec_title = CANONICAL_EXECUTIVE_TITLES.get(intencao) or CANONICAL_EXECUTIVE_TITLES.get(comp_target) or "Diagnostico Executivo"
+    curr_title = props.get("title")
+    if not curr_title or str(curr_title).startswith("render_") or str(curr_title).endswith("UI"):
+        props["title"] = exec_title
 
     # Prepara ações transacionais (Camada 3)
     actions: List[GenUIActionOption] = []
@@ -1581,7 +1803,46 @@ def build_canonical_genui_envelope(
 
     comp_name = mapping.get("component_name", "")
 
-    if comp_name == "render_MarginAnalysisUI" or intencao in ("analise_margem", "vendas_analitico"):
+    if comp_name == "render_PaymentMethodsBreakdownUI" or intencao in ("formas_pagamento", "consultar_formas_pagamento_detalhado", "pagamentos_caixa"):
+        if not actions:
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="🔍 Auditar Furo de Caixa",
+                    action_type="inspection",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"intent": "auditoria_turno", "data": props.get("data_referencia")},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="💰 Conferir Sangrias Pendentes",
+                    action_type="inspection",
+                    variant="secondary",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"intent": "auditoria_fuga_financeira", "data": props.get("data_referencia")},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="📄 Exportar Fechamento",
+                    action_type="inspection",
+                    variant="ghost",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"export": "formas_pagamento", "data": props.get("data_referencia")},
+                )
+            )
+        props["diagnosis"] = props.get("diagnosis") or executive_summary or "Detalhamento de pagamentos apurado no ERP."
+        props["confidence_score"] = float(props.get("confidence_score") or 0.98)
+        props["suggested_actions"] = [a.model_dump(mode="json") if hasattr(a, "model_dump") else a for a in actions]
+
+    elif comp_name == "render_MarginAnalysisUI" or intencao in ("analise_margem", "vendas_analitico"):
         if not actions:
             actions.append(
                 GenUIActionOption(
@@ -2738,6 +2999,16 @@ class AuraEngine:
         def _run_sync():
             # Mapeamento universal de nomes de intenções e ferramentas
             if norm_name in (
+                "formas_pagamento", "consultar_formas_pagamento_detalhado",
+                "pagamentos_caixa", "meios_pagamento", "formas_pagamento_detalhado"
+            ):
+                return self.tools.consultar_formas_pagamento_detalhado(
+                    data=p.get("data"),
+                    turno=p.get("turno"),
+                    pdv=p.get("pdv") or p.get("caixa"),
+                )
+
+            elif norm_name in (
                 "auditoria_turno", "auditar_fechamento_turno", "fechamento_turno",
                 "turno", "conciliacao_turno", "auditoria_de_turno", "fechamento_de_turno",
                 "conferencia_turno", "conferencia_pista"
@@ -2928,6 +3199,55 @@ class AuraEngine:
                     blocos=p.get("blocos") or p.get("blocks"),
                     suggested_actions=p.get("suggested_actions") or p.get("acoes"),
                     limitacoes=p.get("limitacoes") or p.get("limitations"),
+                )
+
+            elif norm_name in (
+                "auditar_erosao_financeira_e_recebiveis", "erosao_financeira",
+                "erosao_financeira_tef_selic", "taxas_tef", "arbitragem_selic"
+            ):
+                return self.tools.auditar_erosao_financeira_e_recebiveis(
+                    data_inicio=p.get("data_inicio") or p.get("data"),
+                    data_fim=p.get("data_fim") or p.get("data"),
+                    taxas_contratadas_custom=p.get("taxas_contratadas_custom") or p.get("taxas_contratadas"),
+                    prazo_liquidacao_dias_custom=p.get("prazo_liquidacao_dias_custom") or p.get("prazos"),
+                    necessidade_caixa_72h=float(p["necessidade_caixa_72h"]) if p.get("necessidade_caixa_72h") is not None else None,
+                    taxa_antecipacao_mensal_custom=float(p["taxa_antecipacao_mensal_custom"]) if p.get("taxa_antecipacao_mensal_custom") is not None else None,
+                )
+
+            elif norm_name in (
+                "diagnosticar_capital_morto_e_ruptura_invisivel", "capital_morto",
+                "capital_morto_selic", "ruptura_invisivel", "ruptura_fantasma"
+            ):
+                return self.tools.diagnosticar_capital_morto_e_ruptura_invisivel(
+                    dias_sem_giro_corte=int(p.get("dias_sem_giro_corte", 30)),
+                    taxa_selic_anual_override=float(p["taxa_selic_anual_override"]) if p.get("taxa_selic_anual_override") is not None else None,
+                    itens_custom=p.get("itens_custom"),
+                )
+
+            elif norm_name in (
+                "diagnosticar_variacao_margem_causal", "raio_x_causal_margem",
+                "margem_causal_waterfall", "variacao_margem", "waterfall_margem"
+            ):
+                return self.tools.diagnosticar_variacao_margem_causal(
+                    periodo_atual=p.get("periodo_atual"),
+                    periodo_anterior=p.get("periodo_anterior"),
+                    dados_custom=p.get("dados_custom"),
+                )
+
+            elif norm_name in (
+                "simular_elasticidade_e_lote_compra", "elasticidade_lote_compra",
+                "simulador_elasticidade", "otimizador_lote"
+            ):
+                return self.tools.simular_elasticidade_e_lote_compra(
+                    produto=p.get("produto") or "GASOLINA COMUM",
+                    municipio=p.get("municipio"),
+                    tanque_capacidade_litros=float(p["tanque_capacidade_litros"]) if p.get("tanque_capacidade_litros") is not None else None,
+                    estoque_atual_litros=float(p["estoque_atual_litros"]) if p.get("estoque_atual_litros") is not None else None,
+                    lote_minimo_litros=float(p.get("lote_minimo_litros", 5000.0)),
+                    desconto_lote_reais_litro=float(p.get("desconto_lote_reais_litro", 0.08)),
+                    preco_venda_atual=float(p["preco_venda_atual"]) if p.get("preco_venda_atual") is not None else None,
+                    consumo_diario_litros=float(p["consumo_diario_litros"]) if p.get("consumo_diario_litros") is not None else None,
+                    elasticidade_estimada=float(p.get("elasticidade_estimada", -1.8)),
                 )
 
             else:
@@ -3133,6 +3453,11 @@ class AuraEngine:
                 data_p, _ = extrair_data_turno(pergunta)
                 resultado_bruto = self.tools.gerar_diagnostico_mentoria_executiva(tipo=intencao, data=data_p)
                 contexto_extra = f"Diagnóstico do Mentor de Decisões Executivo (GenUI Catálogo Expandido):\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+
+            elif intencao in ("formas_pagamento", "consultar_formas_pagamento_detalhado", "pagamentos_caixa"):
+                data_p, turno_p = extrair_data_turno(pergunta)
+                resultado_bruto = self.tools.consultar_formas_pagamento_detalhado(data=data_p, turno=turno_p)
+                contexto_extra = f"Detalhamento de Formas de Pagamento por Caixa e Operador no ERP:\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
 
             elif intencao == "auditoria_turno":
                 data_p, turno_p = extrair_data_turno(pergunta)
@@ -3428,6 +3753,97 @@ class AuraEngine:
             ]
             return "\n".join(linhas)
 
+        # EROSAO FINANCEIRA, TAXAS TEF & ARBITRAGEM SELIC (MOTOR 1 - FASE 3)
+        if intencao in ("erosao_financeira", "auditar_erosao_financeira_e_recebiveis", "erosao_financeira_tef_selic", "taxas_tef"):
+            props = resultado_bruto.get("props") or resultado_bruto
+            diag = props.get("diagnosis") or "Auditoria de taxas TEF e erosao de recebiveis."
+            tot_v = float(props.get("total_vendas_reais") or 0.0)
+            tot_div = float(props.get("total_divergencia_taxas_reais") or 0.0)
+            tot_selic = float(props.get("total_custo_carregamento_selic_reais") or 0.0)
+            selic_aa = float(props.get("taxa_selic_anual_pct") or 10.75)
+            estrat = props.get("estrategia_cobertura_otima") or ""
+            econ = float(props.get("economia_estimada_reais") or 0.0)
+
+            cor_div = "[vermelho]" if tot_div > 0 else "[verde]"
+            cor_div_f = "[/vermelho]" if tot_div > 0 else "[/verde]"
+
+            linhas = [
+                "### 💳 Auditoria de Erosao Financeira & Arbitragem Selic (TEF/Recebiveis)",
+                "",
+                f"**Diagnóstico:** {diag}",
+                f"- **Faturamento Auditado:** R$ {tot_v:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                f"- **Perda por Divergencia de Taxa:** {cor_div}R$ {tot_div:,.2f}{cor_div_f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                f"- **Custo de Carregamento Selic ({selic_aa:.2f}% a.a.):** R$ {tot_selic:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                f"- **Prescricao de Cobertura de Caixa:** {estrat}",
+                f"- **Economia Projetada:** [verde]R$ {econ:,.2f}[/verde]".replace(",", "X").replace(".", ",").replace("X", "."),
+            ]
+            return "\n".join(linhas)
+
+        # CAPITAL MORTO & RUPTURA FANTASMA (MOTOR 2 - FASE 3)
+        if intencao in ("capital_morto", "diagnosticar_capital_morto_e_ruptura_invisivel", "capital_morto_selic", "ruptura_invisivel"):
+            props = resultado_bruto.get("props") or resultado_bruto
+            diag = props.get("diagnosis") or "Diagnostico de capital imobilizado e rupturas invisiveis."
+            cap = float(props.get("total_capital_morto_imobilizado_reais") or 0.0)
+            corrosao = float(props.get("total_custo_selic_acumulado_reais") or 0.0)
+            selic_aa = float(props.get("taxa_selic_anual_pct") or 10.75)
+            plano = props.get("plano_acao_desova") or ""
+
+            linhas = [
+                "### 📦 Cacador de Capital Morto & Ruptura Invisivel de Gondola",
+                "",
+                f"**Diagnóstico:** {diag}",
+                f"- **Capital Imobilizado Sem Giro:** [vermelho]R$ {cap:,.2f}[/vermelho]".replace(",", "X").replace(".", ",").replace("X", "."),
+                f"- **Corrosao Selic Acumulada ({selic_aa:.2f}% a.a.):** R$ {corrosao:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                f"- **Plano de Desova:** {plano}",
+            ]
+            return "\n".join(linhas)
+
+        # DECOMPOSICAO CAUSAL WATERFALL DE MARGEM (MOTOR 3 - FASE 3)
+        if intencao in ("raio_x_causal_margem", "diagnosticar_variacao_margem_causal", "margem_causal_waterfall", "variacao_margem"):
+            props = resultado_bruto.get("props") or resultado_bruto
+            diag = props.get("diagnosis") or "Decomposicao causal da variacao de margem."
+            d_total = float(props.get("delta_margem_total_reais") or 0.0)
+            d_pct = float(props.get("delta_margem_pct") or 0.0)
+            ef_rep = float(props.get("efeito_custo_reposicao_reais") or 0.0)
+            ef_mix = float(props.get("efeito_mix_conversao_reais") or 0.0)
+            ef_vol = float(props.get("efeito_volume_puro_reais") or 0.0)
+            ef_perd = float(props.get("efeito_perdas_descontos_reais") or 0.0)
+
+            cor_tot = "[vermelho]" if d_total < 0 else "[verde]"
+            cor_tot_f = "[/vermelho]" if d_total < 0 else "[/verde]"
+
+            linhas = [
+                "### 📉 Raio-X de Sangria de Margem (Decomposicao Causal Waterfall)",
+                "",
+                f"**Diagnóstico:** {diag}",
+                f"- **Variacao de Margem Total:** {cor_tot}R$ {d_total:,.2f} ({d_pct:+.2f}%){cor_tot_f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                f"- **1. CMV Nao Repassado (Defasagem):** R$ {ef_rep:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                f"- **2. Mix de Produtos & Conversao:** R$ {ef_mix:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                f"- **3. Efeito Volume Puro de Clientes:** R$ {ef_vol:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                f"- **4. Perdas, Descontos & LMC:** R$ {ef_perd:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+            ]
+            return "\n".join(linhas)
+
+        # SIMULADOR DE ELASTICIDADE E LOTE DE COMPRA (MOTOR 4 - FASE 3)
+        if intencao in ("simular_elasticidade_e_lote_compra", "elasticidade_lote_compra", "simulador_elasticidade", "otimizador_lote"):
+            props = resultado_bruto.get("props") or resultado_bruto
+            diag = props.get("diagnosis") or "Simulacao de elasticidade de demanda e otimizacao de lote."
+            prod = props.get("produto") or "GASOLINA COMUM"
+            ullage = float(props.get("espaco_livre_ullage_litros") or 0.0)
+            lote = float(props.get("lote_minimo_compra_litros") or 5000.0)
+            econ = float(props.get("economia_potencial_lote_reais") or 0.0)
+            rec = props.get("cenario_recomendado") or ""
+
+            linhas = [
+                f"### 🚛 Simulador de Elasticidade & Otimizador de Lote ({prod})",
+                "",
+                f"**Diagnóstico:** {diag}",
+                f"- **Espaco Disponivel no Tanque (Ullage):** {ullage:,.0f} L (Lote Minimo: {lote:,.0f} L)",
+                f"- **Economia Potencial do Lote:** [verde]R$ {econ:,.2f}[/verde]".replace(",", "X").replace(".", ",").replace("X", "."),
+                f"- **Recomendacao Prescritiva:** {rec}",
+            ]
+            return "\n".join(linhas)
+
         # 0b. BENCHMARK COMPARATIVO & CONCORRÊNCIA (MICRO-WIDGET F6-03)
         if intencao in ("benchmark_comparativo", "comparativo_turnos"):
             props = resultado_bruto.get("props") or resultado_bruto
@@ -3516,6 +3932,77 @@ class AuraEngine:
             linhas.extend([
                 "",
                 "**⚡ Ações Recomendadas (HITL):** Utilize os botões na Camada 3 do card para revisar estratégias de precificação ou auditar concorrentes no raio."
+            ])
+            return "\n".join(linhas)
+
+        # FORMAS DE PAGAMENTO & CAIXAS
+        if intencao in ("formas_pagamento", "consultar_formas_pagamento_detalhado", "pagamentos_caixa"):
+            props = resultado_bruto.get("props") or resultado_bruto
+            data_ref = props.get("data_referencia") or "Hoje"
+            total_geral = float(props.get("total_geral_reais", 0.0))
+            total_tx = int(props.get("total_transacoes", 0))
+            ticket_medio = float(props.get("ticket_medio_geral", 0.0))
+            modalidades = props.get("modalidades") or []
+            caixas_op = props.get("caixas_operadores") or []
+            aviso = props.get("aviso_data")
+
+            linhas = [
+                "### 💳 Formas de Pagamento & Caixas",
+                "",
+                f"**Posicao Operacional ({data_ref}):**",
+                f"- **Faturamento Consolidado:** [verde]R$ {total_geral:,.2f}[/verde] ({total_tx} vendas apuradas)",
+                f"- **Ticket Medio:** R$ {ticket_medio:,.2f}",
+                "",
+                "**Detalhamento por Modalidade de Pagamento:**",
+            ]
+            for m in modalidades:
+                nome_m = m.get("modalidade", "Outros")
+                val_m = float(m.get("total_reais", 0.0))
+                pct_m = float(m.get("percentual", 0.0))
+                qtd_m = int(m.get("total_transacoes", 0))
+                linhas.append(f"- **{nome_m}:** [ciano]R$ {val_m:,.2f}[/ciano] ({pct_m:.1f}% • {qtd_m} transacoes)")
+
+            if caixas_op:
+                linhas.extend([
+                    "",
+                    "**Detalhamento por Caixa & Operador Responsavel:**",
+                ])
+                for c_item in caixas_op:
+                    cx = c_item.get("caixa", "PDV")
+                    op = c_item.get("operador_nome", "Nao informado")
+                    matr = c_item.get("operador_matricula", "")
+                    tur = c_item.get("turno", "Geral")
+                    tot_cx = float(c_item.get("total_caixa_reais", 0.0))
+                    dinh = float(c_item.get("dinheiro_reais", 0.0))
+                    cart = float(c_item.get("cartao_total_reais", 0.0))
+                    pix = float(c_item.get("pix_reais", 0.0))
+                    prz = float(c_item.get("prazo_convenio_reais", 0.0))
+                    cupons = int(c_item.get("total_cupons", 0))
+
+                    detalhes_partes = []
+                    if dinh > 0:
+                        detalhes_partes.append(f"Dinheiro: R$ {dinh:,.2f}")
+                    if cart > 0:
+                        detalhes_partes.append(f"Cartao: R$ {cart:,.2f}")
+                    if pix > 0:
+                        detalhes_partes.append(f"PIX: R$ {pix:,.2f}")
+                    if prz > 0:
+                        detalhes_partes.append(f"A Prazo: R$ {prz:,.2f}")
+                    detalhes_str = " | ".join(detalhes_partes) if detalhes_partes else f"R$ {tot_cx:,.2f}"
+
+                    matr_str = f" (Matricula: `{matr}`)" if matr and matr != "0" else ""
+                    linhas.append(f"- **{cx} ({tur})** : Operador **{op}**{matr_str}")
+                    linhas.append(f"  Total no Caixa: [verde]R$ {tot_cx:,.2f}[/verde] ({cupons} vendas) - {detalhes_str}")
+
+            if aviso:
+                linhas.extend([
+                    "",
+                    f"*(ℹ️ {aviso})*"
+                ])
+
+            linhas.extend([
+                "",
+                "**⚡ Acoes Disponiveis:** Utilize o Companion Canvas ao lado para auditar sangrias, inspecionar furos ou exportar o fechamento em 1 clique."
             ])
             return "\n".join(linhas)
 
@@ -4190,11 +4677,12 @@ class AuraEngine:
                         tool_call_id=tool_call_id,
                         details={"source": "backend"},
                     )
+                canonical_ui_title = CANONICAL_EXECUTIVE_TITLES.get(intencao) or CANONICAL_EXECUTIVE_TITLES.get(genui_meta.get("component_name")) or genui_meta.get("title")
                 yield AuraChunk(
                     chunk_type=AuraChunkType.UI_COMPLETE,
                     tool_call_id=tool_call_id,
                     component_name=genui_meta["component_name"],
-                    title=genui_meta.get("title"),
+                    title=canonical_ui_title,
                     envelope=envelope_payload,
                     data=envelope_payload,
                     session_id=sess_id,
@@ -4243,16 +4731,33 @@ class AuraEngine:
         for m_name in FALLBACK_MODELS[:1]:
             try:
                 model = genai.GenerativeModel(m_name)
-                # Invoca streaming assincrono com timeout agil de 5 segundos
+                # Invoca streaming assincrono com timeout agil de 3 segundos
                 response_stream = await asyncio.wait_for(
                     model.generate_content_async(
                         prompt_sistema,
                         stream=True,
+                        request_options={"timeout": 3.0},
                     ),
-                    timeout=5.0,
+                    timeout=3.0,
                 )
 
-                async for chunk in response_stream:
+                async def _get_next_chunk(aiter_obj):
+                    return await aiter_obj.__anext__()
+
+                stream_aiter = response_stream.__aiter__()
+                while True:
+                    try:
+                        chunk = await asyncio.wait_for(_get_next_chunk(stream_aiter), timeout=2.5)
+                    except StopAsyncIteration:
+                        break
+                    except (asyncio.TimeoutError, Exception) as stream_step_err:
+                        logger.warning(
+                            "AuraEngine: Timeout ou interrupcao no streaming da LLM (%s): %s",
+                            m_name,
+                            stream_step_err,
+                        )
+                        break
+
                     try:
                         chunk_text = chunk.text
                     except Exception:
@@ -4276,8 +4781,12 @@ class AuraEngine:
                     sucesso_llm = True
                     break
 
-            except Exception:
-                # Fallback para o proximo modelo da lista ou sintese deterministica imediata
+            except Exception as llm_init_err:
+                logger.info(
+                    "AuraEngine: Modelo %s indisponivel ou timeout (%s). Acionando contingencia deterministica.",
+                    m_name,
+                    llm_init_err,
+                )
                 continue
 
         total_llm_ms = (time.perf_counter() - t_llm_start) * 1000
@@ -4330,11 +4839,12 @@ class AuraEngine:
                         tool_call_id=tool_call_id,
                         details={"source": "backend"}
                     )
+                canonical_ui_title = CANONICAL_EXECUTIVE_TITLES.get(intencao) or CANONICAL_EXECUTIVE_TITLES.get(genui_meta.get("component_name")) or genui_meta.get("title")
                 yield AuraChunk(
                     chunk_type=AuraChunkType.UI_COMPLETE,
                     tool_call_id=tool_call_id,
                     component_name=genui_meta["component_name"],
-                    title=genui_meta.get("title"),
+                    title=canonical_ui_title,
                     envelope=envelope_payload,
                     data=envelope_payload,
                     session_id=sess_id,

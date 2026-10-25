@@ -16,15 +16,18 @@
 class AuraAuxPanel {
   constructor() {
     this.isOpen = false;
-    this.isExpanded = false; // false = split padrão (50/50), true = canvas expandido (65/35)
+    this.isExpanded = false; // false = split padrao (54/46), true = canvas expandido (38/62)
     this.activeTab = 'visual'; // 'visual' | 'data' | 'schema' | 'audit'
-    this.artifacts = []; // lista de artefatos da sessão
+    this.artifacts = []; // lista de artefatos da sessao
     this.activeArtifactId = null;
     this.userDismissed = false;
     this.filterQuery = '';
     this.lastDataGridArtifactId = null;
     this.previousFocusedElement = null;
     this.techMode = false;
+    this.morphTimeout = null;
+    this.chatMorphTimeout = null;
+    this.contentRevealTimeout = null;
   }
 
   /**
@@ -323,11 +326,26 @@ class AuraAuxPanel {
   }
 
   /**
-   * Abre o painel auxiliar
+   * Abre o painel auxiliar com arquitetura de transicao desacoplada (60 FPS)
    */
-  open(artifactId = null, playSound = true) {
+  open(artifactId = null, playSound = true, triggerElement = null) {
     if (artifactId) {
       this.activeArtifactId = artifactId;
+    }
+
+    const auxPanel = typeof document !== 'undefined' ? document.getElementById('aura-aux-panel') : null;
+
+    // Se o painel ja estiver aberto e visivel, apenas atualiza o conteudo sem disparar novo morph
+    if (this.isOpen && auxPanel && !auxPanel.classList.contains('hidden') && !auxPanel.classList.contains('aux-panel-morphing')) {
+      this.renderActiveArtifact();
+      const activeArt = this.getActiveArtifact();
+      if (activeArt && activeArt.containerId) {
+        const msgEl = document.getElementById(activeArt.containerId);
+        if (msgEl) {
+          msgEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+      return;
     }
 
     this.isOpen = true;
@@ -336,20 +354,74 @@ class AuraAuxPanel {
     if (typeof document !== 'undefined') {
       this.previousFocusedElement = document.activeElement;
 
+      // Cancela timeouts de animacoes pendentes para evitar condicao de corrida
+      if (this.morphTimeout) {
+        clearTimeout(this.morphTimeout);
+        this.morphTimeout = null;
+      }
+      if (this.chatMorphTimeout) {
+        clearTimeout(this.chatMorphTimeout);
+        this.chatMorphTimeout = null;
+      }
+      if (this.contentRevealTimeout) {
+        clearTimeout(this.contentRevealTimeout);
+        this.contentRevealTimeout = null;
+      }
+
+      // 1. Identifica o botao de origem (card, acao ou header)
+      let trigger = triggerElement;
+      if (!trigger && document.activeElement) {
+        const el = document.activeElement;
+        if (
+          el.id === 'btn-toggle-aux-panel' ||
+          (typeof el.closest === 'function' && el.closest('#btn-toggle-aux-panel')) ||
+          el.classList?.contains('aux-btn-view-panel') ||
+          el.classList?.contains('aux-btn-view-chat') ||
+          el.getAttribute?.('data-action-id') === 'act_default_canvas'
+        ) {
+          trigger = el;
+        }
+      }
+
+      // Se nenhum botao estiver focado, busca o cartao de resultado mais recente no chat
+      if (!trigger) {
+        trigger = document.querySelector('#chat-feed-container .aux-btn-view-panel:last-of-type') ||
+                  document.querySelector('#chat-feed-container [data-action-id="act_default_canvas"]:last-of-type') ||
+                  document.getElementById('btn-toggle-aux-panel');
+      }
+
+      this.lastTriggerElement = trigger;
+
+      if (trigger && typeof trigger.getBoundingClientRect === 'function') {
+        trigger.classList.remove('aux-btn-pulse-morph');
+        void trigger.offsetWidth;
+        trigger.classList.add('aux-btn-pulse-morph');
+      }
+
       const consoleView = document.getElementById('view-console');
-      const auxPanel = document.getElementById('aura-aux-panel');
+      const chatColumn = document.getElementById('chat-stream-column');
       const btnToggle = document.getElementById('btn-toggle-aux-panel');
       const peekToast = document.getElementById('aux-artifact-peek-toast');
       const beacon = document.getElementById('aux-toggle-beacon');
 
+      // 2. Captura geometria previa do chat antes de ativar o layout split
+      const chatFirstRect = (chatColumn && typeof chatColumn.getBoundingClientRect === 'function')
+        ? chatColumn.getBoundingClientRect()
+        : null;
+
+      // 3. Prepara o painel em camada invisivel antes de acoplar no layout
+      if (auxPanel) {
+        auxPanel.style.opacity = '0';
+        auxPanel.style.transition = 'none';
+        auxPanel.classList.remove('hidden');
+        auxPanel.classList.add('aux-panel-morphing');
+        auxPanel.classList.remove('aux-panel-content-revealed');
+      }
+
+      // 4. Ativa estado de layout no console e header (sem transicao sincrona concorrente)
       if (consoleView) {
         consoleView.classList.add('aux-panel-active');
         if (this.isExpanded) consoleView.classList.add('aux-expanded');
-      }
-
-      if (auxPanel) {
-        auxPanel.classList.remove('hidden');
-        auxPanel.classList.add('animate-fade-in');
       }
 
       if (btnToggle) {
@@ -360,15 +432,41 @@ class AuraAuxPanel {
       if (peekToast) peekToast.classList.add('hidden');
       if (beacon) beacon.classList.add('hidden');
 
-      this.renderActiveArtifact();
+      // 5. Pre-popula titulos basicos para evitar salto visual sem custo pesado de renderizacao
+      const artifact = this.getActiveArtifact();
+      if (artifact) {
+        const titleEl = document.getElementById('aux-panel-title');
+        const subEl = document.getElementById('aux-panel-subtitle');
+        if (titleEl) titleEl.textContent = artifact.title;
+        if (subEl) subEl.textContent = artifact.subtitle;
+      }
 
-      // Rola para a mensagem associada no chat
-      const activeArt = this.getActiveArtifact();
-      if (activeArt && activeArt.containerId) {
-        const msgEl = document.getElementById(activeArt.containerId);
-        if (msgEl) {
-          msgEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      // 6. Neutraliza o salto do chat via GPU FLIP imediato
+      const chatLastRect = (chatColumn && typeof chatColumn.getBoundingClientRect === 'function')
+        ? chatColumn.getBoundingClientRect()
+        : null;
+
+      let chatDeltaX = 0;
+      let chatDeltaY = 0;
+      if (chatColumn && chatFirstRect && chatLastRect) {
+        chatDeltaX = chatFirstRect.left - chatLastRect.left;
+        chatDeltaY = chatFirstRect.top - chatLastRect.top;
+        if (Math.abs(chatDeltaX) > 1 || Math.abs(chatDeltaY) > 1) {
+          chatColumn.style.transformOrigin = 'top left';
+          chatColumn.style.transition = 'none';
+          chatColumn.style.transform = `translate3d(${chatDeltaX}px, ${chatDeltaY}px, 0px)`;
+          void chatColumn.offsetWidth;
         }
+      }
+
+      // 7. Captura coordenadas exatas do botao de origem apos o chat estar estabilizado
+      const btnRect = (trigger && typeof trigger.getBoundingClientRect === 'function')
+        ? trigger.getBoundingClientRect()
+        : null;
+
+      // 8. Executa Spatial Morphing desacoplado via GPU FLIP
+      if (auxPanel) {
+        this.runSpatialMorphOpen(trigger, auxPanel, btnRect, chatColumn, chatDeltaX, chatDeltaY);
       }
     }
 
@@ -378,7 +476,133 @@ class AuraAuxPanel {
   }
 
   /**
-   * Fecha o painel auxiliar e devolve o layout ao centro confortável
+   * Spatial Morphing Real (Dynamic Island / Apple Vision Pro)
+   * O proprio painel nasce nas coordenadas e dimensoes exatas do botao clicado (FLIP)
+   * e se expande organicamente no espaco atraves de transform 3D e GPU compositor (60 FPS).
+   * Desacopla o morphing visual de reflows pesados via execucao 100% acelerada por hardware.
+   */
+  runSpatialMorphOpen(triggerEl, auxPanel, cachedBtnRect = null, chatColumn = null, chatDeltaX = 0, chatDeltaY = 0) {
+    if (!auxPanel || typeof document === 'undefined') return;
+
+    if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      auxPanel.style.transform = '';
+      auxPanel.style.opacity = '1';
+      auxPanel.classList.remove('aux-panel-morphing');
+      if (chatColumn) {
+        chatColumn.style.transform = '';
+        chatColumn.style.transition = '';
+      }
+      this.renderActiveArtifact();
+      return;
+    }
+
+    const btnRect = cachedBtnRect || ((triggerEl && typeof triggerEl.getBoundingClientRect === 'function')
+      ? triggerEl.getBoundingClientRect()
+      : null);
+
+    const panelRect = auxPanel.getBoundingClientRect();
+
+    // Caso de fallback (sem coordenadas validas de botao)
+    if (!btnRect || btnRect.width === 0 || btnRect.height === 0 || !panelRect || panelRect.width === 0) {
+      auxPanel.style.transformOrigin = 'center right';
+      auxPanel.style.transform = 'scale(0.96) translate3d(24px, 0, 0)';
+      auxPanel.style.opacity = '0';
+      void auxPanel.offsetWidth;
+
+      requestAnimationFrame(() => {
+        auxPanel.style.transition = 'transform 360ms cubic-bezier(0.2, 0.9, 0.3, 1), opacity 260ms ease-out';
+        auxPanel.style.transform = 'scale(1) translate3d(0, 0, 0)';
+        auxPanel.style.opacity = '1';
+
+        this.contentRevealTimeout = setTimeout(() => {
+          this.renderActiveArtifact();
+          auxPanel.classList.remove('aux-panel-morphing');
+          auxPanel.classList.add('aux-panel-content-revealed');
+        }, 200);
+
+        this.morphTimeout = setTimeout(() => {
+          auxPanel.style.transition = '';
+          auxPanel.style.transform = '';
+          auxPanel.style.transformOrigin = '';
+          auxPanel.classList.remove('aux-panel-content-revealed');
+        }, 380);
+      });
+      return;
+    }
+
+    // FLIP Step 2: Invert: posiciona a capsula do painel exatamente sobre o botao de origem
+    const deltaX = btnRect.left - panelRect.left;
+    const deltaY = btnRect.top - panelRect.top;
+    const scaleX = Math.max(0.04, Math.min(1, btnRect.width / panelRect.width));
+    const scaleY = Math.max(0.02, Math.min(1, btnRect.height / panelRect.height));
+    const initialRadius = Math.max(8, Math.min(btnRect.height / 2, 24));
+
+    auxPanel.style.transformOrigin = 'top left';
+    auxPanel.style.transition = 'none';
+    auxPanel.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0px) scale(${scaleX}, ${scaleY})`;
+    auxPanel.style.borderRadius = `${initialRadius}px`;
+    auxPanel.style.opacity = '0.65';
+    auxPanel.style.boxShadow = '0 0 30px rgba(6, 182, 212, 0.45), 0 10px 25px rgba(0, 0, 0, 0.5)';
+
+    // Forca aplicacao do estado inicial sem reflow concorrente
+    void auxPanel.offsetWidth;
+
+    // FLIP Step 3: Play: animacao simultanea em curva Apple Spring 100% acelerada por hardware
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const springCurve = 'cubic-bezier(0.2, 0.9, 0.3, 1)';
+        const duration = 400;
+
+        auxPanel.style.transition = `transform ${duration}ms ${springCurve}, opacity 280ms ease-out, border-radius ${duration}ms ${springCurve}, box-shadow ${duration}ms ease-out`;
+        auxPanel.style.transform = 'translate3d(0px, 0px, 0px) scale(1, 1)';
+        auxPanel.style.borderRadius = '16px';
+        auxPanel.style.opacity = '1';
+        auxPanel.style.boxShadow = '0 20px 50px -15px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.12)';
+
+        if (chatColumn && (Math.abs(chatDeltaX) > 1 || Math.abs(chatDeltaY) > 1)) {
+          chatColumn.style.transition = `transform ${duration}ms ${springCurve}`;
+          chatColumn.style.transform = 'translate3d(0px, 0px, 0px)';
+        }
+
+        // Revelacao suave do conteudo interno quando a capsula atinge maturidade de expansao
+        const revealDelay = Math.round(duration * 0.65);
+        this.contentRevealTimeout = setTimeout(() => {
+          this.renderActiveArtifact();
+          auxPanel.classList.remove('aux-panel-morphing');
+          auxPanel.classList.add('aux-panel-content-revealed');
+        }, revealDelay);
+
+        this.morphTimeout = setTimeout(() => {
+          auxPanel.style.transition = '';
+          auxPanel.style.transform = '';
+          auxPanel.style.transformOrigin = '';
+          auxPanel.style.borderRadius = '';
+          auxPanel.style.boxShadow = '';
+          auxPanel.classList.remove('aux-panel-content-revealed');
+
+          if (chatColumn) {
+            chatColumn.style.transition = '';
+            chatColumn.style.transform = '';
+            chatColumn.style.transformOrigin = '';
+          }
+
+          // Rola suavemente para a mensagem associada no chat apos conclusao da transicao
+          const activeArt = this.getActiveArtifact();
+          if (activeArt && activeArt.containerId) {
+            const msgEl = document.getElementById(activeArt.containerId);
+            if (msgEl) {
+              msgEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+          }
+        }, duration + 30);
+      });
+    });
+  }
+
+  /**
+   * Fecha o painel auxiliar com Spatial Morphing reverso em direcao ao botao de origem
+   * Desacopla o fechamento em 2 estagios limpos: recolhimento GPU do painel primeiro,
+   * seguido pelo reposicionamento suave da coluna de chat com GPU transform (60 FPS).
    */
   close(playSound = true) {
     this.isOpen = false;
@@ -386,15 +610,21 @@ class AuraAuxPanel {
 
     if (typeof document !== 'undefined') {
       const consoleView = document.getElementById('view-console');
+      const chatColumn = document.getElementById('chat-stream-column');
       const auxPanel = document.getElementById('aura-aux-panel');
       const btnToggle = document.getElementById('btn-toggle-aux-panel');
 
-      if (consoleView) {
-        consoleView.classList.remove('aux-panel-active', 'aux-expanded');
+      if (this.morphTimeout) {
+        clearTimeout(this.morphTimeout);
+        this.morphTimeout = null;
       }
-
-      if (auxPanel) {
-        auxPanel.classList.add('hidden');
+      if (this.chatMorphTimeout) {
+        clearTimeout(this.chatMorphTimeout);
+        this.chatMorphTimeout = null;
+      }
+      if (this.contentRevealTimeout) {
+        clearTimeout(this.contentRevealTimeout);
+        this.contentRevealTimeout = null;
       }
 
       if (btnToggle) {
@@ -402,7 +632,77 @@ class AuraAuxPanel {
         btnToggle.classList.remove('bg-cyan-500/15', 'border-cyan-500/40', 'text-cyan-200');
       }
 
-      // Restaura foco ao gatilho que abriu ou ao input de chat (WCAG 2.1 AA)
+      if (auxPanel && !auxPanel.classList.contains('hidden')) {
+        const trigger = this.lastTriggerElement;
+        const btnRect = (trigger && typeof trigger.getBoundingClientRect === 'function')
+          ? trigger.getBoundingClientRect()
+          : null;
+        const panelRect = auxPanel.getBoundingClientRect();
+
+        // Estagio 1: O painel se recolhe de volta ao botao via GPU (260ms)
+        if (btnRect && panelRect && panelRect.width > 0) {
+          const deltaX = btnRect.left - panelRect.left;
+          const deltaY = btnRect.top - panelRect.top;
+          const scaleX = Math.max(0.04, Math.min(1, btnRect.width / panelRect.width));
+          const scaleY = Math.max(0.02, Math.min(1, btnRect.height / panelRect.height));
+
+          auxPanel.style.transformOrigin = 'top left';
+          auxPanel.style.transition = 'transform 260ms cubic-bezier(0.4, 0, 1, 1), opacity 200ms ease-out';
+          auxPanel.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0px) scale(${scaleX}, ${scaleY})`;
+          auxPanel.style.opacity = '0';
+        } else {
+          auxPanel.style.transformOrigin = 'center right';
+          auxPanel.style.transition = 'transform 220ms ease-in, opacity 200ms ease-out';
+          auxPanel.style.transform = 'scale(0.96) translate3d(20px, 0, 0)';
+          auxPanel.style.opacity = '0';
+        }
+
+        // Estagio 2: Ao finalizar o recolhimento, oculta o painel e reposiciona o chat suavemente
+        this.morphTimeout = setTimeout(() => {
+          auxPanel.classList.add('hidden');
+          auxPanel.style.transition = '';
+          auxPanel.style.transform = '';
+          auxPanel.style.transformOrigin = '';
+          auxPanel.style.opacity = '';
+          auxPanel.classList.remove('aux-panel-morphing', 'aux-panel-content-revealed');
+
+          if (consoleView) {
+            const chatFirstRect = (chatColumn && typeof chatColumn.getBoundingClientRect === 'function')
+              ? chatColumn.getBoundingClientRect()
+              : null;
+
+            consoleView.classList.remove('aux-panel-active', 'aux-expanded');
+
+            const chatLastRect = (chatColumn && typeof chatColumn.getBoundingClientRect === 'function')
+              ? chatColumn.getBoundingClientRect()
+              : null;
+
+            if (chatColumn && chatFirstRect && chatLastRect) {
+              const chatDeltaX = chatFirstRect.left - chatLastRect.left;
+              if (Math.abs(chatDeltaX) > 2) {
+                chatColumn.style.transformOrigin = 'top left';
+                chatColumn.style.transform = `translate3d(${chatDeltaX}px, 0px, 0px)`;
+                chatColumn.style.transition = 'none';
+                void chatColumn.offsetWidth;
+
+                requestAnimationFrame(() => {
+                  chatColumn.style.transition = 'transform 280ms cubic-bezier(0.2, 0.9, 0.3, 1)';
+                  chatColumn.style.transform = 'translate3d(0px, 0px, 0px)';
+
+                  this.chatMorphTimeout = setTimeout(() => {
+                    chatColumn.style.transition = '';
+                    chatColumn.style.transform = '';
+                    chatColumn.style.transformOrigin = '';
+                  }, 300);
+                });
+              }
+            }
+          }
+        }, 260);
+      } else if (consoleView) {
+        consoleView.classList.remove('aux-panel-active', 'aux-expanded');
+      }
+
       if (this.previousFocusedElement && typeof this.previousFocusedElement.focus === 'function') {
         this.previousFocusedElement.focus({ preventScroll: true });
       } else {
@@ -430,20 +730,96 @@ class AuraAuxPanel {
   }
 
   /**
-   * Alterna largura entre Split Padrão (50%) e Expandido (65%)
+   * Alterna largura entre Split Padrao (54%/46%) e Expandido (38%/62%)
+   * Utiliza FLIP GPU para alternancia fluida sem engasgo de reflow.
    */
   toggleExpand() {
     this.isExpanded = !this.isExpanded;
     if (typeof document !== 'undefined') {
       const consoleView = document.getElementById('view-console');
+      const chatColumn = document.getElementById('chat-stream-column');
+      const auxPanel = document.getElementById('aura-aux-panel');
       const expandIcon = document.getElementById('aux-expand-icon');
+
+      if (this.morphTimeout) {
+        clearTimeout(this.morphTimeout);
+        this.morphTimeout = null;
+      }
+      if (this.chatMorphTimeout) {
+        clearTimeout(this.chatMorphTimeout);
+        this.chatMorphTimeout = null;
+      }
+      if (this.contentRevealTimeout) {
+        clearTimeout(this.contentRevealTimeout);
+        this.contentRevealTimeout = null;
+      }
+
       if (consoleView) {
+        const chatFirstRect = (chatColumn && typeof chatColumn.getBoundingClientRect === 'function')
+          ? chatColumn.getBoundingClientRect()
+          : null;
+        const panelFirstRect = (auxPanel && typeof auxPanel.getBoundingClientRect === 'function')
+          ? auxPanel.getBoundingClientRect()
+          : null;
+
         if (this.isExpanded) {
           consoleView.classList.add('aux-expanded');
         } else {
           consoleView.classList.remove('aux-expanded');
         }
+
+        const chatLastRect = (chatColumn && typeof chatColumn.getBoundingClientRect === 'function')
+          ? chatColumn.getBoundingClientRect()
+          : null;
+        const panelLastRect = (auxPanel && typeof auxPanel.getBoundingClientRect === 'function')
+          ? auxPanel.getBoundingClientRect()
+          : null;
+
+        if (chatColumn && chatFirstRect && chatLastRect) {
+          const chatDeltaX = chatFirstRect.left - chatLastRect.left;
+          if (Math.abs(chatDeltaX) > 2) {
+            chatColumn.style.transformOrigin = 'top left';
+            chatColumn.style.transform = `translate3d(${chatDeltaX}px, 0px, 0px)`;
+            chatColumn.style.transition = 'none';
+          }
+        }
+
+        if (auxPanel && panelFirstRect && panelLastRect) {
+          const panelDeltaX = panelFirstRect.left - panelLastRect.left;
+          if (Math.abs(panelDeltaX) > 2) {
+            auxPanel.style.transformOrigin = 'top left';
+            auxPanel.style.transform = `translate3d(${panelDeltaX}px, 0px, 0px)`;
+            auxPanel.style.transition = 'none';
+          }
+        }
+
+        if (auxPanel) void auxPanel.offsetWidth;
+
+        requestAnimationFrame(() => {
+          const springCurve = 'cubic-bezier(0.2, 0.9, 0.3, 1)';
+          if (chatColumn && chatColumn.style.transform) {
+            chatColumn.style.transition = `transform 320ms ${springCurve}`;
+            chatColumn.style.transform = 'translate3d(0px, 0px, 0px)';
+          }
+          if (auxPanel && auxPanel.style.transform) {
+            auxPanel.style.transition = `transform 320ms ${springCurve}`;
+            auxPanel.style.transform = 'translate3d(0px, 0px, 0px)';
+          }
+          setTimeout(() => {
+            if (chatColumn) {
+              chatColumn.style.transition = '';
+              chatColumn.style.transform = '';
+              chatColumn.style.transformOrigin = '';
+            }
+            if (auxPanel) {
+              auxPanel.style.transition = '';
+              auxPanel.style.transform = '';
+              auxPanel.style.transformOrigin = '';
+            }
+          }, 340);
+        });
       }
+
       if (expandIcon) {
         expandIcon.innerHTML = this.isExpanded
           ? '<polyline points="4 14 10 14 10 20" stroke-width="2"/><polyline points="20 10 14 10 14 4" stroke-width="2"/><line x1="14" y1="10" x2="21" y2="3" stroke-width="2"/><line x1="3" y1="21" x2="10" y2="14" stroke-width="2"/>'
@@ -692,8 +1068,18 @@ class AuraAuxPanel {
     const visualView = document.getElementById('aux-view-visual');
     if (!visualView) return;
 
+    let artifactHtml = artifact.html || '';
+    if (artifactHtml && !artifactHtml.includes('genui-hydrated-card') && artifact.id && artifact.id.startsWith('art_genui_')) {
+      const toolCallId = artifact.id.replace('art_genui_', '');
+      artifactHtml = `<div id="genui-canvas-card-${toolCallId}" class="genui-hydrated-card genui-decision-mentor-card" data-tool-call-id="${toolCallId}" data-component="${artifact.toolName || 'render_ExecutiveDecisionMentorUI'}">${artifactHtml}</div>`;
+    }
+
+    // Se o artefato ja possui um widget visual completo (GenUI Card), o proprio widget e a interface completa.
+    // Nao exibimos cards de resumo tecnicos ou redundantes no topo da visualizacao.
+    const hasRichWidget = Boolean(artifactHtml && artifactHtml.trim().length > 0);
+
     let kpisHtml = '';
-    if (artifact.summaryKpis && artifact.summaryKpis.length > 0) {
+    if (!hasRichWidget && artifact.summaryKpis && artifact.summaryKpis.length > 0) {
       kpisHtml = `
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-3">
           ${artifact.summaryKpis.map(kpi => `
@@ -707,10 +1093,27 @@ class AuraAuxPanel {
       `;
     }
 
-    let artifactHtml = artifact.html || '';
-    if (artifactHtml && !artifactHtml.includes('genui-hydrated-card') && artifact.id && artifact.id.startsWith('art_genui_')) {
-      const toolCallId = artifact.id.replace('art_genui_', '');
-      artifactHtml = `<div id="genui-canvas-card-${toolCallId}" class="genui-hydrated-card genui-decision-mentor-card" data-tool-call-id="${toolCallId}" data-component="${artifact.toolName || 'render_ExecutiveDecisionMentorUI'}">${artifactHtml}</div>`;
+    if (!hasRichWidget && (!artifact.summaryKpis || artifact.summaryKpis.length === 0)) {
+      if (artifact.records && artifact.records.length > 0) {
+        visualView.innerHTML = `
+          <div class="p-5 rounded-2xl bg-slate-900/60 border border-white/5 space-y-3 text-center">
+            <div class="w-10 h-10 mx-auto rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" stroke-width="1.75"/><line x1="3" y1="9" x2="21" y2="9" stroke-width="1.5"/><line x1="9" y1="21" x2="9" y2="9" stroke-width="1.5"/></svg>
+            </div>
+            <div>
+              <h4 class="font-bold text-sm text-white font-sans">${this.escapeHtml(artifact.title)}</h4>
+              <p class="text-xs text-slate-400 mt-1">${this.escapeHtml(artifact.subtitle || 'Consulta executiva realizada com sucesso.')}</p>
+            </div>
+            <div class="pt-2">
+              <button class="px-4 py-2 rounded-xl bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/30 text-xs font-semibold transition-all inline-flex items-center gap-2" onclick="window.auraAuxPanel.switchTab('data')">
+                <span>Ver Tabela de Dados (${artifact.records.length} itens)</span>
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6" stroke-width="2"/></svg>
+              </button>
+            </div>
+          </div>
+        `;
+        return;
+      }
     }
 
     visualView.innerHTML = `
@@ -1081,7 +1484,7 @@ class AuraAuxPanel {
       subtitle = c.diagnosis || c.subtitle || data?.props?.diagnosis || data?.subtitle || 'Métricas & Prioridades de Gestão em Blocos';
       const score = c.confidence_score !== undefined ? Math.round(Number(c.confidence_score) * 100) : (data?.props?.confidence_score !== undefined ? Math.round(Number(data.props.confidence_score) * 100) : 98);
       statusChip = {
-        label: ${score}% Confiança Analítica,
+        label: `${score}% Confiança Analítica`,
         severity: score >= 90 ? 'success' : 'attention'
       };
 
@@ -1095,8 +1498,8 @@ class AuraAuxPanel {
       }));
 
       summaryKpis = [
-        { label: 'Score Confiança', value: ${score}%, sub: 'Auditado Determinístico' },
-        { label: 'Métricas Apuradas', value: ${records.length}, sub: 'Indicadores chave' },
+        { label: 'Score Confiança', value: `${score}%`, sub: 'Auditado Determinístico' },
+        { label: 'Métricas Apuradas', value: `${records.length}`, sub: 'Indicadores chave' },
         { label: 'Diagnóstico', value: 'Ativo', sub: 'Visão Integrada' }
       ];
 
@@ -1369,6 +1772,74 @@ class AuraAuxPanel {
       ];
     }
 
+    // MÓDULO 4-B: FORMAS DE PAGAMENTO & CAIXAS
+    else if (
+      effectiveIntent === 'formas_pagamento' ||
+      effectiveIntent === 'pagamentos_caixa' ||
+      toolName === 'formas_pagamento' ||
+      toolName === 'consultar_formas_pagamento_detalhado' ||
+      toolName === 'render_PaymentMethodsBreakdownUI' ||
+      toolName === 'PaymentMethodsBreakdownUI'
+    ) {
+      title = '💳 Formas de Pagamento & Caixas';
+      subtitle = c.subtitle || data?.subtitle || 'Detalhamento por Terminal PDV, Operador & Modalidade';
+      const totGeral = Number(c.total_geral_reais ?? data?.total_geral_reais ?? 0.0);
+      const totCupons = Number(c.total_transacoes ?? data?.total_transacoes ?? 0);
+      const numCaixas = Number(c.total_caixas_ativos ?? data?.total_caixas_ativos ?? (c.caixas_operadores ? c.caixas_operadores.length : 1));
+
+      statusChip = {
+        label: totGeral > 0 ? ('Total R$ ' + totGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })) : 'Vendas Auditadas',
+        severity: 'success'
+      };
+
+      const caixasLista = c.caixas_operadores || data?.caixas_operadores || [];
+      if (caixasLista.length > 0) {
+        records = caixasLista.map(cx => ({
+          'Caixa (PDV)': cx.caixa || cx.caixa_raw || '-',
+          'Operador Responsável': cx.operador_nome || '-',
+          'Matrícula': cx.operador_matricula || '-',
+          'Turno': cx.turno || '1º TURNO',
+          'Dinheiro (R$)': cx.dinheiro_reais !== undefined ? ('R$ ' + Number(cx.dinheiro_reais).toLocaleString('pt-BR', { minimumFractionDigits: 2 })) : '-',
+          'Cartão (R$)': cx.cartao_total_reais !== undefined ? ('R$ ' + Number(cx.cartao_total_reais).toLocaleString('pt-BR', { minimumFractionDigits: 2 })) : '-',
+          'PIX (R$)': cx.pix_reais !== undefined ? ('R$ ' + Number(cx.pix_reais).toLocaleString('pt-BR', { minimumFractionDigits: 2 })) : '-',
+          'Total Caixa (R$)': cx.total_caixa_reais !== undefined ? ('R$ ' + Number(cx.total_caixa_reais).toLocaleString('pt-BR', { minimumFractionDigits: 2 })) : '-',
+          'Cupons': cx.total_cupons || 1
+        }));
+      } else {
+        const mods = c.modalidades || data?.modalidades || [];
+        records = mods.map(m => ({
+          'Modalidade': m.modalidade || '-',
+          'Valor Total (R$)': 'R$ ' + Number(m.total_reais || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+          'Transações': m.total_transacoes || 0,
+          'Representatividade (%)': Number(m.percentual || 0).toFixed(1) + '%',
+          'Ticket Médio (R$)': 'R$ ' + Number(m.ticket_medio || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+        }));
+      }
+
+      summaryKpis = [
+        { label: 'Faturamento Auditado', value: 'R$ ' + totGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), sub: totCupons + ' vendas finalizadas' },
+        { label: 'Caixas com Movimento', value: String(numCaixas), sub: 'Terminais PDV ativos' },
+        { label: 'Maior Modalidade', value: c.maior_modalidade || 'Dinheiro / Cartão', sub: 'Concentração de fluxo' }
+      ];
+
+      schemaInfo = {
+        source: 'PostgreSQL 16 • ERP webPosto (Porta 5433)',
+        table: 'public.pedido JOIN public.prazos JOIN public.funcionarios',
+        recordCount: records.length,
+        fields: [
+          { field: 'pdv', type: 'CHARACTER(3)', sample: '007' },
+          { field: 'vendedor', type: 'CHARACTER(5)', sample: '00007' },
+          { field: 'formapg', type: 'CHARACTER(3)', sample: '001' },
+          { field: 'valortotal', type: 'NUMERIC(12,2)', sample: 13.49 }
+        ]
+      };
+
+      auditRules = [
+        { title: 'Decomposição por Ponto de Venda (PDV)', tag: 'Auditoria de Caixa', formula: 'Total_Caixa = Sum(valortotal) WHERE pdv = X AND situ != C', description: 'Garante que os valores informados correspondam estritamente ao caixa físico e operador emitente.' },
+        { title: 'Conciliação de Meios Eletrônicos vs Espécie', tag: 'Prevenção a Furos', formula: 'Fechamento = Dinheiro_Fisico + TEF_Debito + TEF_Credito + PIX', description: 'Separa rigorosamente dinheiro vivo sob custódia do operador contra liquidações bancárias automáticas.' }
+      ];
+    }
+
     // MÓDULO 5: CONCILIAÇÃO DE TURNO & CAIXA
     else if (effectiveIntent === 'shift_reconciliation' || toolName === 'conciliacao_turno' || toolName === 'auditoria_turno' || toolName === 'render_ShiftReconciliationUI' || toolName === 'ShiftReconciliationUI') {
       title = '💰 Conciliação de Turno & Caixa';
@@ -1473,6 +1944,159 @@ class AuraAuxPanel {
       ];
     }
 
+    // MODULO 7: AUDITORIA DE FUGA FINANCEIRA & CONCILIACAO TEF
+    else if (
+      effectiveIntent === 'fuga_financeira' ||
+      effectiveIntent === 'auditoria_fuga_financeira' ||
+      toolName === 'auditar_fuga_financeira' ||
+      toolName === 'render_FinancialLeakAuditUI' ||
+      toolName === 'FinancialLeakAuditUI'
+    ) {
+      title = '🚨 Auditoria de Fuga Financeira & TEF';
+      subtitle = c.diagnosis || data?.props?.diagnosis || 'Auditoria de quebras de caixa, sangrias retidas e conciliacao TEF';
+      const totalLeak = Number(c.total_leak_value ?? c.total_divergence_reais ?? data?.props?.total_leak_value ?? 0.0);
+      const riskLevel = String(c.risk_level || data?.props?.risk_level || 'baixo').toLowerCase();
+      const isOk = riskLevel === 'baixo' || totalLeak < 0.05;
+
+      statusChip = {
+        label: isOk ? '✔ Conforme' : `⚠ Risco R$ ${totalLeak.toFixed(2)}`,
+        severity: isOk ? 'success' : 'danger'
+      };
+
+      records = [
+        { 'Vetor de Auditoria': 'Quebra de Caixa / Furo de Gaveta', 'Valor (R$)': 'R$ ' + Number(c.cash_break_value || 0).toFixed(2), 'Status': Number(c.cash_break_value || 0) > 0 ? 'Divergente' : 'Conforme' },
+        { 'Vetor de Auditoria': 'Sangrias Pendentes / Retidas', 'Valor (R$)': 'R$ ' + Number(c.pending_bleed_value || 0).toFixed(2), 'Status': Number(c.pending_bleed_value || 0) > 0 ? 'Pendente' : 'Conforme' },
+        { 'Vetor de Auditoria': 'Conciliacao TEF / Cartoes', 'Valor (R$)': 'R$ ' + Number(c.tef_divergence_value || 0).toFixed(2), 'Status': Number(c.tef_divergence_value || 0) > 0 ? 'Divergente' : 'Conforme' }
+      ];
+
+      summaryKpis = [
+        { label: 'Perda Total Identificada', value: 'R$ ' + totalLeak.toFixed(2), sub: isOk ? 'Sem quebras no turno' : 'Divergencia apurada' },
+        { label: 'Turno Auditado', value: c.audited_shift || '1º Turno', sub: c.cashier_name || 'Operador ativo' },
+        { label: 'Nivel de Risco', value: riskLevel.toUpperCase(), sub: 'Compliance Caixa & TEF' }
+      ];
+
+      schemaInfo = {
+        source: 'PostgreSQL 16 • ERP Fechamento & TEF Concentrador',
+        table: 'public.tb_auditoria_caixa_tef',
+        recordCount: records.length,
+        fields: [
+          { field: 'shift_id', type: 'VARCHAR(20)', sample: '1º TURNO' },
+          { field: 'leak_amount', type: 'NUMERIC(12,2)', sample: totalLeak }
+        ]
+      };
+
+      auditRules = [
+        { title: 'Auditoria de Fuga Financeira & Custodia', tag: 'Prevencao de Perdas', formula: 'Fuga_Total = Quebra_Caixa + Sangrias_Retidas + Descompasso_TEF', description: 'Monitoramento continuo de divergencias financeiras em tempo real.' }
+      ];
+    }
+
+    // MODULO 8: BENCHMARK DE MERCADO & CONCORRENCIA (ANP)
+    else if (
+      effectiveIntent === 'benchmark_concorrencia' ||
+      effectiveIntent === 'mercado_anp' ||
+      toolName === 'comparar_benchmark_concorrencia' ||
+      toolName === 'render_BenchmarkComparisonUI' ||
+      toolName === 'BenchmarkComparisonUI'
+    ) {
+      title = '📊 Benchmark de Mercado & Concorrencia';
+      subtitle = c.diagnosis || data?.props?.diagnosis || 'Posicionamento competitivo frente a pesquisa oficial da ANP';
+      const compIndex = c.competitive_index ?? data?.props?.competitive_index ?? 50;
+
+      statusChip = {
+        label: `${compIndex}/100 Competitividade`,
+        severity: compIndex >= 60 ? 'success' : (compIndex >= 40 ? 'attention' : 'danger')
+      };
+
+      const competitors = c.competitors || data?.props?.competitors || [];
+      if (competitors.length > 0) {
+        records = competitors.map(comp => ({
+          'Posto / Concorrente': comp.name || '-',
+          'Bandeira': comp.brand || '-',
+          'Distancia': comp.distance_km ? `${comp.distance_km} km` : '-',
+          'Preco Gasolina (R$)': comp.gasolina_price ? `R$ ${Number(comp.gasolina_price).toFixed(2)}` : '-',
+          'Preco Etanol (R$)': comp.etanol_price ? `R$ ${Number(comp.etanol_price).toFixed(2)}` : '-',
+          'Preco Diesel S10 (R$)': comp.diesel_price ? `R$ ${Number(comp.diesel_price).toFixed(2)}` : '-'
+        }));
+      } else {
+        records = [
+          { 'Metrica de Mercado': 'Preco Medio ANP', 'Valor': c.market_average_price ? `R$ ${Number(c.market_average_price).toFixed(2)}` : '-' },
+          { 'Metrica de Mercado': 'Preco Praticado no Posto', 'Valor': c.current_station_price ? `R$ ${Number(c.current_station_price).toFixed(2)}` : '-' },
+          { 'Metrica de Mercado': 'Diferenca vs Media', 'Valor': c.price_gap_reais !== undefined ? `${c.price_gap_reais > 0 ? '+' : ''}R$ ${Number(c.price_gap_reais).toFixed(2)}` : '-' }
+        ];
+      }
+
+      summaryKpis = [
+        { label: 'Preco Medio ANP', value: c.market_average_price ? `R$ ${Number(c.market_average_price).toFixed(2)}` : '-', sub: c.municipio || 'Mercado Municipal' },
+        { label: 'Diferenca do Posto', value: c.price_gap_reais !== undefined ? `${c.price_gap_reais > 0 ? '+' : ''}R$ ${Number(c.price_gap_reais).toFixed(2)}` : '-', sub: c.positioning_summary || 'vs concorrencia' },
+        { label: 'Amostragem ANP', value: `${c.sampled_competitors_count || competitors.length || 0} postos`, sub: 'Sincronizado ANP' }
+      ];
+
+      schemaInfo = {
+        source: 'Dados Abertos ANP • Serie Historica de Precos',
+        table: 'aura_core.anp_precos_semanais',
+        recordCount: records.length,
+        fields: [
+          { field: 'municipio', type: 'VARCHAR(100)', sample: c.municipio || 'CURITIBA' },
+          { field: 'valor_venda', type: 'NUMERIC(10,3)', sample: c.market_average_price || 5.89 }
+        ]
+      };
+
+      auditRules = [
+        { title: 'Pesquisa Oficial de Precos ANP', tag: 'Benchmark Mercado', formula: 'Gap_Preco = Preco_Posto - Preco_Medio_Municipio', description: 'Auditoria de posicionamento comercial baseada na serie de precos da ANP.' }
+      ];
+    }
+
+    // MODULO 9: AUDITORIA LMC & PORTARIA ANP 26/1992
+    else if (
+      effectiveIntent === 'lmc_compliance' ||
+      effectiveIntent === 'auditoria_lmc_anp' ||
+      toolName === 'auditar_conformidade_lmc_anp' ||
+      toolName === 'render_LMCComplianceReportUI' ||
+      toolName === 'LMCComplianceReportUI'
+    ) {
+      title = '📋 Auditoria LMC & Portaria ANP 26/1992';
+      subtitle = c.diagnosis || data?.props?.diagnosis || 'Conformidade volumetrica de tanques e tolerancia legal de 0,60%';
+      const overallStatus = String(c.overall_status || data?.props?.overall_status || 'CONFORME').toUpperCase();
+      const isConforme = overallStatus === 'CONFORME';
+
+      statusChip = {
+        label: isConforme ? '✔ LMC Conforme' : '⚠ Risco Infracao ANP',
+        severity: isConforme ? 'success' : 'danger'
+      };
+
+      const tankAudits = c.tank_audits || data?.props?.tank_audits || [];
+      records = tankAudits.map(t => ({
+        'Tanque': `Tanque ${t.tanque_id || '-'}`,
+        'Combustivel': t.combustivel || '-',
+        'Estoque Inicial': `${Number(t.estoque_inicial_l || 0).toLocaleString('pt-BR')} L`,
+        'Entradas (DFE)': `${Number(t.entradas_dfe_l || 0).toLocaleString('pt-BR')} L`,
+        'Vendas (Bicos)': `${Number(t.vendas_bicos_l || 0).toLocaleString('pt-BR')} L`,
+        'Estoque Fisico': `${Number(t.estoque_fisico_l || 0).toLocaleString('pt-BR')} L`,
+        'Variacao (%)': `${Number(t.variacao_pct || 0).toFixed(2)}%`,
+        'Status ANP': t.status_anp || 'CONFORME'
+      }));
+
+      summaryKpis = [
+        { label: 'Variacao Maxima', value: `${Number(c.max_variacao_pct || 0).toFixed(2)}%`, sub: 'Tolerancia legal: ±0.60%' },
+        { label: 'Tanques em Alerta', value: `${c.tanques_fora_tolerancia || 0}`, sub: 'Excedem margem legal' },
+        { label: 'Tanques Auditados', value: `${records.length} tanques`, sub: 'Portaria ANP 26/1992' }
+      ];
+
+      schemaInfo = {
+        source: 'PostgreSQL 16 • Livro de Movimentacao de Combustiveis',
+        table: 'aura_core.lmc_fechamento_diario',
+        recordCount: records.length,
+        fields: [
+          { field: 'tanque_id', type: 'SMALLINT', sample: 1 },
+          { field: 'variacao_pct', type: 'NUMERIC(6,3)', sample: 0.15 }
+        ]
+      };
+
+      auditRules = [
+        { title: 'Tolerancia Volumetrica Legal ANP', tag: 'Compliance Regulatório', formula: 'Variacao_Pct = ((Estoque_Fisico - Estoque_Contabil) / Vendas_Totais) * 100', description: 'Variacao volumetrica maxima permitida de ±0,60% conforme Portaria ANP 26/1992.' }
+      ];
+    }
+
     // FALLBACK UNIVERSAL: QUALQUER BANCO DE DADOS RELACIONAL FUTURO OU API
     else {
       title = `📊 ${this.formatToolTitle(toolName)}`;
@@ -1522,10 +2146,8 @@ class AuraAuxPanel {
         }))
       };
 
-      summaryKpis = [
-        { label: 'Linhas Retornadas', value: `${records.length}`, sub: 'Banco Conectado' },
-        { label: 'Status da Execução', value: 'OK (200)', sub: 'ACID Preservado' }
-      ];
+      // Em consultas genericas, summaryKpis fica vazio para nao exibir jargoes tecnicos (ex: Linhas Retornadas, ACID, OK 200)
+      summaryKpis = [];
 
       auditRules = [
         { title: 'Integridade de Dados', tag: 'Governança', formula: 'Transação = READ COMMITTED', description: 'Dados extraídos com isolamento transacional para evitar leituras sujas.' }
@@ -1534,8 +2156,8 @@ class AuraAuxPanel {
 
     // Sobrescrita inteligente se props ou contrato trouxerem titulo/subtitulo executivo explicito
     const explicitTitle = data?.props?.title || c?.title || data?.title;
-    if (explicitTitle && typeof explicitTitle === 'string' && !explicitTitle.startsWith('render_')) {
-      title = explicitTitle;
+    if (explicitTitle && typeof explicitTitle === 'string') {
+      title = this.formatToolTitle(explicitTitle);
     }
     const explicitSubtitle = data?.props?.diagnosis || data?.props?.subtitle || c?.diagnosis || c?.subtitle || data?.subtitle;
     if (explicitSubtitle && typeof explicitSubtitle === 'string') {
@@ -1689,14 +2311,144 @@ class AuraAuxPanel {
 
   formatToolTitle(name) {
     if (!name) return 'Consulta Analítica';
-    const clean = String(name)
+    const raw = String(name).trim();
+
+    const map = {
+      'render_GenerativeModularCardUI': 'Diagnóstico Executivo Modular',
+      'GenerativeModularCardUI': 'Diagnóstico Executivo Modular',
+      'diagnostico_modular': 'Diagnóstico Executivo Modular',
+      'modular_card': 'Diagnóstico Executivo Modular',
+      'modular_lego_card': 'Diagnóstico Executivo Modular',
+      'render_ExecutiveDecisionMentorUI': 'Mentor de Decisões Executivo',
+      'ExecutiveDecisionMentorUI': 'Mentor de Decisões Executivo',
+      'diagnostico_mentoria_executiva': 'Mentor de Decisões Executivo',
+      'mentoria_decisao': 'Mentor de Decisões Executivo',
+      'mentoria_executiva': 'Mentor de Decisões Executivo',
+      'executive_briefing': 'Briefing Executivo do Negócio',
+      'render_ExecutiveBriefingUI': 'Briefing Executivo do Negócio',
+      'ExecutiveBriefingUI': 'Briefing Executivo do Negócio',
+      'auditoria_fuga_financeira': 'Auditoria de Fuga Financeira',
+      'fuga_financeira': 'Auditoria de Fuga Financeira',
+      'fugas': 'Auditoria de Fuga Financeira',
+      'fugas_financeiras': 'Auditoria de Fuga Financeira',
+      'furo_caixa': 'Auditoria de Fuga Financeira',
+      'furo_gaveta': 'Auditoria de Fuga Financeira',
+      'auditar_fuga_financeira': 'Auditoria de Fuga Financeira',
+      'render_FinancialLeakAuditUI': 'Auditoria de Fuga Financeira',
+      'FinancialLeakAuditUI': 'Auditoria de Fuga Financeira',
+      'comparativo_concorrencia': 'Benchmark de Preços ANP',
+      'comparar_benchmark_concorrencia': 'Benchmark de Preços ANP',
+      'benchmark_comparativo': 'Benchmark de Preços ANP',
+      'render_BenchmarkComparisonUI': 'Benchmark de Preços ANP',
+      'BenchmarkComparisonUI': 'Benchmark de Preços ANP',
+      'auditar_conformidade_lmc_anp': 'Auditoria LMC ANP Oficial',
+      'lmc_anp': 'Auditoria LMC ANP Oficial',
+      'lmc_compliance': 'Auditoria LMC ANP Oficial',
+      'render_LMCComplianceReportUI': 'Auditoria LMC ANP Oficial',
+      'LMCComplianceReportUI': 'Auditoria LMC ANP Oficial',
+      'analisar_custo_estoque_macroeconomico': 'Custo de Estoque & Selic',
+      'custo_estoque_macro': 'Custo de Estoque & Selic',
+      'render_MacroeconomicInventoryCostUI': 'Custo de Estoque & Selic',
+      'MacroeconomicInventoryCostUI': 'Custo de Estoque & Selic',
+      'render_TankRunOutPredictionUI': 'Posição de Estoque & Autonomia',
+      'render_TankRunOutForecastUI': 'Posição de Estoque & Autonomia',
+      'TankRunOutPredictionUI': 'Posição de Estoque & Autonomia',
+      'TankForecastWidget': 'Posição de Estoque & Autonomia',
+      'previsao_tanques': 'Posição de Estoque & Autonomia',
+      'estoque_posicao': 'Posição de Estoque & Autonomia',
+      'run_out': 'Posição de Estoque & Autonomia',
+      'render_PaymentMethodsBreakdownUI': 'Formas de Pagamento & Caixas',
+      'PaymentMethodsBreakdownUI': 'Formas de Pagamento & Caixas',
+      'PaymentMethodsBreakdownWidget': 'Formas de Pagamento & Caixas',
+      'formas_pagamento': 'Formas de Pagamento & Caixas',
+      'consultar_formas_pagamento_detalhado': 'Formas de Pagamento & Caixas',
+      'render_ShiftReconciliationUI': 'Conciliação de Turno & Caixa',
+      'ShiftReconciliationUI': 'Conciliação de Turno & Caixa',
+      'ShiftReconciliationWidget': 'Conciliação de Turno & Caixa',
+      'auditoria_turno': 'Conciliação de Turno & Caixa',
+      'conciliacao_turno': 'Conciliação de Turno & Caixa',
+      'shift_reconciliation': 'Conciliação de Turno & Caixa',
+      'render_BasketUpsellStrategyUI': 'Combos & Cross-Selling (Loja)',
+      'BasketUpsellStrategyUI': 'Combos & Cross-Selling (Loja)',
+      'conveniencia_vendas_cruzadas': 'Combos & Cross-Selling (Loja)',
+      'vendas_cruzadas': 'Combos & Cross-Selling (Loja)',
+      'cesta_compras': 'Combos & Cesta de Compras',
+      'market_basket': 'Combos & Cesta de Compras',
+      'basket_upsell': 'Combos & Cross-Selling (Loja)',
+      'render_MarginAnalysisUI': 'Análise de Margens & Lucro',
+      'MarginAnalysisUI': 'Análise de Margens & Lucro',
+      'analise_margem': 'Análise de Margens & Lucro',
+      'vendas_analitico': 'Histórico de Vendas & Rentabilidade',
+      'render_PredictiveScenarioUI': 'Cenários Preditivos & Elasticidade',
+      'PredictiveScenarioUI': 'Cenários Preditivos & Elasticidade',
+      'cenario_preditivo': 'Cenários Preditivos & Elasticidade',
+      'simulacao_preditiva': 'Cenários Preditivos & Elasticidade',
+      'render_RootCauseAnalysisUI': 'Perícia de Causa-Raiz (RCA)',
+      'RootCauseAnalysisUI': 'Perícia de Causa-Raiz (RCA)',
+      'investigar_causa_raiz': 'Perícia de Causa-Raiz (RCA)',
+      'render_PumpPerformanceUI': 'Performance da Pista & Frentistas',
+      'PumpPerformanceUI': 'Performance da Pista & Frentistas',
+      'desempenho_pista_frentistas': 'Performance da Pista & Frentistas',
+      'render_ComplianceStatusUI': 'Blindagem Jurídica & Compliance',
+      'ComplianceStatusUI': 'Blindagem Jurídica & Compliance',
+      'compliance_status': 'Blindagem Jurídica & Compliance',
+      'conformidade_legal': 'Blindagem Jurídica & Compliance',
+      'termo_interoperabilidade': 'Termo de Interoperabilidade',
+      'blindagem_juridica': 'Blindagem Jurídica AUPS',
+      'render_FinancialErosionUI': 'Auditoria de Taxas TEF & Recebíveis',
+      'FinancialErosionUI': 'Auditoria de Taxas TEF & Recebíveis',
+      'erosao_financeira': 'Auditoria de Taxas TEF & Recebíveis',
+      'taxas_tef': 'Auditoria de Taxas TEF & Recebíveis',
+      'render_DeadCapitalOpportunityUI': 'Capital Imobilizado & Rupturas',
+      'DeadCapitalOpportunityUI': 'Capital Imobilizado & Rupturas',
+      'capital_morto': 'Capital Imobilizado & Rupturas',
+      'ruptura_invisivel': 'Capital Imobilizado & Rupturas',
+      'render_MarginWaterfallUI': 'Análise de Margem & Waterfall',
+      'MarginWaterfallUI': 'Análise de Margem & Waterfall',
+      'raio_x_causal_margem': 'Análise de Margem & Waterfall',
+      'render_ElasticityBatchSimulatorUI': 'Simulador de Lote de Compra',
+      'ElasticityBatchSimulatorUI': 'Simulador de Lote de Compra',
+      'simular_elasticidade_e_lote_compra': 'Simulador de Lote de Compra',
+      'sre_metricas': 'Diagnóstico Operacional SRE',
+      'ajuda_sistema': 'Guia da Plataforma AURA',
+      'conhecimento_aura': 'Guia & Conhecimento AURA',
+    };
+    if (map[raw]) return map[raw];
+
+    const clean = raw
       .replace(/^render_/i, '')
       .replace(/(CardUI|UI|Widget|Card)$/i, '')
       .replace(/_/g, ' ')
       .replace(/([a-z])([A-Z])/g, '$1 $2')
       .trim();
+
+    const englishToPt = {
+      'Executive Decision Mentor': 'Mentor de Decisões Executivo',
+      'Executive Briefing': 'Briefing Executivo do Negócio',
+      'Tank Run Out Forecast': 'Posição de Estoque & Autonomia',
+      'Tank Run Out Prediction': 'Posição de Estoque & Autonomia',
+      'Financial Leak Audit': 'Auditoria de Fuga Financeira',
+      'Shift Reconciliation': 'Conciliação de Turno & Caixa',
+      'Basket Upsell Strategy': 'Combos & Vendas Cruzadas (Loja)',
+      'Benchmark Comparison': 'Benchmark de Preços ANP',
+      'L M C Compliance Report': 'Auditoria LMC ANP Oficial',
+      'LMC Compliance Report': 'Auditoria LMC ANP Oficial',
+      'Macroeconomic Inventory Cost': 'Custo de Estoque & Selic',
+      'Margin Analysis': 'Análise de Margens & Lucro',
+      'Predictive Scenario': 'Cenários Preditivos & Elasticidade',
+      'Root Cause Analysis': 'Perícia de Causa-Raiz (RCA)',
+      'Pump Performance': 'Performance da Pista & Frentistas',
+      'Compliance Status': 'Blindagem Jurídica & Compliance',
+      'Financial Erosion': 'Auditoria de Taxas TEF & Recebíveis',
+      'Dead Capital Opportunity': 'Capital Imobilizado & Rupturas',
+      'Margin Waterfall': 'Análise de Margem & Waterfall',
+      'Elasticity Batch Simulator': 'Simulador de Lote de Compra',
+      'Generative Modular': 'Diagnóstico Executivo Modular',
+    };
+
+    if (englishToPt[clean]) return englishToPt[clean];
     if (!clean) return 'Consulta Analítica';
-    return clean.replace(/\b\w/g, l => l.toUpperCase());
+    return clean.charAt(0).toUpperCase() + clean.slice(1);
   }
 
   formatColumnHeader(col) {

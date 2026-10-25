@@ -26,6 +26,11 @@
       darkMode: 'class',
       theme: {
         extend: {
+          fontFamily: {
+            sans: ['Geist', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            serif: ['Newsreader', 'Georgia', 'serif'],
+            mono: ['Geist Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+          },
           colors: {
             obsidian: '#07090e',
             slateSurface: '#0c121e',
@@ -67,12 +72,12 @@
   </script>
 
   <!-- Folha de Estilos Customizada do Design System AURA -->
-  <link rel="stylesheet" href="/static/css/aura.css?v=2.10.2">
+  <link rel="stylesheet" href="/static/css/aura.css?v=2.10.22">
   <script>
     if (window.location.protocol === 'file:') {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = 'css/aura.css?v=2.10.2';
+      link.href = 'css/aura.css?v=2.10.22';
       document.head.appendChild(link);
     }
   </script>
@@ -106,59 +111,179 @@
       </button>
     </div>
 
-    <!-- Conteúdo Scrollável -->
+
+    <!-- Campo de Busca Rapida no Drawer (Fase 2 Lovable: Filtro Instantaneo) -->
+    <div class="p-3 border-b border-white/10 bg-white/[0.01]">
+      <div class="relative">
+        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+        <input id="sidebar-quick-search" type="search" placeholder="Filtrar rotas, acoes e telas..." class="w-full pl-9 pr-3 py-2 bg-slate-900/90 border border-white/10 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-auraCyan/50 focus:ring-1 focus:ring-auraCyan/50 transition-all font-sans min-h-[44px]" autocomplete="off" aria-label="Filtrar telas e configuracoes do drawer" />
+      </div>
+    </div>
+
+    <!-- Conteudo Scrollavel Organizado em 3 Clusters Semanticos -->
     <div class="flex-1 overflow-y-auto p-4 space-y-5">
       
-      <!-- Seção: Navegação de Telas -->
-      <div class="space-y-1.5">
-        <span class="text-[10px] font-sans uppercase tracking-wider text-slate-400 px-2 font-semibold">
-          Navegação Principal
+      <!-- Estado Vazio da Busca Rapida -->
+      <div id="sidebar-search-empty" class="hidden p-4 text-center rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+        <i data-lucide="search-x" class="w-5 h-5 text-slate-500 mx-auto"></i>
+        <p class="text-xs text-slate-400 font-medium font-sans">Nenhuma rota ou acao encontrada</p>
+        <p class="text-[10px] text-slate-500 font-sans">Tente buscar por termos como tanques, lmc, turno, sql ou telemetria</p>
+      </div>
+
+      <!-- Cluster 1: Operacao da Pista (Rotina) -->
+      <div class="space-y-1.5" data-cluster="operacao-pista">
+        <span class="text-[10px] font-sans uppercase tracking-wider text-slate-400 px-2 font-semibold flex items-center justify-between">
+          <span>Operacao da Pista (Rotina)</span>
+          <span class="text-[9px] text-cyan-400/80 font-mono">Cluster 1</span>
         </span>
         <div class="space-y-1">
-          <button class="nav-tab-btn sidebar-nav-item tab-console active min-h-[48px]" data-tab="console" aria-label="Assistente AURA">
-            <div class="p-1.5 rounded-lg bg-purple-500/15 text-purple-400 border border-purple-500/20 flex items-center justify-center">
-              <svg class="w-4 h-4 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><polygon points="12,6.5 16.5,9.5 16.5,14.5 12,17.5 7.5,14.5 7.5,9.5" stroke-width="1.25" fill="rgba(168,85,247,0.25)"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
-            </div>
-            <div class="flex-1">
-              <div class="font-semibold text-slate-100">Assistente AURA</div>
-              <div class="text-[10px] text-slate-400 font-normal">Chat Executivo & Decisão Rápida</div>
-            </div>
-          </button>
-
-          <button class="nav-tab-btn sidebar-nav-item tab-cockpit min-h-[48px]" data-tab="cockpit" aria-label="Panorama Operacional">
-            <div class="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
-              <svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" stroke-width="1.75"/><path d="M12 7v5l3.5 2" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M7 16a6 6 0 0 1 10 0" stroke-width="1.5" stroke-dasharray="2 2"/></svg>
-            </div>
-            <div class="flex-1">
-              <div class="font-semibold text-slate-100">Panorama Operacional</div>
-              <div class="text-[10px] text-slate-400 font-normal">Tanques, Pista & Fechamento</div>
-            </div>
-          </button>
-
-          <button class="nav-tab-btn sidebar-nav-item tab-triggers min-h-[48px]" data-tab="triggers" aria-label="Ações Rápidas">
-            <div class="p-1.5 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 flex items-center justify-center">
-              <svg class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" stroke-width="1.75"/><line x1="12" y1="1.5" x2="12" y2="5" stroke-width="1.75" stroke-linecap="round"/><line x1="12" y1="19" x2="12" y2="22.5" stroke-width="1.75" stroke-linecap="round"/><line x1="1.5" y1="12" x2="5" y2="12" stroke-width="1.75" stroke-linecap="round"/><line x1="19" y1="12" x2="22.5" y2="12" stroke-width="1.75" stroke-linecap="round"/><path d="M8 12.5l2.8 2.8L16.5 8.5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </div>
-            <div class="flex-1">
-              <div class="font-semibold text-slate-100">Ações Rápidas (10)</div>
-              <div class="text-[10px] text-slate-400 font-normal">Diagnósticos Executivos em 1-Clique</div>
-            </div>
-          </button>
-
-          <a href="/showcase" target="_blank" rel="noopener noreferrer" class="sidebar-nav-item min-h-[48px] flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-cyan-500/30 transition-all text-left text-xs group" aria-label="Apresentação da AURA (Saiba mais...)">
-            <div class="p-1.5 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <svg class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" stroke-width="1.75" stroke-linejoin="round"/></svg>
-            </div>
-            <div class="flex-1">
-              <div class="flex items-center gap-1.5">
-                <span class="font-semibold text-slate-100">Saiba mais...</span>
-                <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">Tour</span>
+          <!-- 1.1 Assistente AURA (Chat Executivo) -->
+          <button class="nav-tab-btn sidebar-nav-item tab-console active min-h-[48px] w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-purple-500/30 transition-all text-left text-xs group" data-tab="console" aria-label="Assistente AURA">
+            <div class="flex items-center gap-3">
+              <div class="p-1.5 rounded-lg bg-purple-500/15 text-purple-400 border border-purple-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <svg class="w-4 h-4 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><polygon points="12,6.5 16.5,9.5 16.5,14.5 12,17.5 7.5,14.5 7.5,9.5" stroke-width="1.25" fill="rgba(168,85,247,0.25)"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
               </div>
-              <div class="text-[10px] text-slate-400 font-normal">Apresentação & Escudo AURA</div>
+              <div class="flex-1">
+                <div class="font-semibold text-slate-100">Assistente AURA</div>
+                <div class="text-[10px] text-slate-400 font-normal">Chat Executivo & Decisao Rapida</div>
+              </div>
             </div>
-            <svg class="w-4 h-4 text-slate-500 group-hover:text-cyan-300 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </a>
+            <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30">Chat</span>
+          </button>
 
+          <!-- 1.2 Panorama dos Tanques (Run-Out & Pista) -->
+          <button class="nav-tab-btn sidebar-nav-item tab-cockpit min-h-[48px] w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-emerald-500/30 transition-all text-left text-xs group" data-tab="cockpit" aria-label="Panorama dos Tanques (Run-Out)">
+            <div class="flex items-center gap-3">
+              <div class="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" stroke-width="1.75"/><path d="M12 7v5l3.5 2" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M7 16a6 6 0 0 1 10 0" stroke-width="1.5" stroke-dasharray="2 2"/></svg>
+              </div>
+              <div class="flex-1">
+                <div class="font-semibold text-slate-100">Panorama dos Tanques</div>
+                <div class="text-[10px] text-slate-400 font-normal">Autonomia, Run-Out & Pista</div>
+              </div>
+            </div>
+            <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Tanques</span>
+          </button>
+
+          <!-- 1.3 Conciliacao de Fechamento de Turno -->
+          <button onclick="if(window.auraApp){window.auraApp.askFrequent('Como fechou o ultimo turno? Teve furo de caixa?'); window.auraApp.closeSidebar();}" class="sidebar-nav-item min-h-[48px] flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-cyan-500/30 transition-all text-left text-xs group" aria-label="Conciliacao de Fechamento de Turno">
+            <div class="flex items-center gap-3">
+              <div class="p-1.5 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <svg class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="6" width="20" height="12" rx="2" stroke-width="1.75"/><circle cx="12" cy="12" r="3" stroke-width="1.75"/><path d="M6 12h.01M18 12h.01" stroke-width="2"/></svg>
+              </div>
+              <div class="flex-1">
+                <div class="font-semibold text-slate-100">Fechamento de Turno</div>
+                <div class="text-[10px] text-slate-400 font-normal">Conciliacao de Caixa & Quebras</div>
+              </div>
+            </div>
+            <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Caixa</span>
+          </button>
+
+          <!-- 1.4 Oportunidades da Loja / Conveniencia -->
+          <button onclick="if(window.auraApp){window.auraApp.askFrequent('Quais os combos de vendas cruzadas com maior Lift na conveniencia?'); window.auraApp.closeSidebar();}" class="sidebar-nav-item min-h-[48px] flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-amber-500/30 transition-all text-left text-xs group" aria-label="Oportunidades da Loja e Conveniencia">
+            <div class="flex items-center gap-3">
+              <div class="p-1.5 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <svg class="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="21" r="1.5"/><circle cx="19" cy="21" r="1.5"/><path d="M2.5 3h3l2.4 12.3a1.5 1.5 0 0 0 1.5 1.2h10.2a1.5 1.5 0 0 0 1.5-1.1L23 7H6.5" stroke-width="1.75"/></svg>
+              </div>
+              <div class="flex-1">
+                <div class="font-semibold text-slate-100">Oportunidades da Loja</div>
+                <div class="text-[10px] text-slate-400 font-normal">Vendas Cruzadas & Lift de Margem</div>
+              </div>
+            </div>
+            <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">Loja</span>
+          </button>
+
+          <!-- 1.5 Historico de Conversas -->
+          <button id="sidebar-btn-open-history" onclick="if(window.toggleAuraHistory){window.toggleAuraHistory();}else if(window.auraHistoryDrawer){window.auraHistoryDrawer.toggle();} if(window.auraApp){window.auraApp.closeSidebar();}" class="sidebar-nav-item min-h-[48px] flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-cyan-500/30 transition-all text-left text-xs group" aria-label="Historico de Conversas">
+            <div class="flex items-center gap-3">
+              <div class="p-1.5 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <i data-lucide="history" class="w-4 h-4 text-cyan-400"></i>
+              </div>
+              <div class="flex-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-semibold text-slate-100">Historico de Conversas</span>
+                </div>
+                <div class="text-[10px] text-slate-400 font-normal">Navegar em chats anteriores (Ctrl+H)</div>
+              </div>
+            </div>
+            <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">Sessoes</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Cluster 2: Acoes Rapidas em 1-Clique -->
+      <div class="space-y-1.5 pt-2 border-t border-white/10" data-cluster="acoes-rapidas">
+        <span class="text-[10px] font-sans uppercase tracking-wider text-slate-400 px-2 font-semibold flex items-center justify-between">
+          <span>Acoes Rapidas em 1-Clique</span>
+          <span class="text-[9px] text-purple-400/80 font-mono">Cluster 2</span>
+        </span>
+        <div class="space-y-1">
+          <!-- 2.1 Central de Diagnosticos em 1-Clique -->
+          <button class="nav-tab-btn sidebar-nav-item tab-triggers min-h-[48px] w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-cyan-500/30 transition-all text-left text-xs group" data-tab="triggers" aria-label="Acoes Rapidas">
+            <div class="flex items-center gap-3">
+              <div class="p-1.5 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <svg class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" stroke-width="1.75"/><line x1="12" y1="1.5" x2="12" y2="5" stroke-width="1.75" stroke-linecap="round"/><line x1="12" y1="19" x2="12" y2="22.5" stroke-width="1.75" stroke-linecap="round"/><line x1="1.5" y1="12" x2="5" y2="12" stroke-width="1.75" stroke-linecap="round"/><line x1="19" y1="12" x2="22.5" y2="12" stroke-width="1.75" stroke-linecap="round"/><path d="M8 12.5l2.8 2.8L16.5 8.5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="flex-1">
+                <div class="font-semibold text-slate-100">Central de Acoes (10)</div>
+                <div class="text-[10px] text-slate-400 font-normal">Painel Executivo de Diagnosticos</div>
+              </div>
+            </div>
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">10 Acoes</span>
+          </button>
+
+          <!-- 2.2 Diagnostico ANP (LMC Oficial +-0.6%) -->
+          <button onclick="if(window.auraApp){window.auraApp.askFrequent('O LMC de ontem fechou dentro da tolerancia oficial da ANP?'); window.auraApp.closeSidebar();}" class="sidebar-nav-item min-h-[48px] flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-purple-500/30 transition-all text-left text-xs group" aria-label="Diagnostico LMC Oficial ANP">
+            <div class="flex items-center gap-3">
+              <div class="p-1.5 rounded-lg bg-purple-500/15 text-purple-400 border border-purple-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <svg class="w-4 h-4 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" stroke-width="1.75"/><rect x="8" y="2" width="8" height="4" rx="1" stroke-width="1.75"/></svg>
+              </div>
+              <div class="flex-1">
+                <div class="font-semibold text-slate-100">Conformidade ANP (LMC)</div>
+                <div class="text-[10px] text-slate-400 font-normal">Tolerancia oficial de 0.6%</div>
+              </div>
+            </div>
+            <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30">ANP</span>
+          </button>
+
+          <!-- 2.3 Perdas e Divergencias de Caixa -->
+          <button onclick="if(window.auraApp){window.auraApp.askFrequent('Auditar divergencias e quebras de caixa nos ultimos fechamentos'); window.auraApp.closeSidebar();}" class="sidebar-nav-item min-h-[48px] flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-rose-500/30 transition-all text-left text-xs group" aria-label="Auditar Perdas e Quebras de Caixa">
+            <div class="flex items-center gap-3">
+              <div class="p-1.5 rounded-lg bg-rose-500/15 text-rose-400 border border-rose-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <svg class="w-4 h-4 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke-width="1.75"/><line x1="12" y1="9" x2="12" y2="13" stroke-width="2"/><line x1="12" y1="17" x2="12.01" y2="17" stroke-width="2"/></svg>
+              </div>
+              <div class="flex-1">
+                <div class="font-semibold text-slate-100">Perdas & Quebras de Caixa</div>
+                <div class="text-[10px] text-slate-400 font-normal">Auditoria de divergencias de turno</div>
+              </div>
+            </div>
+            <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">Perdas</span>
+          </button>
+
+          <!-- 2.4 Analitico de Faturamento e Margem -->
+          <button onclick="if(window.auraApp){window.auraApp.askFrequent('Qual o panorama de faturamento e margem media por combustivel no periodo?'); window.auraApp.closeSidebar();}" class="sidebar-nav-item min-h-[48px] flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-emerald-500/30 transition-all text-left text-xs group" aria-label="Analitico de Faturamento e Margem">
+            <div class="flex items-center gap-3">
+              <div class="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" stroke-width="1.75"/><polyline points="17 6 23 6 23 12" stroke-width="1.75"/></svg>
+              </div>
+              <div class="flex-1">
+                <div class="font-semibold text-slate-100">Analitico de Faturamento</div>
+                <div class="text-[10px] text-slate-400 font-normal">Volume vendido e margens brutas</div>
+              </div>
+            </div>
+            <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Margem</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Cluster 3: Governanca & Sistema -->
+      <div class="space-y-1.5 pt-2 border-t border-white/10" data-cluster="governanca-sistema">
+        <span class="text-[10px] font-sans uppercase tracking-wider text-slate-400 px-2 font-semibold flex items-center justify-between">
+          <span>Governanca & Sistema</span>
+          <span class="text-[9px] text-emerald-400/80 font-mono">Cluster 3</span>
+        </span>
+        <div class="space-y-1">
+          <!-- 3.1 Conformidade Legal & LGPD (Termo v1.1) -->
           <button id="sidebar-btn-open-compliance" class="sidebar-nav-item min-h-[48px] flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-emerald-500/30 transition-all text-left text-xs group" aria-label="Conformidade Legal e Interoperabilidade">
             <div class="flex items-center gap-3">
               <div class="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -167,7 +292,7 @@
                   <path d="M9 12l2 2 4-4" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </div>
-              <div>
+              <div class="flex-1">
                 <div class="font-semibold text-slate-100">Conformidade Legal</div>
                 <div class="text-[10px] text-slate-400 font-normal">Termo v1.1 & Driver Shield</div>
               </div>
@@ -175,6 +300,21 @@
             <span id="sidebar-compliance-badge" class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">v1.1 Ativo</span>
           </button>
 
+          <!-- 3.2 SQL Auditavel Read-Only -->
+          <button id="sidebar-btn-open-security-arch" onclick="if(window.auraSecurityArchitecture) window.auraSecurityArchitecture.openModal();" class="sidebar-nav-item min-h-[48px] flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-emerald-500/30 transition-all text-left text-xs group" aria-label="Arquitetura de Confianca e SQL Auditavel">
+            <div class="flex items-center gap-3">
+              <div class="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+              </div>
+              <div class="flex-1">
+                <div class="font-semibold text-slate-100">SQL & Confianca Auditavel</div>
+                <div class="text-[10px] text-slate-400 font-normal">3 Camadas & Role Read-Only</div>
+              </div>
+            </div>
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Auditavel</span>
+          </button>
+
+          <!-- 3.3 Telemetria SRE & Pulso -->
           <button id="sidebar-btn-open-telemetry" class="sidebar-nav-item min-h-[48px] flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-cyan-500/30 transition-all text-left text-xs group" aria-label="Telemetria SRE e Saude da AURA">
             <div class="flex items-center gap-3">
               <div class="p-1.5 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -182,7 +322,7 @@
                   <path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </div>
-              <div>
+              <div class="flex-1">
                 <div class="font-semibold text-slate-100">Telemetria & Pulso SRE</div>
                 <div class="text-[10px] text-slate-400 font-normal">Cockpit Nativo (0 MB RAM)</div>
               </div>
@@ -190,29 +330,104 @@
             <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Ativo</span>
           </button>
 
+          <!-- 3.4 Preferencias do Sistema (Hardware, Sol Forte, SFX e Automacoes) -->
+          <div class="pt-1.5 space-y-1">
+            <span class="text-[9px] font-sans uppercase tracking-wider text-slate-400/90 px-2 font-medium">Preferências do Sistema</span>
+
+            <!-- Modo Pista com Toggle Switch -->
+            <button id="sidebar-btn-toggle-modo-pista" role="switch" aria-checked="false" class="sidebar-nav-item min-h-[48px] w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-amber-500/30 transition-all text-left text-xs group" aria-label="Alternar Modo Pista" title="Interface de alto contraste preto absoluto e botoes tateis ampliados para operacao sob sol forte">
+              <div class="flex items-center gap-3">
+                <div class="p-1.5 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <svg class="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="4" stroke-width="2"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" stroke-width="2" stroke-linecap="round"/></svg>
+                </div>
+                <div class="flex-1">
+                  <div class="font-semibold text-slate-100">Modo Pista (Alto Contraste)</div>
+                  <div class="text-[10px] text-slate-400 font-normal">Operacao tatil sob sol forte</div>
+                </div>
+              </div>
+              <span id="sidebar-modo-pista-badge" class="px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-slate-800 text-slate-400">Desativado</span>
+            </button>
+
+            <!-- GPU Guard Alta Performance -->
+            <button id="sidebar-btn-toggle-gpu-guard" role="switch" aria-checked="false" class="sidebar-nav-item min-h-[48px] w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all text-left text-xs group" aria-label="Alternar Modo Alta Performance GPU Guard" title="Desativa filtros de desfoque pesado (backdrop-filter) para garantir 60 FPS cravados em tablets e celulares da pista">
+              <div class="flex items-center gap-3">
+                <div class="p-1.5 rounded-lg bg-slate-800 text-slate-400 border border-slate-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <svg id="sidebar-gpu-icon" class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" stroke-width="1.75"/><polygon points="12 6 15 11 12 16 9 11" stroke-width="1.5" fill="currentColor" fill-opacity="0.2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </div>
+                <div class="flex-1">
+                  <span id="sidebar-gpu-text" class="font-semibold text-slate-100">Modo Alta Performance (GPU Guard)</span>
+                  <div class="text-[10px] text-slate-400 font-normal">Garante 60 FPS em hardware humilde</div>
+                </div>
+              </div>
+              <span id="sidebar-gpu-badge" class="px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-slate-800 text-slate-400">Desativado</span>
+            </button>
+
+            <!-- SFX Efeitos Sonoros -->
+            <button id="sidebar-btn-toggle-sfx" class="sidebar-nav-item min-h-[48px] w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all text-left text-xs group" aria-label="Alternar Efeitos Sonoros">
+              <div class="flex items-center gap-3">
+                <div class="p-1.5 rounded-lg bg-slate-800 text-slate-400 border border-slate-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <i id="sidebar-sfx-icon" data-lucide="volume-2" class="w-4 h-4 text-slate-400"></i>
+                </div>
+                <div class="flex-1">
+                  <span id="sidebar-sfx-text" class="font-semibold text-slate-100">Efeitos Sonoros (SFX)</span>
+                  <div class="text-[10px] text-slate-400 font-normal">Feedback acustico de acoes</div>
+                </div>
+              </div>
+              <span id="sidebar-sfx-badge" class="px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-slate-800 text-slate-400">Mudo</span>
+            </button>
+
+            <!-- Central de Automacoes & Regras -->
+            <button id="sidebar-btn-open-automations" class="sidebar-nav-item min-h-[48px] w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all text-left text-xs group" aria-label="Abrir Central de Automacoes">
+              <div class="flex items-center gap-3">
+                <div class="p-1.5 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <svg class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3" stroke-width="1.75"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke-width="1.5"/></svg>
+                </div>
+                <div class="flex-1">
+                  <div class="font-semibold text-slate-100">Central de Automacoes & Regras</div>
+                  <div class="text-[10px] text-slate-400 font-normal">Disparadores e alertas proativos</div>
+                </div>
+              </div>
+              <span id="sidebar-automation-badge" class="px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-slate-800 text-slate-400 border border-slate-700/50">Inativo</span>
+            </button>
+
+            <!-- Apresentacao Tour Showcase -->
+            <a href="/showcase" target="_blank" rel="noopener noreferrer" class="sidebar-nav-item min-h-[48px] flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-cyan-500/30 transition-all text-left text-xs group" aria-label="Apresentacao da AURA (Saiba mais...)">
+              <div class="flex items-center gap-3">
+                <div class="p-1.5 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <svg class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" stroke-width="1.75" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="flex-1">
+                  <div class="font-semibold text-slate-100">Saiba mais... (Tour)</div>
+                  <div class="text-[10px] text-slate-400 font-normal">Apresentacao & Escudo AURA</div>
+                </div>
+              </div>
+              <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">Tour</span>
+            </a>
+          </div>
+
         </div>
       </div>
 
-      <!-- Seção: Gerenciamento da Sessão -->
-      <div class="space-y-1.5 pt-2 border-t border-white/10">
+      <!-- Atalhos de Sessao e Produtividade -->
+      <div class="space-y-1.5 pt-2 border-t border-white/10" data-cluster="atalhos-sessao">
         <span class="text-[10px] font-sans uppercase tracking-wider text-slate-400 px-2 font-semibold">
           Gerenciamento da Conversa
         </span>
         <div class="space-y-1">
-          <button id="sidebar-btn-chat-clear" class="w-full min-h-[44px] flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all text-left text-xs" aria-label="Nova Conversa">
+          <button id="sidebar-btn-chat-clear" class="sidebar-nav-item w-full min-h-[48px] flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all text-left text-xs" aria-label="Nova Conversa">
             <i data-lucide="trash-2" class="w-4 h-4 text-rose-400"></i>
             <span>Nova Conversa / Limpar Chat</span>
           </button>
 
-          <button id="sidebar-btn-palette" class="w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all text-left text-xs" aria-label="Comandos Rápidos">
+          <button id="sidebar-btn-palette" class="sidebar-nav-item w-full min-h-[48px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all text-left text-xs" aria-label="Comandos Rapidos">
             <div class="flex items-center gap-3">
               <svg class="w-4 h-4 text-auraCyan flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><polygon points="12,6.5 16.5,9.5 16.5,14.5 12,17.5 7.5,14.5 7.5,9.5" stroke-width="1.25" fill="rgba(6,182,212,0.25)"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
-              <span>Comandos Rápidos</span>
+              <span>Comandos Rapidos</span>
             </div>
             <kbd class="px-1.5 py-0.5 rounded bg-white/10 border border-white/10 text-[10px] text-slate-400 font-sans font-medium">⌘K</kbd>
           </button>
 
-          <button id="sidebar-btn-aux-panel" class="w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all text-left text-xs" aria-label="Painel Auxiliar / Canvas">
+          <button id="sidebar-btn-aux-panel" class="sidebar-nav-item w-full min-h-[48px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all text-left text-xs" aria-label="Painel Auxiliar / Canvas">
             <div class="flex items-center gap-3">
               <svg class="w-4 h-4 text-auraCyan flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="3" width="20" height="18" rx="2.5" stroke-width="1.75"/><line x1="13" y1="3" x2="13" y2="21" stroke-width="1.75"/><rect x="15.5" y="7" width="4" height="4" rx="0.75" fill="currentColor" fill-opacity="0.3"/><line x1="5" y1="8" x2="10" y2="8" stroke-width="1.5" stroke-linecap="round"/><line x1="5" y1="12" x2="9" y2="12" stroke-width="1.5" stroke-linecap="round"/><line x1="5" y1="16" x2="10" y2="16" stroke-width="1.5" stroke-linecap="round"/></svg>
               <span>Painel Auxiliar (Canvas)</span>
@@ -222,74 +437,12 @@
         </div>
       </div>
 
-      <!-- Seção: Preferências do Sistema (F4-04) -->
-      <div class="space-y-1.5 pt-2 border-t border-white/10">
-        <span class="text-[10px] font-sans uppercase tracking-wider text-slate-400 px-2 font-semibold">
-          Preferências do Sistema
-        </span>
-        <div class="space-y-1">
-          <button id="sidebar-btn-toggle-sfx" class="w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all text-left text-xs" aria-label="Alternar Efeitos Sonoros">
-            <div class="flex items-center gap-3">
-              <i id="sidebar-sfx-icon" data-lucide="volume-2" class="w-4 h-4 text-slate-400"></i>
-              <span id="sidebar-sfx-text">Efeitos Sonoros (SFX)</span>
-            </div>
-            <span id="sidebar-sfx-badge" class="px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-slate-800 text-slate-400">Mudo</span>
-          </button>
-          <button id="sidebar-btn-toggle-gpu-guard" role="switch" aria-checked="false" class="w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all text-left text-xs" aria-label="Alternar Modo Alta Performance GPU Guard" title="Desativa filtros de desfoque pesado (backdrop-filter) para garantir 60 FPS cravados em tablets e celulares da pista">
-            <div class="flex items-center gap-3">
-              <svg id="sidebar-gpu-icon" class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" stroke-width="1.75"/><polygon points="12 6 15 11 12 16 9 11" stroke-width="1.5" fill="currentColor" fill-opacity="0.2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke-width="1.5" stroke-linecap="round"/></svg>
-              <span id="sidebar-gpu-text">Modo Alta Performance (GPU Guard)</span>
-            </div>
-            <span id="sidebar-gpu-badge" class="px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-slate-800 text-slate-400">Desativado</span>
-          </button>
-          <button id="sidebar-btn-toggle-modo-pista" role="switch" aria-checked="false" class="w-full min-h-[48px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-amber-500/30 transition-all text-left text-xs" aria-label="Alternar Modo Pista" title="Interface de alto contraste preto absoluto e botoes tateis ampliados para operacao sob sol forte">
-            <div class="flex items-center gap-3">
-              <svg class="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="4" stroke-width="2"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" stroke-width="2" stroke-linecap="round"/></svg>
-              <span>Modo Pista (Alto Contraste)</span>
-            </div>
-            <span id="sidebar-modo-pista-badge" class="px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-slate-800 text-slate-400">Desativado</span>
-          </button>
-          <button id="sidebar-btn-open-automations" class="w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all text-left text-xs" aria-label="Abrir Central de Automações">
-            <div class="flex items-center gap-3">
-              <svg class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3" stroke-width="1.75"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke-width="1.5"/></svg>
-              <span>Central de Automações & Regras</span>
-            </div>
-            <span id="sidebar-automation-badge" class="px-2 py-0.5 rounded text-[10px] font-sans font-medium bg-slate-800 text-slate-400 border border-slate-700/50">Inativo</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Seção: Consultas Frequentes -->
-      <div class="space-y-1.5 pt-2 border-t border-white/10">
-        <span class="text-[10px] font-sans uppercase tracking-wider text-slate-400 px-2 font-semibold">
-          Consultas Frequentes
-        </span>
-        <div class="space-y-1">
-          <button onclick="window.auraApp.askFrequent('Qual a situação e autonomia de cada tanque agora?')" class="w-full min-h-[44px] flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:text-emerald-300 hover:bg-emerald-500/10 transition-all text-left text-xs">
-            <span class="inline-flex text-emerald-400"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="11" height="18" rx="2" stroke-width="1.75"/><line x1="2" y1="21" x2="15" y2="21" stroke-width="1.75"/><path d="M14 8h2.5a2 2 0 0 1 2 2v6.5a1.5 1.5 0 0 0 3 0V9l-2-2" stroke-width="1.5"/></svg></span>
-            <span>Autonomia dos Tanques</span>
-          </button>
-          <button onclick="window.auraApp.askFrequent('Como fechou o último turno? Teve furo de caixa?')" class="w-full min-h-[44px] flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:text-cyan-300 hover:bg-cyan-500/10 transition-all text-left text-xs">
-            <span class="inline-flex text-cyan-400"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="6" width="20" height="12" rx="2" stroke-width="1.75"/><circle cx="12" cy="12" r="3" stroke-width="1.75"/><path d="M6 12h.01M18 12h.01" stroke-width="2"/></svg></span>
-            <span>Fechamento & Caixa</span>
-          </button>
-          <button onclick="window.auraApp.askFrequent('O LMC de ontem fechou dentro da tolerância oficial da ANP?')" class="w-full min-h-[44px] flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:text-purple-300 hover:bg-purple-500/10 transition-all text-left text-xs">
-            <span class="inline-flex text-purple-400"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" stroke-width="1.75"/><rect x="8" y="2" width="8" height="4" rx="1" stroke-width="1.75"/></svg></span>
-            <span>LMC Oficial ANP (±0.6%)</span>
-          </button>
-          <button onclick="window.auraApp.askFrequent('Quais os combos de vendas cruzadas com maior Lift na conveniência?')" class="w-full min-h-[44px] flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:text-amber-300 hover:bg-amber-500/10 transition-all text-left text-xs">
-            <span class="inline-flex text-amber-400"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="21" r="1.5"/><circle cx="19" cy="21" r="1.5"/><path d="M2.5 3h3l2.4 12.3a1.5 1.5 0 0 0 1.5 1.2h10.2a1.5 1.5 0 0 0 1.5-1.1L23 7H6.5" stroke-width="1.75"/></svg></span>
-            <span>Combos da Loja (Lift)</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Seção: Governança & Filial -->
+      <!-- Card: Governanca & Filial -->
       <div class="pt-2 border-t border-white/10">
         <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5 space-y-2">
           <div class="flex items-center justify-between text-xs">
             <span class="text-slate-400">Posto Conectado:</span>
-            <span id="sidebar-filial-name" class="font-semibold text-slate-200">ANÁLISE TÉCNICA REVENDA</span>
+            <span id="sidebar-filial-name" class="font-semibold text-slate-200">ANALISE TECNICA REVENDA</span>
           </div>
           <div class="flex items-center justify-between text-xs">
             <span class="text-slate-400">Turno Ativo:</span>
@@ -308,29 +461,29 @@
 
     </div>
 
-    <!-- Rodapé do Drawer -->
+    <!-- Rodape do Drawer -->
     <div class="p-3 border-t border-white/10 bg-white/[0.01] flex items-center justify-between text-[11px] text-slate-400 font-sans">
-      <span>AURA Engine v2.9.3</span>
+      <span>AURA Engine v2.10.19</span>
       <span class="text-auraCyan/90 font-semibold">Deluxe Glass</span>
     </div>
 
   </aside>
 
   <!-- =========================================================================
-       HEADER EXECUTIVO AURA (STREAMLINED & ULTRA-CLEAN - F4-01 & F4-02)
+       HEADER EXECUTIVO AURA (STREAMLINED & ULTRA-CLEAN - FASE 2 REGRA DOS 7 ITENS)
        ========================================================================= -->
   <header class="sticky top-0 z-40 glass-panel border-b border-white/10 px-4 py-2 backdrop-blur-xl bg-obsidian/90">
     <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
       
-      <!-- Lado Esquerdo: Botão Hambúrguer + Identidade da AURA & Contexto da Unidade/Turno -->
+      <!-- 1. Extremo Esquerdo: Botao Hamburguer + Identidade AURA & Contexto do Posto -->
       <div class="flex items-center gap-3">
-        <!-- Botão Menu Hambúrguer Liquid Glass (Touch Target >= 44px) -->
-        <button id="btn-toggle-sidebar" class="flex items-center justify-center min-w-[44px] min-h-[44px] p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-all shadow-sm active:scale-95 group" title="Menu Executivo (Navegação & Opções)" aria-label="Abrir Menu de Navegação Executivo">
+        <!-- Botao Menu Hamburguer (Touch Target >= 44px) -->
+        <button id="btn-toggle-sidebar" class="flex items-center justify-center min-w-[44px] min-h-[44px] p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-all shadow-sm active:scale-95 group" title="Menu Executivo (Navegacao & Opcoes)" aria-label="Abrir Menu de Navegacao Executivo">
           <i data-lucide="menu" class="w-5 h-5 text-auraCyan group-hover:text-white transition-colors"></i>
         </button>
 
         <div class="flex items-center gap-2.5">
-          <!-- Núcleo Holográfico AURA -->
+          <!-- Nucleo Holografico AURA -->
           <div id="header-neural-core-orb" class="neural-core-orb"></div>
           
           <div>
@@ -341,7 +494,7 @@
               </span>
             </div>
             <div class="flex items-center gap-1.5 text-xs text-slate-400 font-sans hidden sm:flex">
-              <span id="hud-filial-name" class="text-slate-300 font-medium">ANÁLISE TÉCNICA REVENDA</span>
+              <span id="hud-filial-name" class="text-slate-300 font-medium">ANALISE TECNICA REVENDA</span>
               <span class="text-slate-600">•</span>
               <span class="text-slate-400 text-[11px]">Turno Atual</span>
             </div>
@@ -349,23 +502,30 @@
         </div>
       </div>
 
-      <!-- Centro: Status de Prontidão e Atendimento Executivo -->
+      <!-- 2. Centro: Badge de Prontidao Executiva com Pulso Verde Esmeralda -->
       <div class="hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/60 border border-white/5 text-xs text-slate-300 backdrop-blur-md shadow-inner">
         <span class="w-2 h-2 rounded-full bg-auraEmerald animate-pulse"></span>
         <span class="font-medium text-slate-200">Pronta para Atendimento</span>
         <span class="text-slate-600">•</span>
-        <span class="text-slate-400 text-[11px]">Sob demanda</span>
+        <span class="text-slate-400 text-[11px]">Motor Local 100% Offline</span>
         <span class="text-slate-700 hidden lg:inline">|</span>
-        <a href="/showcase" id="header-link-showcase" target="_blank" rel="noopener noreferrer" class="hidden lg:inline-flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-200 transition-colors font-medium ml-1" title="Apresentação da AURA e Escudo de Privacidade (Tour)">
+        <a href="/showcase" id="header-link-showcase" target="_blank" rel="noopener noreferrer" class="hidden lg:inline-flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-200 transition-colors font-medium ml-1" title="Apresentacao da AURA e Escudo de Privacidade (Tour)">
           <span>Saiba mais...</span>
           <svg class="w-3 h-3 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         </a>
       </div>
 
-      <!-- Lado Direito: Toggle Painel Auxiliar (Alt+P), Command Palette (Ctrl+K) & Nova Conversa -->
-      <div class="flex items-center gap-2">
-        <!-- Botão Toggle do Painel Auxiliar / Companion Canvas (Alt+P) -->
-        <button id="btn-toggle-aux-panel" class="flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 font-sans text-xs transition-all shadow-sm relative group" title="Alternar Painel Auxiliar / Canvas (Alt+P)" aria-label="Alternar Painel Auxiliar" aria-expanded="false">
+      <!-- 3. Extremo Direito: Grupo de Produtividade (Regra dos 5 Itens Ancoras) -->
+      <div id="header-productive-actions" class="flex items-center gap-2">
+        <!-- 3.1 Botao de Busca Preditiva e Comandos Rapidos (Ctrl+K / ⌘K) -->
+        <button id="btn-open-palette" class="flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 font-sans text-xs transition-colors shadow-sm active:scale-95 group" title="Abrir Comandos Rapidos (Ctrl+K)" aria-label="Abrir Comandos Rapidos">
+          <svg class="w-4 h-4 text-auraCyan flex-shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><polygon points="12,6.5 16.5,9.5 16.5,14.5 12,17.5 7.5,14.5 7.5,9.5" stroke-width="1.25" fill="rgba(6,182,212,0.25)"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+          <span class="text-[11px] font-medium hidden sm:inline">Comandos</span>
+          <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-mono hidden md:inline">⌘K</kbd>
+        </button>
+
+        <!-- 3.2 Botao Companion Canvas / Painel Auxiliar (Alt+P) -->
+        <button id="btn-toggle-aux-panel" class="flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 font-sans text-xs transition-all shadow-sm relative active:scale-95 group" title="Alternar Painel Auxiliar / Canvas (Alt+P)" aria-label="Alternar Painel Auxiliar" aria-expanded="false">
           <div class="relative flex items-center justify-center">
             <svg class="w-4 h-4 text-auraCyan flex-shrink-0 group-hover:text-cyan-300 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <rect x="2" y="3" width="20" height="18" rx="2.5" stroke-width="1.75"/>
@@ -377,70 +537,27 @@
             </svg>
             <span id="aux-toggle-beacon" class="hidden absolute -top-1 -right-1 w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
           </div>
-          <span class="text-[11px] font-medium hidden sm:inline">Painel Auxiliar</span>
+          <span class="text-[11px] font-medium hidden sm:inline">Canvas</span>
           <span id="aux-toggle-count" class="hidden px-1.5 py-0.2 rounded-full text-[10px] font-sans font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">0</span>
           <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-mono hidden lg:inline">Alt+P</kbd>
         </button>
 
-        <!-- Botão Command Palette Executiva (Ctrl+K) -->
-        <button id="btn-open-palette" class="flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 font-sans text-xs transition-colors shadow-sm" title="Abrir Comandos Rápidos (Ctrl+K)" aria-label="Abrir Comandos Rápidos">
-          <svg class="w-4 h-4 text-auraCyan flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><polygon points="12,6.5 16.5,9.5 16.5,14.5 12,17.5 7.5,14.5 7.5,9.5" stroke-width="1.25" fill="rgba(6,182,212,0.25)"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
-          <span class="text-[11px] font-medium hidden sm:inline">Comandos</span>
-          <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-mono hidden md:inline">⌘K</kbd>
-        </button>
-
-        <!-- Botão Central de Automações & Regras (Configurável) -->
-        <button id="btn-open-automations" class="flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 font-sans text-xs transition-all shadow-sm relative group" title="Central de Automações & Regras" aria-label="Abrir Central de Automações">
-          <svg class="w-4 h-4 text-cyan-400 flex-shrink-0 group-hover:rotate-45 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3" stroke-width="1.75"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke-width="1.5"/></svg>
-          <span class="text-[11px] font-medium hidden sm:inline">Automações</span>
-          <span id="header-automation-status-dot" class="w-2 h-2 rounded-full bg-slate-500" title="Monitoramento Automático: Desativado (100% sob demanda)"></span>
-        </button>
-
-        <!-- Botão Conformidade Legal & Termo de Interoperabilidade v1.1 -->
-        <button id="btn-open-compliance" class="flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 font-sans text-xs transition-all shadow-sm relative group" title="Conformidade Legal & LGPD (Termo v1.1)" aria-label="Abrir Conformidade Legal">
-          <svg class="w-4 h-4 text-emerald-400 flex-shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-width="1.75" stroke-linejoin="round"/>
-            <path d="M9 12l2 2 4-4" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span class="text-[11px] font-medium hidden sm:inline">Conformidade</span>
-          <span id="header-compliance-pill" class="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-sans font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-            <span>v1.1</span>
-          </span>
-        </button>
-
-        <!-- Botão Cockpit SRE & Telemetria Nativa (0 MB RAM) -->
-        <button id="btn-open-telemetry" class="flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 font-sans text-xs transition-all shadow-sm relative group" title="Cockpit SRE & Telemetria Nativa (0 MB RAM)" aria-label="Abrir Telemetria SRE">
-          <svg class="w-4 h-4 text-cyan-400 flex-shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span class="text-[11px] font-medium hidden sm:inline">Telemetria</span>
-          <span id="header-telemetry-badge" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
-            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
-            <span id="header-telemetry-ttft-label">Pulso</span>
-          </span>
-        </button>
-
-        <!-- Botão Modo Pista (P3-4: Alto Contraste & Botões Táteis para Sol Forte) -->
-        <button id="btn-toggle-modo-pista" class="flex items-center gap-2 px-3 py-2 min-h-[48px] rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-amber-300 border border-slate-800 font-sans text-xs transition-all shadow-sm relative group" title="Alternar Modo Pista (Alto Contraste sob Sol Forte)" aria-label="Alternar Modo Pista" aria-pressed="false">
-          <svg class="w-4 h-4 text-amber-400 flex-shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <circle cx="12" cy="12" r="4" stroke-width="2"/>
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          <span class="text-[11px] font-medium hidden sm:inline">Modo Pista</span>
-          <span id="modo-pista-badge" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">OFF</span>
-        </button>
-
-        <!-- Botão Nova Conversa (Header Superior Direito - min-h: 44px) -->
+        <!-- 3.3 Botao Nova Conversa (Header Superior Direito - min-h: 44px) -->
         <button id="btn-new-chat" class="btn-new-chat flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 font-sans text-xs transition-all shadow-sm active:scale-95 group" title="Iniciar Nova Conversa (Limpar Chat)" aria-label="Nova Conversa">
           <i data-lucide="plus-circle" class="w-4 h-4 text-auraEmerald group-hover:rotate-90 transition-transform"></i>
           <span class="text-[11px] font-medium hidden sm:inline">Nova Conversa</span>
         </button>
 
-        <!-- Alias de compatibilidade com testes e atalhos legados -->
-        <button id="btn-chat-clear" class="hidden" aria-hidden="true"></button>
-
-        <span id="chat-session-badge" class="hidden">Sessão Ativa</span>
+        <!-- Elementos de compatibilidade retroativa e automacao (ocultos visualmente) -->
+        <div class="hidden" aria-hidden="true">
+          <button id="btn-open-automations" tabindex="-1"><span id="header-automation-status-dot"></span></button>
+          <button id="btn-open-compliance" tabindex="-1"><span id="header-compliance-pill"><span>v1.1</span></span></button>
+          <button id="btn-open-telemetry" tabindex="-1"><span id="header-telemetry-badge"><span id="header-telemetry-ttft-label">Pulso</span></span></button>
+          <button id="btn-toggle-modo-pista" tabindex="-1"><span id="modo-pista-badge">OFF</span></button>
+          <button id="btn-open-history" class="btn-open-history" tabindex="-1"></button>
+          <button id="btn-chat-clear" tabindex="-1"></button>
+          <span id="chat-session-badge">Sessao Ativa</span>
+        </div>
       </div>
 
     </div>
@@ -456,6 +573,62 @@
          ======================================================================= -->
     <div id="view-cockpit" class="space-y-6 hidden view-transition-active">
       
+      <!-- ===================================================================
+           SEGMENTED CONTROL IOS/MACOS STYLE (FASE 4 ACTIONABLE BI)
+           =================================================================== -->
+      <div class="flex items-center justify-center p-1 rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-xl shadow-inner max-w-xl mx-auto" role="tablist" aria-label="Navegacao do Cockpit">
+        <button id="seg-btn-zeroclick" onclick="if(window.auraCockpit) window.auraCockpit.switchSubSection('zeroclick');" class="flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-sm flex items-center justify-center gap-1.5" role="tab" aria-selected="true">
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span>Feed Zero-Click</span>
+        </button>
+        <button id="seg-btn-tanks" onclick="if(window.auraCockpit) window.auraCockpit.switchSubSection('tanks');" class="flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all text-slate-400 hover:text-white border border-transparent flex items-center justify-center gap-1.5" role="tab" aria-selected="false">
+          <i data-lucide="gauge" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Pista & Tanques</span>
+        </button>
+        <button id="seg-btn-security" onclick="if(window.auraCockpit) window.auraCockpit.switchSubSection('security');" class="flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all text-slate-400 hover:text-white border border-transparent flex items-center justify-center gap-1.5" role="tab" aria-selected="false">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-purple-400"></i>
+          <span>Segurança & Read-Only</span>
+        </button>
+      </div>
+
+      <!-- ===================================================================
+           FEED EXECUTIVO ZERO-CLICK (O ANTI-DASHBOARD ESTATICO - FASE 2/4)
+           =================================================================== -->
+      <section id="aura-zero-click-section" class="space-y-4" aria-label="Feed Executivo Zero-Click">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-zinc-900/40 backdrop-blur-md border border-white/[0.06] shadow-xl">
+          <div class="flex items-center gap-3">
+            <span class="relative flex h-3 w-3">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            </span>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="font-display-title font-bold text-base text-white tracking-wide">Inteligência Ativa (Zero-Click)</h3>
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-sans font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  R$ Priorizado
+                </span>
+              </div>
+              <p class="text-xs text-slate-400 font-sans">Exceções de pista e oportunidades prescritivas prontas para decisão em 1-clique</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btn-refresh-zero-click" onclick="if(window.auraCockpit) window.auraCockpit.loadZeroClickFeed(true);" class="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-cyan-300 border border-white/10 hover:border-cyan-500/30 text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm" title="Recarregar feed zero-click">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-cyan-400"></i>
+              <span>Atualizar Feed</span>
+            </button>
+            <button onclick="if(window.auraSecurityArchitecture) window.auraSecurityArchitecture.openModal();" class="px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm" title="Abrir Arquitetura de Confianca e SQL Auditavel">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <span>SQL Auditável</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Grid de Cards Executivos de Excecao Zero-Click -->
+        <div id="zero-click-cards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Carregado via aura-cockpit.js -->
+        </div>
+      </section>
+
       <!-- Banner Resumo Executivo da Pista -->
       <div class="glass-panel p-4 border-l-4 border-l-auraEmerald bg-gradient-to-r from-auraEmerald/5 via-slateSurface to-transparent">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -791,7 +964,7 @@
     <!-- =======================================================================
          VIEW 3: WORKSPACE DE ASSISTÊNCIA DA AURA (IMERSIVO TOTAL)
          ========================================================================= -->
-    <div id="view-console" class="max-w-3xl lg:max-w-4xl mx-auto w-full view-transition-active flex flex-col h-[calc(100dvh-98px)] max-h-[calc(100dvh-98px)] relative transition-all duration-300">
+    <div id="view-console" class="max-w-3xl lg:max-w-4xl mx-auto w-full view-transition-active flex flex-col h-[calc(100dvh-98px)] max-h-[calc(100dvh-98px)] relative">
       
       <!-- Container Flex Split (se expande para 2 colunas lado a lado quando o painel auxiliar está aberto) -->
       <div id="console-workspace-container" class="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 relative w-full h-full">
@@ -802,7 +975,7 @@
           <!-- Container de Alertas Proativos In-App da AURA (P3-2) -->
           <div id="aura-in-app-alerts-container" class="empty:hidden flex flex-col gap-2 z-20"></div>
 
-          <!-- Feed de Mensagens (Scrollable) - Ocupa 100% da altura e largura -->
+<!-- Feed de Mensagens (Scrollable) - Ocupa 100% da altura e largura -->
           <div id="chat-feed-container" class="glass-panel flex-1 min-h-0 p-4 sm:p-5 overflow-y-auto space-y-4 font-sans rounded-2xl relative scroll-smooth flex flex-col">
             <div id="welcome-message-bubble" class="flex justify-start w-full h-full min-h-full flex-1 animate-fade-in welcome-message-wrapper">
               <div class="chat-bubble-aura chat-bubble-welcome w-full max-w-full h-full min-h-full flex-1 flex flex-col justify-between p-4 sm:p-5 text-slate-100 text-sm space-y-3">
@@ -825,11 +998,18 @@
                 <div class="welcome-content-body w-full flex-1 flex flex-col justify-between">
                   <div class="space-y-3 font-sans text-slate-200 leading-relaxed text-sm">
                     <p>
-                      Olá! Sou a <strong>AURA</strong>, sua assistente executiva para operações de pista, conveniência e gestão do posto.
+                      Olá! Sou a <strong>AURA</strong>. Este é o resumo do seu posto antes mesmo de você perguntar.
                     </p>
-                    <p class="text-slate-300 text-xs sm:text-sm">
-                      Estou conectada e pronta para apoiar suas decisões. Você pode me perguntar sobre a autonomia dos combustíveis, auditar o fechamento de turno e caixa, verificar a conformidade do LMC com a ANP ou analisar as vendas da loja.
-                    </p>
+                    <!-- Cockpit de Prontidão do Posto (Fase 3): dados reais via aura-welcome-cockpit.js; skeleton até a leitura chegar -->
+                    <section id="welcome-readiness-cockpit" class="welcome-cockpit" role="region" aria-label="Cockpit de prontidão do posto" aria-busy="true" aria-live="polite">
+                      <div class="welcome-cockpit-header"><h2 class="welcome-cockpit-title">Prontidão do posto agora</h2><button type="button" id="welcome-cockpit-refresh" class="welcome-cockpit-refresh" aria-label="Atualizar indicadores do posto" onclick="window.auraWelcomeCockpit &amp;&amp; window.auraWelcomeCockpit.refresh({ force: true })"><svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36" stroke-width="1.75" stroke-linecap="round"/><polyline points="21 3 21 9 15 9" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Atualizar</span></button></div>
+                      <div class="welcome-cockpit-grid">
+                        <button type="button" class="welcome-indicator" data-indicator="tanques" data-state="loading" onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" aria-label="Reserva de Tanques: carregando. Toque para consultar a autonomia de cada tanque."><span class="welcome-indicator-label"><span class="welcome-indicator-dot" aria-hidden="true"></span><svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="3" y="3" width="11" height="18" rx="2" stroke-width="1.75"/><line x1="2" y1="21" x2="15" y2="21" stroke-width="1.75"/><path d="M14 8h2.5a2 2 0 0 1 2 2v6.5a1.5 1.5 0 0 0 3 0V9l-2-2" stroke-width="1.5"/></svg><span>Reserva de Tanques</span></span><span class="welcome-indicator-skeleton" aria-hidden="true"><span class="skeleton-shimmer welcome-skel-value"></span><span class="skeleton-shimmer welcome-skel-detail"></span></span><span class="welcome-indicator-body"><span class="welcome-indicator-value" data-role="value"></span><span class="welcome-indicator-detail" data-role="detail"></span></span></button>
+                        <button type="button" class="welcome-indicator" data-indicator="turno" data-state="loading" onclick="window.auraChat.sendUserPrompt('Como fechou o último turno? Teve furo de caixa?')" aria-label="Conciliação do Turno: carregando. Toque para ver como fechou o último turno."><span class="welcome-indicator-label"><span class="welcome-indicator-dot" aria-hidden="true"></span><svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2" stroke-width="1.75"/><circle cx="12" cy="12" r="3" stroke-width="1.75"/><path d="M6 12h.01M18 12h.01" stroke-width="2"/></svg><span>Conciliação do Turno</span></span><span class="welcome-indicator-skeleton" aria-hidden="true"><span class="skeleton-shimmer welcome-skel-value"></span><span class="skeleton-shimmer welcome-skel-detail"></span></span><span class="welcome-indicator-body"><span class="welcome-indicator-value" data-role="value"></span><span class="welcome-indicator-detail" data-role="detail"></span></span></button>
+                        <button type="button" class="welcome-indicator" data-indicator="lmc" data-state="loading" onclick="window.auraChat.sendUserPrompt('O LMC está dentro da tolerância oficial de 0,6% da ANP?')" aria-label="Conformidade LMC: carregando. Toque para auditar o LMC frente à tolerância da ANP."><span class="welcome-indicator-label"><span class="welcome-indicator-dot" aria-hidden="true"></span><svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><polyline points="8.5 12 11 14.5 15.5 9.5" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Conformidade LMC</span></span><span class="welcome-indicator-skeleton" aria-hidden="true"><span class="skeleton-shimmer welcome-skel-value"></span><span class="skeleton-shimmer welcome-skel-detail"></span></span><span class="welcome-indicator-body"><span class="welcome-indicator-value" data-role="value"></span><span class="welcome-indicator-detail" data-role="detail"></span></span></button>
+                      </div>
+                      <p class="welcome-cockpit-meta" data-role="meta">Lendo dados do posto...</p>
+                    </section>
                   </div>
                   <!-- Rodapé do Card de Boas-Vindas: Sugestões Executivas Ancoradas na Base -->
                   <div id="welcome-suggestions-container" class="welcome-card-footer mt-auto !mt-auto pt-4 border-t border-white/10 space-y-2.5">
@@ -841,10 +1021,10 @@
                       <button onclick="window.auraChat.sendUserPrompt('Qual o diagnóstico executivo do meu negócio hoje?')" class="quick-prompt-chip !border-cyan-500/40 text-cyan-200 hover:text-white" aria-label="Consultar Mentor de Decisões Executivo">
                         <svg class="w-3.5 h-3.5 text-cyan-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg> <span>Mentor de Decisões</span>
                       </button>
-                      <button onclick="window.auraChat.sendUserPrompt('Como fechou o último turno? Teve furo de caixa?')" class="quick-prompt-chip" aria-label="Consultar Fechamento de Turno e Caixa">
+                      <button onclick="window.auraChat.sendUserPrompt('Como fechou o último turno? Teve furo de caixa?')" class="quick-prompt-chip" data-welcome-chip="turno" aria-label="Consultar Fechamento de Turno e Caixa">
                         <svg class="w-3.5 h-3.5 text-cyan-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="6" width="20" height="12" rx="2" stroke-width="1.75"/><circle cx="12" cy="12" r="3" stroke-width="1.75"/><path d="M6 12h.01M18 12h.01" stroke-width="2"/></svg> <span>Fechamento & Caixa</span>
                       </button>
-                      <button onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" class="quick-prompt-chip" aria-label="Consultar Autonomia de Tanques">
+                      <button onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" class="quick-prompt-chip" data-welcome-chip="tanques" aria-label="Consultar Autonomia de Tanques">
                         <svg class="w-3.5 h-3.5 text-emerald-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="11" height="18" rx="2" stroke-width="1.75"/><line x1="2" y1="21" x2="15" y2="21" stroke-width="1.75"/><path d="M14 8h2.5a2 2 0 0 1 2 2v6.5a1.5 1.5 0 0 0 3 0V9l-2-2" stroke-width="1.5"/></svg> <span>Autonomia dos Tanques</span>
                       </button>
                       <button onclick="window.auraGlance ? window.auraGlance.openCommandPalette() : document.getElementById('btn-open-palette').click()" class="quick-prompt-chip !border-purple-500/30 text-purple-300 hover:text-purple-200" aria-label="Abrir mais consultas rápidas">
@@ -1900,25 +2080,231 @@
   </aside>
 
   <!-- Anunciador de Tela Acessível (WCAG 2.1 AA) -->
+    <!-- =========================================================================
+       DRAWER LATERAL DE HISTORICO DE CONVERSAS (AURA HISTORY DRAWER: ABORDAGEM C)
+       ========================================================================= -->
+  <div id="aura-history-drawer-overlay" onclick="if(window.closeAuraHistory){window.closeAuraHistory();}else if(window.auraHistoryDrawer){window.auraHistoryDrawer.close();}" class="history-drawer-overlay fixed inset-0 bg-slate-950/75 backdrop-blur-md z-50 transition-opacity duration-300 opacity-0 pointer-events-none" aria-hidden="true"></div>
+
+  <aside id="aura-history-drawer" class="history-drawer fixed inset-y-0 right-0 w-full sm:max-w-md md:max-w-lg z-50 transform translate-x-full transition-transform duration-300 ease-out flex flex-col shadow-2xl border-l border-white/10 bg-slate-950/95 backdrop-blur-2xl" aria-label="Historico de Conversas AURA" role="dialog" aria-modal="true" aria-hidden="true">
+    <!-- Topo do Drawer de Historico -->
+    <div class="p-4 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
+      <div class="flex items-center gap-3">
+        <div class="p-2 rounded-xl bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+          <i data-lucide="history" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-display-title font-bold text-base tracking-wider text-white">Historico de Conversas</span>
+            <span id="history-total-chip" class="px-2 py-0.5 rounded-full text-[10px] font-sans font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+              0 conversas
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-400 font-sans">Navegue, retome ou pesquise conversas anteriores</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btn-drawer-new-chat" class="p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs transition-colors flex items-center gap-1.5" title="Iniciar Nova Conversa">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          <span class="text-[11px] font-medium hidden sm:inline">Nova</span>
+        </button>
+        <button id="btn-close-history-drawer" onclick="if(window.closeAuraHistory){window.closeAuraHistory();}else if(window.auraHistoryDrawer){window.auraHistoryDrawer.close();}" class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 transition-colors" title="Fechar Historico (Esc)" aria-label="Fechar painel de historico">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Campo de Busca em Tempo Real -->
+    <div class="p-3 border-b border-white/5 bg-slate-900/50">
+      <div class="relative flex items-center">
+        <i data-lucide="search" class="w-4 h-4 absolute left-3 text-slate-400 pointer-events-none"></i>
+        <input
+          id="history-search-input"
+          type="text"
+          placeholder="Pesquisar conversas por termo..."
+          class="w-full bg-slate-950/80 border border-white/10 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all font-sans"
+          autocomplete="off"
+        />
+        <button id="btn-history-clear-search" class="absolute right-2.5 text-slate-500 hover:text-slate-300 hidden p-1" title="Limpar busca">
+          <i data-lucide="x" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Conteudo Scrollavel de Grupos Temporais -->
+    <div id="history-groups-container" class="flex-1 overflow-y-auto p-4 space-y-6 font-sans text-xs focus:outline-none">
+      <!-- Grupos (Hoje, Ontem, Ultimos 7 dias, Anteriores) injetados via aura-history-drawer.js -->
+    </div>
+
+    <!-- Rodape do Drawer de Historico -->
+    <div class="p-3 border-t border-white/10 bg-slate-950/80 flex items-center justify-between text-[11px] text-slate-400 font-sans">
+      <button id="btn-clear-all-history" class="text-rose-400 hover:text-rose-300 hover:underline flex items-center gap-1.5 transition-colors p-1" title="Limpar todo o historico de conversas locais">
+        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+        <span>Limpar Todo o Historico</span>
+      </button>
+      <span class="text-slate-500 text-[10px]">Atalho: Ctrl+H</span>
+    </div>
+  </aside>
+
   <div id="aura-sr-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- =========================================================================
+       AURA MODAL ARQUITETURA DE CONFIANÇA & SCRIPT SQL AUDITÁVEL (FASE 2)
+       ========================================================================= -->
+  <div id="aura-security-architecture-modal" class="palette-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="sec-modal-title">
+    <div class="palette-modal-container max-w-4xl w-full p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+      
+      <!-- Topo do Modal -->
+      <div class="flex items-center justify-between border-b border-white/10 pb-4">
+        <div class="flex items-center gap-3">
+          <div class="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
+            <i data-lucide="shield-check" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 id="sec-modal-title" class="font-display-title font-bold text-lg text-white">Arquitetura de Confiança & Script SQL Auditável</h3>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold">
+                Clean Room Read-Only
+              </span>
+            </div>
+            <p class="text-xs text-slate-400 font-sans">Isolamento matemático de 3 camadas com blindagem transacional estrita (Zero Escritas no ERP)</p>
+          </div>
+        </div>
+        <button onclick="if(window.auraSecurityArchitecture) window.auraSecurityArchitecture.closeModal();" class="p-2 rounded-xl bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-white/10 transition-colors cursor-pointer" title="Fechar (Esc)" aria-label="Fechar Modal">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Barra de Telemetria ao Vivo -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="glass-subcard p-3 rounded-xl border border-white/5 bg-slate-900/60">
+          <div class="flex items-center justify-between text-[11px] text-slate-400 font-sans mb-1">
+            <span>Sessão PostgreSQL</span>
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          </div>
+          <div id="sec-pg-status" class="text-xs font-mono text-emerald-300 font-semibold">ON (Read-Only)</div>
+          <div id="sec-pg-options" class="text-[10px] font-mono text-slate-400 truncate mt-0.5" title="statement_timeout=4000ms lock_timeout=1000ms">timeout: 4000ms | lock: 1000ms</div>
+        </div>
+
+        <div class="glass-subcard p-3 rounded-xl border border-white/5 bg-slate-900/60">
+          <div class="flex items-center justify-between text-[11px] text-slate-400 font-sans mb-1">
+            <span>Circuit Breaker</span>
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          </div>
+          <div id="sec-cb-state" class="text-xs font-mono text-emerald-300 font-semibold">FECHADO_SEGURO</div>
+          <div id="sec-cb-cpu-ram" class="text-[10px] font-mono text-slate-400 mt-0.5">CPU &lt; 80% | RAM &lt; 85%</div>
+        </div>
+
+        <div class="glass-subcard p-3 rounded-xl border border-white/5 bg-slate-900/60">
+          <div class="flex items-center justify-between text-[11px] text-slate-400 font-sans mb-1">
+            <span>Privacidade LGPD</span>
+            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+          </div>
+          <div id="sec-pii-count" class="text-xs font-mono text-cyan-300 font-semibold">24 Categorias Ativas</div>
+          <div class="text-[10px] font-mono text-slate-400 mt-0.5">CentralLogSanitizer</div>
+        </div>
+
+        <div class="glass-subcard p-3 rounded-xl border border-white/5 bg-slate-900/60">
+          <div class="flex items-center justify-between text-[11px] text-slate-400 font-sans mb-1">
+            <span>Termo Clean Room</span>
+            <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+          </div>
+          <div class="text-xs font-mono text-purple-300 font-semibold">SHA-256 Ativo</div>
+          <div id="sec-term-hash" class="text-[10px] font-mono text-slate-400 truncate mt-0.5" title="Hash SHA-256 do termo ativo">Validado</div>
+        </div>
+      </div>
+
+      <!-- Diagrama de 3 Camadas -->
+      <div class="glass-subcard p-4 rounded-xl border border-white/10 bg-slate-900/40 space-y-3">
+        <h4 class="text-xs font-bold font-sans uppercase tracking-wider text-slate-300 flex items-center gap-2">
+          <i data-lucide="layers" class="w-4 h-4 text-cyan-400"></i>
+          <span>Diagrama Arquitetural de 3 Camadas (Isolamento de Borda)</span>
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div class="p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-950/20 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300">CAMADA 1</span>
+              <span class="text-[10px] text-slate-400 font-mono">Porta 5432/5433</span>
+            </div>
+            <h5 class="text-xs font-bold text-white">Banco Local do ERP</h5>
+            <p class="text-[11px] text-slate-300 font-sans leading-relaxed">
+              PostgreSQL transacional do posto permanece 100% intacto. Nenhum trigger ou gravacao e permitida.
+            </p>
+          </div>
+
+          <div class="p-3.5 rounded-xl border border-cyan-500/20 bg-cyan-950/20 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300">CAMADA 2</span>
+              <span class="text-[10px] text-slate-400 font-mono">Role aura_service_ro</span>
+            </div>
+            <h5 class="text-xs font-bold text-white">Borda Clean Room Read-Only</h5>
+            <p class="text-[11px] text-slate-300 font-sans leading-relaxed">
+              Sessao read-only forçada, timeout estrito de 4.000ms e lock timeout de 1.000ms. Zero mutacoes.
+            </p>
+          </div>
+
+          <div class="p-3.5 rounded-xl border border-purple-500/20 bg-purple-950/20 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300">CAMADA 3</span>
+              <span class="text-[10px] text-slate-400 font-mono">GenUI Engine</span>
+            </div>
+            <h5 class="text-xs font-bold text-white">Motor Prescritivo AURA</h5>
+            <p class="text-[11px] text-slate-300 font-sans leading-relaxed">
+              Feed Zero-Click com diagnostico causal, prova matematica e acoes executivas HITL em 1-clique.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Script SQL Auditavel da Role -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="code-2" class="w-4 h-4 text-emerald-400"></i>
+            <h4 class="text-xs font-bold font-sans uppercase tracking-wider text-slate-300">
+              Script SQL Exato da Role aura_service_ro (Auditável)
+            </h4>
+          </div>
+          <button id="btn-copy-sec-sql" onclick="if(window.auraSecurityArchitecture) window.auraSecurityArchitecture.copySqlScript();" class="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span>Copiar Script SQL</span>
+          </button>
+        </div>
+        <pre class="p-4 rounded-xl bg-slate-950 border border-white/10 text-emerald-300 font-mono text-xs overflow-x-auto leading-relaxed"><code id="sec-sql-code">-- Carregando telemetria de seguranca...</code></pre>
+      </div>
+
+      <!-- Rodape do Modal -->
+      <div class="pt-3 border-t border-white/10 flex items-center justify-between text-xs text-slate-400 font-sans">
+        <span>Conformidade Legal: LGPD Art. 7, Marco Civil da Internet e Lei de Software</span>
+        <button onclick="if(window.auraSecurityArchitecture) window.auraSecurityArchitecture.closeModal();" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs transition-colors">
+          Fechar
+        </button>
+      </div>
+
+    </div>
+  </div>
 
   <!-- =========================================================================
        SCRIPTS JAVASCRIPT MODULARES DA AURA
        ========================================================================= -->
-  <script src="/static/js/aura-genui.js?v=2.10.4" defer></script>
-  <script src="/static/js/aura-state-manager.js?v=2.10.4" defer></script>
-  <script src="/static/js/aura-genui-widgets.js?v=2.10.4" defer></script>
-  <script src="/static/js/aura-api.js?v=2.10.4"></script>
-  <script src="/static/js/aura-cockpit.js?v=2.10.4"></script>
-  <script src="/static/js/aura-triggers.js?v=2.10.4"></script>
-  <script src="/static/js/aura-automations.js?v=2.10.4"></script>
-  <script src="/static/js/aura-compliance.js?v=2.10.4"></script>
-  <script src="/static/js/aura-telemetry.js?v=2.10.4"></script>
-  <script src="/static/js/aura-aux-panel.js?v=2.10.4"></script>
-  <script src="/static/js/aura-chat.js?v=2.10.4"></script>
-  <script src="/static/js/aura-voice.js?v=2.10.4"></script>
-  <script src="/static/js/aura-app.js?v=2.10.4"></script>
-  <script src="/static/js/aura-fx.js?v=2.10.4"></script>
+  <script src="/static/js/aura-genui.js?v=2.10.22" defer></script>
+  <script src="/static/js/aura-state-manager.js?v=2.10.22" defer></script>
+  <script src="/static/js/aura-genui-widgets.js?v=2.10.22" defer></script>
+  <script src="/static/js/aura-api.js?v=2.10.22"></script>
+  <script src="/static/js/aura-cockpit.js?v=2.10.22"></script>
+  <script src="/static/js/aura-triggers.js?v=2.10.22"></script>
+  <script src="/static/js/aura-automations.js?v=2.10.22"></script>
+  <script src="/static/js/aura-compliance.js?v=2.10.22"></script>
+  <script src="/static/js/aura-telemetry.js?v=2.10.22"></script>
+  <script src="/static/js/aura-security-architecture.js?v=2.10.22"></script>
+  <script src="/static/js/aura-aux-panel.js?v=2.10.22"></script>
+  <script src="/static/js/aura-storage.js?v=2.10.22"></script>
+  <script src="/static/js/aura-history-drawer.js?v=2.10.22"></script>
+  <script src="/static/js/aura-welcome-cockpit.js?v=2.10.22"></script>
+  <script src="/static/js/aura-chat.js?v=2.10.22"></script>
+  <script src="/static/js/aura-voice.js?v=2.10.22"></script>
+  <script src="/static/js/aura-app.js?v=2.10.22"></script>
+  <script src="/static/js/aura-fx.js?v=2.10.22"></script>
 
   <!-- Registro Resiliente e Nao-Bloqueante do Service Worker PWA (Fase P3-4) -->
   <script>

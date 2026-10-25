@@ -9,8 +9,6 @@ Zero travessoes em todo o arquivo.
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from config.settings import (
     AURA_CORE_SCHEMA,
     DB_VECTOR_CONFIG,
@@ -18,8 +16,6 @@ from config.settings import (
     VECTOR_DB_DRIVER_OPTIONS,
 )
 from scripts.init_posto_database import (
-    DDL_AURA_CORE,
-    DDL_N3_SRE,
     apply_schema_migrations,
     ensure_backwards_compatibility_views,
     get_convergence_ddl,
@@ -128,7 +124,7 @@ def test_ensure_backwards_compatibility_views():
 
 def test_sentinel_n3_agent_toml_convergence():
     """Valida que a configuracao do Sentinel n3-agent.toml aponta para a porta 5433 e posto_ai."""
-    sentinel_toml_path = Path("C:/Users/Marlon/Documents/RAG WP/src/station_agent/n3-agent.toml")
+    sentinel_toml_path = Path.home() / "Documents" / "RAG WP" / "src" / "station_agent" / "n3-agent.toml"
     if sentinel_toml_path.exists():
         content = sentinel_toml_path.read_text(encoding="utf-8")
         assert "[vector_db]" in content
@@ -138,7 +134,7 @@ def test_sentinel_n3_agent_toml_convergence():
 
 def test_sentinel_edge_storage_default_port():
     """Valida que o modulo EdgeVectorStorage do Sentinel tem default na porta 5433."""
-    sentinel_storage_path = Path("C:/Users/Marlon/Documents/RAG WP/src/station_agent/edge_storage.py")
+    sentinel_storage_path = Path.home() / "Documents" / "RAG WP" / "src" / "station_agent" / "edge_storage.py"
     if sentinel_storage_path.exists():
         content = sentinel_storage_path.read_text(encoding="utf-8")
         assert 'cfg.get("port", 5433)' in content

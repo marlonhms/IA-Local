@@ -1,20 +1,19 @@
 """AUPS Dominio de Fechamento de Caixa e Movimentacoes Financeiras.
 
-AURA Universal Posto Schema (AUPS): Dominio Canonico Desacoplado.
+AURA Universal Posto Schema (AUPS) e AUDS: Dominio Canonico Desacoplado.
 Entidades imutaveis para turnos de operadores, sangrias e suprimentos.
+Zero travessoes em todo o modulo.
 """
 
 from __future__ import annotations
 
-from datetime import date, datetime
-from typing import Any, Literal
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import AliasChoices, ConfigDict, Field, field_validator, model_validator
+from pydantic import AliasChoices, ConfigDict, Field, field_validator
 
 from core.domain.base import (
     AUPSBaseModel,
-    extract_first_present,
-    parse_date_safe,
     parse_datetime_safe,
     parse_float_safe,
     parse_str_safe,
@@ -123,269 +122,27 @@ class UniversalCashMovement(AUPSBaseModel):
         return parse_str_safe(v, default="1")
 
 
-class UniversalCashierShift(AUPSBaseModel):
-    """Fechamento consolidado de turno de caixa e frentista."""
-
-    model_config = ConfigDict(
-        frozen=True,
-        extra="ignore",
-        populate_by_name=True,
-    )
-
-    operador_id: str = Field(
-        default="0",
-        validation_alias=AliasChoices(
-            "operador_id", "usuario_id", "funcionario_id", "id_operador", "id", "codfun"
-        ),
-        description="Identificador do operador ou frentista responsavel",
-    )
-    operador_nome: str = Field(
-        default="OPERADOR",
-        validation_alias=AliasChoices(
-            "operador_nome", "nome_operador", "nome", "usuario_nome", "nomefun"
-        ),
-        description="Nome civil ou de guerra do operador",
-    )
-    turno_descricao: str = Field(
-        default="GERAL",
-        validation_alias=AliasChoices(
-            "turno_descricao", "turno", "descricao_turno", "periodo", "descturn"
-        ),
-        description="Identificacao do turno operacional (ex: MANHA, TARDE, NOITE)",
-    )
-    data_movimento: date = Field(
-        default_factory=date.today,
-        validation_alias=AliasChoices("data_movimento", "data", "data_turno", "datamov"),
-        description="Data de referencia contabil do movimento",
-    )
-    timestamp_abertura: datetime = Field(
-        default_factory=datetime.now,
-        validation_alias=AliasChoices(
-            "timestamp_abertura", "data_abertura", "hora_abertura", "abertura", "dtabt", "hrabt"
-        ),
-        description="Data e hora exata da abertura do turno",
-    )
-    timestamp_fechamento: datetime | None = Field(
-        default=None,
-        validation_alias=AliasChoices(
-            "timestamp_fechamento", "data_fechamento", "hora_fechamento", "fechamento", "dtfch", "hrfch"
-        ),
-        description="Data e hora do encerramento do turno",
-    )
-    fundo_troco_reais: float = Field(
-        default=0.0,
-        ge=0.0,
-        validation_alias=AliasChoices(
-            "fundo_troco_reais", "fundo_troco", "troco_inicial", "fundotroco"
-        ),
-        description="Valor inicial disponibilizado como fundo de troco em Reais",
-    )
-    total_declarado_reais: float = Field(
-        default=0.0,
-        ge=0.0,
-        validation_alias=AliasChoices(
-            "total_declarado_reais", "total_declarado", "valor_declarado", "valdec"
-        ),
-        description="Valor total em dinheiro e comprovantes declarado pelo operador",
-    )
-    total_sistema_reais: float = Field(
-        default=0.0,
-        ge=0.0,
-        validation_alias=AliasChoices(
-            "total_sistema_reais", "total_sistema", "valor_apurado", "total_apurado", "valsist"
-        ),
-        description="Valor total calculado pelo sistema ERP para as vendas do turno",
-    )
-    quebra_sobra_reais: float = Field(
-        default=0.0,
-        validation_alias=AliasChoices(
-            "quebra_sobra_reais", "quebra_sobra", "diferenca_reais", "diferenca", "quebra"
-        ),
-        description="Diferenca apurada (declarado menos sistema; negativo indica quebra)",
-    )
-    pdv: str = Field(
-        default="1",
-        validation_alias=AliasChoices("pdv", "caixa_pdv", "pos", "caixa", "codpdv"),
-        description="Identificador do PDV associado",
-    )
-    caixa_id: str = Field(
-        default="1",
-        validation_alias=AliasChoices("caixa_id", "cai_cd_caixa", "terminal_id", "terminal"),
-        description="Identificador unico da sessao ou terminal de caixa",
-    )
-    fechado: bool = Field(
-        default=True,
-        validation_alias=AliasChoices("fechado", "is_closed", "status_fechado"),
-        description="Indica se o caixa esta fechado formalmente",
-    )
-    dinheiro_declarado_reais: float = Field(
-        default=0.0,
-        ge=0.0,
-        validation_alias=AliasChoices("dinheiro_declarado_reais", "dinheiro", "valdinh", "cash"),
-        description="Total declarado em dinheiro em especie",
-    )
-    cartao_declarado_reais: float = Field(
-        default=0.0,
-        ge=0.0,
-        validation_alias=AliasChoices("cartao_declarado_reais", "cartao", "valcart", "card"),
-        description="Total declarado em cartoes de debito e credito / TEF",
-    )
-    prazo_declarado_reais: float = Field(
-        default=0.0,
-        ge=0.0,
-        validation_alias=AliasChoices("prazo_declarado_reais", "prazo", "valnotpra", "faturado"),
-        description="Total declarado em faturado a prazo",
-    )
-    convenio_cheque_reais: float = Field(
-        default=0.0,
-        ge=0.0,
-        validation_alias=AliasChoices("convenio_cheque_reais", "convenio_cheque", "convenio", "cheque"),
-        description="Total declarado em convenio e cheques",
-    )
-    venda_combustivel_reais: float = Field(
-        default=0.0,
-        ge=0.0,
-        validation_alias=AliasChoices("venda_combustivel_reais", "venda_combustivel", "combustivel_reais"),
-        description="Total de faturamento em combustivel apurado",
-    )
-    venda_produtos_reais: float = Field(
-        default=0.0,
-        ge=0.0,
-        validation_alias=AliasChoices("venda_produtos_reais", "venda_produtos", "produtos_reais"),
-        description="Total de faturamento em produtos/conveniencia apurado",
-    )
-    litros_declarados: float = Field(
-        default=0.0,
-        ge=0.0,
-        validation_alias=AliasChoices("litros_declarados", "litros"),
-        description="Total de litros declarados",
+if TYPE_CHECKING:
+    from core.domain.universal_entities import (
+        UniversalCashierSession,
+        UniversalCashierShift,
     )
 
 
-    @property
-    def usuario_id(self) -> str:
-        """Alias de conveniencia para operador_id."""
-        return self.operador_id
-
-    @property
-    def funcionario_id(self) -> str:
-        """Alias de conveniencia para operador_id."""
-        return self.operador_id
-
-    @property
-    def nome_operador(self) -> str:
-        """Alias de conveniencia para operador_nome."""
-        return self.operador_nome
-
-    @field_validator("operador_id", mode="before")
-    @classmethod
-    def _validate_operador_id(cls, v: Any) -> str:
-        return parse_str_safe(v, default="0")
-
-    @field_validator("operador_nome", mode="before")
-    @classmethod
-    def _validate_operador_nome(cls, v: Any) -> str:
-        return parse_str_safe(v, default="OPERADOR")
-
-    @field_validator("turno_descricao", mode="before")
-    @classmethod
-    def _validate_turno(cls, v: Any) -> str:
-        return parse_str_safe(v, default="GERAL")
-
-    @field_validator("data_movimento", mode="before")
-    @classmethod
-    def _validate_data(cls, v: Any) -> date:
-        return parse_date_safe(v)
-
-    @field_validator("timestamp_abertura", mode="before")
-    @classmethod
-    def _validate_abertura(cls, v: Any) -> datetime:
-        return parse_datetime_safe(v)
-
-    @field_validator("timestamp_fechamento", mode="before")
-    @classmethod
-    def _validate_fechamento(cls, v: Any) -> datetime | None:
-        if v is None:
-            return None
-        return parse_datetime_safe(v)
-
-    @field_validator(
-        "fundo_troco_reais",
-        "total_declarado_reais",
-        "total_sistema_reais",
-        "dinheiro_declarado_reais",
-        "cartao_declarado_reais",
-        "prazo_declarado_reais",
-        "convenio_cheque_reais",
-        "venda_combustivel_reais",
-        "venda_produtos_reais",
-        "litros_declarados",
-        mode="before",
-    )
-    @classmethod
-    def _validate_positive_floats(cls, v: Any) -> float:
-        return parse_float_safe(v, default=0.0, allow_negative=False)
-
-    @field_validator("quebra_sobra_reais", mode="before")
-    @classmethod
-    def _validate_quebra_sobra(cls, v: Any) -> float:
-        return parse_float_safe(v, default=0.0, allow_negative=True)
-
-    @field_validator("pdv", "caixa_id", mode="before")
-    @classmethod
-    def _validate_shift_ids(cls, v: Any) -> str:
-        return parse_str_safe(v, default="1")
-
-    @field_validator("fechado", mode="before")
-    @classmethod
-    def _validate_fechado(cls, v: Any) -> bool:
-        if isinstance(v, str):
-            clean = v.strip().upper()
-            return clean in ("S", "SIM", "TRUE", "1", "FECHADO")
-        return bool(v) if v is not None else True
+def __getattr__(name: str) -> Any:
+    if name in ("UniversalCashierSession", "UniversalCashierShift"):
+        from core.domain.universal_entities import UniversalCashierSession
+        return UniversalCashierSession
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-    @model_validator(mode="before")
-    @classmethod
-    def _infer_quebra_sobra(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            diff_raw = extract_first_present(
-                data,
-                (
-                    "quebra_sobra_reais",
-                    "quebra_sobra",
-                    "diferenca_reais",
-                    "diferenca",
-                    "quebra",
-                ),
-            )
-            if diff_raw is None:
-                dec = parse_float_safe(
-                    extract_first_present(
-                        data,
-                        (
-                            "total_declarado_reais",
-                            "total_declarado",
-                            "valor_declarado",
-                            "valdec",
-                        ),
-                    ),
-                    default=0.0,
-                    allow_negative=False,
-                )
-                sis = parse_float_safe(
-                    extract_first_present(
-                        data,
-                        (
-                            "total_sistema_reais",
-                            "total_sistema",
-                            "valor_apurado",
-                            "total_apurado",
-                            "valsist",
-                        ),
-                    ),
-                    default=0.0,
-                    allow_negative=False,
-                )
-                data["quebra_sobra_reais"] = round(dec - sis, 2)
-        return data
+def __dir__() -> list[str]:
+    return list(__all__)
+
+
+__all__ = [
+    "CashMovementType",
+    "UniversalCashMovement",
+    "UniversalCashierSession",
+    "UniversalCashierShift",
+]

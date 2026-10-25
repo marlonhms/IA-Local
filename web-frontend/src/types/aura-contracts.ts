@@ -503,3 +503,74 @@ export interface GenerativeModularProps {
   suggested_actions: GenUIActionOption[];
 }
 
+export interface ActionableDirectivePayload {
+  directive_id: string;
+  card_id?: string | null;
+  title: string;
+  category: string;
+  financial_impact_brl: number;
+  roteiro_voz_consultor: string;
+  treinamento_equipe_15s: string;
+  campanha_clientes_whatsapp: string;
+  status: "pending" | "queued" | "dispatched" | "executed" | "cancelled" | string;
+  canal_despacho: "outbox_webhook" | "in_app_cockpit" | "notificador_desktop" | string;
+  idempotency_key?: string | null;
+  created_at: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ExecutiveExceptionCard {
+  card_id: string;
+  title: string;
+  category: string;
+  severity: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "INFO" | string;
+  financial_impact_brl: number;
+  diagnostico_direto: string;
+  prova_matematica: string | Record<string, unknown>;
+  acao_recomendada_hitl: GenUIActionOption | Record<string, unknown>;
+  urgency_timeframe?: string | null;
+  directive?: ActionableDirectivePayload | null;
+  created_at: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface LiveSecurityTelemetry {
+  status: string;
+  timestamp: string;
+  postgresql_session: {
+    default_transaction_read_only: string;
+    statement_timeout: string;
+    lock_timeout: string;
+    role: string;
+    database: string;
+    driver_options: string;
+    forensic_safe: boolean;
+  };
+  hardware_circuit_breaker: {
+    cpu_percent: number;
+    ram_percent: number;
+    circuit_state: string;
+    circuit_state_raw: string;
+    is_heavy_allowed: boolean;
+    tripped_count: number;
+  };
+  pii_sanitization: {
+    total_sanitized_entities: number;
+    category_counts: Record<string, number>;
+    policy_version: string;
+  };
+  clean_room_active_term: {
+    term_hash_sha256: string;
+    term_path: string;
+    is_term_present: boolean;
+  };
+  sql_role_script: string;
+  architecture_layers: Array<{
+    layer: number;
+    name: string;
+    component: string;
+    description: string;
+    status: string;
+  }>;
+}
+

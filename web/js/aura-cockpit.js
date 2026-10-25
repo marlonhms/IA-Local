@@ -13,13 +13,387 @@ class AuraCockpitController {
     this.combosData = null;
     this.stationStatus = null;
     this.isLoading = false;
+    this.zeroClickCards = [];
+    this.isZeroClickLoading = false;
   }
 
   /**
-   * Inicializa o cockpit com estado sob demanda (sem polling ou consultas automáticas)
+   * Inicializa o cockpit com estado sob demanda e Feed Executivo Zero-Click
    */
   async init() {
     this.renderInitialPlaceholder();
+    this.loadZeroClickFeed();
+  }
+
+  async loadZeroClickFeed(forceRefresh = false) {
+    const container = document.getElementById('zero-click-cards-grid');
+    if (this.isZeroClickLoading) return;
+    this.isZeroClickLoading = true;
+
+    if (container && (!this.zeroClickCards || this.zeroClickCards.length === 0)) {
+      container.innerHTML = `
+        <div class="col-span-full p-6 text-center glass-panel border border-cyan-500/20 rounded-2xl bg-cyan-950/10 animate-pulse">
+          <div class="flex items-center justify-center gap-2 mb-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
+            <span class="text-white font-semibold text-sm">Varrendo Indicadores Vitais (Zero-Click)...</span>
+          </div>
+          <p class="text-slate-400 text-xs font-sans">Apurando run-out, quebras de caixa, margem e oportunidades em R$.</p>
+        </div>`;
+    }
+
+    try {
+      const url = `/api/v1/cockpit/zero-click-feed?force_refresh=${forceRefresh ? 'true' : 'false'}`;
+      let res = await fetch(url);
+      if (!res.ok) {
+        res = await fetch(`/api/v1/aura/cockpit/zero-click-feed?force_refresh=${forceRefresh ? 'true' : 'false'}`);
+      }
+      if (res.ok) {
+        const data = await res.json();
+        this.zeroClickCards = data.cards || [];
+        this.renderZeroClickFeed();
+      } else {
+        console.warn('[AURA Zero-Click] Resposta HTTP nao-200:', res.status);
+        if (container && (!this.zeroClickCards || this.zeroClickCards.length === 0)) {
+          this.renderErrorState(container, 'Falha ao carregar o Feed Zero-Click.');
+        }
+      }
+    } catch (err) {
+      console.warn('[AURA Zero-Click] Erro ao carregar feed zero-click:', err);
+      if (container && (!this.zeroClickCards || this.zeroClickCards.length === 0)) {
+        this.renderErrorState(container, 'Serviço da AURA temporariamente indisponível.');
+      }
+    } finally {
+      this.isZeroClickLoading = false;
+    }
+  }
+
+  renderErrorState(container, message) {
+    if (!container) return;
+    container.innerHTML = `
+      <div class="col-span-full p-5 text-center glass-subcard rounded-xl border border-rose-500/20 bg-rose-950/10 text-slate-300 text-xs font-sans">
+        <p class="mb-3 text-rose-300">${message}</p>
+        <button onclick="if(window.auraCockpit) window.auraCockpit.loadZeroClickFeed(true);" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 text-xs font-medium transition-colors inline-flex items-center gap-1.5">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span>Tentar Novamente</span>
+        </button>
+      </div>`;
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
+  }
+
+  switchSubSection(tab) {
+    const zeroClickSection = document.getElementById('aura-zero-click-section');
+    const tanksSection = document.getElementById('cockpit-tanks-section') || document.querySelector('[aria-label="Situação dos Tanques de Combustível"]');
+    const segBtnZero = document.getElementById('seg-btn-zeroclick');
+    const segBtnTanks = document.getElementById('seg-btn-tanks');
+    const segBtnSec = document.getElementById('seg-btn-security');
+
+    [segBtnZero, segBtnTanks, segBtnSec].forEach(btn => {
+      if (btn) {
+        btn.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all text-slate-400 hover:text-white border border-transparent flex items-center justify-center gap-1.5';
+        btn.setAttribute('aria-selected', 'false');
+      }
+    });
+
+    if (tab === 'zeroclick') {
+      if (segBtnZero) {
+        segBtnZero.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-sm flex items-center justify-center gap-1.5';
+        segBtnZero.setAttribute('aria-selected', 'true');
+      }
+      if (zeroClickSection) zeroClickSection.classList.remove('hidden');
+      if (tanksSection) tanksSection.classList.remove('hidden');
+      this.loadZeroClickFeed();
+    } else if (tab === 'tanks') {
+      if (segBtnTanks) {
+        segBtnTanks.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm flex items-center justify-center gap-1.5';
+        segBtnTanks.setAttribute('aria-selected', 'true');
+      }
+      if (zeroClickSection) zeroClickSection.classList.add('hidden');
+      if (tanksSection) tanksSection.classList.remove('hidden');
+      this.refreshAllData();
+    } else if (tab === 'security') {
+      if (segBtnSec) {
+        segBtnSec.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all bg-purple-500/20 text-purple-300 border border-purple-500/30 shadow-sm flex items-center justify-center gap-1.5';
+        segBtnSec.setAttribute('aria-selected', 'true');
+      }
+      if (window.auraSecurityArchitecture && typeof window.auraSecurityArchitecture.openModal === 'function') {
+        window.auraSecurityArchitecture.openModal();
+      }
+    }
+  }
+
+  async dispatchDirective(cardId) {
+    const card = (this.zeroClickCards || []).find(c => c.card_id === cardId);
+    if (!card) return;
+
+    const btn = document.getElementById(`btn-dispatch-dir-${cardId}`);
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `
+        <span class="inline-block w-3.5 h-3.5 border-2 border-cyan-300 border-t-transparent rounded-full animate-spin"></span>
+        <span>Gravando na Outbox...</span>`;
+    }
+
+    const directive = card.directive || {
+      directive_id: `dir_${cardId}`,
+      card_id: cardId,
+      title: card.title,
+      category: card.category,
+      financial_impact_brl: card.financial_impact_brl,
+      roteiro_voz_consultor: card.diagnostico_direto,
+      treinamento_equipe_15s: "Orientar a equipe para execucao imediata.",
+      campanha_clientes_whatsapp: "",
+      canal_despacho: "outbox_webhook"
+    };
+
+    try {
+      const res = await fetch('/api/v1/aura/directives/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          directive_id: directive.directive_id,
+          card_id: cardId,
+          title: directive.title,
+          category: directive.category,
+          financial_impact_brl: directive.financial_impact_brl,
+          roteiro_voz_consultor: directive.roteiro_voz_consultor,
+          treinamento_equipe_15s: directive.treinamento_equipe_15s,
+          campanha_clientes_whatsapp: directive.campanha_clientes_whatsapp,
+          canal_despacho: directive.canal_despacho || 'outbox_webhook',
+          operator_id: 'gerente_01'
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (btn) {
+          btn.className = 'w-full py-2.5 px-3 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm';
+          btn.innerHTML = `
+            <svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Gravado na Outbox (Msg #${(data.outbox_message_id || '').slice(0, 8)})</span>`;
+        }
+      } else {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<span>Erro ao gravar na Outbox. Tentar Novamente</span>`;
+        }
+      }
+    } catch (err) {
+      console.warn('[AURA Actionable BI] Erro ao despachar diretiva:', err);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<span>Falha de rede. Tentar Novamente</span>`;
+      }
+    }
+  }
+
+  toggleAudioPlayer(cardId) {
+    const playerEl = document.getElementById(`audio-player-hub-${cardId}`);
+    const playBtn = document.getElementById(`btn-play-audio-${cardId}`);
+    const waves = document.getElementById(`waveform-svg-${cardId}`);
+    if (!playerEl) return;
+
+    if (playerEl.classList.contains('hidden')) {
+      playerEl.classList.remove('hidden');
+      if (playBtn) playBtn.classList.add('bg-emerald-500/30');
+      if (waves) waves.classList.add('animate-pulse');
+    } else {
+      playerEl.classList.add('hidden');
+      if (playBtn) playBtn.classList.remove('bg-emerald-500/30');
+      if (waves) waves.classList.remove('animate-pulse');
+    }
+  }
+
+  renderZeroClickFeed() {
+    const container = document.getElementById('zero-click-cards-grid');
+    if (!container) return;
+
+    if (!this.zeroClickCards || this.zeroClickCards.length === 0) {
+      container.innerHTML = `
+        <div class="col-span-full p-6 text-center rounded-2xl bg-zinc-900/40 border border-white/[0.06] text-slate-400 text-xs font-sans">
+          Nenhuma anomalia critica detectada no momento. Todos os indicadores vitais operando em conformidade.
+        </div>`;
+      return;
+    }
+
+    const categoryLabels = {
+      caixa_sangria: 'Caixa & Sangria',
+      runout_estoque: 'Ruptura Estoque 48h',
+      margem_conversao: 'Margem & Conversão',
+      market_basket_combo: 'Oportunidade Combo',
+      anomalia_operacional: 'Operação & TEF'
+    };
+
+    const severityStyles = {
+      CRITICAL: {
+        badge: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+        border: 'border-rose-500/25 hover:border-rose-500/40',
+        dot: 'bg-rose-400',
+        glow: 'from-rose-500/[0.04]'
+      },
+      HIGH: {
+        badge: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+        border: 'border-amber-500/25 hover:border-amber-500/40',
+        dot: 'bg-amber-400',
+        glow: 'from-amber-500/[0.04]'
+      },
+      MEDIUM: {
+        badge: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+        border: 'border-cyan-500/25 hover:border-cyan-500/40',
+        dot: 'bg-cyan-400',
+        glow: 'from-cyan-500/[0.04]'
+      },
+      LOW: {
+        badge: 'bg-slate-500/15 text-slate-300 border-slate-500/30',
+        border: 'border-slate-500/25 hover:border-slate-500/40',
+        dot: 'bg-slate-400',
+        glow: 'from-slate-500/[0.04]'
+      }
+    };
+
+    const html = this.zeroClickCards.map((card) => {
+      const sev = (card.severity || 'HIGH').toUpperCase();
+      const style = severityStyles[sev] || severityStyles.HIGH;
+      const catLabel = categoryLabels[card.category] || card.category || 'Geral';
+      const formattedImpact = typeof card.financial_impact_brl === 'number'
+        ? card.financial_impact_brl.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+        : `R$ ${card.financial_impact_brl}`;
+
+      const directive = card.directive || {};
+      const action = card.acao_recomendada_hitl || {};
+      const actionLabel = action.label || 'Executar Ação em 1-Clique';
+      const actionPrompt = card.diagnostico_direto || card.title;
+      const roteiroAudio = directive.roteiro_voz_consultor || card.diagnostico_direto;
+      const treinoPista = directive.treinamento_equipe_15s || '';
+
+      return `
+        <article class="bg-zinc-900/50 backdrop-blur-md border ${style.border} bg-gradient-to-b ${style.glow} to-slate-950/70 rounded-2xl p-5 shadow-xl flex flex-col justify-between transition-all hover:-translate-y-0.5 group" data-card-id="${card.card_id}">
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-3">
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full ${style.dot}"></span>
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-sans font-bold uppercase ${style.badge} border">
+                  ${sev}
+                </span>
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-sans font-medium bg-white/[0.04] text-slate-300 border border-white/[0.08]">
+                  ${catLabel}
+                </span>
+              </div>
+              ${card.urgency_timeframe ? `<span class="text-[10px] font-mono text-slate-400">⏱ ${card.urgency_timeframe}</span>` : ''}
+            </div>
+
+            <!-- Hero Metric (Fim do Box-in-Box) -->
+            <div class="my-3">
+              <span class="text-[10px] font-sans uppercase tracking-wider text-slate-400 font-medium">Impacto Financeiro Apurado</span>
+              <div class="text-2xl sm:text-3xl font-bold font-mono text-emerald-400 tracking-tight mt-0.5">
+                ${formattedImpact}
+              </div>
+            </div>
+
+            <h4 class="text-white font-semibold text-base mb-1.5 leading-snug tracking-tight">
+              ${card.title}
+            </h4>
+
+            <p class="text-zinc-300 text-xs sm:text-sm font-sans mb-3 leading-relaxed">
+              ${card.diagnostico_direto}
+            </p>
+
+            <!-- Memória de Cálculo sem box-in-box pesado -->
+            <details class="text-[11px] font-sans text-slate-400 mb-3 bg-white/[0.02] p-2.5 rounded-xl border border-white/[0.05]">
+              <summary class="cursor-pointer font-medium text-cyan-300/90 hover:text-cyan-200 flex items-center gap-1.5 select-none">
+                <span>Memória de Cálculo & Prova</span>
+              </summary>
+              <div class="mt-2 text-slate-300 font-mono text-[11px] leading-relaxed whitespace-pre-line border-t border-white/[0.05] pt-2">
+                ${typeof card.prova_matematica === 'string' ? card.prova_matematica : JSON.stringify(card.prova_matematica, null, 2)}
+              </div>
+            </details>
+
+            <!-- Hub de Diretiva Acionavel & Audio Waveform (Fase 4) -->
+            <div id="audio-player-hub-${card.card_id}" class="hidden mb-3 p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.08] space-y-2.5 transition-all">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                  <span class="text-[11px] font-sans font-semibold text-white">Briefing de Voz do Consultor</span>
+                </div>
+                <span class="text-[10px] font-mono text-emerald-300">0:35</span>
+              </div>
+
+              <!-- Waveform SVG estético -->
+              <div class="h-6 flex items-center gap-0.5 py-1 px-1 bg-black/30 rounded-lg overflow-hidden">
+                <svg id="waveform-svg-${card.card_id}" class="w-full h-full text-emerald-400" viewBox="0 0 160 20" fill="currentColor">
+                  <rect x="0" y="6" width="3" height="8" rx="1.5" opacity="0.6"/>
+                  <rect x="5" y="4" width="3" height="12" rx="1.5" opacity="0.8"/>
+                  <rect x="10" y="2" width="3" height="16" rx="1.5"/>
+                  <rect x="15" y="5" width="3" height="10" rx="1.5" opacity="0.7"/>
+                  <rect x="20" y="3" width="3" height="14" rx="1.5"/>
+                  <rect x="25" y="7" width="3" height="6" rx="1.5" opacity="0.5"/>
+                  <rect x="30" y="1" width="3" height="18" rx="1.5"/>
+                  <rect x="35" y="4" width="3" height="12" rx="1.5" opacity="0.8"/>
+                  <rect x="40" y="2" width="3" height="16" rx="1.5"/>
+                  <rect x="45" y="6" width="3" height="8" rx="1.5" opacity="0.6"/>
+                  <rect x="50" y="3" width="3" height="14" rx="1.5"/>
+                  <rect x="55" y="5" width="3" height="10" rx="1.5" opacity="0.7"/>
+                  <rect x="60" y="1" width="3" height="18" rx="1.5"/>
+                  <rect x="65" y="4" width="3" height="12" rx="1.5" opacity="0.8"/>
+                  <rect x="70" y="2" width="3" height="16" rx="1.5"/>
+                  <rect x="75" y="6" width="3" height="8" rx="1.5" opacity="0.6"/>
+                  <rect x="80" y="3" width="3" height="14" rx="1.5"/>
+                  <rect x="85" y="7" width="3" height="6" rx="1.5" opacity="0.5"/>
+                  <rect x="90" y="2" width="3" height="16" rx="1.5"/>
+                  <rect x="95" y="5" width="3" height="10" rx="1.5" opacity="0.7"/>
+                  <rect x="100" y="1" width="3" height="18" rx="1.5"/>
+                  <rect x="105" y="4" width="3" height="12" rx="1.5" opacity="0.8"/>
+                  <rect x="110" y="3" width="3" height="14" rx="1.5"/>
+                  <rect x="115" y="6" width="3" height="8" rx="1.5" opacity="0.6"/>
+                  <rect x="120" y="2" width="3" height="16" rx="1.5"/>
+                  <rect x="125" y="5" width="3" height="10" rx="1.5" opacity="0.7"/>
+                  <rect x="130" y="1" width="3" height="18" rx="1.5"/>
+                  <rect x="135" y="4" width="3" height="12" rx="1.5" opacity="0.8"/>
+                  <rect x="140" y="3" width="3" height="14" rx="1.5"/>
+                  <rect x="145" y="7" width="3" height="6" rx="1.5" opacity="0.5"/>
+                  <rect x="150" y="4" width="3" height="12" rx="1.5" opacity="0.8"/>
+                  <rect x="155" y="6" width="3" height="8" rx="1.5" opacity="0.6"/>
+                </svg>
+              </div>
+
+              <p class="text-zinc-300 text-[11px] font-sans leading-relaxed italic">
+                "${roteiroAudio}"
+              </p>
+
+              ${treinoPista ? `
+                <div class="pt-1.5 border-t border-white/[0.05] text-[10px] text-amber-300/90 font-sans flex items-start gap-1.5">
+                  <span class="font-bold">⚡ Pista (15s):</span>
+                  <span>${treinoPista}</span>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- Botoes de Acao Executiva HITL (Loop Fechado) -->
+          <div class="pt-3 border-t border-white/[0.08] flex flex-col gap-2">
+            <button id="btn-dispatch-dir-${card.card_id}" onclick="window.auraCockpit.dispatchDirective('${card.card_id}');" class="w-full py-2.5 px-3 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm">
+              <i data-lucide="send" class="w-3.5 h-3.5 text-cyan-400"></i>
+              <span>${actionLabel}</span>
+            </button>
+            <div class="flex items-center gap-2">
+              <button onclick="window.auraCockpit.toggleAudioPlayer('${card.card_id}');" class="flex-1 py-1.5 px-2.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white border border-white/[0.06] text-[11px] font-medium transition-all flex items-center justify-center gap-1.5">
+                <i data-lucide="headphones" class="w-3 h-3 text-emerald-400"></i>
+                <span>Briefing Voz</span>
+              </button>
+              <button onclick="if(window.auraChat) window.auraChat.sendUserPrompt('${actionPrompt.replace(/'/g, "\\'")}');" class="flex-1 py-1.5 px-2.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white border border-white/[0.06] text-[11px] font-medium transition-all flex items-center justify-center gap-1.5">
+                <i data-lucide="message-square" class="w-3 h-3 text-purple-400"></i>
+                <span>Chat</span>
+              </button>
+            </div>
+          </div>
+        </article>`;
+    }).join('');
+
+    container.innerHTML = html;
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
   }
 
   renderInitialPlaceholder() {
@@ -666,15 +1040,15 @@ class AuraCockpitController {
     }
 
     const diffFormatted = (isNoMovement || isUnavailable)
-      ? '—'
+      ? '-'
       : `${diffVal < 0 ? '-' : diffVal > 0 ? '+' : ''}R$ ${Math.abs(diffVal).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     const autRevText = (isNoMovement || isUnavailable)
-      ? '—'
+      ? '-'
       : `R$ ${autRev.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     const posRevText = (isNoMovement || isUnavailable)
-      ? '—'
+      ? '-'
       : `R$ ${posRev.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     const limitation = assessment.limitation;

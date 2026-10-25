@@ -95,25 +95,20 @@ class PooledConnectionWrapper:
 def _create_erp_pool(
     minconn: int = 2,
     maxconn: int = 10,
-    timeout: int = 5,
+    timeout: int = 2,
 ) -> pool.ThreadedConnectionPool:
     """
     Cria pool gerenciado para o banco ERP com deteccao automatica da porta funcional.
-    Tenta primeiramente a porta configurada (5433) com fallback para portas alternativas (5435).
+    Tenta primeiramente a porta configurada (5433).
     """
     global _last_working_erp_port
     config = dict(DB_ERP_CONFIG)
     config["password"] = get_erp_password()
     configured_port = int(config.get("port", 5433))
 
-    ports_to_try = []
-    if _last_working_erp_port:
-        ports_to_try.append(_last_working_erp_port)
-    if configured_port not in ports_to_try:
-        ports_to_try.append(configured_port)
-    for alt in (5435, 5433):
-        if alt not in ports_to_try:
-            ports_to_try.append(alt)
+    ports_to_try = [configured_port]
+    if _last_working_erp_port and _last_working_erp_port not in ports_to_try:
+        ports_to_try.insert(0, _last_working_erp_port)
 
     last_exc = None
     for port in ports_to_try:
@@ -141,7 +136,7 @@ def _create_erp_pool(
 def _create_vector_pool(
     minconn: int = 2,
     maxconn: int = 8,
-    timeout: int = 5,
+    timeout: int = 2,
 ) -> pool.ThreadedConnectionPool:
     """
     Cria pool gerenciado para o banco vetorial posto_ai (porta 5433).

@@ -509,7 +509,7 @@
         this.projectToCanvas();
 
         if (typeof window !== 'undefined' && window.auraAuxPanel && typeof window.auraAuxPanel.open === 'function') {
-          window.auraAuxPanel.open('art_genui_' + this.toolCallId);
+          window.auraAuxPanel.open('art_genui_' + this.toolCallId, true, btnElement);
         }
 
         const fx = (typeof window !== 'undefined' && window.auraFx) || null;
@@ -1683,6 +1683,196 @@
   // 7b. MICRO-WIDGET: ShiftReconciliationUI (Conciliação de Turno & Caixa)
   // =========================================================================
 
+  // =========================================================================
+  // MICRO-WIDGET: PaymentMethodsBreakdownUI (Formas de Pagamento & Caixas)
+  // =========================================================================
+
+  class PaymentMethodsBreakdownUI extends BaseGenUIWidget {
+    constructor(payload = {}) {
+      super(payload, 'formas_pagamento', 'render_PaymentMethodsBreakdownUI');
+      this.cardClass = 'genui-payment-methods-card';
+      this.ariaLabel = 'Formas de Pagamento e Caixas AURA';
+    }
+
+    renderLayer1() {
+      const p = this.props || {};
+      const totGeral = Number(p.total_geral_reais ?? p.total_geral ?? 0.0);
+      const dataRef = p.data_referencia || 'Hoje';
+      let diagnosisText = p.diagnosis || this.summary || '';
+      if (typeof diagnosisText === 'object' && diagnosisText !== null) {
+        diagnosisText = diagnosisText.text || diagnosisText.summary || JSON.stringify(diagnosisText);
+      }
+      if (!diagnosisText || typeof diagnosisText !== 'string') {
+        diagnosisText = 'Faturamento de R$ ' + totGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ' apurado no ERP webPosto.';
+      }
+
+      return `
+        <div class="genui-card-header flex items-start justify-between gap-3 border-b border-white/5 pb-3">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-sm">
+              💳
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h4 class="font-bold text-white text-sm tracking-tight">${escapeHtml(p.title || 'Formas de Pagamento & Caixas')}</h4>
+                <span class="text-emerald-300 border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono text-[10px] font-bold">AUDITADO ERP</span>
+              </div>
+              <p class="text-xs text-slate-400 font-medium">${escapeHtml(p.subtitle || ('Posição Operacional • ' + dataRef))}</p>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-[10px] uppercase font-bold tracking-wider text-slate-400">Total Faturado</div>
+            <div class="text-base font-bold text-white font-mono tabular-nums">R$ ${totGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+          </div>
+        </div>
+
+        <div class="py-2.5">
+          <p class="text-xs text-slate-300 leading-relaxed font-sans">${escapeHtml(diagnosisText)}</p>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const p = this.props || {};
+      const totGeral = Number(p.total_geral_reais ?? p.total_geral ?? 0.0);
+      const modalidades = p.modalidades || [];
+      const caixas = p.caixas_operadores || [];
+      const ticketMedio = Number(p.ticket_medio_geral ?? p.ticket_medio ?? 0.0);
+      const totalTransacoes = Number(p.total_transacoes ?? 0);
+
+      // Hero KPIs
+      const kpisHtml = `
+        <div class="grid grid-cols-3 gap-2 mb-3">
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 space-y-0.5">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400">Faturamento</span>
+            <div class="text-sm font-bold text-emerald-300 font-mono tabular-nums">R$ ${totGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+            <span class="text-[9px] text-slate-400">${totalTransacoes} transações</span>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 space-y-0.5">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400">Ticket Médio</span>
+            <div class="text-sm font-bold text-cyan-300 font-mono tabular-nums">R$ ${ticketMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+            <span class="text-[9px] text-slate-400">Por venda</span>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 space-y-0.5">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400">Caixas Ativos</span>
+            <div class="text-sm font-bold text-purple-300 font-mono tabular-nums">${caixas.length || 1}</div>
+            <span class="text-[9px] text-slate-400">Terminais com venda</span>
+          </div>
+        </div>
+      `;
+
+      // Barras de Modalidades
+      let modalidadesHtml = '';
+      if (modalidades.length > 0) {
+        modalidadesHtml = `
+          <div class="space-y-1.5 mb-3 p-3 rounded-xl bg-slate-900/40 border border-white/5">
+            <div class="text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1">Distribuição por Forma de Pagamento</div>
+            ${modalidades.map(m => {
+              const val = Number(m.total_reais || 0);
+              const pct = Number(m.percentual || (totGeral > 0 ? (val / totGeral * 100) : 0));
+              const corBarra = m.modalidade.includes('Dinheiro') ? 'bg-emerald-500' : (m.modalidade.includes('PIX') ? 'bg-cyan-500' : 'bg-purple-500');
+              return `
+                <div class="space-y-0.5">
+                  <div class="flex justify-between text-xs font-sans">
+                    <span class="text-slate-300 font-medium">${escapeHtml(m.modalidade)} <span class="text-[10px] text-slate-400">(${m.total_transacoes || 1}x)</span></span>
+                    <span class="font-mono text-white font-bold">R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span class="text-slate-400 text-[10px] font-normal font-sans">(${pct.toFixed(1)}%)</span></span>
+                  </div>
+                  <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                    <div class="${corBarra} h-1.5 rounded-full" style="width: ${Math.min(100, Math.max(4, pct))}%"></div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+
+      // Detalhamento por Caixa e Operador Responsável
+      let caixasHtml = '';
+      if (caixas.length > 0) {
+        caixasHtml = `
+          <div class="space-y-2">
+            <div class="text-[10px] uppercase font-bold tracking-wider text-slate-400">Caixas & Operadores Responsáveis</div>
+            ${caixas.map(cx => {
+              const cxTot = Number(cx.total_caixa_reais || 0);
+              const dinh = Number(cx.dinheiro_reais || 0);
+              const cart = Number(cx.cartao_total_reais || 0);
+              const pix = Number(cx.pix_reais || 0);
+              const prazo = Number(cx.prazo_convenio_reais || 0);
+              return `
+                <div class="p-3 rounded-xl bg-slate-900/60 border border-white/5 space-y-2 hover:border-cyan-500/20 transition-all">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="px-2 py-0.5 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-mono text-[10px] font-bold">${escapeHtml(cx.caixa || 'PDV')}</span>
+                      <span class="text-xs font-bold text-white">${escapeHtml(cx.operador_nome || 'Operador')}</span>
+                      ${cx.operador_matricula && cx.operador_matricula !== '0' ? `<span class="text-[10px] text-slate-400">Matr: ${escapeHtml(cx.operador_matricula)}</span>` : ''}
+                    </div>
+                    <div class="font-mono font-bold text-sm text-emerald-300">R$ ${cxTot.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                  </div>
+                  <div class="flex items-center justify-between text-[11px] text-slate-400 border-t border-white/5 pt-1.5">
+                    <span>Turno: <strong class="text-slate-300 font-normal">${escapeHtml(cx.turno || '1º TURNO')}</strong> • ${cx.total_cupons || 1} vendas</span>
+                    <div class="flex gap-2 font-mono text-[10px]">
+                      ${dinh > 0 ? `<span class="text-emerald-400">D: R$ ${dinh.toFixed(2)}</span>` : ''}
+                      ${cart > 0 ? `<span class="text-purple-400">C: R$ ${cart.toFixed(2)}</span>` : ''}
+                      ${pix > 0 ? `<span class="text-cyan-400">PIX: R$ ${pix.toFixed(2)}</span>` : ''}
+                      ${prazo > 0 ? `<span class="text-amber-400">Pz: R$ ${prazo.toFixed(2)}</span>` : ''}
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+
+      const avisoHtml = p.aviso_data ? `
+        <div class="mt-2.5 p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-[10px] text-cyan-300 leading-normal flex items-center gap-1.5">
+          <span>ℹ️</span>
+          <span>${escapeHtml(p.aviso_data)}</span>
+        </div>
+      ` : '';
+
+      return `
+        <div class="genui-card-body space-y-2 py-1">
+          ${kpisHtml}
+          ${modalidadesHtml}
+          ${caixasHtml}
+          ${avisoHtml}
+        </div>
+      `;
+    }
+
+    renderLayer3() {
+      const actions = this.actions || [];
+      if (!actions || actions.length === 0) return '';
+      return `
+        <div class="genui-card-actions border-t border-white/5 pt-3 mt-2 flex flex-wrap gap-2">
+          ${actions.map((act, idx) => {
+            const actId = act.action_id || ('act_pay_' + idx);
+            const variant = act.variant || (idx === 0 ? 'primary' : 'secondary');
+            const btnClass = variant === 'primary'
+              ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+              : (variant === 'secondary'
+                ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10'
+                : 'bg-transparent hover:bg-white/5 text-slate-400 hover:text-white');
+            return `
+              <button 
+                type="button" 
+                class="genui-action-btn px-3 py-1.5 rounded-lg text-xs font-semibold font-sans transition-colors ${btnClass}"
+                data-action-id="${escapeHtml(actId)}"
+                data-tool-call-id="${escapeHtml(this.toolCallId || '')}"
+              >
+                ${escapeHtml(act.label || 'Ação')}
+              </button>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+  }
+
+  const PaymentMethodsBreakdownWidget = PaymentMethodsBreakdownUI;
+
   class ShiftReconciliationUI extends BaseGenUIWidget {
     constructor(payload = {}) {
       super(payload, 'auditoria_turno', 'render_ShiftReconciliationUI');
@@ -2590,6 +2780,12 @@
         intent: 'benchmark_comparativo'
       },
       {
+        name: 'render_PaymentMethodsBreakdownUI',
+        cls: PaymentMethodsBreakdownUI,
+        aliases: ['PaymentMethodsBreakdownUI', 'PaymentMethodsBreakdownWidget'],
+        intent: 'formas_pagamento'
+      },
+      {
         name: 'render_FinancialLeakAuditUI',
         cls: FinancialLeakAuditUI,
         aliases: ['FinancialLeakAuditUI', 'FinancialLeakAuditWidget'],
@@ -2758,6 +2954,8 @@
     window.AuraGenUI.ComplianceStatusUI = ComplianceStatusUI;
     window.AuraGenUI.GenerativeModularCardUI = GenerativeModularCardUI;
     window.AuraGenUI.ComplianceStatusWidget = ComplianceStatusWidget;
+    window.AuraGenUI.PaymentMethodsBreakdownUI = PaymentMethodsBreakdownUI;
+    window.AuraGenUI.PaymentMethodsBreakdownWidget = PaymentMethodsBreakdownWidget;
     window.AuraGenUI.ShiftReconciliationUI = ShiftReconciliationUI;
     window.AuraGenUI.ShiftReconciliationWidget = ShiftReconciliationWidget;
     window.AuraGenUI.RootCauseAnalysisUI = RootCauseAnalysisUI;

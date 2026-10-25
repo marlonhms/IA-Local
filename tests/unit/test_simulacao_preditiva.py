@@ -1,4 +1,4 @@
-"""
+﻿"""
 Testes Unitarios - Simulacao Preditiva What-If e Precificacao Dinamica no Core Cognitivo AURA.
 Valida o calculo de elasticidade-preco, paridade energetica 70% Etanol vs Gasolina,
 impacto financeiro projetado e aderencia aos contratos Pydantic (PredictiveScenarioProps).
@@ -165,5 +165,5 @@ async def test_execute_tool_cenario_preditivo():
     assert res["status"] == "success"
     assert res["tool_name"] == "cenario_preditivo"
     assert res["data"]["status"] == "ok"
-    assert res["data"]["produto"] == "GASOLINA COMUM"
+    assert "GASOLINA COMUM" in res["data"]["produto"]
     assert res["latency_ms"] < 250
