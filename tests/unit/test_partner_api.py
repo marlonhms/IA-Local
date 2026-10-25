@@ -309,7 +309,10 @@ def test_aups_mapping_tanks(isolated_staging_store, sample_webposto_payload):
     tanks = adapter.get_tank_inventory()
 
     assert len(tanks) == 2
-    t1 = tanks[0]
+    tanks_by_id = {t.identificador_tanque: t for t in tanks}
+    assert "1" in tanks_by_id
+    assert "2" in tanks_by_id
+    t1 = tanks_by_id["1"]
     assert isinstance(t1, UniversalTankReading)
     assert t1.identificador_tanque == "1"
     assert t1.combustivel == "Gasolina Comum"
@@ -383,7 +386,9 @@ def test_partner_get_tanks_api_endpoint(client, sample_webposto_payload):
     assert resp.status_code == 200
     data = resp.json()
     assert data["count"] == 2
-    assert data["tanks"][0]["identificador_tanque"] == "1"
+    tank_ids = {t["identificador_tanque"] for t in data["tanks"]}
+    assert "1" in tank_ids
+    assert "2" in tank_ids
 
 
 # =============================================================================
@@ -613,6 +618,133 @@ def test_partner_health_endpoint(client):
     data = resp.json()
     assert data["status"] == "online"
     assert "AURA Partner Gateway" in data["service"]
+
+
+@pytest.mark.unit
+def test_partner_erp_adapter_check_health_record_counts(isolated_staging_store, sample_webposto_payload):
+    """Garante que check_health calcula COUNT(*) real de registros no staging."""
+    isolated_staging_store.save_raw_data("posto_01", sample_webposto_payload)
+    adapter = get_partner_erp_adapter("posto_01", staging_store=isolated_staging_store)
+    h = adapter.check_health()
+
+    assert h["status"] == "healthy"
+    assert h["connected"] is True
+    assert h["record_counts"]["tanks"] == 2
+    assert h["record_counts"]["pumps"] == 1
+    assert h["record_counts"]["cashier"] == 1
+    assert h["record_counts"]["sales"] == 1
+    assert h["record_counts"]["sales_items"] == 1
+
+
+@pytest.mark.unit
+def test_partner_erp_adapter_date_filtering(isolated_staging_store):
+    """Garante filtragem por start_date e end_date em consultas de vendas."""
+    payload = {
+        "pedido": [
+            {"codi": "PED1", "valortotal": 50.0, "situ": "A", "dtem": "2026-10-20T10:00:00"},
+            {"codi": "PED2", "valortotal": 60.0, "situ": "A", "dtem": "2026-10-22T10:00:00"},
+            {"codi": "PED3", "valortotal": 70.0, "situ": "A", "dtem": "2026-10-25T10:00:00"},
+            {"codi": "PED4", "valortotal": 80.0, "situ": "A", "dtem": "2026-10-25T12:00:00"},
+        ]
+    }
+    isolated_staging_store.save_raw_data("posto_datas", payload)
+    adapter = get_partner_erp_adapter("posto_datas", staging_store=isolated_staging_store)
+
+    # Vendas a partir de 24/10
+    after = adapter.get_recent_sales(start_date="2026-10-24T00:00:00")
+    assert [s.cupom_id for s in after] == ["PED4", "PED3"]
+
+    # Vendas ate 21/10
+    before = adapter.get_recent_sales(end_date="2026-10-21T00:00:00")
+    assert [s.cupom_id for s in before] == ["PED1"]
+
+
+@pytest.mark.unit
+def test_partner_erp_adapter_order_by_and_limit(isolated_staging_store):
+    """Garante que ORDER BY dtem DESC e LIMIT retornam as vendas mais recentes primeiro."""
+    payload = {
+        "pedido": [
+            {"codi": "PED_ANTIGO", "valortotal": 50.0, "situ": "A", "dtem": "2026-10-20T10:00:00"},
+            {"codi": "PED_RECENTE_1", "valortotal": 70.0, "situ": "A", "dtem": "2026-10-25T10:00:00"},
+            {"codi": "PED_RECENTE_2", "valortotal": 80.0, "situ": "A", "dtem": "2026-10-25T14:00:00"},
+        ]
+    }
+    isolated_staging_store.save_raw_data("posto_ordenacao", payload)
+    adapter = get_partner_erp_adapter("posto_ordenacao", staging_store=isolated_staging_store)
+
+    top2 = adapter.get_recent_sales(limit=2)
+    assert len(top2) == 2
+    assert [s.cupom_id for s in top2] == ["PED_RECENTE_2", "PED_RECENTE_1"]
+
+
+@pytest.mark.unit
+def test_partner_raw_sync_brazilian_number_formats(client, isolated_staging_store):
+    """Garante que formatos numericos brasileiros legados (milhar ponto e decimal virgula) sao sanitizados."""
+    payload_br = {
+        "tanques": [
+            {
+                "codtan": "T_BR",
+                "prl_ds_produto_lmc": "Gasolina Aditivada",
+                "volume": "14.250,75",
+                "capacidade": "20.000,00",
+            }
+        ],
+        "pedido": [
+            {
+                "codi": "PED_BR",
+                "valortotal": "1.345,60",
+                "dtem": "2026-10-25T10:00:00",
+                "situ": "A",
+            }
+        ],
+        "itemped": [
+            {
+                "controle": "1",
+                "pedido": "PED_BR",
+                "codpec": "GAS_ADIT",
+                "valunit": "6,19",
+                "quant": "217,38",
+                "valitem": "1.345,60",
+            }
+        ],
+    }
+
+    resp = client.post(
+        "/api/v1/partner/stations/posto_br/raw-sync",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY},
+        json=payload_br,
+    )
+    assert resp.status_code == 200
+
+    adapter = get_partner_erp_adapter("posto_br", staging_store=isolated_staging_store)
+    tanks = adapter.get_tank_inventory()
+    assert len(tanks) == 1
+    assert tanks[0].volume_atual_litros == 14250.75
+    assert tanks[0].capacidade_nominal_litros == 20000.0
+
+    sales = adapter.get_recent_sales()
+    assert len(sales) == 1
+    assert sales[0].total_reais == 1345.60
+    assert sales[0].itens[0].preco_unitario_reais == 6.19
+    assert sales[0].itens[0].total_item_reais == 1345.60
+
+
+@pytest.mark.unit
+def test_partner_chat_station_conflict_between_header_and_body(client):
+    """Garante 400 quando X-Station-ID difere do station_id informado no corpo do chat."""
+    resp = client.post(
+        "/api/v1/partner/chat",
+        headers={
+            "X-Partner-Key": PARTNER_TEST_KEY,
+            "X-Station-ID": "posto_01",
+        },
+        json={
+            "query": "Como esta o estoque?",
+            "station_id": "posto_02",
+        },
+    )
+    assert resp.status_code == 400
+    assert "Conflito de estacao" in resp.json()["detail"]
 
 
 # =============================================================================

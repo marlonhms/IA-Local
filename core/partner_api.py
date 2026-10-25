@@ -66,11 +66,77 @@ RECOGNIZED_RAW_TABLES = {
 
 
 # =============================================================================
+# FUNCOES AUXILIARES DE PARSING E CONVERSAO
+# =============================================================================
+
+def _get_field_val(r: dict[str, Any], key: str) -> Any:
+    """Recupera valor de campo de um registro de forma case-insensitive."""
+    if key in r:
+        return r[key]
+    key_lower = key.lower()
+    for k, v in r.items():
+        if k.lower() == key_lower:
+            return v
+    return None
+
+
+def _compare_values(v_a: Any, v_b: Any) -> int:
+    """Compara dois valores (numericos, ISO-datetime ou string) retornando -1, 0 ou 1."""
+    if v_a is None and v_b is None:
+        return 0
+    if v_a is None:
+        return -1
+    if v_b is None:
+        return 1
+
+    # Comparacao numerica se ambos puderem ser convertidos para float
+    try:
+        fa = float(v_a)
+        fb = float(v_b)
+        return (fa > fb) - (fa < fb)
+    except (ValueError, TypeError):
+        pass
+
+    # Comparacao textual/temporal (normaliza T para espaco para datas ISO)
+    sa = str(v_a).replace("T", " ")
+    sb = str(v_b).replace("T", " ")
+    return (sa > sb) - (sa < sb)
+
+
+def _sanitize_record_numbers(row: dict[str, Any]) -> dict[str, Any]:
+    """Sanitiza strings numericas no padrao brasileiro (ex: '1.250,50' ou '5,89')."""
+    cleaned: dict[str, Any] = {}
+    for k, v in row.items():
+        if isinstance(v, str):
+            s = v.strip()
+            # Formato brasileiro com milhar e virgula: '1.250,50'
+            if re.match(r"^-?\d{1,3}(\.\d{3})*,\d+$", s):
+                try:
+                    cleaned[k] = float(s.replace(".", "").replace(",", "."))
+                    continue
+                except ValueError:
+                    pass
+            # Formato brasileiro com virgula simples: '5,89'
+            if re.match(r"^-?\d+,\d+$", s):
+                try:
+                    cleaned[k] = float(s.replace(",", "."))
+                    continue
+                except ValueError:
+                    pass
+            cleaned[k] = s
+        elif isinstance(v, dict):
+            cleaned[k] = _sanitize_record_numbers(v)
+        else:
+            cleaned[k] = v
+    return cleaned
+
+
+# =============================================================================
 # CONEXAO E CURSOR SIMULADOS PARA STAGING (DB-API COMPLIANT)
 # =============================================================================
 
 class PartnerStagingCursor:
-    """Cursor simulado compatível com DB-API que lê diretamente do staging isolado."""
+    """Cursor simulado compativel com DB-API que le diretamente do staging isolado."""
 
     def __init__(self, store: PartnerStagingStore, station_id: str) -> None:
         self._store = store
@@ -101,20 +167,136 @@ class PartnerStagingCursor:
 
         table_name = m_from.group(1).lower()
         raw_rows = self._store.get_table_rows(self._station_id, table_name)
-        if not raw_rows:
-            self._rows = []
-            self.description = None
-            self.rowcount = 0
+
+        # 3. Filtragem por WHERE parametrizada
+        filtered_rows = list(raw_rows)
+        m_where = re.search(r"\bWHERE\s+(.*?)(?:\s+ORDER\s+BY|\s+LIMIT|\s*;|$)", clean_q, re.IGNORECASE | re.DOTALL)
+        if m_where:
+            where_body = m_where.group(1).strip()
+            conditions = re.split(r"(?i)\s+AND\s+", where_body)
+            param_idx = 0
+            for cond in conditions:
+                c_clean = cond.strip()
+                if not c_clean:
+                    continue
+                num_placeholders = c_clean.count("%s")
+                c_params = params_list[param_idx : param_idx + num_placeholders]
+                param_idx += num_placeholders
+
+                # 3.1. Condicao != ou <> (ex: COALESCE(situ::text, '') != %s)
+                if "!=" in c_clean or "<>" in c_clean:
+                    m_col = re.search(r"(?:COALESCE\s*\(\s*)?([a-zA-Z0-9_]+)", c_clean, re.IGNORECASE)
+                    if m_col and c_params:
+                        col_k = m_col.group(1).lower()
+                        exclude_val = str(c_params[0])
+                        filtered_rows = [
+                            r for r in filtered_rows
+                            if str(_get_field_val(r, col_k) or "") != exclude_val
+                        ]
+
+                # 3.2. Condicao >= %s
+                elif ">=" in c_clean and c_params:
+                    m_col = re.search(r"([a-zA-Z0-9_]+)\s*>=", c_clean, re.IGNORECASE)
+                    if m_col:
+                        col_k = m_col.group(1).lower()
+                        bound_val = c_params[0]
+                        filtered_rows = [
+                            r for r in filtered_rows
+                            if _compare_values(_get_field_val(r, col_k), bound_val) >= 0
+                        ]
+
+                # 3.3. Condicao <= %s
+                elif "<=" in c_clean and c_params:
+                    m_col = re.search(r"([a-zA-Z0-9_]+)\s*<=", c_clean, re.IGNORECASE)
+                    if m_col:
+                        col_k = m_col.group(1).lower()
+                        bound_val = c_params[0]
+                        filtered_rows = [
+                            r for r in filtered_rows
+                            if _compare_values(_get_field_val(r, col_k), bound_val) <= 0
+                        ]
+
+                # 3.4. Condicao = %s
+                elif "=" in c_clean and "IN" not in c_clean.upper() and c_params:
+                    m_col = re.search(r"([a-zA-Z0-9_]+)\s*=", c_clean, re.IGNORECASE)
+                    if m_col:
+                        col_k = m_col.group(1).lower()
+                        target_val = c_params[0]
+                        filtered_rows = [
+                            r for r in filtered_rows
+                            if str(_get_field_val(r, col_k) or "") == str(target_val)
+                        ]
+
+                # 3.5. Condicao IN (%s, ...)
+                elif "IN (" in c_clean.upper() and c_params:
+                    m_col = re.search(r"([a-zA-Z0-9_]+)(?:::text)?\s+IN\s*\(", c_clean, re.IGNORECASE)
+                    col_k = m_col.group(1).lower() if m_col else None
+                    fk_set = {str(p) for p in c_params}
+                    filtered_rows = [
+                        r for r in filtered_rows
+                        if (col_k and str(_get_field_val(r, col_k) or "") in fk_set)
+                        or any(str(r.get(k, "")) in fk_set for k in ("pedido", "cupom_id", "codtan", "codi"))
+                    ]
+
+                # 3.6. Condicao IS NULL
+                elif "IS NULL" in c_clean.upper():
+                    m_col = re.search(r"([a-zA-Z0-9_]+)\s+IS\s+NULL", c_clean, re.IGNORECASE)
+                    if m_col:
+                        col_k = m_col.group(1).lower()
+                        filtered_rows = [
+                            r for r in filtered_rows
+                            if _get_field_val(r, col_k) is None or _get_field_val(r, col_k) == ""
+                        ]
+
+                # 3.7. Condicao IS NOT NULL
+                elif "IS NOT NULL" in c_clean.upper():
+                    m_col = re.search(r"([a-zA-Z0-9_]+)\s+IS\s+NOT\s+NULL", c_clean, re.IGNORECASE)
+                    if m_col:
+                        col_k = m_col.group(1).lower()
+                        filtered_rows = [
+                            r for r in filtered_rows
+                            if _get_field_val(r, col_k) is not None and _get_field_val(r, col_k) != ""
+                        ]
+
+                # 3.8. Falsidade absoluta: 1=0
+                elif "1=0" in c_clean:
+                    filtered_rows = []
+
+        # 4. Tratamento de agregacao: SELECT COUNT(*) AS alias / SELECT COUNT(1) AS alias
+        m_count = re.search(r"SELECT\s+COUNT\s*\([^\)]*\)\s+AS\s+([a-zA-Z0-9_]+)", clean_q, re.IGNORECASE)
+        if m_count:
+            cnt_alias = m_count.group(1)
+            self._rows = [{cnt_alias: len(filtered_rows)}]
+            self.description = [(cnt_alias, None, None, None, None, None, None)]
+            self.rowcount = 1
             return
 
-        # 3. Parseia colunas selecionadas e seus aliases (SELECT col AS alias, ...)
+        # 5. Ordenacao por ORDER BY
+        m_order = re.search(r"\bORDER\s+BY\s+([a-zA-Z0-9_\.]+)(?:\s+(ASC|DESC))?", clean_q, re.IGNORECASE)
+        if m_order:
+            order_col = m_order.group(1).split(".")[-1].lower()
+            direction = (m_order.group(2) or "ASC").upper()
+            reverse = (direction == "DESC")
+
+            def sort_key(row: dict[str, Any]):
+                v = _get_field_val(row, order_col)
+                if v is None:
+                    return (1, "")
+                try:
+                    return (0, float(v))
+                except (ValueError, TypeError):
+                    return (0, str(v).replace("T", " "))
+
+            filtered_rows.sort(key=sort_key, reverse=reverse)
+
+        # 6. Parseia colunas selecionadas e seus aliases (SELECT col AS alias, ...)
         col_defs: list[tuple[str, str]] = []
         m_sel = re.search(r"SELECT\s+(.*?)\s+FROM", clean_q, re.IGNORECASE | re.DOTALL)
         if m_sel:
             raw_cols = m_sel.group(1).split(",")
             for part in raw_cols:
                 part_clean = part.strip()
-                if not part_clean:
+                if not part_clean or part_clean == "*":
                     continue
                 if re.search(r"\s+AS\s+", part_clean, re.IGNORECASE):
                     src_expr, alias = re.split(r"\s+AS\s+", part_clean, flags=re.IGNORECASE, maxsplit=1)
@@ -136,26 +318,7 @@ class PartnerStagingCursor:
 
                 col_defs.append((src_clean, alias_clean))
 
-        # 4. Filtragem por WHERE basica
-        filtered_rows = list(raw_rows)
-        if "WHERE" in clean_q.upper():
-            # Filtro de status cancelado (ex: COALESCE(situ::text, '') != %s)
-            if "!=" in clean_q and params_list:
-                cand_val = str(params_list[0])
-                filtered_rows = [
-                    r for r in filtered_rows
-                    if str(r.get("situ", "") or r.get("status", "")) != cand_val
-                ]
-
-            # Filtro IN de foreign keys (ex: pedido::text IN (%s, ...))
-            if "IN (" in clean_q.upper() and params_list:
-                fk_set = {str(p) for p in params_list}
-                filtered_rows = [
-                    r for r in filtered_rows
-                    if any(str(r.get(k, "")) in fk_set for k in ("pedido", "cupom_id", "codtan", "codi"))
-                ]
-
-        # 5. Mapeamento de colunas para dicionario de saida com aliases
+        # 7. Mapeamento de colunas para dicionario de saida com aliases
         output_rows: list[dict[str, Any]] = []
         for r in filtered_rows:
             if not col_defs:
@@ -163,34 +326,24 @@ class PartnerStagingCursor:
                 continue
             mapped: dict[str, Any] = {}
             for src_col, alias in col_defs:
-                val = None
-                if src_col in r:
-                    val = r[src_col]
-                elif alias in r:
-                    val = r[alias]
-                else:
-                    # Busca case-insensitive
-                    src_lower = src_col.lower()
-                    alias_lower = alias.lower()
-                    for k, v in r.items():
-                        k_lower = k.lower()
-                        if k_lower == src_lower or k_lower == alias_lower:
-                            val = v
-                            break
+                val = _get_field_val(r, src_col)
+                if val is None:
+                    val = _get_field_val(r, alias)
                 mapped[alias] = val
             output_rows.append(mapped)
 
-        # 6. LIMIT
-        m_limit = re.search(r"LIMIT\s+(\d+)", clean_q, re.IGNORECASE)
+        # 8. LIMIT
+        m_limit = re.search(r"LIMIT\s+(\d+|%s)", clean_q, re.IGNORECASE)
         if m_limit:
-            lim = int(m_limit.group(1))
-            output_rows = output_rows[:lim]
-        elif "LIMIT %s" in clean_q.upper() and params_list:
-            try:
-                lim = int(params_list[-1])
-                output_rows = output_rows[:lim]
-            except (ValueError, TypeError):
-                pass
+            lim_str = m_limit.group(1)
+            if lim_str == "%s" and params_list:
+                try:
+                    lim = int(params_list[-1])
+                    output_rows = output_rows[:lim]
+                except (ValueError, TypeError):
+                    pass
+            elif lim_str.isdigit():
+                output_rows = output_rows[:int(lim_str)]
 
         self._rows = output_rows
         self.rowcount = len(output_rows)
@@ -299,7 +452,7 @@ class PartnerStagingStore:
 
             for table_name, rows in tables.items():
                 t_clean = table_name.strip().lower()
-                clean_rows = [r for r in rows if isinstance(r, dict)]
+                clean_rows = [_sanitize_record_numbers(r) for r in rows if isinstance(r, dict)]
                 self._cache[valid_station][t_clean] = clean_rows
                 table_counts[t_clean] = len(clean_rows)
 
@@ -323,15 +476,11 @@ class PartnerStagingStore:
             }
             tmp_staging = station_dir / "raw_data.tmp"
             tmp_staging.write_text(json.dumps(payload, ensure_ascii=False, default=str), encoding="utf-8")
-            if staging_file.exists():
-                staging_file.unlink()
-            tmp_staging.rename(staging_file)
+            tmp_staging.replace(staging_file)
 
             tmp_meta = station_dir / "meta.tmp"
             tmp_meta.write_text(json.dumps(self._metadata[valid_station], ensure_ascii=False), encoding="utf-8")
-            if meta_file.exists():
-                meta_file.unlink()
-            tmp_meta.rename(meta_file)
+            tmp_meta.replace(meta_file)
         except Exception as exc:
             logger.warning(f"PartnerStagingStore: Falha ao persistir staging em disco para {valid_station}: {exc}")
 
@@ -676,7 +825,15 @@ async def partner_chat_endpoint(
 
     engine: AuraEngine = get_aura_engine()
 
-    effective_station = auth_info.get("station_id") or req.station_id or "default"
+    # Validacao de conflito de estacao entre Header e Body
+    header_station = auth_info.get("station_id")
+    if header_station and req.station_id and header_station != req.station_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Conflito de estacao: cabecalho X-Station-ID difere do station_id do corpo da requisicao.",
+        )
+
+    effective_station = header_station or req.station_id or "default"
     effective_session = req.session_id or f"partner_{effective_station}_{uuid.uuid4().hex[:8]}"
 
     if req.stream:
