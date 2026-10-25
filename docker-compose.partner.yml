@@ -1,0 +1,43 @@
+# =============================================================================
+# AURA Partner Gateway: Docker Compose Isolado para Integracao com Parceiros
+# Executa a API AURA Partner em container dedicado com limites de CPU e memoria,
+# volume isolado de staging e zero travessoes em todo o arquivo.
+# =============================================================================
+
+version: '3.8'
+
+services:
+  aura-partner-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.partner
+    container_name: aura_partner_gateway
+    restart: unless-stopped
+    ports:
+      - "${PARTNER_PORT:-8001}:8000"
+    environment:
+      - AURA_PARTNER_API_KEY=${AURA_PARTNER_API_KEY:-aura-partner-secret-2026}
+      - PARTNER_STAGING_DIR=/app/data/staging
+      - AURA_GENUI_ENABLED=0
+      - AURA_ENFORCE_PARTNER_AUTH=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - aura_partner_staging_volume:/app/data/staging
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1024M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/partner/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  aura_partner_staging_volume:
+    name: aura_partner_staging_volume
