@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any, List
@@ -211,12 +212,15 @@ def test_supervisor_stops_after_max_restarts_exceeded(
     assert summary["last_exit_code"] == 137
 
 
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="Requer sistema operacional Windows nativo para operacoes com sc.exe e caminhos de servico",
+)
 def test_windows_service_lifecycle_commands_via_sc_exe(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Testa install, start, stop, status, info e uninstall via sc.exe mockado."""
     monkeypatch.setenv("AURA_DATA_DIR", str(tmp_path / "data"))
-    monkeypatch.setattr(aura_service.os, "name", "nt")
 
     executed_cmds: List[List[str]] = []
     service_installed = {"state": "NOT_INSTALLED"}

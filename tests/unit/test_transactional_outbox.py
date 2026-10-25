@@ -20,6 +20,7 @@ Zero travessoes em todo o arquivo.
 from __future__ import annotations
 
 import sqlite3
+import sys
 import threading
 import time
 from datetime import UTC, datetime, timedelta
@@ -146,15 +147,18 @@ class TestSQLiteWALAndPersistBeforeSend:
             data_dir / "aura_outbox.db"
         )
 
-        # 3. Padrao %ProgramData%\Aura\data\aura_outbox.db no Windows
+        # 3. Padrao %ProgramData%\Aura\data\aura_outbox.db no Windows ou fallback no POSIX
         monkeypatch.delenv("AURA_DATA_DIR", raising=False)
         fake_progdata = tmp_path / "ProgramData"
         monkeypatch.setenv("PROGRAMDATA", str(fake_progdata))
         import core.outbox as outbox_mod
 
-        monkeypatch.setattr(outbox_mod.os, "name", "nt")
-        resolved_win = AuraTransactionalOutbox.resolve_default_db_path()
-        assert resolved_win == str(fake_progdata / "Aura" / "data" / "aura_outbox.db")
+        if sys.platform == "win32":
+            resolved_win = AuraTransactionalOutbox.resolve_default_db_path()
+            assert resolved_win == str(fake_progdata / "Aura" / "data" / "aura_outbox.db")
+        else:
+            resolved_posix = AuraTransactionalOutbox.resolve_default_db_path()
+            assert resolved_posix == str(outbox_mod.PROJECT_ROOT / "data" / "aura_outbox.db")
 
     def test_enqueue_rejects_empty_destination_url(self) -> None:
         """Nao deve permitir enfileirar mensagem sem destination_url."""
