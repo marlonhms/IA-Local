@@ -1076,10 +1076,10 @@ O Parceiro deve configurar os seguintes parametros no arquivo `.env` do backend 
 # =============================================================================
 
 # URL base do gateway AURA (IP Tailscale ou Dominio Seguro HTTPS)
-AURA_API_BASE_URL=http://100.115.92.45:8000
+AURA_API_BASE_URL=https://marlonh-supwp.tail6cf59f.ts.net
 
 # Chave secreta compartilhada fornecida pela equipe AURA
-AURA_PARTNER_KEY=sua-chave-secreta-de-parceiro-aqui
+AURA_PARTNER_KEY=aura_pk_live_LJOztb9MVhTu2d0UErvDPZeCFfOMU7uawlWJ9YNEuvM
 
 # Identificador unico padrao do posto ou filial atual
 AURA_STATION_ID=posto_matriz_01
@@ -1115,7 +1115,7 @@ O Agente de IA do Parceiro devera seguir estritamente o roteiro de validacao aba
 Verificar se o gateway esta respondendo adequadamente:
 
 ```bash
-curl -X GET "http://100.115.92.45:8000/api/v1/partner/health"
+curl -X GET "https://marlonh-supwp.tail6cf59f.ts.net/api/v1/partner/health"
 ```
 **Resposta esperada (HTTP 200):**
 ```json
@@ -1133,12 +1133,12 @@ Garantir que chamadas nao autenticadas sejam barradas:
 
 ```bash
 # Tentativa 1: Sem cabecalho de chave (deve retornar 401)
-curl -s -o /dev/null -w "%{http_code}\n" -X GET "http://100.115.92.45:8000/api/v1/partner/stations/posto_teste/status"
+curl -s -o /dev/null -w "%{http_code}\n" -X GET "https://marlonh-supwp.tail6cf59f.ts.net/api/v1/partner/stations/posto_teste/status"
 # Saida esperada: 401
 
 # Tentativa 2: Com chave valida
-curl -s -X GET "http://100.115.92.45:8000/api/v1/partner/stations/posto_teste/status" \
-  -H "X-Partner-Key: sua-chave-secreta-de-parceiro-aqui"
+curl -s -X GET "https://marlonh-supwp.tail6cf59f.ts.net/api/v1/partner/stations/posto_teste/status" \
+  -H "X-Partner-Key: aura_pk_live_LJOztb9MVhTu2d0UErvDPZeCFfOMU7uawlWJ9YNEuvM"
 # Saida esperada: HTTP 200 com status "ready" ou "empty"
 ```
 
@@ -1148,9 +1148,9 @@ curl -s -X GET "http://100.115.92.45:8000/api/v1/partner/stations/posto_teste/st
 Realizar uma sincronizacao com dados de teste:
 
 ```bash
-curl -X POST "http://100.115.92.45:8000/api/v1/partner/stations/posto_teste/raw-sync" \
+curl -X POST "https://marlonh-supwp.tail6cf59f.ts.net/api/v1/partner/stations/posto_teste/raw-sync" \
   -H "Content-Type: application/json" \
-  -H "X-Partner-Key: sua-chave-secreta-de-parceiro-aqui" \
+  -H "X-Partner-Key: aura_pk_live_LJOztb9MVhTu2d0UErvDPZeCFfOMU7uawlWJ9YNEuvM" \
   -H "X-Station-ID: posto_teste" \
   -d '{
     "station_id": "posto_teste",
@@ -1196,8 +1196,8 @@ curl -X POST "http://100.115.92.45:8000/api/v1/partner/stations/posto_teste/raw-
 Confirmar que os dados brutos foram mapeados com precisao:
 
 ```bash
-curl -X GET "http://100.115.92.45:8000/api/v1/partner/stations/posto_teste/tanks" \
-  -H "X-Partner-Key: sua-chave-secreta-de-parceiro-aqui"
+curl -X GET "https://marlonh-supwp.tail6cf59f.ts.net/api/v1/partner/stations/posto_teste/tanks" \
+  -H "X-Partner-Key: aura_pk_live_LJOztb9MVhTu2d0UErvDPZeCFfOMU7uawlWJ9YNEuvM"
 ```
 **Resposta esperada (HTTP 200):**
 ```json
@@ -1221,9 +1221,9 @@ curl -X GET "http://100.115.92.45:8000/api/v1/partner/stations/posto_teste/tanks
 Validar o processamento em texto puro sem streaming:
 
 ```bash
-curl -X POST "http://100.115.92.45:8000/api/v1/partner/chat" \
+curl -X POST "https://marlonh-supwp.tail6cf59f.ts.net/api/v1/partner/chat" \
   -H "Content-Type: application/json" \
-  -H "X-Partner-Key: sua-chave-secreta-de-parceiro-aqui" \
+  -H "X-Partner-Key: aura_pk_live_LJOztb9MVhTu2d0UErvDPZeCFfOMU7uawlWJ9YNEuvM" \
   -H "X-Station-ID: posto_teste" \
   -d '{
     "query": "Qual o status do tanque 1?",
@@ -1239,9 +1239,9 @@ curl -X POST "http://100.115.92.45:8000/api/v1/partner/chat" \
 Validar a recepcao dos eventos de streaming no terminal:
 
 ```bash
-curl -N -X POST "http://100.115.92.45:8000/api/v1/partner/chat" \
+curl -N -X POST "https://marlonh-supwp.tail6cf59f.ts.net/api/v1/partner/chat" \
   -H "Content-Type: application/json" \
-  -H "X-Partner-Key: sua-chave-secreta-de-parceiro-aqui" \
+  -H "X-Partner-Key: aura_pk_live_LJOztb9MVhTu2d0UErvDPZeCFfOMU7uawlWJ9YNEuvM" \
   -H "X-Station-ID: posto_teste" \
   -d '{
     "query": "Resuma a situacao dos tanques",
