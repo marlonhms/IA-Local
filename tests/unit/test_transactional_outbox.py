@@ -84,6 +84,8 @@ class TestSQLiteWALAndPersistBeforeSend:
         assert pragmas["journal_mode"] == "wal"
         assert pragmas["synchronous"] == 1  # 1 = NORMAL no SQLite
         assert pragmas["busy_timeout"] == 5000
+        assert pragmas["wal_autocheckpoint"] == 1000
+        assert pragmas["journal_size_limit"] == 67108864
         outbox.close()
 
     def test_enqueue_persists_pending_message_before_network(self, tmp_path: Path) -> None:
