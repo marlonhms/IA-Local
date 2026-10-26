@@ -38,6 +38,8 @@ from core.partner_api import (
     get_partner_erp_adapter,
     get_partner_staging_store,
     set_partner_staging_store,
+    compute_station_roi_diagnostic,
+    StationROIDiagnosticResponse,
 )
 
 
@@ -745,6 +747,183 @@ def test_partner_chat_station_conflict_between_header_and_body(client):
     )
     assert resp.status_code == 400
     assert "Conflito de estacao" in resp.json()["detail"]
+
+
+
+# =============================================================================
+# 7. TESTES DO MODULO 1: CALCULADORA EXECUTIVA E DIAGNOSTICO RETROATIVO DE ROI
+# =============================================================================
+
+@pytest.mark.unit
+def test_roi_diagnostic_requires_authentication(client):
+    """Garante 401 ao requisitar /roi-diagnostic sem autenticacao valida."""
+    # Sem header de chave
+    resp = client.get("/api/v1/partner/stations/posto_01/roi-diagnostic")
+    assert resp.status_code == 401
+    assert "Autenticacao de parceiro necessaria" in resp.json()["detail"]
+
+    # Com chave incorreta
+    resp_invalid = client.get(
+        "/api/v1/partner/stations/posto_01/roi-diagnostic",
+        headers={"X-Partner-Key": "chave-invalida-123"},
+    )
+    assert resp_invalid.status_code == 401
+    assert "Autenticacao de parceiro invalida" in resp_invalid.json()["detail"]
+
+
+@pytest.mark.unit
+def test_roi_diagnostic_baseline_when_no_data_in_staging(client, isolated_staging_store):
+    """Valida diagnostico com valores auditados de baseline quando nao ha dados no staging."""
+    resp = client.get(
+        "/api/v1/partner/stations/posto_novo/roi-diagnostic",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["station_id"] == "posto_novo"
+    assert data["data_version_hash"] == "0000000000000000"
+    assert "generated_at" in data
+
+    # Quebra de perdas mensais (baseline auditado)
+    breakdown = data["breakdown_brl"]
+    assert breakdown["lmc_and_tank_shrinkage"] == 4520.00
+    assert breakdown["convenience_and_pos_cancellations"] == 3100.00
+    assert breakdown["cashier_shift_discrepancies"] == 1850.00
+    assert breakdown["pricing_and_carreta_arbitrage"] == 6200.00
+    assert breakdown["working_capital_selic_cost"] == 1400.00
+
+    # Consolidacao executiva
+    summary = data["summary"]
+    assert summary["total_monthly_leakage_brl"] == 17070.00
+    assert summary["estimated_monthly_recovery_brl"] == 13206.00
+    assert summary["roi_90_days_net_brl"] == 28903.80
+    assert summary["roi_multiple"] == 20.7
+    assert summary["guarantee_3x_met"] is True
+
+    # Blindagem regulatoria
+    shield = data["regulatory_shield"]
+    assert shield["anp_law_9847_min_fine_brl"] == 20000.00
+    assert shield["anp_lmc_tolerance_pct"] == 0.60
+    assert shield["clt_art_462_compliance_active"] is True
+
+
+@pytest.mark.unit
+def test_roi_diagnostic_custom_monthly_fee(client, isolated_staging_store):
+    """Valida calculo de ROI liquido em 90 dias com mensalidade customizada."""
+    resp = client.get(
+        "/api/v1/partner/stations/posto_custom_fee/roi-diagnostic?monthly_fee=1200.0",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY},
+    )
+    assert resp.status_code == 200
+    summary = resp.json()["summary"]
+
+    # Custo de 3 mensalidades = 3 * 1200 = 3600.00
+    # Recuperacao em 90 dias com adocao (2.3) = 13206.00 * 2.3 = 30373.80
+    # Retorno liquido = 30373.80 - 3600.00 = 26773.80
+    assert summary["roi_90_days_net_brl"] == 26773.80
+    assert summary["roi_multiple"] == 8.4
+    assert summary["guarantee_3x_met"] is True
+
+
+@pytest.mark.unit
+def test_roi_diagnostic_with_populated_staging_data(client, isolated_staging_store):
+    """Valida diagnostico deterministico com dados reais sincronizados no staging."""
+    station = "posto_auditado"
+    payload = {
+        "fechabomba": [
+            {
+                "enclts": "12000.00",
+                "encltsa": "8000.00",
+                "qtdeaf": "0.00",
+                "preco": "5.90",
+                "encdinh": "18000.00",
+            }
+        ],
+        "tanques": [
+            {
+                "tanque": "1",
+                "iniciodia": "15000.00",
+                "volume": "10500.00",
+            }
+        ],
+        "fechacaixa": [
+            {
+                "fechamento": "1",
+                "valtot": "17800.00",
+                "valrefcai": "0.00",
+            }
+        ],
+        "pedido": [
+            {
+                "pedido": "P101",
+                "situ": "C",
+                "total": "150.00",
+            }
+        ],
+    }
+
+    sync_resp = client.post(
+        f"/api/v1/partner/stations/{station}/raw-sync",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY},
+        json=payload,
+    )
+    assert sync_resp.status_code == 200
+    sync_hash = sync_resp.json().get("data_version_hash")
+    assert sync_hash is not None
+    assert len(sync_hash) == 16
+
+    diag_resp = client.get(
+        f"/api/v1/partner/stations/{station}/roi-diagnostic",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY},
+    )
+    assert diag_resp.status_code == 200
+    diag = diag_resp.json()
+
+    assert diag["station_id"] == station
+    assert diag["data_version_hash"] == sync_hash
+
+    b = diag["breakdown_brl"]
+    assert b["lmc_and_tank_shrinkage"] == 88500.00
+    assert b["convenience_and_pos_cancellations"] == 4500.00
+    assert b["cashier_shift_discrepancies"] == 6000.00
+    assert b["pricing_and_carreta_arbitrage"] == 4200.00
+    assert b["working_capital_selic_cost"] == 526.58
+
+    s = diag["summary"]
+    assert s["total_monthly_leakage_brl"] == 103726.58
+    assert s["estimated_monthly_recovery_brl"] == 81488.29
+    assert s["roi_90_days_net_brl"] == 185953.07
+    assert s["roi_multiple"] == 127.5
+    assert s["guarantee_3x_met"] is True
+
+
+@pytest.mark.unit
+def test_roi_diagnostic_header_station_mismatch(client):
+    """Garante 400 quando X-Station-ID difere da URL do diagnostico."""
+    resp = client.get(
+        "/api/v1/partner/stations/posto_01/roi-diagnostic",
+        headers={
+            "X-Partner-Key": PARTNER_TEST_KEY,
+            "X-Station-ID": "posto_99",
+        },
+    )
+    assert resp.status_code == 400
+    assert "Conflito de estacao" in resp.json()["detail"]
+
+
+@pytest.mark.unit
+def test_compute_station_roi_diagnostic_direct_function(isolated_staging_store):
+    """Valida chamada direta da funcao compute_station_roi_diagnostic sem HTTP."""
+    res = compute_station_roi_diagnostic(
+        "posto_unit_direct",
+        staging_store=isolated_staging_store,
+        monthly_subscription_brl=490.0,
+    )
+    assert res["station_id"] == "posto_unit_direct"
+    assert res["data_version_hash"] == "0000000000000000"
+    assert res["summary"]["guarantee_3x_met"] is True
+    assert res["summary"]["roi_multiple"] >= 3.0
 
 
 # =============================================================================
