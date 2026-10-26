@@ -500,22 +500,24 @@ class TestFrontendOfflineFirst:
         generated_html = build_showcase_page.generate_showcase_html()
         assert generated_html == content, "scripts/build_showcase_page.py e web/showcase.html nao estao perfeitamente sincronizados"
 
-        # Headline Problem-First universal (sem nichar em postos de combustivel)
-        assert "Perdas financeiras invisíveis, furos de caixa e desvios de estoque custam caro para o seu negócio." in content
-        assert "conectando a qualquer banco de dados sem trocar o seu sistema atual" in content
+        # Headline Executiva com foco em Inteligencia de Gestao (sem jargao de banco de dados no Hero)
+        assert "Transforme os dados que sua empresa já gera em" in content
+        assert "lucro recuperado" in content
+        assert "todos os dias." in content
         assert "perda de combustível" not in content
         assert "multas da ANP" not in content
         for erp_brand in ("WebPosto", "Linx", "Totvs", "Sankhya", "Alterdata"):
             assert erp_brand not in content, f"Marca de ERP citada no showcase: {erp_brand}"
 
-        # 3 Badges de Autoridade Tecnica
-        assert "Zero gravação no sistema de gestão (100% somente leitura)" in content
-        assert "Economia de até 95% em custos de IA" in content
-        assert "Resposta local sub-100ms na rede da sua empresa" in content
+        # 3 Selos de Confianca Monocromaticos Discretos
+        assert "Sem trocar de sistema" in content
+        assert "Operação 100% segura e somente leitura" in content
+        assert "Diagnósticos em segundos" in content
 
-        # CTAs Duplos
+        # CTAs Duplos Alto Contraste Executivo (Estilo Linear / Stripe - Branco Solido #f8fafc sem neon)
         assert "Testar Diagnóstico ao Vivo" in content
-        assert "Inspecionar Script SQL Auditável" in content
+        assert "bg-[#f8fafc]" in content
+        assert "Arquitetura de Segurança e Auditoria" in content
         assert "window.auraTour.scrollToSection('sec-chat-graph')" in content
         assert "window.auraSecurityArchitecture.openModal()" in content
 

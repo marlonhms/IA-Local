@@ -649,74 +649,66 @@
     <!-- Hero Split: Proposta de Valor (Esquerda) vs Cockpit Holográfico da AURA (Direita) -->
     <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center min-h-[62vh] sm:min-h-[70vh] py-6 scroll-reveal scroll-reveal-visible" id="hero-cockpit-split">
       
-      <!-- Coluna Esquerda: Proposta de Valor Executiva Universal -->
+      <!-- Coluna Esquerda: Proposta de Valor Executiva Universal (Estilo Alto Contraste Linear/Stripe) -->
       <div class="lg:col-span-7 space-y-6 text-left">
-        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-xs font-sans text-cyan-300">
-          <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-          <span class="font-semibold tracking-wider uppercase text-[10px]">Plataforma Universal de Dados: Varejo • Comércio • Franquias • Postos • Distribuição • Bares & Padarias</span>
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-[11px] font-sans text-slate-300">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          <span class="font-medium tracking-wider uppercase text-[10px] text-slate-300">Inteligência Operacional & Auditoria Executiva</span>
         </div>
 
-        <h1 class="text-3xl sm:text-4xl lg:text-[40px] font-normal tracking-[-0.015em] text-white leading-[1.2] font-display-title [text-wrap:balance]">
-          Perdas financeiras invisíveis, furos de caixa e desvios de estoque custam caro para o seu negócio. <br>
-          <span class="block mt-2 text-[0.8em] leading-[1.25] bg-gradient-to-r from-cyan-300 to-emerald-300 bg-clip-text text-transparent">
-            AURA resolve isso em segundos, conectando a qualquer banco de dados sem trocar o seu sistema atual.
-          </span>
+        <h1 class="text-3xl sm:text-4xl lg:text-[44px] font-normal tracking-[-0.02em] text-white leading-[1.15] font-display-title [text-wrap:balance]">
+          Transforme os dados que sua empresa já gera em <span class="text-slate-100 underline decoration-white/25 underline-offset-8">lucro recuperado</span> todos os dias.
         </h1>
 
-        <!-- Sub-headline com 3 Badges de Autoridade Tecnica -->
-        <div class="flex flex-wrap items-center gap-2 pt-1">
-          <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-xs font-sans text-emerald-300">
-            <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
-            <span class="font-medium">Zero gravação no sistema de gestão (100% somente leitura)</span>
-          </div>
-          <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/25 text-xs font-sans text-purple-300">
-            <i data-lucide="trending-down" class="w-3.5 h-3.5 text-purple-400"></i>
-            <span class="font-medium">Economia de até 95% em custos de IA</span>
-          </div>
-          <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/25 text-xs font-sans text-cyan-300">
-            <i data-lucide="zap" class="w-3.5 h-3.5 text-cyan-400"></i>
-            <span class="font-medium">Resposta local sub-100ms na rede da sua empresa</span>
-          </div>
-        </div>
-
-        <p class="body-regular home_agents-feature-desc text-slate-300 text-[15px] sm:text-base leading-relaxed max-w-xl">
-          O copiloto executivo universal que se conecta a qualquer banco de dados em minutos. Conexão simbiótica 100% não-invasiva e somente-leitura com o ERP, o PDV ou o banco de dados que a sua empresa já usa, transformando dados brutos em diagnósticos de lucro, caixa e estoque em segundos.
+        <p class="body-regular home_agents-feature-desc text-slate-400 text-[15px] sm:text-[17px] leading-relaxed max-w-xl font-normal">
+          A AURA acompanha sua operação em tempo real junto ao sistema de gestão que você já utiliza, identificando furos de caixa, quebras de estoque e desvios de margem para decisão executiva imediata.
         </p>
 
-        <!-- CTAs Duplos: Diagnostico ao Vivo e Inspecionar Script SQL Auditavel -->
+        <!-- Selos de Confiança Monocromáticos Discretos -->
+        <div class="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 text-xs font-sans text-slate-300">
+          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.07]">
+            <i data-lucide="check" class="w-3.5 h-3.5 text-slate-400"></i>
+            <span>Sem trocar de sistema</span>
+          </div>
+          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.07]">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 text-slate-400"></i>
+            <span>Operação 100% segura e somente leitura</span>
+          </div>
+          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.07]">
+            <i data-lucide="zap" class="w-3.5 h-3.5 text-slate-400"></i>
+            <span>Diagnósticos em segundos</span>
+          </div>
+        </div>
+
+        <!-- CTAs Duplos: Alto Contraste Executivo (Branco Sólido #F8FAFC + Vidro Sóbrio) -->
         <div class="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <button onclick="window.auraTour.scrollToSection('sec-chat-graph')" class="inline-flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 text-xs font-bold transition-all shadow-lg shadow-cyan-500/20 active:scale-[0.98] cursor-pointer" id="btn-hero-live-diag">
-            <i data-lucide="play" class="w-4 h-4 fill-slate-950"></i>
+          <button onclick="window.auraTour.scrollToSection('sec-chat-graph')" class="inline-flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl bg-[#f8fafc] hover:bg-white text-slate-950 text-xs font-semibold transition-all shadow-sm active:scale-[0.99] cursor-pointer" id="btn-hero-live-diag">
             <span>Testar Diagnóstico ao Vivo</span>
+            <i data-lucide="arrow-down-right" class="w-4 h-4 text-slate-900"></i>
           </button>
 
-          <button onclick="if(window.auraSecurityArchitecture) window.auraSecurityArchitecture.openModal();" class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white border border-white/10 hover:border-emerald-500/40 text-xs font-medium transition-all cursor-pointer" id="btn-hero-inspect-sql">
-            <i data-lucide="code-2" class="w-4 h-4 text-emerald-400"></i>
-            <span>Inspecionar Script SQL Auditável</span>
+          <button onclick="if(window.auraSecurityArchitecture) window.auraSecurityArchitecture.openModal();" class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] text-slate-300 hover:text-white border border-white/10 text-xs font-medium transition-all cursor-pointer" id="btn-hero-inspect-sql">
+            <i data-lucide="shield" class="w-3.5 h-3.5 text-slate-400"></i>
+            <span>Arquitetura de Segurança e Auditoria</span>
           </button>
         </div>
 
-        <div class="flex items-center gap-2 text-[11px] font-sans text-slate-400">
-          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-          <span>Role para ver o fluxo em tempo real (demonstração autônoma sincronizada ao scroll)</span>
-        </div>
-
-        <!-- Três Micro-Destaques de Engenharia no Rodapé da Coluna Esquerda -->
-        <div class="grid grid-cols-3 gap-3 pt-3 border-t border-white/[0.06] max-w-lg">
+        <!-- Três Micro-Destaques Executivos no Rodapé da Coluna Esquerda -->
+        <div class="grid grid-cols-3 gap-4 pt-4 border-t border-white/[0.07] max-w-lg">
           <div class="space-y-0.5">
-            <div class="text-[10px] text-slate-400 uppercase font-mono">Latência Média</div>
-            <div class="text-sm font-bold text-white font-mono">38 ms</div>
-            <div class="text-[10px] text-emerald-400">Sub-100ms Local</div>
+            <div class="text-[10px] text-slate-500 uppercase font-mono tracking-wider">Implantação</div>
+            <div class="text-sm font-semibold text-white font-mono">Zero Atrito</div>
+            <div class="text-[11px] text-slate-400">Mantém sua rotina atual</div>
           </div>
           <div class="space-y-0.5">
-            <div class="text-[10px] text-slate-400 uppercase font-mono">Privacidade</div>
-            <div class="text-sm font-bold text-white font-mono">100% LGPD</div>
-            <div class="text-[10px] text-cyan-400">Lei 13.709/2018</div>
+            <div class="text-[10px] text-slate-500 uppercase font-mono tracking-wider">Privacidade</div>
+            <div class="text-sm font-semibold text-white font-mono">100% LGPD</div>
+            <div class="text-[11px] text-slate-400">Dados protegidos na origem</div>
           </div>
           <div class="space-y-0.5">
-            <div class="text-[10px] text-slate-400 uppercase font-mono">Economia Tokens</div>
-            <div class="text-sm font-bold text-white font-mono">Até 95%</div>
-            <div class="text-[10px] text-purple-400">Banco do Cliente</div>
+            <div class="text-[10px] text-slate-500 uppercase font-mono tracking-wider">Eficiência</div>
+            <div class="text-sm font-semibold text-white font-mono">Até 95%</div>
+            <div class="text-[11px] text-slate-400">Redução de custo de IA</div>
           </div>
         </div>
       </div>
