@@ -37,6 +37,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,11 +50,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.aurapostoassitance.ui.components.AuraAmbientBackground
+import com.example.aurapostoassitance.ui.components.AuraBottomGlassDock
 import com.example.aurapostoassitance.ui.components.AuraBrandTitle
 import com.example.aurapostoassitance.ui.components.AuraCard
 import com.example.aurapostoassitance.ui.components.AuraChip
+import com.example.aurapostoassitance.ui.components.AuraDynamicIsland
 import com.example.aurapostoassitance.ui.components.AuraGradientButton
+import com.example.aurapostoassitance.ui.components.AuraNavTab
+import com.example.aurapostoassitance.ui.components.LiquidGlassPill
 import com.example.aurapostoassitance.ui.components.SectionLabel
+import com.example.aurapostoassitance.ui.components.SpatialGlassCard
 import com.example.aurapostoassitance.ui.components.StatusDot
 import com.example.aurapostoassitance.ui.theme.AuraCyan
 import com.example.aurapostoassitance.ui.theme.AuraEmerald
@@ -114,141 +124,157 @@ private val chipPrompts = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
-    onNavigateToChat: (String?) -> Unit
+    onNavigateToChat: (String?) -> Unit,
+    onNavigateToSetup: () -> Unit = {}
 ) {
-    Scaffold(
-        containerColor = ObsidianBase,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        AuraBrandTitle(
-                            text = "AURA",
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(50))
-                                .background(ObsidianHigh)
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            StatusDot(color = StatusSuccess, size = 6.dp, pulsing = true)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
+    var selectedTab by remember { mutableStateOf(AuraNavTab.PULSO) }
+
+    AuraAmbientBackground {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AuraBrandTitle(
+                                text = "AURA",
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            LiquidGlassPill(
                                 text = "Posto Online",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = TextSecondary,
-                                fontWeight = FontWeight.SemiBold
+                                accentColor = StatusSuccess,
+                                pulsingDot = true
                             )
                         }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = ObsidianBase
-                )
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-        ) {
-            // Header Editorial Deluxe
-            Text(
-                text = "Pulso Operacional",
-                style = MaterialTheme.typography.displayMedium.copy(
-                    fontFamily = NewsreaderFamily,
-                    letterSpacing = (-0.5).sp
-                ),
-                color = TextPrimary
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Inteligência de pista, tancagem e prontidão de caixa.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Pulse Status Bar (Glassmorphism Telemetria)
-            AuraCard(
-                modifier = Modifier.fillMaxWidth(),
-                accent = AuraCyan,
-                contentPadding = PaddingValues(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    PulseStatItem(label = "Tanques", value = "100% Ativos", dotColor = StatusSuccess)
-                    PulseStatItem(label = "LMC ANP", value = "±0.60% OK", dotColor = StatusSuccess)
-                    PulseStatItem(label = "Turno", value = "Em Aberto", dotColor = AuraCyan)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            SectionLabel(text = "Gatilhos Executivos da Pista")
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // 2x2 Triggers Grid
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                triggers.chunked(2).forEach { rowTriggers ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(IntrinsicSize.Max),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        rowTriggers.forEach { trigger ->
-                            ExecutiveCard(
-                                trigger = trigger,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
-                                onClick = { onNavigateToChat(trigger.query) }
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(26.dp))
-
-            SectionLabel(text = "Consultas Frequentes")
-            Spacer(modifier = Modifier.height(12.dp))
-
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(bottom = 8.dp)
-            ) {
-                items(chipPrompts) { prompt ->
-                    AuraChip(
-                        label = prompt,
-                        icon = Icons.Rounded.AutoAwesome,
-                        onClick = { onNavigateToChat(prompt) }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent
                     )
-                }
+                )
+            },
+            bottomBar = {
+                AuraBottomGlassDock(
+                    selectedTab = selectedTab,
+                    onTabSelected = { tab ->
+                        selectedTab = tab
+                        when (tab) {
+                            AuraNavTab.PULSO -> { /* Já no Pulso */ }
+                            AuraNavTab.COCKPIT -> onNavigateToChat(null)
+                            AuraNavTab.TANQUES -> onNavigateToChat("Faça a previsão de esgotamento (Run-Out) dos tanques e mostre a situação de todos os compartimentos.")
+                            AuraNavTab.CONEXAO -> onNavigateToSetup()
+                        }
+                    }
+                )
             }
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+            ) {
+                // Header Editorial Deluxe
+                Text(
+                    text = "Pulso Operacional",
+                    style = MaterialTheme.typography.displayMedium.copy(
+                        fontFamily = NewsreaderFamily,
+                        letterSpacing = (-0.5).sp
+                    ),
+                    color = TextPrimary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Inteligência de pista, tancagem e prontidão de caixa.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
 
-            Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            // Main CTA AURA Button
-            AuraGradientButton(
-                text = "Abrir AURA",
-                onClick = { onNavigateToChat(null) },
-                icon = Icons.AutoMirrored.Rounded.Chat,
-                modifier = Modifier.fillMaxWidth()
-            )
+                // Dynamic Island de Telemetria Operacional
+                AuraDynamicIsland(
+                    onQueryAction = { query -> onNavigateToChat(query) }
+                )
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Pulse Status Bar (Glassmorphism Telemetria)
+                SpatialGlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    accent = AuraCyan,
+                    iridescentBorder = true,
+                    contentPadding = PaddingValues(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        PulseStatItem(label = "Tanques", value = "100% Ativos", dotColor = StatusSuccess)
+                        PulseStatItem(label = "LMC ANP", value = "±0.60% OK", dotColor = StatusSuccess)
+                        PulseStatItem(label = "Turno", value = "Em Aberto", dotColor = AuraCyan)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                SectionLabel(text = "Gatilhos Executivos da Pista")
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 2x2 Triggers Grid
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    triggers.chunked(2).forEach { rowTriggers ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(IntrinsicSize.Max),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            rowTriggers.forEach { trigger ->
+                                ExecutiveCard(
+                                    trigger = trigger,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight(),
+                                    onClick = { onNavigateToChat(trigger.query) }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(26.dp))
+
+                SectionLabel(text = "Consultas Frequentes")
+                Spacer(modifier = Modifier.height(12.dp))
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 8.dp)
+                ) {
+                    items(chipPrompts) { prompt ->
+                        AuraChip(
+                            label = prompt,
+                            icon = Icons.Rounded.AutoAwesome,
+                            onClick = { onNavigateToChat(prompt) }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(28.dp))
+
+                // Main CTA AURA Button
+                AuraGradientButton(
+                    text = "Abrir AURA",
+                    onClick = { onNavigateToChat(null) },
+                    icon = Icons.AutoMirrored.Rounded.Chat,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+            }
         }
     }
 }
@@ -281,9 +307,10 @@ private fun ExecutiveCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    AuraCard(
+    SpatialGlassCard(
         modifier = modifier.defaultMinSize(minHeight = 170.dp),
         accent = trigger.accentColor,
+        iridescentBorder = true,
         onClick = onClick,
         contentPadding = PaddingValues(14.dp)
     ) {

@@ -70,3 +70,35 @@ val GlassBorderBrush: Brush = Brush.verticalGradient(
     listOf(GlassBorderStrong, GlassBorderSoft)
 )
 
+// Liquid Glassmorphism & Spatial UI Tokens
+val LiquidSpecularHighlight = Color(0x48FFFFFF)
+val AuraAmbientCyan = Color(0x1C22D3EE)
+val AuraAmbientPurple = Color(0x18A855F7)
+val AuraAmbientPetroleum = Color(0x150D9488)
+
+val LiquidGlassSurfaceBrush: Brush = Brush.verticalGradient(
+    listOf(ObsidianHigh.copy(alpha = 0.75f), ObsidianLow.copy(alpha = 0.90f))
+)
+
+val LiquidGlassElevatedBrush: Brush = Brush.verticalGradient(
+    listOf(ObsidianBright.copy(alpha = 0.82f), ObsidianMid.copy(alpha = 0.94f))
+)
+
+val LiquidIridescentBorderBrush: Brush = Brush.linearGradient(
+    colors = listOf(
+        AuraCyan.copy(alpha = 0.55f),
+        Color.White.copy(alpha = 0.25f),
+        AuraBrandPurple.copy(alpha = 0.45f),
+        AuraEmerald.copy(alpha = 0.35f)
+    )
+)
+
+val LiquidIridescentSubtleBrush: Brush = Brush.linearGradient(
+    colors = listOf(
+        AuraCyan.copy(alpha = 0.25f),
+        Color.White.copy(alpha = 0.12f),
+        AuraBrandPurple.copy(alpha = 0.20f)
+    )
+)
+
+

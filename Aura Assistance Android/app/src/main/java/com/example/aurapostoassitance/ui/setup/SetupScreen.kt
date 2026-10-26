@@ -54,6 +54,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.aurapostoassitance.ui.components.AuraAmbientBackground
 import com.example.aurapostoassitance.ui.components.AuraBrandTitle
 import com.example.aurapostoassitance.ui.components.AuraCard
 import com.example.aurapostoassitance.ui.components.AuraGhostButton
@@ -103,12 +104,12 @@ fun SetupScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(ObsidianBase)
-            .padding(horizontal = 24.dp)
-    ) {
+    AuraAmbientBackground {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp)
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -374,4 +375,5 @@ fun SetupScreen(
             Spacer(modifier = Modifier.height(36.dp))
         }
     }
+}
 }

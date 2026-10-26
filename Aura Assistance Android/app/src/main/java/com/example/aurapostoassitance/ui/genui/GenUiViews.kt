@@ -13,6 +13,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -99,6 +100,7 @@ import kotlin.math.sin
 fun GenUiCardView(
     card: GenUiCard,
     onAction: (GenUiAction) -> Unit,
+    onDrillDown: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var pending by remember { mutableStateOf<GenUiAction?>(null) }
@@ -118,7 +120,7 @@ fun GenUiCardView(
             CardHeader(card)
 
             card.blocks.forEachIndexed { index, block ->
-                Staggered(index) { BlockView(block) }
+                Staggered(index) { BlockView(block, onDrillDown) }
             }
 
             if (card.limitations.isNotEmpty()) {
@@ -248,14 +250,14 @@ private fun Staggered(index: Int, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun BlockView(block: GenUiBlock) {
+private fun BlockView(block: GenUiBlock, onDrillDown: (String) -> Unit) {
     when (block) {
-        is GenUiBlock.KpiGrid -> KpiGridBlock(block)
-        is GenUiBlock.Comparison -> ComparisonBlock(block)
-        is GenUiBlock.Ranking -> RankingBlock(block)
+        is GenUiBlock.KpiGrid -> KpiGridBlock(block, onDrillDown)
+        is GenUiBlock.Comparison -> ComparisonBlock(block, onDrillDown)
+        is GenUiBlock.Ranking -> RankingBlock(block, onDrillDown)
         is GenUiBlock.Timeline -> TimelineBlock(block)
         is GenUiBlock.AlertCallout -> AlertBlock(block.alert)
-        is GenUiBlock.Tanks -> TanksBlock(block)
+        is GenUiBlock.Tanks -> TanksBlock(block, onDrillDown)
         is GenUiBlock.Note -> NoteBlock(block)
     }
 }
@@ -272,7 +274,7 @@ private fun BlockTitle(title: String?, subtitle: String?) {
 // ---------------------------------------------------------------- KPIs
 
 @Composable
-private fun KpiGridBlock(block: GenUiBlock.KpiGrid) {
+private fun KpiGridBlock(block: GenUiBlock.KpiGrid, onDrillDown: (String) -> Unit) {
     Column {
         BlockTitle(block.title, block.subtitle)
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -283,7 +285,15 @@ private fun KpiGridBlock(block: GenUiBlock.KpiGrid) {
                         .height(IntrinsicSize.Max),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    pair.forEach { kpi -> KpiTile(kpi, Modifier.weight(1f).fillMaxHeight()) }
+                    pair.forEach { kpi ->
+                        KpiTile(
+                            kpi = kpi,
+                            onClick = {
+                                onDrillDown("Explique em detalhes o indicador '${kpi.label}' (${kpi.value}${kpi.delta?.let { " com variação $it" } ?: ""}) e sugira ações operacionais.")
+                            },
+                            modifier = Modifier.weight(1f).fillMaxHeight()
+                        )
+                    }
                     if (pair.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
@@ -292,13 +302,18 @@ private fun KpiGridBlock(block: GenUiBlock.KpiGrid) {
 }
 
 @Composable
-private fun KpiTile(kpi: GenUiKpi, modifier: Modifier = Modifier) {
+private fun KpiTile(kpi: GenUiKpi, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val haptic = LocalHapticFeedback.current
     val color = statusColor(kpi.status)
     Column(
         modifier
             .clip(RoundedCornerShape(16.dp))
             .background(ObsidianLow)
             .border(1.dp, GlassBorderSoft, RoundedCornerShape(16.dp))
+            .clickable {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -349,7 +364,8 @@ private fun KpiTile(kpi: GenUiKpi, modifier: Modifier = Modifier) {
 // ---------------------------------------------------------------- Comparativo
 
 @Composable
-private fun ComparisonBlock(block: GenUiBlock.Comparison) {
+private fun ComparisonBlock(block: GenUiBlock.Comparison, onDrillDown: (String) -> Unit) {
+    val haptic = LocalHapticFeedback.current
     Column {
         BlockTitle(block.title, block.subtitle)
         Column(
@@ -362,6 +378,10 @@ private fun ComparisonBlock(block: GenUiBlock.Comparison) {
                 Row(
                     Modifier
                         .fillMaxWidth()
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onDrillDown("Analise a discrepância no comparativo '${row.name}': Nosso (${row.primary}) vs Mercado (${row.secondary})${row.gap?.let { " com gap de $it" } ?: ""}. O que a AURA recomenda?")
+                        }
                         .padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -389,7 +409,8 @@ private fun ComparisonBlock(block: GenUiBlock.Comparison) {
 // ---------------------------------------------------------------- Ranking
 
 @Composable
-private fun RankingBlock(block: GenUiBlock.Ranking) {
+private fun RankingBlock(block: GenUiBlock.Ranking, onDrillDown: (String) -> Unit) {
+    val haptic = LocalHapticFeedback.current
     Column {
         BlockTitle(block.title, block.subtitle)
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -400,6 +421,10 @@ private fun RankingBlock(block: GenUiBlock.Ranking) {
                         .clip(RoundedCornerShape(14.dp))
                         .background(ObsidianLow)
                         .border(1.dp, GlassBorderSoft, RoundedCornerShape(14.dp))
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onDrillDown("Detalhe o desempenho de '${item.title}' (Posição #${item.rank}, Total: ${item.value}) no ranking da pista.")
+                        }
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -516,15 +541,30 @@ private fun NoteBlock(block: GenUiBlock.Note) {
 // ---------------------------------------------------------------- Tanques Verticais Deluxe
 
 @Composable
-private fun TanksBlock(block: GenUiBlock.Tanks) {
+private fun TanksBlock(block: GenUiBlock.Tanks, onDrillDown: (String) -> Unit) {
+    var inspectingTank by remember { mutableStateOf<GenUiTank?>(null) }
+
     Column {
-        BlockTitle(block.title, if (block.hiddenInactive > 0) "${block.hiddenInactive} tanques inativos ocultos" else null)
+        BlockTitle(
+            block.title,
+            if (block.hiddenInactive > 0) "${block.hiddenInactive} tanques inativos ocultos" else "Toque para inspecionar lastro e autonomia"
+        )
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp)
         ) {
-            items(block.tanks, key = { it.code + it.fuel }) { TankTile(it) }
+            items(block.tanks, key = { it.code + it.fuel }) { tank ->
+                TankTile(tank = tank, onClick = { inspectingTank = tank })
+            }
         }
+    }
+
+    inspectingTank?.let { tank ->
+        TankDetailModal(
+            tank = tank,
+            onDismiss = { inspectingTank = null },
+            onDrillDown = onDrillDown
+        )
     }
 }
 
@@ -537,7 +577,8 @@ private fun fuelColor(fuel: String): Color = when {
 }
 
 @Composable
-private fun TankTile(tank: GenUiTank) {
+private fun TankTile(tank: GenUiTank, onClick: () -> Unit) {
+    val haptic = LocalHapticFeedback.current
     val target = (tank.occupancyPct / 100.0).coerceIn(0.0, 1.0).toFloat()
     val fill by animateFloatAsState(
         targetValue = target,
@@ -565,6 +606,10 @@ private fun TankTile(tank: GenUiTank) {
                 if (tank.critical) StatusDanger.copy(alpha = 0.5f) else GlassBorderSoft,
                 RoundedCornerShape(18.dp)
             )
+            .clickable {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
             .padding(14.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -721,6 +766,164 @@ private fun TankTile(tank: GenUiTank) {
                     color = if (tank.critical) StatusDanger else TextMuted
                 )
             }
+            Text(
+                text = "Inspecionar detalhes →",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                color = AuraCyan.copy(alpha = 0.85f),
+                modifier = Modifier.padding(top = 2.dp)
+            )
         }
     }
 }
+
+/**
+ * Modal executivo de telemetria e ações do Tanque (GenUI 2.0 Interativo)
+ */
+@Composable
+private fun TankDetailModal(
+    tank: GenUiTank,
+    onDismiss: () -> Unit,
+    onDrillDown: (String) -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    val color = if (tank.critical) StatusDanger else fuelColor(tank.fuel)
+    val freeL = maxOf(0.0, tank.capacityL - tank.balanceL)
+    val comp5k = (freeL / 5000.0).toInt()
+
+    Dialog(onDismissRequest = onDismiss) {
+        AuraCard(
+            shape = RoundedCornerShape(26.dp),
+            accent = color,
+            glowActive = tank.critical,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(20.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Header: Tank and Fuel Info
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        StatusDot(color = color, pulsing = tank.critical, size = 8.dp)
+                        Text(
+                            text = "Tanque ${tank.code}",
+                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                            color = TextPrimary
+                        )
+                    }
+                    if (tank.critical) {
+                        AuraPill("NÍVEL CRÍTICO", StatusDanger)
+                    } else {
+                        AuraPill("${"%.0f".format(tank.occupancyPct)}% OCUPADO", color)
+                    }
+                }
+
+                Text(
+                    text = tank.fuel,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = color
+                )
+
+                // Grid 2x2 com métricas operacionais
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(ObsidianMid)
+                        .padding(14.dp)
+                ) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column {
+                            Text("Saldo Físico Atual", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                            Text("${GenUiParser.fmtNumber(tank.balanceL)} L", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Capacidade Nominal", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                            Text("${GenUiParser.fmtNumber(tank.capacityL)} L", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                        }
+                    }
+
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(OutlineSoft.copy(alpha = 0.5f)))
+
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column {
+                            Text("Lastro Livre (Descarga)", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                            Text("${GenUiParser.fmtNumber(freeL)} L", style = MaterialTheme.typography.titleMedium, color = AuraEmerald)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Caminhão-Tanque", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                            Text(
+                                if (comp5k > 0) "Cabe $comp5k comp. (5k L)" else "Sem lastro para 5k L",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = if (comp5k > 0) AuraCyan else TextMuted
+                            )
+                        }
+                    }
+
+                    tank.autonomyHours?.let { hours ->
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(OutlineSoft.copy(alpha = 0.5f)))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Autonomia Operacional Estimada", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                            Text(
+                                "${"%.1f".format(hours)} horas",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = if (tank.critical) StatusDanger else TextPrimary
+                            )
+                        }
+                    }
+                }
+
+                // Ações Rápidas Cognitivas (Drill-Down 1-tap)
+                SectionLabel("AÇÕES DE CONTEXTO AURA")
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (comp5k > 0) {
+                        AuraGradientButton(
+                            text = "Simular Pedido (${comp5k * 5000} L)",
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onDismiss()
+                                onDrillDown("Simular pedido de compra para o Tanque ${tank.code} (${tank.fuel}) aproveitando o espaço livre para ${comp5k * 5000} L (em compartimentos de 5.000 L).")
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    AuraGhostButton(
+                        text = "Auditar Medição ANP e Variação",
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onDismiss()
+                            onDrillDown("Auditar histórico de perdas, sobras e conformidade LMC/ANP do Tanque ${tank.code} (${tank.fuel}).")
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    AuraGhostButton(
+                        text = "Previsão de Esgotamento por Turno",
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onDismiss()
+                            onDrillDown("Qual a vazão média horária e a previsão de esgotamento por turno para o Tanque ${tank.code} (${tank.fuel})?")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        tint = TextSecondary
+                    )
+                }
+
+                AuraGhostButton(
+                    text = "Fechar",
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    tint = TextMuted
+                )
+            }
+        }
+    }
+}
+

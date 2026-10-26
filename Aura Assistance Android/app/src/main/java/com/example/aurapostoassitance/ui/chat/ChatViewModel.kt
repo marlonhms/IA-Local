@@ -2,6 +2,7 @@ package com.example.aurapostoassitance.ui.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.aurapostoassitance.data.audio.AuraVoiceManager
 import com.example.aurapostoassitance.data.local.ChatDao
 import com.example.aurapostoassitance.data.local.ChatMessageEntity
 import com.example.aurapostoassitance.data.local.ChatSessionEntity
@@ -15,6 +16,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import javax.inject.Inject
@@ -25,14 +31,24 @@ data class ChatMessage(
     val isFromUser: Boolean,
     val isStreaming: Boolean = false,
     /** Envelope GenUI (JSON) para renderizar card nativo abaixo do texto. */
-    val envelopeJson: String? = null
+    val envelopeJson: String? = null,
+    /** Trilha cronológica das etapas e ferramentas consultadas pela IA. */
+    val reasoningSteps: List<String> = emptyList()
 )
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val sseRepository: SseRepository,
-    private val chatDao: ChatDao
+    private val chatDao: ChatDao,
+    private val voiceManager: AuraVoiceManager
 ) : ViewModel() {
+
+    // --- Fluxos de Voz e Fala Hands-Free ---
+    val isListening: StateFlow<Boolean> = voiceManager.isListening
+    val spokenText: StateFlow<String> = voiceManager.spokenText
+    val voiceRms: StateFlow<Float> = voiceManager.voiceRms
+    val isSpeaking: StateFlow<Boolean> = voiceManager.isSpeaking
+    val speakingMessageId: StateFlow<String?> = voiceManager.speakingMessageId
 
     private val _currentSessionId = MutableStateFlow("default")
     val currentSessionId: StateFlow<String> = _currentSessionId.asStateFlow()
@@ -53,6 +69,7 @@ class ChatViewModel @Inject constructor(
     val auraStatusMessage: StateFlow<String?> = _auraStatusMessage.asStateFlow()
 
     private var messageCollectJob: Job? = null
+    private var streamJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -74,8 +91,19 @@ class ChatViewModel @Inject constructor(
         messageCollectJob?.cancel()
         messageCollectJob = viewModelScope.launch {
             chatDao.getMessagesForSession(sessionId).collect { entities ->
-                _messages.value = entities.map {
-                    ChatMessage(it.id, it.text, it.isFromUser, false, it.envelopeJson)
+                val roomList = entities.map {
+                    val steps = it.reasoningJson?.let { raw ->
+                        runCatching {
+                            Json.parseToJsonElement(raw).jsonArray.map { elem -> elem.jsonPrimitive.content }
+                        }.getOrNull()
+                    } ?: emptyList()
+                    ChatMessage(it.id, it.text, it.isFromUser, false, it.envelopeJson, steps)
+                }
+                val activeStreaming = _messages.value.firstOrNull { it.isStreaming }
+                _messages.value = if (activeStreaming != null && roomList.none { it.id == activeStreaming.id }) {
+                    roomList + activeStreaming
+                } else {
+                    roomList
                 }
             }
         }
@@ -127,29 +155,39 @@ class ChatViewModel @Inject constructor(
             )
         }
 
+        streamJob?.cancel()
+
         val auraMessageId = "aura_" + System.currentTimeMillis().toString()
-        _messages.value = _messages.value + ChatMessage(
+        val streamingMessage = ChatMessage(
             id = auraMessageId,
             text = "",
             isFromUser = false,
-            isStreaming = true
+            isStreaming = true,
+            reasoningSteps = emptyList()
         )
+        // Adiciona imediatamente tanto a mensagem do usuario quanto o orbe de resposta da AURA
+        _messages.value = _messages.value + userMessage + streamingMessage
         _isAuraTyping.value = true
         _auraStatusMessage.value = "Conectando à AURA..."
 
-        viewModelScope.launch {
+        streamJob = viewModelScope.launch {
             var currentAuraText = ""
             var currentEnvelope: String? = null
+            val reasoningSteps = mutableListOf<String>()
 
             suspend fun persist(text: String) {
                 if (text.isBlank() && currentEnvelope == null) return
+                val reasoningJson = if (reasoningSteps.isNotEmpty()) {
+                    buildJsonArray { reasoningSteps.forEach { add(JsonPrimitive(it)) } }.toString()
+                } else null
                 chatDao.insertMessage(
                     ChatMessageEntity(
                         id = auraMessageId,
                         sessionId = activeSessionId,
                         text = text,
                         isFromUser = false,
-                        envelopeJson = currentEnvelope
+                        envelopeJson = currentEnvelope,
+                        reasoningJson = reasoningJson
                     )
                 )
             }
@@ -162,14 +200,14 @@ class ChatViewModel @Inject constructor(
                         else -> "Erro de conexão com a AURA: ${e.message}"
                     }
                     val finalErrorText = if (currentAuraText.isBlank()) errorMessage else currentAuraText + "\n\n" + errorMessage
-                    updateAuraMessage(auraMessageId, finalErrorText, false, currentEnvelope)
+                    updateAuraMessage(auraMessageId, finalErrorText, false, currentEnvelope, reasoningSteps.toList())
                     _isAuraTyping.value = false
                     _auraStatusMessage.value = null
                     persist(finalErrorText)
                 }
                 .onCompletion {
                     if (_isAuraTyping.value) {
-                        updateAuraMessage(auraMessageId, currentAuraText, false, currentEnvelope)
+                        updateAuraMessage(auraMessageId, currentAuraText, false, currentEnvelope, reasoningSteps.toList())
                         _isAuraTyping.value = false
                         _auraStatusMessage.value = null
                         persist(currentAuraText)
@@ -177,24 +215,31 @@ class ChatViewModel @Inject constructor(
                 }
                 .collect { event ->
                     when (event) {
-                        is SseEvent.StatusUpdate -> _auraStatusMessage.value = sanitizeStatusMessage(event.statusMessage)
+                        is SseEvent.StatusUpdate -> {
+                            val sanitized = sanitizeStatusMessage(event.statusMessage)
+                            _auraStatusMessage.value = sanitized
+                            if (sanitized.isNotBlank() && (reasoningSteps.isEmpty() || reasoningSteps.last() != sanitized)) {
+                                reasoningSteps.add(sanitized)
+                                updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList())
+                            }
+                        }
                         is SseEvent.TextDelta -> {
                             currentAuraText += event.text
-                            updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope)
+                            updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList())
                         }
                         is SseEvent.UiComplete -> {
                             currentEnvelope = event.envelopeJson
-                            updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope)
+                            updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList())
                         }
                         is SseEvent.Error -> {
                             val finalErrorText = currentAuraText + "\n\n" + event.message
-                            updateAuraMessage(auraMessageId, finalErrorText, false, currentEnvelope)
+                            updateAuraMessage(auraMessageId, finalErrorText, false, currentEnvelope, reasoningSteps.toList())
                             _isAuraTyping.value = false
                             _auraStatusMessage.value = null
                             persist(finalErrorText)
                         }
                         is SseEvent.Done -> {
-                            updateAuraMessage(auraMessageId, currentAuraText, false, currentEnvelope)
+                            updateAuraMessage(auraMessageId, currentAuraText, false, currentEnvelope, reasoningSteps.toList())
                             _isAuraTyping.value = false
                             _auraStatusMessage.value = null
                             persist(currentAuraText)
@@ -226,16 +271,70 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun updateAuraMessage(id: String, newText: String, isStreaming: Boolean, envelopeJson: String?) {
+    private fun updateAuraMessage(
+        id: String,
+        newText: String,
+        isStreaming: Boolean,
+        envelopeJson: String?,
+        reasoningSteps: List<String> = emptyList()
+    ) {
         val currentList = _messages.value.toMutableList()
         val index = currentList.indexOfFirst { it.id == id }
         if (index != -1) {
-            currentList[index] = currentList[index].copy(
+            val existing = currentList[index]
+            currentList[index] = existing.copy(
                 text = newText,
                 isStreaming = isStreaming,
-                envelopeJson = envelopeJson
+                envelopeJson = envelopeJson,
+                reasoningSteps = if (reasoningSteps.isNotEmpty()) reasoningSteps else existing.reasoningSteps
+            )
+            _messages.value = currentList
+        } else {
+            currentList.add(
+                ChatMessage(
+                    id = id,
+                    text = newText,
+                    isFromUser = false,
+                    isStreaming = isStreaming,
+                    envelopeJson = envelopeJson,
+                    reasoningSteps = reasoningSteps
+                )
             )
             _messages.value = currentList
         }
+    }
+
+    // --- Ações de Voz Push-to-Talk & TTS ---
+
+    fun startVoiceListening() {
+        voiceManager.startListening { _ -> }
+    }
+
+    fun sendVoiceQuery(query: String) {
+        voiceManager.finishVoiceSession()
+        if (query.isNotBlank()) {
+            sendMessage(query)
+        }
+    }
+
+    fun stopVoiceListening() {
+        voiceManager.stopListening()
+    }
+
+    fun cancelVoiceListening() {
+        voiceManager.finishVoiceSession()
+    }
+
+    fun toggleSpeech(messageId: String, text: String) {
+        voiceManager.speak(messageId, text)
+    }
+
+    fun stopSpeech() {
+        voiceManager.stopSpeaking()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        voiceManager.release()
     }
 }

@@ -112,6 +112,9 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         navController.navigate("chat")
                                     }
+                                },
+                                onNavigateToSetup = {
+                                    navController.navigate("setup")
                                 }
                             )
                         }

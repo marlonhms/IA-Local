@@ -34,8 +34,8 @@ backups/*
 *.db
 *.sqlite
 *.sqlite3
-data/
-data/*
+/data/
+/data/*
 
 # Logs e arquivos temporários
 *.log
