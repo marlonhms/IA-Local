@@ -500,11 +500,12 @@ class TestFrontendOfflineFirst:
         generated_html = build_showcase_page.generate_showcase_html()
         assert generated_html == content, "scripts/build_showcase_page.py e web/showcase.html nao estao perfeitamente sincronizados"
 
-        # Headline Executiva com foco em Inteligencia de Gestao e degrade azul na palavra AURA
-        assert "from-cyan-400 via-sky-300 to-blue-500 bg-clip-text text-transparent\">AURA</span>" in content
-        assert "transforme os dados que sua empresa já gera em" in content
+        # Headline Executiva Deluxe com foco em Inteligencia de Gestao e degrade AURA sem repeticao
+        assert "from-cyan-400 via-sky-300 to-purple-400 bg-clip-text text-transparent" in content
+        assert "AURA</span> transforma os dados que sua empresa já gera em" in content
         assert "lucro recuperado" in content
         assert "todos os dias." in content
+        assert "Acompanhe sua operação em tempo real" in content
         assert "perda de combustível" not in content
         assert "multas da ANP" not in content
         for erp_brand in ("WebPosto", "Linx", "Totvs", "Sankhya", "Alterdata"):
