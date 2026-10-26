@@ -47,6 +47,8 @@ from core.partner_api import (
     _scrub_pii_from_record,
     validate_physical_invariants,
     SECURITY_BLOCKED_MESSAGE,
+    audit_pos_and_cashier_anomalies,
+    generate_morning_briefing_payload,
 )
 
 
@@ -1370,6 +1372,175 @@ def test_physical_invariants_strict_rejection(client):
     )
     assert resp.status_code == 422
     assert "Invariante fisica violada" in resp.json()["detail"]
+
+
+# =============================================================================
+# 10. TESTES DO MODULO 4: RADAR DE ANOMALIAS PDV (Z-SCORE), CLT E ZERO-CLICK
+# =============================================================================
+
+@pytest.mark.unit
+def test_pos_audit_requires_auth(client):
+    """Garante 401 ao chamar /pos-audit sem autenticacao valida."""
+    resp = client.get("/api/v1/partner/stations/posto_01/pos-audit")
+    assert resp.status_code == 401
+    assert "Autenticacao de parceiro necessaria" in resp.json()["detail"]
+
+
+@pytest.mark.unit
+def test_pos_audit_baseline_empty(client, isolated_staging_store):
+    """Valida auditoria de PDV em estacao vazia com checklist de conformidade CLT."""
+    resp = client.get(
+        "/api/v1/partner/stations/posto_pos_vazio/pos-audit",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["station_id"] == "posto_pos_vazio"
+    assert data["anomalous_operators_count"] == 0
+    assert "clt_compliance_checklist" in data
+
+    clt = data["clt_compliance_checklist"]
+    assert "Art. 462 CLT" in clt["legal_basis"]
+    assert len(clt["mandatory_requirements_for_deduction"]) == 3
+    assert clt["terminology_policy"] == "STRICT_ACCOUNTING_STATISTICAL_ONLY"
+
+    # Garantia de ausencia de termos acusatorios
+    dump_str = json.dumps(data).lower()
+    for forbidden in ["furto", "roubo", "fraude", "apropriacao"]:
+        assert forbidden not in dump_str, f"Termo proibido encontrado: {forbidden}"
+
+
+@pytest.mark.unit
+def test_pos_audit_with_zscore_and_shift_discrepancy(client, isolated_staging_store):
+    """Valida calculo estatistico de Z-Score por operador e divergencia contabil de caixa."""
+    station = "posto_pos_auditado"
+
+    # Pedidos com 3 operadores
+    # OP_A: 20 normais, 1 cancelado (4.76%)
+    # OP_B: 20 normais, 1 cancelado (4.76%)
+    # OP_C: 10 normais, 6 cancelados (37.5% - anomalia estatistica evidente)
+    pedidos: list[dict[str, Any]] = []
+    for i in range(20):
+        pedidos.append({"pedido": f"A{i}", "vendedor": "OP_A", "total": 100.0, "situ": "N"})
+    pedidos.append({"pedido": "A_CANC", "vendedor": "OP_A", "total": 100.0, "situ": "C"})
+
+    for i in range(20):
+        pedidos.append({"pedido": f"B{i}", "vendedor": "OP_B", "total": 100.0, "situ": "N"})
+    pedidos.append({"pedido": "B_CANC", "vendedor": "OP_B", "total": 100.0, "situ": "C"})
+
+    for i in range(10):
+        pedidos.append({"pedido": f"C{i}", "vendedor": "OP_C", "total": 150.0, "situ": "N"})
+    for i in range(6):
+        pedidos.append({"pedido": f"C_CANC{i}", "vendedor": "OP_C", "total": 150.0, "situ": "C"})
+
+    payload = {
+        "pedido": pedidos,
+        "fechabomba": [{"enclts": "5000", "encltsa": "1000", "encdinh": "25000.00"}],
+        "fechacaixa": [{"valtot": "23200.00", "valrefcai": "0.00"}],
+    }
+
+    sync_resp = client.post(
+        f"/api/v1/partner/stations/{station}/raw-sync",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY},
+        json=payload,
+    )
+    assert sync_resp.status_code == 200
+
+    audit_resp = client.get(
+        f"/api/v1/partner/stations/{station}/pos-audit",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY},
+    )
+    assert audit_resp.status_code == 200
+    res = audit_resp.json()
+
+    assert res["total_operators_analyzed"] == 3
+    assert res["anomalous_operators_count"] == 1
+
+    ops = {op["operator_id"]: op for op in res["operators_analysis"]}
+    assert ops["OP_A"]["is_anomaly"] is False
+    assert ops["OP_B"]["is_anomaly"] is False
+    assert ops["OP_C"]["is_anomaly"] is True
+    assert ops["OP_C"]["z_score"] >= 1.0
+    assert "Desvio estatistico de cancelamentos" in ops["OP_C"]["audit_note"]
+
+    # Validacao de divergencia de fechamento de turno
+    shift = res["cashier_shift_audit"]
+    assert shift["status"] == "DIVERGENCIA_PENDENTE"
+    assert shift["discrepancy_brl"] == 1800.00
+    assert "Divergencia fisica/financeira nao conciliada" in shift["audit_note"]
+
+    # Termos acusatorios estritamente ausentes
+    dump_str = json.dumps(res).lower()
+    for forbidden in ["furto", "roubo", "fraude", "apropriacao"]:
+        assert forbidden not in dump_str
+
+
+@pytest.mark.unit
+def test_zero_click_briefing_endpoint(client, isolated_staging_store):
+    """Valida payload do Briefing Matinal zero-click com formatacao WhatsApp e recomendacao de compra."""
+    station = "posto_briefing_test"
+    payload = {
+        "tanques": [
+            {
+                "tanque": "1",
+                "prl_ds_produto_lmc": "Gasolina Comum",
+                "volume": 3500.0,
+                "capacidade": 20000.0,
+            },
+            {
+                "tanque": "2",
+                "prl_ds_produto_lmc": "Diesel S10",
+                "volume": 16000.0,
+                "capacidade": 20000.0,
+            },
+        ],
+        "fechabomba": [
+            {
+                "enclts": 8000.0,
+                "encltsa": 3000.0,
+                "qtdeaf": 0.0,
+                "preco": 5.95,
+            }
+        ],
+        "pedido": [
+            {"pedido": "PED1", "total": 29750.00, "situ": "N"}
+        ]
+    }
+
+    sync_resp = client.post(
+        f"/api/v1/partner/stations/{station}/raw-sync",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY},
+        json=payload,
+    )
+    assert sync_resp.status_code == 200
+
+    briefing_resp = client.get(
+        f"/api/v1/partner/stations/{station}/zero-click-briefing",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY},
+    )
+    assert briefing_resp.status_code == 200
+    data = briefing_resp.json()
+
+    assert data["station_id"] == station
+    assert data["sales_summary_24h"]["total_turnover_brl"] == 29750.00
+    assert data["sales_summary_24h"]["total_liters"] == 5000.00
+    assert data["lmc_compliance"]["anp_compliant"] is True
+
+    crit = data["tank_critical_runout"]
+    assert crit["tank_id"] == "1"
+    assert crit["occupancy_pct"] == 17.5
+    assert crit["recommended_order_compartments"] >= 3
+
+    # Formatacao WhatsApp sem travessoes
+    wa_text = data["whatsapp_formatted_text"]
+    assert station in wa_text
+    assert "Briefing Executivo Matinal" in wa_text
+    assert chr(0x2014) not in wa_text and chr(0x2013) not in wa_text
+
+    # Acoes rapidas
+    assert len(data["quick_actions"]) == 3
+    assert "Aprovar Pedido Combustivel" in data["quick_actions"]
 
 # =============================================================================
 # 6. CONFORMIDADE: ZERO TRAVESSOES
