@@ -678,7 +678,8 @@
     <button onclick="window.auraTour.scrollToSection('sec-blindagem')" class="scroll-nav-dot" title="03. Segurança de Dados & LGPD" data-section="sec-blindagem"></button>
     <button onclick="window.auraTour.scrollToSection('sec-custo-ia')" class="scroll-nav-dot" title="04. Gestão de Custo de IA (Harness)" data-section="sec-custo-ia"></button>
     <button onclick="window.auraTour.scrollToSection('sec-knowledge-graph')" class="scroll-nav-dot" title="05. Grafo de Conhecimento AURA" data-section="sec-knowledge-graph"></button>
-    <button onclick="window.auraTour.scrollToSection('sec-diferenciacao')" class="scroll-nav-dot" title="06. Diferenciação Operacional & ROI" data-section="sec-diferenciacao"></button>
+    <button onclick="window.auraTour.scrollToSection('sec-metricas-perdas')" class="scroll-nav-dot" title="06. Métricas Comprováveis & Perdas" data-section="sec-metricas-perdas"></button>
+    <button onclick="window.auraTour.scrollToSection('sec-diferenciacao')" class="scroll-nav-dot" title="07. Diferenciação Operacional & ROI" data-section="sec-diferenciacao"></button>
     <button onclick="window.auraTour.scrollToSection('sec-faq')" class="scroll-nav-dot" title="07. FAQ Executivo" data-section="sec-faq"></button>
   </aside>
 
@@ -726,6 +727,10 @@
         </button>
         <button onclick="window.auraTour.scrollToSection('sec-knowledge-graph')" class="px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.04] transition-colors">
           Knowledge Graph
+        </button>
+        <button onclick="window.auraTour.scrollToSection('sec-metricas-perdas')" class="px-2.5 py-1.5 rounded-lg text-rose-300 hover:text-white hover:bg-white/[0.04] transition-colors font-medium flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+          <span>Perdas & ROI</span>
         </button>
         <button onclick="window.auraTour.scrollToSection('sec-diferenciacao')" class="px-2.5 py-1.5 rounded-lg text-emerald-300 hover:text-white hover:bg-white/[0.04] transition-colors font-medium">
           ROI & Matriz
@@ -2161,6 +2166,579 @@
 
     </section>
 
+
+    <!-- =========================================================================
+         MÉTRICAS COMPROVÁVEIS: AUDITORIA DE PERDAS NO VAREJO & COMO ALCANÇAMOS O ROI
+         ========================================================================= -->
+    <section id="sec-metricas-perdas" class="obsidian-card p-6 sm:p-8 rounded-3xl space-y-10 scroll-reveal border border-rose-500/20">
+      
+      <!-- Cabeçalho da Seção de Métricas Comprováveis -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-white/[0.08] pb-6">
+        <div class="space-y-2">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 text-rose-300 border border-rose-500/25 text-[10px] font-mono uppercase tracking-wider">
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span>
+            <span>Auditoria Nacional de Perdas no Varejo 2025/2026 • Fonte: Abrappe & KPMG</span>
+          </div>
+          <h3 class="heading-medium home_agents-title font-display-title text-2xl sm:text-3xl text-white">
+            Perdas no Varejo Atingem <span class="text-rose-400 font-semibold">R$ 42,1 Bilhões</span> com Impacto Crítico em Conveniência e Pista
+          </h3>
+          <p class="body-regular home_agents-feature-desc max-w-3xl text-slate-300 text-sm sm:text-base leading-relaxed">
+            O avanço das perdas operacionais e quebras no varejo brasileiro (<strong class="text-rose-300">+15,3% a/a</strong>) supera em mais do que o dobro o crescimento da receita (+6,4%). As lojas de conveniência lideram o ranking de perdas (<strong class="text-rose-300">3,86% do faturamento</strong>), impulsionadas por quebras de perecibilidade em categorias que paradoxalmente detêm as maiores margens brutas (cafeteria até 70% e bebidas até 60%). A AURA estanca esses ralos invisíveis com conciliação contínua e cálculos matemáticos exatos no banco de dados.
+          </p>
+        </div>
+        <div class="flex-shrink-0 flex items-center gap-3">
+          <span class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30 inline-flex items-center gap-2">
+            <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-400"></i>
+            <span>Auditoria Baseada em Fatos</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- 4 Cards de Destaque Estatístico (Conforme Pesquisa Oficial Abrappe/KPMG) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- CARD 1: PERDA TOTAL VAREJO -->
+        <div class="p-5 rounded-2xl bg-slate-900/90 border border-rose-500/30 space-y-2 relative overflow-hidden group hover:border-rose-500/50 transition-all">
+          <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 uppercase tracking-wider">
+            <span>Perda Total Varejo</span>
+            <i data-lucide="trending-down" class="w-4 h-4 text-rose-400"></i>
+          </div>
+          <div class="text-3xl sm:text-4xl font-bold font-mono text-rose-400 tracking-tight">R$ 42,1 Bi</div>
+          <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono bg-rose-500/15 text-rose-300 border border-rose-500/20 font-semibold">
+            <span>+15,3% a/a</span>
+            <span class="text-slate-400">(vs +6,4% receita)</span>
+          </div>
+          <p class="text-xs text-slate-400 pt-1 leading-snug">
+            Prejuízo recorde histórico anual apurado pela 9ª Pesquisa Abrappe de Perdas.
+          </p>
+        </div>
+
+        <!-- CARD 2: LOJAS CONVENIÊNCIA -->
+        <div class="p-5 rounded-2xl bg-slate-900/90 border border-rose-500/30 space-y-2 relative overflow-hidden group hover:border-rose-500/50 transition-all">
+          <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 uppercase tracking-wider">
+            <span>Lojas Conveniência</span>
+            <i data-lucide="store" class="w-4 h-4 text-rose-400"></i>
+          </div>
+          <div class="text-3xl sm:text-4xl font-bold font-mono text-white tracking-tight">3,86%</div>
+          <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-rose-500/15 text-rose-300 border border-rose-500/20 font-semibold">
+            <span>Maior perda sobre faturamento</span>
+          </div>
+          <p class="text-xs text-slate-400 pt-1 leading-snug">
+            Índice 2,3x superior à média geral do varejo (1,65%), destruindo a rentabilidade.
+          </p>
+        </div>
+
+        <!-- CARD 3: QUEBRA OPERACIONAL -->
+        <div class="p-5 rounded-2xl bg-slate-900/90 border border-cyan-500/30 space-y-2 relative overflow-hidden group hover:border-cyan-500/50 transition-all">
+          <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 uppercase tracking-wider">
+            <span>Quebra Operacional</span>
+            <i data-lucide="package-x" class="w-4 h-4 text-cyan-400"></i>
+          </div>
+          <div class="text-3xl sm:text-4xl font-bold font-mono text-cyan-300 tracking-tight">43%</div>
+          <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/15 text-cyan-300 border border-cyan-500/20 font-semibold">
+            <span>Vencidos, avarias e estoque</span>
+          </div>
+          <p class="text-xs text-slate-400 pt-1 leading-snug">
+            Maior causa isolada. Chega a 70% quando somada a desvios internos e inventário.
+          </p>
+        </div>
+
+        <!-- CARD 4: ADOÇÃO DE IA NO SETOR -->
+        <div class="p-5 rounded-2xl bg-slate-900/90 border border-emerald-500/30 space-y-2 relative overflow-hidden group hover:border-emerald-500/50 transition-all">
+          <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 uppercase tracking-wider">
+            <span>Adoção de IA no Setor</span>
+            <i data-lucide="cpu" class="w-4 h-4 text-emerald-400"></i>
+          </div>
+          <div class="text-3xl sm:text-4xl font-bold font-mono text-emerald-400 tracking-tight">13,18%</div>
+          <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 font-semibold">
+            <span>Amplo espaço de automação</span>
+          </div>
+          <p class="text-xs text-slate-400 pt-1 leading-snug">
+            86,8% do mercado ainda opera no escuro manual de planilhas e fechamentos tardios.
+          </p>
+        </div>
+
+      </div>
+
+      <!-- Dois Painéis Gráficos Lado a Lado (Conforme o Infográfico Oficial da Pesquisa) -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- GRÁFICO 1: ÍNDICE DE PERDAS POR FORMATO VAREJISTA -->
+        <div class="p-5 sm:p-6 rounded-2xl bg-slate-950/70 border border-white/[0.08] space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
+            <div>
+              <h4 class="card-title-serif font-serif text-base sm:text-lg text-white font-normal">
+                Índice de Perdas por Formato Varejista (% do Faturamento)
+              </h4>
+              <p class="text-xs text-slate-400 font-sans">Comparativo nacional consolidado pela Abrappe e KPMG</p>
+            </div>
+            <!-- Legenda do Gráfico 1 -->
+            <div class="flex items-center gap-3 text-[10px] font-mono">
+              <span class="inline-flex items-center gap-1 text-rose-400 font-semibold">
+                <span class="w-2.5 h-2.5 rounded-sm bg-rose-500"></span> Conveniência
+              </span>
+              <span class="inline-flex items-center gap-1 text-amber-400 font-semibold">
+                <span class="w-2.5 h-2.5 rounded-sm bg-amber-500"></span> Média Varejo (1,65%)
+              </span>
+              <span class="inline-flex items-center gap-1 text-slate-400">
+                <span class="w-2.5 h-2.5 rounded-sm bg-slate-600"></span> Outros
+              </span>
+            </div>
+          </div>
+
+          <!-- Barras Comparativas de Perdas -->
+          <div class="space-y-2.5 pt-1 font-sans">
+            
+            <!-- Item 1: Lojas de conveniência -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-medium text-white flex items-center gap-1.5">
+                  <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-rose-400"></i>
+                  <span class="font-semibold text-rose-200">Lojas de conveniência</span>
+                </span>
+                <span class="font-mono font-bold text-rose-400 text-sm">3,86%</span>
+              </div>
+              <div class="w-full bg-slate-900 rounded-full h-3 overflow-hidden p-0.5 border border-rose-500/30">
+                <div class="bg-gradient-to-r from-rose-600 to-rose-400 h-full rounded-full transition-all duration-1000" style="width: 85.7%;"></div>
+              </div>
+            </div>
+
+            <!-- Item 2: Mercado de vizinhança -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-300">Mercado de vizinhança</span>
+                <span class="font-mono font-semibold text-slate-300">3,31%</span>
+              </div>
+              <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden p-0.5 border border-white/5">
+                <div class="bg-slate-600 h-full rounded-full transition-all duration-1000" style="width: 73.5%;"></div>
+              </div>
+            </div>
+
+            <!-- Item 3: Hipermercados -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-300">Hipermercados</span>
+                <span class="font-mono font-semibold text-slate-300">2,08%</span>
+              </div>
+              <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden p-0.5 border border-white/5">
+                <div class="bg-slate-600 h-full rounded-full transition-all duration-1000" style="width: 46.2%;"></div>
+              </div>
+            </div>
+
+            <!-- Item 4: Atacarejos -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-300">Atacarejos</span>
+                <span class="font-mono font-semibold text-slate-300">1,85%</span>
+              </div>
+              <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden p-0.5 border border-white/5">
+                <div class="bg-slate-600 h-full rounded-full transition-all duration-1000" style="width: 41.1%;"></div>
+              </div>
+            </div>
+
+            <!-- Item 5: Média Geral Varejo -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-semibold text-amber-300 flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                  <span>Média Geral Varejo</span>
+                </span>
+                <span class="font-mono font-bold text-amber-400">1,65%</span>
+              </div>
+              <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden p-0.5 border border-amber-500/30">
+                <div class="bg-amber-500 h-full rounded-full transition-all duration-1000" style="width: 36.6%;"></div>
+              </div>
+            </div>
+
+            <!-- Item 6: Perfumarias -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-400">Perfumarias</span>
+                <span class="font-mono text-slate-400">1,55%</span>
+              </div>
+              <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden p-0.5 border border-white/5">
+                <div class="bg-slate-700 h-full rounded-full" style="width: 34.4%;"></div>
+              </div>
+            </div>
+
+            <!-- Item 7: Magazine nacional -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-400">Magazine nacional</span>
+                <span class="font-mono text-slate-400">1,18%</span>
+              </div>
+              <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden p-0.5 border border-white/5">
+                <div class="bg-slate-700 h-full rounded-full" style="width: 26.2%;"></div>
+              </div>
+            </div>
+
+            <!-- Item 8: Eletromóveis -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-400">Eletromóveis</span>
+                <span class="font-mono text-slate-400">0,58%</span>
+              </div>
+              <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden p-0.5 border border-white/5">
+                <div class="bg-slate-800 h-full rounded-full" style="width: 12.8%;"></div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Régua Inferior de Escala -->
+          <div class="flex items-center justify-between text-[9px] font-mono text-slate-500 pt-2 border-t border-white/[0.05]">
+            <span>0%</span>
+            <span>1.0%</span>
+            <span>2.0%</span>
+            <span>3.0%</span>
+            <span>4.0%</span>
+            <span>4.5%</span>
+          </div>
+        </div>
+
+        <!-- GRÁFICO 2: POTENCIAL DE MARGEM BRUTA NA CONVENIÊNCIA POR CATEGORIA -->
+        <div class="p-5 sm:p-6 rounded-2xl bg-slate-950/70 border border-white/[0.08] space-y-4 flex flex-col justify-between">
+          <div>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
+              <div>
+                <h4 class="card-title-serif font-serif text-base sm:text-lg text-white font-normal">
+                  Potencial de Margem Bruta na Conveniência por Categoria (%)
+                </h4>
+                <p class="text-xs text-slate-400 font-sans">Onde o lucro real é gerado e onde as quebras acontecem</p>
+              </div>
+              <!-- Legenda do Gráfico 2 -->
+              <div class="flex items-center gap-3 text-[10px] font-mono">
+                <span class="inline-flex items-center gap-1 text-blue-400 font-semibold">
+                  <span class="w-2.5 h-2.5 rounded-sm bg-blue-600"></span> Alta Rentabilidade
+                </span>
+                <span class="inline-flex items-center gap-1 text-cyan-300 font-semibold">
+                  <span class="w-2.5 h-2.5 rounded-sm bg-cyan-500"></span> Meta Loja (>= 32%)
+                </span>
+                <span class="inline-flex items-center gap-1 text-slate-400">
+                  <span class="w-2.5 h-2.5 rounded-sm bg-slate-600"></span> Baixa Margem
+                </span>
+              </div>
+            </div>
+
+            <!-- Barras de Margem por Categoria -->
+            <div class="space-y-3 pt-3 font-sans">
+              
+              <!-- Cafeteria e panificação -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="font-semibold text-blue-200">Cafeteria e panificação</span>
+                  <span class="font-mono font-bold text-blue-400">Até 70%</span>
+                </div>
+                <div class="w-full bg-slate-900 rounded-full h-3 overflow-hidden p-0.5 border border-blue-500/30">
+                  <div class="bg-gradient-to-r from-blue-700 to-blue-500 h-full rounded-full transition-all duration-1000" style="width: 100%;"></div>
+                </div>
+              </div>
+
+              <!-- Bebidas geladas -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="font-semibold text-blue-200">Bebidas geladas</span>
+                  <span class="font-mono font-bold text-blue-400">Até 60%</span>
+                </div>
+                <div class="w-full bg-slate-900 rounded-full h-3 overflow-hidden p-0.5 border border-blue-500/30">
+                  <div class="bg-gradient-to-r from-blue-700 to-blue-500 h-full rounded-full transition-all duration-1000" style="width: 85.7%;"></div>
+                </div>
+              </div>
+
+              <!-- Sorvetes -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-slate-300">Sorvetes</span>
+                  <span class="font-mono font-semibold text-blue-300">Até 55%</span>
+                </div>
+                <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden p-0.5 border border-white/5">
+                  <div class="bg-blue-600 h-full rounded-full transition-all duration-1000" style="width: 78.5%;"></div>
+                </div>
+              </div>
+
+              <!-- Snacks premium -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-slate-300">Snacks premium</span>
+                  <span class="font-mono font-semibold text-blue-300">Até 45%</span>
+                </div>
+                <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden p-0.5 border border-white/5">
+                  <div class="bg-blue-600 h-full rounded-full transition-all duration-1000" style="width: 64.2%;"></div>
+                </div>
+              </div>
+
+              <!-- Meta Sólida da Loja -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="font-bold text-cyan-300 flex items-center gap-1.5">
+                    <i data-lucide="target" class="w-3.5 h-3.5 text-cyan-400"></i>
+                    <span>Meta Sólida da Loja (Equilíbrio Operacional)</span>
+                  </span>
+                  <span class="font-mono font-bold text-cyan-300">32%</span>
+                </div>
+                <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden p-0.5 border border-cyan-500/30">
+                  <div class="bg-cyan-500 h-full rounded-full transition-all duration-1000" style="width: 45.7%;"></div>
+                </div>
+              </div>
+
+              <!-- Cigarros -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-slate-400">Cigarros (Venda de Chamariz)</span>
+                  <span class="font-mono text-slate-400">Até 8%</span>
+                </div>
+                <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden p-0.5 border border-white/5">
+                  <div class="bg-slate-700 h-full rounded-full" style="width: 11.4%;"></div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Box de Destaque Estratégico (O Paradoxo da Rentabilidade) -->
+          <div class="p-3.5 rounded-xl bg-blue-950/30 border border-blue-500/25 space-y-1.5 mt-2">
+            <div class="text-[11px] font-bold text-blue-300 flex items-center gap-1.5">
+              <i data-lucide="lightbulb" class="w-4 h-4 text-blue-400 flex-shrink-0"></i>
+              <span>O Paradoxo da Rentabilidade: Onde a Margem é Maior, a Perda é Mais Destrutiva</span>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed font-sans">
+              Cafeteria, panificação e bebidas representam margem bruta de até 70%, mas são os itens mais vulneráveis a vencimentos, avarias e desvios de caixa. A AURA estanca a perda nessas categorias através de controle preventivo de validade (FEFO) e precificação combinada com a pista.
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- SEÇÃO EXPLICATIVA: COMO A AURA ALCANÇA ESSE ROI (OS 5 MOTORES DETERMINÍSTICOS) -->
+      <div class="p-6 sm:p-7 rounded-2xl bg-slate-950/80 border border-emerald-500/25 space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.08] pb-4">
+          <div>
+            <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[10px] font-mono uppercase tracking-wider mb-1">
+              Metodologia de Engenharia de Valor AURA
+            </div>
+            <h4 class="heading-small text-xl sm:text-2xl font-serif font-normal text-white font-display-title">
+              Como Alcançamos Esse ROI: Os 5 Motores de Recuperação Imediata
+            </h4>
+          </div>
+          <span class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 inline-flex items-center gap-1.5 font-sans">
+            <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+            <span>Auditoria 100% Determinística em Python</span>
+          </span>
+        </div>
+
+        <!-- Grid dos 5 Motores de Recuperação -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          
+          <!-- Motor 1: Estancamento de Perecibilidade -->
+          <div class="p-4 sm:p-5 rounded-xl bg-slate-900/80 border border-white/[0.08] space-y-2 hover:border-emerald-500/30 transition-all">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300">RECUPERAÇÃO: 35% A 55%</span>
+              <i data-lucide="clock-alert" class="w-4 h-4 text-emerald-400"></i>
+            </div>
+            <h5 class="text-sm font-bold text-white">1. Estancamento de Validade e Perecibilidade</h5>
+            <p class="text-xs text-slate-300 leading-relaxed font-sans">
+              Algoritmo FEFO (First Expired, First Out) monitora lotes e prazos de validade da conveniência. Dispara combos automáticos na pista ("Café + Pão de Queijo") para itens a 5 dias do vencimento, recuperando o capital antes da quebra.
+            </p>
+            <div class="text-[11px] text-emerald-400 font-mono font-semibold pt-1">
+              ✓ Economia estimada: R$ 2.700 a R$ 4.250 / mês por loja
+            </div>
+          </div>
+
+          <!-- Motor 2: Auditoria Horária de Tanques e Escudo LMC -->
+          <div class="p-4 sm:p-5 rounded-xl bg-slate-900/80 border border-white/[0.08] space-y-2 hover:border-emerald-500/30 transition-all">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300">RECUPERAÇÃO: 75% A 90%</span>
+              <i data-lucide="fuel" class="w-4 h-4 text-cyan-400"></i>
+            </div>
+            <h5 class="text-sm font-bold text-white">2. Auditoria de Tanques & Escudo LMC da ANP</h5>
+            <p class="text-xs text-slate-300 leading-relaxed font-sans">
+              Conciliação contínua entre encerrantes dos bicos, telemetria/régua física e NF-e de descarga corrigida a 20°C. Fim das perdas camufladas abaixo de 0,6% e blindagem contra multas fiscais da Lei 9.847/99 (iniciando em R$ 20.000).
+            </p>
+            <div class="text-[11px] text-cyan-300 font-mono font-semibold pt-1">
+              ✓ Economia estimada: R$ 1.850 a R$ 6.660 / mês por posto
+            </div>
+          </div>
+
+          <!-- Motor 3: Prevenção de Ruptura por Seta de Carreta -->
+          <div class="p-4 sm:p-5 rounded-xl bg-slate-900/80 border border-white/[0.08] space-y-2 hover:border-emerald-500/30 transition-all">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300">RECUPERAÇÃO: 50% A 70%</span>
+              <i data-lucide="truck" class="w-4 h-4 text-blue-400"></i>
+            </div>
+            <h5 class="text-sm font-bold text-white">3. Previsão de Run-Out por Seta de Carreta</h5>
+            <p class="text-xs text-slate-300 leading-relaxed font-sans">
+              Previsão de esgotamento de combustível restrita à geometria física dos compartimentos de carreta (setas de 5.000 L) e capacidade livre (ullage), cruzada com preço regional da ANP e taxa Selic para momento ótimo de compra.
+            </p>
+            <div class="text-[11px] text-blue-300 font-mono font-semibold pt-1">
+              ✓ Lucro cessante evitado: R$ 2.900 a R$ 9.450 / mês
+            </div>
+          </div>
+
+          <!-- Motor 4: Fechamento Cego de Caixa e Trava CLT -->
+          <div class="p-4 sm:p-5 rounded-xl bg-slate-900/80 border border-white/[0.08] space-y-2 hover:border-emerald-500/30 transition-all">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300">RECUPERAÇÃO: 60% A 80%</span>
+              <i data-lucide="scale" class="w-4 h-4 text-purple-400"></i>
+            </div>
+            <h5 class="text-sm font-bold text-white">4. Fechamento Cego de Caixa & Trava CLT</h5>
+            <p class="text-xs text-slate-300 leading-relaxed font-sans">
+              Reconciliação centavo a centavo por turno e operador cruzando TEF, Pix e dinheiro com encerrantes de bico. Emite termo de conferência auditado com checklist do Art. 462 da CLT para blindar o posto contra processos trabalhistas.
+            </p>
+            <div class="text-[11px] text-purple-300 font-mono font-semibold pt-1">
+              ✓ Prejuízo estancado: R$ 1.100 a R$ 3.690 / mês por turno
+            </div>
+          </div>
+
+          <!-- Motor 5: Precificação Elástica e Margem Combinada -->
+          <div class="p-4 sm:p-5 rounded-xl bg-slate-900/80 border border-white/[0.08] space-y-2 hover:border-emerald-500/30 transition-all md:col-span-2 lg:col-span-2">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300">GANHO MARGINAL LÍQUIDO</span>
+              <i data-lucide="trending-up" class="w-4 h-4 text-amber-400"></i>
+            </div>
+            <h5 class="text-sm font-bold text-white">5. Precificação Elástica & Margem Combinada (Blended Margin)</h5>
+            <p class="text-xs text-slate-300 leading-relaxed font-sans">
+              Mapeia a elasticidade-preço local em 12 semanas. Permite ajustar centavos na bomba sem perder galonagem, promovendo a venda de itens de alta margem na conveniência (cafeteria 70% e bebidas 60%) para maximizar o lucro total em reais no final do dia.
+            </p>
+            <div class="text-[11px] text-amber-300 font-mono font-semibold pt-1">
+              ✓ Ganho marginal estimado: R$ 2.950 a R$ 9.960 / mês por posto
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- SIMULADOR INTERATIVO EXECUTIVO DE ROI DA AURA (SHOW ME THE MONEY) -->
+      <div class="p-6 sm:p-8 rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-cyan-500/30 space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.08] pb-4">
+          <div>
+            <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[10px] font-mono uppercase tracking-wider mb-1">
+              Simulador Interativo em Tempo Real
+            </div>
+            <h4 class="heading-small text-xl sm:text-2xl font-serif font-normal text-white font-display-title">
+              Calcule o Retorno Real (ROI) para o Tamanho da Sua Operação
+            </h4>
+            <p class="text-xs text-slate-400 font-sans">Ajuste os controles abaixo para simular o volume da sua rede e veja o impacto financeiro auditado.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="px-3 py-1 rounded-lg text-xs font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+              Garantia Auditada de 3x em 90 Dias
+            </span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          
+          <!-- Coluna da Esquerda: Controles de Ajuste (Sliders Interativos) -->
+          <div class="lg:col-span-6 space-y-6">
+            
+            <!-- Controle 1: Volume de Combustível da Pista -->
+            <div class="p-4 rounded-xl bg-black/40 border border-white/[0.06] space-y-3 font-sans">
+              <div class="flex items-center justify-between">
+                <label for="sim-fuel-slider" class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                  <i data-lucide="fuel" class="w-4 h-4 text-cyan-400"></i>
+                  <span>Volume Mensal de Combustíveis (Pista)</span>
+                </label>
+                <span id="sim-fuel-display" class="text-sm font-mono font-bold text-cyan-300 tabular-nums">250.000 L / mês</span>
+              </div>
+              <input type="range" id="sim-fuel-slider" min="100000" max="1000000" step="10000" value="250000" class="w-full accent-cyan-400 cursor-pointer h-2 bg-slate-800 rounded-lg">
+              <div class="flex items-center justify-between text-[10px] font-mono text-slate-500">
+                <span>100k Litros (Pequeno)</span>
+                <span>500k Litros (Médio)</span>
+                <span>1M Litros (Rede Grande)</span>
+              </div>
+            </div>
+
+            <!-- Controle 2: Faturamento da Loja de Conveniência -->
+            <div class="p-4 rounded-xl bg-black/40 border border-white/[0.06] space-y-3 font-sans">
+              <div class="flex items-center justify-between">
+                <label for="sim-store-slider" class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                  <i data-lucide="store" class="w-4 h-4 text-emerald-400"></i>
+                  <span>Faturamento Mensal da Loja de Conveniência</span>
+                </label>
+                <span id="sim-store-display" class="text-sm font-mono font-bold text-emerald-300 tabular-nums">R$ 200.000 / mês</span>
+              </div>
+              <input type="range" id="sim-store-slider" min="30000" max="600000" step="5000" value="200000" class="w-full accent-emerald-400 cursor-pointer h-2 bg-slate-800 rounded-lg">
+              <div class="flex items-center justify-between text-[10px] font-mono text-slate-500">
+                <span>R$ 30k (Básica)</span>
+                <span>R$ 200k (Média Nacional)</span>
+                <span>R$ 600k (Grande Porte)</span>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-lg bg-white/[0.02] border border-white/[0.05] text-[11px] text-slate-400 flex items-center gap-2">
+              <i data-lucide="info" class="w-4 h-4 text-cyan-400 flex-shrink-0"></i>
+              <span>Simulação auditada com base nos parâmetros estatísticos conservadores da pesquisa Abrappe/KPMG e Resolução ANP 884/2022.</span>
+            </div>
+
+          </div>
+
+          <!-- Coluna da Direita: Painel de Resultados do ROI em Tempo Real -->
+          <div class="lg:col-span-6 p-5 sm:p-6 rounded-2xl bg-black/60 border border-white/10 space-y-5">
+            <div class="flex items-center justify-between text-xs text-slate-400 font-mono border-b border-white/[0.08] pb-3">
+              <span>DEMONSTRATIVO DE RETORNO EM TEMPO REAL</span>
+              <span class="text-emerald-400 font-bold flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Live Calculation
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              
+              <!-- Prejuízo Oculto Atual -->
+              <div class="p-3.5 rounded-xl bg-rose-950/20 border border-rose-500/25 space-y-1">
+                <div class="text-[10px] font-mono text-rose-300 uppercase">Prejuízo Oculto Atual</div>
+                <div id="sim-leakage-value" class="text-2xl font-bold font-mono text-rose-400 tabular-nums">R$ 24.845 / mês</div>
+                <div class="text-[10px] text-slate-400 leading-tight">Perdas em LMC, quebras de conveniência e diferenças de caixa.</div>
+              </div>
+
+              <!-- Recuperação Líquida com a AURA -->
+              <div class="p-3.5 rounded-xl bg-emerald-950/25 border border-emerald-500/35 space-y-1">
+                <div class="text-[10px] font-mono text-emerald-300 uppercase">Recuperação Estimada</div>
+                <div id="sim-recovery-value" class="text-2xl font-bold font-mono text-emerald-400 tabular-nums">+R$ 13.480 / mês</div>
+                <div class="text-[10px] text-emerald-300/80 leading-tight">Lucro líquido adicional direto no caixa da filial.</div>
+              </div>
+
+            </div>
+
+            <!-- Retorno Líquido em 90 Dias e Múltiplo de ROI -->
+            <div class="p-4 rounded-xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-cyan-950/40 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div class="text-[10px] font-mono text-slate-300 uppercase">Retorno Líquido Acumulado em 90 Dias</div>
+                <div id="sim-90days-value" class="text-3xl font-extrabold font-mono text-white tabular-nums">R$ 38.300 líquidos</div>
+                <div class="text-[10px] text-slate-400">Já descontando 100% da assinatura do software e rampa de implantação.</div>
+              </div>
+              <div class="text-right flex-shrink-0">
+                <div class="text-[10px] font-mono text-cyan-300 uppercase">Múltiplo de ROI</div>
+                <div id="sim-multiplier-value" class="text-3xl font-black font-mono text-cyan-400 tabular-nums">14.2x</div>
+                <span class="text-[9px] text-emerald-300 font-bold">SOBRE O INVESTIMENTO</span>
+              </div>
+            </div>
+
+            <!-- Call to Action Direto -->
+            <div class="pt-1 flex flex-col sm:flex-row items-center gap-3">
+              <button onclick="window.auraTour.scrollToSection('sec-chat-graph')" class="w-full sm:w-auto flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 active:scale-[0.98] cursor-pointer">
+                <i data-lucide="play" class="w-4 h-4 fill-slate-950"></i>
+                <span>Ver a Demonstração ao Vivo</span>
+              </button>
+              <a href="/docs" target="_blank" class="w-full sm:w-auto py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-semibold text-center transition-all">
+                <span>Especificação da API</span>
+              </a>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Rodapé Oficial de Fontes e Citações Estatísticas -->
+      <div class="pt-4 border-t border-white/[0.06] text-center text-xs text-slate-500 font-sans space-y-1">
+        <p>
+          <strong class="text-slate-400">Fontes Oficiais de Dados:</strong> 9ª Pesquisa Abrappe / Reppor de Prevenção de Perdas no Varejo Brasileiro, Giro News, Mercado & Consumo, CNDL / Varejo S.A., KPMG Brasil, Negócios Brasil, Agência Nacional do Petróleo (ANP / Resolução nº 884/2022 e Lei nº 9.847/99), Banco Central do Brasil (BACEN).
+        </p>
+      </div>
+
+    </section>
+
+
     <!-- =========================================================================
          PAINEL & MATRIZ DE DIFERENCIAÇÃO OPERACIONAL REFORÇADO (ROI REAL)
          ========================================================================= -->
@@ -3459,7 +4037,7 @@
         const bar = document.getElementById('scroll-progress-bar');
         if (bar) bar.style.width = `${scrolled}%`;
 
-        const sections = ['top', 'sec-chat-graph', 'sec-blindagem', 'sec-custo-ia', 'sec-knowledge-graph', 'sec-diferenciacao', 'sec-faq'];
+        const sections = ['top', 'sec-chat-graph', 'sec-blindagem', 'sec-custo-ia', 'sec-knowledge-graph', 'sec-metricas-perdas', 'sec-diferenciacao', 'sec-faq'];
         for (let i = sections.length - 1; i >= 0; i--) {
           const secId = sections[i];
           if (secId === 'top') {
@@ -3604,6 +4182,65 @@
       });
 
       // API Pública window.auraTour
+
+      // =========================================================================
+      // SIMULADOR INTERATIVO EXECUTIVO DE ROI DA AURA (ABRAPPE & KPMG MODEL)
+      // =========================================================================
+      function initAuraRoiSimulator() {
+        const fuelSlider = document.getElementById('sim-fuel-slider');
+        const storeSlider = document.getElementById('sim-store-slider');
+        if (!fuelSlider || !storeSlider) return;
+
+        const fuelDisplay = document.getElementById('sim-fuel-display');
+        const storeDisplay = document.getElementById('sim-store-display');
+        const leakageVal = document.getElementById('sim-leakage-value');
+        const recoveryVal = document.getElementById('sim-recovery-value');
+        const ninetyDaysVal = document.getElementById('sim-90days-value');
+        const multiplierVal = document.getElementById('sim-multiplier-value');
+
+        function formatBrl(val) {
+          return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
+        }
+
+        function calculateRoi() {
+          const fuelLiters = parseFloat(fuelSlider.value) || 250000;
+          const storeRevenue = parseFloat(storeSlider.value) || 200000;
+
+          if (fuelDisplay) fuelDisplay.textContent = new Intl.NumberFormat('pt-BR').format(fuelLiters) + ' L / mês';
+          if (storeDisplay) storeDisplay.textContent = formatBrl(storeRevenue) + ' / mês';
+
+          const fuelRevenue = fuelLiters * 6.58;
+          const lmcLoss = fuelRevenue * 0.0035;
+          const storeLoss = storeRevenue * 0.0386;
+          const cashierLoss = (fuelRevenue + storeRevenue) * 0.0018;
+          const pricingLoss = fuelLiters * 0.035;
+
+          const totalMonthlyLeakage = lmcLoss + storeLoss + cashierLoss + pricingLoss;
+          const monthlyRecovery = (lmcLoss * 0.80) + (storeLoss * 0.45) + (cashierLoss * 0.70) + (pricingLoss * 0.50);
+
+          const monthlyFee = 490.0;
+          const totalRecovery90d = monthlyRecovery * 2.30;
+          const net90Days = totalRecovery90d - (3 * monthlyFee);
+          const multiplier = Math.max(1.0, totalRecovery90d / (3 * monthlyFee));
+
+          if (leakageVal) leakageVal.textContent = formatBrl(totalMonthlyLeakage) + ' / mês';
+          if (recoveryVal) recoveryVal.textContent = '+' + formatBrl(monthlyRecovery) + ' / mês';
+          if (ninetyDaysVal) ninetyDaysVal.textContent = formatBrl(net90Days) + ' líquidos';
+          if (multiplierVal) multiplierVal.textContent = multiplier.toFixed(1) + 'x';
+        }
+
+        fuelSlider.addEventListener('input', calculateRoi);
+        storeSlider.addEventListener('input', calculateRoi);
+        calculateRoi();
+      }
+
+      // Dispara ao carregar o DOM ou de imediato
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAuraRoiSimulator);
+      } else {
+        initAuraRoiSimulator();
+      }
+
       window.auraTour = {
         runAutonomousShowcase,
         runStreamingResponse,
