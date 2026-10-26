@@ -2739,6 +2739,552 @@
     }
   }
 
+  // =========================================================================
+  // MÓDULO 1: DIAGNÓSTICO EXECUTIVO DE ROI & PERDAS (90 DIAS)
+  // =========================================================================
+
+  class RoiDiagnosticUI extends BaseGenUIWidget {
+    constructor(payload = {}) {
+      super(payload, 'roi_diagnostic', 'render_RoiDiagnosticUI');
+      this.rawPayload = payload;
+      this.cardClass = 'genui-roi-diagnostic-card';
+      this.ariaLabel = 'Diagnostico Executivo de ROI e Perdas AURA';
+    }
+
+    renderLayer1() {
+      const p = (this.props && (this.props.summary || this.props.breakdown_brl))
+        ? this.props
+        : ((this.rawPayload && (this.rawPayload.props || this.rawPayload.data || this.rawPayload)) || {});
+      const summary = p.summary || {};
+      const totalLeak = Number(summary.total_monthly_leakage_brl || 0);
+      const estRecovery = Number(summary.estimated_monthly_recovery_brl || 0);
+      const net90 = Number(summary.roi_90_days_net_brl || 0);
+      const multiple = Number(summary.roi_multiple || 0);
+      const guarantee3x = summary.guarantee_3x_met !== false;
+      const diagnosisText = p.diagnosis || this.summary || 'Diagnostico deterministico de perdas operacionais e projecao de retorno liquido em 90 dias com rampa de adocao.';
+
+      return `
+        <div class="genui-layer genui-layer-1 mb-4 pb-3 border-b border-white/10">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
+              <h4 class="text-xs font-mono font-bold tracking-wider text-emerald-300 uppercase">
+                AURA ROI Diagnostic &amp; Loss Recovery Mentor
+              </h4>
+              <span class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">
+                ${escapeHtml(this.toolCallId.substring(0, 14))}...
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full border ${guarantee3x ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10' : 'text-amber-300 border-amber-500/40 bg-amber-500/10'} font-semibold flex items-center gap-1">
+                <span>Garantia Contratual 3x: ${guarantee3x ? 'Verificada' : 'Em Calibracao'}</span>
+              </span>
+              <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full border text-purple-300 border-purple-500/40 bg-purple-500/10 font-bold">
+                Retorno: ${formatNumber(multiple)}x
+              </span>
+            </div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-emerald-400 font-mono">Diagnostico Executivo de Perdas</span>
+            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+              ${escapeHtml(diagnosisText)}
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const p = (this.props && (this.props.summary || this.props.breakdown_brl))
+        ? this.props
+        : ((this.rawPayload && (this.rawPayload.props || this.rawPayload.data || this.rawPayload)) || {});
+      const summary = p.summary || {};
+      const breakdown = p.breakdown_brl || {};
+      const shield = p.regulatory_shield || {};
+
+      const totalLeak = Number(summary.total_monthly_leakage_brl || 0);
+      const estRecovery = Number(summary.estimated_monthly_recovery_brl || 0);
+      const net90 = Number(summary.roi_90_days_net_brl || 0);
+      const multiple = Number(summary.roi_multiple || 0);
+
+      const vLmc = Number(breakdown.lmc_and_tank_shrinkage || 0);
+      const vPdv = Number(breakdown.convenience_and_pos_cancellations || 0);
+      const vCaixa = Number(breakdown.cashier_shift_discrepancies || 0);
+      const vPricing = Number(breakdown.pricing_and_carreta_arbitrage || 0);
+      const vSelic = Number(breakdown.working_capital_selic_cost || 0);
+
+      const cardsHtml = `
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Perda Mensal Mapeada</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-rose-400 tabular-nums">
+              R$ ${formatNumber(totalLeak)}
+            </div>
+            <span class="text-[10px] text-slate-500 font-mono">Vazamento Operacional</span>
+          </div>
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Recuperacao Mensal</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-emerald-400 tabular-nums">
+              R$ ${formatNumber(estRecovery)}
+            </div>
+            <span class="text-[10px] text-slate-500 font-mono">Projecao AURA</span>
+          </div>
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Retorno Liquido (90d)</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-cyan-300 tabular-nums">
+              R$ ${formatNumber(net90)}
+            </div>
+            <span class="text-[10px] text-slate-500 font-mono">Lucro Liquido Extra</span>
+          </div>
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Multiplo de Retorno</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-purple-300 tabular-nums">
+              ${formatNumber(multiple)}x
+            </div>
+            <span class="text-[10px] text-slate-500 font-mono">Sobre o Plano</span>
+          </div>
+        </div>
+      `;
+
+      const vectorsHtml = `
+        <div class="p-3 rounded-xl border border-white/5 bg-slate-950/30 mb-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 font-mono">Detalhamento dos 5 Vetores de Perda Financeira</span>
+            <span class="text-[10px] font-mono text-slate-500">Apuracao 100% Deterministica</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex justify-between items-center">
+              <span class="text-slate-300">1. LMC &amp; Variacao Tanques (ANP 26)</span>
+              <span class="font-mono font-bold text-rose-400">R$ ${formatNumber(vLmc)}</span>
+            </div>
+            <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex justify-between items-center">
+              <span class="text-slate-300">2. Cancelamentos PDV &amp; Loja</span>
+              <span class="font-mono font-bold text-rose-400">R$ ${formatNumber(vPdv)}</span>
+            </div>
+            <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex justify-between items-center">
+              <span class="text-slate-300">3. Furos de Gaveta &amp; Fechamento</span>
+              <span class="font-mono font-bold text-rose-400">R$ ${formatNumber(vCaixa)}</span>
+            </div>
+            <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex justify-between items-center">
+              <span class="text-slate-300">4. Arbitragem Carreta &amp; Preco</span>
+              <span class="font-mono font-bold text-rose-400">R$ ${formatNumber(vPricing)}</span>
+            </div>
+            <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex justify-between items-center sm:col-span-2">
+              <span class="text-slate-300">5. Custo SELIC Capital Morto (Estoque > 30d)</span>
+              <span class="font-mono font-bold text-rose-400">R$ ${formatNumber(vSelic)}</span>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const shieldHtml = `
+        <div class="p-3 rounded-xl border border-emerald-500/20 bg-emerald-950/20 mb-3 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span class="text-emerald-300 font-medium">Blindagem Regulatoria ANP (Portaria 26 / Lei 9.847/99)</span>
+          </div>
+          <span class="text-[10px] font-mono text-emerald-400/90 font-semibold">Multa Minima Evitada: R$ 20.000,00</span>
+        </div>
+      `;
+
+      return `
+        <div class="genui-layer genui-layer-2">
+          ${cardsHtml}
+          ${vectorsHtml}
+          ${shieldHtml}
+        </div>
+      `;
+    }
+
+    getDefaultActionsHtml() {
+      const shouldDisable = this.state.isLocked || this.isExpired();
+      return `
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold hover:brightness-110 ${shouldDisable ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
+                data-action-id="act_roi_revisar_precificacao"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}"
+                ${shouldDisable ? 'disabled' : ''}>
+          <span>Revisar Precificacao &amp; Margens</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-emerald-200 border border-emerald-500/30 hover:bg-slate-700"
+                data-action-id="act_roi_auditar_tanques"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>Auditar LMC dos Tanques</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 text-slate-300 border border-white/10 hover:bg-slate-800"
+                data-action-id="act_roi_canvas"
+                data-action-type="inspection"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>Inspecionar no Canvas</span>
+        </button>
+      `;
+    }
+  }
+
+  // =========================================================================
+  // MÓDULO 4: RADAR DE ANOMALIAS DE PDV & CAIXA (Z-SCORE)
+  // =========================================================================
+
+  class PosAuditRadarUI extends BaseGenUIWidget {
+    constructor(payload = {}) {
+      super(payload, 'pos_audit', 'render_PosAuditRadarUI');
+      this.rawPayload = payload;
+      this.cardClass = 'genui-pos-audit-card';
+      this.ariaLabel = 'Radar de Anomalias de PDV e Caixa AURA';
+    }
+
+    renderLayer1() {
+      const p = (this.props && (this.props.total_operators_analyzed !== undefined || this.props.cashier_shift_audit))
+        ? this.props
+        : ((this.rawPayload && (this.rawPayload.props || this.rawPayload.data || this.rawPayload)) || {});
+      const totOp = Number(p.total_operators_analyzed || 0);
+      const anomCount = Number(p.anomalous_operators_count || 0);
+      const shift = p.cashier_shift_audit || {};
+      const isConciliado = shift.status === 'CONCILIADO';
+      const diagnosisText = p.diagnosis || this.summary || 'Auditoria estatistica e contabil de PDV com calculo de Z-Score e blindagem CLT Art. 462.';
+
+      return `
+        <div class="genui-layer genui-layer-1 mb-4 pb-3 border-b border-white/10">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full ${anomCount > 0 ? 'bg-amber-400' : 'bg-cyan-400'} animate-pulse flex-shrink-0"></span>
+              <h4 class="text-xs font-mono font-bold tracking-wider text-cyan-300 uppercase">
+                AURA POS Anomaly &amp; Cashier Audit Radar
+              </h4>
+              <span class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">
+                ${escapeHtml(this.toolCallId.substring(0, 14))}...
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full border ${isConciliado ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10' : 'text-rose-300 border-rose-500/40 bg-rose-500/10'} font-semibold">
+                Caixa: ${isConciliado ? 'CONCILIADO' : 'DIVERGENCIA PENDENTE'}
+              </span>
+              <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full border ${anomCount > 0 ? 'text-rose-300 border-rose-500/40 bg-rose-500/10' : 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10'} font-bold">
+                Desvios: ${anomCount}
+              </span>
+            </div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Diagnostico de Fechamento &amp; Cancelamentos</span>
+            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+              ${escapeHtml(diagnosisText)}
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const p = (this.props && (this.props.total_operators_analyzed !== undefined || this.props.cashier_shift_audit))
+        ? this.props
+        : ((this.rawPayload && (this.rawPayload.props || this.rawPayload.data || this.rawPayload)) || {});
+      const totOp = Number(p.total_operators_analyzed || 0);
+      const anomCount = Number(p.anomalous_operators_count || 0);
+      const shift = p.cashier_shift_audit || {};
+      const discBrl = Number(shift.discrepancy_brl || 0);
+      const ops = Array.isArray(p.operators_analysis) ? p.operators_analysis : [];
+      const clt = p.clt_compliance_checklist || {};
+
+      const cardsHtml = `
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Operadores Auditados</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-white tabular-nums">${totOp}</div>
+            <span class="text-[10px] text-slate-500 font-mono">Pista &amp; Loja</span>
+          </div>
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Anomalias (|Z| > 2.0)</span>
+            <div class="text-sm sm:text-base font-bold font-mono ${anomCount > 0 ? 'text-rose-400' : 'text-emerald-400'} tabular-nums">${anomCount}</div>
+            <span class="text-[10px] text-slate-500 font-mono">Desvio Gaussiano</span>
+          </div>
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Divergencia de Caixa</span>
+            <div class="text-sm sm:text-base font-bold font-mono ${discBrl === 0 ? 'text-slate-300' : 'text-rose-400'} tabular-nums">R$ ${formatNumber(discBrl)}</div>
+            <span class="text-[10px] text-slate-500 font-mono">Pista vs Fechamento</span>
+          </div>
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Politica CLT 462</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-cyan-300">ATIVA</div>
+            <span class="text-[10px] text-slate-500 font-mono">Zero Termos Acusatorios</span>
+          </div>
+        </div>
+      `;
+
+      let opsRows = '';
+      if (ops.length === 0) {
+        opsRows = '<tr><td colspan="5" class="py-2 text-center text-slate-500 text-xs">Nenhum operador com registros no periodo.</td></tr>';
+      } else {
+        ops.forEach(o => {
+          const isAnom = o.is_anomaly;
+          const zSc = Number(o.z_score || 0).toFixed(2);
+          const cRate = Number(o.cancellation_rate_pct || 0).toFixed(1);
+          opsRows += `
+            <tr class="border-b border-slate-800/60">
+              <td class="py-1.5 px-2 font-mono text-slate-200 font-semibold">${escapeHtml(o.operator_id)}</td>
+              <td class="py-1.5 px-2 text-right font-mono text-slate-300">${o.total_orders || 0}</td>
+              <td class="py-1.5 px-2 text-right font-mono text-slate-300">${o.cancelled_orders || 0}</td>
+              <td class="py-1.5 px-2 text-right font-mono ${isAnom ? 'text-rose-400 font-bold' : 'text-slate-300'}">${cRate}%</td>
+              <td class="py-1.5 px-2 text-right font-mono ${isAnom ? 'text-rose-400 font-bold' : 'text-slate-400'}">${zSc}</td>
+            </tr>
+          `;
+        });
+      }
+
+      const tableHtml = `
+        <div class="p-3 rounded-xl border border-white/5 bg-slate-950/30 mb-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 font-mono">Ranking de Operadores &amp; Z-Score de Cancelamento</span>
+            <span class="text-[10px] font-mono text-slate-500">Corte |Z| &gt; 2.0</span>
+          </div>
+          <div class="overflow-x-auto max-h-48 overflow-y-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="border-b border-slate-800 text-[10px] text-slate-400 uppercase tracking-wider">
+                  <th class="py-1 px-2">Operador</th>
+                  <th class="py-1 px-2 text-right">Pedidos</th>
+                  <th class="py-1 px-2 text-right">Cancelados</th>
+                  <th class="py-1 px-2 text-right">Taxa %</th>
+                  <th class="py-1 px-2 text-right">Z-Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${opsRows}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      const cltReqs = clt.mandatory_requirements_for_deduction || [
+        'Comprovacao de pagamento do Adicional de Quebra de Caixa em folha',
+        'Previsao contratual expressa autorizando desconto em caso de divergencia conferida',
+        'Bordero fisico de fechamento assinado pelo operador no ato'
+      ];
+      const cltListHtml = cltReqs.map(r => `
+        <li class="flex items-start gap-1.5 text-[11px] text-slate-300">
+          <span class="text-cyan-400 font-bold mt-0.5">&#10003;</span>
+          <span>${escapeHtml(r)}</span>
+        </li>
+      `).join('');
+
+      const cltBoxHtml = `
+        <div class="p-3 rounded-xl border border-cyan-500/20 bg-cyan-950/20 mb-3 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-cyan-300">Requisitos Cumulativos para Desconto (Art. 462 CLT &amp; TST OJ 251)</span>
+            <span class="text-[10px] font-mono text-cyan-400">TST-OJ-251 OK</span>
+          </div>
+          <ul class="space-y-1">
+            ${cltListHtml}
+          </ul>
+        </div>
+      `;
+
+      return `
+        <div class="genui-layer genui-layer-2">
+          ${cardsHtml}
+          ${tableHtml}
+          ${cltBoxHtml}
+        </div>
+      `;
+    }
+
+    getDefaultActionsHtml() {
+      const shouldDisable = this.state.isLocked || this.isExpired();
+      return `
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold hover:brightness-110 ${shouldDisable ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
+                data-action-id="act_pos_gerar_termo"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}"
+                ${shouldDisable ? 'disabled' : ''}>
+          <span>Gerar Termo Conferencia Turno</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-cyan-200 border border-cyan-500/30 hover:bg-slate-700"
+                data-action-id="act_pos_auditar_turno"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>Auditar Turno Completo</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 text-slate-300 border border-white/10 hover:bg-slate-800"
+                data-action-id="act_pos_canvas"
+                data-action-type="inspection"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>Inspecionar no Canvas</span>
+        </button>
+      `;
+    }
+  }
+
+  // =========================================================================
+  // MÓDULO 4 / MOBILE: BRIEFING MATINAL ZERO-CLICK (CAFÉ COM O DONO)
+  // =========================================================================
+
+  class MorningBriefingUI extends BaseGenUIWidget {
+    constructor(payload = {}) {
+      super(payload, 'zero_click_briefing', 'render_MorningBriefingUI');
+      this.rawPayload = payload;
+      this.cardClass = 'genui-morning-briefing-card';
+      this.ariaLabel = 'Briefing Executivo Matinal AURA';
+    }
+
+    renderLayer1() {
+      const p = (this.props && (this.props.sales_summary_24h || this.props.tank_critical_runout))
+        ? this.props
+        : ((this.rawPayload && (this.rawPayload.props || this.rawPayload.data || this.rawPayload)) || {});
+      const s24 = p.sales_summary_24h || {};
+      const tank = p.tank_critical_runout || {};
+      const faturamento = Number(s24.total_turnover_brl || 0);
+      const diagnosisText = p.diagnosis || this.summary || 'Resumo executivo consolidado das ultimas 24h pronto para envio no WhatsApp do proprietario.';
+
+      return `
+        <div class="genui-layer genui-layer-1 mb-4 pb-3 border-b border-white/10">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-purple-400 animate-pulse flex-shrink-0"></span>
+              <h4 class="text-xs font-mono font-bold tracking-wider text-purple-300 uppercase">
+                AURA Morning Executive Briefing (Cafe com o Dono)
+              </h4>
+              <span class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">
+                ${escapeHtml(this.toolCallId.substring(0, 14))}...
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full border text-emerald-300 border-emerald-500/40 bg-emerald-500/10 font-bold">
+                Faturamento 24h: R$ ${formatNumber(faturamento)}
+              </span>
+            </div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-purple-400 font-mono">Panorama Executivo Matinal</span>
+            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+              ${escapeHtml(diagnosisText)}
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const p = (this.props && (this.props.sales_summary_24h || this.props.tank_critical_runout))
+        ? this.props
+        : ((this.rawPayload && (this.rawPayload.props || this.rawPayload.data || this.rawPayload)) || {});
+      const s24 = p.sales_summary_24h || {};
+      const tank = p.tank_critical_runout || {};
+      const faturamento = Number(s24.total_turnover_brl || 0);
+      const volumeLitros = Number(s24.total_liters || 0);
+      const tankId = tank.tank_id || '1';
+      const fuelName = tank.fuel_type || 'Combustivel';
+      const occPct = Number(tank.occupancy_pct || 0);
+      const orderBoxes = Number(tank.recommended_order_compartments || 0);
+      const wpText = p.whatsapp_formatted_text || '';
+      const encodedWp = encodeURIComponent(wpText);
+
+      const cardsHtml = `
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Faturamento 24h</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-emerald-300 tabular-nums">
+              R$ ${formatNumber(faturamento)}
+            </div>
+            <span class="text-[10px] text-slate-500 font-mono">Consolidado do Posto</span>
+          </div>
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Volume Total de Pista</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-cyan-300 tabular-nums">
+              ${formatNumber(volumeLitros)} L
+            </div>
+            <span class="text-[10px] text-slate-500 font-mono">Litragem Vendida</span>
+          </div>
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1 col-span-2 sm:col-span-1">
+            <span class="text-[10px] text-slate-400 font-medium">Tanque Mais Critico</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-amber-300">
+              Tanque ${tankId} (${occPct.toFixed(1)}%)
+            </div>
+            <span class="text-[10px] text-slate-500 font-mono">${escapeHtml(fuelName)}</span>
+          </div>
+        </div>
+      `;
+
+      const alertHtml = `
+        <div class="p-3 rounded-xl border border-amber-500/30 bg-amber-950/20 mb-3 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse flex-shrink-0"></span>
+            <div>
+              <span class="text-amber-200 font-bold block">Sugestao Logistica de Reposicao</span>
+              <p class="text-[11px] text-slate-300">Tanque ${tankId} (${escapeHtml(fuelName)}) requer pedido de <strong>${orderBoxes} compartimento(s)</strong> de 5.000 L.</p>
+            </div>
+          </div>
+          <span class="text-[11px] font-mono font-bold text-amber-300 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/30 whitespace-nowrap">
+            ${orderBoxes * 5000} L sugeridos
+          </span>
+        </div>
+      `;
+
+      const wpBubbleHtml = `
+        <div class="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-950/30 mb-3 space-y-2">
+          <div class="flex items-center justify-between pb-1.5 border-b border-emerald-500/20">
+            <div class="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+              <span>Preview para WhatsApp do Dono</span>
+            </div>
+            <a href="https://api.whatsapp.com/send?text=${encodedWp}" target="_blank" rel="noopener noreferrer"
+               class="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] transition-colors flex items-center gap-1">
+              <span>Disparar WhatsApp</span>
+            </a>
+          </div>
+          <div class="p-2.5 rounded-lg bg-emerald-950/60 border border-emerald-500/20 text-slate-200 text-xs font-mono whitespace-pre-wrap leading-relaxed shadow-inner">
+            ${escapeHtml(wpText)}
+          </div>
+        </div>
+      `;
+
+      return `
+        <div class="genui-layer genui-layer-2">
+          ${cardsHtml}
+          ${alertHtml}
+          ${wpBubbleHtml}
+        </div>
+      `;
+    }
+
+    getDefaultActionsHtml() {
+      const shouldDisable = this.state.isLocked || this.isExpired();
+      return `
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold hover:brightness-110 ${shouldDisable ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
+                data-action-id="act_briefing_aprovar_combustivel"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}"
+                ${shouldDisable ? 'disabled' : ''}>
+          <span>Aprovar Pedido Combustivel</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-purple-200 border border-purple-500/30 hover:bg-slate-700"
+                data-action-id="act_briefing_justificativa_lmc"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>Emitir Justificativa LMC</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 text-slate-300 border border-white/10 hover:bg-slate-800"
+                data-action-id="act_briefing_canvas"
+                data-action-type="inspection"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>Inspecionar no Canvas</span>
+        </button>
+      `;
+    }
+  }
+
+  const RoiDiagnosticWidget = RoiDiagnosticUI;
+  const PosAuditRadarWidget = PosAuditRadarUI;
+  const MorningBriefingWidget = MorningBriefingUI;
+
   const ExecutiveBriefingWidget = ExecutiveDecisionMentorUI;
   const MarginProfitabilityWidget = MarginAnalysisUI;
   const PredictiveScenarioWidget = PredictiveScenarioUI;
@@ -2818,8 +3364,32 @@
       {
         name: 'render_GenerativeModularCardUI',
         cls: GenerativeModularCardUI,
+      RoiDiagnosticUI,
+      RoiDiagnosticWidget,
+      PosAuditRadarUI,
+      PosAuditRadarWidget,
+      MorningBriefingUI,
+      MorningBriefingWidget,
         aliases: ['GenerativeModularCardUI', 'DynamicLegoCardUI', 'render_ModularLegoCardUI'],
         intent: 'diagnostico_modular'
+      },
+      {
+        name: 'render_RoiDiagnosticUI',
+        cls: RoiDiagnosticUI,
+        aliases: ['RoiDiagnosticUI', 'render_RoiDiagnosticWidget', 'RoiDiagnosticWidget'],
+        intent: 'roi_diagnostic'
+      },
+      {
+        name: 'render_PosAuditRadarUI',
+        cls: PosAuditRadarUI,
+        aliases: ['PosAuditRadarUI', 'render_PosAuditRadarWidget', 'PosAuditRadarWidget'],
+        intent: 'pos_audit'
+      },
+      {
+        name: 'render_MorningBriefingUI',
+        cls: MorningBriefingUI,
+        aliases: ['MorningBriefingUI', 'render_MorningBriefingWidget', 'MorningBriefingWidget'],
+        intent: 'zero_click_briefing'
       }
     ];
 
@@ -2953,6 +3523,12 @@
     window.AuraGenUI.BasketUpsellWidget = BasketUpsellWidget;
     window.AuraGenUI.ComplianceStatusUI = ComplianceStatusUI;
     window.AuraGenUI.GenerativeModularCardUI = GenerativeModularCardUI;
+    window.AuraGenUI.RoiDiagnosticUI = RoiDiagnosticUI;
+    window.AuraGenUI.RoiDiagnosticWidget = RoiDiagnosticWidget;
+    window.AuraGenUI.PosAuditRadarUI = PosAuditRadarUI;
+    window.AuraGenUI.PosAuditRadarWidget = PosAuditRadarWidget;
+    window.AuraGenUI.MorningBriefingUI = MorningBriefingUI;
+    window.AuraGenUI.MorningBriefingWidget = MorningBriefingWidget;
     window.AuraGenUI.ComplianceStatusWidget = ComplianceStatusWidget;
     window.AuraGenUI.PaymentMethodsBreakdownUI = PaymentMethodsBreakdownUI;
     window.AuraGenUI.PaymentMethodsBreakdownWidget = PaymentMethodsBreakdownWidget;

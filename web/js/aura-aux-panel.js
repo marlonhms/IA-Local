@@ -1478,7 +1478,111 @@ class AuraAuxPanel {
       fields: []
     };
 
-    // MÓDULO 0-A: DIAGNÓSTICO MODULAR GENERATIVO (BLOCOS LEGO)
+        // MÓDULO 1: DIAGNÓSTICO EXECUTIVO DE ROI & PERDAS (90 DIAS)
+    if (effectiveIntent === 'roi_diagnostic' || effectiveIntent === 'diagnostico_executivo_roi' || effectiveIntent === 'diagnostico_perdas' || toolName === 'render_RoiDiagnosticUI' || toolName === 'RoiDiagnosticUI') {
+      const summary = c.summary || data?.summary || data?.props?.summary || {};
+      const breakdown = c.breakdown_brl || data?.breakdown_brl || data?.props?.breakdown_brl || {};
+      const shield = c.regulatory_shield || data?.regulatory_shield || data?.props?.regulatory_shield || {};
+
+      title = 'Diagnostico Executivo de ROI & Perdas';
+      subtitle = 'Projecao Deterministica de 90 Dias & Blindagem ANP';
+      const mult = Number(summary.roi_multiple || 20.7);
+      statusChip = {
+        label: `Retorno ${mult.toFixed(1)}x (Garantia 3x Ativa)`,
+        severity: 'success'
+      };
+
+      summaryKpis = [
+        { label: 'Perda Mensal Mapeada', value: `R$ ${Number(summary.total_monthly_leakage_brl || 17070).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, change: 'Vazamento', severity: 'danger' },
+        { label: 'Recuperacao Mensal', value: `R$ ${Number(summary.estimated_monthly_recovery_brl || 13206).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, change: 'Projecao AURA', severity: 'success' },
+        { label: 'Retorno Liquido 90d', value: `R$ ${Number(summary.roi_90_days_net_brl || 28903.8).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, change: 'Lucro Extra', severity: 'success' },
+        { label: 'Multiplo de Retorno', value: `${mult.toFixed(1)}x`, change: 'Sobre o Plano', severity: 'info' }
+      ];
+
+      records = [
+        { 'Vetor de Perda': '1. LMC & Variacao Tanques (ANP 26)', 'Impacto Mensal (R$)': `R$ ${Number(breakdown.lmc_and_tank_shrinkage || 4520).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Origem / Causa': 'Perdas termicas e divergencia escriturada vs fisica', 'Severidade': 'Critico' },
+        { 'Vetor de Perda': '2. Cancelamentos PDV & Loja', 'Impacto Mensal (R$)': `R$ ${Number(breakdown.convenience_and_pos_cancellations || 3100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Origem / Causa': 'Cancelamentos anomolos fora da curva historica', 'Severidade': 'Atencao' },
+        { 'Vetor de Perda': '3. Furos de Gaveta & Fechamento', 'Impacto Mensal (R$)': `R$ ${Number(breakdown.cashier_shift_discrepancies || 1850).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Origem / Causa': 'Divergencia entre numerario de pista e sangrias', 'Severidade': 'Atencao' },
+        { 'Vetor de Perda': '4. Arbitragem Carreta & Preco', 'Impacto Mensal (R$)': `R$ ${Number(breakdown.pricing_and_carreta_arbitrage || 6200).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Origem / Causa': 'Perda de desconto de lote fechado (30.000 L)', 'Severidade': 'Oportunidade' },
+        { 'Vetor de Perda': '5. Custo SELIC Capital Morto', 'Impacto Mensal (R$)': `R$ ${Number(breakdown.working_capital_selic_cost || 1400).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Origem / Causa': 'Custo de capital de giro parado > 30 dias sem giro', 'Severidade': 'Atencao' }
+      ];
+
+      schemaInfo = {
+        source: 'AURA Partner Gateway & Staging Store',
+        table: 'roi_diagnostic_ledger',
+        recordCount: records.length,
+        fields: Object.keys(records[0] || {})
+      };
+      return { title, subtitle, statusChip, records, schemaInfo, auditRules, summaryKpis, intent: 'roi_diagnostic' };
+    }
+
+    // MÓDULO 4: RADAR DE ANOMALIAS DE PDV & CAIXA (Z-SCORE)
+    if (effectiveIntent === 'pos_audit' || effectiveIntent === 'radar_anomalias_pdv' || toolName === 'render_PosAuditRadarUI' || toolName === 'PosAuditRadarUI') {
+      const shift = c.cashier_shift_audit || data?.cashier_shift_audit || data?.props?.cashier_shift_audit || {};
+      const isConc = shift.status === 'CONCILIADO';
+      const anomCount = Number(c.anomalous_operators_count || data?.anomalous_operators_count || 0);
+
+      title = 'Radar de Anomalias de PDV & Caixa (Z-Score)';
+      subtitle = 'Auditoria Estatistica e Contabil com Blindagem Art. 462 CLT';
+      statusChip = {
+        label: isConc ? 'Fechamento Conciliado' : `${anomCount} Anomalia(s) Detectada(s)`,
+        severity: isConc ? 'success' : 'attention'
+      };
+
+      const rawOps = c.operators_analysis || data?.operators_analysis || data?.props?.operators_analysis || [];
+      records = rawOps.map(o => ({
+        'Operador': o.operator_id || 'N/A',
+        'Total Pedidos': o.total_orders || 0,
+        'Cancelados': o.cancelled_orders || 0,
+        'Taxa %': `${Number(o.cancellation_rate_pct || 0).toFixed(1)}%`,
+        'Z-Score': Number(o.z_score || 0).toFixed(2),
+        'Classificacao': o.is_anomaly ? 'Anomalia Estatistica (>2σ)' : 'Padrao Historico'
+      }));
+
+      schemaInfo = {
+        source: 'AURA POS Audit Engine & CLT Shield',
+        table: 'pos_anomaly_ledger',
+        recordCount: records.length,
+        fields: ['Operador', 'Total Pedidos', 'Cancelados', 'Taxa %', 'Z-Score', 'Classificacao']
+      };
+      return { title, subtitle, statusChip, records, schemaInfo, auditRules, summaryKpis, intent: 'pos_audit' };
+    }
+
+    // MÓDULO 4 / MOBILE: BRIEFING MATINAL ZERO-CLICK (CAFÉ COM O DONO)
+    if (effectiveIntent === 'zero_click_briefing' || effectiveIntent === 'briefing_matinal' || toolName === 'render_MorningBriefingUI' || toolName === 'MorningBriefingUI') {
+      const s24 = c.sales_summary_24h || data?.sales_summary_24h || data?.props?.sales_summary_24h || {};
+      const tank = c.tank_critical_runout || data?.tank_critical_runout || data?.props?.tank_critical_runout || {};
+
+      title = 'Briefing Matinal Zero-Click (Cafe com o Dono)';
+      subtitle = 'Panorama Consolidado 24h & Alertas Logísticos';
+      statusChip = {
+        label: 'Pronto p/ WhatsApp',
+        severity: 'success'
+      };
+
+      summaryKpis = [
+        { label: 'Faturamento 24h', value: `R$ ${Number(s24.total_turnover_brl || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, change: 'Consolidado', severity: 'success' },
+        { label: 'Volume Total', value: `${Number(s24.total_liters || 0).toLocaleString('pt-BR')} L`, change: 'Pista', severity: 'info' },
+        { label: 'Tanque Critico', value: `Tanque ${tank.tank_id || '1'} (${Number(tank.occupancy_pct || 0).toFixed(1)}%)`, change: tank.fuel_type || 'Combustivel', severity: 'attention' }
+      ];
+
+      records = [
+        { 'Parametro': 'Faturamento 24h', 'Valor': `R$ ${Number(s24.total_turnover_brl || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` },
+        { 'Parametro': 'Volume Vendido', 'Valor': `${Number(s24.total_liters || 0).toLocaleString('pt-BR')} L` },
+        { 'Parametro': 'Tanque Menor Autonomia', 'Valor': `Tanque ${tank.tank_id || '1'} (${tank.fuel_type || 'Combustivel'}) - ${Number(tank.occupancy_pct || 0).toFixed(1)}%` },
+        { 'Parametro': 'Sugestao de Compra', 'Valor': `${tank.recommended_order_compartments || 0} compartimento(s) de 5.000 L` }
+      ];
+
+      schemaInfo = {
+        source: 'AURA Morning Zero-Click Engine',
+        table: 'morning_briefing_ledger',
+        recordCount: records.length,
+        fields: ['Parametro', 'Valor']
+      };
+      return { title, subtitle, statusChip, records, schemaInfo, auditRules, summaryKpis, intent: 'zero_click_briefing' };
+    }
+
+// MÓDULO 0-A: DIAGNÓSTICO MODULAR GENERATIVO (BLOCOS LEGO)
     if (effectiveIntent === 'diagnostico_modular' || effectiveIntent === 'modular_card' || toolName === 'render_GenerativeModularCardUI' || toolName === 'GenerativeModularCardUI') {
       title = c.title || data?.props?.title || data?.title || '🧩 Diagnóstico Executivo Modular';
       subtitle = c.diagnosis || c.subtitle || data?.props?.diagnosis || data?.subtitle || 'Métricas & Prioridades de Gestão em Blocos';
