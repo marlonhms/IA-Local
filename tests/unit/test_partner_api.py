@@ -40,6 +40,9 @@ from core.partner_api import (
     set_partner_staging_store,
     compute_station_roi_diagnostic,
     StationROIDiagnosticResponse,
+    PartnerSemanticResponseCache,
+    get_partner_semantic_cache,
+    set_partner_semantic_cache,
 )
 
 
@@ -64,10 +67,13 @@ def mock_engine():
 
 @pytest.fixture
 def client(mock_engine, isolated_staging_store, monkeypatch):
-    """TestClient configurado com chave de parceiro de teste."""
+    """TestClient configurado com chave de parceiro de teste e cache semantico limpo."""
     monkeypatch.setenv("AURA_PARTNER_API_KEY", PARTNER_TEST_KEY)
+    cache = PartnerSemanticResponseCache()
+    set_partner_semantic_cache(cache)
     app = create_aura_app(engine=mock_engine)
-    return TestClient(app)
+    yield TestClient(app)
+    set_partner_semantic_cache(None)
 
 
 # =============================================================================
@@ -925,6 +931,264 @@ def test_compute_station_roi_diagnostic_direct_function(isolated_staging_store):
     assert res["summary"]["guarantee_3x_met"] is True
     assert res["summary"]["roi_multiple"] >= 3.0
 
+
+
+# =============================================================================
+# 8. TESTES DO MODULO 2: CACHE SEMANTICO SINCRONIZADO AO DATA_VERSION_HASH
+# =============================================================================
+
+@pytest.mark.unit
+def test_semantic_cache_query_normalization():
+    """Valida normalizacao semantica de queries: acentos, espacos e pontuacao."""
+    norm = PartnerSemanticResponseCache.normalize_query
+    assert norm("Como estao os tanques agora?") == "como estao os tanques agora"
+    assert norm("COMO ESTAO OS TANQUES AGORA???") == "como estao os tanques agora"
+    assert norm("  Qual o   resumo de caixa!  ") == "qual o resumo de caixa"
+    assert norm("Preco da Gasolina Comum R$ 5,80") == "preco da gasolina comum r 5 80"
+    assert norm("") == ""
+    assert norm("   ") == ""
+
+
+@pytest.mark.unit
+def test_semantic_cache_get_set_lru_and_invalidation():
+    """Valida operacoes get/set com chave composta, politica LRU e invalidacao por estacao."""
+    cache = PartnerSemanticResponseCache(max_entries_per_station=2)
+    station = "posto_teste_cache"
+    hash_v1 = "1111222233334444"
+    hash_v2 = "5555666677778888"
+
+    # Set entrada 1
+    cache.set(station, hash_v1, "Como estao os tanques?", {"response_text": "Tanques estaveis"})
+    # Get com variacao de pontuacao/caixa alta -> Cache Hit
+    hit = cache.get(station, hash_v1, "como estao os tanques")
+    assert hit is not None
+    assert hit["response_text"] == "Tanques estaveis"
+
+    # Get com data_version_hash diferente -> Cache Miss
+    miss_hash = cache.get(station, hash_v2, "como estao os tanques")
+    assert miss_hash is None
+
+    # Get com query diferente -> Cache Miss
+    miss_query = cache.get(station, hash_v1, "qual o faturamento")
+    assert miss_query is None
+
+    # Adiciona mais 2 entradas para testar LRU (limite = 2)
+    cache.set(station, hash_v1, "Pergunta B", {"response_text": "B"})
+    cache.set(station, hash_v1, "Pergunta C", {"response_text": "C"})
+
+    # Primeira entrada ("Como estao os tanques?") foi evictada pelo LRU
+    assert cache.get(station, hash_v1, "Como estao os tanques?") is None
+    assert cache.get(station, hash_v1, "Pergunta B") is not None
+    assert cache.get(station, hash_v1, "Pergunta C") is not None
+
+    # Invalidacao da estacao
+    cache.invalidate_station(station)
+    assert cache.get(station, hash_v1, "Pergunta B") is None
+    assert cache.get(station, hash_v1, "Pergunta C") is None
+
+
+@pytest.mark.unit
+def test_partner_chat_semantic_cache_miss_then_hit_non_stream(client, mock_engine, monkeypatch):
+    """Garante economia de tokens: primeira chamada gera Cache Miss, segunda chamada gera Cache Hit com custo zero de LLM."""
+    call_counter = {"count": 0}
+
+    async def mock_ask(query, **kwargs):
+        call_counter["count"] += 1
+        return AuraResponse(
+            session_id="sess_cache_test",
+            query=query,
+            response_text=f"Resposta gerada pelo motor LLM (chamada {call_counter['count']})",
+            intent="tanques",
+            confidence=0.97,
+            routing_method="deep_research",
+        )
+
+    monkeypatch.setattr(mock_engine, "ask", mock_ask)
+
+    # 1. Primeira requisicao: Cache Miss
+    resp1 = client.post(
+        "/api/v1/partner/chat",
+        headers={
+            "X-Partner-Key": PARTNER_TEST_KEY,
+            "X-Station-ID": "posto_cache_01",
+        },
+        json={
+            "query": "Como estao os estoques dos tanques?",
+            "stream": False,
+        },
+    )
+    assert resp1.status_code == 200
+    assert resp1.headers.get("X-Aura-Cache") == "MISS"
+    data1 = resp1.json()
+    assert data1["cache_hit"] is False
+    assert "chamada 1" in data1["response_text"]
+    assert call_counter["count"] == 1
+
+    # 2. Segunda requisicao (mesma query com variacao de pontuacao): Cache Hit
+    resp2 = client.post(
+        "/api/v1/partner/chat",
+        headers={
+            "X-Partner-Key": PARTNER_TEST_KEY,
+            "X-Station-ID": "posto_cache_01",
+        },
+        json={
+            "query": "como estao os estoques dos tanques",
+            "stream": False,
+        },
+    )
+    assert resp2.status_code == 200
+    assert resp2.headers.get("X-Aura-Cache") == "HIT"
+    data2 = resp2.json()
+    assert data2["cache_hit"] is True
+    assert "chamada 1" in data2["response_text"]
+    # Garante que o motor NAO foi invocado novamente
+    assert call_counter["count"] == 1
+
+
+@pytest.mark.unit
+def test_partner_chat_semantic_cache_stream_hit(client, mock_engine, monkeypatch):
+    """Valida que Cache Hit no modo stream=True emite SSE imediato com headers X-Aura-Cache: HIT."""
+    async def mock_ask_stream(query, **kwargs):
+        yield AuraChunk(chunk_type=AuraChunkType.DELTA, text="Chunk inicial.")
+        yield AuraChunk(chunk_type=AuraChunkType.DONE, text="")
+
+    monkeypatch.setattr(mock_engine, "ask_stream", mock_ask_stream)
+
+    # 1. Primeira chamada stream: Miss (armazena no cache)
+    resp1 = client.post(
+        "/api/v1/partner/chat",
+        headers={
+            "X-Partner-Key": PARTNER_TEST_KEY,
+            "X-Station-ID": "posto_stream_cache",
+        },
+        json={
+            "query": "Status das bombas",
+            "stream": True,
+        },
+    )
+    assert resp1.status_code == 200
+    assert resp1.headers.get("X-Aura-Cache") == "MISS"
+    body1 = resp1.text
+    assert "event: delta" in body1
+    assert "Chunk inicial." in body1
+
+    # 2. Segunda chamada stream: Hit
+    resp2 = client.post(
+        "/api/v1/partner/chat",
+        headers={
+            "X-Partner-Key": PARTNER_TEST_KEY,
+            "X-Station-ID": "posto_stream_cache",
+        },
+        json={
+            "query": "status das bombas",
+            "stream": True,
+        },
+    )
+    assert resp2.status_code == 200
+    assert resp2.headers.get("X-Aura-Cache") == "HIT"
+    body2 = resp2.text
+    assert "event: delta" in body2
+    assert "Chunk inicial." in body2
+    assert "event: done" in body2
+
+
+@pytest.mark.unit
+def test_semantic_cache_invalidation_on_raw_sync(client, mock_engine, monkeypatch, isolated_staging_store):
+    """Garante que novo raw-sync altera o data_version_hash e invalida automaticamente o cache semantico."""
+    station = "posto_sync_inval"
+    call_counter = {"count": 0}
+
+    async def mock_ask(query, **kwargs):
+        call_counter["count"] += 1
+        return AuraResponse(
+            session_id="sess_sync_test",
+            query=query,
+            response_text=f"Resposta sincronizada versao {call_counter['count']}",
+            intent="fechamento",
+            confidence=0.99,
+            routing_method="direct",
+        )
+
+    monkeypatch.setattr(mock_engine, "ask", mock_ask)
+
+    # 1. Ingestao inicial de dados
+    sync1 = client.post(
+        f"/api/v1/partner/stations/{station}/raw-sync",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY},
+        json={"tanques": [{"tanque": "1", "volume": "5000"}]},
+    )
+    assert sync1.status_code == 200
+    hash1 = sync1.json()["data_version_hash"]
+
+    # 2. Primeira consulta: Cache Miss
+    chat1 = client.post(
+        "/api/v1/partner/chat",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY, "X-Station-ID": station},
+        json={"query": "Resumo dos tanques", "stream": False},
+    )
+    assert chat1.status_code == 200
+    assert chat1.headers.get("X-Aura-Cache") == "MISS"
+    assert chat1.headers.get("X-Data-Version") == hash1
+    assert call_counter["count"] == 1
+
+    # 3. Segunda consulta: Cache Hit
+    chat2 = client.post(
+        "/api/v1/partner/chat",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY, "X-Station-ID": station},
+        json={"query": "resumo dos tanques", "stream": False},
+    )
+    assert chat2.status_code == 200
+    assert chat2.headers.get("X-Aura-Cache") == "HIT"
+    assert chat2.headers.get("X-Data-Version") == hash1
+    assert call_counter["count"] == 1
+
+    # 4. Novo raw-sync com dados alterados (novo volume)
+    sync2 = client.post(
+        f"/api/v1/partner/stations/{station}/raw-sync",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY},
+        json={"tanques": [{"tanque": "1", "volume": "8000"}]},
+    )
+    assert sync2.status_code == 200
+    hash2 = sync2.json()["data_version_hash"]
+    assert hash2 != hash1
+
+    # 5. Terceira consulta com nova versao de dados: Cache Miss automatico!
+    chat3 = client.post(
+        "/api/v1/partner/chat",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY, "X-Station-ID": station},
+        json={"query": "Resumo dos tanques", "stream": False},
+    )
+    assert chat3.status_code == 200
+    assert chat3.headers.get("X-Aura-Cache") == "MISS"
+    assert chat3.headers.get("X-Data-Version") == hash2
+    assert call_counter["count"] == 2
+
+
+@pytest.mark.unit
+def test_station_status_contains_data_version_hash(client, isolated_staging_store):
+    """Valida que o endpoint GET /stations/{station_id}/status informa data_version_hash."""
+    resp_empty = client.get(
+        "/api/v1/partner/stations/posto_teste_meta/status",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY},
+    )
+    assert resp_empty.status_code == 200
+    assert "data_version_hash" in resp_empty.json() or resp_empty.json()["status"] == "empty"
+
+    # Sincroniza dados e valida status ready com hash
+    client.post(
+        "/api/v1/partner/stations/posto_teste_meta/raw-sync",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY},
+        json={"tanques": [{"tanque": "1", "volume": "1000"}]},
+    )
+
+    resp_ready = client.get(
+        "/api/v1/partner/stations/posto_teste_meta/status",
+        headers={"X-Partner-Key": PARTNER_TEST_KEY},
+    )
+    assert resp_ready.status_code == 200
+    data = resp_ready.json()
+    assert data["status"] == "ready"
+    assert len(data.get("data_version_hash", "")) == 16
 
 # =============================================================================
 # 6. CONFORMIDADE: ZERO TRAVESSOES

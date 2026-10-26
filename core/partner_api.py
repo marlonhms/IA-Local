@@ -13,6 +13,9 @@ Regra estrita de conformidade: Zero travessoes em todo o modulo.
 
 from __future__ import annotations
 
+from collections import OrderedDict
+import unicodedata
+
 import asyncio
 import hashlib
 import json
@@ -468,6 +471,12 @@ class PartnerStagingStore:
                 "data_version_hash": version_hash,
             }
 
+        # Invalida cache semantico da estacao ao sincronizar novos dados
+        try:
+            get_partner_semantic_cache().invalidate_station(valid_station)
+        except Exception:
+            pass
+
         # Persistencia em disco no volume isolado
         try:
             station_dir = self.staging_dir / valid_station
@@ -548,6 +557,7 @@ class PartnerStagingStore:
                 "station_id": valid_station,
                 "status": "ready",
                 "last_synced": meta.get("last_synced"),
+                "data_version_hash": meta.get("data_version_hash", "0000000000000000"),
                 "table_counts": meta.get("table_counts", {}),
                 "is_cached": True,
             }
@@ -561,6 +571,7 @@ class PartnerStagingStore:
                     "station_id": valid_station,
                     "status": "ready",
                     "last_synced": disk_meta.get("last_synced"),
+                    "data_version_hash": disk_meta.get("data_version_hash", "0000000000000000"),
                     "table_counts": disk_meta.get("table_counts", {}),
                     "is_cached": False,
                 }
@@ -581,6 +592,11 @@ class PartnerStagingStore:
         with self._lock:
             self._cache.pop(valid_station, None)
             self._metadata.pop(valid_station, None)
+
+        try:
+            get_partner_semantic_cache().invalidate_station(valid_station)
+        except Exception:
+            pass
 
         station_dir = self.staging_dir / valid_station
         if station_dir.exists():
@@ -615,6 +631,138 @@ def set_partner_staging_store(store: PartnerStagingStore | None) -> None:
     """Permite sobrescrever ou injetar a instancia de staging para testes."""
     global _global_staging_store
     _global_staging_store = store
+
+
+# =============================================================================
+# CACHE SEMANTICO PARTITIONADO POR ESTACAO E VERSAO DE DADOS (MODULO 2)
+# =============================================================================
+
+class PartnerSemanticResponseCache:
+    """
+    Cache semantico em memoria particionado por estacao e hash de versao dos dados.
+    Chave composta: (station_id, data_version_hash, normalized_query).
+    Garante respostas sub-20ms e custo zero de tokens LLM para consultas equivalentes.
+    Invalidacao automatica quando novos dados entram via raw-sync (mudanca de data_version_hash).
+    Limite configuravel por estacao com politica LRU para prevencao de vazamento de memoria.
+    """
+
+    def __init__(self, max_entries_per_station: int = 200) -> None:
+        self.max_entries_per_station = max_entries_per_station
+        self._lock = threading.Lock()
+        # Estrutura: {station_id: OrderedDict[(version_hash, norm_query), cache_payload]}
+        self._cache: dict[str, OrderedDict[tuple[str, str], dict[str, Any]]] = {}
+
+    @staticmethod
+    def normalize_query(query: str) -> str:
+        """
+        Normaliza a consulta removendo acentos, pontuacao e espacos redundantes.
+        Ex: 'Como estao os tanques agora?' -> 'como estao os tanques agora'
+        """
+        if not query:
+            return ""
+        # Normaliza decomposicao unicode para remover diacriticos/acentos
+        normalized = unicodedata.normalize("NFKD", query)
+        without_accents = "".join(c for c in normalized if not unicodedata.combining(c))
+        # Remove pontuacao e caracteres nao-alfanumericos exceto espacos
+        clean = re.sub(r"[^\w\s]", " ", without_accents.lower())
+        # Colapsa espacos multiplos
+        clean = re.sub(r"\s+", " ", clean).strip()
+        return clean
+
+    def get(
+        self,
+        station_id: str,
+        data_version_hash: str,
+        query: str,
+    ) -> dict[str, Any] | None:
+        """
+        Recupera resposta do cache caso exista para a estacao, versao de dados e query normalizada.
+        Move a entrada para o fim (mais recente) no modelo LRU.
+        """
+        norm_query = self.normalize_query(query)
+        if not norm_query:
+            return None
+
+        clean_station = station_id.strip()
+        key = (data_version_hash.strip(), norm_query)
+
+        with self._lock:
+            station_dict = self._cache.get(clean_station)
+            if not station_dict or key not in station_dict:
+                return None
+            station_dict.move_to_end(key)
+            return dict(station_dict[key])
+
+    def set(
+        self,
+        station_id: str,
+        data_version_hash: str,
+        query: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """
+        Armazena resposta no cache sob a chave (data_version_hash, normalized_query).
+        Aplica eviction LRU se a estacao exceder max_entries_per_station.
+        """
+        norm_query = self.normalize_query(query)
+        if not norm_query:
+            return
+
+        clean_station = station_id.strip()
+        key = (data_version_hash.strip(), norm_query)
+
+        entry = dict(payload)
+        entry["cached_at"] = datetime.now(UTC).isoformat()
+
+        with self._lock:
+            if clean_station not in self._cache:
+                self._cache[clean_station] = OrderedDict()
+            station_dict = self._cache[clean_station]
+
+            station_dict[key] = entry
+            station_dict.move_to_end(key)
+
+            if len(station_dict) > self.max_entries_per_station:
+                station_dict.popitem(last=False)
+
+    def invalidate_station(self, station_id: str) -> None:
+        """Invalida imediatamente todas as entradas de cache da estacao informada."""
+        clean_station = station_id.strip()
+        with self._lock:
+            self._cache.pop(clean_station, None)
+
+    def clear(self) -> None:
+        """Limpa todo o cache de todas as estacoes."""
+        with self._lock:
+            self._cache.clear()
+
+    def stats(self, station_id: str | None = None) -> dict[str, Any]:
+        """Retorna estatisticas de itens em cache para monitoramento."""
+        with self._lock:
+            if station_id:
+                clean_station = station_id.strip()
+                count = len(self._cache.get(clean_station, {}))
+                return {"station_id": clean_station, "cached_entries": count}
+            total = sum(len(entries) for entries in self._cache.values())
+            return {"total_stations": len(self._cache), "total_cached_entries": total}
+
+
+_global_semantic_cache: PartnerSemanticResponseCache | None = None
+
+
+def get_partner_semantic_cache() -> PartnerSemanticResponseCache:
+    """Dependency provider do cache semantico particionado por estacao."""
+    global _global_semantic_cache
+    if _global_semantic_cache is None:
+        _global_semantic_cache = PartnerSemanticResponseCache()
+    return _global_semantic_cache
+
+
+def set_partner_semantic_cache(cache: PartnerSemanticResponseCache | None) -> None:
+    """Define ou reseta o cache semantico global (util para testes isolados)."""
+    global _global_semantic_cache
+    _global_semantic_cache = cache
+
 
 
 # =============================================================================
@@ -1018,18 +1166,16 @@ async def partner_chat_endpoint(
     req: PartnerChatRequest,
     request: Request,
     auth_info: dict[str, str] = Depends(verify_partner_auth),
+    staging_store: PartnerStagingStore = Depends(get_partner_staging_store),
+    semantic_cache: PartnerSemanticResponseCache = Depends(get_partner_semantic_cache),
 ):
     """
     Conversacao com a AURA para parceiros externos:
     - Opera em modo texto puro (enable_genui=False).
+    - Cache semantico sincronizado com data_version_hash da estacao (<20ms para hits).
     - No streaming SSE, descarta chunks de calculos internos (intent, tool_start, tool_result, telemetry).
     - Transmite exclusivamente chunks do tipo 'delta' e 'done'.
     """
-    # Import tardio para evitar ciclos de dependencia
-    from core.aura_api import get_aura_engine
-
-    engine: AuraEngine = get_aura_engine()
-
     # Validacao de conflito de estacao entre Header e Body
     header_station = auth_info.get("station_id")
     if header_station and req.station_id and header_station != req.station_id.strip():
@@ -1041,8 +1187,69 @@ async def partner_chat_endpoint(
     effective_station = header_station or req.station_id or "default"
     effective_session = req.session_id or f"partner_{effective_station}_{uuid.uuid4().hex[:8]}"
 
+    # Recupera versao atual dos dados da estacao para particionamento do cache
+    current_version_hash = staging_store.get_data_version_hash(effective_station)
+
+    # 1. Consulta ao Cache Semantico
+    cached = semantic_cache.get(effective_station, current_version_hash, req.query)
+    if cached is not None:
+        if req.stream:
+            async def cached_sse_generator():
+                delta_chunk = AuraChunk(
+                    chunk_type=AuraChunkType.DELTA,
+                    text=cached["response_text"],
+                    session_id=effective_session,
+                )
+                yield delta_chunk.to_sse()
+                done_chunk = AuraChunk(
+                    chunk_type=AuraChunkType.DONE,
+                    text="",
+                    session_id=effective_session,
+                )
+                yield done_chunk.to_sse()
+
+            return StreamingResponse(
+                cached_sse_generator(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no",
+                    "X-Station-ID": effective_station,
+                    "X-GenUI-Enabled": "0",
+                    "X-Aura-Cache": "HIT",
+                    "X-Data-Version": current_version_hash,
+                },
+            )
+        else:
+            return JSONResponse(
+                content={
+                    "session_id": effective_session,
+                    "station_id": effective_station,
+                    "query": req.query,
+                    "response_text": cached["response_text"],
+                    "intent": cached.get("intent", "chat"),
+                    "confidence": cached.get("confidence", 1.0),
+                    "cache_hit": True,
+                    "data_version_hash": current_version_hash,
+                },
+                headers={
+                    "X-Aura-Cache": "HIT",
+                    "X-Data-Version": current_version_hash,
+                    "X-Station-ID": effective_station,
+                    "X-GenUI-Enabled": "0",
+                },
+            )
+
+    # 2. Cache Miss: Executa o fluxo normal do motor
+    # Import tardio para evitar ciclos de dependencia
+    from core.aura_api import get_aura_engine
+
+    engine: AuraEngine = get_aura_engine()
+
     if req.stream:
         async def filtered_sse_generator():
+            accumulated_text: list[str] = []
             try:
                 async for chunk in engine.ask_stream(
                     query=req.query,
@@ -1050,11 +1257,23 @@ async def partner_chat_endpoint(
                     session_id=effective_session,
                     tenant_id=req.tenant_id,
                     filial_id=effective_station,
-                    enable_genui=False, # Estritamente desativado para parceiros
+                    enable_genui=False,  # Estritamente desativado para parceiros
                 ):
                     # Filtro rigoroso: descarta chunks de calculos internos
-                    if chunk.chunk_type in (AuraChunkType.DELTA, AuraChunkType.DONE):
+                    if chunk.chunk_type == AuraChunkType.DELTA:
+                        accumulated_text.append(chunk.text)
                         yield chunk.to_sse()
+                    elif chunk.chunk_type == AuraChunkType.DONE:
+                        yield chunk.to_sse()
+
+                full_text = "".join(accumulated_text)
+                if full_text:
+                    semantic_cache.set(
+                        effective_station,
+                        current_version_hash,
+                        req.query,
+                        {"response_text": full_text, "intent": "chat", "confidence": 0.95},
+                    )
             except Exception as exc:
                 logger.error(f"PartnerGateway: Erro no streaming SSE: {exc}", exc_info=True)
                 err_chunk = AuraChunk(
@@ -1079,6 +1298,8 @@ async def partner_chat_endpoint(
                 "X-Accel-Buffering": "no",
                 "X-Station-ID": effective_station,
                 "X-GenUI-Enabled": "0",
+                "X-Aura-Cache": "MISS",
+                "X-Data-Version": current_version_hash,
             },
         )
     else:
@@ -1091,14 +1312,35 @@ async def partner_chat_endpoint(
             filial_id=effective_station,
             enable_genui=False,
         )
-        return {
-            "session_id": response.session_id,
-            "station_id": effective_station,
-            "query": response.query,
-            "response_text": response.response_text,
-            "intent": response.intent,
-            "confidence": response.confidence,
-        }
+        if response.response_text:
+            semantic_cache.set(
+                effective_station,
+                current_version_hash,
+                req.query,
+                {
+                    "response_text": response.response_text,
+                    "intent": response.intent,
+                    "confidence": response.confidence,
+                },
+            )
+        return JSONResponse(
+            content={
+                "session_id": response.session_id,
+                "station_id": effective_station,
+                "query": response.query,
+                "response_text": response.response_text,
+                "intent": response.intent,
+                "confidence": response.confidence,
+                "cache_hit": False,
+                "data_version_hash": current_version_hash,
+            },
+            headers={
+                "X-Aura-Cache": "MISS",
+                "X-Data-Version": current_version_hash,
+                "X-Station-ID": effective_station,
+                "X-GenUI-Enabled": "0",
+            },
+        )
 
 
 # =============================================================================
