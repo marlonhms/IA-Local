@@ -210,7 +210,7 @@ private fun CardHeader(card: GenUiCard) {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             StatusDot(color = AuraEmerald, pulsing = true, size = 7.dp)
-            SectionLabel("AURA COCKPIT")
+            SectionLabel("AURA")
             card.confidence?.let {
                 Spacer(Modifier.weight(1f))
                 AuraPill(

@@ -37,7 +37,7 @@ class ChatViewModel @Inject constructor(
     private val _currentSessionId = MutableStateFlow("default")
     val currentSessionId: StateFlow<String> = _currentSessionId.asStateFlow()
 
-    private val _currentSessionTitle = MutableStateFlow("AURA Cockpit")
+    private val _currentSessionTitle = MutableStateFlow("AURA")
     val currentSessionTitle: StateFlow<String> = _currentSessionTitle.asStateFlow()
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
@@ -60,7 +60,7 @@ class ChatViewModel @Inject constructor(
                 _sessions.value = sessionList
             }
         }
-        loadSession("default", "AURA Cockpit")
+        loadSession("default", "AURA")
     }
 
     fun loadSession(sessionId: String, title: String) {
@@ -100,7 +100,7 @@ class ChatViewModel @Inject constructor(
             chatDao.deleteSession(sessionId)
             chatDao.clearSessionMessages(sessionId)
             if (_currentSessionId.value == sessionId) {
-                loadSession("default", "AURA Cockpit")
+                loadSession("default", "AURA")
             }
         }
     }

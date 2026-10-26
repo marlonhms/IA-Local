@@ -51,6 +51,14 @@ val StatusDanger = Color(0xFFF87171)
 val StatusInfo = Color(0xFF38BDF8)
 
 // Gradientes de marca
+val AuraBrandBlue = Color(0xFF38BDF8) // Azul celeste vibrante
+val AuraBrandPetroleum = Color(0xFF0D9488) // Verde Petroleo / Teal escuro
+val AuraBrandPurple = Color(0xFFA855F7) // Roxo elegante
+
+val AuraBrandGradient: Brush = Brush.horizontalGradient(
+    colors = listOf(AuraBrandBlue, AuraBrandPetroleum, AuraBrandPurple)
+)
+
 val AuroraBrush: Brush = Brush.linearGradient(listOf(AuraCyan, AuraEmerald))
 val AuroraBrushSoft: Brush = Brush.linearGradient(
     listOf(AuraCyan.copy(alpha = 0.18f), AuraEmerald.copy(alpha = 0.18f))

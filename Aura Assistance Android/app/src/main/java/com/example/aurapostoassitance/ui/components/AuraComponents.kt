@@ -46,11 +46,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.aurapostoassitance.ui.theme.AuraBrandGradient
 import com.example.aurapostoassitance.ui.theme.AuraCyan
 import com.example.aurapostoassitance.ui.theme.AuraEmerald
 import com.example.aurapostoassitance.ui.theme.AuroraBrush
@@ -572,3 +575,27 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) {
         )
     }
 }
+
+/**
+ * Titulo com tipagem premium para a marca AURA:
+ * Gradiente horizontal entre Azul (#38BDF8), Verde Petroleo (#0D9488) e Roxo (#A855F7).
+ */
+@Composable
+fun AuraBrandTitle(
+    text: String = "AURA",
+    modifier: Modifier = Modifier,
+    style: TextStyle = MaterialTheme.typography.titleLarge,
+    fontWeight: FontWeight = FontWeight.ExtraBold,
+    letterSpacing: TextUnit = 1.8.sp
+) {
+    Text(
+        text = text,
+        modifier = modifier,
+        style = style.copy(
+            brush = AuraBrandGradient,
+            fontWeight = fontWeight,
+            letterSpacing = letterSpacing
+        )
+    )
+}
+

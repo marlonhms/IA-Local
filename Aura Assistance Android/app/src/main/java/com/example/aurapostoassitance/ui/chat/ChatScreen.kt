@@ -81,6 +81,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.aurapostoassitance.ui.components.AuraBrandTitle
 import com.example.aurapostoassitance.ui.components.AuraCard
 import com.example.aurapostoassitance.ui.components.AuraChip
 import com.example.aurapostoassitance.ui.components.SectionLabel
@@ -335,12 +336,19 @@ private fun ChatHeader(
                     .weight(1f)
                     .clickable(onClick = onHistory)
             ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = TextPrimary,
-                    maxLines = 1
-                )
+                if (title.equals("AURA", ignoreCase = true) || title.contains("Cockpit", ignoreCase = true)) {
+                    AuraBrandTitle(
+                        text = "AURA",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                } else {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = TextPrimary,
+                        maxLines = 1
+                    )
+                }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)

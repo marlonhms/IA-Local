@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.aurapostoassitance.ui.components.AuraBrandTitle
 import com.example.aurapostoassitance.ui.components.AuraCard
 import com.example.aurapostoassitance.ui.components.AuraChip
 import com.example.aurapostoassitance.ui.components.AuraGradientButton
@@ -121,13 +122,9 @@ fun DashboardScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
+                        AuraBrandTitle(
                             text = "AURA",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.2.sp
-                            ),
-                            color = AuraEmerald
+                            style = MaterialTheme.typography.titleLarge
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Row(
@@ -243,9 +240,9 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // Main CTA Cockpit Button
+            // Main CTA AURA Button
             AuraGradientButton(
-                text = "Abrir Cockpit da AURA",
+                text = "Abrir AURA",
                 onClick = { onNavigateToChat(null) },
                 icon = Icons.AutoMirrored.Rounded.Chat,
                 modifier = Modifier.fillMaxWidth()

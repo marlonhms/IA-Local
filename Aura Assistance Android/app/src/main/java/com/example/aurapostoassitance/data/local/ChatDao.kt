@@ -15,10 +15,10 @@ interface ChatDao {
     suspend fun insertMessage(message: ChatMessageEntity)
 
     @Query("DELETE FROM chat_messages WHERE sessionId = :sessionId")
-    suspend fun clearSessionMessages(sessionId: String)
+    suspend fun clearSessionMessages(sessionId: String): Int
 
     @Query("DELETE FROM chat_messages")
-    suspend fun clearAllMessages()
+    suspend fun clearAllMessages(): Int
 
     @Query("SELECT * FROM chat_sessions ORDER BY timestamp DESC")
     fun getAllSessions(): Flow<List<ChatSessionEntity>>
@@ -27,5 +27,5 @@ interface ChatDao {
     suspend fun insertSession(session: ChatSessionEntity)
 
     @Query("DELETE FROM chat_sessions WHERE sessionId = :sessionId")
-    suspend fun deleteSession(sessionId: String)
+    suspend fun deleteSession(sessionId: String): Int
 }
