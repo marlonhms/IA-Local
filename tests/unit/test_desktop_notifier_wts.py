@@ -684,7 +684,7 @@ class TestPhase4ZeroDashes:
             base_dir / "core" / "aura_api.py",
             base_dir / "core" / "__init__.py",
             base_dir / "ROADMAP_SENTINEL_AURA.md",
-            base_dir / "docs" / "ROADMAP_SENTINEL_AURA.md",
+            base_dir / "docs" / "archive" / "roadmaps" / "ROADMAP_SENTINEL_AURA.md",
             base_dir / "tests" / "unit" / "test_desktop_notifier_wts.py",
         ]
 
