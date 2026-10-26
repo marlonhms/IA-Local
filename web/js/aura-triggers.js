@@ -17,6 +17,39 @@ class AuraTriggersController {
   getToolsCatalog() {
     return [
       {
+        id: 'roi_diagnostic',
+        aliases: ['diagnostico_executivo_roi', 'diagnostico_perdas', 'roi_perdas'],
+        name: 'Diagnóstico Executivo de ROI & Perdas (90 Dias)',
+        category: 'gestao',
+        icon: 'dollar-sign',
+        color: 'emerald',
+        badge: 'Executivo / ROI',
+        desc: 'Diagnóstico determinístico dos 5 vetores de perdas operacionais, projeção de retorno líquido em 90 dias e garantia de 3x.',
+        defaultParams: { monthly_subscription_brl: 490.0 },
+      },
+      {
+        id: 'pos_audit',
+        aliases: ['radar_anomalias_pdv', 'auditoria_pdv_zscore', 'auditoria_pos'],
+        name: 'Radar de Anomalias de PDV & Caixa (Z-Score)',
+        category: 'caixa',
+        icon: 'shield-alert',
+        color: 'cyan',
+        badge: 'Auditoria CLT',
+        desc: 'Auditoria estatística e contábil de cancelamentos com Z-Score por operador e checklist de conformidade Art. 462 CLT.',
+        defaultParams: {},
+      },
+      {
+        id: 'zero_click_briefing',
+        aliases: ['briefing_matinal', 'cafe_com_dono', 'morning_briefing'],
+        name: 'Briefing Matinal Zero-Click (Café com o Dono)',
+        category: 'gestao',
+        icon: 'coffee',
+        color: 'purple',
+        badge: 'WhatsApp / Mobile',
+        desc: 'Resumo executivo consolidado das últimas 24h, alerta de runout de tanques, divergências de caixa e mensagem formatada para WhatsApp.',
+        defaultParams: {},
+      },
+      {
         id: 'run_out',
         name: 'Previsão Run-Out de Tanques',
         category: 'combustiveis',
@@ -1476,6 +1509,361 @@ class AuraTriggersController {
               <span>Ver Vitrine no Showcase</span>
               <span>↗</span>
             </a>
+          </div>
+        </div>
+      `;
+    }
+
+    if (toolId === 'roi_diagnostic' || toolId === 'diagnostico_executivo_roi' || toolId === 'diagnostico_perdas' || toolId === 'roi_perdas') {
+      const summary = data.summary || {};
+      const breakdown = data.breakdown_brl || {};
+      const shield = data.regulatory_shield || {};
+
+      const totalLeakage = Number(summary.total_monthly_leakage_brl || 0);
+      const estRecovery = Number(summary.estimated_monthly_recovery_brl || 0);
+      const net90 = Number(summary.roi_90_days_net_brl || 0);
+      const multiple = Number(summary.roi_multiple || 0);
+      const guarantee3x = summary.guarantee_3x_met !== false;
+
+      const vLmc = Number(breakdown.lmc_and_tank_shrinkage || 0);
+      const vPdv = Number(breakdown.convenience_and_pos_cancellations || 0);
+      const vCaixa = Number(breakdown.cashier_shift_discrepancies || 0);
+      const vPricing = Number(breakdown.pricing_and_carreta_arbitrage || 0);
+      const vSelic = Number(breakdown.working_capital_selic_cost || 0);
+
+      const fmt = (v) => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      return `
+        <div class="space-y-4 font-sans text-xs">
+          <!-- Top Executive Banner -->
+          <div class="p-4 rounded-xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-cyan-950/30 border border-emerald-500/30 shadow-lg shadow-emerald-950/20">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-3 pb-3 border-b border-emerald-500/20">
+              <div class="flex items-center gap-2">
+                <span class="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                </span>
+                <div>
+                  <h4 class="font-bold text-sm text-slate-100">Diagnóstico Executivo de ROI & Perdas</h4>
+                  <p class="text-[11px] text-slate-400">Projeção determinística de 90 dias com rampa de adoção operacional</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold ${guarantee3x ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'}">
+                  ${guarantee3x ? 'Garantia Contratual 3x Ativa' : 'Em Calibração'}
+                </span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+              <div class="p-2.5 rounded-lg bg-slate-950/50 border border-slate-800">
+                <span class="text-[10px] text-slate-400 block uppercase tracking-wider">Perda Mensal Mapeada</span>
+                <span class="text-base font-bold text-rose-400 font-mono mt-0.5 block">${fmt(totalLeakage)}</span>
+              </div>
+              <div class="p-2.5 rounded-lg bg-slate-950/50 border border-slate-800">
+                <span class="text-[10px] text-slate-400 block uppercase tracking-wider">Recuperação Mensal</span>
+                <span class="text-base font-bold text-emerald-400 font-mono mt-0.5 block">${fmt(estRecovery)}</span>
+              </div>
+              <div class="p-2.5 rounded-lg bg-slate-950/50 border border-slate-800">
+                <span class="text-[10px] text-slate-400 block uppercase tracking-wider">Retorno Líquido (90d)</span>
+                <span class="text-base font-bold text-cyan-300 font-mono mt-0.5 block">${fmt(net90)}</span>
+              </div>
+              <div class="p-2.5 rounded-lg bg-slate-950/50 border border-slate-800">
+                <span class="text-[10px] text-slate-400 block uppercase tracking-wider">Múltiplo de Retorno</span>
+                <span class="text-base font-bold text-purple-300 font-mono mt-0.5 block">${multiple.toFixed(1)}x</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5 Vetores de Perdas Operacionais -->
+          <div>
+            <h5 class="text-xs font-semibold text-slate-200 mb-2 flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+              <span>Detalhamento dos 5 Vetores de Perda Financeira</span>
+            </h5>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition-colors">
+                <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                  <span>1. LMC & Variação de Tanques</span>
+                  <span class="text-rose-400 font-mono font-semibold">${fmt(vLmc)}</span>
+                </div>
+                <p class="text-[10px] text-slate-500 leading-relaxed">Perdas térmicas e divergências de estoque escriturado vs físico (Portaria 26 ANP).</p>
+              </div>
+
+              <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition-colors">
+                <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                  <span>2. Cancelamentos PDV & Loja</span>
+                  <span class="text-rose-400 font-mono font-semibold">${fmt(vPdv)}</span>
+                </div>
+                <p class="text-[10px] text-slate-500 leading-relaxed">Itens e cupons cancelados no PDV fora da curva gaussiana esperada.</p>
+              </div>
+
+              <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition-colors">
+                <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                  <span>3. Furos de Gaveta & Caixa</span>
+                  <span class="text-rose-400 font-mono font-semibold">${fmt(vCaixa)}</span>
+                </div>
+                <p class="text-[10px] text-slate-500 leading-relaxed">Diferença apurada entre fechamento físico de dinheiro e sangrias no sistema.</p>
+              </div>
+
+              <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition-colors">
+                <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                  <span>4. Arbitragem de Carreta & Preço</span>
+                  <span class="text-rose-400 font-mono font-semibold">${fmt(vPricing)}</span>
+                </div>
+                <p class="text-[10px] text-slate-500 leading-relaxed">Perda de margem por compra fracionada em vez de carreta fechada (30.000 L).</p>
+              </div>
+
+              <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition-colors">
+                <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                  <span>5. Custo SELIC Capital Parado</span>
+                  <span class="text-rose-400 font-mono font-semibold">${fmt(vSelic)}</span>
+                </div>
+                <p class="text-[10px] text-slate-500 leading-relaxed">Custo de oportunidade do capital de giro em estoque sem giro > 30 dias.</p>
+              </div>
+
+              <div class="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center gap-1.5 text-emerald-400 text-[11px] font-semibold mb-1">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    <span>Blindagem Regulatória ANP</span>
+                  </div>
+                  <p class="text-[10px] text-slate-400 leading-relaxed">Elimina risco de auto de infração da Lei 9.847/99 (Multa mínima: R$ 20.000,00).</p>
+                </div>
+                <span class="text-[10px] text-emerald-300/80 font-mono mt-2 block">Tolerância Legal: +/- 0.60%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rodapé de Ações do Dono -->
+          <div class="p-3 rounded-xl bg-slate-900/40 border border-slate-800 flex flex-wrap items-center justify-between gap-2">
+            <span class="text-[11px] text-slate-400 flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              <span>Diagnóstico validado pelo Copiloto AURA. Nenhuma gravação efetuada no ERP.</span>
+            </span>
+            <div class="flex items-center gap-2">
+              <button type="button" class="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[11px] font-semibold cursor-pointer transition-colors"
+                      onclick="window.auraTriggers.copyJson()">
+                Copiar Dados JSON
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (toolId === 'pos_audit' || toolId === 'radar_anomalias_pdv' || toolId === 'auditoria_pdv_zscore' || toolId === 'auditoria_pos') {
+      const totOp = Number(data.total_operators_analyzed || 0);
+      const anomCount = Number(data.anomalous_operators_count || 0);
+      const ops = data.operators_analysis || [];
+      const shift = data.cashier_shift_audit || {};
+      const clt = data.clt_compliance_checklist || {};
+
+      const isConciliado = shift.status === 'CONCILIADO';
+      const discBrl = Number(shift.discrepancy_brl || 0);
+      const fmt = (v) => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      let opsRows = '';
+      if (ops.length === 0) {
+        opsRows = `<tr><td colspan="6" class="py-3 text-center text-slate-500 text-xs">Nenhum operador com vendas registrado no período.</td></tr>`;
+      } else {
+        ops.forEach(o => {
+          const isAnom = o.is_anomaly;
+          const zScore = Number(o.z_score || 0).toFixed(2);
+          const cRate = Number(o.cancellation_rate_pct || 0).toFixed(1);
+          const badgeClass = isAnom 
+            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' 
+            : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30';
+          const badgeLabel = isAnom ? 'Desvio Estatístico (>2.0σ)' : 'Padrão Histórico';
+
+          opsRows += `
+            <tr class="border-b border-slate-800/60 hover:bg-slate-800/30 transition-colors">
+              <td class="py-2 px-2.5 font-mono text-slate-200 font-semibold">${this.escapeHtml(o.operator_id)}</td>
+              <td class="py-2 px-2.5 text-right font-mono text-slate-300">${o.total_orders || 0}</td>
+              <td class="py-2 px-2.5 text-right font-mono text-slate-300">${o.cancelled_orders || 0}</td>
+              <td class="py-2 px-2.5 text-right font-mono text-slate-200 font-semibold">${cRate}%</td>
+              <td class="py-2 px-2.5 text-right font-mono ${isAnom ? 'text-rose-400 font-bold' : 'text-slate-400'}">${zScore}</td>
+              <td class="py-2 px-2.5 text-center">
+                <span class="px-2 py-0.5 rounded text-[10px] font-sans font-semibold ${badgeClass}">${badgeLabel}</span>
+              </td>
+            </tr>
+          `;
+        });
+      }
+
+      const cltReqs = clt.mandatory_requirements_for_deduction || [
+        'Comprovação de pagamento da rubrica Adicional de Quebra de Caixa em folha',
+        'Previsão contratual expressa autorizando desconto em caso de divergência',
+        'Borderô físico de fechamento conferido e assinado pelo operador no ato',
+      ];
+
+      let reqsHtml = cltReqs.map(r => `
+        <li class="flex items-start gap-2 text-[11px] text-slate-300">
+          <svg class="w-3.5 h-3.5 text-cyan-400 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>${this.escapeHtml(r)}</span>
+        </li>
+      `).join('');
+
+      return `
+        <div class="space-y-4 font-sans text-xs">
+          <!-- Top KPI Grid -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+              <span class="text-[10px] text-slate-400 block uppercase tracking-wider">Operadores Auditados</span>
+              <span class="text-base font-bold text-slate-100 font-mono mt-0.5 block">${totOp}</span>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+              <span class="text-[10px] text-slate-400 block uppercase tracking-wider">Desvios Z-Score (>2σ)</span>
+              <span class="text-base font-bold ${anomCount > 0 ? 'text-rose-400' : 'text-emerald-400'} font-mono mt-0.5 block">${anomCount}</span>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+              <span class="text-[10px] text-slate-400 block uppercase tracking-wider">Status Fechamento Caixa</span>
+              <span class="text-xs font-bold ${isConciliado ? 'text-emerald-400' : 'text-rose-400'} mt-1 block">
+                ${isConciliado ? 'CONCILIADO' : 'DIVERGÊNCIA PENDENTE'}
+              </span>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+              <span class="text-[10px] text-slate-400 block uppercase tracking-wider">Divergência de Pista</span>
+              <span class="text-base font-bold ${discBrl === 0 ? 'text-slate-300' : 'text-rose-400'} font-mono mt-0.5 block">${fmt(discBrl)}</span>
+            </div>
+          </div>
+
+          <!-- Tabela de Operadores -->
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+            <h5 class="text-xs font-semibold text-slate-200 mb-2.5 flex items-center justify-between">
+              <span class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span>Radar Estatístico de Cancelamentos por Operador (Z-Score)</span>
+              </span>
+              <span class="text-[10px] text-slate-400 font-mono font-normal">Corte Anômalo: |Z| > 2.0</span>
+            </h5>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="border-b border-slate-800 text-[10px] text-slate-400 uppercase tracking-wider">
+                    <th class="py-2 px-2.5">Operador</th>
+                    <th class="py-2 px-2.5 text-right">Pedidos</th>
+                    <th class="py-2 px-2.5 text-right">Cancelados</th>
+                    <th class="py-2 px-2.5 text-right">Taxa %</th>
+                    <th class="py-2 px-2.5 text-right">Z-Score</th>
+                    <th class="py-2 px-2.5 text-center">Classificação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${opsRows}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Blindagem Trabalhista CLT Art. 462 -->
+          <div class="p-4 rounded-xl bg-cyan-950/20 border border-cyan-500/30">
+            <div class="flex items-center gap-2 mb-2 pb-2 border-b border-cyan-500/20">
+              <span class="p-1 rounded bg-cyan-500/20 text-cyan-400">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </span>
+              <div>
+                <h5 class="text-xs font-bold text-cyan-300">Blindagem Jurídica Trabalhista (Art. 462 CLT)</h5>
+                <p class="text-[10px] text-slate-400">Requisitos cumulativos exigidos pelo TST (Precedente 103 e OJ 251 SDI-1) para imputação de quebra de caixa</p>
+              </div>
+            </div>
+            <ul class="space-y-1.5 mt-2">
+              ${reqsHtml}
+            </ul>
+            <div class="mt-3 pt-2.5 border-t border-cyan-500/20 text-[10px] text-cyan-400/80 flex items-center justify-between">
+              <span>Política Terminológica: Estritamente contábil e estatística (Zero termos acusatórios).</span>
+              <span class="font-mono">TST-OJ-251 OK</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (toolId === 'zero_click_briefing' || toolId === 'briefing_matinal' || toolId === 'cafe_com_dono' || toolId === 'morning_briefing') {
+      const s24 = data.sales_summary_24h || {};
+      const tank = data.tank_critical_runout || {};
+      const wpText = data.whatsapp_formatted_text || '';
+      const quickActions = data.quick_actions || [];
+
+      const faturamento = Number(s24.total_turnover_brl || 0);
+      const volumeLitros = Number(s24.total_liters || 0);
+      const tankId = tank.tank_id || '1';
+      const fuelName = tank.fuel_type || 'Combustível';
+      const occPct = Number(tank.occupancy_pct || 0);
+      const orderBoxes = tank.recommended_order_compartments || 0;
+
+      const fmt = (v) => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const encodedWp = encodeURIComponent(wpText);
+
+      let actionsHtml = quickActions.map(a => `
+        <button type="button" class="px-3 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border border-purple-500/40 text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5"
+                onclick="if (window.auraChat) { window.auraChat.setInputText('${this.escapeHtml(a)}'); window.auraChat.sendMessage(); }">
+          <svg class="w-3 h-3 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span>${this.escapeHtml(a)}</span>
+        </button>
+      `).join('');
+
+      return `
+        <div class="space-y-4 font-sans text-xs">
+          <!-- Top KPI Row -->
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+              <span class="text-[10px] text-slate-400 block uppercase tracking-wider">Faturamento (Últimas 24h)</span>
+              <span class="text-base font-bold text-emerald-400 font-mono mt-0.5 block">${fmt(faturamento)}</span>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+              <span class="text-[10px] text-slate-400 block uppercase tracking-wider">Volume Vendido</span>
+              <span class="text-base font-bold text-cyan-300 font-mono mt-0.5 block">${Number(volumeLitros).toLocaleString('pt-BR')} L</span>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 col-span-2 md:col-span-1">
+              <span class="text-[10px] text-slate-400 block uppercase tracking-wider">Tanque Crítico</span>
+              <span class="text-xs font-bold text-amber-300 mt-1 block">
+                Tanque ${tankId} (${fuelName}) - ${occPct.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+
+          <!-- Alerta de Runout Crítico -->
+          <div class="p-3.5 rounded-xl bg-amber-950/20 border border-amber-500/30 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <span class="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </span>
+              <div>
+                <strong class="text-amber-200 block text-xs">Recomendação Logística de Compra</strong>
+                <p class="text-[11px] text-slate-300">Tanque ${tankId} (${fuelName}) requer pedido imediato de <strong>${orderBoxes} compartimento(s)</strong> de 5.000 L para evitar risco de ruptura seca.</p>
+              </div>
+            </div>
+            <button type="button" class="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-xs font-semibold cursor-pointer whitespace-nowrap transition-colors"
+                    onclick="if (window.auraChat) { window.auraChat.setInputText('Aprovar Pedido de ${orderBoxes * 5000} L para Tanque ${tankId}'); window.auraChat.sendMessage(); }">
+              Sugerir Pedido
+            </button>
+          </div>
+
+          <!-- Preview Balão WhatsApp -->
+          <div class="p-4 rounded-xl bg-emerald-950/30 border border-emerald-500/30">
+            <div class="flex items-center justify-between mb-2.5 pb-2 border-b border-emerald-500/20">
+              <span class="flex items-center gap-1.5 text-emerald-400 font-bold text-xs">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                <span>Preview do Briefing Matinal (WhatsApp / Mobile)</span>
+              </span>
+              <a href="https://api.whatsapp.com/send?text=${encodedWp}" target="_blank" rel="noopener noreferrer"
+                 class="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] transition-colors flex items-center gap-1">
+                <span>Disparar WhatsApp</span>
+                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              </a>
+            </div>
+
+            <div class="p-3.5 rounded-lg bg-emerald-950/50 border border-emerald-500/20 text-slate-200 text-xs font-mono whitespace-pre-wrap leading-relaxed shadow-inner">
+              ${this.escapeHtml(wpText)}
+            </div>
+          </div>
+
+          <!-- Ações Rápidas em 1-Clique -->
+          <div>
+            <span class="text-[11px] text-slate-400 block mb-2 font-semibold">Ações Rápidas Disponíveis:</span>
+            <div class="flex flex-wrap gap-2">
+              ${actionsHtml}
+            </div>
           </div>
         </div>
       `;

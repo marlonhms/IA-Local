@@ -480,6 +480,43 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
             "Formas de pagamento por funcionario",
         ],
     },
+    "roi_diagnostic": {
+        "descricao": "Diagnostico executivo de 5 vetores de perdas operacionais, projecao de retorno liquido em 90 dias e garantia de 3x",
+        "exemplos": [
+            "Qual o meu diagnostico de ROI e perdas?",
+            "Quanto o posto esta perdendo por mes?",
+            "Diagnostico executivo de perdas operacionais",
+            "Calculo do retorno liquido em 90 dias",
+            "Projecao de ROI do posto",
+            "Estudo dos 5 vetores de perdas financeiras",
+            "Garantia de 3x do plano AURA",
+            "Quanto posso economizar com a AURA?",
+        ],
+    },
+    "pos_audit": {
+        "descricao": "Auditoria estatistica e contabil de cancelamentos com Z-Score por operador e checklist Art. 462 CLT",
+        "exemplos": [
+            "Radar de anomalias no PDV",
+            "Auditoria de cancelamentos de operadores de caixa",
+            "Z-Score de cancelamentos por operador",
+            "Conferencia de cancelamentos e estornos",
+            "Auditoria trabalhista CLT de fechamento de caixa",
+            "Divergencia entre pista e fechamento de caixa",
+            "Operadores com volume de cancelamento anormal",
+        ],
+    },
+    "zero_click_briefing": {
+        "descricao": "Briefing matinal executivo consolidado das ultimas 24h pronto para envio no WhatsApp",
+        "exemplos": [
+            "Briefing matinal do posto",
+            "Cafe com o dono",
+            "Resumo executivo do dia",
+            "Briefing do posto para WhatsApp",
+            "Resumo das ultimas 24 horas de vendas e estoques",
+            "Como fechou o posto ontem?",
+            "Panorama matinal executivo",
+        ],
+    },
 }
 
 
@@ -541,6 +578,18 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     # -2. Comandos de repetição / saudações neutras não devem disparar ferramentas operacionais
     if RETRY_REGEX.match(p) or p in CONVERSATIONAL_WORDS:
         return "catalogo_produtos"
+
+    # -1.87 Diagnostico Executivo de ROI e Perdas (90 Dias)
+    if re.search(r"\b(?:roi|diagnostico\s+de\s+roi|diagnostico\s+executivo|perdas\s+operacionais|quanto\s+(?:o\s+posto\s+)?est[a?]\s+perdendo|quanto\s+estou\s+perdendo|projecao\s+de\s+roi|retorno\s+em\s+90\s+dias|garantia\s+de\s+3x|garantia\s+3x|recuperar\s+perdas|recuperacao\s+de\s+perdas)\b", p):
+        return "roi_diagnostic"
+
+    # -1.86 Radar de Anomalias de PDV & Caixa (Z-Score)
+    if re.search(r"\b(?:radar\s+de\s+anomalias|anomalias\s+de\s+pdv|anomalias\s+no\s+pdv|z-score|zscore|cancelamentos?\s+por\s+operador(?:es)?|operador(?:es)?\s+com\s+cancelamentos?|auditoria\s+de\s+cancelamentos?|art\s*462|artigo\s+462\s+clt|quebra\s+de\s+caixa\s+clt)\b", p):
+        return "pos_audit"
+
+    # -1.85 Briefing Matinal Zero-Click (Cafe com o Dono)
+    if re.search(r"\b(?:briefing\s+matinal|caf[e?]\s+com\s+o\s+dono|cafe\s+com\s+dono|morning\s+briefing|resumo\s+matinal|briefing\s+do\s+dia|briefing\s+(?:de\s+)?hoje|resumo\s+das\s+24h|resumo\s+de\s+24\s+horas|briefing\s+whatsapp|resumo\s+executivo.*whatsapp|briefing.*whatsapp)\b", p):
+        return "zero_click_briefing"
 
     # -1.9 Formas de Pagamento & Caixas por Operador
     termos_pagamento_exatos = [
@@ -1430,6 +1479,9 @@ class SemanticRouter:
                     "analisar_custo_estoque_macroeconomico",
                     "diagnostico_modular",
                     "formas_pagamento",
+                    "roi_diagnostic",
+                    "pos_audit",
+                    "zero_click_briefing",
                 ):
                     intencao_detectada = intencao_h
                     similarity = max(similarity, 0.95)

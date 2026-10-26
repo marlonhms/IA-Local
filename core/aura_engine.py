@@ -1421,6 +1421,21 @@ CANONICAL_EXECUTIVE_TITLES: Dict[str, str] = {
 }
 
 GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
+    "roi_diagnostic": {
+        "component_name": "render_RoiDiagnosticUI",
+        "client_component": "RoiDiagnosticUI",
+        "title": "Calculando diagnostico executivo de perdas e projecao de ROI...",
+    },
+    "pos_audit": {
+        "component_name": "render_PosAuditRadarUI",
+        "client_component": "PosAuditRadarUI",
+        "title": "Auditoria de cancelamentos (Z-Score) e fechamento de caixa...",
+    },
+    "zero_click_briefing": {
+        "component_name": "render_MorningBriefingUI",
+        "client_component": "MorningBriefingUI",
+        "title": "Consolidando briefing matinal zero-click (Cafe com o Dono)...",
+    },
     "formas_pagamento": {
         "component_name": "render_PaymentMethodsBreakdownUI",
         "client_component": "PaymentMethodsBreakdownUI",
@@ -3250,6 +3265,31 @@ class AuraEngine:
                     elasticidade_estimada=float(p.get("elasticidade_estimada", -1.8)),
                 )
 
+            elif norm_name in (
+                "roi_diagnostic", "diagnostico_executivo_roi", "diagnostico_perdas", "roi_perdas"
+            ):
+                from core.partner_api import compute_station_roi_diagnostic, get_partner_staging_store
+                st = get_partner_staging_store()
+                st_id = p.get("station_id") or p.get("filial_id") or self.filial_id or "default"
+                sub_val = float(p.get("monthly_subscription_brl") or 490.0)
+                return compute_station_roi_diagnostic(station_id=st_id, staging_store=st, monthly_subscription_brl=sub_val)
+
+            elif norm_name in (
+                "pos_audit", "radar_anomalias_pdv", "auditoria_pdv_zscore", "auditoria_pos"
+            ):
+                from core.partner_api import audit_pos_and_cashier_anomalies, get_partner_staging_store
+                st = get_partner_staging_store()
+                st_id = p.get("station_id") or p.get("filial_id") or self.filial_id or "default"
+                return audit_pos_and_cashier_anomalies(station_id=st_id, staging_store=st)
+
+            elif norm_name in (
+                "zero_click_briefing", "briefing_matinal", "cafe_com_dono", "morning_briefing"
+            ):
+                from core.partner_api import generate_morning_briefing_payload, get_partner_staging_store
+                st = get_partner_staging_store()
+                st_id = p.get("station_id") or p.get("filial_id") or self.filial_id or "default"
+                return generate_morning_briefing_payload(station_id=st_id, staging_store=st)
+
             else:
                 raise ValueError(f"Ferramenta desconhecida ou não suportada: '{tool_name}'")
 
@@ -3535,7 +3575,62 @@ class AuraEngine:
 
             elif intencao == "clientes_ranking":
                 resultado_bruto = self.tools.consultar_clientes_erp(termo=pergunta)
-                contexto_extra = f"Dados de Clientes e Histórico de Compras no ERP:\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+                contexto_extra = f"Dados de Clientes e Historico de Compras no ERP:\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+
+            elif intencao in ("roi_diagnostic", "diagnostico_executivo_roi", "diagnostico_perdas", "roi_perdas"):
+                from core.partner_api import compute_station_roi_diagnostic, get_partner_staging_store
+                st = get_partner_staging_store()
+                st_id = self.filial_id or "default"
+                resultado_bruto = compute_station_roi_diagnostic(station_id=st_id, staging_store=st)
+                summary = resultado_bruto.get("summary", {})
+                breakdown = resultado_bruto.get("breakdown_brl", {})
+                rec = summary.get("estimated_monthly_recovery_brl", 0.0)
+                net_90 = summary.get("roi_90_days_net_brl", 0.0)
+                mult = summary.get("roi_multiple", 0.0)
+                contexto_extra = (
+                    f"Diagnostico Executivo de ROI e Perdas (90 Dias):\n"
+                    f"- Perda Mensal Mapeada: R$ {summary.get('total_monthly_leakage_brl', 0.0):,.2f}\n"
+                    f"- Recuperacao Mensal Projetada: R$ {rec:,.2f}\n"
+                    f"- Retorno Liquido em 90 Dias: R$ {net_90:,.2f} ({mult:.1f}x o investimento)\n"
+                    f"- Garantia 3x Verificada: {'SIM' if summary.get('guarantee_3x_met') else 'NAO'}\n"
+                    f"- Detalhamento dos 5 Vetores:\n"
+                    f"  * LMC e Tanques: R$ {breakdown.get('lmc_and_tank_shrinkage', 0.0):,.2f}\n"
+                    f"  * Conveniencia e Cancelamentos PDV: R$ {breakdown.get('convenience_and_pos_cancellations', 0.0):,.2f}\n"
+                    f"  * Fechamento de Caixa: R$ {breakdown.get('cashier_shift_discrepancies', 0.0):,.2f}\n"
+                    f"  * Precificacao e Carreta: R$ {breakdown.get('pricing_and_carreta_arbitrage', 0.0):,.2f}\n"
+                    f"  * Custo SELIC Capital Morto: R$ {breakdown.get('working_capital_selic_cost', 0.0):,.2f}\n"
+                )
+
+            elif intencao in ("pos_audit", "radar_anomalias_pdv", "auditoria_pdv_zscore", "auditoria_pos"):
+                from core.partner_api import audit_pos_and_cashier_anomalies, get_partner_staging_store
+                st = get_partner_staging_store()
+                st_id = self.filial_id or "default"
+                resultado_bruto = audit_pos_and_cashier_anomalies(station_id=st_id, staging_store=st)
+                tot_op = resultado_bruto.get("total_operators_analyzed", 0)
+                anom_count = resultado_bruto.get("anomalous_operators_count", 0)
+                caixa = resultado_bruto.get("cashier_shift_audit", {})
+                contexto_extra = (
+                    f"Radar de Anomalias de PDV e Fechamento de Caixa (Z-Score):\n"
+                    f"- Total de Operadores Auditados: {tot_op}\n"
+                    f"- Operadores com Desvio Estatistico (Z-Score > 2.0): {anom_count}\n"
+                    f"- Status da Conciliacao de Caixa: {caixa.get('status')} (Divergencia: R$ {caixa.get('discrepancy_brl', 0.0):,.2f})\n"
+                    f"- Politica CLT Art. 462: Estritamente contabil e sem termos acusatorios.\n"
+                )
+
+            elif intencao in ("zero_click_briefing", "briefing_matinal", "cafe_com_dono", "morning_briefing"):
+                from core.partner_api import generate_morning_briefing_payload, get_partner_staging_store
+                st = get_partner_staging_store()
+                st_id = self.filial_id or "default"
+                resultado_bruto = generate_morning_briefing_payload(station_id=st_id, staging_store=st)
+                s24 = resultado_bruto.get("sales_summary_24h", {})
+                tank = resultado_bruto.get("tank_critical_runout", {})
+                contexto_extra = (
+                    f"Briefing Matinal Zero-Click (Cafe com o Dono):\n"
+                    f"- Faturamento 24h: R$ {s24.get('total_turnover_brl', 0.0):,.2f} ({s24.get('total_liters', 0):,.0f} L)\n"
+                    f"- Tanque Mais Critico: Tanque {tank.get('tank_id')} ({tank.get('fuel_type')}) - {tank.get('occupancy_pct', 0.0):.1f}% ocupacao\n"
+                    f"- Recomendacao de Compra: {tank.get('recommended_order_compartments', 0)} compartimento(s) de 5.000 L\n"
+                    f"Texto WhatsApp:\n{resultado_bruto.get('whatsapp_formatted_text', '')}\n"
+                )
 
             else:
                 # Catálogo de produtos (RAG Híbrido HNSW + GIN FTS) com Cache Semântico
@@ -3626,6 +3721,76 @@ class AuraEngine:
         if status in ("indisponivel", "error", "erro", "timeout"):
             motivo = resultado_bruto.get("motivo") or "Falha de conexão com a base de dados do posto."
             return f"🚨 **Atenção**: Dados operacionais temporariamente [vermelho]indisponíveis[/vermelho].\n\n*Diagnóstico:* {motivo}"
+
+        # 0. ROI DIAGNOSTIC & PERDAS (90 DIAS)
+        if intencao in ("roi_diagnostic", "diagnostico_executivo_roi", "diagnostico_perdas", "roi_perdas"):
+            summary = resultado_bruto.get("summary") or {}
+            breakdown = resultado_bruto.get("breakdown_brl") or {}
+            tot = float(summary.get("total_monthly_leakage_brl") or 0.0)
+            rec = float(summary.get("estimated_monthly_recovery_brl") or 0.0)
+            net_90 = float(summary.get("roi_90_days_net_brl") or 0.0)
+            mult = float(summary.get("roi_multiple") or 0.0)
+            g3x = summary.get("guarantee_3x_met", True)
+            linhas = [
+                "### Diagnostico Executivo de ROI & Perdas (90 Dias)",
+                "",
+                f"**Perda Mensal Mapeada:** [vermelho]R$ {tot:,.2f}[/vermelho]",
+                f"- **Recuperacao Mensal Projetada:** [verde]R$ {rec:,.2f}[/verde]",
+                f"- **Retorno Liquido em 90 Dias:** [verde]R$ {net_90:,.2f}[/verde] ({mult:.1f}x o plano)",
+                f"- **Garantia Contratual de 3x:** {'[verde]VERIFICADA[/verde]' if g3x else '[amarelo]EM MONITORAMENTO[/amarelo]'}",
+                "",
+                "**Detalhamento dos 5 Vetores de Perdas:**",
+                f"- 1. Variacao LMC & Tanques (Port. 26 ANP): R$ {float(breakdown.get('lmc_and_tank_shrinkage') or 0):,.2f}",
+                f"- 2. Cancelamentos PDV & Conveniencia: R$ {float(breakdown.get('convenience_and_pos_cancellations') or 0):,.2f}",
+                f"- 3. Furos de Gaveta & Fechamento: R$ {float(breakdown.get('cashier_shift_discrepancies') or 0):,.2f}",
+                f"- 4. Arbitragem Carreta Fechada & Preco: R$ {float(breakdown.get('pricing_and_carreta_arbitrage') or 0):,.2f}",
+                f"- 5. Custo SELIC Capital de Giro: R$ {float(breakdown.get('working_capital_selic_cost') or 0):,.2f}",
+                "",
+                "*(Diagnostico deterministico AURA: Dados primarios apurados no banco local)*",
+            ]
+            return "\n".join(linhas)
+
+        # 0b. RADAR DE ANOMALIAS DE PDV & CAIXA (Z-SCORE)
+        if intencao in ("pos_audit", "radar_anomalias_pdv", "auditoria_pdv_zscore", "auditoria_pos"):
+            tot_op = int(resultado_bruto.get("total_operators_analyzed") or 0)
+            anom_count = int(resultado_bruto.get("anomalous_operators_count") or 0)
+            caixa = resultado_bruto.get("cashier_shift_audit") or {}
+            status_cx = caixa.get("status", "CONCILIADO")
+            disc_brl = float(caixa.get("discrepancy_brl") or 0.0)
+            cx_cor = "[verde]" if status_cx == "CONCILIADO" else "[vermelho]"
+            cx_cor_f = "[/verde]" if status_cx == "CONCILIADO" else "[/vermelho]"
+            linhas = [
+                "### Radar de Anomalias de PDV & Fechamento de Caixa",
+                "",
+                f"- **Total de Operadores Auditados:** {tot_op}",
+                f"- **Operadores com Desvio Estatistico (Z-Score > 2.0):** {anom_count}",
+                f"- **Status da Conciliacao do Turno:** {cx_cor}{status_cx}{cx_cor_f} (Divergencia: R$ {disc_brl:,.2f})",
+                f"- **Conformidade CLT:** Art. 462 CLT e OJ 251 TST (termos estritamente tecnicos e sem imputacao de dolo)",
+            ]
+            ops = resultado_bruto.get("operators_analysis") or []
+            if ops:
+                linhas.extend(["", "**Ranking de Operadores (Taxa de Cancelamento):**"])
+                for o in ops[:5]:
+                    op_id = o.get("operator_id", "N/A")
+                    c_rate = float(o.get("cancellation_rate_pct") or 0.0)
+                    z_sc = float(o.get("z_score") or 0.0)
+                    anom_tag = " [vermelho](ANOMALIA)[/vermelho]" if o.get("is_anomaly") else ""
+                    linhas.append(f"- Operador `{op_id}`: {c_rate:.1f}% cancelamentos (Z-Score: {z_sc:.2f}){anom_tag}")
+            return "\n".join(linhas)
+
+        # 0c. BRIEFING MATINAL ZERO-CLICK (CAFE COM O DONO)
+        if intencao in ("zero_click_briefing", "briefing_matinal", "cafe_com_dono", "morning_briefing"):
+            wp_text = resultado_bruto.get("whatsapp_formatted_text")
+            if wp_text:
+                return wp_text
+            s24 = resultado_bruto.get("sales_summary_24h") or {}
+            tank = resultado_bruto.get("tank_critical_runout") or {}
+            return (
+                f"### AURA Briefing Executivo Matinal\n\n"
+                f"- **Faturamento 24h:** R$ {float(s24.get('total_turnover_brl') or 0):,.2f} ({float(s24.get('total_liters') or 0):,.0f} L)\n"
+                f"- **Estoque Mais Critico:** Tanque {tank.get('tank_id')} ({tank.get('fuel_type')}) - {float(tank.get('occupancy_pct') or 0):.1f}% ocupacao\n"
+                f"- **Sugestao de Compra:** {tank.get('recommended_order_compartments', 0)} compartimento(s) de 5.000 L\n"
+            )
 
         # 0a. SIMULAÇÃO PREDITIVA WHAT-IF & PRECIFICAÇÃO DINÂMICA
         if intencao in ("cenario_preditivo", "simulacao_preditiva"):
