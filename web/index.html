@@ -556,8 +556,14 @@
           <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-mono hidden lg:inline">Alt+P</kbd>
         </button>
 
-        <!-- 3.3 Botao Nova Conversa (Header Superior Direito - min-h: 44px) -->
-        <button id="btn-new-chat" class="btn-new-chat flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 font-sans text-xs transition-all shadow-sm active:scale-95 group" title="Iniciar Nova Conversa (Limpar Chat)" aria-label="Nova Conversa">
+        <!-- 3.3 Botao Historico / Lista de Conversas (Header Superior Direito - min-h: 44px) -->
+        <button id="btn-open-history" class="btn-open-history flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 font-sans text-xs transition-all shadow-sm active:scale-95 group cursor-pointer" onclick="if(window.toggleAuraHistory){window.toggleAuraHistory();}else if(window.auraHistoryDrawer){window.auraHistoryDrawer.toggle();}" title="Lista de Conversas (Historico)" aria-label="Lista de Conversas">
+          <i data-lucide="history" class="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform"></i>
+          <span class="text-[11px] font-medium hidden sm:inline">Conversas</span>
+        </button>
+
+        <!-- 3.4 Botao Nova Conversa (Header Superior Direito - min-h: 44px) -->
+        <button id="btn-new-chat" class="btn-new-chat flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 font-sans text-xs transition-all shadow-sm active:scale-95 group cursor-pointer" title="Iniciar Nova Conversa (Limpar Chat)" aria-label="Nova Conversa">
           <i data-lucide="plus-circle" class="w-4 h-4 text-auraEmerald group-hover:rotate-90 transition-transform"></i>
           <span class="text-[11px] font-medium hidden sm:inline">Nova Conversa</span>
         </button>
@@ -568,7 +574,6 @@
           <button id="btn-open-compliance" tabindex="-1"><span id="header-compliance-pill"><span>v1.1</span></span></button>
           <button id="btn-open-telemetry" tabindex="-1"><span id="header-telemetry-badge"><span id="header-telemetry-ttft-label">Pulso</span></span></button>
           <button id="btn-toggle-modo-pista" tabindex="-1"><span id="modo-pista-badge">OFF</span></button>
-          <button id="btn-open-history" class="btn-open-history" tabindex="-1"></button>
           <button id="btn-chat-clear" tabindex="-1"></button>
           <span id="chat-session-badge">Sessao Ativa</span>
         </div>

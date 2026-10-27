@@ -295,14 +295,15 @@ class TestFrontendOfflineFirst:
         assert "Motor Local 100% Offline" in content
         assert "bg-auraEmerald animate-pulse" in content
 
-        # 3. Extremo Direito: Grupo de Produtividade com exatamente 3 botoes visiveis
+        # 3. Extremo Direito: Grupo de Produtividade com 4 botoes visiveis (Comandos, Canvas, Conversas e Nova Conversa)
         assert 'id="header-productive-actions"' in content
         assert 'id="btn-open-palette"' in content
         assert 'id="btn-toggle-aux-panel"' in content
         assert 'id="aux-toggle-beacon"' in content
+        assert 'id="btn-open-history"' in content
         assert 'id="btn-new-chat"' in content
 
-        # Extrai o bloco do grupo de produtividade e valida que os botoes visiveis sao exatamente 3
+        # Extrai o bloco do grupo de produtividade e valida que os botoes visiveis sao exatamente 4
         match_prod = re.search(
             r'<div id="header-productive-actions"[^>]*>([\s\S]*?)</div>\s*</div>\s*</header>',
             content
@@ -313,8 +314,8 @@ class TestFrontendOfflineFirst:
         # Separa os botoes visiveis (fora do bloco hidden)
         visible_part = prod_html.split('<div class="hidden"')[0]
         visible_buttons = re.findall(r'<button\s+id="([^"]+)"', visible_part)
-        assert len(visible_buttons) == 3, f"Esperado 3 botoes visiveis no grupo de produtividade, encontrado: {visible_buttons}"
-        assert set(visible_buttons) == {"btn-open-palette", "btn-toggle-aux-panel", "btn-new-chat"}
+        assert len(visible_buttons) == 4, f"Esperado 4 botoes visiveis no grupo de produtividade, encontrado: {visible_buttons}"
+        assert set(visible_buttons) == {"btn-open-palette", "btn-toggle-aux-panel", "btn-open-history", "btn-new-chat"}
 
         # Touch targets no header com minimo de 44px
         for btn_id in visible_buttons:
