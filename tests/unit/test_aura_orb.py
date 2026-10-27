@@ -1,6 +1,6 @@
 """
-Testes Unitarios do AuraOrb Web e Paridade com Android AuraOrb.kt
-Garante presenca cosmica, estados emocionais, reatividade de audio e zero travessoes.
+Testes Unitarios do AuraOrb Web e Paridade com Aura Assistance Android
+Valida AuraLivingOrb, AuraAvatar, AuraBrandTitle, reatividade de audio e zero travessoes.
 """
 
 import os
@@ -21,7 +21,7 @@ def file_sha256(filepath: Path) -> str:
 
 
 def test_ic_aura_logo_assets_exist():
-    """Garante que o ativo visual oficial ic_aura_logo.png esta presente no web e no dist."""
+    """Garante que os ativos visuais oficiais estao presentes no web e no dist."""
     web_img = WEB_DIR / "img" / "ic_aura_logo.png"
     web_static_img = WEB_DIR / "static" / "img" / "ic_aura_logo.png"
     dist_img = DIST_DIR / "img" / "ic_aura_logo.png"
@@ -32,14 +32,34 @@ def test_ic_aura_logo_assets_exist():
     assert dist_img.exists(), "dist/.../web/img/ic_aura_logo.png nao encontrado"
     assert dist_static_img.exists(), "dist/.../web/static/img/ic_aura_logo.png nao encontrado"
 
-    # Valida tamanho minimo de PNG de alta resolucao (> 100KB)
     assert web_img.stat().st_size > 100_000
     assert file_sha256(web_img) == file_sha256(dist_img)
     assert file_sha256(web_static_img) == file_sha256(dist_static_img)
 
 
-def test_aura_orb_js_emotions_parity():
-    """Garante que aura-orb.js implementa todos os estados emocionais do Kotlin AuraOrbEmotion."""
+def test_aura_assistance_android_avatar_and_logo_parity():
+    """Garante paridade exata com AuraAvatar e AuraBrandTitle do Aura Assistance Android."""
+    css_file = WEB_DIR / "css" / "aura.css"
+    with open(css_file, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # AuroraBrush no background do Avatar: linear-gradient(135deg, #22d3ee 0%, #10b981 100%)
+    assert "#22d3ee" in content and "#10b981" in content
+    # Tipografia Newsreader oficial
+    assert "'Newsreader'" in content
+    # Letra A em ObsidianBase (#07090E)
+    assert "#07090e" in content
+    # AuraBrandTitle com AuraBrandGradient (#38bdf8, #0d9488, #a855f7)
+    assert ".aura-brand-title" in content
+    assert "#38bdf8" in content and "#0d9488" in content and "#a855f7" in content
+
+    # Suprime a bolinha interna legada que ficava crescendo e diminuindo
+    assert ".neural-core-orb::after" in content
+    assert "display: none !important" in content
+
+
+def test_aura_living_orb_js_engine_parity():
+    """Garante que aura-orb.js implementa o motor de ondas senoidais polares do AuraLivingOrb."""
     orb_js = WEB_DIR / "js" / "aura-orb.js"
     assert orb_js.exists(), "web/js/aura-orb.js nao encontrado"
 
@@ -59,7 +79,10 @@ def test_aura_orb_js_emotions_parity():
     for em in expected_emotions:
         assert f"{em}: '{em}'" in content, f"Emocao {em} ausente no AuraOrbEmotion JS"
 
-    # Valida componentes centrais
+    # Valida funcoes e classes do AuraLivingOrb e AuraVoiceManager
+    assert "buildLiquidPath" in content
+    assert "drawAuraAvatarEmblem" in content
+    assert "sampleVoiceRms" in content
     assert "class AuraOrbAudioTracker" in content
     assert "class AuraOrb" in content
     assert "class AuraFloatingOrb" in content
@@ -80,24 +103,21 @@ def test_aura_css_no_growing_shrinking_balls():
     assert ".aura-floating-orb-badge" in content
 
     # Verifica que as animacoes de pulso continuo nao deformam a escala
-    # Extrai o bloco do @keyframes pulse-voice
     assert "@keyframes pulse-voice" in content
     voice_block = content.split("@keyframes pulse-voice")[1].split("}")[0]
     assert "transform: scale" not in voice_block
 
-    # Extrai o bloco do @keyframes pulseCore
     assert "@keyframes pulseCore" in content
     core_block = content.split("@keyframes pulseCore")[1].split("}")[0]
     assert "transform: scale" not in core_block
 
-    # Extrai o bloco do @keyframes cognitiveOrbPulse
     assert "@keyframes cognitiveOrbPulse" in content
     cog_block = content.split("@keyframes cognitiveOrbPulse")[1].split("}")[0]
     assert "transform: scale" not in cog_block
 
 
 def test_index_html_integration():
-    """Garante inclusao de aura-orb.js e presenca dos containers no index.html."""
+    """Garante inclusao de aura-orb.js e presenca dos containers e brand title no index.html."""
     html_file = WEB_DIR / "index.html"
     with open(html_file, "r", encoding="utf-8") as f:
         content = f.read()
@@ -106,6 +126,7 @@ def test_index_html_integration():
     assert 'id="header-neural-core-orb"' in content
     assert 'id="drawer-neural-core-orb"' in content
     assert 'id="aura-floating-orb-container"' in content
+    assert 'class="aura-brand-title' in content
 
 
 def test_zero_unicode_dashes_in_orb_artifacts():

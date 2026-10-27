@@ -194,59 +194,74 @@ body {
   box-shadow: inset 1px 0 0 0 rgba(244, 63, 94, 0.2);
 }
 
-/* Núcleo Cognitivo Holográfico AURA (Sem neon brega) */
+/* ==========================================================================
+   AURA AVATAR DELUXE & BRAND TITLE (1:1 COM AURA ASSISTANCE ANDROID)
+   Paridade com AuraAvatar do ChatScreen.kt & Logo Deluxe do SetupScreen.kt
+   ========================================================================== */
+
+.aura-avatar-deluxe,
 .neural-core-orb {
   position: relative;
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #059669 0%, #0891b2 50%, #7c3aed 100%);
+  background: linear-gradient(135deg, #22d3ee 0%, #10b981 100%);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), 0 0 16px rgba(34, 211, 238, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  animation: pulseCore 3.5s ease-in-out infinite;
+  color: #07090e !important;
+  font-family: 'Newsreader', Georgia, serif !important;
+  font-weight: 700 !important;
+  font-size: 20px;
+  line-height: 1;
+  user-select: none;
+  -webkit-user-select: none;
   z-index: 1;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
 }
 
-.neural-core-orb > * {
+.neural-core-orb > *,
+.aura-avatar-deluxe > * {
   position: relative;
   z-index: 2;
+  color: #07090e !important;
+  font-family: 'Newsreader', Georgia, serif !important;
+  font-weight: 700 !important;
+  line-height: 1;
 }
 
-.neural-core-orb::after {
-  content: '';
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  background: #ffffff;
-  border-radius: 50%;
-  opacity: 0.9;
-  filter: blur(1px);
-  animation: coreSpark 2s ease-in-out infinite alternate;
-  z-index: 0;
-  pointer-events: none;
+/* Remocao definitiva da bolinha interna branca pulsante legada */
+.neural-core-orb::after,
+.aura-avatar-deluxe::after {
+  display: none !important;
 }
 
-/* Avatar pequeno da AURA (24px) */
+/* Avatar pequeno da AURA em mensagens de chat (24px) */
 .neural-core-orb.avatar-orb,
 .neural-core-orb.\!w-6 {
   width: 24px !important;
   height: 24px !important;
-  font-size: 10px;
+  font-size: 13px !important;
 }
 
-.neural-core-orb.avatar-orb::after,
-.neural-core-orb.\!w-6::after {
-  width: 8px !important;
-  height: 8px !important;
-  opacity: 0.8;
+.neural-core-orb.\!w-8 {
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 17px !important;
 }
 
-.neural-core-orb.avatar-orb.reasoning-active::after,
-.neural-core-orb.\!w-6.reasoning-active::after {
-  width: 8px !important;
-  height: 8px !important;
+/* Titulo de Marca AURA Brand (1:1 com AuraBrandTitle do Aura Assistance Android) */
+.aura-brand-title {
+  font-family: 'Newsreader', Georgia, serif !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.12em !important;
+  background: linear-gradient(90deg, #38bdf8 0%, #0d9488 50%, #a855f7 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+  display: inline-block;
 }
 
 @keyframes pulseCore {

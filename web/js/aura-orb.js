@@ -1,6 +1,6 @@
 /**
- * AURA Orb: Living Cosmic Presence & Audio-Reactive Neural Core
- * Parity 1:1 with mobile AuraOrb.kt (Compose Canvas Engine).
+ * AURA Orb: Living Liquid Plasma Consciousness & Deluxe Avatar
+ * Parity 1:1 with Aura Assistance Android (AuraLivingOrb & AuraAvatar in AuraComponents.kt & ChatScreen.kt).
  * Zero Unicode dashes policy strictly enforced.
  */
 
@@ -20,7 +20,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  // Estados Emocionais da AURA (1:1 com AuraOrbEmotion do Kotlin)
+  // Estados Emocionais da AURA
   const AuraOrbEmotion = Object.freeze({
     NEUTRAL: 'NEUTRAL',
     CALM: 'CALM',
@@ -31,123 +31,76 @@
     SUCCESS: 'SUCCESS'
   });
 
-  // Paleta de Cores Cosmica AURA (Slate-950 Alinhada)
+  // Paleta de Cores Oficial (Aura Assistance Android Theme.kt & Color.kt)
   const PALETTE = Object.freeze({
-    cyan: '#22d3ee',
-    cyanLight: '#67e8f9',
-    violet: '#7c3aed',
-    violetLight: '#a78bfa',
-    emerald: '#10b981',
-    emeraldLight: '#34d399',
-    amber: '#f59e0b',
-    red: '#ef4444',
-    gold: '#d4af37',
-    slateMuted: '#64748b'
+    auraCyan: '#22d3ee',         // Clarity Cyan
+    auraEmerald: '#10b981',      // Emerald
+    auraPurple: '#8b5cf6',       // Aura Purple
+    auraBrandBlue: '#38bdf8',    // Azul celeste vibrante
+    auraBrandPetroleum: '#0d9488', // Verde Petroleo
+    auraBrandPurple: '#a855f7',  // Roxo elegante
+    obsidianBase: '#07090e',     // Superficie AMOLED Obsidian
+    obsidianDeep: '#030407',
+    textPrimary: '#f1f5f9',
+    textMuted: '#64748b',
+    statusWarning: '#f59e0b',
+    statusDanger: '#ef4444'
   });
 
   // Configuracoes Dinamicas por Emocao
   const EMOTION_CONFIG = Object.freeze({
     NEUTRAL: {
-      primary: 'rgba(34, 211, 238, 0.8)',
-      secondary: 'rgba(100, 116, 139, 0.9)',
-      halo: 'rgba(34, 211, 238, 0.35)',
-      breathingDuration: 2800,
-      glowDuration: 2200,
-      rotationDuration: 12000,
-      scaleMin: 0.93,
-      scaleMax: 1.07,
-      glowMin: 0.35,
-      glowMax: 0.75,
-      hasCounterRing: false,
+      colors: ['#22d3ee', '#64748b', '#0d9488', '#22d3ee'],
+      halo: 'rgba(34, 211, 238, 0.30)',
+      timeDuration: 4200,
+      breathDuration: 2600,
       tooltip: 'AURA em repouso'
     },
     CALM: {
-      primary: 'rgba(34, 211, 238, 1.0)',
-      secondary: 'rgba(16, 185, 129, 1.0)',
-      halo: 'rgba(34, 211, 238, 0.50)',
-      breathingDuration: 2800,
-      glowDuration: 2200,
-      rotationDuration: 12000,
-      scaleMin: 0.93,
-      scaleMax: 1.07,
-      glowMin: 0.35,
-      glowMax: 0.75,
-      hasCounterRing: false,
+      colors: ['#22d3ee', '#10b981', '#8b5cf6', '#22d3ee'],
+      halo: 'rgba(34, 211, 238, 0.40)',
+      timeDuration: 3800,
+      breathDuration: 2200,
       tooltip: 'AURA Pronta'
     },
     THINKING: {
-      primary: 'rgba(34, 211, 238, 1.0)',
-      secondary: 'rgba(124, 58, 237, 1.0)',
-      halo: 'rgba(124, 58, 237, 0.65)',
-      breathingDuration: 1200,
-      glowDuration: 1000,
-      rotationDuration: 2400,
-      scaleMin: 0.90,
-      scaleMax: 1.10,
-      glowMin: 0.50,
-      glowMax: 0.95,
-      hasCounterRing: true,
+      colors: ['#38bdf8', '#8b5cf6', '#a855f7', '#22d3ee'],
+      halo: 'rgba(139, 92, 246, 0.60)',
+      timeDuration: 1400,
+      breathDuration: 1200,
       tooltip: 'Raciocinando...'
     },
     LISTENING: {
-      primary: 'rgba(103, 232, 249, 1.0)',
-      secondary: 'rgba(34, 211, 238, 1.0)',
-      halo: 'rgba(34, 211, 238, 0.60)',
-      breathingDuration: 900,
-      glowDuration: 800,
-      rotationDuration: 3000,
-      scaleMin: 0.93,
-      scaleMax: 1.08,
-      glowMin: 0.40,
-      glowMax: 0.85,
-      hasCounterRing: true,
+      colors: ['#67e8f9', '#22d3ee', '#10b981', '#67e8f9'],
+      halo: 'rgba(34, 211, 238, 0.65)',
+      timeDuration: 1800,
+      breathDuration: 1000,
       tooltip: 'Ouvindo comando de pista...'
     },
     WORRIED: {
-      primary: 'rgba(245, 158, 11, 1.0)',
-      secondary: 'rgba(124, 58, 237, 1.0)',
+      colors: ['#f59e0b', '#8b5cf6', '#f59e0b', '#a855f7'],
       halo: 'rgba(245, 158, 11, 0.50)',
-      breathingDuration: 2200,
-      glowDuration: 1800,
-      rotationDuration: 8000,
-      scaleMin: 0.92,
-      scaleMax: 1.08,
-      glowMin: 0.40,
-      glowMax: 0.80,
-      hasCounterRing: false,
+      timeDuration: 2600,
+      breathDuration: 1800,
       tooltip: 'Atencao operacional'
     },
     AGITATED: {
-      primary: 'rgba(239, 68, 68, 1.0)',
-      secondary: 'rgba(245, 158, 11, 1.0)',
+      colors: ['#ef4444', '#f59e0b', '#ef4444', '#f59e0b'],
       halo: 'rgba(239, 68, 68, 0.65)',
-      breathingDuration: 1500,
-      glowDuration: 1400,
-      rotationDuration: 5000,
-      scaleMin: 0.90,
-      scaleMax: 1.12,
-      glowMin: 0.50,
-      glowMax: 0.90,
-      hasCounterRing: true,
+      timeDuration: 1600,
+      breathDuration: 1400,
       tooltip: 'Alerta critico SEFAZ'
     },
     SUCCESS: {
-      primary: 'rgba(16, 185, 129, 1.0)',
-      secondary: 'rgba(212, 175, 55, 1.0)',
-      halo: 'rgba(212, 175, 55, 0.60)',
-      breathingDuration: 2000,
-      glowDuration: 1600,
-      rotationDuration: 6000,
-      scaleMin: 0.94,
-      scaleMax: 1.08,
-      glowMin: 0.45,
-      glowMax: 0.85,
-      hasCounterRing: false,
+      colors: ['#10b981', '#38bdf8', '#d4af37', '#10b981'],
+      halo: 'rgba(16, 185, 129, 0.55)',
+      timeDuration: 2400,
+      breathDuration: 1800,
       tooltip: 'Concluido com sucesso'
     }
   });
 
-  // Modulo de Rastreamento de Audio em Tempo Real (Web Audio API)
+  // Modulo de Rastreamento de Audio em Tempo Real (AuraVoiceManager Parity)
   class AuraOrbAudioTracker {
     constructor() {
       this.audioCtx = null;
@@ -155,8 +108,8 @@
       this.mediaStreamSource = null;
       this.stream = null;
       this.dataArray = null;
-      this.currentLevel = 0.0;
-      this.targetLevel = 0.0;
+      this.currentLevel = 0.05;
+      this.targetLevel = 0.05;
       this.isTracking = false;
       this.syntheticTime = 0;
     }
@@ -177,7 +130,7 @@
           this.mediaStreamSource = this.audioCtx.createMediaStreamSource(stream);
           this.analyser = this.audioCtx.createAnalyser();
           this.analyser.fftSize = 256;
-          this.analyser.smoothingTimeConstant = 0.5;
+          this.analyser.smoothingTimeConstant = 0.6;
           this.mediaStreamSource.connect(this.analyser);
           this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
           this.isTracking = true;
@@ -197,11 +150,11 @@
       }
       this.stream = null;
       this.analyser = null;
-      this.targetLevel = 0.0;
-      this.currentLevel = 0.0;
+      this.targetLevel = 0.05;
+      this.currentLevel = 0.05;
     }
 
-    sampleAudioLevel(isListeningMode) {
+    sampleVoiceRms(isListeningMode) {
       if (this.isTracking && this.analyser && this.dataArray) {
         try {
           this.analyser.getByteFrequencyData(this.dataArray);
@@ -211,22 +164,23 @@
             sum += this.dataArray[i];
           }
           const rawAvg = count > 0 ? sum / count : 0;
-          this.targetLevel = Math.min(1.0, (rawAvg / 128.0) * 1.5);
+          // Normalizacao identica ao onRmsChanged do AuraVoiceManager
+          this.targetLevel = Math.max(0.05, Math.min(1.0, (rawAvg / 128.0) * 1.4));
         } catch (_) {
-          this.targetLevel = 0.0;
+          this.targetLevel = 0.05;
         }
       } else if (isListeningMode) {
-        // Sintese organica de cadencia vocal caso stream bruto nao esteja linkado
-        this.syntheticTime += 0.08;
-        const base = Math.sin(this.syntheticTime * 2.2) * 0.35 + 0.45;
-        const jitter = Math.sin(this.syntheticTime * 5.7) * 0.2;
-        this.targetLevel = Math.max(0.0, Math.min(1.0, base + jitter));
+        // Sintese organica suave caso o stream bruto de microfone nao esteja conectado
+        this.syntheticTime += 0.06;
+        const base = Math.sin(this.syntheticTime * 2.4) * 0.32 + 0.42;
+        const jitter = Math.sin(this.syntheticTime * 6.1) * 0.18;
+        this.targetLevel = Math.max(0.05, Math.min(1.0, base + jitter));
       } else {
-        this.targetLevel = 0.0;
+        this.targetLevel = 0.05;
       }
 
-      // Suavizacao ataque e decaimento (Attack / Decay Envelope)
-      const factor = this.targetLevel > this.currentLevel ? 0.35 : 0.12;
+      // Amortecimento suave por mola (spring damping)
+      const factor = this.targetLevel > this.currentLevel ? 0.35 : 0.14;
       this.currentLevel += (this.targetLevel - this.currentLevel) * factor;
       return this.currentLevel;
     }
@@ -234,27 +188,15 @@
 
   const globalAudioTracker = new AuraOrbAudioTracker();
 
-  // Singleton de pre-carregamento do logo oficial
-  let sharedLogoImage = null;
-  let isLogoLoaded = false;
-  function getSharedLogoImage() {
-    if (!sharedLogoImage && typeof Image !== 'undefined') {
-      sharedLogoImage = new Image();
-      sharedLogoImage.crossOrigin = 'anonymous';
-      sharedLogoImage.onload = () => { isLogoLoaded = true; };
-      sharedLogoImage.src = '/static/img/ic_aura_logo.png';
-    }
-    return sharedLogoImage;
-  }
-
-  // Componente AuraOrb Canvas de Alta Fidelidade
+  // Componente AuraLivingOrb & AuraAvatar (Compose Canvas 1:1)
   class AuraOrb {
     constructor(options = {}) {
       this.container = typeof options.container === 'string' ? document.querySelector(options.container) : options.container;
-      this.size = Number(options.size) || 48; // Diametro nominal do logo central em px
+      this.size = Number(options.size) || 40; // Diametro base em px (default 40dp do AuraLivingOrb)
       this.emotion = options.emotion && EMOTION_CONFIG[options.emotion] ? options.emotion : AuraOrbEmotion.CALM;
       this.onClick = typeof options.onClick === 'function' ? options.onClick : null;
       this.isInteractive = Boolean(options.isInteractive !== false);
+      this.showLetter = Boolean(options.showLetter !== false); // Renderiza a letra 'A' do AuraAvatar
 
       this.canvas = null;
       this.ctx = null;
@@ -277,7 +219,7 @@
       this.canvas = document.createElement('canvas');
       this.canvas.className = 'aura-orb-canvas';
       this.canvas.setAttribute('role', this.isInteractive ? 'button' : 'img');
-      this.canvas.setAttribute('aria-label', 'AURA Orb');
+      this.canvas.setAttribute('aria-label', 'AURA Consciencia Viva');
       if (this.isInteractive) {
         this.canvas.tabIndex = 0;
       }
@@ -290,14 +232,12 @@
       if (this.isInteractive) {
         this.bindInteractions();
       }
-
-      getSharedLogoImage();
     }
 
     updateDimensions() {
       if (!this.canvas || !this.container) return;
       const dpr = window.devicePixelRatio || 1;
-      // O canvas se expande em 2.2x para acomodar o backglow amplo e ondas cosmicas
+      // 2.2x para expansao fluida do halo atmosferico e ondas senoidais
       const canvasDim = Math.round(this.size * 2.2);
 
       this.canvas.width = Math.round(canvasDim * dpr);
@@ -369,205 +309,186 @@
 
       ctx.clearRect(0, 0, totalSize, totalSize);
 
-      // Audio responsiveness sampling
+      const elapsed = now - this.startTime;
+
+      // 1. Amostragem do RMS de voz (AuraVoiceManager)
       const isListening = this.emotion === AuraOrbEmotion.LISTENING;
-      const audioLevel = globalAudioTracker.sampleAudioLevel(isListening);
+      const voiceRms = globalAudioTracker.sampleVoiceRms(isListening);
 
       // Micro-interacao elastica de clique
       const targetPressScale = this.isPressed ? 0.88 : 1.0;
       this.pressScale += (targetPressScale - this.pressScale) * 0.35;
 
-      const elapsed = now - this.startTime;
+      // 2. Tempo continuo para fluxo liquido das ondas (60fps)
+      const timePhase = ((elapsed % cfg.timeDuration) / cfg.timeDuration) * (Math.PI * 2);
 
-      // 1. Pulso de Escala (Breathing)
-      const breathingHalf = cfg.breathingDuration / 2;
-      const breathProgress = (elapsed % cfg.breathingDuration) / breathingHalf;
-      // Interpolacao cossenoidal suave (FastOutSlowIn approximation)
+      // 3. Respiracao organica lenta (FastOutSlowInEasing)
+      const breathProgress = (elapsed % cfg.breathDuration) / (cfg.breathDuration / 2);
       const breathCos = (1 - Math.cos(breathProgress * Math.PI)) / 2;
-      const baseScale = cfg.scaleMin + (cfg.scaleMax - cfg.scaleMin) * breathCos;
-      // Amplificacao dinamica com audio de voz
-      const audioScaleBoost = isListening ? audioLevel * 0.12 : 0;
-      const currentScale = (baseScale + audioScaleBoost) * this.pressScale;
+      const idleBreath = 0.92 + 0.16 * breathCos;
 
-      const logoRadius = (this.size * dpr / 2) * currentScale;
-
-      // 2. Pulso de Brilho (Glow Pulse)
-      const glowHalf = cfg.glowDuration / 2;
-      const glowProgress = (elapsed % cfg.glowDuration) / glowHalf;
-      const glowCos = (1 - Math.cos(glowProgress * Math.PI)) / 2;
-      const baseGlow = cfg.glowMin + (cfg.glowMax - cfg.glowMin) * glowCos;
-      const audioGlowBoost = isListening ? audioLevel * 0.30 : 0;
-      const glowPulse = Math.min(1.0, baseGlow + audioGlowBoost);
-
-      // 3. Fases das Ondas Concentricas de Aura (Ripples)
-      const waveDuration = cfg.breathingDuration * 1.3;
-      const wavePhase1 = (elapsed % waveDuration) / waveDuration;
-      const wavePhase2 = (wavePhase1 + 0.5) % 1.0;
-
-      // 4. Angulos Orbitais
-      // O audio acelera a rotacao orbital suavemente na fala
-      const rotDuration = isListening ? Math.max(1200, cfg.rotationDuration - audioLevel * 1400) : cfg.rotationDuration;
-      const rotAngle = ((elapsed % rotDuration) / rotDuration) * (Math.PI * 2);
-      const counterRotDuration = rotDuration * 1.5;
-      const counterRotAngle = -(((elapsed % counterRotDuration) / counterRotDuration) * (Math.PI * 2));
+      // Raio base calibrado
+      const baseRadius = ((this.size * dpr) / 2.6) * idleBreath * this.pressScale;
 
       // ----------------------------------------------------------------------
-      // CAMADA A: Nebulosa Atmosferica Ampla de Fundo (Backglow)
+      // CAMADA A: Halo Difuso Atmosferico (AuraComponents.kt L1109-L1123)
       // ----------------------------------------------------------------------
-      const nebulaRadius = logoRadius * (1.85 + audioLevel * 0.25);
-      const backglow = ctx.createRadialGradient(center, center, 0, center, center, nebulaRadius);
-      const haloAlpha = glowPulse * (this.isPressed ? 0.85 : 0.55);
-      backglow.addColorStop(0, this.applyAlpha(cfg.halo, haloAlpha));
-      backglow.addColorStop(0.5, this.applyAlpha(cfg.secondary, glowPulse * 0.22));
-      backglow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      const haloRadius = baseRadius * (1.6 + (voiceRms * 0.70));
+      const haloGradient = ctx.createRadialGradient(center, center, 0, center, center, haloRadius);
+      const haloAlphaMult = 0.5 + voiceRms * 0.5;
+      haloGradient.addColorStop(0, `rgba(34, 211, 238, ${(0.40 * haloAlphaMult).toFixed(3)})`);
+      haloGradient.addColorStop(0.5, `rgba(139, 92, 246, ${(0.25 * haloAlphaMult).toFixed(3)})`);
+      haloGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
       ctx.beginPath();
-      ctx.arc(center, center, nebulaRadius, 0, Math.PI * 2);
-      ctx.fillStyle = backglow;
+      ctx.arc(center, center, haloRadius, 0, Math.PI * 2);
+      ctx.fillStyle = haloGradient;
       ctx.fill();
 
       // ----------------------------------------------------------------------
-      // CAMADA B: Ondas Continuas de Energia (Dual Concentric Ripples)
+      // CAMADA B: Manto Liquido Externo (Polar Harmonic Liquid Waves L1164-L1190)
       // ----------------------------------------------------------------------
-      this.drawRipple(ctx, center, logoRadius, wavePhase1, glowPulse, cfg.primary, cfg.secondary, audioLevel);
-      this.drawRipple(ctx, center, logoRadius, wavePhase2, glowPulse, cfg.secondary, cfg.halo, audioLevel);
+      const outerRMultiplier = 1.0 + (voiceRms * 0.25);
+      this.buildLiquidPath(ctx, center, baseRadius, 0, outerRMultiplier, voiceRms, timePhase);
 
-      // ----------------------------------------------------------------------
-      // CAMADA C: Anel Orbital Primario Rotativo (Sweep Conic Ring)
-      // ----------------------------------------------------------------------
-      this.drawOrbitalRing(ctx, center, logoRadius * 1.10, rotAngle, cfg.primary, cfg.secondary, PALETTE.cyanLight, cfg.hasCounterRing ? 2.4 : 1.8);
-
-      // ----------------------------------------------------------------------
-      // CAMADA D: Anel Secundario em Contra-rotacao (Ativo em THINKING, LISTENING, AGITATED)
-      // ----------------------------------------------------------------------
-      if (cfg.hasCounterRing) {
-        this.drawOrbitalRing(ctx, center, logoRadius * 1.25, counterRotAngle, PALETTE.violet, 'rgba(0,0,0,0)', PALETTE.cyanLight, 1.4);
+      // Preenchimento com Sweep / Conic Gradient
+      if (typeof ctx.createConicGradient === 'function') {
+        const conic = ctx.createConicGradient(timePhase * 0.5, center, center);
+        conic.addColorStop(0, cfg.colors[0]);
+        conic.addColorStop(0.33, cfg.colors[1]);
+        conic.addColorStop(0.66, cfg.colors[2]);
+        conic.addColorStop(1, cfg.colors[3]);
+        ctx.fillStyle = conic;
+      } else {
+        const lin = ctx.createLinearGradient(center - baseRadius, center - baseRadius, center + baseRadius, center + baseRadius);
+        lin.addColorStop(0, cfg.colors[0]);
+        lin.addColorStop(0.5, cfg.colors[1]);
+        lin.addColorStop(1, cfg.colors[2]);
+        ctx.fillStyle = lin;
       }
+      ctx.fill();
+
+      // Borda iridescente fina de vidro liquido contornando a onda (L1179-L1190)
+      const borderLin = ctx.createLinearGradient(center - baseRadius, center - baseRadius, center + baseRadius, center + baseRadius);
+      borderLin.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+      borderLin.addColorStop(0.5, 'rgba(34, 211, 238, 0.40)');
+      borderLin.addColorStop(1, 'rgba(255, 255, 255, 0.75)');
+      ctx.strokeStyle = borderLin;
+      ctx.lineWidth = Math.max(1.0, 1.4 * dpr);
+      ctx.stroke();
 
       // ----------------------------------------------------------------------
-      // CAMADA E: Brilho Emocional Sutil no Centro da Aura
+      // CAMADA C: Nucleo Secundario Contra-Rotativo (Efeito Moire Cosmico L1192-L1205)
       // ----------------------------------------------------------------------
-      if (this.emotion !== AuraOrbEmotion.CALM && this.emotion !== AuraOrbEmotion.NEUTRAL) {
-        const coreGlowRadius = logoRadius * 0.85;
-        const coreGlow = ctx.createRadialGradient(center, center, 0, center, center, coreGlowRadius);
-        const centerAlpha = this.emotion === AuraOrbEmotion.THINKING ? 0.45 : (0.28 + audioLevel * 0.25);
-        coreGlow.addColorStop(0, this.applyAlpha(cfg.primary, centerAlpha));
-        coreGlow.addColorStop(0.6, this.applyAlpha(cfg.secondary, 0.15));
-        coreGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      this.buildLiquidPath(ctx, center, baseRadius, 2.1, 0.78, voiceRms * 0.8, -timePhase * 1.2);
+      const innerRadial = ctx.createRadialGradient(center, center, 0, center, center, baseRadius * 0.95);
+      innerRadial.addColorStop(0, 'rgba(139, 92, 246, 0.70)');
+      innerRadial.addColorStop(0.6, 'rgba(34, 211, 238, 0.85)');
+      innerRadial.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = innerRadial;
+      ctx.fill();
 
+      // ----------------------------------------------------------------------
+      // CAMADA D: Nucleo Incandescente de Plasma Branco/Ciano (L1207-L1222)
+      // ----------------------------------------------------------------------
+      const coreR = baseRadius * 0.38 * (1.0 + voiceRms * 0.30);
+      const coreRadial = ctx.createRadialGradient(center, center, 0, center, center, coreR);
+      coreRadial.addColorStop(0, '#ffffff');
+      coreRadial.addColorStop(0.4, 'rgba(255, 255, 255, 0.92)');
+      coreRadial.addColorStop(0.8, 'rgba(34, 211, 238, 0.85)');
+      coreRadial.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+      ctx.beginPath();
+      ctx.arc(center, center, coreR, 0, Math.PI * 2);
+      ctx.fillStyle = coreRadial;
+      ctx.fill();
+
+      // ----------------------------------------------------------------------
+      // CAMADA E: Emblema Oficial AuraAvatar Deluxe (Newsreader 'A' em ObsidianBase)
+      // Paridade 1:1 com AuraAvatar do ChatScreen.kt & Logo Deluxe do SetupScreen.kt
+      // ----------------------------------------------------------------------
+      if (this.showLetter && this.size >= 22) {
+        this.drawAuraAvatarEmblem(ctx, center, baseRadius * 0.70, dpr);
+      } else {
+        // Centelha Diamante no Centro (L1224-L1229)
         ctx.beginPath();
-        ctx.arc(center, center, coreGlowRadius, 0, Math.PI * 2);
-        ctx.fillStyle = coreGlow;
+        ctx.arc(center, center, baseRadius * 0.12, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
         ctx.fill();
       }
-
-      // ----------------------------------------------------------------------
-      // CAMADA F: Logo Oficial da AURA (ic_aura_logo.png ou Fallback Vetorial)
-      // ----------------------------------------------------------------------
-      this.drawOfficialLogo(ctx, center, logoRadius);
     }
 
-    drawRipple(ctx, center, logoRadius, wavePhase, glowPulse, colPrimary, colSecondary, audioLevel) {
-      const audioExpansion = audioLevel * 0.35;
-      const r = logoRadius * (0.95 + wavePhase * 0.70 + audioExpansion);
-      const a = Math.max(0, Math.min(1.0, (1.0 - wavePhase) * 0.60 * glowPulse));
-      if (a <= 0.01) return;
+    /**
+     * Gerador de Contorno Organico Liquido (Polar Harmonic Spline)
+     * Paridade exata com buildLiquidPath de AuraComponents.kt L1130-L1162
+     */
+    buildLiquidPath(ctx, center, baseRadius, phaseOffset, rMultiplier, waveAmp, timePhase) {
+      const steps = 36;
+      const stepAngle = (2 * Math.PI) / steps;
+      const points = [];
 
-      const ripGrad = ctx.createRadialGradient(center, center, 0, center, center, r);
-      ripGrad.addColorStop(0, this.applyAlpha(colPrimary, a * 0.45));
-      ripGrad.addColorStop(0.7, this.applyAlpha(colSecondary, a * 0.20));
-      ripGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      for (let i = 0; i < steps; i++) {
+        const angle = i * stepAngle;
+        // Modulacao harmonica com 3 frequencias (octaves) senoidais
+        const harm1 = Math.sin(3 * angle + timePhase + phaseOffset) * (0.09 + waveAmp * 0.22);
+        const harm2 = Math.cos(2 * angle - (timePhase * 1.3) + phaseOffset) * (0.07 + waveAmp * 0.18);
+        const harm3 = Math.sin(4 * angle + (timePhase * 0.8)) * (0.05 + waveAmp * 0.12);
 
-      ctx.beginPath();
-      ctx.arc(center, center, r, 0, Math.PI * 2);
-      ctx.fillStyle = ripGrad;
-      ctx.fill();
-
-      // Contorno suave da onda
-      ctx.beginPath();
-      ctx.arc(center, center, r, 0, Math.PI * 2);
-      ctx.strokeStyle = this.applyAlpha(colPrimary, a * 0.85);
-      ctx.lineWidth = Math.max(0.7, (2.2 * (1.0 - wavePhase)));
-      ctx.stroke();
-    }
-
-    drawOrbitalRing(ctx, center, radius, angle, col1, col2, col3, lineWidth) {
-      ctx.save();
-      ctx.translate(center, center);
-      ctx.rotate(angle);
-
-      // Usar conicGradient nativo se disponivel no browser moderno
-      if (typeof ctx.createConicGradient === 'function') {
-        const conic = ctx.createConicGradient(0, 0, 0);
-        conic.addColorStop(0, this.applyAlpha(col1, 0.95));
-        conic.addColorStop(0.33, this.applyAlpha(col2, 0.40));
-        conic.addColorStop(0.66, this.applyAlpha(col3, 0.95));
-        conic.addColorStop(1, this.applyAlpha(col1, 0.95));
-        ctx.strokeStyle = conic;
-      } else {
-        ctx.strokeStyle = this.applyAlpha(col1, 0.85);
+        const r = baseRadius * rMultiplier * (1.0 + harm1 + harm2 + harm3);
+        const x = center + r * Math.cos(angle);
+        const y = center + r * Math.sin(angle);
+        points.push({ x, y });
       }
 
-      ctx.lineWidth = lineWidth;
       ctx.beginPath();
-      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      // Interpolacao Bezier quadratica suave entre os pontos medios
+      const firstMid = {
+        x: (points[0].x + points[steps - 1].x) / 2,
+        y: (points[0].y + points[steps - 1].y) / 2
+      };
+      ctx.moveTo(firstMid.x, firstMid.y);
+
+      for (let i = 0; i < steps; i++) {
+        const current = points[i];
+        const next = points[(i + 1) % steps];
+        const mid = {
+          x: (current.x + next.x) / 2,
+          y: (current.y + next.y) / 2
+        };
+        ctx.quadraticCurveTo(current.x, current.y, mid.x, mid.y);
+      }
+      ctx.closePath();
+    }
+
+    /**
+     * Desenha o Emblema Oficial AuraAvatar (Newsreader 'A' em ObsidianBase com AuroraBrush)
+     */
+    drawAuraAvatarEmblem(ctx, center, emblemRadius, dpr) {
+      // 1. Circulo interno com AuroraBrush (AuraCyan para AuraEmerald)
+      const grad = ctx.createLinearGradient(center - emblemRadius, center - emblemRadius, center + emblemRadius, center + emblemRadius);
+      grad.addColorStop(0, '#22d3ee');
+      grad.addColorStop(1, '#10b981');
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(center, center, emblemRadius, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Borda 1dp 0x44FFFFFF
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.lineWidth = Math.max(1.0, 1.0 * dpr);
       ctx.stroke();
+
+      // 2. Letra 'A' em Newsreader Family Bold e cor ObsidianBase (#07090E)
+      const fontSize = Math.round(emblemRadius * 1.25);
+      ctx.font = `700 ${fontSize}px 'Newsreader', Georgia, serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#07090e';
+      ctx.fillText('A', center, center + (fontSize * 0.04));
 
       ctx.restore();
-    }
-
-    drawOfficialLogo(ctx, center, logoRadius) {
-      const logoImg = getSharedLogoImage();
-      const drawSize = logoRadius * 2;
-
-      if (isLogoLoaded && logoImg && logoImg.naturalWidth > 0) {
-        ctx.drawImage(logoImg, center - drawSize / 2, center - drawSize / 2, drawSize, drawSize);
-      } else {
-        // Fallback vetorial imediato do nucleo de diamante AURA (enquanto imagem carrega)
-        ctx.save();
-        ctx.translate(center, center);
-
-        ctx.beginPath();
-        ctx.moveTo(0, -logoRadius * 0.7);
-        ctx.lineTo(logoRadius * 0.7, 0);
-        ctx.lineTo(0, logoRadius * 0.7);
-        ctx.lineTo(-logoRadius * 0.7, 0);
-        ctx.closePath();
-
-        const grad = ctx.createLinearGradient(-logoRadius, -logoRadius, logoRadius, logoRadius);
-        grad.addColorStop(0, PALETTE.cyan);
-        grad.addColorStop(0.5, PALETTE.emerald);
-        grad.addColorStop(1, PALETTE.violet);
-
-        ctx.fillStyle = grad;
-        ctx.fill();
-
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        ctx.restore();
-      }
-    }
-
-    applyAlpha(colorStr, alpha) {
-      if (!colorStr) return `rgba(34, 211, 238, ${alpha})`;
-      if (colorStr.startsWith('#')) {
-        let hex = colorStr.slice(1);
-        if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
-        const num = parseInt(hex, 16);
-        const r = (num >> 16) & 255;
-        const g = (num >> 8) & 255;
-        const b = num & 255;
-        return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
-      }
-      if (colorStr.startsWith('rgba')) {
-        return colorStr.replace(/rgba?\(([^)]+)\)/, (match, vals) => {
-          const parts = vals.split(',').map(s => s.trim());
-          return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${alpha.toFixed(3)})`;
-        });
-      }
-      return colorStr;
     }
 
     destroy() {
@@ -584,7 +505,7 @@
     }
   }
 
-  // Componente de Orb Flutuante HUD (Floating Interactive Aura Orb)
+  // Componente de Orb Flutuante HUD (Floating Interactive Aura Voice & Status Orb)
   class AuraFloatingOrb {
     constructor() {
       this.container = null;
@@ -597,7 +518,6 @@
     init() {
       if (typeof document === 'undefined') return;
 
-      // Criar container flutuante se ainda nao existir
       let host = document.getElementById('aura-floating-orb-container');
       if (!host) {
         host = document.createElement('div');
@@ -625,6 +545,7 @@
         size: 52, // Diametro confortavel para toque e clique flutuante
         emotion: AuraOrbEmotion.CALM,
         isInteractive: true,
+        showLetter: true,
         onClick: () => {
           this.handleClick();
         }
@@ -666,7 +587,6 @@
     }
 
     bindStateEvents() {
-      // Sincroniza com mudancas de estado no app
       if (this.container) {
         this.container.addEventListener('mouseenter', () => {
           if (this.badge) this.badge.classList.add('badge-visible');
@@ -692,14 +612,15 @@
     init() {
       if (this.isInitialized || typeof document === 'undefined') return;
 
-      // 1. Instanciar Header Orb
+      // 1. Instanciar Header Orb com AuraLivingOrb + AuraAvatar
       const headerEl = document.getElementById('header-neural-core-orb');
       if (headerEl) {
         const orb = new AuraOrb({
           container: headerEl,
-          size: 32,
+          size: 34,
           emotion: AuraOrbEmotion.CALM,
           isInteractive: true,
+          showLetter: true,
           onClick: () => {
             if (window.auraVoice && typeof window.auraVoice.toggleVoice === 'function') {
               window.auraVoice.toggleVoice();
@@ -714,14 +635,15 @@
       if (drawerOrbEl) {
         const orb = new AuraOrb({
           container: drawerOrbEl,
-          size: 28,
+          size: 30,
           emotion: AuraOrbEmotion.CALM,
-          isInteractive: false
+          isInteractive: false,
+          showLetter: true
         });
         this.instances.set('drawer', orb);
       }
 
-      // 3. Instanciar Floating Action Orb
+      // 3. Instanciar Floating Action Orb (AuraVoiceOrbSheet Parity)
       this.floatingOrb = new AuraFloatingOrb();
 
       // 4. Observar classes legadas (retrocompatibilidade perfeita com .reasoning-active)
