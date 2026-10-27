@@ -1,6 +1,7 @@
 /**
- * Controlador de Entrada Rapida por Voz da AURA (Fase P3-4: Web Speech API pt-BR)
- * Projetado para operacao na pista sob sol forte e uso com luvas.
+ * Controlador de Entrada Rapida por Voz da AURA (Experiencia Imersiva estilo Gemini / GPT)
+ * Ao acionar o microfone, o fundo escurece e o orbe sobe flutuando no centro da tela,
+ * reagindo as ondas de audio em tempo real para gerar a transcricao.
  * Regra inegociavel: ZERO travessoes e total tolerancia a falhas de hardware/permissao.
  */
 
@@ -12,9 +13,21 @@ class AuraVoiceController {
     this.autoSend = false;
     this.btnVoice = null;
     this.chatInput = null;
-    this.indicator = null;
     this.announcer = null;
     this.mediaStream = null;
+
+    // Elementos do Modal Imersivo de Voz
+    this.modal = null;
+    this.modalCard = null;
+    this.modalOrbContainer = null;
+    this.modalOrb = null;
+    this.previewText = null;
+    this.statusLabel = null;
+    this.btnClose = null;
+    this.btnSend = null;
+    this.btnClear = null;
+    this.scrim = null;
+    this.currentTranscript = '';
   }
 
   /**
@@ -25,13 +38,23 @@ class AuraVoiceController {
   }
 
   /**
-   * Inicializa o suporte a Web Speech API e vincula os eventos da interface
+   * Inicializa o suporte a Web Speech API e vincula os elementos da interface
    */
   init() {
     this.btnVoice = document.getElementById('btn-voice-input');
     this.chatInput = document.getElementById('chat-input-text');
-    this.indicator = document.getElementById('voice-recording-indicator');
     this.announcer = document.getElementById('aura-sr-announcer');
+
+    // Elementos do Modal Imersivo
+    this.modal = document.getElementById('aura-voice-modal-overlay');
+    this.modalCard = document.getElementById('aura-voice-modal-card');
+    this.modalOrbContainer = document.getElementById('aura-voice-modal-orb-container');
+    this.previewText = document.getElementById('aura-voice-transcription-preview');
+    this.statusLabel = document.getElementById('aura-voice-status-label');
+    this.btnClose = document.getElementById('btn-voice-modal-close');
+    this.btnSend = document.getElementById('btn-voice-modal-send');
+    this.btnClear = document.getElementById('btn-voice-modal-clear');
+    this.scrim = document.getElementById('aura-voice-scrim');
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -58,6 +81,138 @@ class AuraVoiceController {
         this.toggleVoice();
       });
     }
+
+    this.bindModalEvents();
+  }
+
+  /**
+   * Vincula os eventos de interacao do Modal de Voz
+   */
+  bindModalEvents() {
+    if (this.btnClose) {
+      this.btnClose.addEventListener('click', () => {
+        this.cancelVoiceSession();
+      });
+    }
+
+    if (this.scrim) {
+      this.scrim.addEventListener('click', () => {
+        this.cancelVoiceSession();
+      });
+    }
+
+    if (this.btnClear) {
+      this.btnClear.addEventListener('click', () => {
+        this.currentTranscript = '';
+        if (this.chatInput) this.chatInput.value = '';
+        if (this.previewText) {
+          this.previewText.textContent = 'AURA esta ouvindo... Fale sobre bombas, tanques ou auditoria fiscal';
+          this.previewText.className = 'text-sm sm:text-base font-sans text-slate-400 transition-colors leading-relaxed';
+        }
+      });
+    }
+
+    if (this.btnSend) {
+      this.btnSend.addEventListener('click', () => {
+        this.commitAndSendVoice();
+      });
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.isListening && this.modal && !this.modal.classList.contains('hidden')) {
+        this.cancelVoiceSession();
+      }
+    });
+  }
+
+  /**
+   * Abre o Modal Imersivo de Voz: fundo escurece e o orbe sobe flutuando
+   */
+  openVoiceModal() {
+    if (!this.modal) return;
+
+    this.currentTranscript = '';
+    this.modal.classList.remove('hidden');
+
+    // Dispara transicao fluida
+    requestAnimationFrame(() => {
+      this.modal.classList.add('modal-active');
+    });
+
+    if (this.statusLabel) {
+      this.statusLabel.textContent = 'AURA SINTONIZADA • OUVINDO';
+      this.statusLabel.className = 'text-xs font-sans font-bold uppercase tracking-widest text-cyan-300';
+    }
+
+    if (this.previewText) {
+      this.previewText.textContent = 'AURA esta ouvindo... Fale sobre bombas, tanques ou auditoria fiscal';
+      this.previewText.className = 'text-sm sm:text-base font-sans text-slate-400 transition-colors leading-relaxed';
+    }
+
+    // Instancia o Orbe Vivo Majestoso (140px, paridade AuraVoiceOrbSheet)
+    if (this.modalOrbContainer && window.AuraOrb) {
+      if (this.modalOrb) {
+        this.modalOrb.destroy();
+      }
+      this.modalOrb = new window.AuraOrb({
+        container: this.modalOrbContainer,
+        size: 140,
+        emotion: 'LISTENING',
+        isInteractive: false
+      });
+      if (window.auraOrbManager) {
+        window.auraOrbManager.registerOrb('modal-voice', this.modalOrb);
+      }
+    }
+  }
+
+  /**
+   * Fecha o Modal Imersivo de Voz suavemente
+   */
+  closeVoiceModal() {
+    if (!this.modal) return;
+
+    this.modal.classList.remove('modal-active');
+
+    setTimeout(() => {
+      if (!this.isListening && this.modal) {
+        this.modal.classList.add('hidden');
+      }
+      if (this.modalOrb) {
+        if (window.auraOrbManager) {
+          window.auraOrbManager.unregisterOrb('modal-voice');
+        }
+        this.modalOrb.destroy();
+        this.modalOrb = null;
+      }
+    }, 320);
+  }
+
+  /**
+   * Conclui a transcricao de voz e envia imediatamente
+   */
+  commitAndSendVoice() {
+    this.stopListening();
+    this.closeVoiceModal();
+
+    if (this.chatInput && this.chatInput.value.trim()) {
+      this.chatInput.focus();
+      const sendBtn = document.getElementById('btn-chat-send');
+      if (sendBtn) {
+        sendBtn.click();
+      }
+    }
+  }
+
+  /**
+   * Cancela a sessao de voz sem enviar
+   */
+  cancelVoiceSession() {
+    this.stopListening();
+    this.closeVoiceModal();
+    if (this.chatInput) {
+      this.chatInput.value = '';
+    }
   }
 
   /**
@@ -68,11 +223,14 @@ class AuraVoiceController {
 
     this.recognition.onstart = () => {
       this.isListening = true;
-      this.renderListeningState(true);
+      this.openVoiceModal();
       this.announce('Ouvindo comando de pista... Fale agora.');
+
       if (typeof window !== 'undefined' && window.auraOrbManager) {
         window.auraOrbManager.setEmotion('LISTENING');
       }
+
+      // Conecta o analisador Web Audio ao microfone para reagir as ondas de audio em tempo real
       if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
         navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
           if (this.isListening) {
@@ -87,6 +245,7 @@ class AuraVoiceController {
           console.warn('[AURA Voice] Analisador Web Audio opcional indisponivel:', err);
         });
       }
+
       if (window.auraAudio && typeof window.auraAudio.playChime === 'function') {
         window.auraAudio.playChime(640, 0.05);
       }
@@ -106,12 +265,20 @@ class AuraVoiceController {
       }
 
       const recognizedText = (finalTranscript + interimTranscript).trim();
+      this.currentTranscript = recognizedText;
 
-      if (recognizedText && this.chatInput) {
-        this.chatInput.value = recognizedText;
-        this.chatInput.dispatchEvent(new Event('input', { bubbles: true }));
-        this.chatInput.style.height = 'auto';
-        this.chatInput.style.height = `${Math.min(this.chatInput.scrollHeight, 160)}px`;
+      if (recognizedText) {
+        if (this.chatInput) {
+          this.chatInput.value = recognizedText;
+          this.chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+          this.chatInput.style.height = 'auto';
+          this.chatInput.style.height = `${Math.min(this.chatInput.scrollHeight, 160)}px`;
+        }
+
+        if (this.previewText) {
+          this.previewText.textContent = `"${recognizedText}"`;
+          this.previewText.className = 'text-base sm:text-lg font-sans font-semibold text-white tracking-wide transition-all';
+        }
       }
     };
 
@@ -119,15 +286,6 @@ class AuraVoiceController {
       console.warn('[AURA Voice] Erro no reconhecimento:', event.error);
       this.isListening = false;
       this.cleanupMediaStream();
-      this.renderListeningState(false);
-      if (typeof window !== 'undefined' && window.auraOrbManager) {
-        window.auraOrbManager.setEmotion('WORRIED');
-        setTimeout(() => {
-          if (window.auraOrbManager && window.auraOrbManager.getEmotion() === 'WORRIED') {
-            window.auraOrbManager.setEmotion('CALM');
-          }
-        }, 2500);
-      }
 
       let msg = 'Erro no microfone.';
       if (event.error === 'not-allowed') {
@@ -138,26 +296,49 @@ class AuraVoiceController {
         msg = 'Falha de rede no reconhecimento de voz.';
       }
 
-      this.showFeedback(msg);
+      if (this.statusLabel) {
+        this.statusLabel.textContent = 'ATENCAO OPERACIONAL';
+        this.statusLabel.className = 'text-xs font-sans font-bold uppercase tracking-widest text-amber-400';
+      }
+
+      if (this.previewText) {
+        this.previewText.textContent = msg;
+        this.previewText.className = 'text-sm font-sans text-amber-300';
+      }
+
+      if (typeof window !== 'undefined' && window.auraOrbManager) {
+        window.auraOrbManager.setEmotion('WORRIED');
+        setTimeout(() => {
+          if (window.auraOrbManager && window.auraOrbManager.getEmotion() === 'WORRIED') {
+            window.auraOrbManager.setEmotion('CALM');
+          }
+        }, 2500);
+      }
+
       this.announce(msg);
+      setTimeout(() => {
+        this.closeVoiceModal();
+      }, 2200);
     };
 
     this.recognition.onend = () => {
       this.isListening = false;
       this.cleanupMediaStream();
-      this.renderListeningState(false);
       this.announce('Comando de voz concluido.');
+
+      if (this.statusLabel) {
+        this.statusLabel.textContent = 'TRANSCRICAO CONCLUIDA';
+        this.statusLabel.className = 'text-xs font-sans font-bold uppercase tracking-widest text-emerald-400';
+      }
+
       if (typeof window !== 'undefined' && window.auraOrbManager) {
         window.auraOrbManager.setEmotion('CALM');
       }
-      if (this.chatInput && this.chatInput.value.trim()) {
-        this.chatInput.focus();
-        if (this.autoSend) {
-          const sendBtn = document.getElementById('btn-chat-send');
-          if (sendBtn) {
-            sendBtn.click();
-          }
-        }
+
+      if (this.autoSend && this.currentTranscript.trim()) {
+        setTimeout(() => {
+          this.commitAndSendVoice();
+        }, 400);
       }
     };
   }
@@ -178,87 +359,42 @@ class AuraVoiceController {
   }
 
   /**
+   * Interrompe o reconhecimento ativo
+   */
+  stopListening() {
+    this.isListening = false;
+    this.cleanupMediaStream();
+    if (this.recognition) {
+      try {
+        this.recognition.stop();
+      } catch (_) {}
+    }
+    if (typeof window !== 'undefined' && window.auraOrbManager) {
+      window.auraOrbManager.setEmotion('CALM');
+    }
+  }
+
+  /**
    * Alterna entre iniciar ou interromper a escuta
    */
   toggleVoice() {
     if (!this.supported || !this.recognition) {
       const msg = 'Reconhecimento de voz nao suportado neste navegador. Digite seu comando.';
-      this.showFeedback(msg);
       this.announce(msg);
       if (this.chatInput) this.chatInput.focus();
       return;
     }
 
     if (this.isListening) {
-      this.isListening = false;
-      this.cleanupMediaStream();
-      try {
-        this.recognition.stop();
-      } catch (_) {}
-      this.renderListeningState(false);
-      if (typeof window !== 'undefined' && window.auraOrbManager) {
-        window.auraOrbManager.setEmotion('CALM');
-      }
+      this.commitAndSendVoice();
     } else {
       try {
-        this.isListening = true;
-        this.renderListeningState(true);
         this.recognition.start();
       } catch (err) {
         this.isListening = false;
-        this.renderListeningState(false);
+        this.cleanupMediaStream();
         console.warn('[AURA Voice] Erro ao iniciar SpeechRecognition:', err);
-        this.showFeedback('Nao foi possivel acessar o microfone.');
       }
-    }
-  }
-
-  /**
-   * Atualiza o estado visual do botao de voz e do indicador HUD
-   */
-  renderListeningState(listening) {
-    if (this.btnVoice) {
-      this.btnVoice.setAttribute('aria-pressed', listening ? 'true' : 'false');
-      if (listening) {
-        this.btnVoice.classList.add('bg-rose-600', 'text-white', 'border-rose-400', 'voice-recording-pulsing');
-        this.btnVoice.classList.remove('bg-slate-800', 'text-slate-300', 'border-slate-700');
-        this.btnVoice.title = 'Parar escuta de voz';
-      } else {
-        this.btnVoice.classList.remove('bg-rose-600', 'text-white', 'border-rose-400', 'voice-recording-pulsing');
-        this.btnVoice.classList.add('bg-slate-800', 'text-slate-300', 'border-slate-700');
-        this.btnVoice.title = 'Falar comando de pista (Web Speech API)';
-      }
-    }
-
-    if (this.indicator) {
-      if (listening) {
-        this.indicator.classList.remove('hidden');
-        this.indicator.classList.add('flex');
-      } else {
-        this.indicator.classList.add('hidden');
-        this.indicator.classList.remove('flex');
-      }
-    }
-  }
-
-  /**
-   * Exibe mensagem acessivel de feedback temporario
-   */
-  showFeedback(message) {
-    if (this.indicator) {
-      const label = document.getElementById('voice-recording-label');
-      if (label) {
-        label.textContent = message;
-      }
-      this.indicator.classList.remove('hidden');
-      this.indicator.classList.add('flex');
-      setTimeout(() => {
-        if (!this.isListening && this.indicator) {
-          this.indicator.classList.add('hidden');
-          this.indicator.classList.remove('flex');
-          if (label) label.textContent = 'Ouvindo comando de pista...';
-        }
-      }, 3500);
     }
   }
 

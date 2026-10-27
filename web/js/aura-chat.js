@@ -1575,9 +1575,7 @@ class AuraChatController {
         <!-- Header da Resposta com Núcleo e Tags -->
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
           <div class="flex items-center gap-2">
-            <div id="${containerId}-orb" class="neural-core-orb !w-6 !h-6 reasoning-active flex items-center justify-center shadow-sm">
-              <span class="relative z-10 font-serif font-bold text-slate-950 text-[12px] leading-none">A</span>
-            </div>
+            <div id="${containerId}-orb" class="neural-core-orb !w-6 !h-6 reasoning-active flex items-center justify-center shadow-sm"></div>
             <span class="font-bold font-sans text-xs text-white">AURA</span>
             <span class="px-1.5 py-0.5 rounded text-[9px] font-sans font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">AI</span>
           </div>
@@ -1626,9 +1624,7 @@ class AuraChatController {
       <div class="chat-bubble-aura ${opts.isWelcome ? 'chat-bubble-welcome w-full max-w-full h-full min-h-full flex-1 flex flex-col justify-between p-4 sm:p-5 text-slate-100 text-sm space-y-3' : 'w-full max-w-full p-4 sm:p-5 text-slate-100 text-sm space-y-3'}">
         <div class="flex items-center justify-between border-b border-white/10 pb-2 ${opts.isWelcome ? 'flex-shrink-0' : ''}">
           <div class="flex items-center gap-2">
-            <div class="neural-core-orb !w-6 !h-6 flex items-center justify-center shadow-sm">
-              <span class="relative z-10 font-serif font-bold text-slate-950 text-[12px] leading-none">A</span>
-            </div>
+            <div class="neural-core-orb !w-6 !h-6 flex items-center justify-center shadow-sm"></div>
             <span class="font-bold font-sans text-xs text-white">AURA</span>
             <span class="px-1.5 py-0.5 rounded text-[9px] font-sans font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">AI</span>
           </div>

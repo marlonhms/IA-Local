@@ -1,6 +1,6 @@
 /**
- * AURA Orb: Living Liquid Plasma Consciousness & Deluxe Avatar
- * Parity 1:1 with Aura Assistance Android (AuraLivingOrb & AuraAvatar in AuraComponents.kt & ChatScreen.kt).
+ * AURA Orb: Living Liquid Plasma Consciousness & Audio-Reactive Voice Core
+ * Parity 1:1 with Aura Assistance Android (AuraLivingOrb in AuraComponents.kt).
  * Zero Unicode dashes policy strictly enforced.
  */
 
@@ -13,7 +13,6 @@
     const mod = factory();
     root.AuraOrbEmotion = mod.AuraOrbEmotion;
     root.AuraOrb = mod.AuraOrb;
-    root.AuraFloatingOrb = mod.AuraFloatingOrb;
     root.AuraOrbManager = mod.AuraOrbManager;
     root.auraOrbManager = mod.manager;
   }
@@ -188,15 +187,14 @@
 
   const globalAudioTracker = new AuraOrbAudioTracker();
 
-  // Componente AuraLivingOrb & AuraAvatar (Compose Canvas 1:1)
+  // Componente AuraLivingOrb Puro (Compose Canvas 1:1)
   class AuraOrb {
     constructor(options = {}) {
       this.container = typeof options.container === 'string' ? document.querySelector(options.container) : options.container;
-      this.size = Number(options.size) || 40; // Diametro base em px (default 40dp do AuraLivingOrb)
+      this.size = Number(options.size) || 40; // Diametro nominal do orbe em px
       this.emotion = options.emotion && EMOTION_CONFIG[options.emotion] ? options.emotion : AuraOrbEmotion.CALM;
       this.onClick = typeof options.onClick === 'function' ? options.onClick : null;
       this.isInteractive = Boolean(options.isInteractive !== false);
-      this.showLetter = Boolean(options.showLetter !== false); // Renderiza a letra 'A' do AuraAvatar
 
       this.canvas = null;
       this.ctx = null;
@@ -237,7 +235,7 @@
     updateDimensions() {
       if (!this.canvas || !this.container) return;
       const dpr = window.devicePixelRatio || 1;
-      // 2.2x para expansao fluida do halo atmosferico e ondas senoidais
+      // 2.2x para expansao fluida do halo atmosferico e ondas senoidais polares
       const canvasDim = Math.round(this.size * 2.2);
 
       this.canvas.width = Math.round(canvasDim * dpr);
@@ -404,18 +402,12 @@
       ctx.fill();
 
       // ----------------------------------------------------------------------
-      // CAMADA E: Emblema Oficial AuraAvatar Deluxe (Newsreader 'A' em ObsidianBase)
-      // Paridade 1:1 com AuraAvatar do ChatScreen.kt & Logo Deluxe do SetupScreen.kt
+      // CAMADA E: Centelha Diamante no Centro da Consciencia (L1224-L1229)
       // ----------------------------------------------------------------------
-      if (this.showLetter && this.size >= 22) {
-        this.drawAuraAvatarEmblem(ctx, center, baseRadius * 0.70, dpr);
-      } else {
-        // Centelha Diamante no Centro (L1224-L1229)
-        ctx.beginPath();
-        ctx.arc(center, center, baseRadius * 0.12, 0, Math.PI * 2);
-        ctx.fillStyle = '#ffffff';
-        ctx.fill();
-      }
+      ctx.beginPath();
+      ctx.arc(center, center, baseRadius * 0.12, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
     }
 
     /**
@@ -460,37 +452,6 @@
       ctx.closePath();
     }
 
-    /**
-     * Desenha o Emblema Oficial AuraAvatar (Newsreader 'A' em ObsidianBase com AuroraBrush)
-     */
-    drawAuraAvatarEmblem(ctx, center, emblemRadius, dpr) {
-      // 1. Circulo interno com AuroraBrush (AuraCyan para AuraEmerald)
-      const grad = ctx.createLinearGradient(center - emblemRadius, center - emblemRadius, center + emblemRadius, center + emblemRadius);
-      grad.addColorStop(0, '#22d3ee');
-      grad.addColorStop(1, '#10b981');
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(center, center, emblemRadius, 0, Math.PI * 2);
-      ctx.fillStyle = grad;
-      ctx.fill();
-
-      // Borda 1dp 0x44FFFFFF
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-      ctx.lineWidth = Math.max(1.0, 1.0 * dpr);
-      ctx.stroke();
-
-      // 2. Letra 'A' em Newsreader Family Bold e cor ObsidianBase (#07090E)
-      const fontSize = Math.round(emblemRadius * 1.25);
-      ctx.font = `700 ${fontSize}px 'Newsreader', Georgia, serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#07090e';
-      ctx.fillText('A', center, center + (fontSize * 0.04));
-
-      ctx.restore();
-    }
-
     destroy() {
       this.isDestroyed = true;
       if (this.animationFrameId) {
@@ -505,106 +466,10 @@
     }
   }
 
-  // Componente de Orb Flutuante HUD (Floating Interactive Aura Voice & Status Orb)
-  class AuraFloatingOrb {
-    constructor() {
-      this.container = null;
-      this.orb = null;
-      this.badge = null;
-      this.badgeText = null;
-      this.init();
-    }
-
-    init() {
-      if (typeof document === 'undefined') return;
-
-      let host = document.getElementById('aura-floating-orb-container');
-      if (!host) {
-        host = document.createElement('div');
-        host.id = 'aura-floating-orb-container';
-        host.className = 'aura-floating-orb-container';
-        document.body.appendChild(host);
-      }
-
-      host.innerHTML = `
-        <div id="aura-floating-orb-badge" class="aura-floating-orb-badge" aria-live="polite">
-          <span class="aura-badge-dot"></span>
-          <span id="aura-floating-orb-text" class="aura-badge-text">AURA</span>
-        </div>
-        <div id="aura-floating-orb-canvas-wrapper" class="aura-floating-orb-canvas-wrapper"></div>
-      `;
-
-      this.container = host;
-      this.badge = document.getElementById('aura-floating-orb-badge');
-      this.badgeText = document.getElementById('aura-floating-orb-text');
-
-      const wrapper = document.getElementById('aura-floating-orb-canvas-wrapper');
-
-      this.orb = new AuraOrb({
-        container: wrapper,
-        size: 52, // Diametro confortavel para toque e clique flutuante
-        emotion: AuraOrbEmotion.CALM,
-        isInteractive: true,
-        showLetter: true,
-        onClick: () => {
-          this.handleClick();
-        }
-      });
-
-      this.bindStateEvents();
-    }
-
-    handleClick() {
-      // Dispara o controlador de voz se disponivel, ou foca o input de chat
-      if (window.auraVoice && typeof window.auraVoice.toggleVoice === 'function') {
-        window.auraVoice.toggleVoice();
-      } else {
-        const chatInput = document.getElementById('chat-input-text');
-        if (chatInput) {
-          chatInput.focus();
-        }
-      }
-    }
-
-    setEmotion(emotion) {
-      if (!this.orb) return;
-      this.orb.setEmotion(emotion);
-
-      const cfg = EMOTION_CONFIG[emotion];
-      if (this.badgeText && cfg) {
-        this.badgeText.textContent = cfg.tooltip;
-      }
-      if (this.container) {
-        this.container.setAttribute('data-emotion', emotion);
-      }
-      if (this.badge) {
-        if (emotion !== AuraOrbEmotion.CALM && emotion !== AuraOrbEmotion.NEUTRAL) {
-          this.badge.classList.add('badge-visible');
-        } else {
-          this.badge.classList.remove('badge-visible');
-        }
-      }
-    }
-
-    bindStateEvents() {
-      if (this.container) {
-        this.container.addEventListener('mouseenter', () => {
-          if (this.badge) this.badge.classList.add('badge-visible');
-        });
-        this.container.addEventListener('mouseleave', () => {
-          if (this.orb && (this.orb.emotion === AuraOrbEmotion.CALM || this.orb.emotion === AuraOrbEmotion.NEUTRAL)) {
-            if (this.badge) this.badge.classList.remove('badge-visible');
-          }
-        });
-      }
-    }
-  }
-
   // Gerenciador Central de Orbes AURA
   class AuraOrbManager {
     constructor() {
       this.instances = new Map();
-      this.floatingOrb = null;
       this.currentEmotion = AuraOrbEmotion.CALM;
       this.isInitialized = false;
     }
@@ -612,7 +477,7 @@
     init() {
       if (this.isInitialized || typeof document === 'undefined') return;
 
-      // 1. Instanciar Header Orb com AuraLivingOrb + AuraAvatar
+      // 1. Instanciar Header Orb
       const headerEl = document.getElementById('header-neural-core-orb');
       if (headerEl) {
         const orb = new AuraOrb({
@@ -620,7 +485,6 @@
           size: 34,
           emotion: AuraOrbEmotion.CALM,
           isInteractive: true,
-          showLetter: true,
           onClick: () => {
             if (window.auraVoice && typeof window.auraVoice.toggleVoice === 'function') {
               window.auraVoice.toggleVoice();
@@ -637,16 +501,12 @@
           container: drawerOrbEl,
           size: 30,
           emotion: AuraOrbEmotion.CALM,
-          isInteractive: false,
-          showLetter: true
+          isInteractive: false
         });
         this.instances.set('drawer', orb);
       }
 
-      // 3. Instanciar Floating Action Orb (AuraVoiceOrbSheet Parity)
-      this.floatingOrb = new AuraFloatingOrb();
-
-      // 4. Observar classes legadas (retrocompatibilidade perfeita com .reasoning-active)
+      // 3. Observar classes legadas (retrocompatibilidade com .reasoning-active)
       this.setupLegacyObserver();
 
       this.isInitialized = true;
@@ -677,16 +537,24 @@
       observer.observe(headerEl, { attributes: true });
     }
 
+    registerOrb(key, orbInstance) {
+      this.instances.set(key, orbInstance);
+    }
+
+    unregisterOrb(key) {
+      const orb = this.instances.get(key);
+      if (orb) {
+        orb.destroy();
+        this.instances.delete(key);
+      }
+    }
+
     setEmotion(emotion) {
       if (!EMOTION_CONFIG[emotion]) return;
       this.currentEmotion = emotion;
 
       for (const orb of this.instances.values()) {
         orb.setEmotion(emotion);
-      }
-
-      if (this.floatingOrb) {
-        this.floatingOrb.setEmotion(emotion);
       }
     }
 
@@ -720,7 +588,6 @@
   return {
     AuraOrbEmotion,
     AuraOrb,
-    AuraFloatingOrb,
     AuraOrbManager,
     manager,
     audioTracker: globalAudioTracker
