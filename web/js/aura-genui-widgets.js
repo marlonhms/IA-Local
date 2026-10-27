@@ -537,6 +537,50 @@
         }
       }
 
+      // Acao especial: Copiar Diagnostico Fiscal para o Contador (Area de Transferencia)
+      const actionPayload = (this.actions || []).find(a => a.action_id === actionId)?.payload || {};
+      if (actionPayload.intent === 'copiar_diagnostico_contador' || actionId.includes('copiar_diagnostico') || btnElement?.textContent?.includes('Copiar Diagnostico')) {
+        const title = this.props?.title || 'Parecer Fiscal AURA';
+        const diag = this.props?.diagnosis || '';
+        const blocks = Array.isArray(this.props?.blocks) ? this.props.blocks : [];
+        const alerta = blocks.find(b => b.block_type === 'alert_callout')?.alert?.message || '';
+        const acao = blocks.find(b => b.block_type === 'alert_callout')?.alert?.action_label || '';
+        const proc = blocks.find(b => b.block_id === 'blk_procedimento_erp')?.custom_content || '';
+
+        const clipboardText = [
+          `=== PARECER FISCAL / DIAGNOSTICO SEFAZ (AURA INTELLIGENCE) ===`,
+          `Titulo: ${title}`,
+          `Diagnostico: ${diag}`,
+          alerta ? `Impacto: ${alerta}` : '',
+          acao ? `Acao webPosto: ${acao}` : '',
+          proc ? `\nProcedimento Detalhado:\n${proc}` : '',
+          `\nData/Hora: ${new Date().toLocaleString('pt-BR')}`,
+          `Gerado pela AURA - Assistente de Prontidao do Posto`
+        ].filter(Boolean).join('\n');
+
+        if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          navigator.clipboard.writeText(clipboardText).then(() => {
+            const fx = (typeof window !== 'undefined' && window.auraFx) || null;
+            if (fx && typeof fx.showToast === 'function') {
+              fx.showToast({
+                title: 'Parecer Copiado!',
+                message: 'Diagnostico fiscal copiado para a area de transferencia. Pronto para enviar ao contador.',
+                type: 'success'
+              });
+            }
+          }).catch(() => {});
+        }
+        return true;
+      }
+
+      // Acao especial: Consultar Modulo de Faturamento
+      if (actionPayload.intent === 'ajuda_sistema' && actionPayload.modulo === 'faturamento') {
+        if (typeof window !== 'undefined' && window.auraChat && typeof window.auraChat.sendMessage === 'function') {
+          window.auraChat.sendMessage('Como operar o Modulo de Faturamento e Notas Fiscais no webPosto?');
+          return true;
+        }
+      }
+
       // 2. Acao de mutacao / recomendacao transacional
       const actionDef = (this.actions || []).find(a => a.action_id === actionId) || {
         action_id: actionId,
