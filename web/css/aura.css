@@ -252,23 +252,20 @@ body {
 @keyframes pulseCore {
   0%, 100% {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-    transform: scale(1);
   }
   50% {
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.25);
-    transform: scale(1.02);
+    box-shadow: 0 4px 16px rgba(34, 211, 238, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   }
 }
 
 @keyframes coreSpark {
-  0% { transform: scale(0.85); opacity: 0.7; }
-  100% { transform: scale(1.15); opacity: 1; }
+  0% { opacity: 0.7; }
+  100% { opacity: 1; }
 }
 
-/* Orbe de Raciocínio Cognitivo Durante Streaming (Cognitive Reasoning Orb) */
+/* Orbe de Raciocinio Cognitivo Durante Streaming (Cognitive Reasoning Orb) */
 .neural-core-orb.reasoning-active {
-  animation: cognitiveOrbPulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
 }
 
 .neural-core-orb.reasoning-active::after {
@@ -278,19 +275,151 @@ body {
 
 @keyframes cognitiveOrbPulse {
   0%, 100% {
-    transform: scale(1);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
     background: linear-gradient(135deg, #059669 0%, #0891b2 50%, #7c3aed 100%);
   }
   50% {
-    transform: scale(1.04);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 20px rgba(124, 58, 237, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     background: linear-gradient(135deg, #06b6d4 0%, #7c3aed 50%, #a855f7 100%);
   }
 }
 
 @keyframes coreSparkFast {
-  0% { transform: scale(0.85); opacity: 0.8; }
+  0% { opacity: 0.8; }
+  100% { opacity: 1; }
+}
+
+/* ==========================================================================
+   AURA ORB COSMICO & HUD FLUTUANTE (PARIDADE 1:1 COM ANDROID AURAORB)
+   ========================================================================== */
+
+.aura-orb-host {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  animation: none !important;
+}
+
+.aura-orb-host::after,
+.aura-orb-host::before {
+  display: none !important;
+}
+
+.aura-orb-canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: pointer;
+  outline: none;
+  border-radius: 50%;
+  transition: filter 0.2s ease;
+}
+
+.aura-orb-canvas:focus-visible {
+  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.6);
+}
+
+/* Container Flutuante HUD da AURA (Floating Interactive Aura Orb) */
+.aura-floating-orb-container {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  width: 56px;
+  height: 56px;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.aura-floating-orb-canvas-wrapper {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Badge / Tooltip Inteligente Acoplado ao Orb Flutuante */
+.aura-floating-orb-badge {
+  position: absolute;
+  bottom: 66px;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.90);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 12px rgba(34, 211, 238, 0.15);
+  color: #f8fafc;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(6px) scale(0.96);
+  pointer-events: none;
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.aura-floating-orb-badge.badge-visible,
+.aura-floating-orb-container:hover .aura-floating-orb-badge {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.aura-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22d3ee;
+  box-shadow: 0 0 8px #22d3ee;
+}
+
+.aura-floating-orb-container[data-emotion="THINKING"] .aura-badge-dot {
+  background: #a78bfa;
+  box-shadow: 0 0 8px #7c3aed;
+}
+
+.aura-floating-orb-container[data-emotion="LISTENING"] .aura-badge-dot {
+  background: #67e8f9;
+  box-shadow: 0 0 8px #22d3ee;
+}
+
+.aura-floating-orb-container[data-emotion="SUCCESS"] .aura-badge-dot {
+  background: #34d399;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.aura-floating-orb-container[data-emotion="AGITATED"] .aura-badge-dot {
+  background: #f87171;
+  box-shadow: 0 0 8px #ef4444;
+}
+
+@media (max-width: 640px) {
+  .aura-floating-orb-container {
+    bottom: 84px;
+    right: 18px;
+    width: 50px;
+    height: 50px;
+  }
+}
   100% { transform: scale(1.25); opacity: 1; }
 }
 
@@ -3339,15 +3468,12 @@ body.modo-pista #btn-toggle-modo-pista {
 @keyframes pulse-voice {
   0% {
     box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-    transform: scale(1);
   }
   50% {
-    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
-    transform: scale(1.05);
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
   }
   100% {
     box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-    transform: scale(1);
   }
 }
 

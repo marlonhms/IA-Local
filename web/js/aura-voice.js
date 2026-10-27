@@ -14,6 +14,7 @@ class AuraVoiceController {
     this.chatInput = null;
     this.indicator = null;
     this.announcer = null;
+    this.mediaStream = null;
   }
 
   /**
@@ -69,6 +70,23 @@ class AuraVoiceController {
       this.isListening = true;
       this.renderListeningState(true);
       this.announce('Ouvindo comando de pista... Fale agora.');
+      if (typeof window !== 'undefined' && window.auraOrbManager) {
+        window.auraOrbManager.setEmotion('LISTENING');
+      }
+      if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+          if (this.isListening) {
+            this.mediaStream = stream;
+            if (typeof window !== 'undefined' && window.auraOrbManager) {
+              window.auraOrbManager.attachAudioStream(stream);
+            }
+          } else {
+            stream.getTracks().forEach((t) => t.stop());
+          }
+        }).catch((err) => {
+          console.warn('[AURA Voice] Analisador Web Audio opcional indisponivel:', err);
+        });
+      }
       if (window.auraAudio && typeof window.auraAudio.playChime === 'function') {
         window.auraAudio.playChime(640, 0.05);
       }
@@ -100,7 +118,16 @@ class AuraVoiceController {
     this.recognition.onerror = (event) => {
       console.warn('[AURA Voice] Erro no reconhecimento:', event.error);
       this.isListening = false;
+      this.cleanupMediaStream();
       this.renderListeningState(false);
+      if (typeof window !== 'undefined' && window.auraOrbManager) {
+        window.auraOrbManager.setEmotion('WORRIED');
+        setTimeout(() => {
+          if (window.auraOrbManager && window.auraOrbManager.getEmotion() === 'WORRIED') {
+            window.auraOrbManager.setEmotion('CALM');
+          }
+        }, 2500);
+      }
 
       let msg = 'Erro no microfone.';
       if (event.error === 'not-allowed') {
@@ -117,8 +144,12 @@ class AuraVoiceController {
 
     this.recognition.onend = () => {
       this.isListening = false;
+      this.cleanupMediaStream();
       this.renderListeningState(false);
       this.announce('Comando de voz concluido.');
+      if (typeof window !== 'undefined' && window.auraOrbManager) {
+        window.auraOrbManager.setEmotion('CALM');
+      }
       if (this.chatInput && this.chatInput.value.trim()) {
         this.chatInput.focus();
         if (this.autoSend) {
@@ -129,6 +160,21 @@ class AuraVoiceController {
         }
       }
     };
+  }
+
+  /**
+   * Libera stream do microfone e desvincula analisador de audio
+   */
+  cleanupMediaStream() {
+    if (this.mediaStream) {
+      try {
+        this.mediaStream.getTracks().forEach((track) => track.stop());
+      } catch (_) {}
+      this.mediaStream = null;
+    }
+    if (typeof window !== 'undefined' && window.auraOrbManager) {
+      window.auraOrbManager.detachAudioStream();
+    }
   }
 
   /**
@@ -145,10 +191,14 @@ class AuraVoiceController {
 
     if (this.isListening) {
       this.isListening = false;
+      this.cleanupMediaStream();
       try {
         this.recognition.stop();
       } catch (_) {}
       this.renderListeningState(false);
+      if (typeof window !== 'undefined' && window.auraOrbManager) {
+        window.auraOrbManager.setEmotion('CALM');
+      }
     } else {
       try {
         this.isListening = true;

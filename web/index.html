@@ -94,7 +94,7 @@
     <!-- Topo do Menu: Identidade & Botão Fechar -->
     <div class="p-4 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
       <div class="flex items-center gap-3">
-        <div class="neural-core-orb !w-8 !h-8"></div>
+        <div id="drawer-neural-core-orb" class="neural-core-orb !w-8 !h-8"></div>
         <div>
           <div class="flex items-center gap-2">
             <span class="font-display-title font-bold text-base tracking-wider bg-gradient-to-r from-cyan-400 via-sky-300 to-purple-400 bg-clip-text text-transparent">AURA</span>
@@ -1094,10 +1094,9 @@
             </button>
           </div>
 
-          <!-- Indicador Pulsante de Entrada por Voz (Web Speech API) -->
-          <div id="voice-recording-indicator" class="hidden px-3.5 py-2 rounded-xl bg-rose-950/90 border border-rose-500/50 items-center gap-2.5 text-xs text-rose-200 backdrop-blur-md shadow-2xl animate-fade-in mb-2">
-            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping flex-shrink-0"></span>
-            <i data-lucide="mic" class="w-4 h-4 text-rose-400 animate-pulse"></i>
+          <!-- Indicador de Entrada por Voz Sincronizado ao Aura Orb -->
+          <div id="voice-recording-indicator" class="hidden px-3.5 py-2 rounded-xl bg-slate-900/95 border border-cyan-500/50 items-center gap-2.5 text-xs text-cyan-200 backdrop-blur-md shadow-2xl animate-fade-in mb-2">
+            <i data-lucide="mic" class="w-4 h-4 text-cyan-400"></i>
             <span id="voice-recording-label" class="font-semibold tracking-wide">Ouvindo comando de pista...</span>
           </div>
 
@@ -2344,6 +2343,11 @@
   </div>
 
   <!-- =========================================================================
+       AURA ORB FLUTUANTE HUD (Presenca Cosmica & Experiencia de Audio)
+       ========================================================================= -->
+  <div id="aura-floating-orb-container" class="aura-floating-orb-container" aria-label="AURA Orb Flutuante"></div>
+
+  <!-- =========================================================================
        SCRIPTS JAVASCRIPT MODULARES DA AURA
        ========================================================================= -->
   <script src="/static/js/aura-genui.js?v=2.10.22" defer></script>
@@ -2360,6 +2364,7 @@
   <script src="/static/js/aura-storage.js?v=2.10.22"></script>
   <script src="/static/js/aura-history-drawer.js?v=2.10.22"></script>
   <script src="/static/js/aura-welcome-cockpit.js?v=2.10.22"></script>
+  <script src="/static/js/aura-orb.js?v=2.10.22"></script>
   <script src="/static/js/aura-chat.js?v=2.10.22"></script>
   <script src="/static/js/aura-voice.js?v=2.10.22"></script>
   <script src="/static/js/aura-app.js?v=2.10.22"></script>

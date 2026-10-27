@@ -654,6 +654,9 @@ class AuraChatController {
     // Ativa pulso do Cognitive Reasoning Orb no header e define primeira etapa cognitiva
     const headerOrb = typeof document !== 'undefined' ? (document.getElementById('header-neural-core-orb') || document.querySelector('header .neural-core-orb')) : null;
     if (headerOrb) headerOrb.classList.add('reasoning-active');
+    if (typeof window !== 'undefined' && window.auraOrbManager) {
+      window.auraOrbManager.setEmotion('THINKING');
+    }
     this.updateCognitiveStep(messageContainerId, 'Consultando automação da pista...', 'cyan');
 
     // Força rolagem para o início da nova resposta
@@ -1477,6 +1480,14 @@ class AuraChatController {
       document.querySelectorAll('.chat-bubble-aura .neural-core-orb.reasoning-active').forEach(orb => {
         orb.classList.remove('reasoning-active');
       });
+      if (typeof window !== 'undefined' && window.auraOrbManager) {
+        window.auraOrbManager.setEmotion('SUCCESS');
+        setTimeout(() => {
+          if (window.auraOrbManager && window.auraOrbManager.getEmotion() === 'SUCCESS') {
+            window.auraOrbManager.setEmotion('CALM');
+          }
+        }, 1800);
+      }
     }
   }
 
