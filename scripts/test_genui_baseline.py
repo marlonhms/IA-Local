@@ -1,6 +1,6 @@
 """
 Suíte de Testes Automatizada: Linha de Base do Protocolo GenUI & Catálogo Seguro
-(Fase 0 — AURA IntelligentUI / SDUI Baseline & Security Suite)
+(Fase 0 - AURA IntelligentUI / SDUI Baseline & Security Suite)
 
 Validações Obrigatórias:
 1. Idempotência Criptográfica & UUID v4 em Python (core/schemas/idempotency.py):
@@ -59,7 +59,7 @@ from core.schemas.idempotency import (
 
 def run_genui_baseline_tests():
     print("=" * 78)
-    print("🛡️ SUÍTE DE TESTES: LINHA DE BASE & PROTOCOLO GENUI (FASE 0 — P0)")
+    print("🛡️ SUÍTE DE TESTES: LINHA DE BASE & PROTOCOLO GENUI (FASE 0 - P0)")
     print("   (SecureComponentRegistry, Idempotência Criptográfica e Governança)")
     print("=" * 78)
 

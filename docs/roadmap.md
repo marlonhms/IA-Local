@@ -311,3 +311,58 @@ Para considerar este Roadmap 100% concluido, o agente executor devera:
    - Adicionar estilos para `.fiscal-key-segment` e `.persona-switch-bar` garantindo compatibilidade total com `body.modo-pista-active` (alto contraste sob sol forte) e `body.gpu-guard-active` (60 FPS sem `backdrop-filter` pesado).
 2. **Testes Unitarios em `tests/unit/test_fiscal_engine.py`:**
    - Validar a geracao do envelope GenUI para `chave_acesso`, `xml_documento` e `consulta_rejeicao_fiscal` e validar ausencia absoluta de travessoes Unicode (`\u2014` e `\u2013`) em todos os arquivos modificados.
+
+---
+
+# APENDICE B: ENGENHARIA DE TIPOGRAFIA COGNITIVA, UX WRITING E LEITURA INTELIGENTE NO CHAT CONTAINER (FASE 1 A 4)
+
+> **Documento Espelho Completo:** `docs/roadmap_apendice_ux_textual_chat.md`  
+> **Escopo:** Separacao estrita de responsabilidades entre GUI (foco 100% visual e interativo) e Container de Chat (foco 100% textual, editorial, escaneavel e anti-fadiga), aplicando neuroergonomia de leitura digital (Regra de Bringhurst 68ch, BLUF, Layer-Cake Scannability, Auto-Tokenizacao Tabular e Progressive Disclosure).  
+> **Regra Inegociavel:** ZERO travessoes Unicode (`\u2014` e `\u2013`) em qualquer arquivo modificado ou criado.
+
+## B.1. DIAGNOSTICO DE FADIGA VISUAL E COGNITIVA NO CHAT ATUAL
+
+1. **Inflacao de Negrito e Ofuscamento (Bold & Halation Fatigue):**
+   - Textos corridos em `#e2e8f0`/`#ffffff` com excesso de `strong` (`700`) e spans coloridos com `text-shadow` neon causam cansaco ocular rapido e destroem a hierarquia de escaneamento.
+2. **Duplicacao entre Chat e GUI (Companion Canvas):**
+   - Quando a GUI lateral ja exibe os cards interativos, o chat ainda repete listas longas de numeros em algumas sinteses deterministicas (`core/aura_engine.py`).
+3. **Largura de Linha Excessiva e Falta de Ancoras Tabulares:**
+   - Paragrafos sem limite de largura (`ch`) forcam movimentos oculares longos, e metricas misturadas na fonte proporcional dificultam a comparacao rapida de valores (`R$`, `L`, `%`).
+
+---
+
+## B.2. ESPECIFICACAO DE EXECUCAO POR FASE
+
+### FASE 1: Ergonomia Tipografica, Escala Modular e Anti-Fadiga Visual (`web/css/aura.css`)
+
+1. **Calibracao de `.prose-aura`:**
+   - Cor base suave `#cbd5e1` (Slate-300), peso estritamente `400` no texto corrido, `line-height: 1.68` e largura otima de leitura `max-width: 68ch` para paragrafos, listas e citacoes.
+   - Primeiro paragrafo (`.prose-aura > p:first-of-type`) estilizado como **Lead Paragraph (BLUF)** em `#f1f5f9` para ancorar o veredito imediato.
+   - Reducao de `strong`/`b` para `font-weight: 600` (`#f8fafc`), eliminando o aspecto pesado.
+2. **Micro-Tokens de Dados (`.aura-data-token`) e Badges Sutilizados:**
+   - Criacao de `.aura-data-token` com `font-family: var(--font-mono)`, `font-variant-numeric: tabular-nums`, fundo translúcido de `4%` e borda de `8%`.
+   - Remocao de `text-shadow` neon pesado nas classes semanticas dentro de `.prose-aura`, convertendo-as em micro-pilulas editoriais discretas.
+
+### FASE 2: Motor de Formatacao Inteligente e Progressive Disclosure (`web/js/aura-chat.js`)
+
+1. **Auto-Tokenizador de Metricas (`applySmartTypographyTokens`):**
+   - Detector automatico em `formatMarkdown` que envolve valores monetarios (`R$`), volumes (`L`, `L/min`), percentuais (`%`) e codigos fiscais (`CFOP`, `CST`, `NCM`, `Rejeicao`, `cStat`) em `<span class="aura-data-token">`.
+2. **Progressive Disclosure Automatico (`applyProgressiveDisclosure`):**
+   - Quando a resposta possuir card visual na GUI (`hasToolCard === true`) e mais de 3 blocos textuais, manter visiveis os 2 primeiros blocos (veredito + sintese) e agrupar o detalhamento complementar em `<details class="aura-chat-disclosure">`.
+3. **Telemetria Discreta:**
+   - Suavizar o rodape de telemetria (`opacity-60 hover:opacity-100 font-mono text-[10px]`) para nao competir com o texto principal.
+
+### FASE 3: UX Writing nos Prompts e Sintese Enxuta Dual-Channel (`core/prompts/system_prompts.py` e `core/aura_engine.py`)
+
+1. **Regras BLUF e Bold Budget (Maximo 10%) em `core/prompts/system_prompts.py`:**
+   - Instruir a LLM a iniciar sempre pelo veredito direto sem saudacoes repetitivas e limitar o uso de negrito a no maximo 1 a 2 ancoras curtas por topico.
+2. **Enxugamento Dual-Channel em `_gerar_sintese_contingencia_ferramenta` (`core/aura_engine.py`):**
+   - Quando `genui_active=True`, retornar um briefing executivo conciso de 3 a 4 linhas para todas as ferramentas (`roi_diagnostic`, `pos_audit`, `cenario_preditivo`, `conciliacao_caixa`, `estoque_combustivel`, `previsao_esgotamento_tanques`, `conformidade_lmc_anp`), delegando a densidade de tabelas e listas para o Companion Canvas.
+
+### FASE 4: Controle de Conforto de Leitura e Testes Automatizados (`web/index.html`, `web/js/aura-chat.js` e `tests/unit/test_chat_typography_ux.py`)
+
+1. **Toggle de Modo de Leitura (`#btn-chat-reading-density`):**
+   - Botao discreto no cabecalho do chat permitindo alternar entre **Modo Executivo Conciso** (padrao, com Progressive Disclosure) e **Modo Leitura Expandida** (todos os detalhes abertos e fonte `0.96rem`), persistido em `localStorage`.
+2. **Suite de Testes (`tests/unit/test_chat_typography_ux.py`):**
+   - Validar regras CSS ergonomicas, tokenizacao automatica de numeros, Progressive Disclosure, concisao com `genui_active=True` e zero travessoes Unicode (`\u2014` e `\u2013`).
+

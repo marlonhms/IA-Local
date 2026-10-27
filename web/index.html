@@ -994,7 +994,21 @@
           <!-- Container de Alertas Proativos In-App da AURA (P3-2) -->
           <div id="aura-in-app-alerts-container" class="empty:hidden flex flex-col gap-2 z-20"></div>
 
-<!-- Feed de Mensagens (Scrollable) - Ocupa 100% da altura e largura -->
+          <!-- Cabecalho Superior da Coluna do Chat (Ergonomia e Conforto de Leitura) -->
+          <div id="chat-column-header" class="flex items-center justify-between px-3.5 py-1.5 rounded-xl bg-slate-900/60 border border-white/5 text-xs flex-shrink-0">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="font-sans font-medium text-xs text-slate-300">Console Conversacional</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="btn-chat-reading-density" type="button" class="btn-chat-reading-density flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors text-xs font-mono select-none cursor-pointer" title="Alternar Densidade de Leitura: Conciso (Resumo Executivo, 68ch) vs Conforto (Editorial 0.96rem)" aria-label="Alternar densidade de leitura do chat" data-reading-mode="concise">
+                <span class="font-bold text-xs tracking-tighter text-cyan-400">Aa</span>
+                <span id="label-chat-reading-density" class="text-[11px] text-slate-400 font-sans">Conciso</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Feed de Mensagens (Scrollable) - Ocupa 100% da altura e largura -->
           <div id="chat-feed-container" class="glass-panel flex-1 min-h-0 p-4 sm:p-5 overflow-y-auto space-y-4 font-sans rounded-2xl relative scroll-smooth flex flex-col">
             <div id="welcome-message-bubble" class="flex justify-start w-full h-full min-h-full flex-1 animate-fade-in welcome-message-wrapper">
               <div class="chat-bubble-aura chat-bubble-welcome w-full max-w-full h-full min-h-full flex-1 flex flex-col justify-between p-4 sm:p-5 text-slate-100 text-sm space-y-3">

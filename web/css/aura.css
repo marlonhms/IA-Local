@@ -681,11 +681,20 @@ body {
   color: #6ee7b7;
 }
 
-/* Formatação de Markdown no Console Cognitivo */
+/* Formatacao de Markdown no Console Cognitivo (AURA Anti-Fadiga Editorial) */
 .prose-aura {
-  font-size: 0.92rem;
-  line-height: 1.6;
-  color: #e2e8f0;
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 0.915rem;
+  line-height: 1.68;
+  letter-spacing: 0.005em;
+  color: #cbd5e1;
+}
+.prose-aura p,
+.prose-aura ul,
+.prose-aura ol,
+.prose-aura blockquote {
+  max-width: 68ch;
 }
 .prose-aura p {
   margin-bottom: 0.8rem;
@@ -693,11 +702,19 @@ body {
 .prose-aura p:last-child {
   margin-bottom: 0;
 }
+/* Veredito Inicial - Lead Paragraph BLUF */
+.prose-aura > p:first-of-type {
+  color: #f1f5f9;
+  font-size: 0.94rem;
+  line-height: 1.6;
+  margin-bottom: 0.85rem;
+}
+/* Controle de Negrito sem Fadiga */
 .prose-aura strong,
 .prose-aura b {
-  color: #ffffff;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  color: #f8fafc;
+  font-weight: 600;
+  letter-spacing: -0.005em;
 }
 .prose-aura em,
 .prose-aura i {
@@ -713,21 +730,34 @@ body {
   font-weight: 500;
 }
 .prose-aura h1, .prose-aura h2, .prose-aura h3, .prose-aura h4 {
-  color: #ffffff;
-  font-weight: 700;
+  color: #f8fafc;
+  font-weight: 600;
+  letter-spacing: -0.015em;
   margin-top: 1rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.45rem;
 }
-.prose-aura h1 { font-size: 1.25rem; }
-.prose-aura h2 { font-size: 1.12rem; }
-.prose-aura h3 { font-size: 1.0rem; }
-.prose-aura h4 { font-size: 0.92rem; }
+.prose-aura h1 { font-size: 1.18rem; }
+.prose-aura h2 { font-size: 1.08rem; }
+.prose-aura h3 { font-size: 0.98rem; }
+.prose-aura h4 { font-size: 0.90rem; }
 .prose-aura ul, .prose-aura ol {
   margin-left: 1.4rem;
   margin-bottom: 0.8rem;
 }
 .prose-aura li {
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.45rem;
+  padding-left: 0.25rem;
+}
+.prose-aura ul li::marker {
+  color: #64748b;
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+}
+.prose-aura ol li::marker {
+  color: #64748b;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  font-weight: 600;
 }
 .prose-aura table {
   width: 100%;
@@ -3862,4 +3892,240 @@ body.modo-pista-active .persona-switch-btn.persona-btn-contador[aria-selected="t
   background: #0284c7 !important;
   color: #ffffff !important;
   border: 2px solid #38bdf8 !important;
+}
+
+/* ==========================================================================
+   Aura Fiscal Status Floating Tooltip (Positioned strictly ABOVE the pointer)
+   ========================================================================== */
+.aura-status-tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.aura-status-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 0.16s cubic-bezier(0.16, 1, 0.3, 1), transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.16s;
+  z-index: 60;
+  white-space: nowrap;
+}
+
+.aura-status-tooltip-wrapper:hover .aura-status-tooltip,
+.aura-status-tooltip-wrapper:focus-visible .aura-status-tooltip,
+.aura-status-tooltip-wrapper:focus-within .aura-status-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.aura-status-tooltip-wrapper:hover .aura-status-icon {
+  transform: scale(1.1);
+}
+
+.aura-status-tooltip-arrow {
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  margin-right: 8px;
+  background-color: #020617;
+  transform: rotate(45deg);
+}
+
+/* ==========================================================================
+   Persona Views (Gestor & Contador): Monospace suave e legivel (anti-fadiga)
+   ========================================================================== */
+.persona-view-gestor p,
+.persona-view-contador p {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  color: #cbd5e1; /* slate-300 */
+}
+
+/* ==========================================================================
+   TIPOGRAFIA COGNITIVA & MICRO-TOKENS CHAT (APENDICE B - FASE 1)
+   ========================================================================== */
+
+/* 1. Micro-Tokens Tabulares e Precisao de Dados no Chat */
+.prose-aura .aura-data-token {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-feature-settings: "tnum" 1;
+  font-feature-settings: "tnum" 1;
+  font-size: 0.86em;
+  font-weight: 500;
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.08rem 0.35rem;
+  border-radius: 5px;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: baseline;
+}
+
+/* 2. Destaques Editoriais Confortaveis no Chat (Micro-Badges sem Halation) */
+.prose-aura .text-emerald,
+.prose-aura .aura-text-emerald,
+.prose-aura .aura-hl-emerald,
+.prose-aura .text-green,
+.prose-aura .aura-text-green,
+.prose-aura .aura-hl-green {
+  color: #34d399 !important;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  font-weight: 500;
+  padding: 0.08rem 0.38rem;
+  border-radius: 5px;
+  background: rgba(52, 211, 153, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.22);
+  text-shadow: none !important;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: baseline;
+}
+
+.prose-aura .text-amber,
+.prose-aura .aura-text-amber,
+.prose-aura .aura-hl-amber,
+.prose-aura .text-yellow,
+.prose-aura .aura-text-yellow,
+.prose-aura .aura-hl-yellow {
+  color: #fbbf24 !important;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  font-weight: 500;
+  padding: 0.08rem 0.38rem;
+  border-radius: 5px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  text-shadow: none !important;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: baseline;
+}
+
+.prose-aura .text-rose,
+.prose-aura .aura-text-rose,
+.prose-aura .aura-hl-rose,
+.prose-aura .text-red,
+.prose-aura .aura-text-red,
+.prose-aura .aura-hl-red {
+  color: #f87171 !important;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  font-weight: 500;
+  padding: 0.08rem 0.38rem;
+  border-radius: 5px;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.22);
+  text-shadow: none !important;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: baseline;
+}
+
+.prose-aura .text-cyan,
+.prose-aura .aura-text-cyan,
+.prose-aura .aura-hl-cyan {
+  color: #22d3ee !important;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  font-weight: 500;
+  padding: 0.08rem 0.38rem;
+  border-radius: 5px;
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid rgba(34, 211, 238, 0.22);
+  text-shadow: none !important;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: baseline;
+}
+
+.prose-aura .text-purple,
+.prose-aura .aura-text-purple,
+.prose-aura .aura-hl-purple {
+  color: #c084fc !important;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  font-weight: 500;
+  padding: 0.08rem 0.38rem;
+  border-radius: 5px;
+  background: rgba(192, 132, 252, 0.08);
+  border: 1px solid rgba(192, 132, 252, 0.22);
+  text-shadow: none !important;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: baseline;
+}
+
+/* 3. Container de Progressive Disclosure no Chat (Apêndice B) */
+.aura-chat-disclosure {
+  margin-top: 0.65rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(3, 7, 18, 0.4);
+  overflow: hidden;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.aura-chat-disclosure[open] {
+  border-color: rgba(6, 182, 212, 0.25);
+  background: rgba(3, 7, 18, 0.6);
+}
+
+.aura-chat-disclosure summary {
+  padding: 0.45rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+  transition: color 0.15s ease;
+}
+
+.aura-chat-disclosure summary:hover {
+  color: #67e8f9;
+}
+
+/* 4. Modo de Conforto de Leitura no Chat (Apendice B - Fase 4) */
+#chat-feed-container.reading-mode-comfort .prose-aura,
+#chat-feed-container.aura-reading-comfort .prose-aura,
+#chat-stream-column.reading-mode-comfort .prose-aura,
+#chat-stream-column.aura-reading-comfort .prose-aura,
+.reading-mode-comfort .prose-aura,
+.aura-reading-comfort .prose-aura,
+.reading-comfort .prose-aura {
+  font-size: 0.96rem;
+  line-height: 1.72;
+}
+
+#chat-feed-container.reading-mode-comfort .prose-aura > p:first-of-type,
+#chat-feed-container.aura-reading-comfort .prose-aura > p:first-of-type,
+#chat-stream-column.reading-mode-comfort .prose-aura > p:first-of-type,
+#chat-stream-column.aura-reading-comfort .prose-aura > p:first-of-type,
+.reading-mode-comfort .prose-aura > p:first-of-type,
+.aura-reading-comfort .prose-aura > p:first-of-type,
+.reading-comfort .prose-aura > p:first-of-type {
+  font-size: 0.99rem;
+  line-height: 1.65;
+}
+
+#btn-chat-reading-density.active,
+#btn-chat-reading-density[data-reading-mode="comfort"] {
+  background: rgba(6, 182, 212, 0.15);
+  border-color: rgba(6, 182, 212, 0.35);
+  color: #f1f5f9;
 }

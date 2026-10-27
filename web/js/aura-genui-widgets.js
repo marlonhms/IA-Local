@@ -42,6 +42,22 @@
       .replace(/`/g, '&#96;');
   }
 
+    function formatFiscalHighlightText(str, accentColor) {
+    if (str === null || str === undefined) return '';
+    const color = accentColor === 'emerald' ? 'emerald' : 'cyan';
+    let safe = escapeHtml(str);
+    const tagColor = color === 'emerald' ? 'text-emerald-400' : 'text-cyan-400';
+    // 1. Destacar tags de regras no inicio com bullet: • [REGRA]: ou [REGRA]:
+    safe = safe.replace(/([\u2022\*\-]?\s*)(\[[A-Za-z0-9_\-\.\/]+\]:?)/g, '$1<strong class="font-bold ' + tagColor + '">$2</strong>');
+    // 2. Destacar tags xml escapadas <tag>
+    safe = safe.replace(/(&lt;[a-zA-Z0-9_\-]+&gt;)/g, '<span class="font-semibold text-slate-100">$1</span>');
+    // 3. Destacar parametros e campos chave (ex: cStat=100, vOutro=-1066.69, vProd=251.79)
+    safe = safe.replace(/\b([a-zA-Z]{1,10}=[-0-9\.,]+)\b/g, '<span class="font-semibold text-slate-100">$1</span>');
+    // 4. Destacar tags de severidade [REJEICAO] / [ALERTA] se presentes
+    safe = safe.replace(/(\[(?:REJEICAO|ALERTA|ERRO|CONFORME|AVISO)[^\]]*\])/gi, '<strong class="font-bold text-rose-400">$1</strong>');
+    return safe;
+  }
+
   function formatNumber(num, decimals = 2) {
     const n = Number(num);
     if (isNaN(n)) return String(num || '0');
@@ -888,7 +904,7 @@
           </div>
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
             <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Diagnostico Executivo</span>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -1072,7 +1088,7 @@
           </div>
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
             <span class="text-[10px] uppercase font-bold tracking-wider text-emerald-400 font-mono">Diagnostico de Rentabilidade</span>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -1272,7 +1288,7 @@
               <span class="text-[10px] uppercase font-bold tracking-wider text-purple-400 font-mono">Hipotese Simulada</span>
               <span class="text-[11px] font-mono font-semibold text-slate-300">${escapeHtml(title)}</span>
             </div>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -1431,7 +1447,7 @@
               <span class="text-blue-400 uppercase font-bold">${escapeHtml(entity)}</span>
               <span class="text-slate-400">vs ${escapeHtml(group)}</span>
             </div>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -1625,7 +1641,7 @@
           </div>
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
             <span class="text-[10px] uppercase font-bold tracking-wider text-rose-400 font-mono">Diagnostico de Perdas</span>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -1987,7 +2003,7 @@
           ` : ''}
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
             <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Diagnóstico do Fechamento</span>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -2144,7 +2160,7 @@
           </div>
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
             <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Diagnostico Pericial de Causa-Raiz</span>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-sans font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagPrincipal)}
             </p>
           </div>
@@ -2313,7 +2329,7 @@
           </div>
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
             <span class="text-[10px] uppercase font-bold tracking-wider text-amber-400 font-mono">Estrategia de Vendas Cruzadas</span>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -2588,7 +2604,7 @@
               <span class="text-cyan-400 font-bold uppercase">${escapeHtml(subtitle)}</span>
               <span class="text-slate-400">Intelligent UI : Blocos Lego</span>
             </div>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -2712,57 +2728,57 @@
               if (isInvalid) {
                 cardBorderClass = 'border-rose-500/25 bg-rose-950/10 hover:border-rose-500/40';
                 statusBtnHtml = `
-                  <div class="relative group/status flex-shrink-0" tabindex="0" title="Rejeicao SEFAZ: Bloqueio Impeditivo de Emissao">
-                    <div class="w-6 h-6 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 flex items-center justify-center shadow-[0_0_8px_rgba(244,63,94,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-rose-500/25 cursor-pointer">
+                  <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                    <div class="w-6 h-6 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 flex items-center justify-center shadow-[0_0_8px_rgba(244,63,94,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
                       <svg class="w-3 h-3 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                       </svg>
                     </div>
-                    <div class="absolute right-0 bottom-full mb-1.5 hidden group-hover/status:flex flex-col items-center z-30 pointer-events-none animate-fade-in whitespace-nowrap">
-                      <div class="px-2 py-1 rounded-md bg-slate-900/95 border border-rose-500/50 shadow-xl text-center backdrop-blur-md">
-                        <div class="text-[9px] font-bold text-rose-300 font-mono uppercase">Rejeicao SEFAZ</div>
-                        <div class="text-[10px] text-slate-200 font-medium">Bloqueio Impeditivo</div>
+                    <div class="aura-status-tooltip">
+                      <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-rose-500/50 shadow-2xl text-center backdrop-blur-md">
+                        <div class="text-[9px] font-bold text-rose-300 font-mono uppercase tracking-wider">Rejeicao SEFAZ</div>
+                        <div class="text-[10px] text-slate-200 font-medium">Bloqueio Impeditivo de Emissao</div>
                       </div>
-                      <div class="w-1.5 h-1.5 -mt-0.5 bg-slate-900 border-r border-b border-rose-500/50 rotate-45"></div>
+                      <div class="aura-status-tooltip-arrow border-r border-b border-rose-500/50"></div>
                     </div>
                   </div>
                 `;
               } else if (isWarning) {
                 cardBorderClass = 'border-amber-500/25 bg-amber-950/10 hover:border-amber-500/40';
                 statusBtnHtml = `
-                  <div class="relative group/status flex-shrink-0" tabindex="0" title="Alerta Fiscal: Risco de Bitributacao ou SPED">
-                    <div class="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-[0_0_8px_rgba(245,158,11,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-amber-500/25 cursor-pointer">
+                  <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                    <div class="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-[0_0_8px_rgba(245,158,11,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
                       <svg class="w-3 h-3 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
                         <line x1="12" y1="9" x2="12" y2="13"></line>
                         <line x1="12" y1="17" x2="12.01" y2="17"></line>
                       </svg>
                     </div>
-                    <div class="absolute right-0 bottom-full mb-1.5 hidden group-hover/status:flex flex-col items-center z-30 pointer-events-none animate-fade-in whitespace-nowrap">
-                      <div class="px-2 py-1 rounded-md bg-slate-900/95 border border-amber-500/50 shadow-xl text-center backdrop-blur-md">
-                        <div class="text-[9px] font-bold text-amber-300 font-mono uppercase">Alerta Fiscal</div>
-                        <div class="text-[10px] text-slate-200 font-medium">Risco Tributario</div>
+                    <div class="aura-status-tooltip">
+                      <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-amber-500/50 shadow-2xl text-center backdrop-blur-md">
+                        <div class="text-[9px] font-bold text-amber-300 font-mono uppercase tracking-wider">Alerta Fiscal</div>
+                        <div class="text-[10px] text-slate-200 font-medium">Risco de Bitributacao ou SPED</div>
                       </div>
-                      <div class="w-1.5 h-1.5 -mt-0.5 bg-slate-900 border-r border-b border-amber-500/50 rotate-45"></div>
+                      <div class="aura-status-tooltip-arrow border-r border-b border-amber-500/50"></div>
                     </div>
                   </div>
                 `;
               } else {
                 cardBorderClass = 'border-emerald-500/25 bg-emerald-950/10 hover:border-emerald-500/40';
                 statusBtnHtml = `
-                  <div class="relative group/status flex-shrink-0" tabindex="0" title="Conforme: Regra Validada perante SEFAZ e SPED">
-                    <div class="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shadow-[0_0_8px_rgba(16,185,129,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-emerald-500/25 cursor-pointer">
+                  <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                    <div class="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shadow-[0_0_8px_rgba(16,185,129,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
                       <svg class="w-3 h-3 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="20 6 9 17 4 12"></polyline>
                       </svg>
                     </div>
-                    <div class="absolute right-0 bottom-full mb-1.5 hidden group-hover/status:flex flex-col items-center z-30 pointer-events-none animate-fade-in whitespace-nowrap">
-                      <div class="px-2 py-1 rounded-md bg-slate-900/95 border border-emerald-500/50 shadow-xl text-center backdrop-blur-md">
-                        <div class="text-[10px] font-bold text-emerald-300 font-mono uppercase">Conforme</div>
-                        <div class="text-[10px] text-slate-200 font-medium">Regra Homologada</div>
+                    <div class="aura-status-tooltip">
+                      <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-emerald-500/50 shadow-2xl text-center backdrop-blur-md">
+                        <div class="text-[9px] font-bold text-emerald-300 font-mono uppercase tracking-wider">Conforme</div>
+                        <div class="text-[10px] text-slate-200 font-medium">Validado perante SEFAZ e SPED</div>
                       </div>
-                      <div class="w-1.5 h-1.5 -mt-0.5 bg-slate-900 border-r border-b border-emerald-500/50 rotate-45"></div>
+                      <div class="aura-status-tooltip-arrow border-r border-b border-emerald-500/50"></div>
                     </div>
                   </div>
                 `;
@@ -2796,7 +2812,7 @@
                   </div>
 
                   ${execMsg ? `
-                    <p class="text-xs text-slate-300 leading-relaxed font-sans">
+                    <p class="text-xs text-slate-300 leading-relaxed font-mono font-normal">
                       ${escapeHtml(execMsg)}
                     </p>
                   ` : ''}
@@ -2838,55 +2854,55 @@
               let valHtml = '';
               if (isInv) {
                 valHtml = `
-                  <div class="relative group/status flex-shrink-0" tabindex="0" title="Rejeicao SEFAZ: Bloqueio Impeditivo de Emissao">
-                    <div class="w-6 h-6 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 flex items-center justify-center shadow-[0_0_8px_rgba(244,63,94,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-rose-500/25 cursor-pointer">
+                  <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                    <div class="w-6 h-6 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 flex items-center justify-center shadow-[0_0_8px_rgba(244,63,94,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
                       <svg class="w-3 h-3 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                       </svg>
                     </div>
-                    <div class="absolute right-0 bottom-full mb-1.5 hidden group-hover/status:flex flex-col items-center z-30 pointer-events-none animate-fade-in whitespace-nowrap">
-                      <div class="px-2 py-1 rounded-md bg-slate-900/95 border border-rose-500/50 shadow-xl text-center backdrop-blur-md">
-                        <div class="text-[9px] font-bold text-rose-300 font-mono uppercase">Rejeicao SEFAZ</div>
-                        <div class="text-[10px] text-slate-200 font-medium">Bloqueio Impeditivo</div>
+                    <div class="aura-status-tooltip">
+                      <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-rose-500/50 shadow-2xl text-center backdrop-blur-md">
+                        <div class="text-[9px] font-bold text-rose-300 font-mono uppercase tracking-wider">Rejeicao SEFAZ</div>
+                        <div class="text-[10px] text-slate-200 font-medium">Bloqueio Impeditivo de Emissao</div>
                       </div>
-                      <div class="w-1.5 h-1.5 -mt-0.5 bg-slate-900 border-r border-b border-rose-500/50 rotate-45"></div>
+                      <div class="aura-status-tooltip-arrow border-r border-b border-rose-500/50"></div>
                     </div>
                   </div>
                 `;
               } else if (isWarn) {
                 valHtml = `
-                  <div class="relative group/status flex-shrink-0" tabindex="0" title="Alerta Fiscal: Risco de Bitributacao ou SPED">
-                    <div class="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-[0_0_8px_rgba(245,158,11,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-amber-500/25 cursor-pointer">
+                  <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                    <div class="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-[0_0_8px_rgba(245,158,11,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
                       <svg class="w-3 h-3 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
                         <line x1="12" y1="9" x2="12" y2="13"></line>
                         <line x1="12" y1="17" x2="12.01" y2="17"></line>
                       </svg>
                     </div>
-                    <div class="absolute right-0 bottom-full mb-1.5 hidden group-hover/status:flex flex-col items-center z-30 pointer-events-none animate-fade-in whitespace-nowrap">
-                      <div class="px-2 py-1 rounded-md bg-slate-900/95 border border-amber-500/50 shadow-xl text-center backdrop-blur-md">
-                        <div class="text-[9px] font-bold text-amber-300 font-mono uppercase">Alerta Fiscal</div>
-                        <div class="text-[10px] text-slate-200 font-medium">Risco Tributario</div>
+                    <div class="aura-status-tooltip">
+                      <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-amber-500/50 shadow-2xl text-center backdrop-blur-md">
+                        <div class="text-[9px] font-bold text-amber-300 font-mono uppercase tracking-wider">Alerta Fiscal</div>
+                        <div class="text-[10px] text-slate-200 font-medium">Risco de Bitributacao ou SPED</div>
                       </div>
-                      <div class="w-1.5 h-1.5 -mt-0.5 bg-slate-900 border-r border-b border-amber-500/50 rotate-45"></div>
+                      <div class="aura-status-tooltip-arrow border-r border-b border-amber-500/50"></div>
                     </div>
                   </div>
                 `;
               } else if (isVal) {
                 valHtml = `
-                  <div class="relative group/status flex-shrink-0" tabindex="0" title="Conforme: Regra Validada perante SEFAZ e SPED">
-                    <div class="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shadow-[0_0_8px_rgba(16,185,129,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-emerald-500/25 cursor-pointer">
+                  <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                    <div class="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shadow-[0_0_8px_rgba(16,185,129,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
                       <svg class="w-3 h-3 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="20 6 9 17 4 12"></polyline>
                       </svg>
                     </div>
-                    <div class="absolute right-0 bottom-full mb-1.5 hidden group-hover/status:flex flex-col items-center z-30 pointer-events-none animate-fade-in whitespace-nowrap">
-                      <div class="px-2 py-1 rounded-md bg-slate-900/95 border border-emerald-500/50 shadow-xl text-center backdrop-blur-md">
-                        <div class="text-[9px] font-bold text-emerald-300 font-mono uppercase">Conforme</div>
-                        <div class="text-[10px] text-slate-200 font-medium">Regra Homologada</div>
+                    <div class="aura-status-tooltip">
+                      <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-emerald-500/50 shadow-2xl text-center backdrop-blur-md">
+                        <div class="text-[9px] font-bold text-emerald-300 font-mono uppercase tracking-wider">Conforme</div>
+                        <div class="text-[10px] text-slate-200 font-medium">Validado perante SEFAZ e SPED</div>
                       </div>
-                      <div class="w-1.5 h-1.5 -mt-0.5 bg-slate-900 border-r border-b border-emerald-500/50 rotate-45"></div>
+                      <div class="aura-status-tooltip-arrow border-r border-b border-emerald-500/50"></div>
                     </div>
                   </div>
                 `;
@@ -3069,8 +3085,8 @@
               <span class="text-emerald-400 font-bold uppercase">${escapeHtml(subtitle)}</span>
               <span class="text-emerald-400/80">Operacao &amp; Acao Imediata</span>
             </div>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed whitespace-pre-line">
-              ${escapeHtml(gestorText)}
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed whitespace-pre-line">
+              ${formatFiscalHighlightText(gestorText, 'emerald')}
             </p>
           </div>
 
@@ -3080,8 +3096,8 @@
               <span class="text-cyan-400 font-bold uppercase">${escapeHtml(subtitle)}</span>
               <span class="text-cyan-400/80">MOC 7.0 &amp; EFD / SPED Fiscal</span>
             </div>
-            <p class="text-xs sm:text-sm font-mono text-cyan-100 leading-relaxed whitespace-pre-line">
-              ${escapeHtml(contadorText)}
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed whitespace-pre-line">
+              ${formatFiscalHighlightText(contadorText, 'cyan')}
             </p>
             ${basesLegais.length > 0 ? `
               <div class="pt-2 border-t border-white/5 flex flex-wrap gap-1.5">
@@ -3268,7 +3284,7 @@
           </div>
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
             <span class="text-[10px] uppercase font-bold tracking-wider text-emerald-400 font-mono">Diagnostico Executivo de Perdas</span>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -3452,7 +3468,7 @@
           </div>
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
             <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Diagnostico de Fechamento &amp; Cancelamentos</span>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -3644,7 +3660,7 @@
           </div>
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
             <span class="text-[10px] uppercase font-bold tracking-wider text-purple-400 font-mono">Panorama Executivo Matinal</span>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>

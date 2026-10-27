@@ -1,5 +1,5 @@
 """
-Suíte de Testes Automatizada: Fase 5 — Respostas Especializadas (AURA Precision Glass)
+Suíte de Testes Automatizada: Fase 5 - Respostas Especializadas (AURA Precision Glass)
 Validação ponta-a-ponta dos 4 módulos canônicos:
 1. Autonomia de Tanques (TankForecastContract / prever_esgotamento_tanques)
 2. Vazão de Bicos & Frentistas (PumpPerformanceContract / auditar_desempenho_pista_frentistas)
@@ -47,7 +47,7 @@ from core.tools import PostoTools
 
 def run_tests():
     print("=" * 78)
-    print("💎 SUÍTE DE TESTES: FASE 5 — RESPOSTAS ESPECIALIZADAS (AURA PRECISION GLASS)")
+    print("💎 SUÍTE DE TESTES: FASE 5 - RESPOSTAS ESPECIALIZADAS (AURA PRECISION GLASS)")
     print("=" * 78)
 
     rag = HybridRAGEngine()

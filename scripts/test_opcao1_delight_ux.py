@@ -1,5 +1,5 @@
 """
-Suíte de Testes Automatizada: Opção 1 — Micro-Interações & Delight UX
+Suíte de Testes Automatizada: Opção 1 - Micro-Interações & Delight UX
 (Sensação de App Nativo de Luxo para o Painel Executivo AURA)
 
 Validações:
@@ -49,7 +49,7 @@ from core.aura_api import create_aura_app
 
 def run_delight_ux_tests():
     print("=" * 78)
-    print("✨ SUÍTE DE TESTES: OPÇÃO 1 — MICRO-INTERAÇÕES & DELIGHT UX (LUXURY NATIVE)")
+    print("✨ SUÍTE DE TESTES: OPÇÃO 1 - MICRO-INTERAÇÕES & DELIGHT UX (LUXURY NATIVE)")
     print("   (Skeleton Shimmer, Cognitive Reasoning Orb, Smooth Transitions & GPU Guard)")
     print("=" * 78)
 

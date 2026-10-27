@@ -1642,57 +1642,57 @@ class AuraTriggersController {
                   if (isInv) {
                     cardBorder = 'border-rose-500/20 bg-rose-950/10';
                     iconBtnHtml = `
-                      <div class="relative group/status flex-shrink-0" tabindex="0" title="Rejeicao SEFAZ: Bloqueio Impeditivo de Emissao">
-                        <div class="w-6 h-6 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 flex items-center justify-center shadow-[0_0_8px_rgba(244,63,94,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-rose-500/25 cursor-pointer">
+                      <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                        <div class="w-6 h-6 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 flex items-center justify-center shadow-[0_0_8px_rgba(244,63,94,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
                           <svg class="w-3 h-3 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
                             <line x1="6" y1="6" x2="18" y2="18"></line>
                           </svg>
                         </div>
-                        <div class="absolute right-0 bottom-full mb-1.5 hidden group-hover/status:flex flex-col items-center z-30 pointer-events-none animate-fade-in whitespace-nowrap">
-                          <div class="px-2 py-1 rounded-md bg-slate-900/95 border border-rose-500/50 shadow-xl text-center backdrop-blur-md">
-                            <div class="text-[9px] font-bold text-rose-300 font-mono uppercase">Rejeicao SEFAZ</div>
-                            <div class="text-[10px] text-slate-200 font-medium">Bloqueio Impeditivo</div>
+                        <div class="aura-status-tooltip">
+                          <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-rose-500/50 shadow-2xl text-center backdrop-blur-md">
+                            <div class="text-[9px] font-bold text-rose-300 font-mono uppercase tracking-wider">Rejeicao SEFAZ</div>
+                            <div class="text-[10px] text-slate-200 font-medium">Bloqueio Impeditivo de Emissao</div>
                           </div>
-                          <div class="w-1.5 h-1.5 -mt-0.5 bg-slate-900 border-r border-b border-rose-500/50 rotate-45"></div>
+                          <div class="aura-status-tooltip-arrow border-r border-b border-rose-500/50"></div>
                         </div>
                       </div>
                     `;
                   } else if (isWarn) {
                     cardBorder = 'border-amber-500/20 bg-amber-950/10';
                     iconBtnHtml = `
-                      <div class="relative group/status flex-shrink-0" tabindex="0" title="Alerta Fiscal: Risco de Bitributacao ou SPED">
-                        <div class="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-[0_0_8px_rgba(245,158,11,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-amber-500/25 cursor-pointer">
+                      <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                        <div class="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-[0_0_8px_rgba(245,158,11,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
                           <svg class="w-3 h-3 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
                             <line x1="12" y1="9" x2="12" y2="13"></line>
                             <line x1="12" y1="17" x2="12.01" y2="17"></line>
                           </svg>
                         </div>
-                        <div class="absolute right-0 bottom-full mb-1.5 hidden group-hover/status:flex flex-col items-center z-30 pointer-events-none animate-fade-in whitespace-nowrap">
-                          <div class="px-2 py-1 rounded-md bg-slate-900/95 border border-amber-500/50 shadow-xl text-center backdrop-blur-md">
-                            <div class="text-[9px] font-bold text-amber-300 font-mono uppercase">Alerta Fiscal</div>
-                            <div class="text-[10px] text-slate-200 font-medium">Risco Tributario</div>
+                        <div class="aura-status-tooltip">
+                          <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-amber-500/50 shadow-2xl text-center backdrop-blur-md">
+                            <div class="text-[9px] font-bold text-amber-300 font-mono uppercase tracking-wider">Alerta Fiscal</div>
+                            <div class="text-[10px] text-slate-200 font-medium">Risco de Bitributacao ou SPED</div>
                           </div>
-                          <div class="w-1.5 h-1.5 -mt-0.5 bg-slate-900 border-r border-b border-amber-500/50 rotate-45"></div>
+                          <div class="aura-status-tooltip-arrow border-r border-b border-amber-500/50"></div>
                         </div>
                       </div>
                     `;
                   } else {
                     cardBorder = 'border-emerald-500/20 bg-emerald-950/10';
                     iconBtnHtml = `
-                      <div class="relative group/status flex-shrink-0" tabindex="0" title="Conforme: Regra Validada perante SEFAZ e SPED">
-                        <div class="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shadow-[0_0_8px_rgba(16,185,129,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-emerald-500/25 cursor-pointer">
+                      <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                        <div class="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shadow-[0_0_8px_rgba(16,185,129,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
                           <svg class="w-3 h-3 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="20 6 9 17 4 12"></polyline>
                           </svg>
                         </div>
-                        <div class="absolute right-0 bottom-full mb-1.5 hidden group-hover/status:flex flex-col items-center z-30 pointer-events-none animate-fade-in whitespace-nowrap">
-                          <div class="px-2 py-1 rounded-md bg-slate-900/95 border border-emerald-500/50 shadow-xl text-center backdrop-blur-md">
-                            <div class="text-[9px] font-bold text-emerald-300 font-mono uppercase">Conforme</div>
-                            <div class="text-[10px] text-slate-200 font-medium">Validado perante SEFAZ</div>
+                        <div class="aura-status-tooltip">
+                          <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-emerald-500/50 shadow-2xl text-center backdrop-blur-md">
+                            <div class="text-[9px] font-bold text-emerald-300 font-mono uppercase tracking-wider">Conforme</div>
+                            <div class="text-[10px] text-slate-200 font-medium">Validado perante SEFAZ e SPED</div>
                           </div>
-                          <div class="w-1.5 h-1.5 -mt-0.5 bg-slate-900 border-r border-b border-emerald-500/50 rotate-45"></div>
+                          <div class="aura-status-tooltip-arrow border-r border-b border-emerald-500/50"></div>
                         </div>
                       </div>
                     `;

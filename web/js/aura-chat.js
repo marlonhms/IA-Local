@@ -49,6 +49,19 @@ class AuraChatController {
     this.messages = [];
     this.userScrolledUp = false;
 
+    // FASE 4: Modo de Conforto de Leitura no Chat (concise vs comfort)
+    this.readingMode = 'concise';
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const savedMode = localStorage.getItem('aura_chat_reading_mode');
+        if (savedMode === 'comfort' || savedMode === 'expanded') {
+          this.readingMode = 'comfort';
+        } else if (savedMode === 'concise') {
+          this.readingMode = 'concise';
+        }
+      }
+    } catch (_) {}
+
     // F5-01: Registro Modular Centralizado de Renderizadores Especializados por Intent / Ferramenta
     this.responseRenderers = {
       'shift_reconciliation': this.renderTurnoWidget.bind(this),
@@ -179,7 +192,8 @@ class AuraChatController {
             this.updateToolResultCard(containerId, msg.toolName, msg.toolResult, true);
           }
           if (msg.text) {
-            this.updateAuraText(containerId, msg.text, false);
+            const hasTool = !!(msg.genuiEnvelope || msg.toolName);
+            this.updateAuraText(containerId, msg.text, false, hasTool);
           }
           this.finalizeCognitiveStep(containerId, false);
         }
@@ -216,6 +230,7 @@ class AuraChatController {
       } catch (_) {}
     }
     this.bindEvents();
+    this.setReadingMode(this.readingMode);
     this.renderSessionId();
     this.restoreChatHistory();
     this.expireStaleWidgets();
@@ -265,6 +280,12 @@ class AuraChatController {
     if (sendBtn) sendBtn.addEventListener('click', () => this.handleSendMessage());
     if (stopBtn) stopBtn.addEventListener('click', () => this.abortStreaming());
     if (clearBtn) clearBtn.addEventListener('click', () => this.clearSession());
+
+    // FASE 4: Toggle de Conforto de Leitura no Chat
+    const readingDensityBtn = document.getElementById('btn-chat-reading-density');
+    if (readingDensityBtn) {
+      readingDensityBtn.addEventListener('click', () => this.toggleReadingMode());
+    }
 
     // FASE 2: Ligacao do Smart Fiscal Composer e Leitor Local de XML
     this.setupSmartFiscalComposer();
@@ -654,7 +675,8 @@ class AuraChatController {
 
     const handleDoneReconciliation = () => {
       if (hasStreamError) return;
-      this.updateAuraText(messageContainerId, fullResponseText, false);
+      const hasToolPayload = !!(currentToolResult || lastGenUIEnvelope);
+      this.updateAuraText(messageContainerId, fullResponseText, false, hasToolPayload);
       this.finalizeCognitiveStep(messageContainerId, true);
 
       const scheduleMount = (callback) => {
@@ -5743,7 +5765,190 @@ class AuraChatController {
    * destaques coloridos ([verde], [amarelo], [vermelho], [ciano], [roxo]), badges e tags seguras.
    * Garante renderização suave no streaming token-a-token e sanitização estrita contra XSS.
    */
-  formatMarkdown(rawMarkdown, isStillStreaming = false) {
+  /**
+   * Auto-Tokenizacao inteligente de dados operacionais (Apendice B - Fase 2).
+   * Identifica padroes numericos, moedas, volumes e codigos fiscais fora de tags e code blocks,
+   * envolvendo-os em <span class="aura-data-token"> com fonte tabular monoespacada.
+   */
+  applySmartTypographyTokens(htmlContent) {
+    if (!htmlContent || typeof htmlContent !== 'string') return '';
+    const parts = htmlContent.split(/(<[^>]+>)/g);
+    let inCodeOrPre = 0;
+    let inDataToken = 0;
+    const tokenRegex = /(R\$\s?-?\d{1,3}(?:\.\d{3})*(?:,\d{2})?|\b\d{1,3}(?:\.\d{3})*(?:,\d+)?\s?(?:L\/min|L\/h|L|litros)\b|[+\-]?\d+(?:[.,]\d+)?%|\b(?:CFOP\s?\d{4}|CST\s?\d{2,3}|NCM\s?\d{4,8}|Rejeicao\s?\d{3}|cStat\s?=\s?\d{3})\b)/gi;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      if (!part) continue;
+
+      if (part.startsWith('<')) {
+        const lower = part.toLowerCase();
+        if (lower.startsWith('<pre') || lower.startsWith('<code')) {
+          inCodeOrPre++;
+        } else if (lower.startsWith('</pre') || lower.startsWith('</code')) {
+          inCodeOrPre = Math.max(0, inCodeOrPre - 1);
+        }
+        if (lower.startsWith('<span') && lower.includes('aura-data-token')) {
+          inDataToken++;
+        } else if (lower.startsWith('</span') && inDataToken > 0) {
+          inDataToken--;
+        }
+        continue;
+      }
+
+      if (inCodeOrPre === 0 && inDataToken === 0 && part.trim()) {
+        parts[i] = part.replace(tokenRegex, '<span class="aura-data-token">$1</span>');
+      }
+    }
+    return parts.join('');
+  }
+
+  /**
+   * Progressive Disclosure no Chat (Apendice B - Fase 2 & Fase 4).
+   * Quando uma resposta possui card na GUI (Companion Canvas) e mais de 3 blocos textuais,
+   * mantem os 2 primeiros blocos visiveis (BLUF) e agrupa o restante em container colapsavel.
+   * No modo 'comfort', abre o disclosure automaticamente via atributo 'open'.
+   */
+  applyProgressiveDisclosure(htmlContent, isStillStreaming = false, hasToolCard = false) {
+    if (!htmlContent || typeof htmlContent !== 'string') return '';
+    if (isStillStreaming || !hasToolCard) return htmlContent;
+
+    const isExpanded = (this.getReadingMode() === 'comfort');
+    const openAttr = isExpanded ? ' open' : '';
+
+    // 1. Em navegadores com DOMParser nativo
+    if (typeof DOMParser !== 'undefined') {
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(`<body>${htmlContent}</body>`, 'text/html');
+        const children = Array.from(doc.body.children);
+        if (children.length > 3) {
+          const visibleBlocks = children.slice(0, 2).map(el => el.outerHTML).join('\n');
+          const hiddenBlocks = children.slice(2).map(el => el.outerHTML).join('\n');
+          return `
+            ${visibleBlocks}
+            <details class="aura-chat-disclosure mt-2.5 rounded-xl border border-white/10 bg-slate-950/40 overflow-hidden"${openAttr}>
+              <summary class="px-3 py-1.5 text-[11px] font-mono text-slate-400 hover:text-cyan-300 cursor-pointer flex items-center justify-between select-none transition-colors">
+                <span>Explorar detalhamento textual completo</span>
+                <span class="text-[10px] bg-slate-800/80 px-1.5 py-0.5 rounded text-slate-300">+Detalhes</span>
+              </summary>
+              <div class="p-3 pt-2 border-t border-white/5 space-y-2 text-xs text-slate-300">
+                ${hiddenBlocks}
+              </div>
+            </details>
+          `;
+        }
+        return htmlContent;
+      } catch (err) {
+        // Fallback para Node.js / regex
+      }
+    }
+
+    // 2. Fallback regex para testes headless em Node.js
+    const blockMatches = htmlContent.match(/(<(?:p|ul|ol|table|blockquote|div)[\s\S]*?<\/(?:p|ul|ol|table|blockquote|div)>)/gi);
+    if (blockMatches && blockMatches.length > 3) {
+      const visibleBlocks = blockMatches.slice(0, 2).join('\n');
+      const hiddenBlocks = blockMatches.slice(2).join('\n');
+      return `
+        ${visibleBlocks}
+        <details class="aura-chat-disclosure mt-2.5 rounded-xl border border-white/10 bg-slate-950/40 overflow-hidden"${openAttr}>
+          <summary class="px-3 py-1.5 text-[11px] font-mono text-slate-400 hover:text-cyan-300 cursor-pointer flex items-center justify-between select-none transition-colors">
+            <span>Explorar detalhamento textual completo</span>
+            <span class="text-[10px] bg-slate-800/80 px-1.5 py-0.5 rounded text-slate-300">+Detalhes</span>
+          </summary>
+          <div class="p-3 pt-2 border-t border-white/5 space-y-2 text-xs text-slate-300">
+            ${hiddenBlocks}
+          </div>
+        </details>
+      `;
+    }
+
+    return htmlContent;
+  }
+
+  /**
+   * FASE 4: Toggle e Gerenciador de Conforto de Leitura no Chat.
+   * Alterna entre os modos 'concise' (68ch, progressive disclosure fechado)
+   * e 'comfort' (corpo 0.96rem, progressive disclosure aberto automaticamente).
+   */
+  getReadingMode() {
+    return this.readingMode || 'concise';
+  }
+
+  setReadingMode(mode) {
+    this.readingMode = (mode === 'comfort' || mode === 'expanded') ? 'comfort' : 'concise';
+
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('aura_chat_reading_mode', this.readingMode);
+      }
+    } catch (_) {}
+
+    if (typeof document !== 'undefined') {
+      const feed = document.getElementById('chat-feed-container');
+      const streamCol = document.getElementById('chat-stream-column');
+      const btn = document.getElementById('btn-chat-reading-density');
+      const label = document.getElementById('label-chat-reading-density');
+
+      const isComfort = (this.readingMode === 'comfort');
+
+      if (feed) {
+        if (isComfort) {
+          feed.classList.add('reading-mode-comfort', 'aura-reading-comfort');
+        } else {
+          feed.classList.remove('reading-mode-comfort', 'aura-reading-comfort');
+        }
+      }
+
+      if (streamCol) {
+        if (isComfort) {
+          streamCol.classList.add('reading-mode-comfort', 'aura-reading-comfort');
+        } else {
+          streamCol.classList.remove('reading-mode-comfort', 'aura-reading-comfort');
+        }
+      }
+
+      if (btn) {
+        btn.setAttribute('data-reading-mode', this.readingMode);
+        btn.setAttribute('aria-pressed', isComfort ? 'true' : 'false');
+        if (isComfort) {
+          btn.classList.add('active', 'border-cyan-500/40', 'bg-cyan-500/10', 'text-cyan-200');
+          btn.classList.remove('text-slate-300');
+          btn.title = 'Modo de Leitura: Conforto Editorial (Fonte 0.96rem, detalhes abertos) - Clique para Conciso';
+        } else {
+          btn.classList.remove('active', 'border-cyan-500/40', 'bg-cyan-500/10', 'text-cyan-200');
+          btn.classList.add('text-slate-300');
+          btn.title = 'Modo de Leitura: Conciso (Resumo Executivo, 68ch) - Clique para Conforto Editorial';
+        }
+      }
+
+      if (label) {
+        label.textContent = isComfort ? 'Conforto' : 'Conciso';
+        if (isComfort) {
+          label.classList.add('text-cyan-300');
+          label.classList.remove('text-slate-400');
+        } else {
+          label.classList.remove('text-cyan-300');
+          label.classList.add('text-slate-400');
+        }
+      }
+
+      // Sincroniza estado de todos os blocos de disclosure presentes no DOM
+      const disclosures = document.querySelectorAll('.aura-chat-disclosure');
+      disclosures.forEach(d => {
+        d.open = isComfort;
+      });
+    }
+
+    return this.readingMode;
+  }
+
+  toggleReadingMode() {
+    const nextMode = (this.readingMode === 'comfort') ? 'concise' : 'comfort';
+    return this.setReadingMode(nextMode);
+  }
+
+  formatMarkdown(rawMarkdown, isStillStreaming = false, hasToolCard = false) {
     if (!rawMarkdown || typeof rawMarkdown !== 'string') return '';
 
     // 1. Auto-balanceia tags abertas SEMPRE (inclusive na renderização final isStillStreaming === false)
@@ -5771,12 +5976,29 @@ class AuraChatController {
       html = this.renderFallbackMarkdown(finalText);
     }
 
+    // 6. Auto-Tokenizacao Inteligente de Dados Operacionais (Apendice B - Fase 2)
+    html = this.applySmartTypographyTokens(html);
+
+    // 7. Progressive Disclosure no Chat (Apendice B - Fase 2)
+    html = this.applyProgressiveDisclosure(html, isStillStreaming, hasToolCard);
+
     return html;
   }
 
-  updateAuraText(containerId, fullMarkdown, isStillStreaming) {
+  updateAuraText(containerId, fullMarkdown, isStillStreaming, hasToolCardParam = null) {
     const textIds = [containerId + '-text', containerId + '-split-text'];
-    const html = this.formatMarkdown(fullMarkdown, isStillStreaming);
+
+    // Auto-detecta presenca de card de ferramenta/GUI associado ao container
+    let hasToolCard = hasToolCardParam;
+    if (hasToolCard === null && typeof document !== 'undefined') {
+      const toolCardEl = document.getElementById(containerId + '-tool-card');
+      const splitCardEl = document.getElementById(containerId + '-split-tool-card');
+      const hasChildren = (toolCardEl && toolCardEl.children.length > 0 && !toolCardEl.classList.contains('hidden')) ||
+                          (splitCardEl && splitCardEl.children.length > 0 && !splitCardEl.classList.contains('hidden'));
+      hasToolCard = !!hasChildren;
+    }
+
+    const html = this.formatMarkdown(fullMarkdown, isStillStreaming, hasToolCard);
 
     textIds.forEach(id => {
       const textEl = document.getElementById(id);
@@ -5800,10 +6022,10 @@ class AuraChatController {
     const lgpd = t.lgpd_sanitized_count || 0;
 
     const html = `
-      <div class="flex flex-wrap items-center gap-3">
-        ${e2e ? `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Resposta em <strong class="text-emerald-300 font-sans tabular-nums font-semibold">${e2e}</strong></span>` : ''}
+      <div class="flex flex-wrap items-center gap-3 opacity-60 hover:opacity-100 transition-opacity font-mono text-[10px]">
+        ${e2e ? `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Resposta em <strong class="text-emerald-300 tabular-nums font-semibold">${e2e}</strong></span>` : ''}
         <span class="text-slate-500">•</span>
-        <span>Motor: <strong class="text-purple-300">${model}</strong></span>
+        <span>Motor: <strong class="text-purple-300 font-semibold">${model}</strong></span>
         ${lgpd > 0 ? `<span class="text-slate-500">•</span><span class="text-emerald-400/90 font-medium inline-flex items-center gap-1">${CHAT_ICONS.shield} LGPD: ${lgpd} dados protegidos</span>` : ''}
       </div>
     `;

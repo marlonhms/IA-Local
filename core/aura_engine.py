@@ -4081,6 +4081,16 @@ class AuraEngine:
             net_90 = float(summary.get("roi_90_days_net_brl") or 0.0)
             mult = float(summary.get("roi_multiple") or 0.0)
             g3x = summary.get("guarantee_3x_met", True)
+
+            if genui_active:
+                g_txt = "[verde]atendida[/verde]" if g3x else "[amarelo]em monitoramento[/amarelo]"
+                return (
+                    "### Diagnostico Executivo de ROI & Perdas\n\n"
+                    f"Perda mensal mapeada de [vermelho]R$ {tot:,.2f}[/vermelho] com recuperacao projetada de [verde]R$ {rec:,.2f}[/verde] ao mes.\n\n"
+                    f"- **Retorno em 90 dias:** [verde]R$ {net_90:,.2f}[/verde] ({mult:.1f}x o plano) com garantia contratual {g_txt}.\n"
+                    "- **Detalhamento Vetorial:** A decomposicao dos 5 vetores de perda e o plano de acao estao no **painel lateral**."
+                )
+
             linhas = [
                 "### Diagnostico Executivo de ROI & Perdas (90 Dias)",
                 "",
@@ -4109,6 +4119,16 @@ class AuraEngine:
             disc_brl = float(caixa.get("discrepancy_brl") or 0.0)
             cx_cor = "[verde]" if status_cx == "CONCILIADO" else "[vermelho]"
             cx_cor_f = "[/verde]" if status_cx == "CONCILIADO" else "[/vermelho]"
+
+            if genui_active:
+                st_badge = f"{cx_cor}{status_cx}{cx_cor_f}"
+                return (
+                    "### Radar de Anomalias de PDV & Fechamento de Caixa\n\n"
+                    f"Auditoria concluida em {tot_op} operadores com {anom_count} operador(es) em desvio estatistico (Z-Score > 2.0).\n\n"
+                    f"- **Status da Conciliacao:** {st_badge} com divergencia de R$ {disc_brl:,.2f} (em conformidade com Art. 462 CLT).\n"
+                    "- **Ranking e Condutas:** O ranking completo de operadores e sugestoes de prevencao estao projetados no **painel lateral**."
+                )
+
             linhas = [
                 "### Radar de Anomalias de PDV & Fechamento de Caixa",
                 "",
@@ -4160,6 +4180,14 @@ class AuraEngine:
             rec_sinal = "+" if d_rec >= 0 else ""
             lucro_sinal = "+" if d_lucro >= 0 else ""
             mg_sinal = "+" if d_mg >= 0 else ""
+
+            if genui_active:
+                return (
+                    "### Cenario Preditivo & Precificacao Dinamica\n\n"
+                    f"{diag}\n\n"
+                    f"- **Projecao para {prod}:** Volume {vol_sinal}{d_vol:.1f}% com receita de **{rec_sinal}R$ {d_rec:,.2f}** (confianca de [verde]{int(score * 100)}%[/verde]).\n"
+                    "- **Simulacao e Decisao HITL:** O comparativo de precos e os botoes de repasse estao disponiveis no **painel lateral**."
+                )
 
             linhas = [
                 "### 📈 AURA Predictive Scenario & What-If (Precificação Dinâmica)",
@@ -4235,6 +4263,14 @@ class AuraEngine:
             cor = "[verde]" if abs(var_pct) <= tol else "[vermelho]"
             cor_f = "[/verde]" if abs(var_pct) <= tol else "[/vermelho]"
 
+            if genui_active:
+                return (
+                    "### Auditoria de Conformidade LMC ANP\n\n"
+                    f"{diag}\n\n"
+                    f"- **Status Regulatorio:** {cor}{status_str}{cor_f} (tolerancia legal +-0.60%) com variacao de {cor}{var_pct:+.2f}%{cor_f} ({var_litros:+.1f} L).\n"
+                    "- **Ficha Individualizada:** A abertura por tanque e o historico de movimentacao estao disponiveis no **painel lateral**."
+                )
+
             linhas = [
                 "### 📋 Auditoria de Conformidade LMC ANP (Portaria 26/1992)",
                 "",
@@ -4257,6 +4293,15 @@ class AuraEngine:
             c_diario_str = f"R$ {c_diario:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             c_mensal_str = f"R$ {c_mensal:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             spread_str = f"R$ {spread:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+            if genui_active:
+                return (
+                    "### Analise Macroeconomica de Custo de Estoque\n\n"
+                    f"{diag}\n\n"
+                    f"- **Capital Imobilizado:** {cap_str} sob Selic de {selic:.2f}% a.a. (carregamento mensal de {c_mensal_str}).\n"
+                    "- **Curva e Spread:** A analise de spread vs PMPF ICMS-ST esta detalhada no **painel lateral**."
+                )
+
             linhas = [
                 "### 📊 Analise Macroeconomica de Custo de Estoque (BACEN/CONFAZ)",
                 "",
@@ -4282,6 +4327,14 @@ class AuraEngine:
             cor_div = "[vermelho]" if tot_div > 0 else "[verde]"
             cor_div_f = "[/vermelho]" if tot_div > 0 else "[/verde]"
 
+            if genui_active:
+                return (
+                    "### Auditoria de Erosao Financeira & TEF\n\n"
+                    f"{diag}\n\n"
+                    f"- **Perda por Taxas:** {cor_div}R$ {tot_div:,.2f}{cor_div_f} com economia projetada de [verde]R$ {econ:,.2f}[/verde].\n"
+                    "- **Arbitragem e Cobertura:** A discriminacao por adquirente e a estrategia de caixa estao no **painel lateral**."
+                )
+
             linhas = [
                 "### 💳 Auditoria de Erosao Financeira & Arbitragem Selic (TEF/Recebiveis)",
                 "",
@@ -4302,6 +4355,14 @@ class AuraEngine:
             corrosao = float(props.get("total_custo_selic_acumulado_reais") or 0.0)
             selic_aa = float(props.get("taxa_selic_anual_pct") or 10.75)
             plano = props.get("plano_acao_desova") or ""
+
+            if genui_active:
+                return (
+                    "### Cacador de Capital Morto & Rupturas de Gondola\n\n"
+                    f"{diag}\n\n"
+                    f"- **Capital Imobilizado:** [vermelho]R$ {cap:,.2f}[/vermelho] sem giro (corrosao Selic de R$ {corrosao:,.2f}).\n"
+                    "- **Plano de Desova:** O ranking de itens encalhados e os combos promocionais estao no **painel lateral**."
+                )
 
             linhas = [
                 "### 📦 Cacador de Capital Morto & Ruptura Invisivel de Gondola",
@@ -4327,6 +4388,14 @@ class AuraEngine:
             cor_tot = "[vermelho]" if d_total < 0 else "[verde]"
             cor_tot_f = "[/vermelho]" if d_total < 0 else "[/verde]"
 
+            if genui_active:
+                return (
+                    "### Raio-X de Sangria de Margem (Waterfall)\n\n"
+                    f"{diag}\n\n"
+                    f"- **Variacao Total:** {cor_tot}R$ {d_total:,.2f} ({d_pct:+.2f}%){cor_tot_f}.\n"
+                    "- **Decomposicao Causal:** O grafico waterfall com os 4 vetores de impacto esta detalhado no **painel lateral**."
+                )
+
             linhas = [
                 "### 📉 Raio-X de Sangria de Margem (Decomposicao Causal Waterfall)",
                 "",
@@ -4348,6 +4417,14 @@ class AuraEngine:
             lote = float(props.get("lote_minimo_compra_litros") or 5000.0)
             econ = float(props.get("economia_potencial_lote_reais") or 0.0)
             rec = props.get("cenario_recomendado") or ""
+
+            if genui_active:
+                return (
+                    f"### Simulador de Elasticidade & Otimizador de Lote ({prod})\n\n"
+                    f"{diag}\n\n"
+                    f"- **Espaco Livre (Ullage):** {ullage:,.0f} L com economia potencial de [verde]R$ {econ:,.2f}[/verde].\n"
+                    "- **Cenarios de Compra:** O dimensionamento de compartimentos e a simulacao de lote estao no **painel lateral**."
+                )
 
             linhas = [
                 f"### 🚛 Simulador de Elasticidade & Otimizador de Lote ({prod})",
@@ -4461,6 +4538,14 @@ class AuraEngine:
             caixas_op = props.get("caixas_operadores") or []
             aviso = props.get("aviso_data")
 
+            if genui_active:
+                return (
+                    "### Formas de Pagamento & Fechamento de Caixas\n\n"
+                    f"Faturamento consolidado apurado em [verde]R$ {total_geral:,.2f}[/verde] ({total_tx} vendas, ticket medio R$ {ticket_medio:,.2f}).\n\n"
+                    f"- **Composicao:** Modalidades e gavetas auditadas para {len(caixas_op)} caixa(s) ({data_ref}).\n"
+                    "- **Auditoria por Operador:** O extrato completo de sangrias e TEF esta projetado no **painel lateral**."
+                )
+
             linhas = [
                 "### 💳 Formas de Pagamento & Caixas",
                 "",
@@ -4546,6 +4631,14 @@ class AuraEngine:
 
             sev_badge = "[vermelho]CRÍTICO[/vermelho]" if sev == "critical" else ("[amarelo]ATENÇÃO[/amarelo]" if sev == "attention" else "[verde]CONFORME[/verde]")
 
+            if genui_active:
+                return (
+                    "### Auditoria de Fuga Financeira & Conciliacao TEF\n\n"
+                    f"{diag}\n\n"
+                    f"- **Status de Risco:** {sev_badge} com perda total apurada de **R$ {total_leak:,.2f}** ({shift} : {cashier}).\n"
+                    "- **Acoes de Contencao:** A lista de terminais sob suspeita e os botoes de intervencao estao no **painel lateral**."
+                )
+
             linhas = [
                 "### 🚨 Auditoria de Fuga Financeira & Conciliação TEF",
                 "",
@@ -4599,6 +4692,14 @@ class AuraEngine:
             metrics = props.get("metrics") or []
             impacto = props.get("impact_projection") or {}
             impacto_txt = impacto.get("summary") if isinstance(impacto, dict) else (str(impacto) if impacto else "")
+
+            if genui_active:
+                return (
+                    "### Mentor Executivo de Decisoes\n\n"
+                    f"{diag}\n\n"
+                    f"- **Confiabilidade Analitica:** [verde]{int(score * 100)}%[/verde] com metricas apuradas no ERP.\n"
+                    "- **Painel de Decisao:** O detalhamento dos indicadores e os botoes de acao rapida estao no **painel lateral**."
+                )
 
             linhas = [
                 "### 🎯 Mentor de Decisões Executivo (Briefing Estratégico)",
@@ -4666,6 +4767,14 @@ class AuraEngine:
             ped_conv_hoje = resumo_hoje.get("pedidos_conveniencia_hoje", 0)
             fat_conv_hoje = float(resumo_hoje.get("faturamento_conveniencia_hoje", 0) or 0)
             fat_total_hoje = fat_comb_hoje + fat_conv_hoje
+
+            if genui_active:
+                return (
+                    "### Diagnostico Executivo de Vendas & Faturamento\n\n"
+                    f"Faturamento consolidado de hoje apurado em [verde]R$ {fat_total_hoje:,.2f}[/verde] ({data_str}).\n\n"
+                    f"- **Segmentacao:** Pista [ciano]R$ {fat_comb_hoje:,.2f}[/ciano] ({litros_hoje:,.2f} L) e Loja [verde]R$ {fat_conv_hoje:,.2f}[/verde] ({ped_conv_hoje} pedidos).\n"
+                    "- **Extrato de Vendas:** O ranking completo de produtos e os cupons detalhados estao projetados no **painel lateral**."
+                )
 
             linhas = [
                 "### 📊 Diagnóstico Executivo de Vendas & Faturamento",
@@ -4735,6 +4844,16 @@ class AuraEngine:
             tanque_crit_cod = assessment.get("tanque_mais_critico_cod")
 
             badge = assessment.get("badge_label", "Estoque Apurado")
+
+            if genui_active:
+                tanque_info = f" no Tanque {tanque_crit_cod}" if tanque_crit_cod else ""
+                return (
+                    "### Diagnostico de Autonomia dos Tanques\n\n"
+                    f"Autonomia mais critica estimada em [amarelo]{min_auto_h:.1f}h[/amarelo] (~{min_auto_d:.1f} dias){tanque_info} ({badge}).\n\n"
+                    f"- **Espaco Livre (Ullage):** [ciano]{ullage_tot:,.0f} L[/ciano] (~{bocas_5k} bocas de 5.000 L em carreta padrao).\n"
+                    "- **Mapa de Tanques:** A telemetria individual e os botoes de emissao de pedido estao no **painel lateral**."
+                )
+
             linhas = [
                 "### ⛽ Diagnóstico Executivo de Autonomia dos Tanques",
                 "",
@@ -4772,6 +4891,14 @@ class AuraEngine:
 
             cor_dif = "[verde]" if abs(dif_caixa) <= 5.0 else ("[vermelho]" if dif_caixa < 0 else "[amarelo]")
             cor_dif_f = "[/verde]" if abs(dif_caixa) <= 5.0 else ("[/vermelho]" if dif_caixa < 0 else "[/amarelo]")
+
+            if genui_active:
+                return (
+                    "### Conciliacao Executiva de Turno & Fechamento\n\n"
+                    f"Confronto de pista vs caixa com diferenca apurada de {cor_dif}R$ {dif_caixa:,.2f}{cor_dif_f}.\n\n"
+                    f"- **Faturamento Consolidado:** Pista [ciano]R$ {fat_pista:,.2f}[/ciano] ({vol_pista:,.2f} L) e PDV [verde]R$ {fat_caixa:,.2f}[/verde].\n"
+                    "- **Gaveta de Evidencias:** O extrato completo de cupons e encerrantes fisicos esta no **painel lateral**."
+                )
 
             linhas = [
                 "### 📋 Conciliação Executiva de Turno & Fechamento",
@@ -4823,6 +4950,14 @@ class AuraEngine:
             cor = "[verde]" if conforme else "[vermelho]"
             cor_f = "[/verde]" if conforme else "[/vermelho]"
 
+            if genui_active:
+                st_txt = "CONFORME ANP (+/-0.6%)" if conforme else "ALERTA FORA DA TOLERANCIA ANP"
+                return (
+                    "### Livro de Movimentacao de Combustiveis (LMC Oficial ANP)\n\n"
+                    f"Status de conformidade {cor}{st_txt}{cor_f} com variacao volumetrica de {var_l:+,.3f} L ({var_pct:+.2f}%).\n\n"
+                    "- **Demonstrativo Fisico-Contabil:** Os lancamentos livro a livro e perdas por tanque estao no **painel lateral**."
+                )
+
             linhas = [
                 "### ⚖️ Livro de Movimentação de Combustíveis (LMC Oficial ANP)",
                 "",
@@ -4850,6 +4985,21 @@ class AuraEngine:
                         val = c.get("metricas", {}).get("lift", 0)
                     if float(val or 0) > maior_lift:
                         maior_lift = float(val)
+
+            if genui_active:
+                destaque_combo = ""
+                if combos:
+                    c1 = combos[0]
+                    orig = c1.get("anchor_product") or c1.get("produto_origem") or "Produto"
+                    orig_nome = orig.get("nompro") if isinstance(orig, dict) else str(orig)
+                    rec = c1.get("recommended_product") or c1.get("produto_recomendado") or "Item"
+                    rec_nome = rec.get("nompro") if isinstance(rec, dict) else str(rec)
+                    destaque_combo = f" Destaque para combo **{orig_nome}** + **{rec_nome}**."
+                return (
+                    "### Inteligencia de Vendas Cruzadas (Market Basket PDV)\n\n"
+                    f"Mineracao concluida com maior Lift apurado em [roxo]{maior_lift:.2f}x[/roxo] em {len(combos)} oportunidades.{destaque_combo}\n\n"
+                    "- **Scripts e Promocoes:** Os scripts de balcao e disposicao de gondola estao no **painel lateral**."
+                )
 
             linhas = [
                 "### 🛒 Inteligência de Vendas Cruzadas (Market Basket PDV)",
@@ -4887,6 +5037,15 @@ class AuraEngine:
                 aponts = resultado_bruto.get("apontamentos", [])
                 erros = [a for a in aponts if a.get("status") == "INVALID"]
                 status_txt = "[vermelho]Chave Invalida[/vermelho]" if erros else "[verde]Chave Autentica e Valida[/verde]"
+
+                if genui_active:
+                    return (
+                        f"### Auditoria de Chave SEFAZ ({status_txt})\n\n"
+                        f"Chave analisada para Modelo {decomp.get('tipo_documento', 'NF-e')} da UF {decomp.get('uf_sigla')} (Nota {decomp.get('numero_nfe')}).\n\n"
+                        f"- **Apontamentos:** {len(erros)} inconsistencia(s) impeditiva(s) detectada(s).\n"
+                        "- **Decomposicao Tecnica:** Os campos da chave e a validacao do DV estao no **painel lateral**."
+                    )
+
                 linhas = [
                     f"### 🔍 Auditoria de Chave de Acesso SEFAZ ({status_txt})",
                     "",
@@ -4917,6 +5076,13 @@ class AuraEngine:
                     status_badge = "[verde]100% Conforme e Homologado[/verde]"
                     conclusao = "Documento em total conformidade perante regras SEFAZ MOC 7.0 e SPED."
 
+                if genui_active:
+                    return (
+                        f"### Auditoria de Documento XML ({status_badge})\n\n"
+                        f"Documento Modelo {res.get('modelo', '55')} (rota {res.get('emit_uf', 'SP')} -> {res.get('dest_uf', 'SP')}): {conclusao}\n\n"
+                        "- **Resolucao e Parecer:** Os apontamentos detalhados da SEFAZ e o parecer para o contador estao no **painel lateral**."
+                    )
+
                 linhas = [
                     f"### 📑 Auditoria de Documento XML ({status_badge})",
                     f"- **Documento:** Modelo {res.get('modelo', '55')} | **Rota:** {res.get('emit_uf', 'SP')} -> {res.get('dest_uf', 'SP')}",
@@ -4931,6 +5097,15 @@ class AuraEngine:
                 if not resultados:
                     return f"Nenhuma regra fiscal correspondente encontrada no acervo oficial para: '{pergunta}'."
                 top = resultados[0]
+
+                if genui_active:
+                    return (
+                        f"### Parecer Fiscal SEFAZ ({top.get('codigo_ref')})\n\n"
+                        f"{top.get('resumo_executivo')}\n\n"
+                        f"- **Acao webPosto:** {top.get('acao_recomendada')}\n"
+                        "- **Base Normativa:** O parecer contabil completo para o contador esta projetado no **painel lateral**."
+                    )
+
                 linhas = [
                     f"### ⚖️ Parecer Fiscal & Normativa SEFAZ ({top.get('codigo_ref')})",
                     "",
@@ -5605,6 +5780,7 @@ class AuraEngine:
         resultado_bruto: Any,
         pergunta: str = "",
         session_id: Optional[str] = None,
+        genui_active: bool = False,
     ) -> Optional[str]:
         """Formata o texto de resposta determinística executiva (contingência e síntese GenUI)."""
         return self._gerar_sintese_contingencia_ferramenta(
@@ -5612,5 +5788,6 @@ class AuraEngine:
             resultado_bruto=resultado_bruto,
             pergunta=pergunta,
             session_id=session_id,
+            genui_active=genui_active,
         )
 

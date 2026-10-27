@@ -1,4 +1,4 @@
-﻿"""
+"""
 Testes Unitarios - Simulacao Preditiva What-If e Precificacao Dinamica no Core Cognitivo AURA.
 Valida o calculo de elasticidade-preco, paridade energetica 70% Etanol vs Gasolina,
 impacto financeiro projetado e aderencia aos contratos Pydantic (PredictiveScenarioProps).
@@ -154,8 +154,11 @@ def test_extrair_parametros_simulacao_nlp():
 
 
 @pytest.mark.asyncio
-async def test_execute_tool_cenario_preditivo():
+async def test_execute_tool_cenario_preditivo(monkeypatch):
     """Valida execucao direta de cenario_preditivo via AuraEngine sem intermediacao de LLM."""
+    import core.tools
+    monkeypatch.setattr(core.tools, "get_erp_connection", lambda timeout=None: None)
+
     engine = AuraEngine()
     res = await engine.execute_tool(
         "cenario_preditivo",
