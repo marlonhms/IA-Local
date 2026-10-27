@@ -161,7 +161,11 @@ class AuraChatController {
       for (let i = 0; i < msgs.length; i++) {
         const msg = msgs[i];
         if (msg.role === 'user') {
-          this.appendUserMessage(msg.text);
+          this.appendUserMessage(msg.text, {
+            isFile: msg.isFile,
+            filename: msg.filename,
+            fileSize: msg.fileSize,
+          });
         } else if (msg.role === 'assistant' || msg.role === 'aura') {
           const containerId = msg.id || ('aura-hist-msg-' + i);
           this.createAuraMessageBubble(containerId);
@@ -495,7 +499,7 @@ class AuraChatController {
           if (xmlContent && typeof xmlContent === 'string') {
             if (pill) pill.classList.add('hidden');
             if (input) input.value = '';
-            this.handleSendMessage(xmlContent);
+            this.handleSendMessage(xmlContent, { isFile: true, filename: file.name, fileSize: file.size });
           }
         };
         reader.readAsText(file);
@@ -522,7 +526,7 @@ class AuraChatController {
             if (xmlContent && typeof xmlContent === 'string') {
               if (pill) pill.classList.add('hidden');
               if (input) input.value = '';
-              this.handleSendMessage(xmlContent);
+              this.handleSendMessage(xmlContent, { isFile: true, filename: file.name, fileSize: file.size });
             }
           };
           reader.readAsText(file);
@@ -531,17 +535,17 @@ class AuraChatController {
     }
   }
 
-  sendUserPrompt(text) {
+  sendUserPrompt(text, meta = null) {
     if (this.isSubmitting || this.isStreaming) return;
     const input = document.getElementById('chat-input-text');
     if (input) input.value = '';
-    this.handleSendMessage(text);
+    this.handleSendMessage(text, meta);
   }
 
   /**
    * Envia a mensagem do usuário e inicia a conexão SSE
    */
-  async handleSendMessage(promptText = null) {
+  async handleSendMessage(promptText = null, meta = null) {
     if (this.isSubmitting || this.isStreaming) return;
     this.isSubmitting = true;
 
@@ -601,12 +605,22 @@ class AuraChatController {
 
     this.setStreamingState(true);
 
+    const isRawXml = !meta?.isFile && typeof query === 'string' && (
+      query.includes('<infNFe') || 
+      query.includes('<nfeProc') || 
+      query.includes('<NFe') ||
+      (query.trim().startsWith('<?xml') && query.length > 150)
+    );
+
     // 1. Adiciona a mensagem do usuário na tela e persiste no cache local
-    this.appendUserMessage(query);
+    this.appendUserMessage(query, meta);
     if (typeof window !== 'undefined' && window.AuraStorage) {
       window.AuraStorage.saveMessage(this.sessionId, {
         role: 'user',
         text: query,
+        isFile: !!(meta?.isFile || isRawXml),
+        filename: meta?.filename || (isRawXml ? 'documento_fiscal.xml' : null),
+        fileSize: meta?.fileSize || (isRawXml ? query.length : null),
         timestamp: Date.now()
       });
     }
@@ -1444,12 +1458,62 @@ class AuraChatController {
     }
   }
 
-  appendUserMessage(text) {
+  appendUserMessage(text, meta = null) {
     const feed = document.getElementById('chat-feed-container');
     if (!feed) return;
 
     const div = document.createElement('div');
     div.className = 'flex justify-end w-full animate-fade-in';
+
+    const isFileMeta = meta && (meta.isFile || meta.filename);
+    const isRawXml = !isFileMeta && typeof text === 'string' && (
+      text.includes('<infNFe') || 
+      text.includes('<nfeProc') || 
+      text.includes('<NFe') ||
+      (text.trim().startsWith('<?xml') && text.length > 150)
+    );
+
+    let contentHtml = '';
+
+    if (isFileMeta || isRawXml) {
+      const fileName = (meta && meta.filename) || 'documento_fiscal.xml';
+      const rawSize = meta && meta.fileSize ? Number(meta.fileSize) : (text ? text.length : 0);
+      let sizeFormatted = '';
+      if (rawSize >= 1048576) {
+        sizeFormatted = `${(rawSize / 1048576).toFixed(1)} MB`;
+      } else if (rawSize >= 1024) {
+        sizeFormatted = `${(rawSize / 1024).toFixed(1)} KB`;
+      } else if (rawSize > 0) {
+        sizeFormatted = `${rawSize} B`;
+      } else {
+        sizeFormatted = 'XML';
+      }
+
+      const fileDesc = isFileMeta 
+        ? `Arquivo XML anexado (${sizeFormatted}) - Auditoria SEFAZ MOC 7.0`
+        : `XML Fiscal enviado (${sizeFormatted}) - Estrutura NFe/NFCe detectada`;
+
+      contentHtml = `
+        <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-900/90 border border-cyan-500/30 shadow-inner">
+          <div class="w-10 h-10 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center flex-shrink-0 text-cyan-400 font-mono font-bold text-xs tracking-wider">
+            XML
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-semibold text-slate-100 truncate">${this.escapeHtml(fileName)}</div>
+            <div class="text-[11px] font-mono text-cyan-300 mt-0.5">${this.escapeHtml(fileDesc)}</div>
+          </div>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-mono font-semibold text-emerald-300 flex-shrink-0">
+            <svg class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Anexado</span>
+          </span>
+        </div>
+      `;
+    } else {
+      contentHtml = `<div class="leading-relaxed whitespace-pre-wrap">${this.escapeHtml(text)}</div>`;
+    }
+
+    const timeStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
     div.innerHTML = `
       <div class="chat-bubble-user max-w-[85%] md:max-w-[70%] lg:max-w-[65%] ml-auto p-4 text-slate-100 text-sm">
         <div class="flex items-center justify-between text-[11px] font-sans font-medium text-slate-400 mb-1.5 pb-1 border-b border-white/5">
@@ -1457,9 +1521,9 @@ class AuraChatController {
             <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
             <span>OPERADOR</span>
           </span>
-          <span class="text-slate-400 tabular-nums">${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+          <span class="text-slate-400 tabular-nums">${timeStr}</span>
         </div>
-        <div class="leading-relaxed whitespace-pre-wrap">${this.escapeHtml(text)}</div>
+        ${contentHtml}
       </div>
     `;
     feed.appendChild(div);

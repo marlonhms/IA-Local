@@ -1126,6 +1126,7 @@ class LegoBlock(BaseModel):
     ranking_items: List[LegoRankingItem] = Field(default_factory=list, description="Itens de ranking (para block_type=ranking_list)")
     timeline_events: List[LegoTimelineEvent] = Field(default_factory=list, description="Eventos de timeline (para block_type=timeline_feed)")
     alert: Optional[LegoAlertItem] = Field(default=None, description="Item de alerta (para block_type=alert_callout)")
+    findings: List[Dict[str, Any]] = Field(default_factory=list, description="Lista de apontamentos e regras fiscais (para block_type=fiscal_findings_list)")
     custom_content: Optional[str] = Field(default=None, description="Conteudo textual ou markdown customizado")
 
 

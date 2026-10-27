@@ -290,7 +290,7 @@ class PostoTools:
                 return {
                     "tipo": "chave_acesso",
                     "decomposicao": decomp,
-                    "apontamentos": [f.model_dump() for f in findings],
+                    "apontamentos": [f.model_dump(mode="json") for f in findings],
                     "status": "sucesso",
                 }
             elif "<" in clean_input and ("infNFe" in clean_input or "NFe" in clean_input or "nfeProc" in clean_input):

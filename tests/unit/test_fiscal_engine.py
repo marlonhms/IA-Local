@@ -726,6 +726,20 @@ def test_genui_envelope_xml_documento():
     assert "blk_xml_kpis" in block_ids
     assert "blk_xml_apontamentos" in block_ids
 
+    # Validar bloco fiscal_findings_list e higienizacao de status
+    blk_apont = next(b for b in blocks if b.get("block_id") == "blk_xml_apontamentos")
+    assert blk_apont["block_type"] == "fiscal_findings_list"
+    assert "findings" in blk_apont
+    findings = blk_apont["findings"]
+    assert len(findings) == 2
+    # Invalid deve vir antes de warning
+    assert findings[0]["status"] == "invalid"
+    assert findings[1]["status"] == "warning"
+    assert findings[0]["gravidade"] == "critical"
+    # Nenhum StatusApontamento.INVALID ou GravidadeApontamento.CRITICAL como texto bruto
+    assert "StatusApontamento" not in str(props)
+    assert "GravidadeApontamento" not in str(props)
+
     # Validar persona views
     assert "persona_views" in props
     assert "SEFAZ-REJ-960" in props["persona_views"]["gestor"]
@@ -772,6 +786,156 @@ def test_genui_envelope_consulta_rejeicao_dinamica():
     assert "LC 192/2022" in procedimento_block.get("custom_content", "")
 
 
+def test_auditar_documento_xml_json_serialized_apontamentos():
+    """Valida que auditar_documento_xml serializa enums Pydantic em strings puras e nao representacoes tecnicas."""
+    from core.fiscal_engine import auditar_documento_xml
+
+    xml_teste = '''<?xml version="1.0" encoding="UTF-8"?>
+    <nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+        <NFe>
+            <infNFe Id="NFe35260100000000000191550010000001231000001231" versao="4.00">
+                <ide>
+                    <cUF>35</cUF>
+                    <mod>55</mod>
+                    <serie>1</serie>
+                    <nNF>123</nNF>
+                </ide>
+                <emit>
+                    <CNPJ>00000000000191</CNPJ>
+                    <enderEmit><UF>SP</UF></enderEmit>
+                </emit>
+                <dest>
+                    <CNPJ>11111111000191</CNPJ>
+                    <enderDest><UF>RJ</UF></enderDest>
+                </dest>
+                <det nItem="1">
+                    <prod>
+                        <cProd>101</cProd>
+                        <xProd>GASOLINA C ADITIVADA</xProd>
+                        <NCM>27101259</NCM>
+                        <cProdANP>320102002</cProdANP>
+                        <qCom>10.0000</qCom>
+                        <vUnCom>5.0000</vUnCom>
+                        <vProd>50.00</vProd>
+                    </prod>
+                    <imposto>
+                        <ICMS>
+                            <ICMS00>
+                                <orig>0</orig>
+                                <CST>00</CST>
+                                <vBC>50.00</vBC>
+                                <pICMS>18.00</pICMS>
+                                <vICMS>9.00</vICMS>
+                            </ICMS00>
+                        </ICMS>
+                    </imposto>
+                </det>
+                <total>
+                    <ICMSTot>
+                        <vProd>50.00</vProd>
+                        <vNF>50.00</vNF>
+                        <vICMS>9.00</vICMS>
+                    </ICMSTot>
+                </total>
+            </infNFe>
+        </NFe>
+    </nfeProc>'''
+
+    res = auditar_documento_xml(xml_teste)
+    assert res["valido"] is False
+    assert len(res["apontamentos"]) > 0
+    for ap in res["apontamentos"]:
+        assert isinstance(ap["status"], str)
+        assert not ap["status"].startswith("StatusApontamento.")
+        assert ap["status"] in ("VALID", "INVALID", "WARNING")
+        assert isinstance(ap["gravidade"], str)
+        assert not ap["gravidade"].startswith("GravidadeApontamento.")
+
+
+def test_gerar_sintese_contingencia_ferramenta_xml_concisa():
+    """Valida que a sintese em texto no chat e sucinta e direciona para o GenUI card."""
+    from core.aura_engine import AuraEngine
+
+    engine = AuraEngine(tenant_id="test_sintese", filial_id="posto_01")
+    resultado_mock = {
+        "valido": False,
+        "erros_impeditivos": 2,
+        "alertas_fiscais": 1,
+        "modelo": "55",
+        "emit_uf": "SP",
+        "dest_uf": "MG",
+        "apontamentos": []
+    }
+    sintese = engine._gerar_sintese_contingencia_ferramenta(
+        intencao="auditoria_fiscal_sefaz",
+        resultado_bruto={"tipo": "xml_documento", "resultado": resultado_mock},
+        pergunta="Analise meu XML"
+    )
+
+    assert "Bloqueio SEFAZ" in sintese
+    assert "2 erro(s) impeditivo(s)" in sintese
+    assert "card interativo abaixo" in sintese
+    # Nao deve conter texto de enum
+    assert "StatusApontamento" not in sintese
+
+
+def test_genui_envelope_xml_documento_filtro_codigos_genericos():
+    """Valida que codigos genericos como SEFAZ-VAL-NEG e W07-10 nao geram tags e que titulos sao despoluidos."""
+    from core.aura_engine import build_canonical_genui_envelope
+
+    resultado_mock = {
+        "valido": False,
+        "total_apontamentos": 2,
+        "erros_impeditivos": 1,
+        "alertas_fiscais": 0,
+        "conformidades": 1,
+        "modelo": "55",
+        "emit_uf": "SP",
+        "dest_uf": "SP",
+        "apontamentos": [
+            {
+                "status": "INVALID",
+                "gravidade": "CRITICAL",
+                "regra_id": "SEFAZ-VAL-NEG",
+                "titulo": "[REJEICAO] Falha de Schema (XSD): Valor Monetario Negativo nos Totais",
+                "explicacao_executiva": "Valor negativo nos totais.",
+            },
+            {
+                "status": "VALID",
+                "gravidade": "INFO",
+                "regra_id": "SEFAZ-W07-10",
+                "titulo": "[CONFORME] Total de Produtos Conforme com a Soma dos Itens (Regra W07-10)",
+                "explicacao_executiva": "Total conforme.",
+            },
+        ],
+    }
+
+    envelope = build_canonical_genui_envelope(
+        intencao="auditoria_fiscal_sefaz",
+        tool_call_id=f"call_{uuid.uuid4()}",
+        resultado_bruto={"tipo": "xml_documento", "resultado": resultado_mock, "status": "sucesso"},
+        executive_summary="Auditoria concluida.",
+    )
+
+    props = envelope.props
+    blocks = props.get("blocks", [])
+    blk_apont = next(b for b in blocks if b.get("block_id") == "blk_xml_apontamentos")
+    findings = blk_apont["findings"]
+
+    # Codigos genericos de sistema ficam com tag_fiscal=None
+    assert findings[0]["tag_fiscal"] is None
+    assert findings[1]["tag_fiscal"] is None
+
+    # Titulos devem estar limpos de prefixos [REJEICAO] e [CONFORME]
+    assert not findings[0]["titulo"].startswith("[REJEICAO]")
+    assert not findings[1]["titulo"].startswith("[CONFORME]")
+    assert "Falha de Schema" in findings[0]["titulo"]
+
+    # persona_views nao deve conter [SEFAZ-VAL-NEG]
+    assert "[SEFAZ-VAL-NEG]" not in props["persona_views"]["gestor"]
+    assert "[SEFAZ-W07-10]" not in props["persona_views"]["gestor"]
+
+
 def test_ausencia_absoluta_travessoes_arquivos_gui_fiscal():
     """Garante ausencia estrita de travessoes Unicode (\u2014 e \u2013) em todos os arquivos tocados."""
     import os
@@ -786,6 +950,9 @@ def test_ausencia_absoluta_travessoes_arquivos_gui_fiscal():
         os.path.join(base_dir, "web", "js", "aura-triggers.js"),
         os.path.join(base_dir, "web", "index.html"),
         os.path.join(base_dir, "web", "css", "aura.css"),
+        os.path.join(base_dir, "core", "fiscal_engine.py"),
+        os.path.join(base_dir, "core", "schemas", "genui.py"),
+        os.path.join(base_dir, "core", "tools.py"),
         os.path.join(base_dir, "tests", "unit", "test_fiscal_engine.py"),
     ]
 

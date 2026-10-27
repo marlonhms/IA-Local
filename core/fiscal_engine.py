@@ -1168,5 +1168,5 @@ def auditar_documento_xml(xml_texto: str) -> Dict[str, Any]:
         "modelo": mod,
         "emit_uf": emit_uf,
         "dest_uf": dest_uf,
-        "apontamentos": [f.model_dump() for f in findings],
+        "apontamentos": [f.model_dump(mode="json") for f in findings],
     }

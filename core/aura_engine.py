@@ -2823,32 +2823,89 @@ def build_canonical_genui_envelope(
             })
 
             if apontamentos:
-                items_ranking = []
-                for idx, a in enumerate(apontamentos[:6]):
-                    st_label = "[REJEICAO]" if a.get("status") == "INVALID" else ("[ALERTA]" if a.get("status") == "WARNING" else "[CONFORME]")
-                    items_ranking.append({
-                        "rank": idx + 1,
-                        "title": f"{st_label} {a.get('titulo', 'Regra Fiscal')}",
-                        "subtitle": f"Regra: {a.get('regra_id', 'SEFAZ')} | Gravidade: {a.get('gravidade', 'INFO')}",
-                        "value": str(a.get("status", "INFO")),
-                        "tag": a.get("regra_id", "SEFAZ"),
+                findings_normalizados = []
+                for a in apontamentos:
+                    st_raw = str(a.get("status", "")).upper()
+                    if "INVALID" in st_raw:
+                        st_clean = "invalid"
+                    elif "WARN" in st_raw:
+                        st_clean = "warning"
+                    elif "VALID" in st_raw:
+                        st_clean = "valid"
+                    else:
+                        st_clean = "info"
+
+                    grav_raw = str(a.get("gravidade", "")).upper()
+                    if "CRITIC" in grav_raw:
+                        grav_clean = "critical"
+                    elif "HIGH" in grav_raw:
+                        grav_clean = "high"
+                    elif "MED" in grav_raw:
+                        grav_clean = "medium"
+                    else:
+                        grav_clean = "info"
+
+                    raw_tit = a.get("titulo", "Regra Fiscal")
+                    clean_tit = re.sub(r"^\[(REJEICAO|ALERTA|CONFORME|AVISO|ERRO)\]\s*", "", raw_tit, flags=re.IGNORECASE).strip()
+
+                    regra_raw = str(a.get("regra_id", "")).strip()
+                    base_legal_list = a.get("base_legal") or []
+                    tag_fiscal = None
+
+                    # Apenas exibir tag de identificacao se indicar rejeicao oficial SEFAZ ou lei/norma especifica
+                    m_rej = re.search(r'(?:REJ[-_]?)(\d{3,4})', regra_raw, re.IGNORECASE)
+                    if m_rej:
+                        tag_fiscal = f"Rejeicao {m_rej.group(1)}"
+                    elif "BITRIBUTACAO" in regra_raw.upper() or "PISCOFINS" in regra_raw.upper():
+                        tag_fiscal = "EFD Tabela 4.3.10"
+                    elif "DIFAL" in regra_raw.upper():
+                        tag_fiscal = "DIFAL ANP"
+                    else:
+                        for bl in base_legal_list:
+                            bl_clean = str(bl).strip()
+                            if any(term in bl_clean.upper() for term in ["LC ", "LEI ", "CONVENIO", "TABELA", "AJUSTE", "NT "]):
+                                tag_fiscal = bl_clean
+                                break
+
+                    findings_normalizados.append({
+                        "status": st_clean,
+                        "gravidade": grav_clean,
+                        "regra_id": regra_raw,
+                        "tag_fiscal": tag_fiscal,
+                        "titulo": clean_tit,
+                        "explicacao_executiva": a.get("explicacao_executiva") or "",
+                        "explicacao_tecnica": a.get("explicacao_tecnica") or "",
+                        "acoes_recomendadas": a.get("acoes_recomendadas") or [],
+                        "acao_recomendada": (a.get("acoes_recomendadas") or [""])[0] if a.get("acoes_recomendadas") else "",
+                        "campos_afetados": a.get("campos_afetados") or [],
+                        "valor_esperado": a.get("valor_esperado"),
+                        "valor_observado": a.get("valor_observado"),
+                        "base_legal": a.get("base_legal") or [],
                     })
+
+                order_priority = {"invalid": 0, "warning": 1, "valid": 2, "info": 3}
+                findings_normalizados.sort(key=lambda x: order_priority.get(x["status"], 99))
+
                 blocks.append({
                     "block_id": "blk_xml_apontamentos",
-                    "block_type": "ranking_list",
-                    "title": "Apontamentos Fiscais Identificados",
-                    "subtitle": f"{len(apontamentos)} regras avaliadas",
-                    "ranking_items": items_ranking,
+                    "block_type": "fiscal_findings_list",
+                    "title": "Diagnostico de Regras Fiscais SEFAZ & SPED",
+                    "subtitle": f"{len(findings_normalizados)} regras avaliadas",
+                    "findings": findings_normalizados,
                 })
 
             textos_gestor = []
             textos_contador = []
             bases_legais = []
             for a in apontamentos:
+                reg_id = a.get("regra_id", "")
+                # Se for codigo generico de validacao interna sem valor legal (ex: SEFAZ-VAL-NEG), omite a tag interna
+                is_generico = bool(re.match(r"^SEFAZ-(VAL-NEG|W\d|I\d|CHAVE-LEN|CHAVE-01)", reg_id))
+                prefixo = f"• [{reg_id}]: " if (reg_id and not is_generico) else "• "
                 if a.get("explicacao_executiva"):
-                    textos_gestor.append(f"• [{a.get('regra_id')}]: {a.get('explicacao_executiva')}")
+                    textos_gestor.append(f"{prefixo}{a.get('explicacao_executiva')}")
                 if a.get("explicacao_tecnica"):
-                    textos_contador.append(f"• [{a.get('regra_id')}]: {a.get('explicacao_tecnica')}")
+                    textos_contador.append(f"{prefixo}{a.get('explicacao_tecnica')}")
                 for bl in (a.get("base_legal") or []):
                     if bl not in bases_legais:
                         bases_legais.append(bl)
@@ -4847,21 +4904,26 @@ class AuraEngine:
 
             elif tipo == "xml_documento":
                 res = resultado_bruto.get("resultado", {})
-                valido = res.get("valido", False)
-                status_txt = "[verde]Emissao Conforme e Aprovada[/verde]" if valido else "[vermelho]Inconsistencias Fiscais Identificadas[/vermelho]"
+                valido = bool(res.get("valido", False))
+                erros = int(res.get("erros_impeditivos", 0))
+                alertas = int(res.get("alertas_fiscais", 0))
+                if erros > 0:
+                    status_badge = "[vermelho]Bloqueio SEFAZ (Rejeicao Impeditiva)[/vermelho]"
+                    conclusao = f"Foram identificados {erros} erro(s) impeditivo(s) de autorizacao."
+                elif alertas > 0:
+                    status_badge = "[amarelo]Autorizavel com Alertas Fiscais[/amarelo]"
+                    conclusao = f"Documento autorizavel perante a SEFAZ, porem com {alertas} alerta(s) de conformidade tributaria ou bitributacao."
+                else:
+                    status_badge = "[verde]100% Conforme e Homologado[/verde]"
+                    conclusao = "Documento em total conformidade perante regras SEFAZ MOC 7.0 e SPED."
+
                 linhas = [
-                    f"### 📑 Auditoria de Documento XML ({status_txt})",
+                    f"### 📑 Auditoria de Documento XML ({status_badge})",
+                    f"- **Documento:** Modelo {res.get('modelo', '55')} | **Rota:** {res.get('emit_uf', 'SP')} -> {res.get('dest_uf', 'SP')}",
+                    f"- **Diagnostico:** {conclusao}",
                     "",
-                    f"- **Modelo:** {res.get('modelo')} | **UF:** {res.get('emit_uf')}",
-                    f"- **Erros Impeditivos (Rejeicao SEFAZ):** {res.get('erros_impeditivos', 0)}",
-                    f"- **Alertas de Risco Fiscal:** {res.get('alertas_fiscais', 0)}",
+                    "Consulte o card interativo abaixo para diagnostico detalhado de cada regra e instrucoes para resolucao no webPosto.",
                 ]
-                aponts = res.get("apontamentos", [])
-                erros = [a for a in aponts if a.get("status") == "INVALID"]
-                if erros:
-                    linhas.extend(["", "**Principais Inconsistencias:**"])
-                    for e in erros[:4]:
-                        linhas.append(f"- **{e.get('titulo')}:** {e.get('explicacao_executiva')}")
                 return "\n".join(linhas)
 
             elif tipo == "consulta_rejeicao_fiscal":
