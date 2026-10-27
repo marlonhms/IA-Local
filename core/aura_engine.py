@@ -5164,7 +5164,7 @@ class AuraEngine:
 
                     # 3. Resolucao no ERP webPosto
                     if has_neg:
-                        linhas.append("- **Resolucao no webPosto:** Acesse **Faturamento > Notas Fiscais**, localize o documento e mova os valores para o campo oficial de Desconto (`vDesc`), evitando acrescimos negativos.")
+                        linhas.append("- **Resolucao no webPosto:** Acionar o suporte tecnico do webPosto para ajuste na emissao/fechamento com cupons de aplicativo (o sistema nao deve gerar valor negativo no XML). Voce pode usar o botao de chamado no Canvas para envio rapido via WhatsApp.")
                     elif has_prot:
                         linhas.append("- **Resolucao no webPosto:** Acesse **Faturamento > Monitor SEFAZ**, execute Consulta de Lote ou retransmita o documento apos restabelecer a comunicacao.")
                     elif erros > 0:

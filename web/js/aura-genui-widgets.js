@@ -2714,151 +2714,237 @@
         `;
       } else if (bType === 'fiscal_findings_list') {
         const rawFindings = Array.isArray(b.findings) ? b.findings : (Array.isArray(b.ranking_items) ? b.ranking_items : []);
-        bodyHtml = `
-          <div class="space-y-2.5">
-            ${rawFindings.map(item => {
-              const stRaw = String(item.status || item.value || '').toUpperCase();
-              let isInvalid = stRaw.includes('INVALID') || stRaw.includes('REJEIC');
-              let isWarning = stRaw.includes('WARN') || stRaw.includes('ALERTA');
-              let isValid = stRaw.includes('VALID') || stRaw.includes('CONFORM');
 
-              let cardBorderClass = 'border-white/5 bg-slate-950/50';
-              let statusBtnHtml = '';
+        const isConformeItem = (item) => {
+          const st = String(item.status || item.value || '').toUpperCase();
+          return st.includes('VALID') || st.includes('CONFORM');
+        };
 
-              if (isInvalid) {
-                cardBorderClass = 'border-rose-500/25 bg-rose-950/10 hover:border-rose-500/40';
-                statusBtnHtml = `
-                  <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
-                    <div class="w-6 h-6 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 flex items-center justify-center shadow-[0_0_8px_rgba(244,63,94,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
-                      <svg class="w-3 h-3 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                      </svg>
-                    </div>
-                    <div class="aura-status-tooltip">
-                      <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-rose-500/50 shadow-2xl text-center backdrop-blur-md">
-                        <div class="text-[9px] font-bold text-rose-300 font-mono uppercase tracking-wider">Rejeicao SEFAZ</div>
-                        <div class="text-[10px] text-slate-200 font-medium">Bloqueio Impeditivo de Emissao</div>
+        const pendencias = rawFindings.filter(item => !isConformeItem(item));
+        const conformes = rawFindings.filter(item => isConformeItem(item));
+
+        const renderFindingCard = (item, isConforme = false) => {
+          const stRaw = String(item.status || item.value || '').toUpperCase();
+          let isInvalid = stRaw.includes('INVALID') || stRaw.includes('REJEIC');
+          let isWarning = stRaw.includes('WARN') || stRaw.includes('ALERTA');
+          let isValid = stRaw.includes('VALID') || stRaw.includes('CONFORM');
+
+          let cardBorderClass = 'border-white/5 bg-slate-950/50';
+          let statusBadgeClass = 'bg-slate-800 text-slate-300 border-slate-700';
+          let statusBadgeLabel = 'Fiscal';
+          let statusBtnHtml = '';
+
+          if (isInvalid) {
+            cardBorderClass = 'border-rose-500/25 bg-rose-950/10 hover:border-rose-500/40';
+            statusBadgeClass = 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+            statusBadgeLabel = 'Bloqueio de Emissao';
+            statusBtnHtml = `
+              <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                <div class="w-6 h-6 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 flex items-center justify-center shadow-[0_0_8px_rgba(244,63,94,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
+                  <svg class="w-3 h-3 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </div>
+                <div class="aura-status-tooltip">
+                  <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-rose-500/50 shadow-2xl text-center backdrop-blur-md">
+                    <div class="text-[9px] font-bold text-rose-300 font-mono uppercase tracking-wider">Rejeicao SEFAZ</div>
+                    <div class="text-[10px] text-slate-200 font-medium">Bloqueio Impeditivo de Emissao</div>
+                  </div>
+                  <div class="aura-status-tooltip-arrow border-r border-b border-rose-500/50"></div>
+                </div>
+              </div>
+            `;
+          } else if (isWarning) {
+            cardBorderClass = 'border-amber-500/25 bg-amber-950/10 hover:border-amber-500/40';
+            statusBadgeClass = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+            statusBadgeLabel = 'Alerta de Conformidade';
+            statusBtnHtml = `
+              <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                <div class="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-[0_0_8px_rgba(245,158,11,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
+                  <svg class="w-3 h-3 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                  </svg>
+                </div>
+                <div class="aura-status-tooltip">
+                  <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-amber-500/50 shadow-2xl text-center backdrop-blur-md">
+                    <div class="text-[9px] font-bold text-amber-300 font-mono uppercase tracking-wider">Alerta Fiscal</div>
+                    <div class="text-[10px] text-slate-200 font-medium">Risco de Bitributacao ou SPED</div>
+                  </div>
+                  <div class="aura-status-tooltip-arrow border-r border-b border-amber-500/50"></div>
+                </div>
+              </div>
+            `;
+          } else {
+            cardBorderClass = 'border-emerald-500/25 bg-emerald-950/10 hover:border-emerald-500/40';
+            statusBadgeClass = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+            statusBadgeLabel = 'Aprovado SEFAZ';
+            statusBtnHtml = `
+              <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                <div class="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shadow-[0_0_8px_rgba(16,185,129,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
+                  <svg class="w-3 h-3 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+                <div class="aura-status-tooltip">
+                  <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-emerald-500/50 shadow-2xl text-center backdrop-blur-md">
+                    <div class="text-[9px] font-bold text-emerald-300 font-mono uppercase tracking-wider">Conforme</div>
+                    <div class="text-[10px] text-slate-200 font-medium">Validado perante SEFAZ e SPED</div>
+                  </div>
+                  <div class="aura-status-tooltip-arrow border-r border-b border-emerald-500/50"></div>
+                </div>
+              </div>
+            `;
+          }
+
+          let rawTit = item.titulo || item.title || 'Regra Fiscal';
+          let cleanTit = rawTit.replace(/^\[(REJEICAO|ALERTA|CONFORME|AVISO|ERRO)\]\s*/i, '').trim();
+
+          const ruleCode = String(item.regra_id || item.tag || '').trim();
+          const execMsg = item.explicacao_executiva || item.subtitle || '';
+          const acaoMsg = item.acao_recomendada || (Array.isArray(item.acoes_recomendadas) && item.acoes_recomendadas[0]) || '';
+          const fields = Array.isArray(item.campos_afetados) ? item.campos_afetados : [];
+          const isSuporteErp = isInvalid || (acaoMsg && acaoMsg.toLowerCase().includes('suporte')) || (item.canal_acao === 'suporte_webposto');
+
+          const ticketPayload = JSON.stringify({
+            titulo: cleanTit,
+            regra: ruleCode,
+            causa: execMsg,
+            tecnica: item.explicacao_tecnica || '',
+            campos: fields.join(', '),
+            obs: String(item.valor_observado || ''),
+            esp: String(item.valor_esperado || '')
+          }).replace(/'/g, "&apos;");
+
+          return `
+            <div class="p-3.5 rounded-xl border ${cardBorderClass} transition-all space-y-2.5">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0 flex-1 space-y-1">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-sans font-semibold border ${statusBadgeClass}">
+                      ${statusBadgeLabel}
+                    </span>
+                    <span class="finding-rule-code hidden text-[10px] text-slate-400 font-mono">
+                      Regra: ${escapeHtml(ruleCode)}
+                    </span>
+                  </div>
+                  <h5 class="text-xs sm:text-sm font-semibold text-slate-100 leading-snug">
+                    ${escapeHtml(cleanTit)}
+                  </h5>
+                </div>
+                <div class="text-right flex-shrink-0">
+                  ${statusBtnHtml}
+                </div>
+              </div>
+
+              <!-- FASE 4/5: Visualizacao Diferenciada por Persona (Gestor vs. Contador) -->
+              <!-- Modo Gestor (Foco de Pista & Destravamento) -->
+              <div class="finding-view-gestor space-y-2">
+                ${execMsg ? `
+                  <p class="text-xs text-slate-300 leading-relaxed font-sans">
+                    ${escapeHtml(execMsg)}
+                  </p>
+                ` : ''}
+                ${acaoMsg ? `
+                  <div class="p-2.5 rounded-lg bg-emerald-950/30 border border-emerald-500/30 text-xs text-emerald-200 space-y-2">
+                    <div class="flex items-start gap-2 leading-relaxed">
+                      <span class="text-emerald-400 flex-shrink-0 text-sm">💡</span>
+                      <div>
+                        <strong class="text-emerald-300 font-semibold">Como destravar no webPosto: </strong>
+                        <span>${escapeHtml(acaoMsg)}</span>
                       </div>
-                      <div class="aura-status-tooltip-arrow border-r border-b border-rose-500/50"></div>
                     </div>
-                  </div>
-                `;
-              } else if (isWarning) {
-                cardBorderClass = 'border-amber-500/25 bg-amber-950/10 hover:border-amber-500/40';
-                statusBtnHtml = `
-                  <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
-                    <div class="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-[0_0_8px_rgba(245,158,11,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
-                      <svg class="w-3 h-3 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
-                        <line x1="12" y1="9" x2="12" y2="13"></line>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                      </svg>
-                    </div>
-                    <div class="aura-status-tooltip">
-                      <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-amber-500/50 shadow-2xl text-center backdrop-blur-md">
-                        <div class="text-[9px] font-bold text-amber-300 font-mono uppercase tracking-wider">Alerta Fiscal</div>
-                        <div class="text-[10px] text-slate-200 font-medium">Risco de Bitributacao ou SPED</div>
-                      </div>
-                      <div class="aura-status-tooltip-arrow border-r border-b border-amber-500/50"></div>
-                    </div>
-                  </div>
-                `;
-              } else {
-                cardBorderClass = 'border-emerald-500/25 bg-emerald-950/10 hover:border-emerald-500/40';
-                statusBtnHtml = `
-                  <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
-                    <div class="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shadow-[0_0_8px_rgba(16,185,129,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
-                      <svg class="w-3 h-3 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                      </svg>
-                    </div>
-                    <div class="aura-status-tooltip">
-                      <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-emerald-500/50 shadow-2xl text-center backdrop-blur-md">
-                        <div class="text-[9px] font-bold text-emerald-300 font-mono uppercase tracking-wider">Conforme</div>
-                        <div class="text-[10px] text-slate-200 font-medium">Validado perante SEFAZ e SPED</div>
-                      </div>
-                      <div class="aura-status-tooltip-arrow border-r border-b border-emerald-500/50"></div>
-                    </div>
-                  </div>
-                `;
-              }
-
-              // Titulo sem prefixos redundantes [REJEICAO] ou [CONFORME]
-              let rawTit = item.titulo || item.title || 'Regra Fiscal';
-              let cleanTit = rawTit.replace(/^\[(REJEICAO|ALERTA|CONFORME|AVISO|ERRO)\]\s*/i, '').trim();
-
-              const ruleCode = String(item.regra_id || item.tag || '').trim();
-              const execMsg = item.explicacao_executiva || item.subtitle || '';
-              const acaoMsg = item.acao_recomendada || (Array.isArray(item.acoes_recomendadas) && item.acoes_recomendadas[0]) || '';
-              const fields = Array.isArray(item.campos_afetados) ? item.campos_afetados : [];
-
-              return `
-                <div class="p-3.5 rounded-xl border ${cardBorderClass} transition-all space-y-2">
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0 flex-1 space-y-0.5">
-                      <h5 class="text-xs sm:text-sm font-semibold text-slate-100 leading-snug">
-                        ${escapeHtml(cleanTit)}
-                      </h5>
-                      ${ruleCode ? `
-                        <div class="text-[10px] text-slate-400 font-mono">
-                          Regra: ${escapeHtml(ruleCode)}
-                        </div>
-                      ` : ''}
-                    </div>
-                    <div class="text-right flex-shrink-0">
-                      ${statusBtnHtml}
-                    </div>
-                  </div>
-
-                  <!-- FASE 4: Visualizacao Diferenciada por Persona (Gestor vs. Contador) -->
-                  <!-- Modo Gestor (Foco de Pista & Destravamento) -->
-                  <div class="finding-view-gestor space-y-2">
-                    ${execMsg ? `
-                      <p class="text-xs text-slate-300 leading-relaxed font-sans">
-                        ${escapeHtml(execMsg)}
-                      </p>
+                    ${isSuporteErp ? `
+                      <button
+                        type="button"
+                        class="btn-suporte-webposto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 text-xs font-semibold transition-all active:scale-95 shadow-sm cursor-pointer"
+                        data-ticket='${ticketPayload}'
+                        title="Copiar chamado formatado para enviar no WhatsApp do Suporte webPosto"
+                      >
+                        <svg class="w-3.5 h-3.5 text-emerald-300 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                        </svg>
+                        <span>Copiar Chamado Suporte webPosto (WhatsApp)</span>
+                      </button>
                     ` : ''}
-                    ${acaoMsg ? `
-                      <div class="p-2.5 rounded-lg bg-emerald-950/30 border border-emerald-500/30 text-xs text-emerald-200 flex items-start gap-2">
-                        <span class="text-emerald-400 flex-shrink-0 text-sm">💡</span>
-                        <div class="leading-relaxed">
-                          <strong class="text-emerald-300 font-semibold">Como destravar no webPosto: </strong>
-                          <span>${escapeHtml(acaoMsg)}</span>
-                        </div>
-                      </div>
-                    ` : ''}
                   </div>
+                ` : ''}
+              </div>
 
-                  <!-- Modo Contador (Foco Contabil, Tags XML & SPED) -->
-                  <div class="finding-view-contador hidden space-y-2">
-                    ${item.explicacao_tecnica ? `
-                      <p class="text-xs text-cyan-200/90 leading-relaxed font-mono">
-                        ${escapeHtml(item.explicacao_tecnica)}
-                      </p>
-                    ` : (execMsg ? `
-                      <p class="text-xs text-slate-300 leading-relaxed font-mono">
-                        ${escapeHtml(execMsg)}
-                      </p>
-                    ` : '')}
-                    ${fields.length > 0 ? `
-                      <div class="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-slate-400">
-                        <span class="text-cyan-400 font-semibold">Tags XML:</span>
-                        ${fields.map(f => `<span class="bg-slate-900 px-1.5 py-0.5 rounded border border-cyan-500/30 text-cyan-300">${escapeHtml(f)}</span>`).join('')}
-                      </div>
-                    ` : ''}
-                    ${(Array.isArray(item.base_legal) && item.base_legal.length > 0) ? `
-                      <div class="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-slate-400">
-                        <span class="text-slate-500">Fundamentacao:</span>
-                        ${item.base_legal.map(b => `<span class="bg-slate-900 px-1.5 py-0.5 rounded border border-white/5 text-slate-300">${escapeHtml(b)}</span>`).join('')}
-                      </div>
-                    ` : ''}
+              <!-- Modo Contador (Foco Contabil, Tags XML & SPED) -->
+              <div class="finding-view-contador hidden space-y-2">
+                ${item.explicacao_tecnica ? `
+                  <p class="text-xs text-cyan-200/90 leading-relaxed font-mono">
+                    ${escapeHtml(item.explicacao_tecnica)}
+                  </p>
+                ` : (execMsg ? `
+                  <p class="text-xs text-slate-300 leading-relaxed font-mono">
+                    ${escapeHtml(execMsg)}
+                  </p>
+                ` : '')}
+                ${fields.length > 0 ? `
+                  <div class="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-slate-400">
+                    <span class="text-cyan-400 font-semibold">Tags XML:</span>
+                    ${fields.map(f => `<span class="bg-slate-900 px-1.5 py-0.5 rounded border border-cyan-500/30 text-cyan-300">${escapeHtml(f)}</span>`).join('')}
+                  </div>
+                ` : ''}
+                ${(Array.isArray(item.base_legal) && item.base_legal.length > 0) ? `
+                  <div class="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-slate-400">
+                    <span class="text-slate-500">Fundamentacao:</span>
+                    ${item.base_legal.map(b => `<span class="bg-slate-900 px-1.5 py-0.5 rounded border border-white/5 text-slate-300">${escapeHtml(b)}</span>`).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        };
+
+        if (pendencias.length > 0) {
+          bodyHtml = `
+            <div class="space-y-2.5">
+              ${pendencias.map(item => renderFindingCard(item, false)).join('')}
+
+              ${conformes.length > 0 ? `
+                <div class="finding-conformes-box mt-3 pt-2 border-t border-white/10">
+                  <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/60 border border-emerald-500/20 text-xs">
+                    <div class="flex items-center gap-2">
+                      <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]"></span>
+                      <span class="text-emerald-300 font-medium">${conformes.length} checagem(ns) estruturais SEFAZ 100% conformes</span>
+                    </div>
+                    <button type="button" class="btn-toggle-conformes px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] font-mono text-cyan-400 hover:text-cyan-300 transition-colors" data-state="closed">
+                      Ver conformes (+${conformes.length})
+                    </button>
+                  </div>
+                  <div class="container-conformes-list hidden space-y-2 pt-2">
+                    ${conformes.map(item => renderFindingCard(item, true)).join('')}
                   </div>
                 </div>
-              `;
-            }).join('')}
-          </div>
-        `;
+              ` : ''}
+            </div>
+          `;
+        } else {
+          bodyHtml = `
+            <div class="space-y-2.5">
+              <div class="p-4 rounded-xl border border-emerald-500/30 bg-emerald-950/20 text-center space-y-2">
+                <div class="w-10 h-10 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 flex items-center justify-center mx-auto shadow-[0_0_12px_rgba(16,185,129,0.25)]">
+                  <svg class="w-5 h-5 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </div>
+                <h5 class="text-sm font-bold text-emerald-200">Documento Fiscal 100% Conforme</h5>
+                <p class="text-xs text-slate-300 max-w-md mx-auto">Todas as regras tributarias e de schema foram validadas com sucesso perante a SEFAZ e SPED. Emissao liberada na pista.</p>
+                ${conformes.length > 0 ? `
+                  <button type="button" class="btn-toggle-conformes text-xs font-mono text-cyan-400 hover:text-cyan-300 underline mt-1">
+                    Ver as ${conformes.length} regras aprovadas
+                  </button>
+                  <div class="container-conformes-list hidden space-y-2 text-left pt-3">
+                    ${conformes.map(item => renderFindingCard(item, true)).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }
       } else if (bType === 'ranking_list') {
         const items = Array.isArray(b.ranking_items) ? b.ranking_items : [];
         bodyHtml = `
@@ -3281,10 +3367,18 @@
             if (gestorPanel) gestorPanel.classList.toggle('hidden', targetPersona !== 'gestor');
             if (contadorPanel) contadorPanel.classList.toggle('hidden', targetPersona !== 'contador');
 
-            // FASE 4: Alterna o detalhamento interno dos cards de findings
+            // FASE 4/5: Alterna o detalhamento interno dos cards de findings
             const isGestor = (targetPersona === 'gestor');
             rootElement.querySelectorAll('.finding-view-gestor').forEach(el => el.classList.toggle('hidden', !isGestor));
             rootElement.querySelectorAll('.finding-view-contador').forEach(el => el.classList.toggle('hidden', isGestor));
+            rootElement.querySelectorAll('.finding-rule-code').forEach(el => el.classList.toggle('hidden', isGestor));
+            if (!isGestor) {
+              rootElement.querySelectorAll('.container-conformes-list').forEach(el => el.classList.remove('hidden'));
+              rootElement.querySelectorAll('.btn-toggle-conformes').forEach(el => {
+                el.textContent = 'Ocultar conformes';
+                el.setAttribute('data-state', 'open');
+              });
+            }
           });
         }
       });
@@ -4145,6 +4239,76 @@
       escapeHtml,
       formatNumber
     };
+  }
+
+
+  // Delegacao global de cliques para botoes interativos do Fiscal Shield (AURA Apendice C)
+  if (typeof document !== 'undefined' && !window._auraFiscalShieldListenersBound) {
+    window._auraFiscalShieldListenersBound = true;
+    document.addEventListener('click', (e) => {
+      // 1. Botao de copiar chamado para Suporte webPosto (WhatsApp)
+      const btnSuporte = e.target.closest('.btn-suporte-webposto');
+      if (btnSuporte) {
+        e.preventDefault();
+        try {
+          const rawTicket = btnSuporte.getAttribute('data-ticket') || '{}';
+          const t = JSON.parse(rawTicket);
+          const texto =
+`[AURA - Abertura de Chamado Suporte webPosto]
+Documento: Cupom Fiscal / NFC-e
+Problema: ${t.titulo || "Inconsistencia de Emissao"}
+Causa Operacional: ${t.causa || "Divergencia na rotina de fechamento de venda"}
+
+Diagnostico Tecnico:
+- Regra SEFAZ: ${t.regra || "N/A"}
+- Campo(s) Afetado(s): ${t.campos || "Cabecalho/Total"}
+- Valor Observado: ${t.obs || "N/A"} (Esperado: ${t.esp || ">= 0.00"})
+- Detalhes Tecnicos: ${t.tecnica || "Erro de schema/validacao gerado no XML pelo PDV"}
+
+Solicitacao: Favor orientar ajuste na rotina de emissao de cupons/descontos no PDV para liberar a autorizacao da nota.`;
+
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            navigator.clipboard.writeText(texto).then(() => {
+              const origHtml = btnSuporte.innerHTML;
+              btnSuporte.innerHTML = `
+                <svg class="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-white font-bold">✓ Chamado Copiado! Pronto para WhatsApp</span>
+              `;
+              btnSuporte.classList.add('!bg-emerald-600', '!border-emerald-400');
+              setTimeout(() => {
+                btnSuporte.innerHTML = origHtml;
+                btnSuporte.classList.remove('!bg-emerald-600', '!border-emerald-400');
+              }, 3500);
+            });
+          }
+        } catch (err) {
+          console.warn('[AuraGenUI] Erro ao copiar chamado suporte webPosto:', err);
+        }
+        return;
+      }
+
+      // 2. Botao de alternar visualizacao das regras conformes
+      const btnToggleConformes = e.target.closest('.btn-toggle-conformes');
+      if (btnToggleConformes) {
+        e.preventDefault();
+        const parentBox = btnToggleConformes.closest('.finding-conformes-box') || btnToggleConformes.closest('.p-4');
+        const container = parentBox ? parentBox.querySelector('.container-conformes-list') : null;
+        if (container) {
+          const isHidden = container.classList.contains('hidden');
+          if (isHidden) {
+            container.classList.remove('hidden');
+            btnToggleConformes.textContent = 'Ocultar conformes';
+            btnToggleConformes.setAttribute('data-state', 'open');
+          } else {
+            container.classList.add('hidden');
+            const count = container.children.length;
+            btnToggleConformes.textContent = `Ver conformes (+${count})`;
+            btnToggleConformes.setAttribute('data-state', 'closed');
+          }
+        }
+        return;
+      }
+    });
   }
 
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : this));

@@ -323,11 +323,11 @@ def auditar_matematica_item(
             status=StatusApontamento.INVALID,
             gravidade=GravidadeApontamento.CRITICAL,
             regra_id="SEFAZ-VAL-NEG",
-            titulo=f"Falha de Schema (XSD): Valor Monetario Negativo no Item {n_item}",
+            titulo=f"Bloqueio de Emissao: Valor Monetario Negativo no Item {n_item} (Cupom de Aplicativo)",
             explicacao_executiva=(
-                f"No item {n_item} ({x_prod}), foi informado um valor negativo. "
-                "A SEFAZ e o componente ACBr proíbem expressamente qualquer sinal negativo no XML. "
-                "Descontos e vouchers de aplicativos devem ser somados no campo de Desconto (vDesc), nunca como acrescimo negativo."
+                f"No item {n_item} ({x_prod}), foi gerado um valor negativo. "
+                "A SEFAZ proibe expressamente qualquer sinal negativo no documento fiscal. "
+                "Descontos e cupons de aplicativos (Shell Box, Premmia, Abastece Ai) nao podem ser gerados como acrescimo negativo."
             ),
             explicacao_tecnica=(
                 f"Item {n_item} possui valor negativo (vOutro={v_outro:.2f}, vProd={v_prod:.2f}). "
@@ -337,7 +337,7 @@ def auditar_matematica_item(
             valor_esperado=">= 0.00",
             valor_observado=f"{v_outro:.2f}",
             base_legal=["MOC 7.0 - Tipos Basicos (TDec_1302)"],
-            acoes_recomendadas=["Transferir o valor do cupom ou desconto para o campo vDesc."],
+            acoes_recomendadas=["Acionar o suporte tecnico do webPosto para ajuste na emissao de cupons de aplicativo ou verificar cadastro de desconto da promocao no webPosto."],
         )
 
     # 2. Multiplicacao qCom * vUnCom == vProd (Regra I08-10 / Rejeicao 629)
@@ -367,7 +367,7 @@ def auditar_matematica_item(
                 "ABNT NBR 5891:2014 - Regras de Arredondamento Decimal",
             ],
             acoes_recomendadas=[
-                f"Ajustar a tag <vProd> do item {n_item} para {v_prod_esperado:.2f} ou recalcular o valor unitario no webPosto.",
+                f"Recalcular a quantidade ou valor unitario da venda no webPosto (esperado: R$ {v_prod_esperado:.2f}). Se persistir, contatar o suporte webPosto.",
             ],
         )
 
@@ -399,17 +399,18 @@ def auditar_totais_documento(
                 status=StatusApontamento.INVALID,
                 gravidade=GravidadeApontamento.CRITICAL,
                 regra_id="SEFAZ-VAL-NEG",
-                titulo="Falha de Schema (XSD): Valor Monetario Negativo nos Totais (<total>/<ICMSTot>)",
+                titulo="Bloqueio de Emissao: Valor Monetario Negativo nos Totais do Cupom (Cupom de Aplicativo)",
                 explicacao_executiva=(
-                    "Nos totais da nota foram encontrados valores negativos. A SEFAZ proíbe expressamente "
-                    "valores negativos no cabecalho. Cupons de aplicativos devem ser somados em vDesc (Desconto)."
+                    "Nos totais da nota foram encontrados valores negativos gerados pelo fechamento da venda. "
+                    "A SEFAZ proibe expressamente valores negativos no cabecalho do documento. "
+                    "Isso ocorre tipicamente quando cupons de aplicativos parceiros (Shell Box, Premmia, Abastece Ai) geram descontos maiores que os produtos ou sao processados incorretamente pelo PDV."
                 ),
-                explicacao_tecnica=f"Campo totalizador com valor negativo: vOutro={v_outro:.2f}.",
+                explicacao_tecnica=f"Campo totalizador com valor negativo: vOutro={v_outro:.2f} (infringe tipo basico TDec_1302).",
                 campos_afetados=["total/ICMSTot/vOutro"],
                 valor_esperado=">= 0.00",
                 valor_observado=f"{v_outro:.2f}",
                 base_legal=["MOC 7.0 - Tipos Basicos (TDec_1302)"],
-                acoes_recomendadas=["Zerar vOutro e transferir o valor para vDesc."],
+                acoes_recomendadas=["Acionar o suporte tecnico do webPosto para ajuste no fechamento com cupom de aplicativo (o sistema nao deve gerar valor negativo no XML)."],
             )
         )
 
@@ -436,7 +437,7 @@ def auditar_totais_documento(
                 valor_esperado=f"{soma_itens:.2f}",
                 valor_observado=f"{v_prod_total_declarado:.2f}",
                 base_legal=["MOC 7.0 - Regra W07-10"],
-                acoes_recomendadas=["Ajustar a tag <vProd> no totalizador para coincidir com a soma exata dos itens."],
+                acoes_recomendadas=["Revalidar o fechamento da venda no webPosto para sincronizar os totais dos itens. Se persistir, contatar o suporte webPosto."],
             )
         )
     else:
@@ -478,7 +479,7 @@ def auditar_totais_documento(
                 valor_esperado=f"{vnf_esperado:.2f}",
                 valor_observado=f"{v_nf_declarado:.2f}",
                 base_legal=["MOC 7.0 - Regra W16-10"],
-                acoes_recomendadas=["Ajustar o total <vNF> para coincidir com a soma exata das parcelas."],
+                acoes_recomendadas=["Revalidar as formas de pagamento e descontos da venda no webPosto. Se persistir, contatar o suporte webPosto."],
             )
         )
     else:
@@ -767,8 +768,8 @@ def auditar_regras_tributarias_posto(
                     valor_observado=f"{len(chaves_65)} chaves de modelo 65 referenciadas",
                     base_legal=["MOC 7.0 - Anexo I - Regra I08-180 / Rejeicao 375", "NT 2026.002"],
                     acoes_recomendadas=[
-                        "Remover as tags <refNFe> de modelo 65 do grupo <NFref>.",
-                        "Informar as chaves e numeros dos cupons exclusivamente em <infCpl> (comportamento nativo do webPosto 26.9).",
+                        "No webPosto: configurar a emissao de NF-e referenciada para modelo 55 ou atualizar os parametros fiscais com o suporte webPosto.",
+                        "Informar as chaves e numeros dos cupons exclusivamente em Informacoes Complementares (infCpl).",
                     ],
                 )
             )
