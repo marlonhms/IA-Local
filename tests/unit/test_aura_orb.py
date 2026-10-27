@@ -137,6 +137,8 @@ def test_zero_unicode_dashes_in_orb_artifacts():
         DIST_DIR / "js" / "aura-chat.js",
         DIST_DIR / "css" / "aura.css",
         DIST_DIR / "index.html",
+        WEB_DIR / "js" / "aura-genui-widgets.js",
+        DIST_DIR / "js" / "aura-genui-widgets.js",
     ]
 
     for p in target_files:
@@ -157,6 +159,7 @@ def test_web_and_dist_sync():
         "js/aura-chat.js",
         "css/aura.css",
         "index.html",
+        "js/aura-genui-widgets.js",
     ]
 
     for rel in synced_rel_paths:

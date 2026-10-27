@@ -21,6 +21,11 @@ else:
 
 # Google Gemini API
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+# Groq Whisper Cloud API (Transcricao de Voz Gratuita)
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
+GROQ_AUDIO_URL = os.getenv("GROQ_AUDIO_URL", "https://api.groq.com/openai/v1/audio/transcriptions").strip()
+GROQ_WHISPER_MODEL = os.getenv("GROQ_WHISPER_MODEL", "whisper-large-v3-turbo").strip()
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY, transport="rest")
 

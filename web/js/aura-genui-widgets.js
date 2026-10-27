@@ -3962,7 +3962,7 @@
       {
         name: 'render_PredictiveScenarioUI',
         cls: PredictiveScenarioUI,
-        aliases: ['PredictiveScenarioUI', 'PredictiveScenarioWidget'],
+        aliases: ['PredictiveScenarioUI', 'PredictiveScenarioWidget', 'render_TankRunOutForecastUI', 'TankRunOutForecastUI', 'render_TankRunOutPredictionUI', 'TankRunOutPredictionUI'],
         intent: 'cenario_preditivo'
       },
       {

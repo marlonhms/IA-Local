@@ -90,6 +90,7 @@ from core.webhooks import (
 router = APIRouter(prefix="/api/v1/aura", tags=["AURA Core Engine"])
 cockpit_router = APIRouter(prefix="/api/v1/cockpit", tags=["AURA Cockpit Zero-Click"])
 from core.partner_api import partner_router
+from core.voice_api import voice_router
 
 # Instância Singleton do Motor (pode ser injetada externamente)
 _engine_instance: AuraEngine | None = None
@@ -2524,6 +2525,7 @@ def create_aura_app(
     app.include_router(router)
     app.include_router(cockpit_router)
     app.include_router(partner_router)
+    app.include_router(voice_router)
 
     @app.get(
         "/metrics",

@@ -1,20 +1,26 @@
 /**
  * Controlador de Entrada Rapida por Voz da AURA (Experiencia Imersiva estilo Gemini / GPT)
- * Ao acionar o microfone, o fundo escurece e o orbe sobe flutuando no centro da tela,
- * reagindo as ondas de audio em tempo real para gerar a transcricao.
+ * Utiliza o motor gratuito de alta velocidade Groq Whisper Cloud (/api/v1/aura/voice/transcribe)
+ * com captura de audio via HTML5 MediaRecorder e reatividade fluida do AuraLivingOrb a 60 FPS.
  * Regra inegociavel: ZERO travessoes e total tolerancia a falhas de hardware/permissao.
  */
 
 class AuraVoiceController {
   constructor() {
-    this.recognition = null;
+    this.mediaRecorder = null;
+    this.audioChunks = [];
+    this.mediaStream = null;
     this.isListening = false;
+    this.isTranscribing = false;
     this.supported = false;
     this.autoSend = false;
+    this.voiceStatus = null;
+    this.currentTranscript = '';
+
+    // Elementos da interface
     this.btnVoice = null;
     this.chatInput = null;
     this.announcer = null;
-    this.mediaStream = null;
 
     // Elementos do Modal Imersivo de Voz
     this.modal = null;
@@ -27,7 +33,6 @@ class AuraVoiceController {
     this.btnSend = null;
     this.btnClear = null;
     this.scrim = null;
-    this.currentTranscript = '';
   }
 
   /**
@@ -38,7 +43,7 @@ class AuraVoiceController {
   }
 
   /**
-   * Inicializa o suporte a Web Speech API e vincula os elementos da interface
+   * Inicializa o suporte a gravacao e vincula os elementos da interface
    */
   init() {
     this.btnVoice = document.getElementById('btn-voice-input');
@@ -56,24 +61,13 @@ class AuraVoiceController {
     this.btnClear = document.getElementById('btn-voice-modal-clear');
     this.scrim = document.getElementById('aura-voice-scrim');
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const hasMedia = Boolean(
+      navigator.mediaDevices &&
+      typeof navigator.mediaDevices.getUserMedia === 'function' &&
+      typeof window.MediaRecorder !== 'undefined'
+    );
 
-    if (SpeechRecognition) {
-      try {
-        this.recognition = new SpeechRecognition();
-        this.recognition.lang = 'pt-BR';
-        this.recognition.continuous = false;
-        this.recognition.interimResults = true;
-        this.recognition.maxAlternatives = 1;
-        this.supported = true;
-        this.bindRecognitionEvents();
-      } catch (err) {
-        console.warn('[AURA Voice] Falha ao instanciar SpeechRecognition:', err);
-        this.supported = false;
-      }
-    } else {
-      this.supported = false;
-    }
+    this.supported = hasMedia;
 
     if (this.btnVoice) {
       this.btnVoice.addEventListener('click', (e) => {
@@ -83,6 +77,21 @@ class AuraVoiceController {
     }
 
     this.bindModalEvents();
+    this.checkBackendVoiceStatus();
+  }
+
+  /**
+   * Consulta o status do servico Groq Whisper no backend
+   */
+  async checkBackendVoiceStatus() {
+    try {
+      const resp = await fetch('/api/v1/aura/voice/status');
+      if (resp.ok) {
+        this.voiceStatus = await resp.json();
+      }
+    } catch (_) {
+      // Falha silenciosa de probe no startup
+    }
   }
 
   /**
@@ -119,7 +128,7 @@ class AuraVoiceController {
     }
 
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.isListening && this.modal && !this.modal.classList.contains('hidden')) {
+      if (e.key === 'Escape' && (this.isListening || this.isTranscribing) && this.modal && !this.modal.classList.contains('hidden')) {
         this.cancelVoiceSession();
       }
     });
@@ -134,7 +143,6 @@ class AuraVoiceController {
     this.currentTranscript = '';
     this.modal.classList.remove('hidden');
 
-    // Dispara transicao fluida
     requestAnimationFrame(() => {
       this.modal.classList.add('modal-active');
     });
@@ -145,8 +153,8 @@ class AuraVoiceController {
     }
 
     if (this.previewText) {
-      this.previewText.textContent = 'AURA esta ouvindo... Fale sobre bombas, tanques ou auditoria fiscal';
-      this.previewText.className = 'text-sm sm:text-base font-sans text-slate-400 transition-colors leading-relaxed';
+      this.previewText.textContent = 'AURA esta ouvindo... Fale seu comando e clique em Concluir quando terminar';
+      this.previewText.className = 'text-sm sm:text-base font-sans text-slate-300 transition-colors leading-relaxed';
     }
 
     // Instancia o Orbe Vivo Majestoso (140px, paridade AuraVoiceOrbSheet)
@@ -175,7 +183,7 @@ class AuraVoiceController {
     this.modal.classList.remove('modal-active');
 
     setTimeout(() => {
-      if (!this.isListening && this.modal) {
+      if (!this.isListening && !this.isTranscribing && this.modal) {
         this.modal.classList.add('hidden');
       }
       if (this.modalOrb) {
@@ -189,111 +197,74 @@ class AuraVoiceController {
   }
 
   /**
-   * Conclui a transcricao de voz e envia imediatamente
+   * Inicia gravacao de audio via HTML5 MediaRecorder e conecta ao AuraLivingOrb
    */
-  commitAndSendVoice() {
-    this.stopListening();
-    this.closeVoiceModal();
-
-    if (this.chatInput && this.chatInput.value.trim()) {
-      this.chatInput.focus();
-      const sendBtn = document.getElementById('btn-chat-send');
-      if (sendBtn) {
-        sendBtn.click();
-      }
+  async startListening() {
+    if (!this.supported) {
+      const msg = 'Gravacao de microfone nao suportada neste navegador. Digite seu comando.';
+      this.announce(msg);
+      if (this.chatInput) this.chatInput.focus();
+      return;
     }
-  }
 
-  /**
-   * Cancela a sessao de voz sem enviar
-   */
-  cancelVoiceSession() {
-    this.stopListening();
-    this.closeVoiceModal();
-    if (this.chatInput) {
-      this.chatInput.value = '';
-    }
-  }
-
-  /**
-   * Configura os callbacks de escuta, transcricao e tratamento de erros
-   */
-  bindRecognitionEvents() {
-    if (!this.recognition) return;
-
-    this.recognition.onstart = () => {
+    try {
+      this.audioChunks = [];
       this.isListening = true;
+      this.isTranscribing = false;
       this.openVoiceModal();
       this.announce('Ouvindo comando de pista... Fale agora.');
 
-      if (typeof window !== 'undefined' && window.auraOrbManager) {
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+
+      // Conecta analisador Web Audio do Orbe para reagir as ondas de audio em tempo real
+      if (window.auraOrbManager) {
+        window.auraOrbManager.attachAudioStream(this.mediaStream);
         window.auraOrbManager.setEmotion('LISTENING');
       }
 
-      // Conecta o analisador Web Audio ao microfone para reagir as ondas de audio em tempo real
-      if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
-        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-          if (this.isListening) {
-            this.mediaStream = stream;
-            if (typeof window !== 'undefined' && window.auraOrbManager) {
-              window.auraOrbManager.attachAudioStream(stream);
-            }
-          } else {
-            stream.getTracks().forEach((t) => t.stop());
-          }
-        }).catch((err) => {
-          console.warn('[AURA Voice] Analisador Web Audio opcional indisponivel:', err);
-        });
+      // Detecta formato suportado pelo navegador
+      let mimeType = 'audio/webm;codecs=opus';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        if (MediaRecorder.isTypeSupported('audio/webm')) {
+          mimeType = 'audio/webm';
+        } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+          mimeType = 'audio/ogg;codecs=opus';
+        } else {
+          mimeType = '';
+        }
       }
+
+      this.mediaRecorder = mimeType
+        ? new MediaRecorder(this.mediaStream, { mimeType })
+        : new MediaRecorder(this.mediaStream);
+
+      this.mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          this.audioChunks.push(event.data);
+        }
+      };
+
+      this.mediaRecorder.start(250);
 
       if (window.auraAudio && typeof window.auraAudio.playChime === 'function') {
         window.auraAudio.playChime(640, 0.05);
       }
-    };
-
-    this.recognition.onresult = (event) => {
-      let finalTranscript = '';
-      let interimTranscript = '';
-
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        const item = event.results[i];
-        if (item.isFinal) {
-          finalTranscript += item[0].transcript;
-        } else {
-          interimTranscript += item[0].transcript;
-        }
-      }
-
-      const recognizedText = (finalTranscript + interimTranscript).trim();
-      this.currentTranscript = recognizedText;
-
-      if (recognizedText) {
-        if (this.chatInput) {
-          this.chatInput.value = recognizedText;
-          this.chatInput.dispatchEvent(new Event('input', { bubbles: true }));
-          this.chatInput.style.height = 'auto';
-          this.chatInput.style.height = `${Math.min(this.chatInput.scrollHeight, 160)}px`;
-        }
-
-        if (this.previewText) {
-          this.previewText.textContent = `"${recognizedText}"`;
-          this.previewText.className = 'text-base sm:text-lg font-sans font-semibold text-white tracking-wide transition-all';
-        }
-      }
-    };
-
-    this.recognition.onerror = (event) => {
-      console.warn('[AURA Voice] Erro no reconhecimento:', event.error);
+    } catch (err) {
+      console.warn('[AURA Voice] Falha ao obter microfone:', err);
       this.isListening = false;
       this.cleanupMediaStream();
 
-      let msg = 'Erro no microfone.';
-      if (event.error === 'not-allowed') {
-        msg = 'Permissao de microfone negada no navegador.';
-      } else if (event.error === 'no-speech') {
-        msg = 'Nenhum comando de voz detectado na pista.';
-      } else if (event.error === 'network') {
-        msg = 'Falha de rede no reconhecimento de voz.';
+      let msg = 'Erro no microfone ou permissao negada no navegador.';
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        msg = 'Permissao de microfone negada. Autorize o microfone no cadeado da barra de endereco.';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        msg = 'Nenhum microfone encontrado neste computador.';
       }
 
       if (this.statusLabel) {
@@ -303,44 +274,184 @@ class AuraVoiceController {
 
       if (this.previewText) {
         this.previewText.textContent = msg;
-        this.previewText.className = 'text-sm font-sans text-amber-300';
+        this.previewText.className = 'text-sm font-sans text-amber-300 leading-relaxed';
       }
 
-      if (typeof window !== 'undefined' && window.auraOrbManager) {
+      if (window.auraOrbManager) {
         window.auraOrbManager.setEmotion('WORRIED');
-        setTimeout(() => {
-          if (window.auraOrbManager && window.auraOrbManager.getEmotion() === 'WORRIED') {
-            window.auraOrbManager.setEmotion('CALM');
-          }
-        }, 2500);
       }
 
       this.announce(msg);
       setTimeout(() => {
+        if (!this.isListening && !this.currentTranscript) {
+          this.closeVoiceModal();
+        }
+      }, 5000);
+    }
+  }
+
+  /**
+   * Conclui a gravacao de audio e envia para o backend transcrever via Groq Whisper
+   */
+  commitAndSendVoice() {
+    if (!this.isListening || !this.mediaRecorder) {
+      if (this.currentTranscript && this.chatInput) {
         this.closeVoiceModal();
-      }, 2200);
+        const sendBtn = document.getElementById('btn-chat-send');
+        if (sendBtn) sendBtn.click();
+      }
+      return;
+    }
+
+    this.isListening = false;
+    this.isTranscribing = true;
+
+    if (this.statusLabel) {
+      this.statusLabel.textContent = 'PROCESSANDO COM GROQ WHISPER...';
+      this.statusLabel.className = 'text-xs font-sans font-bold uppercase tracking-widest text-amber-300 animate-pulse';
+    }
+
+    if (this.previewText) {
+      this.previewText.textContent = 'Transcrevendo comando de pista com alta velocidade...';
+      this.previewText.className = 'text-sm font-sans text-amber-200 animate-pulse';
+    }
+
+    if (window.auraOrbManager) {
+      window.auraOrbManager.setEmotion('THINKING');
+    }
+
+    this.mediaRecorder.onstop = async () => {
+      try {
+        const mime = this.mediaRecorder.mimeType || 'audio/webm';
+        const audioBlob = new Blob(this.audioChunks, { type: mime });
+        this.cleanupMediaStream();
+
+        if (audioBlob.size < 400) {
+          if (this.statusLabel) {
+            this.statusLabel.textContent = 'ATENCAO OPERACIONAL';
+            this.statusLabel.className = 'text-xs font-sans font-bold uppercase tracking-widest text-amber-400';
+          }
+          if (this.previewText) {
+            this.previewText.textContent = 'Gravacao muito curta. Fale mais proximo ao microfone e tente novamente.';
+            this.previewText.className = 'text-sm font-sans text-amber-300';
+          }
+          if (window.auraOrbManager) window.auraOrbManager.setEmotion('WORRIED');
+          this.isTranscribing = false;
+          return;
+        }
+
+        const response = await fetch('/api/v1/aura/voice/transcribe', {
+          method: 'POST',
+          headers: {
+            'Content-Type': mime
+          },
+          body: audioBlob
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          const detail = data && data.detail ? data.detail : 'Falha na transcricao do audio.';
+          if (this.statusLabel) {
+            this.statusLabel.textContent = response.status === 503 ? 'CONFIGURACAO NECESSARIA' : 'ATENCAO OPERACIONAL';
+            this.statusLabel.className = 'text-xs font-sans font-bold uppercase tracking-widest text-amber-400';
+          }
+          if (this.previewText) {
+            this.previewText.textContent = detail;
+            this.previewText.className = 'text-sm font-sans text-amber-300 leading-relaxed';
+          }
+          if (window.auraOrbManager) window.auraOrbManager.setEmotion('WORRIED');
+          this.isTranscribing = false;
+          return;
+        }
+
+        const recognizedText = String(data.text || '').trim();
+        this.currentTranscript = recognizedText;
+        this.isTranscribing = false;
+
+        if (recognizedText) {
+          if (this.chatInput) {
+            this.chatInput.value = recognizedText;
+            this.chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+            this.chatInput.style.height = 'auto';
+            this.chatInput.style.height = `${Math.min(this.chatInput.scrollHeight, 160)}px`;
+          }
+
+          if (this.previewText) {
+            this.previewText.textContent = `"${recognizedText}"`;
+            this.previewText.className = 'text-base sm:text-lg font-sans font-semibold text-white tracking-wide transition-all';
+          }
+
+          if (this.statusLabel) {
+            const timeInfo = data.duration_ms ? ` (${data.duration_ms}ms)` : '';
+            this.statusLabel.textContent = `TRANSCRICAO CONCLUIDA${timeInfo}`;
+            this.statusLabel.className = 'text-xs font-sans font-bold uppercase tracking-widest text-emerald-400';
+          }
+
+          if (window.auraOrbManager) {
+            window.auraOrbManager.setEmotion('SUCCESS');
+          }
+
+          this.announce(`Comando reconhecido: ${recognizedText}`);
+
+          // Dispara o envio imediato para o chat
+          setTimeout(() => {
+            this.closeVoiceModal();
+            if (this.chatInput && this.chatInput.value.trim()) {
+              this.chatInput.focus();
+              const sendBtn = document.getElementById('btn-chat-send');
+              if (sendBtn) {
+                sendBtn.click();
+              }
+            }
+          }, 650);
+        } else {
+          if (this.statusLabel) {
+            this.statusLabel.textContent = 'NENHUMA FALA DETECTADA';
+            this.statusLabel.className = 'text-xs font-sans font-bold uppercase tracking-widest text-amber-400';
+          }
+          if (this.previewText) {
+            this.previewText.textContent = 'Nao foi possivel identificar palavras na gravacao. Fale novamente.';
+            this.previewText.className = 'text-sm font-sans text-amber-300';
+          }
+          if (window.auraOrbManager) window.auraOrbManager.setEmotion('CALM');
+        }
+      } catch (err) {
+        console.error('[AURA Voice] Erro ao comunicar com endpoint de voz:', err);
+        this.isTranscribing = false;
+        if (this.statusLabel) {
+          this.statusLabel.textContent = 'FALHA DE REDE';
+          this.statusLabel.className = 'text-xs font-sans font-bold uppercase tracking-widest text-red-400';
+        }
+        if (this.previewText) {
+          this.previewText.textContent = 'Nao foi possivel conectar ao servidor da AURA para transcrever o audio.';
+          this.previewText.className = 'text-sm font-sans text-red-300';
+        }
+        if (window.auraOrbManager) window.auraOrbManager.setEmotion('WORRIED');
+      }
     };
 
-    this.recognition.onend = () => {
-      this.isListening = false;
-      this.cleanupMediaStream();
-      this.announce('Comando de voz concluido.');
+    try {
+      this.mediaRecorder.stop();
+    } catch (_) {}
+  }
 
-      if (this.statusLabel) {
-        this.statusLabel.textContent = 'TRANSCRICAO CONCLUIDA';
-        this.statusLabel.className = 'text-xs font-sans font-bold uppercase tracking-widest text-emerald-400';
-      }
-
-      if (typeof window !== 'undefined' && window.auraOrbManager) {
-        window.auraOrbManager.setEmotion('CALM');
-      }
-
-      if (this.autoSend && this.currentTranscript.trim()) {
-        setTimeout(() => {
-          this.commitAndSendVoice();
-        }, 400);
-      }
-    };
+  /**
+   * Cancela a sessao de voz sem enviar
+   */
+  cancelVoiceSession() {
+    this.isListening = false;
+    this.isTranscribing = false;
+    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      try {
+        this.mediaRecorder.stop();
+      } catch (_) {}
+    }
+    this.cleanupMediaStream();
+    this.closeVoiceModal();
+    if (this.chatInput) {
+      this.chatInput.value = '';
+    }
   }
 
   /**
@@ -362,39 +473,17 @@ class AuraVoiceController {
    * Interrompe o reconhecimento ativo
    */
   stopListening() {
-    this.isListening = false;
-    this.cleanupMediaStream();
-    if (this.recognition) {
-      try {
-        this.recognition.stop();
-      } catch (_) {}
-    }
-    if (typeof window !== 'undefined' && window.auraOrbManager) {
-      window.auraOrbManager.setEmotion('CALM');
-    }
+    this.cancelVoiceSession();
   }
 
   /**
-   * Alterna entre iniciar ou interromper a escuta
+   * Alterna entre iniciar gravacao ou concluir e transcrever
    */
   toggleVoice() {
-    if (!this.supported || !this.recognition) {
-      const msg = 'Reconhecimento de voz nao suportado neste navegador. Digite seu comando.';
-      this.announce(msg);
-      if (this.chatInput) this.chatInput.focus();
-      return;
-    }
-
     if (this.isListening) {
       this.commitAndSendVoice();
     } else {
-      try {
-        this.recognition.start();
-      } catch (err) {
-        this.isListening = false;
-        this.cleanupMediaStream();
-        console.warn('[AURA Voice] Erro ao iniciar SpeechRecognition:', err);
-      }
+      this.startListening();
     }
   }
 
