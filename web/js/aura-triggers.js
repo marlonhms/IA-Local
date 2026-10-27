@@ -1643,8 +1643,8 @@ class AuraTriggersController {
                     cardBorder = 'border-rose-500/20 bg-rose-950/10';
                     iconBtnHtml = `
                       <div class="relative group/status flex-shrink-0" tabindex="0" title="Rejeicao SEFAZ: Bloqueio Impeditivo de Emissao">
-                        <div class="w-7 h-7 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 flex items-center justify-center shadow-[0_0_10px_rgba(244,63,94,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-rose-500/25 cursor-pointer">
-                          <svg class="w-3.5 h-3.5 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <div class="w-6 h-6 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 flex items-center justify-center shadow-[0_0_8px_rgba(244,63,94,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-rose-500/25 cursor-pointer">
+                          <svg class="w-3 h-3 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
                             <line x1="6" y1="6" x2="18" y2="18"></line>
                           </svg>
@@ -1662,8 +1662,8 @@ class AuraTriggersController {
                     cardBorder = 'border-amber-500/20 bg-amber-950/10';
                     iconBtnHtml = `
                       <div class="relative group/status flex-shrink-0" tabindex="0" title="Alerta Fiscal: Risco de Bitributacao ou SPED">
-                        <div class="w-7 h-7 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-[0_0_10px_rgba(245,158,11,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-amber-500/25 cursor-pointer">
-                          <svg class="w-3.5 h-3.5 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <div class="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-[0_0_8px_rgba(245,158,11,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-amber-500/25 cursor-pointer">
+                          <svg class="w-3 h-3 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
                             <line x1="12" y1="9" x2="12" y2="13"></line>
                             <line x1="12" y1="17" x2="12.01" y2="17"></line>
@@ -1682,8 +1682,8 @@ class AuraTriggersController {
                     cardBorder = 'border-emerald-500/20 bg-emerald-950/10';
                     iconBtnHtml = `
                       <div class="relative group/status flex-shrink-0" tabindex="0" title="Conforme: Regra Validada perante SEFAZ e SPED">
-                        <div class="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shadow-[0_0_10px_rgba(16,185,129,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-emerald-500/25 cursor-pointer">
-                          <svg class="w-3.5 h-3.5 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <div class="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shadow-[0_0_8px_rgba(16,185,129,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-emerald-500/25 cursor-pointer">
+                          <svg class="w-3 h-3 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="20 6 9 17 4 12"></polyline>
                           </svg>
                         </div>
@@ -1701,25 +1701,18 @@ class AuraTriggersController {
                   // Limpa prefixo [REJEICAO] ou [CONFORME] do titulo
                   let rawTit = a.titulo || 'Regra';
                   let cleanTit = rawTit.replace(/^\[(REJEICAO|ALERTA|CONFORME|AVISO|ERRO)\]\s*/i, '').trim();
-
-                  // Tag de referencia fiscal apenas quando for lei, parametro ou rejeicao especifica
-                  let tagFiscal = a.tag_fiscal || null;
-                  if (!tagFiscal) {
-                    const code = String(a.regra_id || '').trim();
-                    const rejM = code.match(/(?:REJ[-_]?)(\d{3,4})/i);
-                    if (rejM) tagFiscal = `Rejeicao ${rejM[1]}`;
-                    else if (/BITRIBUTACAO|PISCOFINS/i.test(code)) tagFiscal = 'EFD Tabela 4.3.10';
-                    else if (/DIFAL/i.test(code)) tagFiscal = 'DIFAL ANP';
-                  }
+                  let ruleId = String(a.regra_id || '').trim();
 
                   return `
                     <div class="p-3 rounded-lg bg-slate-950/70 border ${cardBorder} space-y-1.5">
-                      <div class="flex items-center justify-between gap-2">
-                        <div class="flex items-center gap-2 min-w-0">
-                          ${tagFiscal ? `<span class="px-2 py-0.5 rounded font-mono font-bold text-[9px] bg-slate-800 text-cyan-300 border border-cyan-500/30">${this.escapeHtml(tagFiscal)}</span>` : ''}
+                      <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0 flex-1 space-y-0.5">
                           <span class="font-semibold text-slate-100">${this.escapeHtml(cleanTit)}</span>
+                          ${ruleId ? `<div class="text-[10px] font-mono text-slate-400">Regra: ${this.escapeHtml(ruleId)}</div>` : ''}
                         </div>
-                        ${iconBtnHtml}
+                        <div class="text-right flex-shrink-0">
+                          ${iconBtnHtml}
+                        </div>
                       </div>
                       <p class="text-[11px] text-slate-300 leading-relaxed">${this.escapeHtml(a.explicacao_executiva || '')}</p>
                       ${a.explicacao_tecnica ? `<div class="text-[10px] font-mono text-cyan-300/80 pt-0.5">MOC/SPED: ${this.escapeHtml(a.explicacao_tecnica)}</div>` : ''}

@@ -2713,18 +2713,18 @@
                 cardBorderClass = 'border-rose-500/25 bg-rose-950/10 hover:border-rose-500/40';
                 statusBtnHtml = `
                   <div class="relative group/status flex-shrink-0" tabindex="0" title="Rejeicao SEFAZ: Bloqueio Impeditivo de Emissao">
-                    <div class="w-8 h-8 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 flex items-center justify-center shadow-[0_0_14px_rgba(244,63,94,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-rose-500/25 group-hover/status:border-rose-500/60 cursor-pointer">
-                      <svg class="w-4 h-4 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <div class="w-6 h-6 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 flex items-center justify-center shadow-[0_0_8px_rgba(244,63,94,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-rose-500/25 cursor-pointer">
+                      <svg class="w-3 h-3 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                       </svg>
                     </div>
-                    <div class="absolute right-0 bottom-full mb-2 hidden group-hover/status:flex flex-col items-center z-30 pointer-events-none animate-fade-in whitespace-nowrap">
-                      <div class="px-2.5 py-1.5 rounded-lg bg-slate-900/95 border border-rose-500/50 shadow-2xl text-center backdrop-blur-md">
-                        <div class="text-[10px] font-bold text-rose-300 font-mono uppercase tracking-wider">Rejeicao SEFAZ</div>
-                        <div class="text-[11px] text-slate-200 font-medium">Bloqueio Impeditivo de Emissao</div>
+                    <div class="absolute right-0 bottom-full mb-1.5 hidden group-hover/status:flex flex-col items-center z-30 pointer-events-none animate-fade-in whitespace-nowrap">
+                      <div class="px-2 py-1 rounded-md bg-slate-900/95 border border-rose-500/50 shadow-xl text-center backdrop-blur-md">
+                        <div class="text-[9px] font-bold text-rose-300 font-mono uppercase">Rejeicao SEFAZ</div>
+                        <div class="text-[10px] text-slate-200 font-medium">Bloqueio Impeditivo</div>
                       </div>
-                      <div class="w-2 h-2 -mt-1 bg-slate-900 border-r border-b border-rose-500/50 rotate-45"></div>
+                      <div class="w-1.5 h-1.5 -mt-0.5 bg-slate-900 border-r border-b border-rose-500/50 rotate-45"></div>
                     </div>
                   </div>
                 `;
@@ -2732,19 +2732,19 @@
                 cardBorderClass = 'border-amber-500/25 bg-amber-950/10 hover:border-amber-500/40';
                 statusBtnHtml = `
                   <div class="relative group/status flex-shrink-0" tabindex="0" title="Alerta Fiscal: Risco de Bitributacao ou SPED">
-                    <div class="w-8 h-8 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-[0_0_14px_rgba(245,158,11,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-amber-500/25 group-hover/status:border-amber-500/60 cursor-pointer">
-                      <svg class="w-4 h-4 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <div class="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-[0_0_8px_rgba(245,158,11,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-amber-500/25 cursor-pointer">
+                      <svg class="w-3 h-3 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
                         <line x1="12" y1="9" x2="12" y2="13"></line>
                         <line x1="12" y1="17" x2="12.01" y2="17"></line>
                       </svg>
                     </div>
-                    <div class="absolute right-0 bottom-full mb-2 hidden group-hover/status:flex flex-col items-center z-30 pointer-events-none animate-fade-in whitespace-nowrap">
-                      <div class="px-2.5 py-1.5 rounded-lg bg-slate-900/95 border border-amber-500/50 shadow-2xl text-center backdrop-blur-md">
-                        <div class="text-[10px] font-bold text-amber-300 font-mono uppercase tracking-wider">Alerta Fiscal</div>
-                        <div class="text-[11px] text-slate-200 font-medium">Inconsistencia ou Risco de Bitributacao</div>
+                    <div class="absolute right-0 bottom-full mb-1.5 hidden group-hover/status:flex flex-col items-center z-30 pointer-events-none animate-fade-in whitespace-nowrap">
+                      <div class="px-2 py-1 rounded-md bg-slate-900/95 border border-amber-500/50 shadow-xl text-center backdrop-blur-md">
+                        <div class="text-[9px] font-bold text-amber-300 font-mono uppercase">Alerta Fiscal</div>
+                        <div class="text-[10px] text-slate-200 font-medium">Risco Tributario</div>
                       </div>
-                      <div class="w-2 h-2 -mt-1 bg-slate-900 border-r border-b border-amber-500/50 rotate-45"></div>
+                      <div class="w-1.5 h-1.5 -mt-0.5 bg-slate-900 border-r border-b border-amber-500/50 rotate-45"></div>
                     </div>
                   </div>
                 `;
@@ -2752,17 +2752,17 @@
                 cardBorderClass = 'border-emerald-500/25 bg-emerald-950/10 hover:border-emerald-500/40';
                 statusBtnHtml = `
                   <div class="relative group/status flex-shrink-0" tabindex="0" title="Conforme: Regra Validada perante SEFAZ e SPED">
-                    <div class="w-8 h-8 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shadow-[0_0_14px_rgba(16,185,129,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-emerald-500/25 group-hover/status:border-emerald-500/60 cursor-pointer">
-                      <svg class="w-4 h-4 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <div class="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shadow-[0_0_8px_rgba(16,185,129,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-emerald-500/25 cursor-pointer">
+                      <svg class="w-3 h-3 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="20 6 9 17 4 12"></polyline>
                       </svg>
                     </div>
-                    <div class="absolute right-0 bottom-full mb-2 hidden group-hover/status:flex flex-col items-center z-30 pointer-events-none animate-fade-in whitespace-nowrap">
-                      <div class="px-2.5 py-1.5 rounded-lg bg-slate-900/95 border border-emerald-500/50 shadow-2xl text-center backdrop-blur-md">
-                        <div class="text-[10px] font-bold text-emerald-300 font-mono uppercase tracking-wider">Conforme</div>
-                        <div class="text-[11px] text-slate-200 font-medium">Validado perante SEFAZ e SPED</div>
+                    <div class="absolute right-0 bottom-full mb-1.5 hidden group-hover/status:flex flex-col items-center z-30 pointer-events-none animate-fade-in whitespace-nowrap">
+                      <div class="px-2 py-1 rounded-md bg-slate-900/95 border border-emerald-500/50 shadow-xl text-center backdrop-blur-md">
+                        <div class="text-[10px] font-bold text-emerald-300 font-mono uppercase">Conforme</div>
+                        <div class="text-[10px] text-slate-200 font-medium">Regra Homologada</div>
                       </div>
-                      <div class="w-2 h-2 -mt-1 bg-slate-900 border-r border-b border-emerald-500/50 rotate-45"></div>
+                      <div class="w-1.5 h-1.5 -mt-0.5 bg-slate-900 border-r border-b border-emerald-500/50 rotate-45"></div>
                     </div>
                   </div>
                 `;
@@ -2772,23 +2772,7 @@
               let rawTit = item.titulo || item.title || 'Regra Fiscal';
               let cleanTit = rawTit.replace(/^\[(REJEICAO|ALERTA|CONFORME|AVISO|ERRO)\]\s*/i, '').trim();
 
-              // Tag de referencia fiscal inteligente (Apenas leis, parametros e rejeicoes oficiais; nunca codigos genericos como SEFAZ-VAL-NEG)
-              let tagFiscal = item.tag_fiscal || null;
-              if (!tagFiscal) {
-                const codeRaw = String(item.regra_id || item.tag || '').trim();
-                const rejMatch = codeRaw.match(/(?:REJ[-_]?)(\d{3,4})/i);
-                if (rejMatch) {
-                  tagFiscal = `Rejeicao ${rejMatch[1]}`;
-                } else if (/BITRIBUTACAO|PISCOFINS/i.test(codeRaw)) {
-                  tagFiscal = 'EFD Tabela 4.3.10';
-                } else if (/DIFAL/i.test(codeRaw)) {
-                  tagFiscal = 'DIFAL ANP';
-                } else if (Array.isArray(item.base_legal) && item.base_legal.length > 0) {
-                  const legal = item.base_legal.find(bl => /LC |LEI |CONVENIO|TABELA|AJUSTE/i.test(bl));
-                  if (legal) tagFiscal = legal;
-                }
-              }
-
+              const ruleCode = String(item.regra_id || item.tag || '').trim();
               const execMsg = item.explicacao_executiva || item.subtitle || '';
               const acaoMsg = item.acao_recomendada || (Array.isArray(item.acoes_recomendadas) && item.acoes_recomendadas[0]) || '';
               const fields = Array.isArray(item.campos_afetados) ? item.campos_afetados : [];
@@ -2796,19 +2780,19 @@
               return `
                 <div class="p-3.5 rounded-xl border ${cardBorderClass} transition-all space-y-2">
                   <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0 flex-1 space-y-1">
-                      <div class="flex flex-wrap items-center gap-1.5">
-                        ${tagFiscal ? `
-                          <span class="px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-slate-800 text-cyan-300 border border-cyan-500/30 flex-shrink-0">
-                            ${escapeHtml(tagFiscal)}
-                          </span>
-                        ` : ''}
-                        <h5 class="text-xs sm:text-sm font-semibold text-slate-100 leading-snug">
-                          ${escapeHtml(cleanTit)}
-                        </h5>
-                      </div>
+                    <div class="min-w-0 flex-1 space-y-0.5">
+                      <h5 class="text-xs sm:text-sm font-semibold text-slate-100 leading-snug">
+                        ${escapeHtml(cleanTit)}
+                      </h5>
+                      ${ruleCode ? `
+                        <div class="text-[10px] text-slate-400 font-mono">
+                          Regra: ${escapeHtml(ruleCode)}
+                        </div>
+                      ` : ''}
                     </div>
-                    ${statusBtnHtml}
+                    <div class="text-right flex-shrink-0">
+                      ${statusBtnHtml}
+                    </div>
                   </div>
 
                   ${execMsg ? `
@@ -2855,8 +2839,8 @@
               if (isInv) {
                 valHtml = `
                   <div class="relative group/status flex-shrink-0" tabindex="0" title="Rejeicao SEFAZ: Bloqueio Impeditivo de Emissao">
-                    <div class="w-7 h-7 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 flex items-center justify-center shadow-[0_0_10px_rgba(244,63,94,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-rose-500/25 cursor-pointer">
-                      <svg class="w-3.5 h-3.5 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <div class="w-6 h-6 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 flex items-center justify-center shadow-[0_0_8px_rgba(244,63,94,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-rose-500/25 cursor-pointer">
+                      <svg class="w-3 h-3 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                       </svg>
@@ -2873,8 +2857,8 @@
               } else if (isWarn) {
                 valHtml = `
                   <div class="relative group/status flex-shrink-0" tabindex="0" title="Alerta Fiscal: Risco de Bitributacao ou SPED">
-                    <div class="w-7 h-7 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-[0_0_10px_rgba(245,158,11,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-amber-500/25 cursor-pointer">
-                      <svg class="w-3.5 h-3.5 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <div class="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-[0_0_8px_rgba(245,158,11,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-amber-500/25 cursor-pointer">
+                      <svg class="w-3 h-3 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
                         <line x1="12" y1="9" x2="12" y2="13"></line>
                         <line x1="12" y1="17" x2="12.01" y2="17"></line>
@@ -2892,8 +2876,8 @@
               } else if (isVal) {
                 valHtml = `
                   <div class="relative group/status flex-shrink-0" tabindex="0" title="Conforme: Regra Validada perante SEFAZ e SPED">
-                    <div class="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shadow-[0_0_10px_rgba(16,185,129,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-emerald-500/25 cursor-pointer">
-                      <svg class="w-3.5 h-3.5 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <div class="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shadow-[0_0_8px_rgba(16,185,129,0.3)] transition-all duration-200 group-hover/status:scale-110 group-hover/status:bg-emerald-500/25 cursor-pointer">
+                      <svg class="w-3 h-3 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="20 6 9 17 4 12"></polyline>
                       </svg>
                     </div>
@@ -2914,15 +2898,11 @@
               let rawItemTitle = item.title || 'Entidade';
               let cleanItemTitle = rawItemTitle.replace(/^\[(REJEICAO|ALERTA|CONFORME|AVISO|ERRO)\]\s*/i, '').trim();
 
-              // Limpa subtitulo de GravidadeApontamento e regras genericas
+              // Subtitulo padronizado: Regra: <CODIGO> (sem GravidadeApontamento.CRITICAL)
               let rawSub = item.subtitle || '';
-              let cleanSub = rawSub.replace(/\|?\s*Gravidade:\s*GravidadeApontamento\.[A-Z]+/gi, '').replace(/Regra:\s*SEFAZ-(VAL-NEG|W\d+-\d+|I\d+-\d+|CHAVE[A-Z0-9-]*)/gi, '').trim();
+              let cleanSub = rawSub.replace(/\|?\s*Gravidade:\s*(?:GravidadeApontamento\.)?[A-Z]+/gi, '').trim();
               if (cleanSub.startsWith('|')) cleanSub = cleanSub.substring(1).trim();
-
-              // Tag apenas se for relevante e nao generica
-              let rawTag = item.tag || '';
-              let isGeneric = /^SEFAZ-(VAL|W\d|I\d|CHAVE|SCHEMA|GEN|MAT)/i.test(rawTag);
-              let displayTag = isGeneric ? '' : rawTag;
+              if (cleanSub.endsWith('|')) cleanSub = cleanSub.substring(0, cleanSub.length - 1).trim();
 
               return `
                 <div class="p-2.5 rounded-lg bg-slate-950/50 border border-white/5 flex items-center justify-between gap-2 text-xs">
@@ -2933,9 +2913,8 @@
                       ${cleanSub ? `<div class="text-[10px] text-slate-400 font-mono mt-0.5">${escapeHtml(cleanSub)}</div>` : ''}
                     </div>
                   </div>
-                  <div class="text-right flex-shrink-0 flex items-center gap-2">
+                  <div class="text-right flex-shrink-0">
                     ${valHtml}
-                    ${displayTag ? `<span class="text-[9px] text-slate-400 font-mono bg-slate-800 px-1.5 py-0.5 rounded border border-white/5">${escapeHtml(displayTag)}</span>` : ''}
                   </div>
                 </div>
               `;
