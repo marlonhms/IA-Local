@@ -560,6 +560,13 @@
 
         if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
           navigator.clipboard.writeText(clipboardText).then(() => {
+            if (btnElement) {
+              const origHtml = btnElement.innerHTML;
+              btnElement.innerHTML = '<span>✔ Laudo Copiado para Area de Transferencia!</span>';
+              setTimeout(() => {
+                if (btnElement) btnElement.innerHTML = origHtml;
+              }, 4000);
+            }
             const fx = (typeof window !== 'undefined' && window.auraFx) || null;
             if (fx && typeof fx.showToast === 'function') {
               fx.showToast({
@@ -2783,6 +2790,236 @@
     }
   }
 
+
+  // =========================================================================
+  // MICRO-WIDGET FISCAL: FiscalShieldInspectorUI (Escudo Fiscal SEFAZ & SPED)
+  // =========================================================================
+
+  class FiscalShieldInspectorUI extends GenerativeModularCardUI {
+    constructor(payload = {}) {
+      super(payload);
+      this.intent = escapeHtml(payload.intent || "auditoria_fiscal_sefaz");
+      this.componentName = escapeHtml(payload.component_name || "render_FiscalShieldInspectorUI");
+      this.cardClass = "genui-fiscal-shield-card genui-modular-lego-card";
+      this.ariaLabel = "Escudo Fiscal SEFAZ e Auditoria de Regras Tributarias AURA";
+      this.activePersona = "gestor"; // "gestor" | "contador"
+    }
+
+    renderLayer1() {
+      const p = this.props || {};
+      const title = p.title || "Escudo Fiscal SEFAZ & Auditoria Tributaria";
+      const subtitle = p.subtitle || "Auditoria Deterministica MOC 7.0 + webPosto RAG";
+      const scoreRaw = p.confidence_score !== undefined ? Number(p.confidence_score) : 0.99;
+      const scorePct = Math.round(scoreRaw * 100);
+      const diagnosisText = p.diagnosis || this.summary || "Auditoria fiscal processada com sucesso.";
+      const personaViews = p.persona_views || {};
+
+      const gestorText = personaViews.gestor || diagnosisText;
+      const contadorText = personaViews.contador || diagnosisText;
+      const basesLegais = Array.isArray(personaViews.base_legal) ? personaViews.base_legal : [];
+
+      const scoreColor = scorePct >= 90
+        ? "text-emerald-300 border-emerald-500/40 bg-emerald-500/10"
+        : (scorePct >= 75 ? "text-amber-300 border-amber-500/40 bg-amber-500/10" : "text-slate-300 border-slate-600 bg-slate-800/40");
+
+      return `
+        <div class="genui-layer genui-layer-1 mb-4 pb-3 border-b border-white/10">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse flex-shrink-0"></span>
+              <h4 class="text-xs font-mono font-bold tracking-wider text-cyan-300 uppercase">
+                ${escapeHtml(title)}
+              </h4>
+              <span class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">
+                ${escapeHtml(this.toolCallId.substring(0, 14))}...
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full border ${scoreColor} font-semibold flex items-center gap-1">
+                <svg class="w-3 h-3 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+                <span>${scorePct}% Confiabilidade</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Switch Dupla Persona: Gestor / Pista vs Contador / SPED -->
+          <div class="persona-switch-bar inline-flex p-1 rounded-xl bg-slate-950/80 border border-white/10 my-2 gap-1 w-full sm:w-auto" role="tablist">
+            <button type="button" 
+                    role="tab" 
+                    aria-selected="${this.activePersona === 'gestor' ? 'true' : 'false'}"
+                    class="persona-switch-btn persona-btn-gestor flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${this.activePersona === 'gestor' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm' : 'text-slate-400 hover:text-slate-200'}" 
+                    data-persona="gestor">
+              <span>💼</span>
+              <span>Visao Gestor &amp; Pista</span>
+            </button>
+            <button type="button" 
+                    role="tab" 
+                    aria-selected="${this.activePersona === 'contador' ? 'true' : 'false'}"
+                    class="persona-switch-btn persona-btn-contador flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${this.activePersona === 'contador' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm' : 'text-slate-400 hover:text-slate-200'}" 
+                    data-persona="contador">
+              <span>💻</span>
+              <span>Visao Contador &amp; SPED</span>
+            </button>
+          </div>
+
+          <!-- Painel Visao Gestor -->
+          <div class="persona-view-panel persona-view-gestor ${this.activePersona === 'gestor' ? '' : 'hidden'} p-3 rounded-xl bg-slate-950/50 border border-emerald-500/20 space-y-1.5 animate-fade-in">
+            <div class="flex items-center justify-between text-[10px] font-mono">
+              <span class="text-emerald-400 font-bold uppercase">${escapeHtml(subtitle)}</span>
+              <span class="text-emerald-400/80">Operacao &amp; Acao Imediata</span>
+            </div>
+            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed whitespace-pre-line">
+              ${escapeHtml(gestorText)}
+            </p>
+          </div>
+
+          <!-- Painel Visao Contador -->
+          <div class="persona-view-panel persona-view-contador ${this.activePersona === 'contador' ? '' : 'hidden'} p-3 rounded-xl bg-slate-950/50 border border-cyan-500/20 space-y-1.5 animate-fade-in">
+            <div class="flex items-center justify-between text-[10px] font-mono">
+              <span class="text-cyan-400 font-bold uppercase">${escapeHtml(subtitle)}</span>
+              <span class="text-cyan-400/80">MOC 7.0 &amp; EFD / SPED Fiscal</span>
+            </div>
+            <p class="text-xs sm:text-sm font-mono text-cyan-100 leading-relaxed whitespace-pre-line">
+              ${escapeHtml(contadorText)}
+            </p>
+            ${basesLegais.length > 0 ? `
+              <div class="pt-2 border-t border-white/5 flex flex-wrap gap-1.5">
+                <span class="text-[10px] font-mono text-slate-400">Base Legal:</span>
+                ${basesLegais.map(bl => `<span class="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-950/60 text-cyan-300 border border-cyan-500/30">${escapeHtml(bl)}</span>`).join('')}
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const p = this.props || {};
+      const anatomy = p.access_key_anatomy;
+      let anatomyHtml = '';
+
+      if (anatomy && typeof anatomy === 'object') {
+        const isDvOk = !!anatomy.is_dv_valido;
+        const dvStatusClass = isDvOk 
+          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50' 
+          : 'bg-rose-500/20 text-rose-300 border-rose-500/50 animate-pulse';
+
+        anatomyHtml = `
+          <div class="p-3.5 rounded-xl bg-slate-900/80 border border-cyan-500/30 space-y-2 mb-3.5" data-block-id="blk_chave_anatomy_bar">
+            <div class="flex items-center justify-between text-xs border-b border-white/5 pb-1.5">
+              <span class="font-bold text-slate-100 flex items-center gap-1.5">
+                <span>🔑</span>
+                <span>Anatomia dos 44 Digitos da Chave SEFAZ</span>
+              </span>
+              <span class="text-[10px] font-mono text-cyan-300">Decomposicao Estrutural MOC 7.0</span>
+            </div>
+            <div class="overflow-x-auto pb-1">
+              <div class="flex items-stretch gap-1.5 min-w-max text-center font-mono">
+                <!-- Segmento 1: UF -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10" title="Codigo IBGE da UF">
+                  <div class="text-[9px] text-slate-400">UF</div>
+                  <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.c_uf || '--')}</div>
+                  <div class="text-[8px] text-slate-500">${escapeHtml(anatomy.uf_sigla || '')}</div>
+                </div>
+                <!-- Segmento 2: AAMM -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10" title="Ano e Mes de Emissao (AAMM)">
+                  <div class="text-[9px] text-slate-400">AAMM</div>
+                  <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.aamm || '----')}</div>
+                  <div class="text-[8px] text-slate-500">${escapeHtml(anatomy.ano || '')}/${escapeHtml(anatomy.mes || '')}</div>
+                </div>
+                <!-- Segmento 3: CNPJ -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10" title="CNPJ do Emitente">
+                  <div class="text-[9px] text-slate-400">CNPJ Emitente (14d)</div>
+                  <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.cnpj_emitente || '--------------')}</div>
+                  <div class="text-[8px] text-slate-500">Posto / Matriz</div>
+                </div>
+                <!-- Segmento 4: Modelo -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10" title="Modelo do Documento Fiscal">
+                  <div class="text-[9px] text-slate-400">Mod</div>
+                  <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.modelo || '--')}</div>
+                  <div class="text-[8px] text-slate-500">${anatomy.modelo === '65' ? 'NFC-e' : 'NF-e'}</div>
+                </div>
+                <!-- Segmento 5: Serie -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10" title="Serie do Documento">
+                  <div class="text-[9px] text-slate-400">Serie</div>
+                  <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.serie || '---')}</div>
+                  <div class="text-[8px] text-slate-500">Serie</div>
+                </div>
+                <!-- Segmento 6: Numero -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10" title="Numero da Nota Fiscal">
+                  <div class="text-[9px] text-slate-400">Numero NF (9d)</div>
+                  <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.numero_nfe || '---------')}</div>
+                  <div class="text-[8px] text-slate-500">Documento</div>
+                </div>
+                <!-- Segmento 7: Tipo Emissao -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10" title="Tipo de Emissao (1: Normal, 9: Contingencia)">
+                  <div class="text-[9px] text-slate-400">Emis</div>
+                  <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.tipo_emissao || '-')}</div>
+                  <div class="text-[8px] text-slate-500">${anatomy.tipo_emissao === '1' ? 'Normal' : 'Conting.'}</div>
+                </div>
+                <!-- Segmento 8: Codigo Numerico -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10" title="Codigo Numerico de Seguranca">
+                  <div class="text-[9px] text-slate-400">Cod Num (8d)</div>
+                  <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.codigo_numerico || '--------')}</div>
+                  <div class="text-[8px] text-slate-500">Aleatorio</div>
+                </div>
+                <!-- Segmento 9: DV -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg border ${dvStatusClass}" title="Digito Verificador (Modulo 11)">
+                  <div class="text-[9px] font-bold">DV Modulo 11</div>
+                  <div class="text-xs font-black">${escapeHtml(anatomy.digito_verificador || '-')}</div>
+                  <div class="text-[8px] font-semibold">${isDvOk ? '✔ Valido' : 'Falha: ' + escapeHtml(anatomy.dv_calculado || '')}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="genui-layer genui-layer-2 mb-4 space-y-3.5">
+          ${anatomyHtml}
+          ${super.renderLayer2()}
+        </div>
+      `;
+    }
+
+    bindEvents(rootElement) {
+      super.bindEvents(rootElement);
+      if (!rootElement || typeof rootElement.querySelectorAll !== 'function') return;
+
+      const personaBtns = rootElement.querySelectorAll('.persona-switch-btn');
+      personaBtns.forEach(btn => {
+        if (!btn._hasBoundPersonaClick) {
+          btn._hasBoundPersonaClick = true;
+          btn.addEventListener('click', () => {
+            const targetPersona = btn.getAttribute('data-persona');
+            if (!targetPersona || targetPersona === this.activePersona) return;
+            this.activePersona = targetPersona;
+
+            personaBtns.forEach(b => {
+              const isTarget = b.getAttribute('data-persona') === targetPersona;
+              b.setAttribute('aria-selected', isTarget ? 'true' : 'false');
+              if (isTarget) {
+                if (targetPersona === 'gestor') {
+                  b.className = 'persona-switch-btn persona-btn-gestor flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm';
+                } else {
+                  b.className = 'persona-switch-btn persona-btn-contador flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm';
+                }
+              } else {
+                b.className = 'persona-switch-btn flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer text-slate-400 hover:text-slate-200';
+              }
+            });
+
+            const gestorPanel = rootElement.querySelector('.persona-view-gestor');
+            const contadorPanel = rootElement.querySelector('.persona-view-contador');
+            if (gestorPanel) gestorPanel.classList.toggle('hidden', targetPersona !== 'gestor');
+            if (contadorPanel) contadorPanel.classList.toggle('hidden', targetPersona !== 'contador');
+          });
+        }
+      });
+    }
+  }
+
   // =========================================================================
   // MÓDULO 1: DIAGNÓSTICO EXECUTIVO DE ROI & PERDAS (90 DIAS)
   // =========================================================================
@@ -3400,6 +3637,18 @@
         intent: 'investigar_causa_raiz'
       },
       {
+        name: 'render_FiscalShieldInspectorUI',
+        cls: FiscalShieldInspectorUI,
+        aliases: [
+          'FiscalShieldInspectorUI',
+          'FiscalShieldWidget',
+          'render_FiscalShieldWidget',
+          'render_FiscalAuditUI',
+          'FiscalAuditUI'
+        ],
+        intent: 'auditoria_fiscal_sefaz'
+      },
+      {
         name: 'render_ComplianceStatusUI',
         cls: ComplianceStatusUI,
         aliases: ['ComplianceStatusUI', 'ComplianceStatusWidget', 'render_ComplianceUI'],
@@ -3570,6 +3819,8 @@
     window.AuraGenUI.BasketUpsellWidget = BasketUpsellWidget;
     window.AuraGenUI.ComplianceStatusUI = ComplianceStatusUI;
     window.AuraGenUI.GenerativeModularCardUI = GenerativeModularCardUI;
+    window.AuraGenUI.FiscalShieldInspectorUI = FiscalShieldInspectorUI;
+    window.AuraGenUI.FiscalShieldWidget = FiscalShieldInspectorUI;
     window.AuraGenUI.RoiDiagnosticUI = RoiDiagnosticUI;
     window.AuraGenUI.RoiDiagnosticWidget = RoiDiagnosticWidget;
     window.AuraGenUI.PosAuditRadarUI = PosAuditRadarUI;
@@ -3617,6 +3868,7 @@
       BasketUpsellWidget,
       ComplianceStatusUI,
       ComplianceStatusWidget,
+      FiscalShieldInspectorUI,
       registerWidgets,
       initGlobalGenUIActionDelegation,
       escapeHtml,

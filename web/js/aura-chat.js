@@ -262,6 +262,9 @@ class AuraChatController {
     if (stopBtn) stopBtn.addEventListener('click', () => this.abortStreaming());
     if (clearBtn) clearBtn.addEventListener('click', () => this.clearSession());
 
+    // FASE 2: Ligacao do Smart Fiscal Composer e Leitor Local de XML
+    this.setupSmartFiscalComposer();
+
     // F4-12 & F4-13: Detecção de rolagem e botão flutuante de mensagens recentes
     const chatFeed = document.getElementById('chat-feed-container');
     const scrollBtn = document.getElementById('btn-scroll-bottom');
@@ -429,6 +432,105 @@ class AuraChatController {
   /**
    * Dispara prompt vindo de atalhos rápidos ou outros módulos
    */
+
+  /**
+   * FASE 2: Smart Fiscal Composer & Leitor Local de XML / Chave 44d
+   * Deteccao automatica ao colar 44 digitos ou XML e upload 100% offline via FileReader.
+   */
+  setupSmartFiscalComposer() {
+    const input = document.getElementById('chat-input-text');
+    const pill = document.getElementById('fiscal-smart-paste-pill');
+    const pillText = document.getElementById('fiscal-smart-pill-text');
+    const triggerBtn = document.getElementById('btn-trigger-smart-fiscal');
+    const uploadBtn = document.getElementById('btn-upload-fiscal-xml');
+    const fileInput = document.getElementById('fiscal-xml-file-input');
+    const composer = document.querySelector('.message-composer-container');
+
+    const checkFiscalInput = () => {
+      const val = (input?.value || '').trim();
+      const matchKey = val.match(/\b\d{44}\b/);
+      const isXml = /<infNFe|<nfeProc|<NFe/i.test(val);
+
+      if (matchKey) {
+        if (pill) pill.classList.remove('hidden');
+        if (pillText) pillText.textContent = `Chave SEFAZ detectada: ${matchKey[0].substring(0, 4)}...${matchKey[0].substring(40)} (Auditoria Modulo 11)`;
+        this._detectedFiscalQuery = matchKey[0];
+      } else if (isXml) {
+        if (pill) pill.classList.remove('hidden');
+        if (pillText) pillText.textContent = 'Documento XML Fiscal detectado (Auditoria Completa SEFAZ)';
+        this._detectedFiscalQuery = val;
+      } else {
+        if (pill) pill.classList.add('hidden');
+        this._detectedFiscalQuery = null;
+      }
+    };
+
+    if (input) {
+      input.addEventListener('input', checkFiscalInput);
+      input.addEventListener('paste', () => setTimeout(checkFiscalInput, 50));
+    }
+
+    if (triggerBtn) {
+      triggerBtn.addEventListener('click', () => {
+        if (this._detectedFiscalQuery) {
+          const q = this._detectedFiscalQuery;
+          this._detectedFiscalQuery = null;
+          if (pill) pill.classList.add('hidden');
+          if (input) input.value = '';
+          this.handleSendMessage(q);
+        }
+      });
+    }
+
+    if (uploadBtn && fileInput) {
+      uploadBtn.addEventListener('click', () => fileInput.click());
+
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target?.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const xmlContent = ev.target?.result;
+          if (xmlContent && typeof xmlContent === 'string') {
+            if (pill) pill.classList.add('hidden');
+            if (input) input.value = '';
+            this.handleSendMessage(xmlContent);
+          }
+        };
+        reader.readAsText(file);
+        fileInput.value = '';
+      });
+    }
+
+    if (composer) {
+      composer.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        composer.classList.add('border-cyan-400');
+      });
+      composer.addEventListener('dragleave', () => {
+        composer.classList.remove('border-cyan-400');
+      });
+      composer.addEventListener('drop', (e) => {
+        e.preventDefault();
+        composer.classList.remove('border-cyan-400');
+        const file = e.dataTransfer?.files?.[0];
+        if (file && (file.name.endsWith('.xml') || file.type.includes('xml'))) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const xmlContent = ev.target?.result;
+            if (xmlContent && typeof xmlContent === 'string') {
+              if (pill) pill.classList.add('hidden');
+              if (input) input.value = '';
+              this.handleSendMessage(xmlContent);
+            }
+          };
+          reader.readAsText(file);
+        }
+      });
+    }
+  }
+
   sendUserPrompt(text) {
     if (this.isSubmitting || this.isStreaming) return;
     const input = document.getElementById('chat-input-text');

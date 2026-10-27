@@ -246,3 +246,68 @@ Para considerar este Roadmap 100% concluido, o agente executor devera:
    - Geracao do Briefing Matinal Zero-Click (`/zero-click-briefing`);
    - Aplicacao efetiva dos novos PRAGMAs (`wal_autocheckpoint=1000` e `journal_size_limit=67108864`) no `AuraTransactionalOutbox`.
 3. Executar `pytest` e `ruff check` garantindo 100% de aprovacao.
+
+
+---
+
+# APENDICE A: OTIMIZACAO DA GUI & GENUI PARA INTELIGENCIA FISCAL, TRIBUTARIA E CONTABIL (FASE 1 A 4)
+
+> **Documento Espelho Completo:** `docs/roadmap_apendice_gui_fiscal.md`  
+> **Escopo:** Integracao Visual Premium (`AURA Precision Glass Deluxe`) do Motor Fiscal Deterministico (`core/fiscal_engine.py`) e Acervo Normativo Local (`data/webposto_knowledge.db`) no Companion Canvas, Chat Composer, Central de Gatilhos em 1-Clique e Welcome Cockpit.  
+> **Regra Inegociavel:** ZERO travessoes Unicode (`\u2014` e `\u2013`) em qualquer arquivo modificado ou criado.
+
+## A.1. DIAGNOSTICO TECNICO DOS PONTOS DE OTIMIZACAO NA GUI ATUAL
+
+1. **Hidratacao Incompleta de `xml_documento` no Companion Canvas (`core/aura_engine.py`, linhas 2703-2776):**
+   - Atualmente, `build_canonical_genui_envelope` trata apenas `tipo == "chave_acesso"` e `tipo == "consulta_rejeicao_fiscal"`, caindo em `else: blocks = []` quando o usuario audita um arquivo ou trecho XML (`tipo == "xml_documento"`).
+2. **Mapeamento de Chaves Legadas em `chave_acesso` (`core/aura_engine.py`, linhas 2709-2734):**
+   - O builder consulta chaves antigas (`nivel`, `numero_nf`, `dv_valido`) em vez dos campos do contrato `ApontamentoFiscal` e `decompor_chave_acesso` (`status`, `gravidade`, `numero_nfe`, `is_dv_valido`, `explicacao_executiva`, `explicacao_tecnica`, `base_legal`).
+3. **Nota Contabil Estatica (`core/aura_engine.py`, linha 2773):**
+   - O bloco `blk_procedimento_erp` exibe texto fixo sobre `Registro C113` mesmo para regras de ICMS Monofasico (LC 192/2022), PIS/COFINS Monofasico (Tabela 4.3.10), LMC (Registro 1300) ou Reforma Tributaria (LC 214/2025).
+4. **Ausencia de Ferramenta Fiscal Dedicada nos Gatilhos em 1-Clique (`web/js/aura-triggers.js`) e Composer (`web/index.html`):**
+   - O catalogo de gatilhos rapidos ainda nao possui o card `auditoria_fiscal_sefaz` e o composer nao detecta colagem de chaves de 44 digitos ou upload de arquivos `.xml`.
+
+---
+
+## A.2. ESPECIFICACAO DE EXECUCAO POR FASE
+
+### FASE 1: Backend GenUI Hydration (`core/aura_engine.py`) & Micro-Widget `FiscalShieldInspectorUI` (`web/js/aura-genui-widgets.js`)
+
+1. **Em `core/aura_engine.py` (`build_canonical_genui_envelope`):**
+   - **Para `tipo == "chave_acesso"`:**
+     - Ler `is_dv_valido = bool(decomp.get("is_dv_valido", False))` e `invalidos = [a for a in apontamentos if a.get("status") == "INVALID"]`.
+     - Popular `props["access_key_anatomy"]` com os 9 segmentos oficiais da chave de 44 digitos (`c_uf`, `uf_sigla`, `aamm`, `cnpj_emitente`, `modelo`, `serie`, `numero_nfe`, `tipo_emissao`, `codigo_numerico`, `digito_verificador`, `dv_calculado`, `is_dv_valido`).
+     - Popular `props["persona_views"]` com `{"gestor": top_apont.get("explicacao_executiva"), "contador": top_apont.get("explicacao_tecnica"), "base_legal": top_apont.get("base_legal", [])}`.
+   - **Para `tipo == "xml_documento"`:**
+     - Construir `blk_xml_status` (`alert_callout`), `blk_xml_kpis` (`kpi_grid` com Modelo, UF Origem -> Destino, Erros Impeditivos e Alertas Contabeis) e `blk_xml_apontamentos` (`ranking_list` detalhando cada violacao como `SEFAZ-REJ-960`, `SEFAZ-REJ-806`, `SPED-RISCO-BITRIBUTACAO-PISCOFINS`, `SEFAZ-I08-10`).
+     - Popular `props["persona_views"]` separando a visao executiva de pista/retaguarda e a visao contabil/SPED.
+   - **Para `tipo == "consulta_rejeicao_fiscal"`:**
+     - Extrair dinamicamente `metadados_json` do registro retornado pelo SQLite FTS5 (`base_legal`, `gravidade`, `campos_xml`) e alimentar `blk_procedimento_erp` e `props["persona_views"]` sem texto fixo engessado.
+
+2. **Em `web/js/aura-genui-widgets.js`:**
+   - Implementar suporte nativo em `GenerativeModularCardUI` (e alias `FiscalShieldInspectorUI`) para:
+     - **Switch Dupla Persona:** Botoes `[Visao Gestor & Pista]` e `[Visao Contador & SPED]` que alternam instantaneamente a exibicao entre o resumo executivo/operacional e a especificacao tecnica XML/SPED.
+     - **Barra Anatomica de 44 Digitos:** Renderizacao visual dos 9 blocos da chave de acesso quando `props.access_key_anatomy` estiver presente, destacando o DV Modulo 11 em verde esmeralda (valido) ou vermelho rosa (invalido).
+     - **Acao de Copia em 1-Clique (`copiar_diagnostico_contador`):** Copia para a area de transferencia um parecer tecnico estruturado pronto para envio ao contador via WhatsApp/E-mail.
+
+### FASE 2: Smart Fiscal Composer & Leitor Local de XML (`web/index.html` e `web/js/aura-chat.js`)
+
+1. **Pilula de Deteccao Instantanea (`#fiscal-smart-paste-pill`):**
+   - Detectar via regex no evento `input`/`paste` de `#chat-input-text` quando o usuario colar 44 digitos (`/\b\d{44}\b/`) ou tags `<infNFe`/`<nfeProc`, exibindo uma pilula interativa acima do composer para disparo imediato da auditoria.
+2. **Botao de Inspecao de Arquivo XML (`#btn-upload-fiscal-xml`):**
+   - Adicionar botao com icone `file-code-2` ao lado do botao de voz no composer que abre seletor de arquivo `.xml`, le o conteudo localmente via `FileReader` (100% offline) e submete para auditoria deterministica.
+
+### FASE 3: Central de Gatilhos em 1-Clique (`web/js/aura-triggers.js`) e Navegacao Rapida (`web/index.html`)
+
+1. **Novo Gatilho `auditoria_fiscal_sefaz` em `getToolsCatalog()` (`web/js/aura-triggers.js`):**
+   - Adicionar card na categoria `fiscal` com badge `SEFAZ / LC 192 / SPED`, permitindo executar diagnosticos de rejeicoes, ICMS Monofasico (CST 61) e PIS/COFINS (CST 04) em 1-clique.
+   - Implementar formatador visual executivo no inspetor de gatilhos para exibir cartoes estruturados em vez de JSON puro.
+2. **Atalhos no Card de Boas-Vindas e Menu Lateral (`web/index.html`):**
+   - Adicionar chip `"Escudo Fiscal & SEFAZ"` nas sugestoes executivas iniciais e no Cluster 2 do Menu Lateral.
+
+### FASE 4: Estilos Liquid Glass (`web/css/aura.css`) e Testes Automatizados (`tests/unit/test_fiscal_engine.py`)
+
+1. **Estilos em `web/css/aura.css`:**
+   - Adicionar estilos para `.fiscal-key-segment` e `.persona-switch-bar` garantindo compatibilidade total com `body.modo-pista-active` (alto contraste sob sol forte) e `body.gpu-guard-active` (60 FPS sem `backdrop-filter` pesado).
+2. **Testes Unitarios em `tests/unit/test_fiscal_engine.py`:**
+   - Validar a geracao do envelope GenUI para `chave_acesso`, `xml_documento` e `consulta_rejeicao_fiscal` e validar ausencia absoluta de travessoes Unicode (`\u2014` e `\u2013`) em todos os arquivos modificados.

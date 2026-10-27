@@ -1730,18 +1730,18 @@ GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
         "title": "Simulando elasticidade de demanda e otimizador de lote de compra...",
     },
     "auditoria_fiscal_sefaz": {
-        "component_name": "render_GenerativeModularCardUI",
-        "client_component": "GenerativeModularCardUI",
+        "component_name": "render_FiscalShieldInspectorUI",
+        "client_component": "FiscalShieldInspectorUI",
         "title": "Auditando regras fiscais, tributacao e rejeicoes SEFAZ...",
     },
     "conhecimento_fiscal": {
-        "component_name": "render_GenerativeModularCardUI",
-        "client_component": "GenerativeModularCardUI",
+        "component_name": "render_FiscalShieldInspectorUI",
+        "client_component": "FiscalShieldInspectorUI",
         "title": "Auditando regras fiscais, tributacao e rejeicoes SEFAZ...",
     },
     "fiscal_sefaz": {
-        "component_name": "render_GenerativeModularCardUI",
-        "client_component": "GenerativeModularCardUI",
+        "component_name": "render_FiscalShieldInspectorUI",
+        "client_component": "FiscalShieldInspectorUI",
         "title": "Auditando regras fiscais, tributacao e rejeicoes SEFAZ...",
     },
 }
@@ -2700,39 +2700,166 @@ def build_canonical_genui_envelope(
         props["custo_mensal_carregamento_reais"] = float(props.get("custo_mensal_carregamento_reais") or 0.0)
         props["suggested_actions"] = [a.model_dump(mode="json") if hasattr(a, "model_dump") else a for a in actions]
 
-    elif intencao in ("auditoria_fiscal_sefaz", "conhecimento_fiscal", "fiscal_sefaz"):
+    elif intencao in ("auditoria_fiscal_sefaz", "conhecimento_fiscal", "fiscal_sefaz") or comp_name in ("render_FiscalShieldInspectorUI", "FiscalShieldInspectorUI", "render_FiscalAuditUI", "FiscalAuditUI"):
         blocks = []
         tipo = resultado_bruto.get("tipo") if isinstance(resultado_bruto, dict) else ""
+        persona_views = {}
+
         if tipo == "chave_acesso":
             decomp = resultado_bruto.get("decomposicao") or {}
             apontamentos = resultado_bruto.get("apontamentos") or []
-            tem_erro = any(a.get("nivel") in ("erro", "bloqueante") for a in apontamentos)
+            is_dv_valido = bool(decomp.get("is_dv_valido", False))
+            invalidos = [a for a in apontamentos if a.get("status") == "INVALID"]
+            tem_erro = len(invalidos) > 0 or not is_dv_valido
+            top_apont = invalidos[0] if invalidos else (apontamentos[0] if apontamentos else {})
+
+            titulo_alerta = top_apont.get("titulo") or ("Chave Invalida" if tem_erro else "Chave Autentica e Valida (Modulo 11 OK)")
+            msg_alerta = top_apont.get("explicacao_executiva") or "Estrutura de 44 digitos e digito verificador conferem com o padrao SEFAZ."
+            acao_alerta = (top_apont.get("acoes_recomendadas") or ["Chave pronta para escrituracao fiscal."])[0]
+
             blocks.append({
                 "block_id": "blk_chave_status",
                 "block_type": "alert_callout",
-                "title": "Chave Invalida" if tem_erro else "Chave Sintaticamente Valida",
-                "subtitle": f"Modelo {decomp.get('modelo', '55')} - Serie {decomp.get('serie', '1')}",
+                "title": titulo_alerta,
+                "subtitle": f"{decomp.get('tipo_documento', 'NF-e')} : Serie {decomp.get('serie', '1')} : UF {decomp.get('uf_sigla', 'BR')}",
                 "alert": {
                     "severity": "critical" if tem_erro else "success",
-                    "title": f"Chave de Acesso: {decomp.get('uf_nome', 'UF')} / Mod {decomp.get('modelo', '55')}",
-                    "message": apontamentos[0].get("mensagem") if apontamentos else "Estrutura e digito verificador modulo 11 conferem rigorosamente.",
-                    "action_label": apontamentos[0].get("acao_recomendada") if apontamentos else "Chave integra e pronta para consulta ou escrituracao.",
+                    "title": titulo_alerta,
+                    "message": msg_alerta,
+                    "action_label": acao_alerta,
                 }
             })
+
+            anatomy = {
+                "c_uf": str(decomp.get("c_uf", "")),
+                "uf_sigla": str(decomp.get("uf_sigla", "")),
+                "aamm": str(decomp.get("aamm", "")),
+                "ano": str(decomp.get("ano", "")),
+                "mes": str(decomp.get("mes", "")),
+                "cnpj_emitente": str(decomp.get("cnpj_emitente", "")),
+                "modelo": str(decomp.get("modelo", "")),
+                "tipo_documento": str(decomp.get("tipo_documento", "")),
+                "serie": str(decomp.get("serie", "")),
+                "numero_nfe": str(decomp.get("numero_nfe", "")),
+                "tipo_emissao": str(decomp.get("tipo_emissao", "")),
+                "codigo_numerico": str(decomp.get("codigo_numerico", "")),
+                "digito_verificador": str(decomp.get("digito_verificador", "")),
+                "dv_calculado": str(decomp.get("dv_calculado", "")),
+                "is_dv_valido": is_dv_valido,
+            }
+            props["access_key_anatomy"] = anatomy
+
+            blocks.append({
+                "block_id": "blk_chave_anatomia",
+                "block_type": "custom_content",
+                "title": "Anatomia dos 44 Digitos da Chave SEFAZ",
+                "subtitle": "Segmentacao e Deteccao Estrutural",
+                "custom_content": f"Chave analisada: UF {decomp.get('uf_sigla', '-')} | AAMM {decomp.get('aamm', '-')} | CNPJ {decomp.get('cnpj_emitente', '-')} | Mod {decomp.get('modelo', '-')} | Serie {decomp.get('serie', '-')} | Num {decomp.get('numero_nfe', '-')} | Emissao {decomp.get('tipo_emissao', '-')} | Cod {decomp.get('codigo_numerico', '-')} | DV {decomp.get('digito_verificador', '-')} (Modulo 11: {'Valido' if is_dv_valido else 'Invalido'})",
+            })
+
             blocks.append({
                 "block_id": "blk_chave_kpis",
                 "block_type": "kpi_grid",
                 "title": "Decomposicao Estrutural da Chave",
                 "subtitle": "44 digitos SEFAZ",
                 "kpis": [
-                    {"label": "UF Emissora", "value": str(decomp.get("uf_sigla") or decomp.get("uf_ibge") or "-"), "status": "neutral"},
-                    {"label": "Modelo Documento", "value": f"Mod {decomp.get('modelo', '-')}", "status": "neutral"},
-                    {"label": "Numero NF", "value": str(decomp.get("numero_nf", "-")), "status": "neutral"},
-                    {"label": "Serie", "value": str(decomp.get("serie", "-")), "status": "neutral"},
-                    {"label": "CNPJ Emitente", "value": str(decomp.get("cnpj_formatado") or decomp.get("cnpj_emitente") or "-"), "status": "neutral"},
-                    {"label": "DV Modulo 11", "value": f"{decomp.get('dv_calculado')} (Valido)" if decomp.get("dv_valido") else "Invalido", "status": "success" if decomp.get("dv_valido") else "danger"},
+                    {"label": "UF Emissora", "value": f"{decomp.get('uf_sigla', '-')} ({decomp.get('c_uf', '-')})", "status": "neutral"},
+                    {"label": "Documento", "value": str(decomp.get("tipo_documento", "NF-e")), "status": "neutral"},
+                    {"label": "Numero / Serie", "value": f"Nº {decomp.get('numero_nfe', '-')} / Serie {decomp.get('serie', '-')}", "status": "neutral"},
+                    {"label": "CNPJ Emitente", "value": str(decomp.get("cnpj_emitente", "-")), "status": "neutral"},
+                    {"label": "Competencia", "value": f"20{decomp.get('ano', '--')}/{decomp.get('mes', '--')}", "status": "neutral"},
+                    {"label": "DV Modulo 11", "value": f"DV {decomp.get('digito_verificador')} (Calculado: {decomp.get('dv_calculado')})", "status": "success" if is_dv_valido else "danger"},
                 ]
             })
+
+            persona_views = {
+                "gestor": top_apont.get("explicacao_executiva") or "Chave integra e autentica perante o algoritmo Modulo 11 da SEFAZ.",
+                "contador": top_apont.get("explicacao_tecnica") or f"Chave de 44 digitos validada com sucesso. DV observado {decomp.get('digito_verificador')} igual ao calculado {decomp.get('dv_calculado')}.",
+                "base_legal": top_apont.get("base_legal") or ["MOC 7.0 - Calculo do Digito Verificador (Modulo 11)"],
+            }
+            props["persona_views"] = persona_views
+
+        elif tipo == "xml_documento":
+            res_xml = resultado_bruto.get("resultado") or {}
+            valido = bool(res_xml.get("valido", False))
+            erros_count = int(res_xml.get("erros_impeditivos", 0))
+            alertas_count = int(res_xml.get("alertas_fiscais", 0))
+            conformidades_count = int(res_xml.get("conformidades", 0))
+            apontamentos = res_xml.get("apontamentos") or []
+
+            invalidos = [a for a in apontamentos if a.get("status") == "INVALID"]
+            alertas = [a for a in apontamentos if a.get("status") == "WARNING"]
+            top_crit = invalidos[0] if invalidos else (alertas[0] if alertas else (apontamentos[0] if apontamentos else {}))
+
+            sev = "critical" if erros_count > 0 else ("warning" if alertas_count > 0 else "success")
+            tit_status = "Documento XML com Rejeicoes Impeditivas" if erros_count > 0 else ("XML Autorizavel com Alertas de Bitributacao/SPED" if alertas_count > 0 else "Documento XML 100% Conforme e Homologado")
+            msg_status = top_crit.get("explicacao_executiva") or "Documento XML homologado e em conformidade fiscal perante regras SEFAZ e SPED."
+            acao_status = (top_crit.get("acoes_recomendadas") or ["Documento pronto para faturamento ou escrituracao."])[0]
+
+            blocks.append({
+                "block_id": "blk_xml_status",
+                "block_type": "alert_callout",
+                "title": tit_status,
+                "subtitle": f"Modelo {res_xml.get('modelo', '55')} : Emissor {res_xml.get('emit_uf', 'SP')} -> Destino {res_xml.get('dest_uf', 'SP')}",
+                "alert": {
+                    "severity": sev,
+                    "title": tit_status,
+                    "message": msg_status,
+                    "action_label": acao_status,
+                }
+            })
+
+            blocks.append({
+                "block_id": "blk_xml_kpis",
+                "block_type": "kpi_grid",
+                "title": "Resumo da Auditoria XML",
+                "subtitle": "SEFAZ MOC 7.0 + SPED",
+                "kpis": [
+                    {"label": "Modelo Documento", "value": f"Mod {res_xml.get('modelo', '55')}", "status": "neutral"},
+                    {"label": "Rota Fiscal", "value": f"{res_xml.get('emit_uf', 'SP')} -> {res_xml.get('dest_uf', 'SP')}", "status": "neutral"},
+                    {"label": "Erros Impeditivos", "value": str(erros_count), "status": "danger" if erros_count > 0 else "success"},
+                    {"label": "Alertas Fiscais", "value": str(alertas_count), "status": "warning" if alertas_count > 0 else "success"},
+                ]
+            })
+
+            if apontamentos:
+                items_ranking = []
+                for idx, a in enumerate(apontamentos[:6]):
+                    st_label = "[REJEICAO]" if a.get("status") == "INVALID" else ("[ALERTA]" if a.get("status") == "WARNING" else "[CONFORME]")
+                    items_ranking.append({
+                        "rank": idx + 1,
+                        "title": f"{st_label} {a.get('titulo', 'Regra Fiscal')}",
+                        "subtitle": f"Regra: {a.get('regra_id', 'SEFAZ')} | Gravidade: {a.get('gravidade', 'INFO')}",
+                        "value": str(a.get("status", "INFO")),
+                        "tag": a.get("regra_id", "SEFAZ"),
+                    })
+                blocks.append({
+                    "block_id": "blk_xml_apontamentos",
+                    "block_type": "ranking_list",
+                    "title": "Apontamentos Fiscais Identificados",
+                    "subtitle": f"{len(apontamentos)} regras avaliadas",
+                    "ranking_items": items_ranking,
+                })
+
+            textos_gestor = []
+            textos_contador = []
+            bases_legais = []
+            for a in apontamentos:
+                if a.get("explicacao_executiva"):
+                    textos_gestor.append(f"• [{a.get('regra_id')}]: {a.get('explicacao_executiva')}")
+                if a.get("explicacao_tecnica"):
+                    textos_contador.append(f"• [{a.get('regra_id')}]: {a.get('explicacao_tecnica')}")
+                for bl in (a.get("base_legal") or []):
+                    if bl not in bases_legais:
+                        bases_legais.append(bl)
+
+            persona_views = {
+                "gestor": "\n".join(textos_gestor) if textos_gestor else "Nenhuma rejeicao ou inconformidade encontrada no documento.",
+                "contador": "\n".join(textos_contador) if textos_contador else "Documento validado com sucesso perante regras estruturais e de negocio.",
+                "base_legal": bases_legais if bases_legais else ["MOC 7.0", "NT SEFAZ"],
+            }
+            props["persona_views"] = persona_views
+
         elif tipo == "consulta_rejeicao_fiscal":
             resultados = resultado_bruto.get("resultados") or []
             top_res = resultados[0] if resultados else {}
@@ -2740,6 +2867,23 @@ def build_canonical_genui_envelope(
             tit = top_res.get("titulo") or "Regra Fiscal SEFAZ"
             impacto = top_res.get("impacto_financeiro") or "Faturamento ou emissao de documento fiscal afetado."
             acao = top_res.get("acao_recomendada") or "Verifique o cadastro e a tributacao na retaguarda."
+
+            meta_raw = top_res.get("metadados_json") or {}
+            meta = {}
+            if isinstance(meta_raw, dict):
+                meta = meta_raw
+            elif isinstance(meta_raw, str) and meta_raw.strip():
+                try:
+                    import json
+                    meta = json.loads(meta_raw)
+                except Exception:
+                    meta = {}
+
+            base_legal_val = meta.get("base_legal") or "MOC 7.0 / Normativa SEFAZ & SPED"
+            campos_xml_list = meta.get("campos_xml") or []
+            campos_xml_str = ", ".join(campos_xml_list) if isinstance(campos_xml_list, list) else str(campos_xml_list or "")
+            gravidade_val = meta.get("gravidade") or "ALTA"
+
             blocks.append({
                 "block_id": "blk_rejeicao_alerta",
                 "block_type": "alert_callout",
@@ -2765,13 +2909,22 @@ def build_canonical_genui_envelope(
                 ]
             })
             if top_res.get("conteudo_completo") or acao:
+                procedimento_text = f"Acao imediata no webPosto: {acao}\n\nBase Legal: {base_legal_val}\nRegistros / Tags afetadas: {campos_xml_str or top_res.get('tabelas_banco', 'Documento Fiscal')}"
                 blocks.append({
                     "block_id": "blk_procedimento_erp",
                     "block_type": "custom_content",
                     "title": "Procedimento de Liberacao na Retaguarda (webPosto)",
                     "subtitle": "Passo a passo operacional",
-                    "custom_content": f"Acao imediata: {acao}\n\nNota Contabil / SPED: Escrituracao adequada do documento referenciado (Registro C113 do SPED Fiscal ICMS/IPI) e verificacao de regras da UF de destino.",
+                    "custom_content": procedimento_text,
                 })
+
+            persona_views = {
+                "gestor": f"{top_res.get('resumo_executivo', '')}\n\nImpacto Financeiro: {impacto}\n\nAcao recomendada no webPosto: {acao}",
+                "contador": f"{top_res.get('conteudo_completo', '')}\n\nBase Legal: {base_legal_val}\nTags/Campos Afetados: {campos_xml_str or top_res.get('tabelas_banco', '')}",
+                "base_legal": [base_legal_val],
+            }
+            props["persona_views"] = persona_views
+
         else:
             blocks = props.get("blocks") or []
 
@@ -3413,6 +3566,15 @@ class AuraEngine:
                 st = get_partner_staging_store()
                 st_id = p.get("station_id") or p.get("filial_id") or self.filial_id or "default"
                 return generate_morning_briefing_payload(station_id=st_id, staging_store=st)
+
+            elif norm_name in (
+                "auditoria_fiscal_sefaz", "conhecimento_fiscal", "fiscal_sefaz",
+                "auditoria_sefaz", "escudo_fiscal", "auditar_documento_ou_chave_fiscal"
+            ):
+                query_txt = (p.get("chave_ou_xml") or p.get("query") or p.get("termo") or p.get("pergunta") or "").strip()
+                if not query_txt:
+                    query_txt = "Quais as regras de ICMS Monofasico CST 61, PIS/COFINS CST 04 na conveniencia e principais rejeicoes SEFAZ?"
+                return self.tools.auditar_documento_ou_chave_fiscal(query_txt)
 
             else:
                 raise ValueError(f"Ferramenta desconhecida ou não suportada: '{tool_name}'")

@@ -11,6 +11,7 @@ Regra inegociavel: ZERO travessoes em todo o arquivo.
 """
 
 from __future__ import annotations
+import uuid
 
 import sqlite3
 from decimal import Decimal
@@ -608,3 +609,189 @@ def test_fts5_pesquisa_regras_enriquecidas_sefaz_sped():
         assert len(res) > 0, f"Nenhum resultado para termo: {termo}"
         codigos = [r["codigo_ref"] for r in res]
         assert any(ref_esperada in cod for cod in codigos), f"Esperava {ref_esperada} em {codigos} para termo {termo}"
+
+
+
+# =============================================================================
+# TESTES DE INTEGRACAO GENUI & HIGIENE FISCAL (FASE 4)
+# =============================================================================
+
+def test_genui_envelope_chave_acesso():
+    """Valida geracao do envelope GenUI para chave_acesso com anatomia e dupla persona."""
+    from core.aura_engine import build_canonical_genui_envelope
+    from core.fiscal_engine import decompor_chave_acesso, validar_chave_acesso
+
+    chave_exemplo = "35260100000000000191550010000001231000001231"
+    decomp = decompor_chave_acesso(chave_exemplo)
+    findings = validar_chave_acesso(chave_exemplo)
+
+    resultado_bruto = {
+        "tipo": "chave_acesso",
+        "decomposicao": decomp,
+        "apontamentos": [f.model_dump() for f in findings],
+        "status": "sucesso",
+    }
+
+    envelope = build_canonical_genui_envelope(
+        intencao="auditoria_fiscal_sefaz",
+        tool_call_id=f"call_{uuid.uuid4()}",
+        resultado_bruto=resultado_bruto,
+        executive_summary="Chave validada com sucesso pelo algoritmo Modulo 11.",
+    )
+
+    assert envelope is not None
+    assert envelope.component_name == "render_FiscalShieldInspectorUI"
+    props = envelope.props
+
+    # Validar presenca da anatomia dos 44 digitos
+    assert "access_key_anatomy" in props
+    anatomy = props["access_key_anatomy"]
+    assert anatomy["c_uf"] == "35"
+    assert anatomy["uf_sigla"] == "SP"
+    assert anatomy["numero_nfe"] == "000000123"
+    assert anatomy["is_dv_valido"] is True
+
+    # Validar dupla persona
+    assert "persona_views" in props
+    assert "gestor" in props["persona_views"]
+    assert "contador" in props["persona_views"]
+    assert "base_legal" in props["persona_views"]
+
+    # Validar blocos canônicos
+    blocks = props.get("blocks", [])
+    block_ids = [b.get("block_id") for b in blocks]
+    assert "blk_chave_status" in block_ids
+    assert "blk_chave_anatomia" in block_ids
+    assert "blk_chave_kpis" in block_ids
+
+    # Validar acao de copiar laudo
+    actions = props.get("suggested_actions", [])
+    assert any(a.get("payload", {}).get("intent") == "copiar_diagnostico_contador" for a in actions)
+
+
+def test_genui_envelope_xml_documento():
+    """Valida geracao do envelope GenUI para xml_documento com blocos e apontamentos."""
+    from core.aura_engine import build_canonical_genui_envelope
+
+    resultado_mock = {
+        "valido": False,
+        "total_apontamentos": 2,
+        "erros_impeditivos": 1,
+        "alertas_fiscais": 1,
+        "conformidades": 0,
+        "chave_acesso": "35260100000000000191550010000001231000001231",
+        "modelo": "55",
+        "emit_uf": "SP",
+        "dest_uf": "MG",
+        "apontamentos": [
+            {
+                "status": "INVALID",
+                "gravidade": "CRITICAL",
+                "regra_id": "SEFAZ-REJ-960",
+                "titulo": "Rejeicao 960: Combustivel Monofasico sem CST 61",
+                "explicacao_executiva": "Gasolina comum emitida com CST diferente de 61.",
+                "explicacao_tecnica": "Violacao da Regra N12-20 e LC 192/2022.",
+                "base_legal": ["Convenio ICMS 199/2022", "LC 192/2022"],
+                "acoes_recomendadas": ["Ajustar cadastro para CST 61."],
+            },
+            {
+                "status": "WARNING",
+                "gravidade": "MEDIUM",
+                "regra_id": "SPED-RISCO-BITRIBUTACAO-PISCOFINS",
+                "titulo": "Risco de Bitributacao PIS/COFINS",
+                "explicacao_executiva": "Bebida fria sem CST 04.",
+                "explicacao_tecnica": "Tabela 4.3.10 EFD-Contribuicoes exige CST 04.",
+                "base_legal": ["Lei 13.097/2015"],
+                "acoes_recomendadas": ["Ajustar CST PIS/COFINS para 04."],
+            },
+        ],
+    }
+
+    envelope = build_canonical_genui_envelope(
+        intencao="auditoria_fiscal_sefaz",
+        tool_call_id=f"call_{uuid.uuid4()}",
+        resultado_bruto={"tipo": "xml_documento", "resultado": resultado_mock, "status": "sucesso"},
+        executive_summary="Auditoria de XML identificou 1 erro impeditivo e 1 alerta fiscal.",
+    )
+
+    assert envelope is not None
+    assert envelope.component_name == "render_FiscalShieldInspectorUI"
+    props = envelope.props
+
+    # Validar blocos
+    blocks = props.get("blocks", [])
+    assert len(blocks) >= 3
+    block_ids = [b.get("block_id") for b in blocks]
+    assert "blk_xml_status" in block_ids
+    assert "blk_xml_kpis" in block_ids
+    assert "blk_xml_apontamentos" in block_ids
+
+    # Validar persona views
+    assert "persona_views" in props
+    assert "SEFAZ-REJ-960" in props["persona_views"]["gestor"]
+    assert "Convenio ICMS 199/2022" in props["persona_views"]["base_legal"]
+
+
+def test_genui_envelope_consulta_rejeicao_dinamica():
+    """Valida extracao dinamica de base legal e metadados no envelope de consulta de rejeicao."""
+    from core.aura_engine import build_canonical_genui_envelope
+
+    resultado_mock = [
+        {
+            "codigo_ref": "SEFAZ-REJ-960",
+            "titulo": "Rejeicao 960: Combustivel monofasico sem CST 61",
+            "modulo": "Faturamento / Combustiveis",
+            "resumo_executivo": "Bloqueio de autorizacao por uso de CST incorreto em combustivel sujeito a monofasia.",
+            "conteudo_completo": "Regra N12-20 do MOC 7.0 vinculada a LC 192/2022.",
+            "impacto_financeiro": "Caminhao parado na pista sem poder emitir NF-e.",
+            "acao_recomendada": "Alterar cadastro do produto para CST 61 no webPosto.",
+            "tabelas_banco": "PRODUTOS, FISCAL_PARAMETROS",
+            "metadados_json": {
+                "base_legal": "LC 192/2022 e Convenio ICMS 199/2022",
+                "campos_xml": ["det/imposto/ICMS/ICMS61/CST", "det/imposto/ICMS/ICMS61/qBCMono"],
+                "gravidade": "CRITICAL",
+            },
+        }
+    ]
+
+    envelope = build_canonical_genui_envelope(
+        intencao="auditoria_fiscal_sefaz",
+        tool_call_id=f"call_{uuid.uuid4()}",
+        resultado_bruto={"tipo": "consulta_rejeicao_fiscal", "resultados": resultado_mock, "status": "sucesso"},
+        executive_summary="Diagnostico da Rejeicao 960 obtido via base RAG.",
+    )
+
+    assert envelope is not None
+    props = envelope.props
+
+    # Validar que a base legal e dinamica e nao texto fixo
+    assert "LC 192/2022 e Convenio ICMS 199/2022" in props["persona_views"]["base_legal"]
+    blocks = props.get("blocks", [])
+    procedimento_block = next((b for b in blocks if b.get("block_id") == "blk_procedimento_erp"), None)
+    assert procedimento_block is not None
+    assert "LC 192/2022" in procedimento_block.get("custom_content", "")
+
+
+def test_ausencia_absoluta_travessoes_arquivos_gui_fiscal():
+    """Garante ausencia estrita de travessoes Unicode (\u2014 e \u2013) em todos os arquivos tocados."""
+    import os
+
+    # Caminho base do repositorio
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+    arquivos_alvo = [
+        os.path.join(base_dir, "core", "aura_engine.py"),
+        os.path.join(base_dir, "web", "js", "aura-genui-widgets.js"),
+        os.path.join(base_dir, "web", "js", "aura-chat.js"),
+        os.path.join(base_dir, "web", "js", "aura-triggers.js"),
+        os.path.join(base_dir, "web", "index.html"),
+        os.path.join(base_dir, "web", "css", "aura.css"),
+        os.path.join(base_dir, "tests", "unit", "test_fiscal_engine.py"),
+    ]
+
+    for caminho in arquivos_alvo:
+        assert os.path.exists(caminho), f"Arquivo nao encontrado: {caminho}"
+        with open(caminho, "r", encoding="utf-8") as f:
+            conteudo = f.read()
+        assert "\u2014" not in conteudo, f"Em-dash detectado em {caminho}"
+        assert "\u2013" not in conteudo, f"En-dash detectado em {caminho}"

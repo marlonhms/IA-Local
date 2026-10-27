@@ -151,6 +151,17 @@ class AuraTriggersController {
         defaultParams: { termo: 'combustivel', top_k: 5 },
       },
       {
+        id: 'auditoria_fiscal_sefaz',
+        aliases: ['conhecimento_fiscal', 'fiscal_sefaz', 'auditoria_sefaz', 'escudo_fiscal'],
+        name: 'Escudo Fiscal SEFAZ & Tributação Monofásica',
+        category: 'fiscal',
+        icon: 'shield-check',
+        color: 'cyan',
+        badge: 'SEFAZ / LC 192 / SPED',
+        desc: 'Auditoria determinística de chaves de 44 dígitos, XML, Rejeições SEFAZ (375, 629, 806, 958, 960), ICMS Monofásico (CST 61) e PIS/COFINS Conveniência (CST 04).',
+        defaultParams: { query: 'Quais as regras de ICMS Monofasico CST 61, PIS/COFINS CST 04 na conveniencia e principais rejeicoes SEFAZ?' },
+      },
+      {
         id: 'vendas_analitico',
         name: 'Vendas & Faturamento ERP',
         category: 'fiscal',
@@ -1510,6 +1521,180 @@ class AuraTriggersController {
               <span>↗</span>
             </a>
           </div>
+        </div>
+      `;
+    }
+
+    // FASE 3: Formatador Executivo de Auditoria Fiscal & Regras SEFAZ
+    if (toolId === 'auditoria_fiscal_sefaz' || toolId === 'conhecimento_fiscal' || toolId === 'fiscal_sefaz' || toolId === 'auditoria_sefaz' || toolId === 'escudo_fiscal') {
+      const tipo = data.tipo || (data.decomposicao ? 'chave_acesso' : (data.resultado ? 'xml_documento' : 'consulta_rejeicao_fiscal'));
+      const queryTerm = data.termo || '';
+
+      const searchBarHtml = `
+        <div class="p-3.5 rounded-xl bg-slate-900/80 border border-cyan-500/30 mb-3.5 space-y-2">
+          <div class="text-xs font-semibold text-cyan-300 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <span>🔍</span>
+              <span>Auditoria Imediata de Rejeições, Chaves ou XML</span>
+            </span>
+            <span class="text-[10px] font-mono text-slate-400">Motor Determinístico SEFAZ</span>
+          </div>
+          <div class="flex gap-2">
+            <input type="text" 
+                   id="fiscal-inspector-query-input" 
+                   value="${this.escapeHtml(queryTerm)}"
+                   placeholder="Ex: 960, 375, 806, CST 61, ou cole 44 dígitos..." 
+                   class="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-white/10 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-mono" />
+            <button type="button" 
+                    class="px-3.5 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-semibold cursor-pointer transition-colors"
+                    onclick="const val = document.getElementById('fiscal-inspector-query-input')?.value; if(val){ window.auraTriggers.executeTrigger('auditoria_fiscal_sefaz', { query: val }); }">
+              Auditar
+            </button>
+          </div>
+        </div>
+      `;
+
+      if (tipo === 'chave_acesso') {
+        const decomp = data.decomposicao || {};
+        const apontamentos = Array.isArray(data.apontamentos) ? data.apontamentos : [];
+        const isDvValido = Boolean(decomp.is_dv_valido);
+
+        return `
+          <div class="space-y-4 font-sans text-xs">
+            ${searchBarHtml}
+            <div class="p-4 rounded-xl bg-slate-900/90 border ${isDvValido ? 'border-emerald-500/40' : 'border-rose-500/40'} space-y-3">
+              <div class="flex items-center justify-between border-b border-white/5 pb-2.5">
+                <div>
+                  <div class="text-[10px] font-mono text-cyan-400 uppercase font-semibold">Auditoria de Chave SEFAZ</div>
+                  <h4 class="text-sm font-bold text-white">${this.escapeHtml(decomp.tipo_documento || 'NF-e')} - Série ${this.escapeHtml(decomp.serie || '1')}</h4>
+                </div>
+                <span class="px-2.5 py-1 rounded-full text-[11px] font-bold border ${isDvValido ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border-rose-500/40'}">
+                  ${isDvValido ? '✓ Módulo 11 Válido' : '❌ Falha de Módulo 11'}
+                </span>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div class="p-2 rounded-lg bg-slate-950 border border-white/5 font-mono">
+                  <div class="text-[10px] text-slate-400">UF Emissora</div>
+                  <div class="font-bold text-slate-100">${this.escapeHtml(decomp.uf_sigla || '-')} (${this.escapeHtml(decomp.c_uf || '-')})</div>
+                </div>
+                <div class="p-2 rounded-lg bg-slate-950 border border-white/5 font-mono">
+                  <div class="text-[10px] text-slate-400">Número da Nota</div>
+                  <div class="font-bold text-cyan-300">Nº ${this.escapeHtml(decomp.numero_nfe || '-')}</div>
+                </div>
+                <div class="p-2 rounded-lg bg-slate-950 border border-white/5 font-mono">
+                  <div class="text-[10px] text-slate-400">Competência</div>
+                  <div class="font-bold text-slate-100">20${this.escapeHtml(decomp.ano || '--')}/${this.escapeHtml(decomp.mes || '--')}</div>
+                </div>
+                <div class="p-2 rounded-lg bg-slate-950 border border-white/5 font-mono">
+                  <div class="text-[10px] text-slate-400">Dígito Verificador</div>
+                  <div class="font-bold ${isDvValido ? 'text-emerald-400' : 'text-rose-400'}">DV ${this.escapeHtml(decomp.digito_verificador || '-')}</div>
+                </div>
+              </div>
+              <div class="space-y-2 pt-1">
+                ${apontamentos.map(a => `
+                  <div class="p-3 rounded-lg bg-slate-950/70 border border-white/5 space-y-1">
+                    <div class="font-semibold text-slate-200 flex items-center gap-1.5">
+                      <span>${a.status === 'VALID' ? '✅' : '🚨'}</span>
+                      <span>${this.escapeHtml(a.titulo || 'Regra')}</span>
+                    </div>
+                    <p class="text-[11px] text-slate-300 leading-relaxed">${this.escapeHtml(a.explicacao_executiva || '')}</p>
+                    ${a.explicacao_tecnica ? `<div class="text-[10px] font-mono text-cyan-300/80 pt-1">Técnico: ${this.escapeHtml(a.explicacao_tecnica)}</div>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      if (tipo === 'xml_documento') {
+        const resXml = data.resultado || {};
+        const apontamentos = Array.isArray(resXml.apontamentos) ? resXml.apontamentos : [];
+        const errosCount = Number(resXml.erros_impeditivos || 0);
+        const alertasCount = Number(resXml.alertas_fiscais || 0);
+
+        return `
+          <div class="space-y-4 font-sans text-xs">
+            ${searchBarHtml}
+            <div class="p-4 rounded-xl bg-slate-900/90 border ${errosCount > 0 ? 'border-rose-500/40' : 'border-emerald-500/40'} space-y-3">
+              <div class="flex items-center justify-between border-b border-white/5 pb-2.5">
+                <div>
+                  <div class="text-[10px] font-mono text-cyan-400 uppercase font-semibold">Auditoria de XML Fiscal</div>
+                  <h4 class="text-sm font-bold text-white">Modelo ${this.escapeHtml(resXml.modelo || '55')} (${this.escapeHtml(resXml.emit_uf || 'SP')} &rarr; ${this.escapeHtml(resXml.dest_uf || 'SP')})</h4>
+                </div>
+                <div class="flex gap-2">
+                  <span class="px-2.5 py-1 rounded-full text-[10px] font-bold border ${errosCount > 0 ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'}">
+                    ${errosCount} Bloqueio(s)
+                  </span>
+                  <span class="px-2.5 py-1 rounded-full text-[10px] font-bold border ${alertasCount > 0 ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-slate-800 text-slate-300 border-white/10'}">
+                    ${alertasCount} Alerta(s)
+                  </span>
+                </div>
+              </div>
+              <div class="space-y-2">
+                ${apontamentos.map(a => `
+                  <div class="p-3 rounded-lg bg-slate-950/70 border border-white/5 space-y-1">
+                    <div class="flex items-center justify-between">
+                      <span class="font-semibold text-slate-200 flex items-center gap-1.5">
+                        <span>${a.status === 'INVALID' ? '🚨' : (a.status === 'WARNING' ? '⚠️' : '✅')}</span>
+                        <span>${this.escapeHtml(a.titulo || 'Regra')}</span>
+                      </span>
+                      <span class="text-[10px] font-mono text-cyan-400">${this.escapeHtml(a.regra_id || '')}</span>
+                    </div>
+                    <p class="text-[11px] text-slate-300 leading-relaxed">${this.escapeHtml(a.explicacao_executiva || '')}</p>
+                    ${a.explicacao_tecnica ? `<div class="text-[10px] font-mono text-cyan-300/80 pt-1">MOC/SPED: ${this.escapeHtml(a.explicacao_tecnica)}</div>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // Caso tipo === 'consulta_rejeicao_fiscal'
+      const resultados = Array.isArray(data.resultados) ? data.resultados : [];
+      return `
+        <div class="space-y-4 font-sans text-xs">
+          ${searchBarHtml}
+          ${resultados.length === 0 ? `
+            <div class="p-4 rounded-xl bg-slate-900/60 border border-white/5 text-center text-slate-400">
+              Nenhuma regra fiscal encontrada para a consulta. Tente informar o código de rejeição (ex: 960, 375, 806) ou termo como CST 61.
+            </div>
+          ` : `
+            <div class="space-y-3">
+              ${resultados.map(r => `
+                <div class="p-4 rounded-xl bg-slate-900/90 border border-cyan-500/20 hover:border-cyan-500/40 transition-colors space-y-2.5">
+                  <div class="flex items-center justify-between border-b border-white/5 pb-2">
+                    <div class="flex items-center gap-2">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                        ${this.escapeHtml(r.codigo_ref || 'SEFAZ')}
+                      </span>
+                      <h4 class="font-bold text-slate-100 text-xs sm:text-sm">${this.escapeHtml(r.titulo || 'Regra SEFAZ')}</h4>
+                    </div>
+                    <span class="text-[10px] font-mono text-slate-400">${this.escapeHtml(r.modulo || 'Faturamento')}</span>
+                  </div>
+                  <p class="text-xs text-slate-300 leading-relaxed">${this.escapeHtml(r.resumo_executivo || r.conteudo_completo || '')}</p>
+                  ${r.impacto_financeiro ? `
+                    <div class="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-200">
+                      <strong>Impacto Financeiro:</strong> ${this.escapeHtml(r.impacto_financeiro)}
+                    </div>
+                  ` : ''}
+                  ${r.acao_recomendada ? `
+                    <div class="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-200">
+                      <strong>Ação Recomendada webPosto:</strong> ${this.escapeHtml(r.acao_recomendada)}
+                    </div>
+                  ` : ''}
+                  <div class="pt-2 flex flex-wrap gap-2">
+                    <button type="button" 
+                            class="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-[11px] font-semibold border border-cyan-500/30 transition-colors cursor-pointer"
+                            onclick="if(window.auraChat){ window.auraChat.sendUserPrompt('Como corrigir a rejeicao ${this.escapeHtml(r.codigo_ref || '')} no webPosto?'); }">
+                      Perguntar à AURA no Chat &rarr;
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `}
         </div>
       `;
     }
