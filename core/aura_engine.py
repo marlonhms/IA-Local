@@ -1418,6 +1418,9 @@ CANONICAL_EXECUTIVE_TITLES: Dict[str, str] = {
     "sre_metricas": "Diagnóstico Operacional SRE",
     "ajuda_sistema": "Guia da Plataforma AURA",
     "conhecimento_aura": "Guia & Conhecimento AURA",
+    "auditoria_fiscal_sefaz": "Auditoria Fiscal & Regras SEFAZ",
+    "conhecimento_fiscal": "Auditoria Fiscal & Regras SEFAZ",
+    "fiscal_sefaz": "Auditoria Fiscal & Regras SEFAZ",
 }
 
 GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
@@ -1725,6 +1728,21 @@ GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
         "component_name": "render_ElasticityBatchSimulatorUI",
         "client_component": "ElasticityBatchSimulatorUI",
         "title": "Simulando elasticidade de demanda e otimizador de lote de compra...",
+    },
+    "auditoria_fiscal_sefaz": {
+        "component_name": "render_GenerativeModularCardUI",
+        "client_component": "GenerativeModularCardUI",
+        "title": "Auditando regras fiscais, tributacao e rejeicoes SEFAZ...",
+    },
+    "conhecimento_fiscal": {
+        "component_name": "render_GenerativeModularCardUI",
+        "client_component": "GenerativeModularCardUI",
+        "title": "Auditando regras fiscais, tributacao e rejeicoes SEFAZ...",
+    },
+    "fiscal_sefaz": {
+        "component_name": "render_GenerativeModularCardUI",
+        "client_component": "GenerativeModularCardUI",
+        "title": "Auditando regras fiscais, tributacao e rejeicoes SEFAZ...",
     },
 }
 
@@ -2682,6 +2700,112 @@ def build_canonical_genui_envelope(
         props["custo_mensal_carregamento_reais"] = float(props.get("custo_mensal_carregamento_reais") or 0.0)
         props["suggested_actions"] = [a.model_dump(mode="json") if hasattr(a, "model_dump") else a for a in actions]
 
+    elif intencao in ("auditoria_fiscal_sefaz", "conhecimento_fiscal", "fiscal_sefaz"):
+        blocks = []
+        tipo = resultado_bruto.get("tipo") if isinstance(resultado_bruto, dict) else ""
+        if tipo == "chave_acesso":
+            decomp = resultado_bruto.get("decomposicao") or {}
+            apontamentos = resultado_bruto.get("apontamentos") or []
+            tem_erro = any(a.get("nivel") in ("erro", "bloqueante") for a in apontamentos)
+            blocks.append({
+                "block_id": "blk_chave_status",
+                "block_type": "alert_callout",
+                "title": "Chave Invalida" if tem_erro else "Chave Sintaticamente Valida",
+                "subtitle": f"Modelo {decomp.get('modelo', '55')} - Serie {decomp.get('serie', '1')}",
+                "alert": {
+                    "severity": "critical" if tem_erro else "success",
+                    "title": f"Chave de Acesso: {decomp.get('uf_nome', 'UF')} / Mod {decomp.get('modelo', '55')}",
+                    "message": apontamentos[0].get("mensagem") if apontamentos else "Estrutura e digito verificador modulo 11 conferem rigorosamente.",
+                    "action_label": apontamentos[0].get("acao_recomendada") if apontamentos else "Chave integra e pronta para consulta ou escrituracao.",
+                }
+            })
+            blocks.append({
+                "block_id": "blk_chave_kpis",
+                "block_type": "kpi_grid",
+                "title": "Decomposicao Estrutural da Chave",
+                "subtitle": "44 digitos SEFAZ",
+                "kpis": [
+                    {"label": "UF Emissora", "value": str(decomp.get("uf_sigla") or decomp.get("uf_ibge") or "-"), "status": "neutral"},
+                    {"label": "Modelo Documento", "value": f"Mod {decomp.get('modelo', '-')}", "status": "neutral"},
+                    {"label": "Numero NF", "value": str(decomp.get("numero_nf", "-")), "status": "neutral"},
+                    {"label": "Serie", "value": str(decomp.get("serie", "-")), "status": "neutral"},
+                    {"label": "CNPJ Emitente", "value": str(decomp.get("cnpj_formatado") or decomp.get("cnpj_emitente") or "-"), "status": "neutral"},
+                    {"label": "DV Modulo 11", "value": f"{decomp.get('dv_calculado')} (Valido)" if decomp.get("dv_valido") else "Invalido", "status": "success" if decomp.get("dv_valido") else "danger"},
+                ]
+            })
+        elif tipo == "consulta_rejeicao_fiscal":
+            resultados = resultado_bruto.get("resultados") or []
+            top_res = resultados[0] if resultados else {}
+            cod_ref = top_res.get("codigo_ref") or "SEFAZ"
+            tit = top_res.get("titulo") or "Regra Fiscal SEFAZ"
+            impacto = top_res.get("impacto_financeiro") or "Faturamento ou emissao de documento fiscal afetado."
+            acao = top_res.get("acao_recomendada") or "Verifique o cadastro e a tributacao na retaguarda."
+            blocks.append({
+                "block_id": "blk_rejeicao_alerta",
+                "block_type": "alert_callout",
+                "title": f"{cod_ref}: Diagnostico de Bloqueio SEFAZ",
+                "subtitle": top_res.get("modulo") or "Faturamento e NF-e",
+                "alert": {
+                    "severity": "critical",
+                    "title": tit,
+                    "message": f"Impacto na Operacao: {impacto}",
+                    "action_label": f"Solucao webPosto: {acao}",
+                }
+            })
+            blocks.append({
+                "block_id": "blk_rejeicao_kpis",
+                "block_type": "kpi_grid",
+                "title": "Parametros do Bloqueio SEFAZ",
+                "subtitle": "MOC 7.0 / NT SEFAZ",
+                "kpis": [
+                    {"label": "Codigo SEFAZ", "value": str(cod_ref).replace("SEFAZ-REJ-", ""), "status": "danger"},
+                    {"label": "Modulo Afetado", "value": str(top_res.get("modulo") or "Faturamento").split("/")[0].strip(), "status": "warning"},
+                    {"label": "Impacto", "value": "Faturamento Travado", "status": "danger"},
+                    {"label": "Versao ERP", "value": "webPosto 26.9+", "status": "success"},
+                ]
+            })
+            if top_res.get("conteudo_completo") or acao:
+                blocks.append({
+                    "block_id": "blk_procedimento_erp",
+                    "block_type": "custom_content",
+                    "title": "Procedimento de Liberacao na Retaguarda (webPosto)",
+                    "subtitle": "Passo a passo operacional",
+                    "custom_content": f"Acao imediata: {acao}\n\nNota Contabil / SPED: Escrituracao adequada do documento referenciado (Registro C113 do SPED Fiscal ICMS/IPI) e verificacao de regras da UF de destino.",
+                })
+        else:
+            blocks = props.get("blocks") or []
+
+        if not actions:
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="📋 Copiar Diagnostico para o Contador",
+                    action_type="inspection",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"intent": "copiar_diagnostico_contador", "origem": "auditoria_fiscal_sefaz"},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="📄 Consultar Modulo Faturamento",
+                    action_type="inspection",
+                    variant="secondary",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"intent": "ajuda_sistema", "modulo": "faturamento"},
+                )
+            )
+
+        props["title"] = "Diagnostico Fiscal & Regras SEFAZ"
+        props["subtitle"] = "Auditoria Deterministica MOC 7.0 + webPosto RAG"
+        props["confidence_score"] = float(props.get("confidence_score") or 0.99)
+        props["diagnosis"] = props.get("diagnosis") or executive_summary or "Auditoria de rejeicao SEFAZ e procedimento de desbloqueio webPosto processados com sucesso."
+        props["blocks"] = blocks
+        props["suggested_actions"] = [a.model_dump(mode="json") if hasattr(a, "model_dump") else a for a in actions]
+
     elif comp_name == "render_GenerativeModularCardUI" or intencao in (
         "diagnostico_modular", "generative_modular_card", "modular_lego_card"
     ):
@@ -3428,6 +3552,13 @@ class AuraEngine:
                         f"Ação UI: {json.dumps(art.get('ui_action', {}), ensure_ascii=False)}\n"
                         f"Tags: {', '.join(art.get('tags', []) or [])}\n\n"
                     )
+
+            elif intencao in ("auditoria_fiscal_sefaz", "conhecimento_fiscal", "fiscal_sefaz"):
+                resultado_bruto = self.tools.auditar_documento_ou_chave_fiscal(pergunta)
+                contexto_extra = (
+                    "Auditoria Fiscal e Diagnostico Especialista SEFAZ (Agent Sefaz + webPosto RAG):\n"
+                    f"{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+                )
 
             elif intencao in ("cenario_preditivo", "simulacao_preditiva"):
                 params_sim = extrair_parametros_simulacao(pergunta)

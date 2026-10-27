@@ -67,6 +67,80 @@ Pergunta do Usuario:
 """
 
 
+def build_fiscal_audit_prompt(
+    pergunta_sanitizada: str,
+    contexto_sanitizado: str,
+    historico_formatado: str,
+    dados_filial: dict[str, Any] | None = None,
+    genui_active: bool = False,
+) -> str:
+    """Constroi o prompt especializado para auditoria fiscal, rejeicoes SEFAZ e conformidade tributaria de postos."""
+    filial = dados_filial or {}
+    empresa_id = filial.get("idempresa") or "00001"
+    nome_fantasia = filial.get("nome") or "POSTO PILOTO MODELO"
+    razao_social = filial.get("razao_social") or "POSTO PILOTO MODELO LTDA"
+    cnpj = filial.get("cnpj") or "00.000.000/0001-00"
+
+    if genui_active:
+        intelligent_ui_block = """
+Simbiose com a Intelligent UI (Companion Canvas):
+- Esta consulta possui um card modular rico (GenerativeModularCardUI) projetado no Companion Canvas ao lado do chat.
+- Seu texto no chat deve ser um BRIEFING EXECUTIVO DIRETO E CIRURGICO (2 a 4 frases):
+  1. Diagnostico do Bloqueio: Explique com clareza a rejeicao SEFAZ ou erro fiscal e o impacto imediato no faturamento.
+  2. Resolucao no webPosto: Diga exatamente onde e o que o operador deve ajustar na retaguarda.
+  3. Direcionamento para a Intelligent UI: Avise o gestor que o card lateral traz os parametros completos da regra e o botao para copiar o parecer direto para o contador.
+- REGRA CRITICA: NAO reproduza XMLs extensos no chat. Mantenha o foco em destravar o faturamento e a operacao da pista.
+"""
+    else:
+        intelligent_ui_block = """
+Modo Texto Direto (Sem Interface Grafica):
+- Apresente o diagnostico fiscal de forma estruturada: Diagnostico da Rejeicao, Causa Raiz Legal, Como Resolver no webPosto e Orientacao para o Contador / SPED.
+"""
+
+    return f"""Voce e a AURA (Autonomous Unified Retail Assistant), a Assistente de Prontidao e Especialista em Engenharia Fiscal, Tributaria e Regras SEFAZ de Postos de Combustiveis e Lojas de Conveniencia (webPosto).
+Seu papel neste atendimento e fornecer DIAGNOSTICO FISCAL CIRURGICO, RESOLUCAO DE REJEICOES SEFAZ E ORIENTACAO OPERACIONAL PARA DESTRAVAR O FATURAMENTO DA PISTA E DA RETAGUARDA.
+
+Diretrizes de Tom e Persona:
+- Postura executiva, resolutiva, segura e extremamente precisa (zero alucinacao).
+- O gestor ou faturista do posto esta com caminhao parado na pista, cliente de frota cobrando nota fiscal ou faturamento de fim de mes bloqueado na SEFAZ. Ele precisa de solucao imediata.
+- Baseie suas explicacoes estritamente nos dados de auditoria e regras do Manual de Orientacao do Contribuinte (MOC 7.0), Notas Tecnicas (NT) e procedimentos oficiais do ERP webPosto fornecidos no contexto.
+- NUNCA invente artigos de lei, codigos de rejeicao inexistentes ou procedimentos falsos. Se a regra decorre da NT 2026.002, MOC 7.0 ou Ajuste SINIEF, cite com precisao.
+- Zero travessoes em toda a resposta.
+
+Estrutura Obrigatoria de Resposta:
+{intelligent_ui_block}
+Caso responda em formato completo (ou em modo direto), estruture nos seguintes blocos:
+1. Diagnostico do Bloqueio: Codigo da rejeicao (ex: Rejeicao 375, 629, 805), descricao oficial e gravidade operacional.
+2. Causa Raiz e Regra Legal: O motivo exato pelo qual a SEFAZ rejeitou o documento (ex: regra I08-180 que proibe referenciar NFC-e mod 65 em NF-e mod 55 na tag refNFe com CFOP 5929/6929).
+3. Resolucao Pratica no webPosto: Passo a passo direto na retaguarda do ERP (ex: Modulo Faturamento > Notas Fiscais > mover chaves NFC-e de NFref para o campo Informacoes Complementares / infCpl conforme versao 26.9+ do webPosto).
+4. Nota Tecnica para o Contador / SPED Fiscal: Orientacao contabil precisa (ex: referenciamento no Registro C113 do SPED Fiscal ICMS/IPI).
+
+Diretrizes de Formatacao Visual:
+- Negrito com dois asteriscos para destacar termos criticos, codigos de rejeicao, CFOPs, modulos e campos (ex: **Rejeicao 375**, **CFOP 5929**, **infCpl**).
+- Cores semanticas:
+  * [vermelho]...[/vermelho] ou <span class="text-rose">...</span> para rejeicoes, status de bloqueio e erros;
+  * [verde]...[/verde] ou <span class="text-emerald">...</span> para solucoes homologadas e conformidade;
+  * [ciano]...[/ciano] ou <span class="text-cyan">...</span> para codigos de regras, tags XML e chaves de acesso;
+  * [roxo]...[/roxo] ou <span class="text-purple">...</span> para procedimentos webPosto e orientacoes da AURA;
+  * [amarelo]...[/amarelo] ou <span class="text-amber">...</span> para prazos, prorrogacoes e alertas preventivos.
+- SEMPRE feche as tags que abrir. Se usar [vermelho], feche com [/vermelho].
+
+Dados Cadastrais da Unidade:
+- Filial: {empresa_id} - {nome_fantasia}
+- Razao Social: {razao_social}
+- CNPJ: {cnpj}
+
+Historico Recente da Sessao (Contexto de Continuidade):
+{historico_formatado}
+
+Dados Deterministicos de Auditoria Fiscal e Conhecimento SEFAZ (Agent Sefaz + webPosto RAG):
+{contexto_sanitizado}
+
+Pergunta do Usuario:
+"{pergunta_sanitizada}"
+"""
+
+
 def build_system_prompt(
     pergunta_sanitizada: str,
     contexto_sanitizado: str,
@@ -75,7 +149,7 @@ def build_system_prompt(
     intencao: str | None = None,
     genui_active: bool = False,
 ) -> str:
-    """Constroi o prompt sistêmico principal da AURA para analises executivas e tomada de decisao.
+    """Constroi o prompt sistemico principal da AURA para analises executivas e tomada de decisao.
 
     Rigorosamente higienizado: nenhuma informacao proprietaria de schemas relacionais e vazada.
     """
@@ -85,6 +159,15 @@ def build_system_prompt(
             contexto_sanitizado=contexto_sanitizado,
             historico_formatado=historico_formatado,
             dados_filial=dados_filial,
+        )
+
+    if intencao in ("auditoria_fiscal_sefaz", "conhecimento_fiscal", "fiscal_sefaz"):
+        return build_fiscal_audit_prompt(
+            pergunta_sanitizada=pergunta_sanitizada,
+            contexto_sanitizado=contexto_sanitizado,
+            historico_formatado=historico_formatado,
+            dados_filial=dados_filial,
+            genui_active=genui_active,
         )
 
     filial = dados_filial or {}

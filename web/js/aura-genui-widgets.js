@@ -2703,7 +2703,7 @@
         `;
       } else {
         bodyHtml = `
-          <div class="text-xs text-slate-300 leading-relaxed">
+          <div class="text-xs text-slate-300 leading-relaxed whitespace-pre-line">
             ${escapeHtml(b.custom_content || '')}
           </div>
         `;
@@ -3364,13 +3364,16 @@
       {
         name: 'render_GenerativeModularCardUI',
         cls: GenerativeModularCardUI,
-      RoiDiagnosticUI,
-      RoiDiagnosticWidget,
-      PosAuditRadarUI,
-      PosAuditRadarWidget,
-      MorningBriefingUI,
-      MorningBriefingWidget,
-        aliases: ['GenerativeModularCardUI', 'DynamicLegoCardUI', 'render_ModularLegoCardUI'],
+        aliases: [
+          'GenerativeModularCardUI',
+          'DynamicLegoCardUI',
+          'render_ModularLegoCardUI',
+          'render_AuraSystemGuideUI',
+          'AuraSystemGuideWidget',
+          'AuraSystemGuideUI',
+          'render_FiscalAuditUI',
+          'FiscalAuditUI'
+        ],
         intent: 'diagnostico_modular'
       },
       {

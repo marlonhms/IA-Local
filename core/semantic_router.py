@@ -295,6 +295,23 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
             "O que vender junto para aumentar o ticket?",
         ]
     },
+    "auditoria_fiscal_sefaz": {
+        "descricao": "Auditoria fiscal e tributaria, rejeicoes da SEFAZ (375, 629, 805, 508, etc.), validacao de chaves de acesso de 44 digitos, XML e regras de postos",
+        "exemplos": [
+            "AURA, travou uma nota de frota com Rejeicao 375, o que significa?",
+            "Minha nota deu rejeicao 629 no posto",
+            "Rejeicao 508 SEFAZ o que fazer?",
+            "Rejeicao 805 cliente isento",
+            "Como calcular DIFAL de combustivel interestadual",
+            "O que significa rejeicao 760 na NFC-e?",
+            "Auditar chave de acesso da nota fiscal",
+            "35261001173538000160550040000039571624115433",
+            "Auditar nota fiscal XML",
+            "Por que a nota deu erro na SEFAZ?",
+            "CFOP 5929 com cupom referenciado",
+            "Nota fiscal de frota travada na SEFAZ",
+        ]
+    },
     "ajuda_sistema": {
         "descricao": "Auto-conhecimento da AURA, funcionamento do sistema, explicações de telas, módulos, atalhos de teclado e interface",
         "exemplos": [
@@ -564,12 +581,13 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     # -2.6 Auditoria fiscal, regras SEFAZ, chave de acesso de 44 digitos e rejeicoes de notas
     if re.search(
         r"\b(?:\d{44}|rejei[cç][aã]o\s*\d+|rejeicao|erro\s+sefaz|sefaz|chave\s+de\s+acesso|"
-        r"nota\s+rejeitada|nfe\s+rejeitada|nfce\s+rejeitada|cfop\s+5929|cfop\s+6929|"
+        r"nota\s+(?:fiscal\s+)?(?:de\s+frota\s+)?(?:travada|bloqueada|rejeitada)|travou\s+(?:uma\s+)?nota|"
+        r"nfe\s+rejeitada|nfce\s+rejeitada|cfop\s+5929|cfop\s+6929|"
         r"sped\s+c113|abnt\s+nbr\s+5891|arredondamento\s+sefaz|indiedest|isento\s+de\s+ie|"
         r"difal|auditar\s+xml|auditar\s+nota)\b",
         p
     ):
-        return "ajuda_sistema"
+        return "auditoria_fiscal_sefaz"
 
     # -2.5 Meta-perguntas sobre funcionamento do sistema, UI, telas, módulos e atalhos
     padrao_meta_pergunta = re.compile(
