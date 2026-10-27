@@ -12,6 +12,11 @@ Integrado a partir do Agent Sefaz com principios de Zero Alucinacao:
    - Regra BA02 / Rejeicao 701 (Documento referenciado x SPED C113)
    - Rejeicoes 508, 600, 529 e 805 (indIEDest x CST/CSOSN x UFs que vedam Isento)
    - Rejeicoes 694, 695, 697 e 698 (DIFAL x Excecoes de combustiveis derivados de petroleo ANP)
+   - Rejeicao 960 (Combustivel monofasico LC 192/2022 exigindo CST 61)
+   - Rejeicao 958 (CFOP incompativel com combustivel monofasico)
+   - Rejeicao 959 (Etanol hidratado vedado em CST 61)
+   - Rejeicao 806 (CEST compulsorio para produtos com ST/Monofasico)
+   - Alerta Contabil Bitributacao PIS/COFINS (Tabela 4.3.10 EFD-Contribuicoes : CST 04)
    - Protocolo SEFAZ (SEFAZ-PROT-01: identificacao de notas em rascunho sem autorizacao)
 
 Regra inegociavel: ZERO travessoes em todo o arquivo.
@@ -61,6 +66,55 @@ ANP_NAO_DERIVADOS_PETROLEO = {
     "810101001", "810101002", "810101003", "810102001", "810102002", "810102003",
     "810102004", "820101001", "820101010", "220101001", "220101002", "220101003",
     "220101004", "220101005", "220101006"
+}
+
+ANP_COMBUSTIVEIS_MONOFASICOS_ICMS = {
+    "320102001",  # Gasolina Comum
+    "320102002",  # Gasolina Aditivada
+    "320102003",  # Gasolina Premium
+    "320102005",  # Gasolina de Aviacao
+    "820101034",  # Diesel S10
+    "820101033",  # Diesel S500
+    "820101012",  # Diesel Maritimo
+    "820101013",  # Diesel S10 Maritimo
+    "820101014",  # Diesel S500 Maritimo
+    "210203001",  # GLP
+}
+
+ANP_ETANOL_HIDRATADO = {
+    "810101001",  # Etanol Hidratado Comum
+    "810101002",  # Etanol Hidratado Aditivado
+}
+
+# NCMs com Tributacao Monofasica de PIS/COFINS (Tabela 4.3.10 EFD-Contribuicoes e combustiveis)
+# O revendedor varejista (posto/conveniencia) deve aplicar CST 04 (Aliquota Zero no Varejo)
+NCMS_MONOFASICOS_PIS_COFINS = {
+    # Bebidas Frias (Lei 13.097/2015)
+    "22011000",  # Aguas minerais e potaveis
+    "22021000",  # Refrigerantes e aguas aromatizadas
+    "22029900",  # Energeticos, chas prontos, isotonicos
+    "22030000",  # Cervejas de malte
+    # Cigarros e Tabacos (Lei 9.532/1997)
+    "24022000",  # Cigarros de tabaco
+    # Combustiveis Automotivos (Lei 9.718/1998 e Lei 9.990/2000)
+    "27101259",  # Gasolinas
+    "27101921",  # Oleo Diesel
+    "22071090",  # Etanol combustivel
+    "27111910",  # GLP
+    # Lubrificantes
+    "27101932",  # Oleos lubrificantes
+}
+
+# Tabela de CESTs compulsorios para produtos com ST e Monofasico em postos (Convenio 142/2018)
+CESTS_OBRIGATORIOS_POSTO: Dict[str, str] = {
+    "27101259": "06.001.00",  # Gasolinas
+    "27101921": "06.002.00",  # Oleo Diesel
+    "22071090": "06.004.00",  # Etanol
+    "27111910": "06.006.00",  # GLP
+    "27101932": "06.007.00",  # Oleos lubrificantes
+    "22011000": "03.001.00",  # Aguas minerais
+    "22021000": "03.003.00",  # Refrigerantes
+    "22030000": "03.010.00",  # Cervejas
 }
 
 
@@ -446,6 +500,219 @@ def auditar_totais_documento(
     return findings
 
 
+def validar_tributacao_combustivel_monofasico(
+    anp_code: str,
+    cst: Optional[str],
+    cfop: str = "5656",
+    crt: str = "3",
+) -> List[ApontamentoFiscal]:
+    """
+    Valida enquadramento no ICMS Monofasico sobre combustiveis (LC 192/2022).
+    - Gasolina, Diesel e GLP exigem CST 61 e CFOP especifico (5656/5655/5929)
+    - Etanol Hidratado permanece em Substituicao Tributaria (CST 60) e veda CST 61
+    """
+    findings: List[ApontamentoFiscal] = []
+    anp_clean = re.sub(r"[^0-9]", "", str(anp_code or ""))
+    cfop_clean = re.sub(r"[^0-9]", "", str(cfop or ""))
+    cst_clean = (cst or "").strip()
+
+    if not anp_clean:
+        return findings
+
+    # Combustiveis monofasicos: Gasolina, Diesel, GLP
+    if anp_clean in ANP_COMBUSTIVEIS_MONOFASICOS_ICMS:
+        # Rejeicao 960: Exigencia de CST 61 (para regime normal CRT 3 ou com CST)
+        if crt != "1" and cst_clean and cst_clean != "61":
+            findings.append(
+                ApontamentoFiscal(
+                    status=StatusApontamento.INVALID,
+                    gravidade=GravidadeApontamento.CRITICAL,
+                    regra_id="SEFAZ-REJ-960",
+                    titulo="Rejeicao 960: Combustivel sujeito ao ICMS Monofasico exige CST 61",
+                    explicacao_executiva=(
+                        "Gasolina, Diesel e GLP estao sob regime monofasico de ICMS (LC 192/2022). "
+                        "O uso do antigo CST 60 e expressamente proibido pela SEFAZ e trava a emissao. "
+                        "O produto deve ser cadastrado com CST 61 no webPosto."
+                    ),
+                    explicacao_tecnica=(
+                        f"Codigo ANP {anp_clean} com CST {cst_clean}. A SEFAZ exige CST 61 "
+                        "(ICMS monofasico sobre combustiveis cobrado anteriormente) e rejeita com cStat 960."
+                    ),
+                    campos_afetados=["det/imposto/ICMS/*/CST", "det/prod/comb/cProdANP"],
+                    valor_esperado="CST 61",
+                    valor_observado=f"CST {cst_clean}",
+                    base_legal=[
+                        "LC 192/2022",
+                        "Convenio CONFAZ 199/2022",
+                        "Convenio CONFAZ 15/2023",
+                        "MOC 7.0 - Rejeicao 960",
+                    ],
+                    acoes_recomendadas=[
+                        "Alterar o CST do combustivel de 60 para 61 no cadastro de produtos do webPosto.",
+                        "Garantir a geracao das tags <qBCMonoRet> e <adRemICMSRet> no XML.",
+                    ],
+                )
+            )
+
+        # Rejeicao 958: CFOP incompativel com ICMS Monofasico
+        cfops_permitidos = {"5656", "5655", "5929", "6656", "6655", "6929"}
+        if cfop_clean and cfop_clean not in cfops_permitidos:
+            findings.append(
+                ApontamentoFiscal(
+                    status=StatusApontamento.INVALID,
+                    gravidade=GravidadeApontamento.HIGH,
+                    regra_id="SEFAZ-REJ-958",
+                    titulo="Rejeicao 958: CFOP incompativel com ICMS Monofasico de Combustivel",
+                    explicacao_executiva=(
+                        f"Combustivel monofasico (ANP {anp_clean}) emitido com CFOP {cfop_clean}. "
+                        "A SEFAZ exige CFOP especifico como 5656 (ou 5655/5929). "
+                        "CFOPs genericos de revenda como 5102 geram rejeicao imediata."
+                    ),
+                    explicacao_tecnica=(
+                        f"CFOP {cfop_clean} incompativel com combustivel sob ICMS monofasico "
+                        "(Regra N12-90 da NT 2023.001 / Rejeicao 958)."
+                    ),
+                    campos_afetados=["det/prod/CFOP", "det/prod/comb/cProdANP"],
+                    valor_esperado="CFOP 5656, 5655 ou 5929",
+                    valor_observado=f"CFOP {cfop_clean}",
+                    base_legal=["NT 2023.001 v1.50 - Regra N12-90 / Rejeicao 958"],
+                    acoes_recomendadas=[
+                        "Corrigir o CFOP do item no webPosto para 5656 (venda de combustivel monofasico).",
+                    ],
+                )
+            )
+
+    # Etanol Hidratado: Nao faz parte da monofasia do ICMS (permanece em ST CST 60)
+    elif anp_clean in ANP_ETANOL_HIDRATADO:
+        if cst_clean == "61":
+            findings.append(
+                ApontamentoFiscal(
+                    status=StatusApontamento.INVALID,
+                    gravidade=GravidadeApontamento.CRITICAL,
+                    regra_id="SEFAZ-REJ-959",
+                    titulo="Rejeicao 959: Etanol Hidratado nao admite CST 61 (Monofasico)",
+                    explicacao_executiva=(
+                        "O Etanol Hidratado (ANP 810101001/810101002) permanece sob o regime de Substituicao "
+                        "Tributaria (CST 60) e nao entrou no ICMS Monofasico da LC 192/2022. O uso de CST 61 e indevido."
+                    ),
+                    explicacao_tecnica=(
+                        f"Codigo ANP {anp_clean} (Etanol) com CST 61. Violacao da Regra da NT 2023.001 (Rejeicao 959)."
+                    ),
+                    campos_afetados=["det/imposto/ICMS/*/CST", "det/prod/comb/cProdANP"],
+                    valor_esperado="CST 60",
+                    valor_observado="CST 61",
+                    base_legal=["LC 192/2022", "Convenio CONFAZ 199/2022", "NT 2023.001"],
+                    acoes_recomendadas=[
+                        "Ajustar o cadastro de Etanol Hidratado no webPosto para CST 60.",
+                    ],
+                )
+            )
+
+    return findings
+
+
+def validar_pis_cofins_monofasico(
+    ncm: str,
+    cst_pis_cofins: Optional[str],
+    produto_nome: str = "",
+) -> List[ApontamentoFiscal]:
+    """
+    Audita tributacao de PIS/COFINS para produtos da cadeia monofasica (Tabela 4.3.10 EFD-Contribuicoes).
+    Evita bitributacao: postos e lojas de conveniencia devem aplicar CST 04 (Aliquota Zero no Varejo).
+    """
+    findings: List[ApontamentoFiscal] = []
+    ncm_clean = re.sub(r"[^0-9]", "", str(ncm or ""))
+    cst_clean = re.sub(r"[^0-9]", "", str(cst_pis_cofins or ""))
+
+    if not ncm_clean or not cst_clean:
+        return findings
+
+    if ncm_clean in NCMS_MONOFASICOS_PIS_COFINS:
+        # CSTs tributaveis indevidos no varejo (01, 02, 03, 99)
+        if cst_clean in ("01", "02", "03", "99"):
+            findings.append(
+                ApontamentoFiscal(
+                    status=StatusApontamento.WARNING,
+                    gravidade=GravidadeApontamento.HIGH,
+                    regra_id="SPED-RISCO-BITRIBUTACAO-PISCOFINS",
+                    titulo="Alerta Contabil: Risco de Bitributacao de PIS/COFINS Monofasico",
+                    explicacao_executiva=(
+                        f"O item '{produto_nome or ncm_clean}' (NCM {ncm_clean}) pertence a cadeia monofasica de PIS/COFINS. "
+                        "No posto e na loja de conveniencia, esse imposto ja foi recolhido antecipadamente pela refinaria "
+                        f"ou fabricante. Manter cadastrado com CST {cst_clean} faz a empresa recolher imposto em dobro "
+                        "(bitributacao de 9,25% no Lucro Real ou 3,65% no Lucro Presumido). O correto e CST 04 (Aliquota Zero no Varejo)."
+                    ),
+                    explicacao_tecnica=(
+                        f"NCM {ncm_clean} listado na Tabela 4.3.10 da EFD-Contribuicoes cadastrado com CST PIS/COFINS {cst_clean}. "
+                        "Gera apuracao indevida no Bloco M da EFD-Contribuicoes e recolhimento duplicado via DARF."
+                    ),
+                    campos_afetados=["det/imposto/PIS/*/CST", "det/imposto/COFINS/*/CST", "det/prod/NCM"],
+                    valor_esperado="CST 04 (Operacao Tributavel Monofasica - Aliquota Zero)",
+                    valor_observado=f"CST {cst_clean}",
+                    base_legal=[
+                        "Lei 13.097/2015 art. 28 (Bebidas Frias)",
+                        "Lei 10.833/2003 e Lei 9.718/1998 (Combustiveis)",
+                        "Tabela 4.3.10 EFD-Contribuicoes",
+                    ],
+                    acoes_recomendadas=[
+                        "Alterar imediatamente a tributacao de PIS e COFINS no webPosto para CST 04.",
+                        "Solicitar a contabilidade a segregacao dessas receitas no SPED Contribuicoes.",
+                    ],
+                )
+            )
+
+    return findings
+
+
+def validar_ncm_e_cest(
+    ncm: str,
+    cest: Optional[str] = None,
+    produto_nome: str = "",
+) -> List[ApontamentoFiscal]:
+    """
+    Valida presenca compulsoria do codigo CEST para NCMs sujeitos a ST e Monofasico (Convenio ICMS 142/2018).
+    Evita a Rejeicao 806 da SEFAZ.
+    """
+    findings: List[ApontamentoFiscal] = []
+    ncm_clean = re.sub(r"[^0-9]", "", str(ncm or ""))
+    cest_clean = re.sub(r"[^0-9]", "", str(cest or ""))
+
+    if not ncm_clean:
+        return findings
+
+    if ncm_clean in CESTS_OBRIGATORIOS_POSTO:
+        expected_cest = CESTS_OBRIGATORIOS_POSTO[ncm_clean]
+        expected_clean = re.sub(r"[^0-9]", "", expected_cest)
+
+        if not cest_clean:
+            findings.append(
+                ApontamentoFiscal(
+                    status=StatusApontamento.INVALID,
+                    gravidade=GravidadeApontamento.HIGH,
+                    regra_id="SEFAZ-REJ-806",
+                    titulo="Rejeicao 806: Falta do CEST obrigatorio para produto com ICMS-ST / Monofasico",
+                    explicacao_executiva=(
+                        f"O produto '{produto_nome or ncm_clean}' (NCM {ncm_clean}) esta sujeito a Substituicao Tributaria "
+                        f"ou regime Monofasico e exige codigo CEST correspondente ({expected_cest}). "
+                        "A emissao do documento sera rejeitada pela SEFAZ caso o campo CEST esteja em branco."
+                    ),
+                    explicacao_tecnica=(
+                        f"NCM {ncm_clean} sem codigo CEST informado. Violacao da Regra I08-01 / I08-02 da NT 2015.003 "
+                        "e Convenio ICMS 142/2018 (Rejeicao 806)."
+                    ),
+                    campos_afetados=["det/prod/CEST", "det/prod/NCM"],
+                    valor_esperado=f"CEST {expected_cest}",
+                    valor_observado="Ausente",
+                    base_legal=["Convenio ICMS 142/2018", "MOC 7.0 - Rejeicao 806"],
+                    acoes_recomendadas=[
+                        f"Cadastrar o codigo CEST {expected_cest} no cadastro do item no webPosto.",
+                    ],
+                )
+            )
+
+    return findings
+
+
 def auditar_regras_tributarias_posto(
     mod: str,
     cfop: str,
@@ -461,6 +728,10 @@ def auditar_regras_tributarias_posto(
     p_icms_inter: Optional[Decimal] = None,
     orig: str = "0",
     emit_uf: str = "SP",
+    ncm: Optional[str] = None,
+    cest: Optional[str] = None,
+    cst_pis_cofins: Optional[str] = None,
+    produto_nome: Optional[str] = None,
 ) -> List[ApontamentoFiscal]:
     """
     Audita regras de negocio e tributacao especificas de postos:
@@ -658,6 +929,37 @@ def auditar_regras_tributarias_posto(
                     )
                 )
 
+    # 6. Regra ICMS Monofasico de Combustiveis (LC 192/2022 - Rejeicoes 958, 959, 960)
+    if anp_code:
+        findings.extend(
+            validar_tributacao_combustivel_monofasico(
+                anp_code=anp_code,
+                cst=cst,
+                cfop=cfop_clean,
+                crt=crt,
+            )
+        )
+
+    # 7. Regra PIS/COFINS Monofasico - Alerta de Bitributacao (Tabela 4.3.10 EFD-Contribuicoes)
+    if ncm:
+        findings.extend(
+            validar_pis_cofins_monofasico(
+                ncm=ncm,
+                cst_pis_cofins=cst_pis_cofins,
+                produto_nome=produto_nome or "",
+            )
+        )
+
+    # 8. Regra CEST Obrigatorio para itens de ST / Monofasico (Rejeicao 806 / Convenio 142/2018)
+    if ncm:
+        findings.extend(
+            validar_ncm_e_cest(
+                ncm=ncm,
+                cest=cest,
+                produto_nome=produto_nome or "",
+            )
+        )
+
     return findings
 
 
@@ -795,6 +1097,19 @@ def auditar_documento_xml(xml_texto: str) -> Dict[str, Any]:
         comb_elem = prod.find("{*}comb")
         anp_code = comb_elem.findtext("{*}cProdANP") if comb_elem is not None else None
 
+        # Extrair NCM e CEST
+        ncm_item = prod.findtext("{*}NCM")
+        cest_item = prod.findtext("{*}CEST")
+
+        # Extrair CST PIS
+        pis_elem = det.find(".//{*}imposto/{*}PIS")
+        pis_cst = None
+        if pis_elem is not None:
+            for child in pis_elem:
+                if child.find("{*}CST") is not None:
+                    pis_cst = child.findtext("{*}CST")
+                    break
+
         # Auditar regras do posto para cada item
         item_tax_findings = auditar_regras_tributarias_posto(
             mod=mod,
@@ -809,6 +1124,10 @@ def auditar_documento_xml(xml_texto: str) -> Dict[str, Any]:
             id_dest=id_dest,
             ind_final=ind_final,
             emit_uf=emit_uf,
+            ncm=ncm_item,
+            cest=cest_item,
+            cst_pis_cofins=pis_cst,
+            produto_nome=x_prod,
         )
         findings.extend(item_tax_findings)
 

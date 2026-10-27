@@ -27,6 +27,9 @@ from core.fiscal_engine import (
     auditar_totais_documento,
     auditar_regras_tributarias_posto,
     auditar_documento_xml,
+    validar_tributacao_combustivel_monofasico,
+    validar_pis_cofins_monofasico,
+    validar_ncm_e_cest,
     round_abnt,
 )
 from core.webposto_rag import WebPostoRAGEngine
@@ -350,3 +353,258 @@ def test_fts5_pesquisa_rejeicoes_sefaz():
     res_805 = engine.buscar_geral("rejeicao 805 isento", pilar="fiscal_tributario_sefaz")
     assert len(res_805) > 0
     assert "805" in res_805[0]["codigo_ref"]
+
+
+def test_rejeicao_960_combustivel_monofasico_cst60_rejeitado():
+    """Combustivel monofasico (Gasolina) com CST 60 gera Rejeicao 960 (exige CST 61)."""
+    # Gasolina Comum com CST 60
+    findings = auditar_regras_tributarias_posto(
+        mod="55",
+        cfop="5656",
+        ref_chaves=[],
+        anp_code="320102001",
+        cst="60",
+    )
+    rej = [f for f in findings if f.regra_id == "SEFAZ-REJ-960"]
+    assert len(rej) == 1
+    assert rej[0].status == StatusApontamento.INVALID
+    assert rej[0].valor_esperado == "CST 61"
+    assert "960" in rej[0].titulo
+
+    # Com CST 61 e valido
+    findings_ok = auditar_regras_tributarias_posto(
+        mod="55",
+        cfop="5656",
+        ref_chaves=[],
+        anp_code="320102001",
+        cst="61",
+    )
+    assert not any(f.regra_id == "SEFAZ-REJ-960" for f in findings_ok)
+
+
+def test_rejeicao_958_combustivel_monofasico_cfop_invalido():
+    """Combustivel monofasico com CFOP de revenda comum (5102) gera Rejeicao 958."""
+    findings = auditar_regras_tributarias_posto(
+        mod="55",
+        cfop="5102",  # Invalido para combustivel monofasico
+        ref_chaves=[],
+        anp_code="320102001",
+        cst="61",
+    )
+    rej = [f for f in findings if f.regra_id == "SEFAZ-REJ-958"]
+    assert len(rej) == 1
+    assert rej[0].status == StatusApontamento.INVALID
+    assert "958" in rej[0].titulo
+
+    # Com CFOP 5656 e valido
+    findings_ok = auditar_regras_tributarias_posto(
+        mod="55",
+        cfop="5656",
+        ref_chaves=[],
+        anp_code="320102001",
+        cst="61",
+    )
+    assert not any(f.regra_id == "SEFAZ-REJ-958" for f in findings_ok)
+
+
+def test_rejeicao_959_etanol_com_cst61_rejeitado():
+    """Etanol Hidratado (ANP 810101001) permanece em ST (CST 60) e rejeita CST 61."""
+    findings = auditar_regras_tributarias_posto(
+        mod="55",
+        cfop="5656",
+        ref_chaves=[],
+        anp_code="810101001",  # Etanol Hidratado Comum
+        cst="61",
+    )
+    rej = [f for f in findings if f.regra_id == "SEFAZ-REJ-959"]
+    assert len(rej) == 1
+    assert rej[0].status == StatusApontamento.INVALID
+    assert rej[0].valor_esperado == "CST 60"
+
+    # Com CST 60 e valido
+    findings_ok = auditar_regras_tributarias_posto(
+        mod="55",
+        cfop="5656",
+        ref_chaves=[],
+        anp_code="810101001",
+        cst="60",
+    )
+    assert not any(f.regra_id == "SEFAZ-REJ-959" for f in findings_ok)
+
+
+def test_alerta_piscofins_monofasico_bitributacao():
+    """Detecta risco de bitributacao em produtos da conveniencia e pista com CST PIS 01."""
+    # Bebida fria (Cerveja NCM 22030000) com CST PIS 01
+    findings = auditar_regras_tributarias_posto(
+        mod="65",
+        cfop="5102",
+        ref_chaves=[],
+        ncm="22030000",
+        cst_pis_cofins="01",
+        produto_nome="CERVEJA HEINEKEN 350ML",
+    )
+    alertas = [f for f in findings if f.regra_id == "SPED-RISCO-BITRIBUTACAO-PISCOFINS"]
+    assert len(alertas) == 1
+    assert alertas[0].status == StatusApontamento.WARNING
+    assert "Bitributacao" in alertas[0].titulo
+    assert "CST 04" in alertas[0].valor_esperado
+
+    # Com CST 04 nao gera alerta
+    findings_ok = auditar_regras_tributarias_posto(
+        mod="65",
+        cfop="5102",
+        ref_chaves=[],
+        ncm="22030000",
+        cst_pis_cofins="04",
+        produto_nome="CERVEJA HEINEKEN 350ML",
+    )
+    assert not any(f.regra_id == "SPED-RISCO-BITRIBUTACAO-PISCOFINS" for f in findings_ok)
+
+
+def test_rejeicao_806_ncm_st_sem_cest():
+    """Item sujeito a ST/Monofasico sem CEST gera Rejeicao 806."""
+    findings = auditar_regras_tributarias_posto(
+        mod="55",
+        cfop="5656",
+        ref_chaves=[],
+        ncm="27101259",  # Gasolinas
+        cest="",  # Omitido
+        produto_nome="GASOLINA ADITIVADA GRID",
+    )
+    rej = [f for f in findings if f.regra_id == "SEFAZ-REJ-806"]
+    assert len(rej) == 1
+    assert rej[0].status == StatusApontamento.INVALID
+    assert rej[0].valor_esperado == "CEST 06.001.00"
+
+    # Com CEST informado e valido
+    findings_ok = auditar_regras_tributarias_posto(
+        mod="55",
+        cfop="5656",
+        ref_chaves=[],
+        ncm="27101259",
+        cest="06.001.00",
+        produto_nome="GASOLINA ADITIVADA GRID",
+    )
+    assert not any(f.regra_id == "SEFAZ-REJ-806" for f in findings_ok)
+
+
+def test_auditar_documento_xml_completo_combustivel_e_conveniencia():
+    """Audita XML completo contendo item de pista conforme e item de conveniencia com falha."""
+    xml_multi = f"""
+    <nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+        <NFe>
+            <infNFe Id="NFe{CHAVE_NFE_VALIDA}">
+                <ide>
+                    <mod>55</mod>
+                    <idDest>1</idDest>
+                    <indFinal>1</indFinal>
+                </ide>
+                <emit>
+                    <CRT>3</CRT>
+                    <enderEmit><UF>SP</UF></enderEmit>
+                </emit>
+                <dest>
+                    <indIEDest>9</indIEDest>
+                    <enderDest><UF>SP</UF></enderDest>
+                </dest>
+                <det nItem="1">
+                    <prod>
+                        <cProd>001</cProd>
+                        <xProd>GASOLINA COMUM</xProd>
+                        <NCM>27101259</NCM>
+                        <CEST>0600100</CEST>
+                        <CFOP>5656</CFOP>
+                        <qCom>20.000</qCom>
+                        <vUnCom>5.500</vUnCom>
+                        <vProd>110.00</vProd>
+                        <comb>
+                            <cProdANP>320102001</cProdANP>
+                        </comb>
+                    </prod>
+                    <imposto>
+                        <ICMS>
+                            <ICMS61>
+                                <orig>0</orig>
+                                <CST>61</CST>
+                            </ICMS61>
+                        </ICMS>
+                        <PIS>
+                            <PISNT>
+                                <CST>04</CST>
+                            </PISNT>
+                        </PIS>
+                    </imposto>
+                </det>
+                <det nItem="2">
+                    <prod>
+                        <cProd>002</cProd>
+                        <xProd>REFRIGERANTE COCA COLA 2L</xProd>
+                        <NCM>22021000</NCM>
+                        <!-- CEST omitido propositalmente para testar Rejeicao 806 -->
+                        <CFOP>5102</CFOP>
+                        <qCom>2.000</qCom>
+                        <vUnCom>10.000</vUnCom>
+                        <vProd>20.00</vProd>
+                    </prod>
+                    <imposto>
+                        <ICMS>
+                            <ICMS60>
+                                <orig>0</orig>
+                                <CST>60</CST>
+                            </ICMS60>
+                        </ICMS>
+                        <PIS>
+                            <PISAliq>
+                                <!-- CST 01 propositalmente para testar alerta de bitributacao -->
+                                <CST>01</CST>
+                            </PISAliq>
+                        </PIS>
+                    </imposto>
+                </det>
+                <total>
+                    <ICMSTot>
+                        <vProd>130.00</vProd>
+                        <vNF>130.00</vNF>
+                    </ICMSTot>
+                </total>
+            </infNFe>
+        </NFe>
+        <protNFe>
+            <infProt>
+                <cStat>100</cStat>
+                <nProt>135260000000001</nProt>
+            </infProt>
+        </protNFe>
+    </nfeProc>
+    """
+    res = auditar_documento_xml(xml_multi)
+    # Item 2 possui Rejeicao 806 (CEST ausente) -> invalido
+    assert res["valido"] is False
+    assert res["erros_impeditivos"] >= 1
+    # Verifica presenca da Rejeicao 806 no item 2
+    rej_806 = [a for a in res["apontamentos"] if a["regra_id"] == "SEFAZ-REJ-806"]
+    assert len(rej_806) == 1
+    # Verifica presenca do alerta de bitributacao de PIS/COFINS no item 2
+    alerta_pis = [a for a in res["apontamentos"] if a["regra_id"] == "SPED-RISCO-BITRIBUTACAO-PISCOFINS"]
+    assert len(alerta_pis) == 1
+
+
+def test_fts5_pesquisa_regras_enriquecidas_sefaz_sped():
+    """Valida recuperacao rapida (< 5ms) de todas as novas regras normativas no RAG SQLite."""
+    engine = WebPostoRAGEngine()
+
+    consultas_esperadas = [
+        ("rejeicao 960 monofasico", "960"),
+        ("rejeicao 958 cfop combustivel", "958"),
+        ("rejeicao 806 cest", "806"),
+        ("pis cofins monofasico bebidas", "4.3.10"),
+        ("sped fiscal registro 1300 lmc", "1300"),
+        ("cfop 5927 perda evaporacao tanque", "5927"),
+        ("reforma tributaria ibs cbs combustiveis", "LC214"),
+    ]
+
+    for termo, ref_esperada in consultas_esperadas:
+        res = engine.buscar_geral(termo, pilar="fiscal_tributario_sefaz", limit=3)
+        assert len(res) > 0, f"Nenhum resultado para termo: {termo}"
+        codigos = [r["codigo_ref"] for r in res]
+        assert any(ref_esperada in cod for cod in codigos), f"Esperava {ref_esperada} em {codigos} para termo {termo}"
