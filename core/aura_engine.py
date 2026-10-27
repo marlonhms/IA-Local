@@ -4659,6 +4659,71 @@ class AuraEngine:
                 ])
             return "\n".join(linhas)
 
+        elif intencao in ("auditoria_fiscal_sefaz", "conhecimento_fiscal", "fiscal_sefaz"):
+            if not isinstance(resultado_bruto, dict):
+                return None
+            tipo = resultado_bruto.get("tipo")
+            if tipo == "chave_acesso":
+                decomp = resultado_bruto.get("decomposicao", {})
+                aponts = resultado_bruto.get("apontamentos", [])
+                erros = [a for a in aponts if a.get("status") == "INVALID"]
+                status_txt = "[vermelho]Chave Invalida[/vermelho]" if erros else "[verde]Chave Autentica e Valida[/verde]"
+                linhas = [
+                    f"### 🔍 Auditoria de Chave de Acesso SEFAZ ({status_txt})",
+                    "",
+                    f"- **Tipo de Documento:** {decomp.get('tipo_documento')}",
+                    f"- **UF Emitente:** {decomp.get('uf_sigla')} (Codigo IBGE: {decomp.get('c_uf')})",
+                    f"- **CNPJ Emitente:** {decomp.get('cnpj_emitente')}",
+                    f"- **Numero da Nota:** {decomp.get('numero_nfe')} (Serie: {decomp.get('serie')})",
+                    f"- **Digito Verificador:** {decomp.get('digito_verificador')} (Calculado: {decomp.get('dv_calculado')})",
+                ]
+                if erros:
+                    linhas.extend(["", "**Apontamentos Impeditivos:**"])
+                    for e in erros:
+                        linhas.append(f"- [vermelho]{e.get('titulo')}:[/vermelho] {e.get('explicacao_executiva')}")
+                return "\n".join(linhas)
+
+            elif tipo == "xml_documento":
+                res = resultado_bruto.get("resultado", {})
+                valido = res.get("valido", False)
+                status_txt = "[verde]Emissao Conforme e Aprovada[/verde]" if valido else "[vermelho]Inconsistencias Fiscais Identificadas[/vermelho]"
+                linhas = [
+                    f"### 📑 Auditoria de Documento XML ({status_txt})",
+                    "",
+                    f"- **Modelo:** {res.get('modelo')} | **UF:** {res.get('emit_uf')}",
+                    f"- **Erros Impeditivos (Rejeicao SEFAZ):** {res.get('erros_impeditivos', 0)}",
+                    f"- **Alertas de Risco Fiscal:** {res.get('alertas_fiscais', 0)}",
+                ]
+                aponts = res.get("apontamentos", [])
+                erros = [a for a in aponts if a.get("status") == "INVALID"]
+                if erros:
+                    linhas.extend(["", "**Principais Inconsistencias:**"])
+                    for e in erros[:4]:
+                        linhas.append(f"- **{e.get('titulo')}:** {e.get('explicacao_executiva')}")
+                return "\n".join(linhas)
+
+            elif tipo == "consulta_rejeicao_fiscal":
+                resultados = resultado_bruto.get("resultados", [])
+                if not resultados:
+                    return f"Nenhuma regra fiscal correspondente encontrada no acervo oficial para: '{pergunta}'."
+                top = resultados[0]
+                linhas = [
+                    f"### ⚖️ Parecer Fiscal & Normativa SEFAZ ({top.get('codigo_ref')})",
+                    "",
+                    f"**{top.get('titulo')}**",
+                    f"*{top.get('subtitulo', '')}*",
+                    "",
+                    f"**Diagnostico / Resumo Executivo:**",
+                    f"{top.get('resumo_executivo')}",
+                    "",
+                    f"**Acao Recomendada no webPosto:**",
+                    f"{top.get('acao_recomendada')}",
+                    "",
+                    f"**Impacto Financeiro / Operacional:**",
+                    f"{top.get('impacto_financeiro')}",
+                ]
+                return "\n".join(linhas)
+
         elif intencao in ("dados_filial", "empresa", "filial"):
             nome = resultado_bruto.get("nome", "Posto")
             razao = resultado_bruto.get("razao_social", nome)

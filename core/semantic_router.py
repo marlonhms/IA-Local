@@ -296,7 +296,7 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
         ]
     },
     "auditoria_fiscal_sefaz": {
-        "descricao": "Auditoria fiscal e tributaria, rejeicoes da SEFAZ (375, 629, 805, 508, etc.), validacao de chaves de acesso de 44 digitos, XML e regras de postos",
+        "descricao": "Auditoria fiscal e tributaria, rejeicoes da SEFAZ (375, 629, 805, 508, 960, 958, 806, etc.), validacao de chaves de acesso de 44 digitos, XML e regras de postos",
         "exemplos": [
             "AURA, travou uma nota de frota com Rejeicao 375, o que significa?",
             "Minha nota deu rejeicao 629 no posto",
@@ -310,6 +310,13 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
             "Por que a nota deu erro na SEFAZ?",
             "CFOP 5929 com cupom referenciado",
             "Nota fiscal de frota travada na SEFAZ",
+            "Qual o CST e CFOP correto para revenda de Gasolina Monofasica segundo a LC 192?",
+            "Como funciona PIS e COFINS monofasico na loja de conveniencia?",
+            "O que significa a Rejeicao 960 da SEFAZ para combustiveis?",
+            "Como funciona a escrituracao do LMC no SPED Fiscal registros 1300 e 1310?",
+            "Tratamento tributario de perdas e evaporacao de tanques e CFOP 5927",
+            "Reforma tributaria LC 214 regime monofasico de IBS e CBS sobre combustiveis",
+            "Rejeicao 806 falta do codigo CEST obrigatorio",
         ]
     },
     "ajuda_sistema": {
@@ -578,13 +585,18 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     ):
         return "ajuda_sistema"
 
-    # -2.6 Auditoria fiscal, regras SEFAZ, chave de acesso de 44 digitos e rejeicoes de notas
+    # -2.6 Auditoria fiscal, regras SEFAZ, chave de acesso de 44 digitos, rejeicoes e legislacao tributaria
     if re.search(
         r"\b(?:\d{44}|rejei[cç][aã]o\s*\d+|rejeicao|erro\s+sefaz|sefaz|chave\s+de\s+acesso|"
         r"nota\s+(?:fiscal\s+)?(?:de\s+frota\s+)?(?:travada|bloqueada|rejeitada)|travou\s+(?:uma\s+)?nota|"
-        r"nfe\s+rejeitada|nfce\s+rejeitada|cfop\s+5929|cfop\s+6929|"
-        r"sped\s+c113|abnt\s+nbr\s+5891|arredondamento\s+sefaz|indiedest|isento\s+de\s+ie|"
-        r"difal|auditar\s+xml|auditar\s+nota)\b",
+        r"nfe\s+rejeitada|nfce\s+rejeitada|cfop\s+(?:5929|6929|5656|5655|5927|5102|6102)|"
+        r"monof[aá]sic[ao]|monofasia|icms\s+monof[aá]sico|"
+        r"pis\s*(?:e\s*|\/\s*)?cofins\s+monof[aá]sico|pis\s*(?:e\s*|\/\s*)?cofins|"
+        r"lc\s*192|lc\s*214|cst\s*(?:61|60|04|02|01|03)|"
+        r"sped\s+(?:c113|fiscal|contribui[cç][oõ]es)|registro\s*(?:1300|1310|1320)|"
+        r"tabela\s+4\.3\.10|reforma\s+tribut[aá]ria|cest|abnt\s+nbr\s+5891|arredondamento\s+sefaz|"
+        r"indiedest|isento\s+de\s+ie|difal|auditar\s+xml|auditar\s+nota|"
+        r"tributa[cç][aã]o(?:\s+(?:de\s+)?combust[ií]ve[li]s)?|bitributa[cç][aã]o)\b",
         p
     ):
         return "auditoria_fiscal_sefaz"
