@@ -170,17 +170,19 @@ class TestChatTypographyUX:
         proc = subprocess.run(["node", "-e", js_script], cwd=BASE_DIR, capture_output=True, text=True, check=True)
         data = json.loads(proc.stdout)
 
-        # 1. Com tool card ativo (hasToolCard === true) -> Encapsula blocos complementares em disclosure
-        assert "aura-chat-disclosure" in data["withToolCard"], (
-            "Progressive disclosure deveria estar ativo quando hasToolCard=true e blocos > 3"
+        # 1. Com tool card ativo (hasToolCard === true) -> Delegado ao Companion Canvas, SEM disclosure duplicado no chat (Apendice C)
+        assert "aura-chat-disclosure" not in data["withToolCard"], (
+            "Com tool card ativo, o disclosure deve ser desativado para evitar botoes concorrentes (+Detalhes vs Ver no Painel)"
         )
-        assert "<p>Paragrafo 1</p>" in data["withToolCard"], "Primeiro bloco deve permanecer visivel no topo"
-        assert "<p>Paragrafo 2</p>" in data["withToolCard"], "Segundo bloco deve permanecer visivel no topo"
+        assert "<p>Paragrafo 1</p>" in data["withToolCard"]
+        assert "<p>Paragrafo 4</p>" in data["withToolCard"]
 
-        # 2. Sem tool card (hasToolCard === false) -> Nao deve encapsular
-        assert "aura-chat-disclosure" not in data["withoutToolCard"], (
-            "Progressive disclosure nao deve ser acionado quando hasToolCard=false"
+        # 2. Sem tool card (hasToolCard === false) -> Encapsula blocos complementares em disclosure
+        assert "aura-chat-disclosure" in data["withoutToolCard"], (
+            "Progressive disclosure deve estar ativo para respostas textuais puras com blocos > 3"
         )
+        assert "<p>Paragrafo 1</p>" in data["withoutToolCard"]
+        assert "<p>Paragrafo 2</p>" in data["withoutToolCard"]
 
         # 3. Durante streaming (isStillStreaming === true) -> Nao deve encapsular prematuramente
         assert "aura-chat-disclosure" not in data["whileStreaming"], (
@@ -207,11 +209,11 @@ class TestChatTypographyUX:
 
         const defaultMode = c.getReadingMode();
         c.setReadingMode('concise');
-        const conciseOutput = c.applyProgressiveDisclosure(html, false, true);
+        const conciseOutput = c.applyProgressiveDisclosure(html, false, false);
 
         c.setReadingMode('comfort');
         const comfortMode = c.getReadingMode();
-        const comfortOutput = c.applyProgressiveDisclosure(html, false, true);
+        const comfortOutput = c.applyProgressiveDisclosure(html, false, false);
 
         c.toggleReadingMode();
         const toggledMode = c.getReadingMode();

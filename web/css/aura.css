@@ -101,8 +101,8 @@
 }
 
 html, body {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
   text-rendering: optimizeLegibility;
 }
 
@@ -583,10 +583,11 @@ body {
   transition: all 0.2s ease;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: subpixel-antialiased !important;
+  -moz-osx-font-smoothing: auto !important;
   text-rendering: optimizeLegibility;
   transform: none !important;
+  will-change: auto !important;
 }
 .chat-bubble-user:hover {
   border-color: rgba(6, 182, 212, 0.38);
@@ -605,10 +606,11 @@ body {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
   word-break: break-word;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: subpixel-antialiased !important;
+  -moz-osx-font-smoothing: auto !important;
   text-rendering: optimizeLegibility;
   transform: none !important;
+  will-change: auto !important;
 }
 
 /* Blindagem total contra qualquer embacamento ou desfoque de texto nos cards e bolhas do chat */
@@ -620,6 +622,11 @@ body {
 .chat-bubble-welcome * {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  -webkit-font-smoothing: subpixel-antialiased !important;
+  -moz-osx-font-smoothing: auto !important;
+  text-rendering: optimizeLegibility;
+  transform: none !important;
+  will-change: auto !important;
 }
 .chat-bubble-aura:hover {
   border-color: rgba(168, 180, 197, 0.22);
@@ -685,10 +692,10 @@ body {
 .prose-aura {
   font-family: var(--font-sans);
   font-weight: 400;
-  font-size: 0.915rem;
-  line-height: 1.68;
+  font-size: 0.935rem;
+  line-height: 1.65;
   letter-spacing: 0.005em;
-  color: #cbd5e1;
+  color: #e2e8f0;
 }
 .prose-aura p,
 .prose-aura ul,
@@ -704,8 +711,8 @@ body {
 }
 /* Veredito Inicial - Lead Paragraph BLUF */
 .prose-aura > p:first-of-type {
-  color: #f1f5f9;
-  font-size: 0.94rem;
+  color: #f8fafc;
+  font-size: 0.96rem;
   line-height: 1.6;
   margin-bottom: 0.85rem;
 }
@@ -782,7 +789,7 @@ body {
 .prose-aura td {
   padding: 6px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  color: #cbd5e1;
+  color: #e2e8f0;
   font-variant-numeric: tabular-nums;
   -webkit-font-feature-settings: "tnum" 1;
   font-feature-settings: "tnum" 1;
@@ -2515,8 +2522,8 @@ body.gpu-guard-active,
 .gpu-guard-active *::after {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  -webkit-font-smoothing: antialiased !important;
-  -moz-osx-font-smoothing: grayscale !important;
+  -webkit-font-smoothing: subpixel-antialiased !important;
+  -moz-osx-font-smoothing: auto !important;
   text-rendering: optimizeLegibility !important;
 }
 
@@ -2556,8 +2563,8 @@ body.gpu-guard-active,
   transform: none !important;
   will-change: auto !important;
   filter: none !important;
-  -webkit-font-smoothing: antialiased !important;
-  -moz-osx-font-smoothing: grayscale !important;
+  -webkit-font-smoothing: subpixel-antialiased !important;
+  -moz-osx-font-smoothing: auto !important;
   text-rendering: optimizeLegibility !important;
 }
 
@@ -3948,7 +3955,7 @@ body.modo-pista-active .persona-switch-btn.persona-btn-contador[aria-selected="t
 .persona-view-contador p {
   font-family: var(--font-mono);
   font-weight: 400;
-  color: #cbd5e1; /* slate-300 */
+  color: #e2e8f0; /* slate-200 */
 }
 
 /* ==========================================================================
@@ -3961,11 +3968,11 @@ body.modo-pista-active .persona-switch-btn.persona-btn-contador[aria-selected="t
   font-variant-numeric: tabular-nums;
   -webkit-font-feature-settings: "tnum" 1;
   font-feature-settings: "tnum" 1;
-  font-size: 0.86em;
+  font-size: 0.88em;
   font-weight: 500;
-  color: #e2e8f0;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   padding: 0.08rem 0.35rem;
   border-radius: 5px;
   white-space: nowrap;
@@ -4098,6 +4105,13 @@ body.modo-pista-active .persona-switch-btn.persona-btn-contador[aria-selected="t
 
 .aura-chat-disclosure summary:hover {
   color: #67e8f9;
+}
+
+.aura-chat-disclosure .prose-aura,
+.aura-chat-disclosure > div {
+  font-size: 0.935rem;
+  line-height: 1.65;
+  color: #e2e8f0;
 }
 
 /* 4. Modo de Conforto de Leitura no Chat (Apendice B - Fase 4) */

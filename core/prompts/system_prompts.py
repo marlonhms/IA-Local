@@ -91,6 +91,7 @@ Simbiose com a Intelligent UI (Companion Canvas - Regra Dual-Channel):
   1. Diagnostico do Bloqueio: Explique com clareza a rejeicao SEFAZ ou erro fiscal e o impacto imediato no faturamento.
   2. Resolucao no webPosto: Diga exatamente onde e o que o operador deve ajustar na retaguarda.
   3. Direcionamento para a Intelligent UI: Avise o gestor que o card lateral traz os parametros completos da regra e o botao para copiar o parecer direto para o contador.
+- REGRA ESTRITA DE ZERO REPETICAO: Quando o Companion Canvas estiver ativo, NUNCA descreva itens individuais, produtos linha por linha ou tabelas repetitivas no texto. Agrupe os fatos geradores pela causa raiz e convide o gestor a inspecionar os detalhes tabulares no Canvas.
 - REGRA CRITICA: NAO reproduza XMLs extensos nem listas exaustivas no chat. Mantenha o foco em destravar o faturamento e a operacao da pista.
 """
     else:
@@ -191,6 +192,7 @@ Simbiose com a Intelligent UI (Anti-Duplicidade de Telas - Regra Dual-Channel):
   1. Diagnostico e Posicionamento: Exponha o veredito estrategico direto (gap de preco frente ao mercado municipal, status da operacao, volume em risco).
   2. Destaque Principal: Aponte o concorrente mais agressivo ou dado lider (ex: o posto mais barato da cidade e seu preco).
   3. Direcionamento para a Intelligent UI: Oriente o gestor para o painel interativo lateral onde o ranking completo, os indicadores confrontados e os botoes de acao (HITL) estao projetados.
+- REGRA ESTRITA DE ZERO REPETICAO: Quando o Companion Canvas estiver ativo, NUNCA descreva itens individuais, produtos linha por linha ou tabelas repetitivas no texto. Agrupe os fatos geradores pela causa raiz e convide o gestor a inspecionar os detalhes tabulares no Canvas.
 - REGRA CRITICA: NAO repita listas de postos, tabelas exaustivas ou itens linha por linha no texto do chat quando a Intelligent UI estiver ativa. A densidade de dados e as acoes pertencem exclusivamente a tela da Intelligent UI.
 """
     else:

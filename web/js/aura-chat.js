@@ -1095,7 +1095,7 @@ class AuraChatController {
             intent: envelopeData.intent,
             data: envelopeData.props,
             html: widgetContentHtml,
-            autoOpen: !isMobile
+            autoOpen: false
           });
           if (art) {
             if (art.title) artifactTitle = this.sanitizeExecutiveTitle(art.title, envelopeData.intent || envelopeData.component_name);
@@ -1976,7 +1976,7 @@ class AuraChatController {
             intent: resultData?.contrato?.intent || resultData?.intent,
             data: resultData,
             html: widgetHtml,
-            autoOpen: true
+            autoOpen: false
           });
           if (art && art.id) {
             artifactId = art.id;
@@ -2095,9 +2095,9 @@ class AuraChatController {
             <button type="button" onclick="window.auraChat && window.auraChat.toggleInlineArtifact('${containerId}')" id="${containerId}-btn-toggle-pc" aria-expanded="${ariaExpanded}" aria-controls="${containerId}-inline-widget" class="aux-btn-toggle-pc hidden md:inline-flex px-2.5 py-1.5 min-h-[36px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-medium transition-all items-center gap-1 active:scale-95 cursor-pointer" title="Mostrar ou esconder este card no feed de mensagens">
               <span id="${containerId}-btn-toggle-pc-label">${labelText}</span>
             </button>
-            <!-- PC / Desktop: Somente Ver no Painel lateral -->
-            <button type="button" onclick="window.auraAuxPanel && window.auraAuxPanel.open('${artifactId}', true, this)" id="${containerId}-btn-open-panel" class="aux-btn-view-panel hidden md:inline-flex px-3 py-1.5 min-h-[36px] rounded-xl bg-gradient-to-r from-cyan-500/20 to-purple-500/20 hover:from-cyan-500/30 hover:to-purple-500/30 text-cyan-200 hover:text-white border border-cyan-500/40 text-xs font-semibold items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer" title="Abrir no Painel Auxiliar">
-              <span>Ver no Painel</span>
+            <!-- PC / Desktop: Convite Contextual para o Canvas lateral (Apendice C - Fase 2) -->
+            <button type="button" onclick="window.auraAuxPanel && window.auraAuxPanel.open('${artifactId}', true, this)" id="${containerId}-btn-open-panel" class="aux-btn-view-panel hidden md:inline-flex px-3.5 py-1.5 min-h-[36px] rounded-xl bg-gradient-to-r from-cyan-500/25 via-cyan-500/30 to-blue-600/30 hover:from-cyan-500/40 hover:to-blue-600/40 text-cyan-200 hover:text-white border border-cyan-500/50 text-xs font-semibold items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer" title="Explorar matriz detalhada e acoes no Canvas lateral">
+              <span>Explorar no Canvas -></span>
               <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
@@ -5811,7 +5811,10 @@ class AuraChatController {
    */
   applyProgressiveDisclosure(htmlContent, isStillStreaming = false, hasToolCard = false) {
     if (!htmlContent || typeof htmlContent !== 'string') return '';
-    if (isStillStreaming || !hasToolCard) return htmlContent;
+    if (isStillStreaming) return htmlContent;
+    // Apendice C - Fase 2: Com Tool Card/Companion Canvas acoplado, DESATIVA o disclosure no chat.
+    // O texto no chat e mantido como resumo fluido executivo, delegando o aprofundamento ao Canvas.
+    if (hasToolCard) return htmlContent;
 
     const isExpanded = (this.getReadingMode() === 'comfort');
     const openAttr = isExpanded ? ' open' : '';
@@ -5832,7 +5835,7 @@ class AuraChatController {
                 <span>Explorar detalhamento textual completo</span>
                 <span class="text-[10px] bg-slate-800/80 px-1.5 py-0.5 rounded text-slate-300">+Detalhes</span>
               </summary>
-              <div class="p-3 pt-2 border-t border-white/5 space-y-2 text-xs text-slate-300">
+              <div class="p-3 pt-2 border-t border-white/5 space-y-2 text-[0.935rem] leading-relaxed text-slate-200">
                 ${hiddenBlocks}
               </div>
             </details>
@@ -5856,7 +5859,7 @@ class AuraChatController {
             <span>Explorar detalhamento textual completo</span>
             <span class="text-[10px] bg-slate-800/80 px-1.5 py-0.5 rounded text-slate-300">+Detalhes</span>
           </summary>
-          <div class="p-3 pt-2 border-t border-white/5 space-y-2 text-xs text-slate-300">
+          <div class="p-3 pt-2 border-t border-white/5 space-y-2 text-[0.935rem] leading-relaxed text-slate-200">
             ${hiddenBlocks}
           </div>
         </details>

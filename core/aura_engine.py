@@ -2894,16 +2894,33 @@ def build_canonical_genui_envelope(
                     "findings": findings_normalizados,
                 })
 
-            textos_gestor = []
-            textos_contador = []
+            # FASE 4: Limpeza da Redundancia Interna no Canvas (Card Resumo de Impacto da Pista)
+            # Remove a repeticao em lista de todas as explicacoes executivas que ja aparecem nos cards abaixo
+            regras_nao_genericas = [
+                a.get("regra_id", "") for a in apontamentos
+                if a.get("regra_id") and not re.match(r"^SEFAZ-(VAL-NEG|W\d|I\d|CHAVE-LEN|CHAVE-01)", a.get("regra_id", ""))
+            ]
+            regras_ref = f" [{', '.join(regras_nao_genericas)}]" if regras_nao_genericas else ""
+
+            if invalidos:
+                gestor_text = (
+                    f"Impacto na Operacao: Documento bloqueado com {len(invalidos)} apontamento(s) impeditivo(s){regras_ref}. "
+                    "Faturamento retido no PDV/webPosto. Resolucao guiada indicada nos cards abaixo."
+                )
+            elif alertas:
+                gestor_text = (
+                    f"Impacto na Operacao: Documento autorizavel com {len(alertas)} alerta(s) tributario(s){regras_ref}. "
+                    "Nao ha retencao imediata na pista, porem requer regularizacao cadastral na retaguarda."
+                )
+            else:
+                gestor_text = "Impacto na Operacao: Documento 100% conforme. Faturamento e emissao liberados perante a SEFAZ."
+
             bases_legais = []
+            textos_contador = []
             for a in apontamentos:
                 reg_id = a.get("regra_id", "")
-                # Se for codigo generico de validacao interna sem valor legal (ex: SEFAZ-VAL-NEG), omite a tag interna
                 is_generico = bool(re.match(r"^SEFAZ-(VAL-NEG|W\d|I\d|CHAVE-LEN|CHAVE-01)", reg_id))
                 prefixo = f"• [{reg_id}]: " if (reg_id and not is_generico) else "• "
-                if a.get("explicacao_executiva"):
-                    textos_gestor.append(f"{prefixo}{a.get('explicacao_executiva')}")
                 if a.get("explicacao_tecnica"):
                     textos_contador.append(f"{prefixo}{a.get('explicacao_tecnica')}")
                 for bl in (a.get("base_legal") or []):
@@ -2911,9 +2928,11 @@ def build_canonical_genui_envelope(
                         bases_legais.append(bl)
 
             persona_views = {
-                "gestor": "\n".join(textos_gestor) if textos_gestor else "Nenhuma rejeicao ou inconformidade encontrada no documento.",
+                "gestor": gestor_text,
                 "contador": "\n".join(textos_contador) if textos_contador else "Documento validado com sucesso perante regras estruturais e de negocio.",
                 "base_legal": bases_legais if bases_legais else ["MOC 7.0", "NT SEFAZ"],
+                "faturamento_status": "Bloqueado para Autorizacao SEFAZ" if invalidos else ("Sob Alerta Tributario" if alertas else "Faturamento Liberado"),
+                "tempo_retencao": "~3 a 5 min na pista" if invalidos else ("Sem retencao imediata" if alertas else "0 min"),
             }
             props["persona_views"] = persona_views
 
@@ -3702,6 +3721,7 @@ class AuraEngine:
         pergunta: str,
         intencao: str,
         query_vector: Optional[list] = None,
+        genui_active: bool = False,
     ) -> Tuple[str, Any, Optional[Dict[str, Any]], bool, float]:
         """
         Executa a ferramenta correspondente à intenção identificada e retorna o contexto formatado.
@@ -3774,8 +3794,15 @@ class AuraEngine:
 
             elif intencao in ("auditoria_fiscal_sefaz", "conhecimento_fiscal", "fiscal_sefaz"):
                 resultado_bruto = self.tools.auditar_documento_ou_chave_fiscal(pergunta)
+                directive = ""
+                if genui_active:
+                    directive = (
+                        "\n[DIRETIVA DUAL-CHANNEL ATIVA]: O Companion Canvas esta ativo ao lado. "
+                        "NUNCA descreva itens individuais, produtos linha por linha ou tabelas repetitivas no texto. "
+                        "Agrupe os fatos geradores pela causa raiz e convide o gestor a inspecionar os detalhes tabulares no Canvas.\n"
+                    )
                 contexto_extra = (
-                    "Auditoria Fiscal e Diagnostico Especialista SEFAZ (Agent Sefaz + webPosto RAG):\n"
+                    f"Auditoria Fiscal e Diagnostico Especialista SEFAZ (Agent Sefaz + webPosto RAG):{directive}\n"
                     f"{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
                 )
 
@@ -5077,11 +5104,85 @@ class AuraEngine:
                     conclusao = "Documento em total conformidade perante regras SEFAZ MOC 7.0 e SPED."
 
                 if genui_active:
-                    return (
-                        f"### Auditoria de Documento XML ({status_badge})\n\n"
-                        f"Documento Modelo {res.get('modelo', '55')} (rota {res.get('emit_uf', 'SP')} -> {res.get('dest_uf', 'SP')}): {conclusao}\n\n"
-                        "- **Resolucao e Parecer:** Os apontamentos detalhados da SEFAZ e o parecer para o contador estao no **painel lateral**."
+                    # FASE 3: Contrato Zero Repeticao (Sintese Representativa e Observavel por Causa Raiz)
+                    # NUNCA lista produtos linha por linha ou itens individuais no texto do chat
+                    linhas = [
+                        f"### Auditoria de Documento XML ({status_badge})",
+                        "",
+                    ]
+                    # 1. Veredito macro
+                    if erros > 0:
+                        linhas.append(
+                            f"Documento Modelo {res.get('modelo', '55')} (rota {res.get('emit_uf', 'SP')} -> {res.get('dest_uf', 'SP')}) "
+                            f"bloqueado com **{erros} inconsistencia(s) impeditiva(s)** de autorizacao SEFAZ."
+                        )
+                    elif alertas > 0:
+                        linhas.append(
+                            f"Documento Modelo {res.get('modelo', '55')} (rota {res.get('emit_uf', 'SP')} -> {res.get('dest_uf', 'SP')}) "
+                            f"autorizavel perante a SEFAZ, com **{alertas} alerta(s) de conformidade tributaria**."
+                        )
+                    else:
+                        linhas.append(
+                            f"Documento Modelo {res.get('modelo', '55')} (rota {res.get('emit_uf', 'SP')} -> {res.get('dest_uf', 'SP')}) "
+                            "em **total conformidade fiscal** perante regras SEFAZ MOC 7.0 e SPED."
+                        )
+
+                    linhas.append("")
+
+                    # 2. Causa Raiz Geral (clusterizada)
+                    aponts = res.get("apontamentos", [])
+                    causas = []
+                    has_neg = any(
+                        a.get("status") == "INVALID" and (
+                            "negativo" in (a.get("titulo") or "").lower() or
+                            "negativo" in (a.get("explicacao_executiva") or "").lower()
+                        ) for a in aponts
                     )
+                    has_prot = any(
+                        "protocolo" in (a.get("titulo") or "").lower() or
+                        "protocolo" in (a.get("explicacao_executiva") or "").lower()
+                        for a in aponts
+                    )
+                    has_cst = any(
+                        "cst" in (a.get("titulo") or "").lower() or
+                        "aliquota" in (a.get("explicacao_executiva") or "").lower()
+                        for a in aponts
+                    )
+
+                    if has_neg:
+                        causas.append("Descontos comerciais de aplicativo ou abatimentos foram declarados incorretamente como acrescimo negativo em campo nao permitido pelo MOC.")
+                    if has_prot:
+                        causas.append("Ausencia de protocolo de autorizacao valido ou lote pendente de processamento no ambiente autorizador.")
+                    if has_cst:
+                        causas.append("Divergencia entre regime tributario monofasico e aliquotas declaradas nos itens de combustiveis.")
+                    if not causas and (erros > 0 or alertas > 0):
+                        top_apont = aponts[0] if aponts else {}
+                        causas.append(top_apont.get("explicacao_executiva") or "Inconformidades de validacao estrutural ou regras de negocio SEFAZ.")
+
+                    if causas:
+                        linhas.append(f"- **Causa Raiz Geral:** {' '.join(causas)}")
+
+                    # 3. Resolucao no ERP webPosto
+                    if has_neg:
+                        linhas.append("- **Resolucao no webPosto:** Acesse **Faturamento > Notas Fiscais**, localize o documento e mova os valores para o campo oficial de Desconto (`vDesc`), evitando acrescimos negativos.")
+                    elif has_prot:
+                        linhas.append("- **Resolucao no webPosto:** Acesse **Faturamento > Monitor SEFAZ**, execute Consulta de Lote ou retransmita o documento apos restabelecer a comunicacao.")
+                    elif erros > 0:
+                        linhas.append("- **Resolucao no webPosto:** Acesse **Faturamento > Notas Fiscais**, ajuste as regras tributarias dos itens indicados e revalide o documento.")
+                    else:
+                        linhas.append("- **Status Operacional:** Nenhuma correcao necessaria na retaguarda do webPosto.")
+
+                    # 4. Ponte Contextual para o Canvas
+                    if erros > 0 or alertas > 0:
+                        qtd_itens = len(aponts)
+                        linhas.append(
+                            f"- **Ponte Contextual:** A matriz detalhada com os {qtd_itens} apontamento(s) individualizado(s), "
+                            "o totalizador de impacto e o parecer tecnico para o contador estao no **painel lateral** (Canvas)."
+                        )
+                    else:
+                        linhas.append("- **Ponte Contextual:** O espelho fiscal e a chave de acesso estao disponiveis no **painel lateral** (Canvas).")
+
+                    return "\n".join(linhas)
 
                 linhas = [
                     f"### 📑 Auditoria de Documento XML ({status_badge})",
@@ -5296,6 +5397,7 @@ class AuraEngine:
             pergunta_efetiva,
             intencao,
             query_vector,
+            (genui_meta is not None and genui_active),
         )
 
         # 3. Tratamento de Cache Hit Semântico

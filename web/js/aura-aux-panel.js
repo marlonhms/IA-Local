@@ -268,7 +268,7 @@ class AuraAuxPanel {
   /**
    * Registra e projeta um novo artefato gerado pela AURA no painel auxiliar
    */
-  projectArtifact({ id, containerId, toolName, intent, data, html, autoOpen = true }) {
+  projectArtifact({ id, containerId, toolName, intent, data, html, autoOpen = false }) {
     if (!data && !html) return null;
 
     const artifactId = id || ('art_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6));

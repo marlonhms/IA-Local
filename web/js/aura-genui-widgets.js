@@ -2811,28 +2811,49 @@
                     </div>
                   </div>
 
-                  ${execMsg ? `
-                    <p class="text-xs text-slate-300 leading-relaxed font-mono font-normal">
-                      ${escapeHtml(execMsg)}
-                    </p>
-                  ` : ''}
-
-                  ${fields.length > 0 ? `
-                    <div class="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-slate-400">
-                      <span class="text-slate-500">Campos XML:</span>
-                      ${fields.map(f => `<span class="bg-slate-900 px-1.5 py-0.5 rounded border border-white/5 text-slate-300">${escapeHtml(f)}</span>`).join('')}
-                    </div>
-                  ` : ''}
-
-                  ${acaoMsg ? `
-                    <div class="p-2.5 rounded-lg bg-cyan-950/40 border border-cyan-500/20 text-xs text-cyan-200 flex items-start gap-2">
-                      <span class="text-cyan-400 flex-shrink-0 text-sm">💡</span>
-                      <div class="leading-relaxed">
-                        <strong class="text-cyan-300 font-semibold">Como resolver no webPosto: </strong>
-                        <span>${escapeHtml(acaoMsg)}</span>
+                  <!-- FASE 4: Visualizacao Diferenciada por Persona (Gestor vs. Contador) -->
+                  <!-- Modo Gestor (Foco de Pista & Destravamento) -->
+                  <div class="finding-view-gestor space-y-2">
+                    ${execMsg ? `
+                      <p class="text-xs text-slate-300 leading-relaxed font-sans">
+                        ${escapeHtml(execMsg)}
+                      </p>
+                    ` : ''}
+                    ${acaoMsg ? `
+                      <div class="p-2.5 rounded-lg bg-emerald-950/30 border border-emerald-500/30 text-xs text-emerald-200 flex items-start gap-2">
+                        <span class="text-emerald-400 flex-shrink-0 text-sm">💡</span>
+                        <div class="leading-relaxed">
+                          <strong class="text-emerald-300 font-semibold">Como destravar no webPosto: </strong>
+                          <span>${escapeHtml(acaoMsg)}</span>
+                        </div>
                       </div>
-                    </div>
-                  ` : ''}
+                    ` : ''}
+                  </div>
+
+                  <!-- Modo Contador (Foco Contabil, Tags XML & SPED) -->
+                  <div class="finding-view-contador hidden space-y-2">
+                    ${item.explicacao_tecnica ? `
+                      <p class="text-xs text-cyan-200/90 leading-relaxed font-mono">
+                        ${escapeHtml(item.explicacao_tecnica)}
+                      </p>
+                    ` : (execMsg ? `
+                      <p class="text-xs text-slate-300 leading-relaxed font-mono">
+                        ${escapeHtml(execMsg)}
+                      </p>
+                    ` : '')}
+                    ${fields.length > 0 ? `
+                      <div class="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-slate-400">
+                        <span class="text-cyan-400 font-semibold">Tags XML:</span>
+                        ${fields.map(f => `<span class="bg-slate-900 px-1.5 py-0.5 rounded border border-cyan-500/30 text-cyan-300">${escapeHtml(f)}</span>`).join('')}
+                      </div>
+                    ` : ''}
+                    ${(Array.isArray(item.base_legal) && item.base_legal.length > 0) ? `
+                      <div class="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-slate-400">
+                        <span class="text-slate-500">Fundamentacao:</span>
+                        ${item.base_legal.map(b => `<span class="bg-slate-900 px-1.5 py-0.5 rounded border border-white/5 text-slate-300">${escapeHtml(b)}</span>`).join('')}
+                      </div>
+                    ` : ''}
+                  </div>
                 </div>
               `;
             }).join('')}
@@ -3079,28 +3100,56 @@
             </button>
           </div>
 
-          <!-- Painel Visao Gestor -->
-          <div class="persona-view-panel persona-view-gestor ${this.activePersona === 'gestor' ? '' : 'hidden'} p-3 rounded-xl bg-slate-950/50 border border-emerald-500/20 space-y-1.5 animate-fade-in">
-            <div class="flex items-center justify-between text-[10px] font-mono">
-              <span class="text-emerald-400 font-bold uppercase">${escapeHtml(subtitle)}</span>
-              <span class="text-emerald-400/80">Operacao &amp; Acao Imediata</span>
+          <!-- Painel Visao Gestor: Card Resumo de Impacto da Pista (Apendice C - Fase 4) -->
+          <div class="persona-view-panel persona-view-gestor ${this.activePersona === 'gestor' ? '' : 'hidden'} p-3.5 rounded-xl bg-slate-950/60 border border-emerald-500/30 space-y-2.5 animate-fade-in">
+            <div class="flex items-center justify-between text-[11px] font-mono border-b border-white/5 pb-1.5">
+              <span class="text-emerald-400 font-bold uppercase flex items-center gap-1.5">
+                <span>⛽</span>
+                <span>Resumo de Impacto na Pista &amp; Faturamento</span>
+              </span>
+              <span class="text-emerald-400/90 font-semibold px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/30">
+                Operacao Direta
+              </span>
             </div>
-            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed whitespace-pre-line">
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-sans">
+              <div class="p-2.5 rounded-lg bg-slate-900/80 border border-white/5 space-y-0.5">
+                <span class="text-[10px] text-slate-400 font-mono uppercase">Impacto no Faturamento:</span>
+                <p class="font-semibold text-slate-100 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full ${personaViews.faturamento_status && personaViews.faturamento_status.toLowerCase().includes('bloqueado') ? 'bg-rose-400 animate-pulse' : 'bg-emerald-400'}"></span>
+                  <span>${escapeHtml(personaViews.faturamento_status || 'Operacao Normal')}</span>
+                </p>
+              </div>
+              <div class="p-2.5 rounded-lg bg-slate-900/80 border border-white/5 space-y-0.5">
+                <span class="text-[10px] text-slate-400 font-mono uppercase">Tempo Estimado na Pista:</span>
+                <p class="font-semibold text-slate-100 flex items-center gap-1.5">
+                  <span>⏱</span>
+                  <span>${escapeHtml(personaViews.tempo_retencao || '0 min')}</span>
+                </p>
+              </div>
+            </div>
+
+            <p class="text-xs text-slate-300 leading-relaxed font-sans">
               ${formatFiscalHighlightText(gestorText, 'emerald')}
             </p>
           </div>
 
-          <!-- Painel Visao Contador -->
-          <div class="persona-view-panel persona-view-contador ${this.activePersona === 'contador' ? '' : 'hidden'} p-3 rounded-xl bg-slate-950/50 border border-cyan-500/20 space-y-1.5 animate-fade-in">
-            <div class="flex items-center justify-between text-[10px] font-mono">
-              <span class="text-cyan-400 font-bold uppercase">${escapeHtml(subtitle)}</span>
-              <span class="text-cyan-400/80">MOC 7.0 &amp; EFD / SPED Fiscal</span>
+          <!-- Painel Visao Contador: Auditoria Tecnica MOC 7.0 & SPED -->
+          <div class="persona-view-panel persona-view-contador ${this.activePersona === 'contador' ? '' : 'hidden'} p-3.5 rounded-xl bg-slate-950/60 border border-cyan-500/30 space-y-2.5 animate-fade-in">
+            <div class="flex items-center justify-between text-[11px] font-mono border-b border-white/5 pb-1.5">
+              <span class="text-cyan-400 font-bold uppercase flex items-center gap-1.5">
+                <span>💻</span>
+                <span>Auditoria Tecnica MOC 7.0 &amp; EFD / SPED Fiscal</span>
+              </span>
+              <span class="text-cyan-400/90 font-semibold px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-500/30">
+                Escrituracao Contabil
+              </span>
             </div>
             <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed whitespace-pre-line">
               ${formatFiscalHighlightText(contadorText, 'cyan')}
             </p>
             ${basesLegais.length > 0 ? `
-              <div class="pt-2 border-t border-white/5 flex flex-wrap gap-1.5">
+              <div class="pt-2 border-t border-white/5 flex flex-wrap gap-1.5 items-center">
                 <span class="text-[10px] font-mono text-slate-400">Base Legal:</span>
                 ${basesLegais.map(bl => `<span class="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-950/60 text-cyan-300 border border-cyan-500/30">${escapeHtml(bl)}</span>`).join('')}
               </div>
@@ -3231,6 +3280,11 @@
             const contadorPanel = rootElement.querySelector('.persona-view-contador');
             if (gestorPanel) gestorPanel.classList.toggle('hidden', targetPersona !== 'gestor');
             if (contadorPanel) contadorPanel.classList.toggle('hidden', targetPersona !== 'contador');
+
+            // FASE 4: Alterna o detalhamento interno dos cards de findings
+            const isGestor = (targetPersona === 'gestor');
+            rootElement.querySelectorAll('.finding-view-gestor').forEach(el => el.classList.toggle('hidden', !isGestor));
+            rootElement.querySelectorAll('.finding-view-contador').forEach(el => el.classList.toggle('hidden', isGestor));
           });
         }
       });

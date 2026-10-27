@@ -366,3 +366,20 @@ Para considerar este Roadmap 100% concluido, o agente executor devera:
 2. **Suite de Testes (`tests/unit/test_chat_typography_ux.py`):**
    - Validar regras CSS ergonomicas, tokenizacao automatica de numeros, Progressive Disclosure, concisao com `genui_active=True` e zero travessoes Unicode (`\u2014` e `\u2013`).
 
+---
+
+# APENDICE C: SINERGIA DUAL-CHANNEL, NITIDEZ OPTICA E FLUXO SEQUENCIAL (CHAT -> CANVAS) [CONCLUIDO]
+
+> **Status:** 100% Concluido (Fases 1, 2, 3, 4 e 5 implementadas e validadas com 829 testes aprovados)  
+> **Documento Espelho Completo:** `docs/roadmap_apendice_sinergia_dual_channel.md`  
+> **Escopo:** Desacoplamento temporal e cognitivo entre Chat e Canvas (leitura primeiro no chat, abertura sob demanda do Canvas), restauracao de nitidez optica no Windows (ClearType subpixel sem blur de GPU) e eliminacao definitiva de redundancia textual tripla no core do sistema.  
+> **Regra Inegociavel:** ZERO travessoes Unicode (`\u2014` e `\u2013`) em qualquer arquivo modificado ou criado.
+
+## C.1. FASES DO APENDICE C [100% CONCLUIDAS]
+1. **Fase 1 - Nitidez Optica e Renderizacao Cristalina (`web/css/aura.css`):** [CONCLUIDA] Subpixel ClearType nativo no Windows, fim de transforms residuais e contraste elevado (`#e2e8f0` / `0.935rem`).
+2. **Fase 2 - Coreografia Sequencial e Card de Ponte Contextual (`web/js/aura-chat.js`):** [CONCLUIDA] `autoOpen: false` para evitar atropelamento da leitura, remocao de `<details>` concorrente no chat e botao `Explorar no Canvas ->`.
+3. **Fase 3 - Contrato "Zero Repeticao" no Core (`core/aura_engine.py` e Prompts):** [CONCLUIDA] Clusterizacao causal no chat (sem listar itens) e detalhamento item a item exclusivo no Canvas.
+4. **Fase 4 - Higienizacao de Redundancia no Canvas (`web/js/aura-genui-widgets.js`):** [CONCLUIDA] Cockpit de Resumo de Impacto da Pista no topo da Visao Gestor e alternancia inteligente de persona nos cards de apontamentos.
+5. **Fase 5 - Suite de Testes e Sincronizacao (`tests/unit/test_sinergia_dual_channel.py`):** [CONCLUIDA] 21 testes unitarios dedicados, paridade 100% de distribuicao com `dist/`, zero travessoes Unicode e 829 testes aprovados no repositrio.
+
+
