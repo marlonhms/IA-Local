@@ -1,0 +1,352 @@
+"""
+Testes Unitarios do Motor Fiscal e Tributario Determinístico (tests/unit/test_fiscal_engine.py).
+Valida:
+1. Calculo de DV Modulo 11 e decomposicao de chave de 44 digitos da SEFAZ
+2. Auditoria matematica ABNT NBR 5891:2014 (Regra I08-10, W07-10, W16-10, SEFAZ-VAL-NEG)
+3. Regras de negocio de postos (Rejeicao 375 vs 701, Rejeicao 805, 508, 760 e DIFAL ANP)
+4. Auditoria completa de XML com defusedxml e lxml
+5. Integracao com PostoTools e WebPostoRAGEngine (FTS5 BM25)
+
+Regra inegociavel: ZERO travessoes em todo o arquivo.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+from decimal import Decimal
+from pathlib import Path
+import pytest
+
+from core.fiscal_engine import (
+    StatusApontamento,
+    GravidadeApontamento,
+    calcular_dv_modulo_11,
+    decompor_chave_acesso,
+    validar_chave_acesso,
+    auditar_matematica_item,
+    auditar_totais_documento,
+    auditar_regras_tributarias_posto,
+    auditar_documento_xml,
+    round_abnt,
+)
+from core.webposto_rag import WebPostoRAGEngine
+from core.tools import PostoTools
+
+
+CHAVE_NFE_VALIDA = "35261001173538000160550040000039571624115433"
+CHAVE_NFCE_VALIDA = "35260901173538000160650010001678371007376817"
+
+
+def test_calcular_dv_modulo_11_sucesso():
+    """Valida calculo de DV por Modulo 11 conforme padrao oficial SEFAZ MOC 7.0."""
+    base_43 = CHAVE_NFE_VALIDA[:43]
+    dv = calcular_dv_modulo_11(base_43)
+    assert dv == 3
+
+    base_43_nfce = CHAVE_NFCE_VALIDA[:43]
+    dv_nfce = calcular_dv_modulo_11(base_43_nfce)
+    assert dv_nfce == 7
+
+
+def test_calcular_dv_modulo_11_tamanho_invalido():
+    """Garante excecao explicita quando a base de calculo nao contiver 43 digitos."""
+    with pytest.raises(ValueError, match="deve ter 43 digitos"):
+        calcular_dv_modulo_11("12345")
+
+
+def test_decompor_chave_acesso():
+    """Decompoe chave oficial de 44 digitos nos campos estruturados."""
+    d = decompor_chave_acesso(CHAVE_NFE_VALIDA)
+    assert d["c_uf"] == "35"
+    assert d["uf_sigla"] == "SP"
+    assert d["ano"] == "26"
+    assert d["mes"] == "10"
+    assert d["cnpj_emitente"] == "01173538000160"
+    assert d["modelo"] == "55"
+    assert d["tipo_documento"] == "NF-e (modelo 55)"
+    assert d["serie"] == "004"
+    assert d["numero_nfe"] == "000003957"
+    assert d["tipo_emissao"] == "1"
+    assert d["digito_verificador"] == "3"
+    assert d["is_dv_valido"] is True
+
+
+def test_validar_chave_acesso_valida():
+    """Verifica chave de acesso integra e autentica."""
+    findings = validar_chave_acesso(CHAVE_NFE_VALIDA)
+    assert len(findings) == 1
+    assert findings[0].status == StatusApontamento.VALID
+    assert findings[0].regra_id == "SEFAZ-CHAVE-01"
+
+
+def test_validar_chave_acesso_dv_invalido():
+    """Detecta violacao do Digito Verificador (Rejeicao 253)."""
+    # Altera o ultimo digito de 3 para 9
+    chave_corrompida = CHAVE_NFE_VALIDA[:43] + "9"
+    findings = validar_chave_acesso(chave_corrompida)
+    assert any(f.regra_id == "SEFAZ-REJ-253" for f in findings)
+    rej = [f for f in findings if f.regra_id == "SEFAZ-REJ-253"][0]
+    assert rej.status == StatusApontamento.INVALID
+    assert rej.valor_esperado == "3"
+    assert rej.valor_observado == "9"
+
+
+def test_validar_chave_acesso_tamanho_errado():
+    """Detecta chave truncada ou incompleta."""
+    findings = validar_chave_acesso("3526100117353800016055004000003957")
+    assert len(findings) == 1
+    assert findings[0].regra_id == "SEFAZ-CHAVE-LEN"
+    assert findings[0].status == StatusApontamento.INVALID
+
+
+def test_auditar_matematica_item_conforme():
+    """Valida multiplicacao exata qCom * vUnCom == vProd (Regra I08-10)."""
+    ok, finding = auditar_matematica_item(
+        n_item=1,
+        c_prod="001",
+        x_prod="GASOLINA COMUM C",
+        q_com=Decimal("15.500"),
+        v_un_com=Decimal("5.590"),
+        v_prod=Decimal("86.65"),
+    )
+    assert ok is True
+    assert finding is None
+
+
+def test_auditar_matematica_item_rejeicao_629():
+    """Detecta divergencia matematica em abastecimento fracionado (Rejeicao 629)."""
+    ok, finding = auditar_matematica_item(
+        n_item=33,
+        c_prod="005747",
+        x_prod="PALHEIROS PAULISTINHA OURO",
+        q_com=Decimal("1.0000"),
+        v_un_com=Decimal("33.0000"),
+        v_prod=Decimal("35.00"),  # Divergencia de R$ 2.00
+    )
+    assert ok is False
+    assert finding is not None
+    assert finding.regra_id == "SEFAZ-I08-10"
+    assert finding.status == StatusApontamento.INVALID
+    assert finding.valor_esperado == "33.00"
+    assert finding.valor_observado == "35.00"
+
+
+def test_auditar_matematica_item_valor_negativo_proibido():
+    """Detecta valor monetario negativo que trava o ACBr (SEFAZ-VAL-NEG)."""
+    ok, finding = auditar_matematica_item(
+        n_item=1,
+        c_prod="001",
+        x_prod="GASOLINA COMUM",
+        q_com=Decimal("10.00"),
+        v_un_com=Decimal("5.00"),
+        v_prod=Decimal("50.00"),
+        v_outro=Decimal("-5.00"),  # Cupom de app lancado como vOutro negativo
+    )
+    assert ok is False
+    assert finding is not None
+    assert finding.regra_id == "SEFAZ-VAL-NEG"
+    assert finding.gravidade == GravidadeApontamento.CRITICAL
+
+
+def test_auditar_totais_documento_conforme():
+    """Valida somatorio e composicao de vNF conformes (Regras W07-10 e W16-10)."""
+    itens = [Decimal("50.00"), Decimal("30.00"), Decimal("20.00")]
+    findings = auditar_totais_documento(
+        v_prod_total_declarado=Decimal("100.00"),
+        itens_v_prod=itens,
+        v_nf_declarado=Decimal("100.00"),
+    )
+    assert all(f.status == StatusApontamento.VALID for f in findings)
+
+
+def test_auditar_totais_documento_rejeicao_531_e_535():
+    """Detecta total de produtos divergente da soma dos itens e vNF inconsistente."""
+    itens = [Decimal("50.00"), Decimal("30.00")]  # Soma = 80.00
+    findings = auditar_totais_documento(
+        v_prod_total_declarado=Decimal("100.00"),  # Divergencia de R$ 20.00
+        itens_v_prod=itens,
+        v_nf_declarado=Decimal("95.00"),  # vNF divergente da composicao
+        v_desc=Decimal("0.00"),
+    )
+    ids = [f.regra_id for f in findings]
+    assert "SEFAZ-W07-10" in ids
+    assert "SEFAZ-W16-10" in ids
+
+
+def test_rejeicao_375_cfop_5929_referenciando_nfce_65():
+    """Valida deteccao da Rejeicao 375 e orientacao para webPosto 26.9."""
+    findings = auditar_regras_tributarias_posto(
+        mod="55",
+        cfop="5929",
+        ref_chaves=[CHAVE_NFCE_VALIDA],  # Modelo 65 referenciada em NFref
+    )
+    assert len(findings) == 1
+    rej = findings[0]
+    assert rej.regra_id == "SEFAZ-I08-180"
+    assert rej.status == StatusApontamento.INVALID
+    assert "Rejeicao 375" in rej.titulo
+    assert "webPosto 26.9" in rej.explicacao_executiva
+
+
+def test_alerta_701_cfop_5929_sem_nfref_sped_c113():
+    """Gera alerta fiscal e de SPED C113 quando NFref for omitida em CFOP 5929."""
+    findings = auditar_regras_tributarias_posto(
+        mod="55",
+        cfop="5929",
+        ref_chaves=[],  # Sem NFref
+    )
+    assert len(findings) == 1
+    alerta = findings[0]
+    assert alerta.regra_id == "SEFAZ-BA02"
+    assert alerta.status == StatusApontamento.WARNING
+    assert "C113" in alerta.explicacao_executiva
+    assert "SPED" in alerta.explicacao_executiva
+
+
+def test_rejeicao_805_uf_destinatario_veda_isento():
+    """Bloqueia indIEDest=2 (Isento) em UFs vedadas como SP."""
+    findings = auditar_regras_tributarias_posto(
+        mod="55",
+        cfop="5102",
+        ref_chaves=[],
+        ind_ie_dest="2",
+        dest_uf="SP",
+    )
+    rej = [f for f in findings if f.regra_id == "SEFAZ-REJ-805"]
+    assert len(rej) == 1
+    assert rej[0].status == StatusApontamento.INVALID
+
+
+def test_rejeicao_508_cst_incompativel_nao_contribuinte():
+    """Detecta CST 10 para destinatario nao contribuinte (indIEDest=9)."""
+    findings = auditar_regras_tributarias_posto(
+        mod="55",
+        cfop="5102",
+        ref_chaves=[],
+        ind_ie_dest="9",
+        cst="10",
+        crt="3",
+    )
+    rej = [f for f in findings if f.regra_id == "SEFAZ-REJ-508"]
+    assert len(rej) == 1
+    assert rej[0].status == StatusApontamento.INVALID
+
+
+def test_rejeicao_760_nfce_cst_proibido():
+    """Detecta CST 10 indevido na NFC-e (mod 65) de pista."""
+    findings = auditar_regras_tributarias_posto(
+        mod="65",
+        cfop="5656",
+        ref_chaves=[],
+        cst="10",
+    )
+    rej = [f for f in findings if f.regra_id == "SEFAZ-REJ-760"]
+    assert len(rej) == 1
+    assert rej[0].status == StatusApontamento.INVALID
+
+
+def test_excecao_combustivel_derivado_petroleo_difal():
+    """Confirma que combustivel derivado de petroleo nao leva DIFAL (Regra NA01-20)."""
+    findings = auditar_regras_tributarias_posto(
+        mod="55",
+        cfop="6656",
+        ref_chaves=[],
+        id_dest="2",
+        ind_final="1",
+        ind_ie_dest="9",
+        anp_code="320101001",  # Gasolina Comum (derivado de petroleo)
+    )
+    exc = [f for f in findings if f.regra_id == "SEFAZ-ANP-DIFAL-EXC"]
+    assert len(exc) == 1
+    assert exc[0].status == StatusApontamento.VALID
+
+
+def test_auditar_documento_xml_simulado():
+    """Audita XML simples garantindo deteccao de rascunho sem protocolo e itens."""
+    xml_fake = f"""
+    <nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+        <NFe>
+            <infNFe Id="NFe{CHAVE_NFE_VALIDA}">
+                <ide>
+                    <mod>55</mod>
+                    <idDest>1</idDest>
+                    <indFinal>1</indFinal>
+                </ide>
+                <emit>
+                    <CRT>3</CRT>
+                    <enderEmit><UF>SP</UF></enderEmit>
+                </emit>
+                <dest>
+                    <indIEDest>9</indIEDest>
+                    <enderDest><UF>SP</UF></enderDest>
+                </dest>
+                <det nItem="1">
+                    <prod>
+                        <cProd>001</cProd>
+                        <xProd>GASOLINA COMUM</xProd>
+                        <CFOP>5656</CFOP>
+                        <qCom>10.000</qCom>
+                        <vUnCom>5.000</vUnCom>
+                        <vProd>50.00</vProd>
+                    </prod>
+                    <imposto>
+                        <ICMS>
+                            <ICMS60>
+                                <orig>0</orig>
+                                <CST>60</CST>
+                            </ICMS60>
+                        </ICMS>
+                    </imposto>
+                </det>
+                <total>
+                    <ICMSTot>
+                        <vProd>50.00</vProd>
+                        <vNF>50.00</vNF>
+                    </ICMSTot>
+                </total>
+            </infNFe>
+        </NFe>
+        <protNFe>
+            <infProt>
+                <cStat>100</cStat>
+                <nProt>135260000000001</nProt>
+            </infProt>
+        </protNFe>
+    </nfeProc>
+    """
+    res = auditar_documento_xml(xml_fake)
+    assert res["valido"] is True
+    assert res["chave_acesso"] == CHAVE_NFE_VALIDA
+    assert res["erros_impeditivos"] == 0
+
+
+def test_posto_tools_auditoria_fiscal():
+    """Valida tool exposta auditar_documento_ou_chave_fiscal."""
+    tools = PostoTools()
+    # 1. Auditoria por chave de 44 digitos
+    resp_chave = tools.auditar_documento_ou_chave_fiscal(CHAVE_NFE_VALIDA)
+    assert resp_chave["status"] == "sucesso"
+    assert resp_chave["tipo"] == "chave_acesso"
+    assert resp_chave["decomposicao"]["uf_sigla"] == "SP"
+
+    # 2. Consulta de rejeicao fiscal no acervo SEFAZ
+    resp_rej = tools.auditar_documento_ou_chave_fiscal("rejeicao 375 cupom fiscal")
+    assert resp_rej["status"] == "sucesso"
+    assert resp_rej["tipo"] == "consulta_rejeicao_fiscal"
+    assert len(resp_rej["resultados"]) > 0
+
+
+def test_fts5_pesquisa_rejeicoes_sefaz():
+    """Garante que WebPostoRAGEngine localiza rejeicoes fiscais curadas."""
+    engine = WebPostoRAGEngine()
+    res_375 = engine.buscar_geral("rejeicao 375 cupom fiscal", pilar="fiscal_tributario_sefaz")
+    assert len(res_375) > 0
+    assert "375" in res_375[0]["codigo_ref"]
+
+    res_629 = engine.buscar_geral("rejeicao 629 arredondamento", pilar="fiscal_tributario_sefaz")
+    assert len(res_629) > 0
+    assert "629" in res_629[0]["codigo_ref"]
+
+    res_805 = engine.buscar_geral("rejeicao 805 isento", pilar="fiscal_tributario_sefaz")
+    assert len(res_805) > 0
+    assert "805" in res_805[0]["codigo_ref"]

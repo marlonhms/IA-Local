@@ -236,6 +236,85 @@ class PostoTools:
                 "motivo": f"Base de conhecimento AURA indisponível: {e}",
             }
 
+    def consultar_conhecimento_webposto(
+        self,
+        termo: str,
+        pilar: str = None,
+        modulo: str = None,
+        top_k: int = 3,
+    ) -> dict:
+        """
+        Consulta o acervo oficial curado do webPosto (Confluence, Dicionario SQL, Incidentes e APIs).
+        Busca full-text instantanea local com ranking BM25 via FTS5.
+        """
+        try:
+            from core.webposto_rag import get_webposto_rag
+            resultados = get_webposto_rag().buscar_geral(termo, pilar=pilar, modulo=modulo, limit=top_k)
+            return {
+                "termo": termo,
+                "pilar": pilar,
+                "modulo": modulo,
+                "resultados": resultados,
+                "status": "online_local",
+                "total": len(resultados),
+            }
+        except Exception as e:
+            return {
+                "termo": termo,
+                "pilar": pilar,
+                "resultados": [],
+                "status": "offline_ou_erro",
+                "motivo": f"Falha na consulta webPosto RAG: {e}",
+            }
+
+    def auditar_documento_ou_chave_fiscal(
+        self,
+        chave_ou_xml: str,
+    ) -> dict:
+        """
+        Audita de forma deterministica uma chave de acesso (44 digitos), trecho de XML ou dados de NF-e/NFC-e.
+        Aplica regras SEFAZ, calculo matematico ABNT NBR 5891:2014, regras de combustiveis ANP,
+        compatibilidade de CFOP/CST/CSOSN, Rejeicao 375 e SPED C113.
+        """
+        try:
+            from core.fiscal_engine import (
+                validar_chave_acesso,
+                decompor_chave_acesso,
+                auditar_documento_xml,
+            )
+            clean_input = (chave_ou_xml or "").strip()
+            digits = re.sub(r"[^0-9]", "", clean_input)
+            if len(digits) == 44 and "<" not in clean_input:
+                decomp = decompor_chave_acesso(digits)
+                findings = validar_chave_acesso(digits)
+                return {
+                    "tipo": "chave_acesso",
+                    "decomposicao": decomp,
+                    "apontamentos": [f.model_dump() for f in findings],
+                    "status": "sucesso",
+                }
+            elif "<" in clean_input and ("infNFe" in clean_input or "NFe" in clean_input or "nfeProc" in clean_input):
+                resultado = auditar_documento_xml(clean_input)
+                return {
+                    "tipo": "xml_documento",
+                    "resultado": resultado,
+                    "status": "sucesso",
+                }
+            else:
+                from core.webposto_rag import get_webposto_rag
+                resultados = get_webposto_rag().buscar_geral(clean_input, pilar="fiscal_tributario_sefaz", limit=3)
+                return {
+                    "tipo": "consulta_rejeicao_fiscal",
+                    "termo": clean_input,
+                    "resultados": resultados,
+                    "status": "sucesso",
+                }
+        except Exception as e:
+            return {
+                "status": "erro",
+                "motivo": f"Falha na auditoria fiscal: {e}",
+            }
+
     def consultar_analise_vendas_erp(self, tipo: str = "mais_vendidos") -> dict:
         """
         Consulta dados analíticos de vendas e abastecimentos através do Adaptador Universal AUPS.

@@ -551,6 +551,26 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     if re.search(r"\b(?:preciso\s+de\s+ajuda|me\s+ajuda|quero\s+ajuda|ajuda\s+aqui|ajuda\s+a[ií]|d[aá]\s+(?:uma\s+)?ajuda|ajuda\s+com\s+o\s+sistema|estou\s+com\s+d[uú]vida|pode\s+me\s+ajudar)\b", p):
         return "ajuda_sistema"
 
+    # -2.7 Conhecimento operacional do webPosto, manuais, procedimentos, incidentes e schemas
+    if re.search(
+        r"\b(?:abastecimento\s+preso|bico\s+(?:preso|travado)|bico\s+inoperante|erro\s+no\s+pdv|"
+        r"como\s+(?:emitir|gerar|tirar|fazer|configurar|lan[cç]ar|consultar)|"
+        r"onde\s+(?:fica|encontro|vejo|configuro)|webposto|confluence|runbook|dicionario\s+sql|"
+        r"tabela\s+(?:abastecimentos|pedido|nfce|itemped|tanque)|flag\s+imprimiu|api\s+webposto)\b",
+        p
+    ):
+        return "ajuda_sistema"
+
+    # -2.6 Auditoria fiscal, regras SEFAZ, chave de acesso de 44 digitos e rejeicoes de notas
+    if re.search(
+        r"\b(?:\d{44}|rejei[cç][aã]o\s*\d+|rejeicao|erro\s+sefaz|sefaz|chave\s+de\s+acesso|"
+        r"nota\s+rejeitada|nfe\s+rejeitada|nfce\s+rejeitada|cfop\s+5929|cfop\s+6929|"
+        r"sped\s+c113|abnt\s+nbr\s+5891|arredondamento\s+sefaz|indiedest|isento\s+de\s+ie|"
+        r"difal|auditar\s+xml|auditar\s+nota)\b",
+        p
+    ):
+        return "ajuda_sistema"
+
     # -2.5 Meta-perguntas sobre funcionamento do sistema, UI, telas, módulos e atalhos
     padrao_meta_pergunta = re.compile(
         r"\b(?:onde\s+(?:(?:eu|voc[eê]|a\s+gente)\s+)?(?:fica|vejo|encontro|est[aá]|olho)|"

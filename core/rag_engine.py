@@ -623,6 +623,7 @@ class HybridRAGEngine:
             logger.warning("Falha ao consultar banco vetorial: %s. Ativando fallback em memoria.", e)
             retrieval_mode = "offline_memory_fallback"
             try:
+                # 1. Consulta sementes operacionais e normativas oficiais da AURA (ANP, INMETRO, Cockpit)
                 from scripts.seed_aura_conhecimento import CONHECIMENTO_SEEDS
                 q_words = [w for w in re.findall(r"[\w]+", q_clean.lower()) if len(w) > 2]
                 scored = []
@@ -642,7 +643,36 @@ class HybridRAGEngine:
                         item.setdefault("sparse_rank", 1)
                         item.setdefault("rrf_score", 0.04762)
                         results.append(item)
-                else:
+
+                # 2. Complementa com o acervo operacional curado do webPosto (Confluence, Dicionario SQL, Incidentes, APIs)
+                from core.webposto_rag import get_webposto_rag
+                wp_limit = top_k if not results else top_k
+                wp_items = get_webposto_rag().buscar_geral(q_clean, limit=wp_limit)
+                for wp in wp_items:
+                    results.append({
+                        "id": f"wp_{wp['id']}",
+                        "modulo": f"webPosto / {wp['modulo']}",
+                        "topico": wp["codigo_ref"],
+                        "titulo": wp["titulo"],
+                        "subtitulo": wp.get("subtitulo") or wp["resumo_executivo"],
+                        "conteudo": wp["conteudo_completo"],
+                        "metadados": {
+                            "pilar": wp["pilar"],
+                            "impacto_financeiro": wp.get("impacto_financeiro"),
+                            "acao_recomendada": wp.get("acao_recomendada"),
+                            "tabelas_banco": wp.get("tabelas_banco"),
+                        },
+                        "elementos_ui": {},
+                        "ui_action": {},
+                        "tags": [t.strip() for t in wp.get("tags_busca", "").split(",") if t.strip()],
+                        "cosine_similarity": 0.0,
+                        "fts_score": wp.get("score_bm25", 0.0),
+                        "dense_rank": None,
+                        "sparse_rank": 1,
+                        "rrf_score": 0.04,
+                    })
+
+                if not results:
                     item = dict(CONHECIMENTO_SEEDS[0])
                     item.setdefault("id", None)
                     item.setdefault("cosine_similarity", 0.0)
