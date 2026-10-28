@@ -178,7 +178,7 @@ def test_auditar_totais_documento_rejeicao_531_e_535():
 
 
 def test_rejeicao_375_cfop_5929_referenciando_nfce_65():
-    """Valida deteccao da Rejeicao 375 e orientacao para webPosto 26.9."""
+    """Valida deteccao da Rejeicao 375 e orientacao para seu ERP."""
     findings = auditar_regras_tributarias_posto(
         mod="55",
         cfop="5929",
@@ -189,7 +189,7 @@ def test_rejeicao_375_cfop_5929_referenciando_nfce_65():
     assert rej.regra_id == "SEFAZ-I08-180"
     assert rej.status == StatusApontamento.INVALID
     assert "Rejeicao 375" in rej.titulo
-    assert "webPosto 26.9" in rej.explicacao_executiva
+    assert "seu ERP" in rej.explicacao_executiva
 
 
 def test_alerta_701_cfop_5929_sem_nfref_sped_c113():

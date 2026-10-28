@@ -170,5 +170,5 @@ FALLBACK_MODELS = [
     DEFAULT_LLM_MODEL,
     "models/gemini-3.5-flash-lite",
     "models/gemini-flash-latest",
-    "models/gemini-2.5-flash",
+    "models/gemini-3.8-flash",
 ]

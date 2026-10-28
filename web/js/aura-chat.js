@@ -627,8 +627,8 @@ class AuraChatController {
     this.setStreamingState(true);
 
     const isRawXml = !meta?.isFile && typeof query === 'string' && (
-      query.includes('<infNFe') || 
-      query.includes('<nfeProc') || 
+      query.includes('<infNFe') ||
+      query.includes('<nfeProc') ||
       query.includes('<NFe') ||
       (query.trim().startsWith('<?xml') && query.length > 150)
     );
@@ -803,18 +803,18 @@ class AuraChatController {
             } else {
               this.updateCognitiveStep(messageContainerId, 'Processando raciocínio cognitivo...', 'cyan');
             }
-          } 
+          }
           else if (type === 'tool_start') {
             const toolName = chunk.data?.tool_name || chunk.data?.intent || chunk.tool_name || chunk.intent || 'ferramenta';
             this.updateToolStartStatus(messageContainerId, toolName);
-          } 
+          }
           else if (type === 'tool_result') {
             const toolName = chunk.data?.tool_name || chunk.data?.intent || chunk.tool_name || chunk.intent || 'ferramenta';
             currentToolName = toolName;
             currentToolResult = chunk.data?.result || chunk.data || {};
             // Registra os dados da ferramenta sem abrir card prematuro antes do texto
             this.updateCognitiveStep(messageContainerId, 'Confrontando dados e regras de negócio...', 'purple');
-          } 
+          }
           else if (
             type === 'ui_skeleton' ||
             type === 'ui_delta' ||
@@ -830,7 +830,7 @@ class AuraChatController {
             if (!fullResponseText && (chunk.text || '').trim()) {
               this.updateCognitiveStep(messageContainerId, 'Gerando diagnóstico executivo...', 'purple');
             }
-          } 
+          }
           else if (type === 'telemetry') {
             telemetryData = chunk.data || {};
             this.updateTelemetryBadge(messageContainerId, telemetryData);
@@ -1056,7 +1056,7 @@ class AuraChatController {
         if (inlineWidget) {
           const entranceClass = options.animated ? 'genui-wow-entrance' : 'animate-fade-in';
           hydratedHtml = `
-            <div id="genui-card-${this.escapeHtml(toolCallId || 'default')}" 
+            <div id="genui-card-${this.escapeHtml(toolCallId || 'default')}"
                  class="genui-hydrated-card ${entranceClass} my-2"
                  data-tool-call-id="${this.escapeHtml(toolCallId || '')}"
                  data-component="${this.escapeHtml(envelopeData.component_name || '')}">
@@ -1213,7 +1213,7 @@ class AuraChatController {
         ? 'bg-slate-800 text-slate-200 border-white/10 hover:bg-slate-700'
         : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/30';
       return `
-        <button type="button" 
+        <button type="button"
                 data-action-id="${this.escapeHtml(act.action_id || '')}"
                 data-tool-call-id="${this.escapeHtml(toolCallId || '')}"
                 class="genui-action-btn px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${variantClass} ${disabledClass}"
@@ -1231,7 +1231,7 @@ class AuraChatController {
     ` : '';
 
     return `
-      <div id="genui-card-${this.escapeHtml(toolCallId || 'default')}" 
+      <div id="genui-card-${this.escapeHtml(toolCallId || 'default')}"
            class="genui-hydrated-card p-4 sm:p-5 space-y-3.5 rounded-2xl border border-cyan-500/30 bg-slate-900/80 backdrop-blur-xl animate-fade-in my-2"
            data-tool-call-id="${this.escapeHtml(toolCallId)}"
            data-component="${this.escapeHtml(componentName)}">
@@ -1500,8 +1500,8 @@ class AuraChatController {
 
     const isFileMeta = meta && (meta.isFile || meta.filename);
     const isRawXml = !isFileMeta && typeof text === 'string' && (
-      text.includes('<infNFe') || 
-      text.includes('<nfeProc') || 
+      text.includes('<infNFe') ||
+      text.includes('<nfeProc') ||
       text.includes('<NFe') ||
       (text.trim().startsWith('<?xml') && text.length > 150)
     );
@@ -1522,7 +1522,7 @@ class AuraChatController {
         sizeFormatted = 'XML';
       }
 
-      const fileDesc = isFileMeta 
+      const fileDesc = isFileMeta
         ? `Arquivo XML anexado (${sizeFormatted}) - Auditoria SEFAZ MOC 7.0`
         : `XML Fiscal enviado (${sizeFormatted}) - Estrutura NFe/NFCe detectada`;
 
@@ -1871,7 +1871,7 @@ class AuraChatController {
     ids.forEach(id => {
       const chip = typeof document !== 'undefined' ? document.getElementById(id) : null;
       if (chip) {
-        const colorClass = mode === 'purple' 
+        const colorClass = mode === 'purple'
           ? 'bg-purple-500/10 text-purple-300 border-purple-500/30'
           : mode === 'emerald'
           ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
@@ -2069,7 +2069,8 @@ class AuraChatController {
     const isHiddenClass = startExpanded ? '' : 'hidden';
     const labelText = startExpanded ? 'Esconder Widget ▴' : 'Ver no Chat ▾';
     const ariaExpanded = startExpanded ? 'true' : 'false';
-    const displayTitle = this.sanitizeExecutiveTitle(artifactTitle);
+    const displayTitle = this.sanitizeErpBrand(this.sanitizeExecutiveTitle(artifactTitle));
+    const displaySubtitle = this.sanitizeErpBrand(artifactSubtitle || '');
 
     const entranceClass = animated ? 'genui-wow-entrance' : 'animate-fade-in';
     return `
@@ -2088,7 +2089,7 @@ class AuraChatController {
                 <span>${this.escapeHtml(displayTitle)}</span>
                 <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Canvas</span>
               </div>
-              <p class="text-[11px] text-slate-400 font-sans truncate">${this.escapeHtml(artifactSubtitle)}</p>
+              <p class="text-[11px] text-slate-400 font-sans truncate">${this.escapeHtml(displaySubtitle)}</p>
             </div>
           </div>
 
@@ -2115,8 +2116,8 @@ class AuraChatController {
           ${widgetHtml}
           <!-- Barra rápida para esconder o widget no chat -->
           <div class="flex justify-end pt-1">
-            <button type="button" 
-                    onclick="window.auraChat && window.auraChat.toggleInlineArtifact('${containerId}')" 
+            <button type="button"
+                    onclick="window.auraChat && window.auraChat.toggleInlineArtifact('${containerId}')"
                     class="text-[11px] text-slate-400 hover:text-cyan-300 transition-colors flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-white/10 cursor-pointer"
                     title="Recolher visualização deste card no chat">
               <span>Esconder este widget ▴</span>
@@ -2343,18 +2344,18 @@ class AuraChatController {
         </div>
 
         <div class="decision-actions">
-          <button 
-            type="button" 
-            class="decision-btn-primary" 
+          <button
+            type="button"
+            class="decision-btn-primary"
             onclick="if (window.auraChat) window.auraChat.sendUserPrompt('${escapedPrompt}');"
             title="Tentar executar a consulta novamente">
             <span>${CHAT_ICONS.refresh}</span>
             <span>Tentar Novamente</span>
           </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
+          <button
+            type="button"
+            class="decision-btn-secondary"
             onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como verificar a integridade da conexão do ERP e banco local?');"
             title="Verificar status e procedimento manual de contingência">
             <span>${CHAT_ICONS.wrench}</span>
@@ -2409,9 +2410,9 @@ class AuraChatController {
       const label = action.label || 'Acessar Funcionalidade';
       if (action.action === 'switch_tab' && action.target) {
         actionButtonHtml = `
-          <button 
+          <button
             type="button"
-            onclick="if (window.auraAudio) window.auraAudio.playChime(650, 0.05); if (window.auraApp) window.auraApp.switchTab('${this.escapeHtml(action.target)}');" 
+            onclick="if (window.auraAudio) window.auraAudio.playChime(650, 0.05); if (window.auraApp) window.auraApp.switchTab('${this.escapeHtml(action.target)}');"
             class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
             <span class="inline-flex">${CHAT_ICONS.rocket}</span>
             <span>${this.escapeHtml(label)}</span>
@@ -2422,9 +2423,9 @@ class AuraChatController {
         `;
       } else if (action.action === 'open_sidebar') {
         actionButtonHtml = `
-          <button 
+          <button
             type="button"
-            onclick="if (window.auraApp) window.auraApp.openSidebar();" 
+            onclick="if (window.auraApp) window.auraApp.openSidebar();"
             class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
             <span class="inline-flex">${CHAT_ICONS.folder}</span>
             <span>${this.escapeHtml(label)}</span>
@@ -2432,9 +2433,9 @@ class AuraChatController {
         `;
       } else if (action.action === 'open_command_palette') {
         actionButtonHtml = `
-          <button 
+          <button
             type="button"
-            onclick="const btn = document.getElementById('btn-open-palette'); if (btn) btn.click();" 
+            onclick="const btn = document.getElementById('btn-open-palette'); if (btn) btn.click();"
             class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
             <span class="inline-flex">${CHAT_ICONS.terminal}</span>
             <span>${this.escapeHtml(label)}</span>
@@ -2442,9 +2443,9 @@ class AuraChatController {
         `;
       } else if (action.action === 'toggle_audio') {
         actionButtonHtml = `
-          <button 
+          <button
             type="button"
-            onclick="const btn = document.getElementById('sidebar-btn-toggle-sfx') || document.getElementById('btn-toggle-sfx'); if (btn) { btn.click(); } else if (window.auraAudio) { const m = window.auraAudio.toggleMute(); if (window.auraApp) window.auraApp.syncSfxButtons(m); }" 
+            onclick="const btn = document.getElementById('sidebar-btn-toggle-sfx') || document.getElementById('btn-toggle-sfx'); if (btn) { btn.click(); } else if (window.auraAudio) { const m = window.auraAudio.toggleMute(); if (window.auraApp) window.auraApp.syncSfxButtons(m); }"
             class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
             <span class="inline-flex">${CHAT_ICONS.volume}</span>
             <span>${this.escapeHtml(label)}</span>
@@ -2452,9 +2453,9 @@ class AuraChatController {
         `;
       } else {
         actionButtonHtml = `
-          <button 
+          <button
             type="button"
-            onclick="if (window.auraApp) window.auraApp.switchTab('cockpit');" 
+            onclick="if (window.auraApp) window.auraApp.switchTab('cockpit');"
             class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
             <span class="inline-flex">${CHAT_ICONS.pulse}</span>
             <span>${this.escapeHtml(label)}</span>
@@ -2788,53 +2789,53 @@ class AuraChatController {
         <!-- Ações Permitidas -->
         <div class="decision-actions">
           ${isUnavailable ? `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual a previsão de esgotamento e a autonomia estimada dos tanques?');"
               title="Tentar executar a consulta novamente">
               <span>${CHAT_ICONS.refresh}</span>
               <span>Tentar Novamente</span>
             </button>
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar estoque de combustível sem telemetria eletrônica?');"
               title="Procedimento de contingência">
               <span>${CHAT_ICONS.wrench}</span>
               <span>Procedimento de Contingência</span>
             </button>
           ` : `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual a melhor sugestão de pedido de carreta para o Tanque ${codCritico}?');"
               title="Sugerir compra imediata com base no Ullage">
               ${CHAT_ICONS.truck}
               <span>${this.escapeHtml(recLabel)}</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
               title="Ver fórmulas matemáticas de consumo médio e run-out">
               ${CHAT_ICONS.formula}
               <span>Como foi calculado</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'tanques');"
               title="Ver detalhamento completo dos tanques">
               ${CHAT_ICONS.tank}
               <span>Ver Tanques & Detalhes</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
               title="Ver fontes de telemetria e diagnóstico">
               ${CHAT_ICONS.audit}
@@ -3121,53 +3122,53 @@ class AuraChatController {
         <!-- Ações Permitidas -->
         <div class="decision-actions">
           ${isUnavailable ? `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('O LMC de ontem fechou dentro da tolerância oficial da ANP?');"
               title="Tentar executar a consulta novamente">
               <span>${CHAT_ICONS.refresh}</span>
               <span>Tentar Novamente</span>
             </button>
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como preencher o LMC em contingência sem sistema ERP?');"
               title="Procedimento de contingência">
               <span>${CHAT_ICONS.wrench}</span>
               <span>Procedimento de Contingência</span>
             </button>
           ` : `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar a divergência física no tanque de combustíveis?');"
               title="Abrir procedimento de conferência de sonda e régua">
               ${CHAT_ICONS.search}
               <span>${this.escapeHtml(recLabel)}</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
               title="Ver definição regulatória da Portaria 26 da ANP">
               ${CHAT_ICONS.formula}
               <span>Como foi calculado</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'tanques');"
               title="Ver balanço físico-contábil completo dos tanques">
               ${CHAT_ICONS.tank}
               <span>Ver Tanques & ANP</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
               title="Ver fontes fiscais e telemetria">
               ${CHAT_ICONS.audit}
@@ -3454,35 +3455,35 @@ class AuraChatController {
         <!-- Ações Permitidas (Uma primária + botões de evidência) -->
         <div class="decision-actions">
           ${isUnavailable ? `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual a conciliação do turno de hoje?');"
               title="Tentar executar a consulta novamente">
               <span>${CHAT_ICONS.refresh}</span>
               <span>Tentar Novamente</span>
             </button>
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar fechamento de turno em contingência sem ERP?');"
               title="Procedimento de contingência">
               <span>${CHAT_ICONS.wrench}</span>
               <span>Procedimento de Contingência</span>
             </button>
           ` : `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
               title="Abrir painel lateral com proveniência e detalhamento">
               ${CHAT_ICONS.audit}
               <span>${this.escapeHtml(recLabel)} ↗</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
               title="Ver fórmula matemática e definição do cálculo">
               ${CHAT_ICONS.formula}
@@ -3490,9 +3491,9 @@ class AuraChatController {
             </button>
 
             ${pendingItems.length > 0 ? `
-              <button 
-                type="button" 
-                class="decision-btn-secondary" 
+              <button
+                type="button"
+                class="decision-btn-secondary"
                 onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
                 title="Ver lista de pendências impeditivas">
                 ${CHAT_ICONS.alert}
@@ -3500,9 +3501,9 @@ class AuraChatController {
               </button>
             ` : ''}
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'bicos');"
               title="Ver todos os bicos da pista e encerrantes">
               ${CHAT_ICONS.nozzle}
@@ -3878,7 +3879,7 @@ class AuraChatController {
           <div class="p-3 rounded-xl glass-subcard border border-white/5 font-sans text-xs space-y-2">
             <div class="text-cyan-400 font-bold font-mono">Divergência Pista = Volume Automação - Encerrantes Faturados</div>
             <div class="text-slate-300">
-              ${this.formatLiters(autVol, 3)} (Pista) - ${this.formatLiters(0, 3)} (fechabomba) = 
+              ${this.formatLiters(autVol, 3)} (Pista) - ${this.formatLiters(0, 3)} (fechabomba) =
               <strong class="text-emerald-400 tabular-nums">${this.formatLiters(0, 3)}</strong>
             </div>
           </div>
@@ -3892,7 +3893,7 @@ class AuraChatController {
           <div class="p-3 rounded-xl glass-subcard border border-white/5 font-sans text-xs space-y-2">
             <div class="text-cyan-400 font-bold font-mono">Divergência Pista = Volume Automação - Encerrantes Faturados</div>
             <div class="text-slate-300">
-              ${this.formatLiters(autVol, 3)} (Pista) - ${this.formatLiters(encVol, 3)} (fechabomba) = 
+              ${this.formatLiters(autVol, 3)} (Pista) - ${this.formatLiters(encVol, 3)} (fechabomba) =
               <strong class="${Math.abs(diffVol) < 0.01 ? 'text-emerald-400' : 'text-amber-400'} tabular-nums">${diffVol > 0 ? '+' : ''}${this.formatLiters(diffVol, 3)}</strong>
             </div>
           </div>
@@ -3911,7 +3912,7 @@ class AuraChatController {
             <div class="p-3 rounded-xl glass-subcard border border-white/5 font-sans text-xs space-y-2">
               <div class="text-cyan-400 font-bold font-mono">Diferença = Faturamento PDV - Automação da Pista</div>
               <div class="text-slate-300">
-                ${this.formatBRL(posRev)} (PDV) - ${this.formatBRL(autRev)} (Pista) = 
+                ${this.formatBRL(posRev)} (PDV) - ${this.formatBRL(autRev)} (Pista) =
                 <strong class="${diff < 0 ? 'text-amber-400' : 'text-emerald-400'} tabular-nums">${this.formatSignedBRL(diff)}</strong>
               </div>
             </div>
@@ -4653,53 +4654,53 @@ class AuraChatController {
         <!-- Ações Permitidas -->
         <div class="decision-actions">
           ${isUnavailable ? `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Quais os combos de conveniência com maior afinidade?');"
               title="Tentar executar a consulta novamente">
               <span>${CHAT_ICONS.refresh}</span>
               <span>Tentar Novamente</span>
             </button>
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar vendas de conveniência em contingência?');"
               title="Procedimento de contingência">
               <span>${CHAT_ICONS.wrench}</span>
               <span>Procedimento de Contingência</span>
             </button>
           ` : `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Quais os scripts de balcão recomendados para a equipe do caixa?');"
               title="Capacitar operadores com roteiro persuasivo no PDV">
               ${CHAT_ICONS.store}
               <span>${this.escapeHtml(recLabel)}</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
               title="Ver definições matemáticas de Suporte, Confiança e Lift">
               ${CHAT_ICONS.formula}
               <span>Como foi calculado</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'caixas');"
               title="Ver tabela detalhada de todas as regras mineradas">
               ${CHAT_ICONS.chart}
               <span>Ver Regras Detalhadas</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
               title="Ver fontes de dados e diagnósticos">
               ${CHAT_ICONS.audit}
@@ -4987,53 +4988,53 @@ class AuraChatController {
         <!-- Ações Permitidas -->
         <div class="decision-actions">
           ${isUnavailable ? `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual o desempenho da pista e vazão de bicos hoje?');"
               title="Tentar executar a consulta novamente">
               <span>${CHAT_ICONS.refresh}</span>
               <span>Tentar Novamente</span>
             </button>
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar vazão de bicos manualmente em contingência?');"
               title="Procedimento de contingência">
               <span>${CHAT_ICONS.wrench}</span>
               <span>Procedimento de Contingência</span>
             </button>
           ` : `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como programar a manutenção preventiva dos filtros de bicos de combustíveis?');"
               title="Abrir diretrizes de manutenção de bicos e bombas">
               <span class="text-xs inline-flex">${CHAT_ICONS.wrench}</span>
               <span>${this.escapeHtml(recLabel)}</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
               title="Ver fórmulas de vazão e conversão de aditivada">
               <span class="text-xs inline-flex">${CHAT_ICONS.formula}</span>
               <span>Como foi calculado</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'bicos');"
               title="Ver detalhamento de todos os bicos da pista">
               <span class="text-xs inline-flex">${CHAT_ICONS.nozzle}</span>
               <span>Ver Bicos & Pista</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
               title="Ver fontes de dados e diagnósticos">
               <span class="text-xs inline-flex">${CHAT_ICONS.audit}</span>
@@ -5208,27 +5209,27 @@ class AuraChatController {
 
         <!-- Ações do Card -->
         <div class="decision-actions">
-          <button 
-            type="button" 
-            class="decision-btn-primary" 
+          <button
+            type="button"
+            class="decision-btn-primary"
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
             title="Abrir extrato analítico com cupons e histórico">
             ${CHAT_ICONS.audit}
             <span>Extrato Completo de Vendas ↗</span>
           </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
+          <button
+            type="button"
+            class="decision-btn-secondary"
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'caixas');"
             title="Ver cupons fiscais da conveniência">
             ${CHAT_ICONS.store}
             <span>Cupons da Loja</span>
           </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
+          <button
+            type="button"
+            class="decision-btn-secondary"
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'bicos');"
             title="Ver histórico de abastecimentos da pista">
             ${CHAT_ICONS.nozzle}
@@ -5524,6 +5525,23 @@ class AuraChatController {
         const rightTrimmed = content.replace(/\s+$/, '');
         const trailing = content.slice(rightTrimmed.length);
         return `[${tag}]${rightTrimmed}[/${tag}]${trailing}`;
+      }
+    );
+
+    // 4.2.5. Desempacota tags de cor sobredimensionadas (evita pintar oracoes inteiras que estouram o layout)
+    text = text.replace(
+      new RegExp('\\[(' + allColors + ')\\]([\\s\\S]*?)\\[\\/\\1\\]', 'gi'),
+      (match, tag, inner) => {
+        if (inner.length <= 45 && !/[.;!?]/.test(inner)) return match;
+        const anchorMatch = inner.match(/(\b\*\*[^*]+\*\*|Rejei[cç][aã]o\s*\d+|CFOP\s*\d+|CST\s*\d+|CSOSN\s*\d+|NCM\s*\d+|[+\-]?\d+(?:[.,]\d+)?%|R\$\s*[\d.,]+)/i);
+        if (anchorMatch) {
+          const anchor = anchorMatch[0];
+          const idx = anchorMatch.index;
+          const prefix = inner.slice(0, idx);
+          const suffix = inner.slice(idx + anchor.length);
+          return `${prefix}[${tag}]${anchor}[/${tag}]${suffix}`;
+        }
+        return inner;
       }
     );
 
@@ -5958,8 +5976,47 @@ class AuraChatController {
     return this.setReadingMode(nextMode);
   }
 
+  sanitizeErpBrand(text) {
+    if (!text || typeof text !== 'string') return text || '';
+    let t = text;
+    t = t.replace(/\bwebposto\s*\(retaguarda\)/gi, 'Retaguarda do seu ERP');
+    t = t.replace(/\bwebpostopdv\b/gi, 'PDV do Posto');
+    t = t.replace(/\bwebpostopay(?:server)?\b/gi, 'Módulo de Pagamentos / TEF');
+    t = t.replace(/\bwebfrota\b/gi, 'Módulo de Frotas');
+    t = t.replace(/\bweboil(?:\s*app)?\b/gi, 'App de Lubrificantes/Pista');
+
+    t = t.replace(/\bNo\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'No seu ERP');
+    t = t.replace(/(?<=[a-zA-Z0-9,;]\s)No seu ERP\b/g, 'no seu ERP');
+
+    t = t.replace(/\bDo\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'Do seu ERP');
+    t = t.replace(/(?<=[a-zA-Z0-9,;]\s)Do seu ERP\b/g, 'do seu ERP');
+
+    t = t.replace(/\bpelo\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'pelo seu ERP');
+    t = t.replace(/\bao\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'ao seu ERP');
+    t = t.replace(/\bpara\s+o\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'para o seu ERP');
+    t = t.replace(/\bcom\s+o\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'com o seu ERP');
+
+    t = t.replace(/\bdesbloqueio\s+webposto\b/gi, 'desbloqueio no seu ERP');
+    t = t.replace(/\bsuporte\s+webposto\b/gi, 'suporte do seu ERP');
+    t = t.replace(/\bapi\s+webposto\b/gi, 'API do seu ERP');
+    t = t.replace(/\bapis\s+webposto\b/gi, 'APIs do seu ERP');
+    t = t.replace(/\bsistema\s+webposto\b/gi, 'seu sistema ERP');
+    t = t.replace(/\berp\s+webposto(?:\s+v?\d+(?:\.\d+)*\+?)?\b/gi, 'ERP do Posto');
+    t = t.replace(/\bvers[aã]o\s+erp\s*:\s*webposto(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'Versao ERP: ERP do Posto');
+
+    t = t.replace(/\bwebposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'seu ERP');
+
+    if (t.startsWith('seu ERP')) {
+      t = 'Seu ERP' + t.slice(7);
+    } else if (t.startsWith('no seu ERP')) {
+      t = 'No seu ERP' + t.slice(10);
+    }
+    return t;
+  }
+
   formatMarkdown(rawMarkdown, isStillStreaming = false, hasToolCard = false) {
     if (!rawMarkdown || typeof rawMarkdown !== 'string') return '';
+    rawMarkdown = this.sanitizeErpBrand(rawMarkdown);
 
     // 1. Auto-balanceia tags abertas SEMPRE (inclusive na renderização final isStillStreaming === false)
     let preparedText = this.balanceStreamingText(rawMarkdown, isStillStreaming);

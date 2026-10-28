@@ -1718,7 +1718,7 @@ class AuraTriggersController {
                       ${a.explicacao_tecnica ? `<div class="text-[10px] font-mono text-cyan-300/80 pt-0.5">MOC/SPED: ${this.escapeHtml(a.explicacao_tecnica)}</div>` : ''}
                       ${a.acoes_recomendadas && a.acoes_recomendadas[0] ? `
                         <div class="mt-1 p-2 rounded bg-cyan-950/30 border border-cyan-500/20 text-[10px] text-cyan-200">
-                          <strong class="text-cyan-300">Acao no webPosto: </strong>${this.escapeHtml(a.acoes_recomendadas[0])}
+                          <strong class="text-cyan-300">Acao no seu ERP: </strong>${this.escapeHtml(a.acoes_recomendadas[0])}
                         </div>
                       ` : ''}
                     </div>
@@ -1760,13 +1760,13 @@ class AuraTriggersController {
                   ` : ''}
                   ${r.acao_recomendada ? `
                     <div class="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-200">
-                      <strong>Ação Recomendada webPosto:</strong> ${this.escapeHtml(r.acao_recomendada)}
+                      <strong>Ação Recomendada no seu ERP:</strong> ${this.escapeHtml(r.acao_recomendada)}
                     </div>
                   ` : ''}
                   <div class="pt-2 flex flex-wrap gap-2">
                     <button type="button" 
                             class="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-[11px] font-semibold border border-cyan-500/30 transition-colors cursor-pointer"
-                            onclick="if(window.auraChat){ window.auraChat.sendUserPrompt('Como corrigir a rejeicao ${this.escapeHtml(r.codigo_ref || '')} no webPosto?'); }">
+                            onclick="if(window.auraChat){ window.auraChat.sendUserPrompt('Como corrigir a rejeicao ${this.escapeHtml(r.codigo_ref || '')} no seu ERP?'); }">
                       Perguntar à AURA no Chat &rarr;
                     </button>
                   </div>

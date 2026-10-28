@@ -513,6 +513,22 @@
       if (stateMgr && typeof stateMgr.isActionExecuted === 'function' && stateMgr.isActionExecuted(actionId)) return false;
       if (this.isExpired() && actionType !== 'inspection') return false;
 
+      // 0. Investigacao Forense de Causa-Raiz (RCA): avaliada ANTES da inspecao, pois o botao
+      // e do tipo 'inspection' mas deve disparar uma nova consulta no chat.
+      const rcaPayload = (this.actions || []).find(a => a.action_id === actionId)?.payload || {};
+      const isRcaAction = actionId === 'act_investigar_rca' ||
+                          btnElement?.getAttribute?.('data-action-id') === 'act_investigar_rca' ||
+                          btnElement?.getAttribute?.('data-intent') === 'investigar_causa_raiz' ||
+                          rcaPayload.intent === 'investigar_causa_raiz';
+      if (isRcaAction && typeof window !== 'undefined' && window.auraChat && typeof window.auraChat.sendUserPrompt === 'function') {
+        const turnoAud = rcaPayload.turno || this.props?.turno_auditado || '';
+        const dataAud = rcaPayload.data || this.props?.data_auditada || '';
+        const shift = turnoAud && !String(turnoAud).toUpperCase().includes('TODOS') ? ` do ${turnoAud}` : '';
+        const dataA = dataAud ? ` de ${dataAud}` : '';
+        window.auraChat.sendUserPrompt(`Investigar causa raiz da quebra${shift}${dataA}`);
+        return true;
+      }
+
       // 1. Acoes de inspecao no Companion Canvas com protecao de debounce
       const btnText = (btnElement && typeof btnElement.textContent === 'string') ? btnElement.textContent : '';
       const isInspection = actionType === 'inspection' || btnText.includes('Canvas') || btnText.includes('Projetar');
@@ -543,16 +559,6 @@
         return true;
       }
 
-      // Acao especial: Disparo de Investigacao Forense de Causa-Raiz (RCA)
-      if (actionId === 'act_investigar_rca' || btnElement?.getAttribute('data-action-id') === 'act_investigar_rca') {
-        if (typeof window !== 'undefined' && window.auraChat && typeof window.auraChat.sendMessage === 'function') {
-          const shift = this.props?.turno_auditado && !this.props.turno_auditado.includes('TODOS') ? ` do ${this.props.turno_auditado}` : '';
-          const dataA = this.props?.data_auditada ? ` de ${this.props.data_auditada}` : '';
-          window.auraChat.sendMessage(`Investigar causa raiz da quebra${shift}${dataA}`);
-          return true;
-        }
-      }
-
       // Acao especial: Copiar Diagnostico Fiscal para o Contador (Area de Transferencia)
       const actionPayload = (this.actions || []).find(a => a.action_id === actionId)?.payload || {};
       if (actionPayload.intent === 'copiar_diagnostico_contador' || actionId.includes('copiar_diagnostico') || btnElement?.textContent?.includes('Copiar Diagnostico')) {
@@ -568,7 +574,7 @@
           `Titulo: ${title}`,
           `Diagnostico: ${diag}`,
           alerta ? `Impacto: ${alerta}` : '',
-          acao ? `Acao webPosto: ${acao}` : '',
+          acao ? `Acao no seu ERP: ${acao}` : '',
           proc ? `\nProcedimento Detalhado:\n${proc}` : '',
           `\nData/Hora: ${new Date().toLocaleString('pt-BR')}`,
           `Gerado pela AURA - Assistente de Prontidao do Posto`
@@ -598,8 +604,8 @@
 
       // Acao especial: Consultar Modulo de Faturamento
       if (actionPayload.intent === 'ajuda_sistema' && actionPayload.modulo === 'faturamento') {
-        if (typeof window !== 'undefined' && window.auraChat && typeof window.auraChat.sendMessage === 'function') {
-          window.auraChat.sendMessage('Como operar o Modulo de Faturamento e Notas Fiscais no webPosto?');
+        if (typeof window !== 'undefined' && window.auraChat && typeof window.auraChat.sendUserPrompt === 'function') {
+          window.auraChat.sendUserPrompt('Como operar o Modulo de Faturamento e Notas Fiscais no seu ERP?');
           return true;
         }
       }
@@ -1770,7 +1776,7 @@
         diagnosisText = diagnosisText.text || diagnosisText.summary || JSON.stringify(diagnosisText);
       }
       if (!diagnosisText || typeof diagnosisText !== 'string') {
-        diagnosisText = 'Faturamento de R$ ' + totGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ' apurado no ERP webPosto.';
+        diagnosisText = 'Faturamento de R$ ' + totGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ' apurado no seu ERP.';
       }
 
       return `
@@ -2675,8 +2681,8 @@
               const trendArrow = k.trend === 'up' ? '↗' : (k.trend === 'down' ? '↘' : '→');
               return `
                 <div class="p-2.5 rounded-lg bg-slate-950/60 border ${statusBorder} flex flex-col justify-between">
-                  <div class="text-[11px] text-slate-400 truncate">${escapeHtml(k.label || 'Métrica')}</div>
-                  <div class="font-mono font-bold text-base ${valueColor} my-0.5">${escapeHtml(String(k.value || '0'))}</div>
+                  <div class="text-[11px] text-slate-400 truncate">${escapeHtml((k.label || 'Métrica').replace(/\bwebposto\b/gi, 'ERP'))}</div>
+                  <div class="font-mono font-bold text-base ${valueColor} my-0.5">${escapeHtml(String(k.value || '0').replace(/\bwebposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'ERP do Posto'))}</div>
                   <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
                     ${k.delta ? `<span class="text-slate-300">${trendArrow} ${escapeHtml(k.delta)}</span>` : '<span></span>'}
                     ${k.subtext ? `<span class="truncate ml-1 text-slate-400">${escapeHtml(k.subtext)}</span>` : ''}
@@ -2852,7 +2858,7 @@
                     <div class="flex items-start gap-2 leading-relaxed">
                       <span class="text-emerald-400 flex-shrink-0 text-sm">💡</span>
                       <div>
-                        <strong class="text-emerald-300 font-semibold">Como destravar no webPosto: </strong>
+                        <strong class="text-emerald-300 font-semibold">Como destravar no seu ERP: </strong>
                         <span>${escapeHtml(acaoMsg)}</span>
                       </div>
                     </div>
@@ -2861,12 +2867,12 @@
                         type="button"
                         class="btn-suporte-webposto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 text-xs font-semibold transition-all active:scale-95 shadow-sm cursor-pointer"
                         data-ticket='${ticketPayload}'
-                        title="Copiar chamado formatado para enviar no WhatsApp do Suporte webPosto"
+                        title="Copiar chamado formatado para enviar no WhatsApp do Suporte do seu ERP"
                       >
                         <svg class="w-3.5 h-3.5 text-emerald-300 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
                         </svg>
-                        <span>Copiar Chamado Suporte webPosto (WhatsApp)</span>
+                        <span>Copiar Chamado Suporte do ERP (WhatsApp)</span>
                       </button>
                     ` : ''}
                   </div>
@@ -2905,23 +2911,6 @@
           bodyHtml = `
             <div class="space-y-2.5">
               ${pendencias.map(item => renderFindingCard(item, false)).join('')}
-
-              ${conformes.length > 0 ? `
-                <div class="finding-conformes-box mt-3 pt-2 border-t border-white/10">
-                  <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/60 border border-emerald-500/20 text-xs">
-                    <div class="flex items-center gap-2">
-                      <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]"></span>
-                      <span class="text-emerald-300 font-medium">${conformes.length} checagem(ns) estruturais SEFAZ 100% conformes</span>
-                    </div>
-                    <button type="button" class="btn-toggle-conformes px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] font-mono text-cyan-400 hover:text-cyan-300 transition-colors" data-state="closed">
-                      Ver conformes (+${conformes.length})
-                    </button>
-                  </div>
-                  <div class="container-conformes-list hidden space-y-2 pt-2">
-                    ${conformes.map(item => renderFindingCard(item, true)).join('')}
-                  </div>
-                </div>
-              ` : ''}
             </div>
           `;
         } else {
@@ -3132,7 +3121,7 @@
     renderLayer1() {
       const p = this.props || {};
       const title = p.title || "Escudo Fiscal SEFAZ & Auditoria Tributaria";
-      const subtitle = p.subtitle || "Auditoria Deterministica MOC 7.0 + webPosto RAG";
+      const subtitle = p.subtitle || "Auditoria Fiscal e Normativas SEFAZ";
       const scoreRaw = p.confidence_score !== undefined ? Number(p.confidence_score) : 0.99;
       const scorePct = Math.round(scoreRaw * 100);
       const diagnosisText = p.diagnosis || this.summary || "Auditoria fiscal processada com sucesso.";
@@ -4254,7 +4243,7 @@
           const rawTicket = btnSuporte.getAttribute('data-ticket') || '{}';
           const t = JSON.parse(rawTicket);
           const texto =
-`[AURA - Abertura de Chamado Suporte webPosto]
+`[AURA - Abertura de Chamado Suporte do ERP]
 Documento: Cupom Fiscal / NFC-e
 Problema: ${t.titulo || "Inconsistencia de Emissao"}
 Causa Operacional: ${t.causa || "Divergencia na rotina de fechamento de venda"}
@@ -4282,7 +4271,7 @@ Solicitacao: Favor orientar ajuste na rotina de emissao de cupons/descontos no P
             });
           }
         } catch (err) {
-          console.warn('[AuraGenUI] Erro ao copiar chamado suporte webPosto:', err);
+          console.warn('[AuraGenUI] Erro ao copiar chamado suporte do ERP:', err);
         }
         return;
       }

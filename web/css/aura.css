@@ -49,7 +49,7 @@
   --border-emerald: rgba(16, 185, 129, 0.35);
   --border-cyan: rgba(6, 182, 212, 0.35);
   --border-purple: rgba(124, 58, 237, 0.35);
-  
+
   --emerald-main: #10b981;
   --emerald-glow: rgba(16, 185, 129, 0.15);
   --cyan-main: #06b6d4;
@@ -111,7 +111,7 @@ body {
   color: #f1f5fa;
   font-family: var(--font-sans);
   overflow-x: hidden;
-  background-image: 
+  background-image:
     radial-gradient(circle at 12% 8%, rgba(6, 182, 212, 0.08) 0%, transparent 44%),
     radial-gradient(circle at 88% 14%, rgba(124, 58, 237, 0.09) 0%, transparent 48%),
     radial-gradient(circle at 50% 90%, rgba(16, 185, 129, 0.06) 0%, transparent 55%),
@@ -437,7 +437,7 @@ body {
   border: 1.5px solid rgba(255, 255, 255, 0.16);
   border-radius: 29px;
   overflow: hidden;
-  box-shadow: 
+  box-shadow:
     inset 0 2px 4px rgba(255, 255, 255, 0.22),
     inset 0 -2px 8px rgba(0, 0, 0, 0.5),
     inset 0 0 16px rgba(0, 0, 0, 0.4),
@@ -779,6 +779,10 @@ body {
   line-height: 1.65;
   letter-spacing: 0.005em;
   color: #e2e8f0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .prose-aura p,
 .prose-aura ul,
@@ -1473,13 +1477,13 @@ body {
   position: relative;
   width: 100%;
   height: 16px;
-  background: linear-gradient(90deg, 
-    rgba(244, 63, 94, 0.35) 0%, 
-    rgba(244, 63, 94, 0.15) 20%, 
-    rgba(16, 185, 129, 0.25) 25%, 
-    rgba(16, 185, 129, 0.4) 50%, 
-    rgba(16, 185, 129, 0.25) 75%, 
-    rgba(244, 63, 94, 0.15) 80%, 
+  background: linear-gradient(90deg,
+    rgba(244, 63, 94, 0.35) 0%,
+    rgba(244, 63, 94, 0.15) 20%,
+    rgba(16, 185, 129, 0.25) 25%,
+    rgba(16, 185, 129, 0.4) 50%,
+    rgba(16, 185, 129, 0.25) 75%,
+    rgba(244, 63, 94, 0.15) 80%,
     rgba(244, 63, 94, 0.35) 100%
   );
   border-radius: 8px;
@@ -2076,7 +2080,7 @@ body {
   backdrop-filter: blur(28px) saturate(190%) contrast(102%);
   -webkit-backdrop-filter: blur(28px) saturate(190%) contrast(102%);
   border-right: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 
+  box-shadow:
     inset 1px 0 0 0 rgba(255, 255, 255, 0.12),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.15),
     0 25px 60px -10px rgba(0, 0, 0, 0.85),
@@ -4055,12 +4059,16 @@ body.modo-pista-active .persona-switch-btn.persona-btn-contador[aria-selected="t
   border: 1px solid rgba(255, 255, 255, 0.12);
   padding: 0.08rem 0.35rem;
   border-radius: 5px;
-  white-space: nowrap;
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: normal;
   display: inline-block;
+  word-break: break-word;
+  overflow-wrap: anywhere;
   vertical-align: baseline;
 }
 
-/* 2. Destaques Editoriais Confortaveis no Chat (Micro-Badges sem Halation) */
+/* 2. Destaques Editoriais Confortaveis no Chat (Micro-Badges sem Halation e sem Quebra de Layout) */
 .prose-aura .text-emerald,
 .prose-aura .aura-text-emerald,
 .prose-aura .aura-hl-emerald,
@@ -4068,17 +4076,19 @@ body.modo-pista-active .persona-switch-btn.persona-btn-contador[aria-selected="t
 .prose-aura .aura-text-green,
 .prose-aura .aura-hl-green {
   color: #34d399 !important;
-  font-family: var(--font-mono);
-  font-size: 0.88em;
+  font-size: 0.9em;
   font-weight: 500;
   padding: 0.08rem 0.38rem;
   border-radius: 5px;
   background: rgba(52, 211, 153, 0.08);
   border: 1px solid rgba(52, 211, 153, 0.22);
   text-shadow: none !important;
-  white-space: nowrap;
-  display: inline-block;
-  vertical-align: baseline;
+  white-space: normal;
+  display: inline;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .prose-aura .text-amber,
@@ -4088,17 +4098,19 @@ body.modo-pista-active .persona-switch-btn.persona-btn-contador[aria-selected="t
 .prose-aura .aura-text-yellow,
 .prose-aura .aura-hl-yellow {
   color: #fbbf24 !important;
-  font-family: var(--font-mono);
-  font-size: 0.88em;
+  font-size: 0.9em;
   font-weight: 500;
   padding: 0.08rem 0.38rem;
   border-radius: 5px;
   background: rgba(251, 191, 36, 0.08);
   border: 1px solid rgba(251, 191, 36, 0.22);
   text-shadow: none !important;
-  white-space: nowrap;
-  display: inline-block;
-  vertical-align: baseline;
+  white-space: normal;
+  display: inline;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .prose-aura .text-rose,
@@ -4108,51 +4120,57 @@ body.modo-pista-active .persona-switch-btn.persona-btn-contador[aria-selected="t
 .prose-aura .aura-text-red,
 .prose-aura .aura-hl-red {
   color: #f87171 !important;
-  font-family: var(--font-mono);
-  font-size: 0.88em;
+  font-size: 0.9em;
   font-weight: 500;
   padding: 0.08rem 0.38rem;
   border-radius: 5px;
   background: rgba(248, 113, 113, 0.08);
   border: 1px solid rgba(248, 113, 113, 0.22);
   text-shadow: none !important;
-  white-space: nowrap;
-  display: inline-block;
-  vertical-align: baseline;
+  white-space: normal;
+  display: inline;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .prose-aura .text-cyan,
 .prose-aura .aura-text-cyan,
 .prose-aura .aura-hl-cyan {
   color: #22d3ee !important;
-  font-family: var(--font-mono);
-  font-size: 0.88em;
+  font-size: 0.9em;
   font-weight: 500;
   padding: 0.08rem 0.38rem;
   border-radius: 5px;
   background: rgba(34, 211, 238, 0.08);
   border: 1px solid rgba(34, 211, 238, 0.22);
   text-shadow: none !important;
-  white-space: nowrap;
-  display: inline-block;
-  vertical-align: baseline;
+  white-space: normal;
+  display: inline;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .prose-aura .text-purple,
 .prose-aura .aura-text-purple,
 .prose-aura .aura-hl-purple {
   color: #c084fc !important;
-  font-family: var(--font-mono);
-  font-size: 0.88em;
+  font-size: 0.9em;
   font-weight: 500;
   padding: 0.08rem 0.38rem;
   border-radius: 5px;
   background: rgba(192, 132, 252, 0.08);
   border: 1px solid rgba(192, 132, 252, 0.22);
   text-shadow: none !important;
-  white-space: nowrap;
-  display: inline-block;
-  vertical-align: baseline;
+  white-space: normal;
+  display: inline;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* 3. Container de Progressive Disclosure no Chat (Apêndice B) */

@@ -125,7 +125,10 @@ def _create_erp_pool(
             logger.info(f"ERP ThreadedConnectionPool inicializado na porta {port} (min={minconn}, max={maxconn}).")
             return p
         except (psycopg2.Error, OSError, RuntimeError, UnicodeDecodeError) as exc:
-            last_exc = exc
+            try:
+                last_exc = str(exc)
+            except Exception:
+                last_exc = repr(exc)
             continue
 
     raise psycopg2.OperationalError(

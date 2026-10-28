@@ -69,6 +69,7 @@ A tabela abaixo conecta cada documento ao seu papel no ciclo de vida da AURA:
 | :--- | :--- | :---: | :---: | :--- |
 | **Roadmap Atual** | [`roadmap.md`](roadmap.md) | Engenharia | **EM EXECUCAO** | Plano diretor dos 5 modulos imediatos: `/roi-diagnostic`, Semantic Cache, Zero-Trust Gateway, Z-Score CLT e Edge Hardening. |
 | **Apendice Longo Prazo** | [`apendice_longo_prazo.md`](apendice_longo_prazo.md) | Arquitetura | **ATIVO** | Visao 30-90+ dias: DuckDB Hypertenancy colunar, SLMs locais na borda, Domain Packs e Pricing B2B. |
+| **Apendice Conhecimento Multicamada** | [`roadmap_apendice_conhecimento_multicamada_rag.md`](roadmap_apendice_conhecimento_multicamada_rag.md) | Arquitetura / RAG | **EM EXECUCAO** | RAG Multicamada (core, vertical, erp, tenant) no pgvector 0.8.6, chunking do Confluence, isolamento LGPD e busca hibrida. |
 | **Deep Research Estrategia** | [`Deep research Estrategia e Arquitetura da AURA.md`](Deep%20research%20Estratégia%20e%20Arquitetura%20da%20AURA.md) | Estrategia | **ATIVO** | Estudo aprofundado de viabilidade, retorno sobre investimento, dados nacionais de perdas no varejo e diferenciais de borda. |
 | **Dossie Tecnico** | [`dossie_tecnico.md`](dossie_tecnico.md) | Sistema | **ATIVO** | Sintese de componentes, requisitos, stack tecnologica e topologia de execucao. |
 | **Estrategia de Produto** | [`Estrategia de Produto IA AURA.md`](Estratégia%20de%20Produto%20IA%20AURA.md) | Produto | **ATIVO** | Posicionamento estrategico, abordagem nao-invasiva e canais de monetizacao. |

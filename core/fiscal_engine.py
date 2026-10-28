@@ -8,7 +8,7 @@ Integrado a partir do Agent Sefaz com principios de Zero Alucinacao:
    - Regra W07-10 / Rejeicao 531 (Somatorio de itens vs vProd) e Projecao de Cascata
    - Regra W16-10 / Rejeicao 535 (Composicao do vNF)
    - Regra SEFAZ-VAL-NEG (Bloqueio de valores monetarios negativos no ACBr)
-   - Regra I08-180 / Rejeicao 375 (CFOP 5929/6929 x NFC-e mod 65 x webPosto versao 26.9)
+   - Regra I08-180 / Rejeicao 375 (CFOP 5929/6929 x NFC-e mod 65 x versao homologada do seu ERP)
    - Regra BA02 / Rejeicao 701 (Documento referenciado x SPED C113)
    - Rejeicoes 508, 600, 529 e 805 (indIEDest x CST/CSOSN x UFs que vedam Isento)
    - Rejeicoes 694, 695, 697 e 698 (DIFAL x Excecoes de combustiveis derivados de petroleo ANP)
@@ -337,7 +337,7 @@ def auditar_matematica_item(
             valor_esperado=">= 0.00",
             valor_observado=f"{v_outro:.2f}",
             base_legal=["MOC 7.0 - Tipos Basicos (TDec_1302)"],
-            acoes_recomendadas=["Acionar o suporte tecnico do webPosto para ajuste na emissao de cupons de aplicativo ou verificar cadastro de desconto da promocao no webPosto."],
+            acoes_recomendadas=["Acionar o suporte tecnico do seu ERP para ajuste na emissao de cupons de aplicativo ou verificar cadastro de desconto da promocao no seu ERP."],
         )
 
     # 2. Multiplicacao qCom * vUnCom == vProd (Regra I08-10 / Rejeicao 629)
@@ -367,7 +367,7 @@ def auditar_matematica_item(
                 "ABNT NBR 5891:2014 - Regras de Arredondamento Decimal",
             ],
             acoes_recomendadas=[
-                f"Recalcular a quantidade ou valor unitario da venda no webPosto (esperado: R$ {v_prod_esperado:.2f}). Se persistir, contatar o suporte webPosto.",
+                f"Recalcular a quantidade ou valor unitario da venda no seu ERP (esperado: R$ {v_prod_esperado:.2f}). Se persistir, contatar o suporte seu ERP.",
             ],
         )
 
@@ -410,7 +410,7 @@ def auditar_totais_documento(
                 valor_esperado=">= 0.00",
                 valor_observado=f"{v_outro:.2f}",
                 base_legal=["MOC 7.0 - Tipos Basicos (TDec_1302)"],
-                acoes_recomendadas=["Acionar o suporte tecnico do webPosto para ajuste no fechamento com cupom de aplicativo (o sistema nao deve gerar valor negativo no XML)."],
+                acoes_recomendadas=["Acionar o suporte tecnico do seu ERP para ajuste no fechamento com cupom de aplicativo (o sistema nao deve gerar valor negativo no XML)."],
             )
         )
 
@@ -437,7 +437,7 @@ def auditar_totais_documento(
                 valor_esperado=f"{soma_itens:.2f}",
                 valor_observado=f"{v_prod_total_declarado:.2f}",
                 base_legal=["MOC 7.0 - Regra W07-10"],
-                acoes_recomendadas=["Revalidar o fechamento da venda no webPosto para sincronizar os totais dos itens. Se persistir, contatar o suporte webPosto."],
+                acoes_recomendadas=["Revalidar o fechamento da venda no seu ERP para sincronizar os totais dos itens. Se persistir, contatar o suporte seu ERP."],
             )
         )
     else:
@@ -479,7 +479,7 @@ def auditar_totais_documento(
                 valor_esperado=f"{vnf_esperado:.2f}",
                 valor_observado=f"{v_nf_declarado:.2f}",
                 base_legal=["MOC 7.0 - Regra W16-10"],
-                acoes_recomendadas=["Revalidar as formas de pagamento e descontos da venda no webPosto. Se persistir, contatar o suporte webPosto."],
+                acoes_recomendadas=["Revalidar as formas de pagamento e descontos da venda no seu ERP. Se persistir, contatar o suporte seu ERP."],
             )
         )
     else:
@@ -533,7 +533,7 @@ def validar_tributacao_combustivel_monofasico(
                     explicacao_executiva=(
                         "Gasolina, Diesel e GLP estao sob regime monofasico de ICMS (LC 192/2022). "
                         "O uso do antigo CST 60 e expressamente proibido pela SEFAZ e trava a emissao. "
-                        "O produto deve ser cadastrado com CST 61 no webPosto."
+                        "O produto deve ser cadastrado com CST 61 no seu ERP."
                     ),
                     explicacao_tecnica=(
                         f"Codigo ANP {anp_clean} com CST {cst_clean}. A SEFAZ exige CST 61 "
@@ -549,7 +549,7 @@ def validar_tributacao_combustivel_monofasico(
                         "MOC 7.0 - Rejeicao 960",
                     ],
                     acoes_recomendadas=[
-                        "Alterar o CST do combustivel de 60 para 61 no cadastro de produtos do webPosto.",
+                        "Alterar o CST do combustivel de 60 para 61 no cadastro de produtos do seu ERP.",
                         "Garantir a geracao das tags <qBCMonoRet> e <adRemICMSRet> no XML.",
                     ],
                 )
@@ -578,7 +578,7 @@ def validar_tributacao_combustivel_monofasico(
                     valor_observado=f"CFOP {cfop_clean}",
                     base_legal=["NT 2023.001 v1.50 - Regra N12-90 / Rejeicao 958"],
                     acoes_recomendadas=[
-                        "Corrigir o CFOP do item no webPosto para 5656 (venda de combustivel monofasico).",
+                        "Corrigir o CFOP do item no seu ERP para 5656 (venda de combustivel monofasico).",
                     ],
                 )
             )
@@ -604,7 +604,7 @@ def validar_tributacao_combustivel_monofasico(
                     valor_observado="CST 61",
                     base_legal=["LC 192/2022", "Convenio CONFAZ 199/2022", "NT 2023.001"],
                     acoes_recomendadas=[
-                        "Ajustar o cadastro de Etanol Hidratado no webPosto para CST 60.",
+                        "Ajustar o cadastro de Etanol Hidratado no seu ERP para CST 60.",
                     ],
                 )
             )
@@ -656,7 +656,7 @@ def validar_pis_cofins_monofasico(
                         "Tabela 4.3.10 EFD-Contribuicoes",
                     ],
                     acoes_recomendadas=[
-                        "Alterar imediatamente a tributacao de PIS e COFINS no webPosto para CST 04.",
+                        "Alterar imediatamente a tributacao de PIS e COFINS no seu ERP para CST 04.",
                         "Solicitar a contabilidade a segregacao dessas receitas no SPED Contribuicoes.",
                     ],
                 )
@@ -706,7 +706,7 @@ def validar_ncm_e_cest(
                     valor_observado="Ausente",
                     base_legal=["Convenio ICMS 142/2018", "MOC 7.0 - Rejeicao 806"],
                     acoes_recomendadas=[
-                        f"Cadastrar o codigo CEST {expected_cest} no cadastro do item no webPosto.",
+                        f"Cadastrar o codigo CEST {expected_cest} no cadastro do item no seu ERP.",
                     ],
                 )
             )
@@ -756,7 +756,7 @@ def auditar_regras_tributarias_posto(
                     explicacao_executiva=(
                         "A NF-e modelo 55 utiliza CFOP 5929/6929 e referencia chaves de NFC-e (modelo 65) no grupo NFref. "
                         "A SEFAZ bloqueia essa estrutura pela Regra I08-180 (Rejeicao 375). "
-                        "No webPosto 26.9+, essa situacao e contornada removendo o grupo NFref do XML e informando "
+                        "No seu ERP, essa situacao e contornada configurando a emissao para informar "
                         "os cupons apenas nas Informacoes Complementares (infCpl)."
                     ),
                     explicacao_tecnica=(
@@ -768,7 +768,7 @@ def auditar_regras_tributarias_posto(
                     valor_observado=f"{len(chaves_65)} chaves de modelo 65 referenciadas",
                     base_legal=["MOC 7.0 - Anexo I - Regra I08-180 / Rejeicao 375", "NT 2026.002"],
                     acoes_recomendadas=[
-                        "No webPosto: configurar a emissao de NF-e referenciada para modelo 55 ou atualizar os parametros fiscais com o suporte webPosto.",
+                        "No seu ERP: configurar a emissao de NF-e referenciada para modelo 55 ou atualizar os parametros fiscais com o suporte seu ERP.",
                         "Informar as chaves e numeros dos cupons exclusivamente em Informacoes Complementares (infCpl).",
                     ],
                 )
@@ -823,7 +823,7 @@ def auditar_regras_tributarias_posto(
                 valor_observado=f"indIEDest=2 para UF={dest_uf_clean}",
                 base_legal=["NT 2015.003 v1.60 - Regra E16a-30 / Rejeicao 805"],
                 acoes_recomendadas=[
-                    f"Consultar o Sintegra de {dest_uf_clean}. Se tiver IE, informe-a e marque indIEDest=1 no webPosto.",
+                    f"Consultar o Sintegra de {dest_uf_clean}. Se tiver IE, informe-a e marque indIEDest=1 no seu ERP.",
                     "Se nao tiver IE ou for consumidor final, altere para indIEDest=9 (Nao Contribuinte).",
                 ],
             )
@@ -853,7 +853,7 @@ def auditar_regras_tributarias_posto(
                         valor_esperado="CST 00, 20, 40, 41 ou 60",
                         valor_observado=f"CST {cst_clean}",
                         base_legal=["NT 2015.003 v1.60 - Regra N12-70 / Rejeicao 508"],
-                        acoes_recomendadas=["Alterar o CST do produto no webPosto para 60 (se combustivel ST) ou 00/20."],
+                        acoes_recomendadas=["Alterar o CST do produto no seu ERP para 60 (se combustivel ST) ou 00/20."],
                     )
                 )
 
@@ -876,7 +876,7 @@ def auditar_regras_tributarias_posto(
                         valor_esperado="CSOSN 102, 103, 300, 400 ou 500",
                         valor_observado=f"CSOSN {csosn_clean}",
                         base_legal=["NT 2015.003 v1.60 - Regra N12a-10 / Rejeicao 600"],
-                        acoes_recomendadas=["Corrigir o CSOSN do produto no cadastro do webPosto para 500 (ST) ou 102."],
+                        acoes_recomendadas=["Corrigir o CSOSN do produto no cadastro do seu ERP para 500 (ST) ou 102."],
                     )
                 )
 
@@ -900,7 +900,7 @@ def auditar_regras_tributarias_posto(
                     valor_esperado="CST 00, 20, 40, 41 ou 60",
                     valor_observado=f"CST {cst_clean}",
                     base_legal=["MOC 7.0 - Rejeicao 760", "NT 2015.002"],
-                    acoes_recomendadas=["Alterar o cadastro do produto no webPosto para CST 60 (ICMS-ST retido)."],
+                    acoes_recomendadas=["Alterar o cadastro do produto no seu ERP para CST 60 (ICMS-ST retido)."],
                 )
             )
 
@@ -1031,7 +1031,7 @@ def auditar_documento_xml(xml_texto: str) -> Dict[str, Any]:
                 valor_esperado="<protNFe> com cStat=100",
                 valor_observado="Ausente",
                 base_legal=["MOC 7.0 - Padrao de Distribuicao", "Ajuste SINIEF 07/05"],
-                acoes_recomendadas=["Para notas ja autorizadas, exportar o XML completo de distribuicao (procNFe) no webPosto."],
+                acoes_recomendadas=["Para notas ja autorizadas, exportar o XML completo de distribuicao (procNFe) no seu ERP."],
             )
         )
     else:

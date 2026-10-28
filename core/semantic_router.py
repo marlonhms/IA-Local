@@ -344,6 +344,29 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
             "Quais são as funcionalidades e módulos do sistema AURA?",
         ]
     },
+    "procedimento_erp": {
+        "descricao": "Procedimentos operacionais, manuais do ERP e rotinas de sistema (como emitir notas, como dar entrada em NF-e, fechamento de caixa, cadastro, cancelamento, etc.)",
+        "exemplos": [
+            "Como fazer a entrada de uma nota fiscal de fornecedor?",
+            "Como dar entrada em NFe no retaguarda?",
+            "Passo a passo para emitir nota fiscal de saida",
+            "Como fazer uma importacao de XML de nota fiscal?",
+            "Onde fica a rotina de recebimento de notas fiscais?",
+            "Como cadastrar novo produto no ERP?",
+            "Como cancelar uma venda ou cupom fiscal?",
+            "Como fazer o fechamento de caixa e sangria no PDV?",
+            "Como dar entrada em CTe com rateio de frete?",
+            "Como lancar nota fiscal de combustivel?",
+            "Como gerar o SPED Fiscal no sistema?",
+            "Como cadastrar bico e tanque no retaguarda?",
+            "Qual o procedimento para estorno de nota fiscal?",
+            "Onde configuro as regras de preco e promocao no ERP?",
+            "Como fazer a conciliacao de cartoes no retaguarda?",
+            "Como dar entrada em compras de mercadorias?",
+            "Como importar XML em lote no sistema?",
+            "Onde vejo o relatorio de notas fiscais?",
+        ]
+    },
     "benchmark_comparativo": {
         "descricao": "Benchmark comparativo de preços de combustíveis, ticket médio, conversão de aditivada e posicionamento competitivo frente a concorrentes no raio e metas da rede",
         "exemplos": [
@@ -1442,6 +1465,39 @@ class SemanticRouter:
                 with self._cache_lock:
                     self._memory_cache[query_norm] = ("ajuda_sistema", 1.0, telemetry)
             return "ajuda_sistema", 1.0, telemetry
+
+        # 0.06 Deteccao deterministica de procedimentos operacionais e manuais do ERP
+        is_procedural = bool(
+            re.search(
+                r"\b(como\s+(?:dar\s+(?:a\s+|na\s+)?entrada|fazer\s+(?:a\s+|o\s+)?(?:entrada|fechamento)|emitir|lan[cç]ar|cadastrar|cancelar|estornar|consultar|configurar|importar|imprimir|gerar|fechar)|"
+                r"passo\s+a\s+passo|onde\s+fica|onde\s+(?:acho|encontro|vejo|configuro|lan[cç]o)|"
+                r"entrada\s+(?:de\s+(?:uma\s+)?|da\s+|na\s+)?(?:nota|nfe|nf-e|xml|cte|ct-e|mercadoria)|"
+                r"importa[cç][aã]o\s+(?:de\s+(?:um\s+)?|do\s+)?xml|"
+                r"manifesta[cç][aã]o\s+(?:de\s+(?:uma\s+)?|da\s+)?(?:nfe|nf-e|destinat[aá]rio)|"
+                r"rateio\s+(?:de\s+)?frete|"
+                r"fechamento\s+(?:de\s+)?caixa|"
+                r"como\s+funciona\s+(?:a\s+tela|o\s+m[oó]dulo|o\s+menu|o\s+retaguarda))\b",
+                query_norm,
+                re.IGNORECASE
+            )
+        )
+        if is_procedural:
+            total_ms = (time.perf_counter() - t0) * 1000
+            telemetry = {
+                "intent": "procedimento_erp",
+                "confidence": 0.98,
+                "method": "procedural_erp_heuristics",
+                "matched_phrase": "Padrao procedural identificado",
+                "pgvector_latency_ms": 0.0,
+                "embedding_latency_ms": 0.0,
+                "total_routing_latency_ms": round(total_ms, 3),
+                "confidence_threshold": self.confidence_threshold,
+                "query_vector": None,
+            }
+            if use_cache:
+                with self._cache_lock:
+                    self._memory_cache[query_norm] = ("procedimento_erp", 0.98, telemetry)
+            return "procedimento_erp", 0.98, telemetry
 
         # 0.1 Comandos de repeticao / saudacoes genericas - neutralizacao de falsos positivos operacionais
         if RETRY_REGEX.match(query_norm) or query_norm in CONVERSATIONAL_WORDS:

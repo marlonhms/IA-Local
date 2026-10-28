@@ -264,10 +264,10 @@ POSTO_VOCABULARY = {
         "CBCPROTOCOLO",
         "QualityPDV",
         "QualityPDV_PAF",
-        "webPosto",
+        "ERP",
         "IntegraWeb",
         "IntegraWebService.exe",
-        "webPostoPayServer",
+        "ERP_PayServer",
         "SiTef",
         "TEF",
         "PAF-ECF",
@@ -870,3 +870,63 @@ def sanitize_text(text: str) -> str:
 def sanitize_dict(data: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, int]]:
     """Função utilitária para sanitizar dicionários ou payloads JSON."""
     return central_log_sanitizer.sanitize_payload(data)
+
+
+def sanitize_erp_brand_names(text: str) -> str:
+    """
+    Substitui terminologias comerciais proprietarias de ERPs por expressoes
+    genericas e profissionais ('seu ERP', 'seu sistema', 'ERP do Posto').
+    Regra inegociavel: ZERO travessoes em todo o codigo.
+    """
+    if not text or not isinstance(text, str):
+        return "" if text is None else str(text)
+
+    # 1. Modulos e subsistemas especificos
+    t = re.sub(r'(?i)\bwebposto\s*\(retaguarda\)', 'Retaguarda do seu ERP', text)
+    t = re.sub(r'(?i)\bwebpostopdv\b', 'PDV do Posto', t)
+    t = re.sub(r'(?i)\bwebpostopay(?:server)?\b', 'Modulo de Pagamentos / TEF', t)
+    t = re.sub(r'(?i)\bwebfrota\b', 'Modulo de Frotas', t)
+    t = re.sub(r'(?i)\bweboil(?:\s*app)?\b', 'App de Lubrificantes/Pista', t)
+
+    # 2. Preposicoes comuns com versao ou isoladas
+    t = re.sub(r'\bNo\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?', 'No seu ERP', t, flags=re.IGNORECASE)
+    t = re.sub(r'(?<=[a-zA-Z0-9,;]\s)No seu ERP\b', 'no seu ERP', t)
+
+    t = re.sub(r'\bDo\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?', 'Do seu ERP', t, flags=re.IGNORECASE)
+    t = re.sub(r'(?<=[a-zA-Z0-9,;]\s)Do seu ERP\b', 'do seu ERP', t)
+
+    t = re.sub(r'(?i)\bpelo\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?', 'pelo seu ERP', t)
+    t = re.sub(r'(?i)\bao\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?', 'ao seu ERP', t)
+    t = re.sub(r'(?i)\bpara\s+o\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?', 'para o seu ERP', t)
+    t = re.sub(r'(?i)\bcom\s+o\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?', 'com o seu ERP', t)
+
+    # 3. Expressoes compostas frequentes em diagnostico e chamados
+    t = re.sub(r'(?i)\bdesbloqueio\s+webposto\b', 'desbloqueio no seu ERP', t)
+    t = re.sub(r'(?i)\bsuporte\s+webposto\b', 'suporte do seu ERP', t)
+    t = re.sub(r'(?i)\bapi\s+webposto\b', 'API do seu ERP', t)
+    t = re.sub(r'(?i)\bapis\s+webposto\b', 'APIs do seu ERP', t)
+    t = re.sub(r'(?i)\bsistema\s+webposto\b', 'seu sistema ERP', t)
+    t = re.sub(r'(?i)\berp\s+webposto(?:\s+v?\d+(?:\.\d+)*\+?)?\b', 'ERP do Posto', t)
+    t = re.sub(r'(?i)\bvers[aã]o\s+erp\s*:\s*webposto(?:\s+v?\d+(?:\.\d+)*\+?)?', 'Versao ERP: ERP do Posto', t)
+
+    # 4. webPosto com ou sem versao
+    t = re.sub(r'(?i)\bwebposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?', 'seu ERP', t)
+
+    # 5. Ajuste maiuscula no inicio da string
+    if t.startswith('seu ERP'):
+        t = 'Seu ERP' + t[7:]
+    elif t.startswith('no seu ERP'):
+        t = 'No seu ERP' + t[10:]
+
+    return t
+
+
+def sanitize_erp_brand_data(obj: Any) -> Any:
+    """Higieniza recursivamente nomes comerciais de ERP em dicionarios, listas e strings."""
+    if isinstance(obj, str):
+        return sanitize_erp_brand_names(obj)
+    if isinstance(obj, dict):
+        return {k: sanitize_erp_brand_data(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [sanitize_erp_brand_data(item) for item in obj]
+    return obj

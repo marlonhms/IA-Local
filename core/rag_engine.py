@@ -84,7 +84,10 @@ class HybridRAGEngine:
         self.rrf_k = rrf_k
 
         if self.api_key:
-            genai.configure(api_key=self.api_key)
+            try:
+                genai.configure(api_key=self.api_key, transport="rest")
+            except Exception:
+                genai.configure(api_key=self.api_key)
 
     def _get_connection(self):
         """Abre conexao com o PostgreSQL do pgvector a partir do pool gerenciado (P0-4)."""
@@ -651,7 +654,7 @@ class HybridRAGEngine:
                 for wp in wp_items:
                     results.append({
                         "id": f"wp_{wp['id']}",
-                        "modulo": f"webPosto / {wp['modulo']}",
+                        "modulo": f"ERP / {wp['modulo']}",
                         "topico": wp["codigo_ref"],
                         "titulo": wp["titulo"],
                         "subtitulo": wp.get("subtitulo") or wp["resumo_executivo"],
@@ -702,6 +705,275 @@ class HybridRAGEngine:
 
         return {
             "results": [dict(r) for r in results],
+            "telemetry": telemetry,
+        }
+
+    def search_hybrid_procedimentos(
+        self,
+        query_text: str,
+        top_k: int = 5,
+        tenant_id: str = "posto_local",
+        erp: str = "webposto",
+        dense_weight: float = 0.5,
+        sparse_weight: float = 0.5,
+        ef_search: int = 100,
+        query_vector: list = None,
+    ) -> dict:
+        """
+        Busca hibrida multicamada de procedimentos operacionais e manuais do ERP (Secao 8 do Roadmap).
+        Executa busca em aura_core.aura_conhecimento_chunks:
+        - Ramo denso: HNSW halfvec(768) com varredura iterativa e ef_search calibrado
+        - Ramo esparso: GIN tsvector em portugues com ts_rank_cd e fallback relaxado
+        - Fusao: Reciprocal Rank Fusion (RRF, k=60)
+        - Deduplicacao: maximo 2 chunks por pagina (doc_id)
+        - Indicador de relevancia minima (evidencia_insuficiente)
+        """
+        ef = ef_search or 100
+        t0 = time.perf_counter()
+
+        q_clean = (query_text or "").strip()
+        if not q_clean:
+            return {
+                "results": [],
+                "evidencia_insuficiente": True,
+                "telemetry": {"query": "", "results_count": 0, "total_ms": 0.0}
+            }
+
+        t_emb_start = time.perf_counter()
+        if not query_vector:
+            try:
+                query_vector = self.gerar_embedding(q_clean, task_type="retrieval_query")
+            except Exception:
+                query_vector = None
+        emb_latency_ms = (time.perf_counter() - t_emb_start) * 1000
+
+        # Deteccao de ambiente operacional alvo (PDV vs Retaguarda)
+        q_lower = q_clean.lower()
+        is_pdv = bool(re.search(r'\b(pdv|ponto de venda|frente|pista|caixa da pista|caixa do posto)\b', q_lower))
+        is_retaguarda = bool(re.search(r'\b(retaguarda|administrativo|gerencial|escritorio)\b', q_lower))
+
+        # Limpeza de stopwords procedimentais e termos genericos do dominio ERP
+        stopwords = {
+            "como", "faco", "faço", "fazer", "posso", "consigo", "onde", "qual", "quais",
+            "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas", "para", "pra",
+            "um", "uma", "uns", "umas", "o", "a", "os", "as", "que", "se", "por", "com",
+            "passo", "etapa", "tutorial", "explicar", "ensinar"
+        }
+        broad_terms = {"pdv", "erp", "sistema", "modulo", "webposto", "posto", "retaguarda"}
+        termos = re.findall(r"[\w]+", q_clean.lower())
+        uteis = [t for t in termos if len(t) > 1 and t not in stopwords]
+        uteis_core = [t for t in uteis if t not in broad_terms]
+        active_terms = uteis_core if uteis_core else uteis
+
+        # Expansao de sinonimos operacionais no tsquery
+        expanded = []
+        for t in active_terms:
+            if t == "caixa" and is_pdv:
+                expanded.append("(caixa | turno)")
+            elif t == "turno":
+                expanded.append("(turno | caixa)")
+            else:
+                expanded.append(t)
+
+        tsquery_and = " & ".join(expanded) if expanded else q_clean
+        tsquery_or = " | ".join(expanded) if expanded else q_clean
+        like_main = f"%{active_terms[0]}%" if active_terms else f"%{q_clean}%"
+
+        t_db_start = time.perf_counter()
+        retrieval_mode = "hybrid_chunks_rrf" if query_vector is not None else "sparse_chunks_fts"
+        results = []
+
+        try:
+            with self._get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+                if query_vector is not None:
+                    sql_rrf = f"""
+                    SET LOCAL hnsw.ef_search = {ef};
+                    SET LOCAL hnsw.iterative_scan = 'relaxed_order';
+
+                    WITH dense_search AS (
+                        SELECT 
+                            id, doc_id, doc_titulo, doc_url, doc_versao, breadcrumb, secao,
+                            chunk_idx, chunk_total, conteudo, n_tokens,
+                            1 - (embedding <=> %s::halfvec) AS cosine_similarity,
+                            ROW_NUMBER() OVER (
+                                ORDER BY 
+                                    (CASE 
+                                        WHEN %s AND (breadcrumb ILIKE '%%pdv%%' OR doc_titulo ILIKE '%%pdv%%') THEN 0
+                                        WHEN %s AND (breadcrumb ILIKE '%%retaguarda%%' OR doc_titulo ILIKE '%%retaguarda%%') THEN 0
+                                        WHEN %s AND breadcrumb ILIKE '%%retaguarda%%' THEN 1
+                                        WHEN %s AND breadcrumb ILIKE '%%pdv%%' THEN 1
+                                        ELSE 0
+                                    END) ASC,
+                                    embedding <=> %s::halfvec ASC
+                            ) AS dense_rank
+                        FROM aura_core.aura_conhecimento_chunks
+                        WHERE embedding IS NOT NULL
+                          AND status = 'ativo'
+                          AND (camada IN ('core', 'vertical', 'erp') OR (camada = 'tenant' AND tenant_id = %s))
+                        LIMIT 30
+                    ),
+                    sparse_search AS (
+                        SELECT 
+                            id, doc_id, doc_titulo, doc_url, doc_versao, breadcrumb, secao,
+                            chunk_idx, chunk_total, conteudo, n_tokens,
+                            ts_rank_cd(tsv, to_tsquery('portuguese', %s)) AS fts_score,
+                            ROW_NUMBER() OVER (
+                                ORDER BY 
+                                    (CASE 
+                                        WHEN %s AND (breadcrumb ILIKE '%%pdv%%' OR doc_titulo ILIKE '%%pdv%%') THEN 10
+                                        WHEN %s AND (breadcrumb ILIKE '%%retaguarda%%' OR doc_titulo ILIKE '%%retaguarda%%') THEN 10
+                                        WHEN %s AND breadcrumb ILIKE '%%retaguarda%%' THEN -5
+                                        WHEN %s AND breadcrumb ILIKE '%%pdv%%' THEN -5
+                                        ELSE 0
+                                    END) DESC,
+                                    (CASE WHEN tsv @@ to_tsquery('portuguese', %s) THEN 1 ELSE 0 END) DESC,
+                                    (CASE WHEN doc_titulo ILIKE %s THEN 1 ELSE 0 END) DESC,
+                                    ts_rank_cd(tsv, to_tsquery('portuguese', %s)) DESC,
+                                    id ASC
+                            ) AS sparse_rank
+                        FROM aura_core.aura_conhecimento_chunks
+                        WHERE (tsv @@ to_tsquery('portuguese', %s)
+                               OR tsv @@ to_tsquery('portuguese', %s)
+                               OR doc_titulo ILIKE %s
+                               OR breadcrumb ILIKE %s)
+                          AND status = 'ativo'
+                          AND (camada IN ('core', 'vertical', 'erp') OR (camada = 'tenant' AND tenant_id = %s))
+                        ORDER BY sparse_rank ASC
+                        LIMIT 30
+                    )
+                    SELECT 
+                        COALESCE(d.id, s.id) AS id,
+                        COALESCE(d.doc_id, s.doc_id) AS doc_id,
+                        COALESCE(d.doc_titulo, s.doc_titulo) AS doc_titulo,
+                        COALESCE(d.doc_url, s.doc_url) AS doc_url,
+                        COALESCE(d.doc_versao, s.doc_versao) AS doc_versao,
+                        COALESCE(d.breadcrumb, s.breadcrumb) AS breadcrumb,
+                        COALESCE(d.secao, s.secao) AS secao,
+                        COALESCE(d.chunk_idx, s.chunk_idx) AS chunk_idx,
+                        COALESCE(d.chunk_total, s.chunk_total) AS chunk_total,
+                        COALESCE(d.conteudo, s.conteudo) AS conteudo,
+                        COALESCE(d.n_tokens, s.n_tokens) AS n_tokens,
+                        COALESCE(d.cosine_similarity, 0.0) AS cosine_similarity,
+                        COALESCE(s.fts_score, 0.0) AS fts_score,
+                        d.dense_rank,
+                        s.sparse_rank,
+                        (
+                            {dense_weight} * COALESCE(1.0 / (60 + d.dense_rank), 0.0) +
+                            {sparse_weight} * COALESCE(1.0 / (60 + s.sparse_rank), 0.0)
+                        ) AS rrf_score
+                    FROM dense_search d
+                    FULL OUTER JOIN sparse_search s ON d.id = s.id
+                    ORDER BY rrf_score DESC
+                    LIMIT 30;
+                    """
+                    vec_str = str(query_vector)
+                    params = (
+                        vec_str,
+                        is_pdv, is_retaguarda, is_pdv, is_retaguarda,
+                        vec_str, tenant_id,
+                        tsquery_and,
+                        is_pdv, is_retaguarda, is_pdv, is_retaguarda,
+                        tsquery_and, like_main, tsquery_and,
+                        tsquery_and, tsquery_or, like_main, like_main, tenant_id
+                    )
+                    cur.execute(sql_rrf, params)
+                    raw_rows = cur.fetchall()
+                else:
+                    sql_sparse = """
+                    SELECT 
+                        id, doc_id, doc_titulo, doc_url, doc_versao, breadcrumb, secao,
+                        chunk_idx, chunk_total, conteudo, n_tokens,
+                        0.0 AS cosine_similarity,
+                        ts_rank_cd(tsv, to_tsquery('portuguese', %s)) AS fts_score,
+                        NULL::bigint AS dense_rank,
+                        ROW_NUMBER() OVER (
+                            ORDER BY 
+                                (CASE 
+                                    WHEN %s AND (breadcrumb ILIKE '%%pdv%%' OR doc_titulo ILIKE '%%pdv%%') THEN 10
+                                    WHEN %s AND (breadcrumb ILIKE '%%retaguarda%%' OR doc_titulo ILIKE '%%retaguarda%%') THEN 10
+                                    WHEN %s AND breadcrumb ILIKE '%%retaguarda%%' THEN -5
+                                    WHEN %s AND breadcrumb ILIKE '%%pdv%%' THEN -5
+                                    ELSE 0
+                                END) DESC,
+                                (CASE WHEN tsv @@ to_tsquery('portuguese', %s) THEN 1 ELSE 0 END) DESC,
+                                (CASE WHEN doc_titulo ILIKE %s THEN 1 ELSE 0 END) DESC,
+                                ts_rank_cd(tsv, to_tsquery('portuguese', %s)) DESC,
+                                id ASC
+                        ) AS sparse_rank,
+                        (1.0 / (60 + ROW_NUMBER() OVER (
+                            ORDER BY 
+                                (CASE 
+                                    WHEN %s AND (breadcrumb ILIKE '%%pdv%%' OR doc_titulo ILIKE '%%pdv%%') THEN 10
+                                    WHEN %s AND (breadcrumb ILIKE '%%retaguarda%%' OR doc_titulo ILIKE '%%retaguarda%%') THEN 10
+                                    WHEN %s AND breadcrumb ILIKE '%%retaguarda%%' THEN -5
+                                    WHEN %s AND breadcrumb ILIKE '%%pdv%%' THEN -5
+                                    ELSE 0
+                                END) DESC,
+                                (CASE WHEN tsv @@ to_tsquery('portuguese', %s) THEN 1 ELSE 0 END) DESC,
+                                (CASE WHEN doc_titulo ILIKE %s THEN 1 ELSE 0 END) DESC,
+                                ts_rank_cd(tsv, to_tsquery('portuguese', %s)) DESC,
+                                id ASC
+                        ))) AS rrf_score
+                    FROM aura_core.aura_conhecimento_chunks
+                    WHERE (tsv @@ to_tsquery('portuguese', %s)
+                           OR tsv @@ to_tsquery('portuguese', %s)
+                           OR doc_titulo ILIKE %s
+                           OR breadcrumb ILIKE %s)
+                      AND status = 'ativo'
+                      AND (camada IN ('core', 'vertical', 'erp') OR (camada = 'tenant' AND tenant_id = %s))
+                    ORDER BY rrf_score DESC
+                    LIMIT 30;
+                    """
+                    params = (
+                        tsquery_and,
+                        is_pdv, is_retaguarda, is_pdv, is_retaguarda,
+                        tsquery_and, like_main, tsquery_and,
+                        is_pdv, is_retaguarda, is_pdv, is_retaguarda,
+                        tsquery_and, like_main, tsquery_and,
+                        tsquery_and, tsquery_or, like_main, like_main, tenant_id
+                    )
+                    cur.execute(sql_sparse, params)
+                    raw_rows = cur.fetchall()
+
+                # Deduplicacao com limite de 2 chunks por pagina
+                doc_counts = {}
+                for r in raw_rows:
+                    d_id = r["doc_id"]
+                    cnt = doc_counts.get(d_id, 0)
+                    if cnt < 2:
+                        results.append(dict(r))
+                        doc_counts[d_id] = cnt + 1
+                    if len(results) >= top_k:
+                        break
+
+        except Exception as e:
+            logger.warning("Falha na busca de procedimentos em chunks: %s", e)
+            retrieval_mode = "error_fallback"
+
+        db_latency_ms = (time.perf_counter() - t_db_start) * 1000
+        total_latency_ms = (time.perf_counter() - t0) * 1000
+
+        # Calibracao de limiar minimo de evidencia
+        max_score = max((r.get("rrf_score", 0.0) for r in results), default=0.0)
+        evidencia_insuficiente = bool(not results or max_score < 0.008)
+
+        telemetry = {
+            "query": query_text,
+            "tsquery_used": tsquery_or,
+            "embedding_latency_ms": round(emb_latency_ms, 2),
+            "db_rrf_latency_ms": round(db_latency_ms, 2),
+            "total_retrieval_latency_ms": round(total_latency_ms, 2),
+            "hnsw_ef_search": ef,
+            "top_k": top_k,
+            "results_count": len(results),
+            "max_rrf_score": round(max_score, 5),
+            "evidencia_insuficiente": evidencia_insuficiente,
+            "retrieval_mode": retrieval_mode,
+        }
+
+        return {
+            "results": results,
+            "evidencia_insuficiente": evidencia_insuficiente,
             "telemetry": telemetry,
         }
 

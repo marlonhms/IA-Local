@@ -48,7 +48,7 @@ from core.rag_engine import HybridRAGEngine
 from core.tools import PostoTools, get_erp_connection
 from core.prompts import build_help_prompt, build_system_prompt
 from core.adapters.erp.base import BaseERPAdapter
-from core.sanitizer import central_log_sanitizer
+from core.sanitizer import central_log_sanitizer, sanitize_erp_brand_names, sanitize_erp_brand_data
 from core.semantic_router import SemanticRouter, classificar_intencao_heuristica, RETRY_REGEX
 from core.schemas.idempotency import generate_tool_call_id, generate_action_id
 from core.schemas.genui import (
@@ -1032,7 +1032,32 @@ def normalize_aura_color_markup(text: str) -> str:
     )
     protected = unclosed_pattern.sub(_fix_unclosed, protected)
 
-    # 4. Protege pares válidos não-vazios [tag]...[/tag] para higienizar apenas tags órfãs
+    # 3.5. Desempacota tags de cor sobredimensionadas (evita fita estourando layout)
+    def _unwrap_oversized(m: re.Match) -> str:
+        tag = m.group(1)
+        inner = m.group(2)
+        if len(inner) <= 45 and not re.search(r'[.;!?]', inner):
+            return m.group(0)
+        anchor_match = re.search(
+            r'(\*\*[^*]+\*\*|Rejei[cç][aã]o\s*\d+|CFOP\s*\d+|CST\s*\d+|CSOSN\s*\d+|NCM\s*\d+|[+\-]?\d+(?:[.,]\d+)?%|R\$\s*[\d.,]+)',
+            inner,
+            flags=re.IGNORECASE,
+        )
+        if anchor_match:
+            anchor = anchor_match.group(1)
+            prefix = inner[:anchor_match.start()]
+            suffix = inner[anchor_match.end():]
+            return f"{prefix}[{tag}]{anchor}[/{tag}]{suffix}"
+        return inner
+
+    protected = re.sub(
+        rf"\[({tag_names})\]([\s\S]*?)\[\/\1\]",
+        _unwrap_oversized,
+        protected,
+        flags=re.IGNORECASE,
+    )
+
+        # 4. Protege pares válidos não-vazios [tag]...[/tag] para higienizar apenas tags órfãs
     valid_tags: List[str] = []
     def _stash_valid(m: re.Match) -> str:
         content = m.group(2)
@@ -1070,6 +1095,9 @@ def normalize_aura_color_markup(text: str) -> str:
     # 7. Restaura blocos de código
     for idx, snippet in enumerate(code_snippets):
         protected = protected.replace(f"XAURACODE{idx}END", snippet)
+
+    # 8. Sanitiza qualquer menção comercial residual a ERPs proprietários
+    protected = sanitize_erp_brand_names(protected)
 
     return protected
 
@@ -2905,7 +2933,7 @@ def build_canonical_genui_envelope(
             if invalidos:
                 gestor_text = (
                     f"Impacto na Operacao: Documento bloqueado com {len(invalidos)} apontamento(s) impeditivo(s){regras_ref}. "
-                    "Faturamento retido no PDV/webPosto. Resolucao guiada indicada nos cards abaixo."
+                    "Faturamento retido no PDV/ERP. Resolucao guiada indicada nos cards abaixo."
                 )
             elif alertas:
                 gestor_text = (
@@ -2969,7 +2997,7 @@ def build_canonical_genui_envelope(
                     "severity": "critical",
                     "title": tit,
                     "message": f"Impacto na Operacao: {impacto}",
-                    "action_label": f"Solucao webPosto: {acao}",
+                    "action_label": f"Solucao no seu ERP: {acao}",
                 }
             })
             blocks.append({
@@ -2981,21 +3009,21 @@ def build_canonical_genui_envelope(
                     {"label": "Codigo SEFAZ", "value": str(cod_ref).replace("SEFAZ-REJ-", ""), "status": "danger"},
                     {"label": "Modulo Afetado", "value": str(top_res.get("modulo") or "Faturamento").split("/")[0].strip(), "status": "warning"},
                     {"label": "Impacto", "value": "Faturamento Travado", "status": "danger"},
-                    {"label": "Versao ERP", "value": "webPosto 26.9+", "status": "success"},
+                    {"label": "Sistema", "value": "ERP do Posto", "status": "success"},
                 ]
             })
             if top_res.get("conteudo_completo") or acao:
-                procedimento_text = f"Acao imediata no webPosto: {acao}\n\nBase Legal: {base_legal_val}\nRegistros / Tags afetadas: {campos_xml_str or top_res.get('tabelas_banco', 'Documento Fiscal')}"
+                procedimento_text = f"Acao imediata no seu ERP: {acao}\n\nBase Legal: {base_legal_val}\nRegistros / Tags afetadas: {campos_xml_str or top_res.get('tabelas_banco', 'Documento Fiscal')}"
                 blocks.append({
                     "block_id": "blk_procedimento_erp",
                     "block_type": "custom_content",
-                    "title": "Procedimento de Liberacao na Retaguarda (webPosto)",
+                    "title": "Procedimento de Liberacao na Retaguarda do seu ERP",
                     "subtitle": "Passo a passo operacional",
                     "custom_content": procedimento_text,
                 })
 
             persona_views = {
-                "gestor": f"{top_res.get('resumo_executivo', '')}\n\nImpacto Financeiro: {impacto}\n\nAcao recomendada no webPosto: {acao}",
+                "gestor": f"{top_res.get('resumo_executivo', '')}\n\nImpacto Financeiro: {impacto}\n\nAcao recomendada no seu ERP: {acao}",
                 "contador": f"{top_res.get('conteudo_completo', '')}\n\nBase Legal: {base_legal_val}\nTags/Campos Afetados: {campos_xml_str or top_res.get('tabelas_banco', '')}",
                 "base_legal": [base_legal_val],
             }
@@ -3029,9 +3057,9 @@ def build_canonical_genui_envelope(
             )
 
         props["title"] = "Diagnostico Fiscal & Regras SEFAZ"
-        props["subtitle"] = "Auditoria Deterministica MOC 7.0 + webPosto RAG"
+        props["subtitle"] = "Auditoria Fiscal e Normativas SEFAZ"
         props["confidence_score"] = float(props.get("confidence_score") or 0.99)
-        props["diagnosis"] = props.get("diagnosis") or executive_summary or "Auditoria de rejeicao SEFAZ e procedimento de desbloqueio webPosto processados com sucesso."
+        props["diagnosis"] = props.get("diagnosis") or executive_summary or "Auditoria de rejeicao SEFAZ e procedimento de desbloqueio no seu ERP processados com sucesso."
         props["blocks"] = blocks
         props["suggested_actions"] = [a.model_dump(mode="json") if hasattr(a, "model_dump") else a for a in actions]
 
@@ -3100,13 +3128,14 @@ def build_canonical_genui_envelope(
                     clean_diag = clean_diag[:247] + "..."
             props["diagnosis"] = clean_diag
 
+    props = sanitize_erp_brand_data(props)
     return GenUIEnvelope(
         schema_version="1.0",
         tool_call_id=tool_call_id,
         component_name=mapping["component_name"],
         client_component=mapping.get("client_component"),
         intent=intencao,
-        executive_summary=executive_summary,
+        executive_summary=sanitize_erp_brand_names(executive_summary),
         props=props,
         actions=actions,
         ttl_seconds=900,
@@ -3792,6 +3821,45 @@ class AuraEngine:
                         f"Tags: {', '.join(art.get('tags', []) or [])}\n\n"
                     )
 
+            elif intencao in ("procedimento_erp", "manuais_erp", "operacao_erp"):
+                busca = self.tools.consultar_procedimento_erp(
+                    termo=pergunta,
+                    top_k=3,
+                    query_vector=query_vector,
+                )
+                chunks = busca.get("results", [])
+                telemetria_retrieval = busca.get("telemetry", {})
+                evidencia_insuficiente = busca.get("evidencia_insuficiente", False)
+
+                resultado_bruto = {
+                    "tipo": "procedimento_erp",
+                    "chunks": chunks,
+                    "total_encontrado": len(chunks),
+                    "evidencia_insuficiente": evidencia_insuficiente,
+                }
+
+                if chunks and not evidencia_insuficiente:
+                    contexto_extra = (
+                        "Manual Operacional Oficial do ERP (pgvector Chunks + GIN tsvector):\n"
+                        "[DIRETIVA DE RESPOSTA OPERACIONAL]: Responda ensinando o passo a passo com precisao e clareza, "
+                        "citando menus, botoes, opcoes e telas descritas nos manuais abaixo. "
+                        "Cite a referencia numerica [1], [2] ao lado de cada orientacao. "
+                        "NUNCA recuse o atendimento dizendo que o canal nao suporta operacoes fiscais, pois voce esta tirando "
+                        "uma duvida operacional sobre como usar o ERP. Se algum ponto nao estiver no manual, mencione apenas "
+                        "o que consta nas fontes oficiais.\n\n"
+                    )
+                    for idx, c in enumerate(chunks, 1):
+                        bcrumb = c.get("breadcrumb") or c.get("doc_titulo", "")
+                        contexto_extra += (
+                            f"[{idx}] Documento: {c.get('doc_titulo')} | Secao: {c.get('secao')} | Caminho: {bcrumb}\n"
+                            f"Conteudo do Trecho:\n{c.get('conteudo')}\n\n"
+                        )
+                else:
+                    contexto_extra = (
+                        "Manual Operacional do ERP: Nao foram encontradas instrucoes detalhadas para esta operacao especifica nos manuais indexados. "
+                        "Oriente o usuario a reformular a pergunta com o nome do modulo ou menu do ERP, ou contatar o suporte tecnico especialista.\n"
+                    )
+
             elif intencao in ("auditoria_fiscal_sefaz", "conhecimento_fiscal", "fiscal_sefaz"):
                 resultado_bruto = self.tools.auditar_documento_ou_chave_fiscal(pergunta)
                 directive = ""
@@ -3802,7 +3870,7 @@ class AuraEngine:
                         "Agrupe os fatos geradores pela causa raiz e convide o gestor a inspecionar os detalhes tabulares no Canvas.\n"
                     )
                 contexto_extra = (
-                    f"Auditoria Fiscal e Diagnostico Especialista SEFAZ (Agent Sefaz + webPosto RAG):{directive}\n"
+                    f"Auditoria Fiscal e Diagnostico Especialista SEFAZ (Agent Sefaz + ERP RAG):{directive}\n"
                     f"{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
                 )
 
@@ -5164,13 +5232,13 @@ class AuraEngine:
 
                     # 3. Resolucao no ERP webPosto
                     if has_neg:
-                        linhas.append("- **Resolucao no webPosto:** Acionar o suporte tecnico do webPosto para ajuste na emissao/fechamento com cupons de aplicativo (o sistema nao deve gerar valor negativo no XML). Voce pode usar o botao de chamado no Canvas para envio rapido via WhatsApp.")
+                        linhas.append("- **Resolucao no seu ERP:** Acionar o suporte do seu ERP para correcao na emissao/fechamento com cupons de aplicativo (o sistema deve gerar a tag sem valor negativo). Voce pode usar o botao de chamado para envio rapido via WhatsApp.")
                     elif has_prot:
-                        linhas.append("- **Resolucao no webPosto:** Acesse **Faturamento > Monitor SEFAZ**, execute Consulta de Lote ou retransmita o documento apos restabelecer a comunicacao.")
+                        linhas.append("- **Resolucao no seu ERP:** Acesse o menu de gestao fiscal do seu sistema, execute Consulta de Lote ou retransmita o documento apos restabelecer a comunicacao com a SEFAZ.")
                     elif erros > 0:
-                        linhas.append("- **Resolucao no webPosto:** Acesse **Faturamento > Notas Fiscais**, ajuste as regras tributarias dos itens indicados e revalide o documento.")
+                        linhas.append("- **Resolucao no seu ERP:** Acesse o cadastro de produtos ou regras tributarias do seu ERP, ajuste a tributacao indicada e revalide o documento.")
                     else:
-                        linhas.append("- **Status Operacional:** Nenhuma correcao necessaria na retaguarda do webPosto.")
+                        linhas.append("- **Status Operacional:** Nenhuma correcao necessaria na retaguarda do seu ERP.")
 
                     # 4. Ponte Contextual para o Canvas
                     if erros > 0 or alertas > 0:
@@ -5189,7 +5257,7 @@ class AuraEngine:
                     f"- **Documento:** Modelo {res.get('modelo', '55')} | **Rota:** {res.get('emit_uf', 'SP')} -> {res.get('dest_uf', 'SP')}",
                     f"- **Diagnostico:** {conclusao}",
                     "",
-                    "Consulte o card interativo abaixo para diagnostico detalhado de cada regra e instrucoes para resolucao no webPosto.",
+                    "Consulte o card interativo abaixo para diagnostico detalhado de cada regra e instrucoes para resolucao no seu ERP.",
                 ]
                 return "\n".join(linhas)
 
@@ -5203,7 +5271,7 @@ class AuraEngine:
                     return (
                         f"### Parecer Fiscal SEFAZ ({top.get('codigo_ref')})\n\n"
                         f"{top.get('resumo_executivo')}\n\n"
-                        f"- **Acao webPosto:** {top.get('acao_recomendada')}\n"
+                        f"- **Acao no seu ERP:** {top.get('acao_recomendada')}\n"
                         "- **Base Normativa:** O parecer contabil completo para o contador esta projetado no **painel lateral**."
                     )
 
@@ -5216,7 +5284,7 @@ class AuraEngine:
                     f"**Diagnostico / Resumo Executivo:**",
                     f"{top.get('resumo_executivo')}",
                     "",
-                    f"**Acao Recomendada no webPosto:**",
+                    f"**Acao Recomendada no seu ERP:**",
                     f"{top.get('acao_recomendada')}",
                     "",
                     f"**Impacto Financeiro / Operacional:**",
@@ -5268,6 +5336,37 @@ class AuraEngine:
                     linhas.append(f"- **{desc}:** [verde]{f_val}[/verde]")
             else:
                 linhas.append(f"Consulta ao catálogo executada para: '{pergunta}'. Nenhum item específico com saldo em estoque no momento.")
+            return "\n".join(linhas)
+
+        if intencao in ("procedimento_erp", "manuais_erp", "operacao_erp"):
+            chunks = resultado_bruto.get("chunks", []) if isinstance(resultado_bruto, dict) else []
+            if not chunks:
+                return "Nao foram encontrados procedimentos operacionais cadastrados para esta consulta no momento."
+            
+            def _format_contingency_steps(raw_text: str, max_chars: int = 1200) -> str:
+                # Remove marcadores de imagens internas
+                clean = re.sub(r'ret-[\w-]+', '', raw_text)
+                clean = re.sub(r'img-[\w-]+', '', clean)
+                clean = re.sub(r'\n{3,}', '\n\n', clean).strip()
+                if len(clean) <= max_chars:
+                    return clean
+                trunc = clean[:max_chars]
+                last_break = max(trunc.rfind('.\n'), trunc.rfind('. '), trunc.rfind('\n\n'))
+                if last_break > max_chars // 2:
+                    return trunc[:last_break + 1].strip()
+                return trunc.rstrip() + '.'
+
+            linhas = ["### Roteiro Operacional (Manual do ERP)", ""]
+            for idx, c in enumerate(chunks[:2], 1):
+                tit = c.get("doc_titulo", "Manual").strip()
+                sec = c.get("secao", "").strip()
+                bcrumb = c.get("breadcrumb", "").strip()
+                cont = c.get("conteudo", "").strip()
+                linhas.append(f"#### [{idx}] {tit} - {sec}")
+                if bcrumb:
+                    linhas.append(f"*Caminho no ERP:* `{bcrumb}`\n")
+                linhas.append(_format_contingency_steps(cont, 1200))
+                linhas.append("")
             return "\n".join(linhas)
 
         # Fallback genérico para qualquer ferramenta com dados válidos
@@ -5530,7 +5629,7 @@ class AuraEngine:
                 telemetry=self.telemetry,
             )
             if envelope:
-                envelope_payload = envelope.to_sse_payload()
+                envelope_payload = sanitize_erp_brand_data(envelope.to_sse_payload())
                 if t_skeleton_emitted is not None:
                     backend_hydration_ms = (time.perf_counter() - t_skeleton_emitted) * 1000
                     self.telemetry.record_hydration(
@@ -5590,17 +5689,17 @@ class AuraEngine:
         texto_completo: List[str] = []
         sucesso_llm = False
 
-        for m_name in FALLBACK_MODELS[:1]:
+        for m_name in FALLBACK_MODELS[:2]:
             try:
                 model = genai.GenerativeModel(m_name)
-                # Invoca streaming assincrono com timeout agil de 3 segundos
+                # Invoca streaming assincrono com timeout resiliente de 25 segundos
                 response_stream = await asyncio.wait_for(
                     model.generate_content_async(
                         prompt_sistema,
                         stream=True,
-                        request_options={"timeout": 3.0},
+                        request_options={"timeout": 25.0},
                     ),
-                    timeout=3.0,
+                    timeout=25.0,
                 )
 
                 async def _get_next_chunk(aiter_obj):
@@ -5609,7 +5708,7 @@ class AuraEngine:
                 stream_aiter = response_stream.__aiter__()
                 while True:
                     try:
-                        chunk = await asyncio.wait_for(_get_next_chunk(stream_aiter), timeout=2.5)
+                        chunk = await asyncio.wait_for(_get_next_chunk(stream_aiter), timeout=20.0)
                     except StopAsyncIteration:
                         break
                     except (asyncio.TimeoutError, Exception) as stream_step_err:
@@ -5692,7 +5791,7 @@ class AuraEngine:
                 telemetry=self.telemetry,
             )
             if envelope:
-                envelope_payload = envelope.to_sse_payload()
+                envelope_payload = sanitize_erp_brand_data(envelope.to_sse_payload())
                 if t_skeleton_emitted is not None:
                     backend_hydration_ms = (time.perf_counter() - t_skeleton_emitted) * 1000
                     self.telemetry.record_hydration(

@@ -71,3 +71,6 @@ build/
 # Android development screenshots
 screen_*.png
 **/screen_*.png
+
+# Scratch scripts
+scratch/

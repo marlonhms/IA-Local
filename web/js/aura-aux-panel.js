@@ -1927,7 +1927,7 @@ class AuraAuxPanel {
       ];
 
       schemaInfo = {
-        source: 'PostgreSQL 16 • ERP webPosto (Porta 5433)',
+        source: 'PostgreSQL 16 • ERP do Posto (Porta 5433)',
         table: 'public.pedido JOIN public.prazos JOIN public.funcionarios',
         recordCount: records.length,
         fields: [

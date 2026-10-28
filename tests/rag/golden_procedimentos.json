@@ -1,0 +1,72 @@
+[
+  {
+    "id": "gold_01",
+    "pergunta": "como fazer a entrada de uma nota fiscal de fornecedor?",
+    "intencao_esperada": "procedimento_erp",
+    "modulo_esperado": "Compras / Movimentos",
+    "termos_obrigatorios": ["entrada", "nota", "fiscal"]
+  },
+  {
+    "id": "gold_02",
+    "pergunta": "como dar entrada em nfe no retaguarda",
+    "intencao_esperada": "procedimento_erp",
+    "modulo_esperado": "Movimentos > Entradas",
+    "termos_obrigatorios": ["nfe", "entrada"]
+  },
+  {
+    "id": "gold_03",
+    "pergunta": "como fazer uma importacao de xml de nota fiscal?",
+    "intencao_esperada": "procedimento_erp",
+    "modulo_esperado": "Movimentos > Entradas",
+    "termos_obrigatorios": ["xml", "importa"]
+  },
+  {
+    "id": "gold_04",
+    "pergunta": "onde fica a rotina de recebimento de notas fiscais?",
+    "intencao_esperada": "procedimento_erp",
+    "modulo_esperado": "Movimentos",
+    "termos_obrigatorios": ["retaguarda", "movimentos"]
+  },
+  {
+    "id": "gold_05",
+    "pergunta": "como fazer fechamento de caixa no pdv",
+    "intencao_esperada": "procedimento_erp",
+    "modulo_esperado": "PDV / Caixa",
+    "termos_obrigatorios": ["fechamento", "caixa"]
+  },
+  {
+    "id": "gold_06",
+    "pergunta": "como cadastrar produto no erp",
+    "intencao_esperada": "procedimento_erp",
+    "modulo_esperado": "Cadastros > Produtos",
+    "termos_obrigatorios": ["produto", "cadastro"]
+  },
+  {
+    "id": "gold_07",
+    "pergunta": "como cancelar um cupom fiscal no pdv",
+    "intencao_esperada": "procedimento_erp",
+    "modulo_esperado": "PDV",
+    "termos_obrigatorios": ["cancelar", "cupom"]
+  },
+  {
+    "id": "gold_08",
+    "pergunta": "como dar entrada em CTe com rateio de frete?",
+    "intencao_esperada": "procedimento_erp",
+    "modulo_esperado": "Movimentos > Entradas",
+    "termos_obrigatorios": ["rateio", "frete", "cte"]
+  },
+  {
+    "id": "gold_09",
+    "pergunta": "como cadastrar bico e tanque no retaguarda",
+    "intencao_esperada": "procedimento_erp",
+    "modulo_esperado": "Cadastros / Pista",
+    "termos_obrigatorios": ["tanque", "bico"]
+  },
+  {
+    "id": "gold_10",
+    "pergunta": "passo a passo para emitir nota fiscal de saida",
+    "intencao_esperada": "procedimento_erp",
+    "modulo_esperado": "Movimentos > Saida",
+    "termos_obrigatorios": ["saida", "nota"]
+  }
+]

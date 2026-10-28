@@ -20,6 +20,7 @@ import sqlite3
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from core.sanitizer import sanitize_erp_brand_names
 
 logger = logging.getLogger("aura.webposto_rag")
 
@@ -104,16 +105,16 @@ class WebPostoRAGEngine:
                     resultados.append({
                         "id": row["id"],
                         "pilar": row["pilar"],
-                        "codigo_ref": row["codigo_ref"],
-                        "modulo": row["modulo"],
-                        "titulo": row["titulo"],
-                        "subtitulo": row["subtitulo"],
-                        "resumo_executivo": row["resumo_executivo"],
-                        "conteudo_completo": row["conteudo_completo"],
+                        "codigo_ref": sanitize_erp_brand_names(row["codigo_ref"]),
+                        "modulo": sanitize_erp_brand_names(row["modulo"]),
+                        "titulo": sanitize_erp_brand_names(row["titulo"]),
+                        "subtitulo": sanitize_erp_brand_names(row["subtitulo"]),
+                        "resumo_executivo": sanitize_erp_brand_names(row["resumo_executivo"]),
+                        "conteudo_completo": sanitize_erp_brand_names(row["conteudo_completo"]),
                         "tabelas_banco": row["tabelas_banco"],
-                        "impacto_financeiro": row["impacto_financeiro"],
-                        "acao_recomendada": row["acao_recomendada"],
-                        "tags_busca": row["tags_busca"],
+                        "impacto_financeiro": sanitize_erp_brand_names(row["impacto_financeiro"]),
+                        "acao_recomendada": sanitize_erp_brand_names(row["acao_recomendada"]),
+                        "tags_busca": sanitize_erp_brand_names(row["tags_busca"]),
                         "score_bm25": round(float(row["bm25_rank"]), 4) if row["bm25_rank"] is not None else 0.0,
                     })
         except Exception as e:

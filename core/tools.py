@@ -160,9 +160,20 @@ class PostoTools:
         erp_adapter: Optional[BaseERPAdapter] = None,
         public_data_repo: Optional[Any] = None,
     ):
-        self.rag = rag_engine
+        self._rag = rag_engine
         self.erp_adapter = erp_adapter or PostgresLocalERPAdapter()
         self._public_data_repo = public_data_repo
+
+    @property
+    def rag(self) -> HybridRAGEngine:
+        if self._rag is None:
+            from core.rag_engine import HybridRAGEngine
+            self._rag = HybridRAGEngine()
+        return self._rag
+
+    @rag.setter
+    def rag(self, value):
+        self._rag = value
 
     @property
     def public_data_repo(self):
@@ -234,6 +245,33 @@ class PostoTools:
                 "conhecimento": [],
                 "status": "offline",
                 "motivo": f"Base de conhecimento AURA indisponível: {e}",
+            }
+
+    def consultar_procedimento_erp(
+        self,
+        termo: str,
+        top_k: int = 3,
+        tenant_id: str = "posto_local",
+        erp: str = "webposto",
+        query_vector: list = None,
+    ) -> dict:
+        """
+        Consulta procedural de operacoes e manuais do ERP via Hybrid RAG no pgvector (Secao 9 do Roadmap).
+        """
+        try:
+            return self.rag.search_hybrid_procedimentos(
+                query_text=termo,
+                top_k=top_k,
+                tenant_id=tenant_id,
+                erp=erp,
+                query_vector=query_vector,
+            )
+        except Exception as e:
+            return {
+                "results": [],
+                "evidencia_insuficiente": True,
+                "status": "erro",
+                "motivo": f"Falha na busca de procedimentos: {e}",
             }
 
     def consultar_conhecimento_webposto(
