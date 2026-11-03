@@ -6174,6 +6174,10 @@ class AuraChatController {
       }
     });
 
+    if (window.auraTelemetry && typeof window.auraTelemetry.fetchSilentBadge === 'function') {
+      window.auraTelemetry.fetchSilentBadge();
+    }
+
     this.scrollToBottom();
   }
 

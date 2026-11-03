@@ -529,6 +529,26 @@
         </a>
       </div>
 
+      <!-- 2.1 Barra de Acompanhamento de Tokens & Telemetria AURA (FiscalLLM) -->
+      <button id="btn-header-token-tracking" class="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 text-xs border border-white/10 hover:border-cyan-500/30 transition-all cursor-pointer shadow-sm active:scale-95 group" title="Monitor de Tokens e Orcamento FiscalLLM (Clique para abrir Telemetria)">
+        <div class="flex items-center gap-1.5">
+          <span class="text-cyan-400 text-xs group-hover:scale-110 transition-transform">⚡</span>
+          <span id="header-token-counter" class="font-mono text-[11px] text-slate-200 font-semibold">0 tokens</span>
+        </div>
+        <span class="text-slate-600 text-[10px]">•</span>
+        <!-- Mini Barra de Progresso com Custo -->
+        <div class="flex items-center gap-1.5" title="Consumo acumulado em relacao a meta mensal">
+          <div class="w-14 sm:w-16 h-1.5 rounded-full bg-slate-800 overflow-hidden border border-white/5">
+            <div id="header-budget-progress-bar" class="h-full bg-emerald-500 rounded-full transition-all duration-500" style="width: 2%;"></div>
+          </div>
+          <span id="header-budget-cost-label" class="font-mono text-[10px] text-emerald-400 font-medium">R$ 0,00</span>
+        </div>
+        <span class="text-slate-600 text-[10px] hidden xl:inline">•</span>
+        <span id="header-budget-avoided-pill" class="hidden xl:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20" title="Economia financeira gerada por respostas do cache local semantico">
+          Economia ~R$ 0,00
+        </span>
+      </button>
+
       <!-- 3. Extremo Direito: Grupo de Produtividade (Regra dos 5 Itens Ancoras) -->
       <div id="header-productive-actions" class="flex items-center gap-2">
         <!-- 3.1 Botao de Busca Preditiva e Comandos Rapidos (Ctrl+K / ⌘K) -->
@@ -1821,6 +1841,179 @@
             </div>
           </div>
 
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SECAO: GOVERNANCA E MONITORAMENTO DE TOKENS (FISCAL-LLM)     -->
+        <!-- ============================================================= -->
+        <div class="p-4 rounded-xl bg-slate-950/70 border border-cyan-500/20 shadow-lg space-y-3.5">
+          <!-- Topo da Secao: Titulo e Status da Politica -->
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-2.5">
+              <div class="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center">
+                <span class="text-sm">⚡</span>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-xs sm:text-sm font-bold text-white font-sans">Acompanhamento de Tokens &amp; Orcamento FiscalLLM</h3>
+                  <span id="sre-budget-status-pill" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    Normal (Dentro da Meta)
+                  </span>
+                </div>
+                <p class="text-[11px] text-slate-400 font-sans">Tabela oficial Google AI Studio • Custo transparente por token e filial</p>
+              </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+              <span id="sre-budget-mode-badge" class="px-2 py-1 rounded-lg text-[10px] font-mono font-semibold bg-slate-800 text-cyan-300 border border-slate-700">
+                Modo: Smart Pacing
+              </span>
+            </div>
+          </div>
+
+          <!-- Barra de Acompanhamento e Progresso Ampla -->
+          <div class="space-y-1.5 p-3 rounded-lg bg-slate-900/80 border border-white/5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-300 font-medium font-sans flex items-center gap-1.5">
+                <span>Progresso do Teto Mensal:</span>
+                <strong id="sre-budget-pct-label" class="text-white font-mono">0.0%</strong>
+              </span>
+              <span class="text-[11px] font-mono text-slate-400">
+                <span id="sre-budget-cost-current" class="text-emerald-400 font-bold">R$ 0,00</span> / <span id="sre-budget-cost-limit">R$ 30,00</span>
+              </span>
+            </div>
+            <div class="w-full h-3 rounded-full bg-slate-950 overflow-hidden border border-white/10 relative">
+              <!-- Marcador de Alerta 80% -->
+              <div class="absolute top-0 bottom-0 left-[80%] w-[2px] bg-amber-400/60 z-10" title="Limiar de Alerta Preventivo (80%)"></div>
+              <div id="sre-budget-main-progress-bar" class="h-full bg-gradient-to-r from-emerald-500 via-cyan-500 to-indigo-500 rounded-full transition-all duration-700 shadow-inner" style="width: 2%;"></div>
+            </div>
+            <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono">
+              <span>0% (Inicio)</span>
+              <span class="text-amber-400/80">▲ Alerta 80%</span>
+              <span class="text-rose-400/80">Meta 100% (Teto)</span>
+            </div>
+          </div>
+
+          <!-- Grid de 4 Indicadores Estruturados -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <!-- 1. Tokens Consumidos -->
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-white/5">
+              <span class="text-[10px] text-slate-400 font-sans block">Tokens no Mes</span>
+              <div id="sre-token-total-count" class="text-lg font-bold text-white font-mono">0</div>
+              <span class="text-[9px] text-slate-500 font-mono block mt-0.5" id="sre-token-split">0 in / 0 out</span>
+            </div>
+            
+            <!-- 2. Custo Financeiro Real -->
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-white/5">
+              <span class="text-[10px] text-slate-400 font-sans block">Custo Apurado</span>
+              <div id="sre-token-cost-real" class="text-lg font-bold text-cyan-400 font-mono">R$ 0,00</div>
+              <span class="text-[9px] text-slate-500 font-mono block mt-0.5" id="sre-token-cost-usd">US$ 0.00</span>
+            </div>
+
+            <!-- 3. Economia Gerada (Cache Local) -->
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-emerald-500/20 bg-emerald-500/[0.03]">
+              <span class="text-[10px] text-emerald-300 font-sans block flex items-center gap-1">
+                <span>🛡️ Economia Cache</span>
+              </span>
+              <div id="sre-token-avoided-brl" class="text-lg font-bold text-emerald-400 font-mono">R$ 0,00</div>
+              <span class="text-[9px] text-emerald-400/70 font-mono block mt-0.5" id="sre-token-cache-hits">0 respostas sem custo</span>
+            </div>
+
+            <!-- 4. Projecao Fim do Mes -->
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-white/5">
+              <span class="text-[10px] text-slate-400 font-sans block">Projecao Fechamento</span>
+              <div id="sre-token-projection-brl" class="text-lg font-bold text-slate-200 font-mono">R$ 0,00</div>
+              <span class="text-[9px] text-slate-500 font-sans block mt-0.5">Run-rate linear simples</span>
+            </div>
+          </div>
+
+          <!-- Form de Metas Personalizaveis de Uso -->
+          <div class="p-3 rounded-lg bg-slate-900/60 border border-white/5 space-y-2.5">
+            <div class="flex items-center justify-between cursor-pointer" onclick="document.getElementById('token-policy-form-container').classList.toggle('hidden');">
+              <span class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" stroke-width="1.75"/><circle cx="12" cy="12" r="3" stroke-width="1.75"/></svg>
+                Personalizar Metas Orcamentarias da Filial
+              </span>
+              <span class="text-[10px] text-cyan-400 font-mono">Editar Parametros ▼</span>
+            </div>
+
+            <div id="token-policy-form-container" class="hidden pt-2 border-t border-white/5 grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+              <div>
+                <label class="text-[10px] text-slate-400 block mb-1">Meta Mensal (R$)</label>
+                <input id="input-budget-monthly" type="number" step="0.50" min="5" max="1000" value="30.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:border-cyan-400 focus:outline-none" />
+              </div>
+              <div>
+                <label class="text-[10px] text-slate-400 block mb-1">Limiar Alerta (%)</label>
+                <input id="input-budget-alert-pct" type="number" step="5" min="10" max="95" value="80" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:border-cyan-400 focus:outline-none" />
+              </div>
+              <div>
+                <label class="text-[10px] text-slate-400 block mb-1">Modo de Acao</label>
+                <select id="select-budget-mode" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-sans focus:border-cyan-400 focus:outline-none">
+                  <option value="smart_pacing">Smart Pacing (Prioriza cache/sintese)</option>
+                  <option value="advisory">Consultivo (Apenas Alerta)</option>
+                  <option value="strict_local">Contingencia Estrita (100% Local)</option>
+                </select>
+              </div>
+              <div>
+                <button id="btn-save-token-policy" type="button" class="w-full py-1.5 px-3 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-colors flex items-center justify-center gap-1 active:scale-95 cursor-pointer">
+                  <span>Salvar Meta</span>
+                </button>
+              </div>
+            </div>
+            <div id="token-policy-save-feedback" class="hidden text-[10px] text-emerald-400 font-semibold text-right">
+              ✓ Meta orcamentaria atualizada com sucesso!
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SECAO: INSIGHTS OPERACIONAIS E DE DESEMPENHO DA AURA         -->
+        <!-- ============================================================= -->
+        <div class="p-4 rounded-xl bg-slate-950/70 border border-white/5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-white flex items-center gap-1.5">
+              <span>🧠</span> Insights Operacionais &amp; Inteligencia da AURA
+            </span>
+            <span class="text-[10px] font-mono text-emerald-400 font-semibold" id="sre-insights-health-label">Saudavel</span>
+          </div>
+
+          <!-- Veredito Executivo em Destaque -->
+          <div class="p-3 rounded-lg bg-cyan-950/20 border border-cyan-500/20 flex items-start gap-2.5">
+            <div class="text-cyan-400 text-base mt-0.5">💡</div>
+            <div class="space-y-0.5 text-xs">
+              <div class="font-bold text-cyan-300">Veredito Operacional Executivo:</div>
+              <p id="sre-operational-verdict" class="text-slate-300 leading-relaxed font-sans">
+                Analisando performance das ultimas requisicoes e taxa de aderencia de dados locais...
+              </p>
+            </div>
+          </div>
+
+          <!-- 3 Metricas de Desempenho Operacional -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-white/5 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] text-slate-400 block">Eficiencia Cache Local</span>
+                <span id="sre-cache-efficiency-rate" class="text-sm font-bold text-emerald-400 font-mono">100%</span>
+              </div>
+              <span class="text-xs text-slate-500 font-sans">Zero Latencia API</span>
+            </div>
+
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-white/5 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] text-slate-400 block">Motor RAG &amp; FTS5</span>
+                <span id="sre-rag-efficiency-status" class="text-sm font-bold text-cyan-400 font-mono">Hibrido Ativo</span>
+              </div>
+              <span class="text-xs text-slate-500 font-sans">Borda Conectada</span>
+            </div>
+
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-white/5 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] text-slate-400 block">Media Tokens / Turno</span>
+                <span id="sre-avg-tokens-per-turn" class="text-sm font-bold text-purple-400 font-mono">~450</span>
+              </div>
+              <span class="text-xs text-slate-500 font-sans">Alta Concisao</span>
+            </div>
+          </div>
         </div>
 
         <!-- Secao Central: Grafico Canvas de Latencia TTFT em Tempo Real -->
