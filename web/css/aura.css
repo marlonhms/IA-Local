@@ -796,6 +796,19 @@ body {
 .prose-aura p:last-child {
   margin-bottom: 0;
 }
+.prose-aura a,
+.aura-doc-link {
+  color: #38bdf8;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 500;
+  transition: color 0.15s ease-in-out;
+}
+.prose-aura a:hover,
+.aura-doc-link:hover {
+  color: #7dd3fc;
+  text-decoration: underline;
+}
 /* Veredito Inicial - Lead Paragraph BLUF */
 .prose-aura > p:first-of-type {
   color: #f8fafc;

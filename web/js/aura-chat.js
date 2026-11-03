@@ -223,7 +223,31 @@ class AuraChatController {
   init() {
     if (window.marked && typeof window.marked.setOptions === 'function') {
       try {
+        const renderer = new window.marked.Renderer();
+        renderer.link = (token, titleArg, textArg) => {
+          let href = '';
+          let title = '';
+          let text = '';
+          if (token && typeof token === 'object') {
+            href = token.href || '';
+            title = token.title || '';
+            text = token.text || '';
+          } else {
+            href = token || '';
+            title = titleArg || '';
+            text = textArg || '';
+          }
+          if (!text || text === 'undefined' || text.trim() === '' || text === 'null') {
+            text = title || 'Manual Oficial do ERP';
+          }
+          if (!href || href === 'undefined' || href.trim() === '' || href === 'null' || href === 'URL' || href === 'URL_REAL_DO_CONTEXTO') {
+            return `<span class="aura-doc-link inline-flex items-center gap-1 text-cyan-400 font-medium">${text}</span>`;
+          }
+          const tAttr = title ? ` title="${title}"` : '';
+          return `<a href="${href}"${tAttr} target="_blank" rel="noopener noreferrer" class="aura-doc-link inline-flex items-center gap-1 text-cyan-400 hover:text-cyan-300 underline font-medium">${text} <svg class="w-3.5 h-3.5 inline opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg></a>`;
+        };
         window.marked.setOptions({
+          renderer: renderer,
           gfm: true,
           breaks: true,
         });
@@ -5339,9 +5363,10 @@ class AuraChatController {
     const stack = [];
     const tokenRegex = /(\*\*|__|(?<!\*)\*(?!\*)|\[(\/?)([a-zA-Z0-9_\-]+)\]|<(\/?)([a-zA-Z0-9]+)(?:\s+[^>]*)?>)/g;
     const bbTags = new Set([
-      'verde', 'emerald', 'green', 'amarelo', 'amber', 'yellow', 'vermelho', 'rose', 'red', 'ciano', 'cyan', 'roxo', 'purple',
+      'verde', 'emerald', 'green', 'amarelo', 'amber', 'yellow', 'vermelho', 'rose', 'red', 'ciano', 'cyan', 'cyano', 'roxo', 'purple',
       'badge-verde', 'badge-emerald', 'badge-green', 'badge-amarelo', 'badge-amber', 'badge-yellow',
-      'badge-vermelho', 'badge-rose', 'badge-red', 'badge-ciano', 'badge-cyan', 'badge-roxo', 'badge-purple', 'u'
+      'badge-vermelho', 'badge-rose', 'badge-red', 'badge-ciano', 'badge-cyan', 'badge-cyano', 'badge-roxo', 'badge-purple',
+      'u', 'sublinhado', 'underline', 'italic', 'italico', 'bold', 'negrito', 'i', 'b'
     ]);
     const htmlTags = new Set(['span', 'u', 'strong', 'em', 'b', 'i', 'mark']);
 
@@ -5500,13 +5525,14 @@ class AuraChatController {
 
       'ciano': { hl: 'text-cyan aura-hl-cyan', badge: 'badge-cyan aura-badge-cyan' },
       'cyan': { hl: 'text-cyan aura-hl-cyan', badge: 'badge-cyan aura-badge-cyan' },
+      'cyano': { hl: 'text-cyan aura-hl-cyan', badge: 'badge-cyan aura-badge-cyan' },
 
       'roxo': { hl: 'text-purple aura-hl-purple', badge: 'badge-purple aura-badge-purple' },
       'purple': { hl: 'text-purple aura-hl-purple', badge: 'badge-purple aura-badge-purple' },
     };
 
     const allColors = Object.keys(colorMap).join('|');
-    const allTags = `(?:badge-)?(?:${allColors})|u|sublinhado|underline`;
+    const allTags = `(?:badge-)?(?:${allColors})|u|sublinhado|underline|italic|italico|bold|negrito|i|b`;
 
     // 4.1. Normaliza fechamentos quebrados e tolerantes de BBCode (ex: [cor]texto /cor ou [cor]texto[/ cor])
     text = text.replace(
@@ -5571,6 +5597,18 @@ class AuraChatController {
 
     // 4.6. Transforma Markdown de sublinhado: __texto__ (permite underlines no meio de palavras compostas)
     text = text.replace(/(^|[^\w])__(?!_)([^\r\n]+?)(?<!_)__([^\w]|$)/g, '$1<u class="aura-underline">$2</u>$3');
+
+    // 4.6.1. Transforma BBCode de italico: [italic]...[/italic], [italico]...[/italico], [i]...[/i]
+    text = text.replace(/\[(?:italic|italico|i)\]([\s\S]*?)\[\/(?:italic|italico|i)\]/gi, (match, content) => {
+      if (!content.trim()) return '';
+      return `<em>${content}</em>`;
+    });
+
+    // 4.6.2. Transforma BBCode de negrito: [bold]...[/bold], [negrito]...[/negrito], [b]...[/b]
+    text = text.replace(/\[(?:bold|negrito|b)\]([\s\S]*?)\[\/(?:bold|negrito|b)\]/gi, (match, content) => {
+      if (!content.trim()) return '';
+      return `<strong>${content}</strong>`;
+    });
 
     // 4.7. Higienizacao estrita de tags orfas restantes (nunca deixando /vermelho, [ciano], [/vermelho] soltos)
     // Remove tags de fechamento orfas: [/vermelho], [/ciano], etc.
@@ -5781,6 +5819,12 @@ class AuraChatController {
     // Inline code (`código`)
     html = html.replace(/`([^`\n]+)`/g, '<code class="px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300 font-mono text-xs">$1</code>');
 
+    // Links em Markdown [Texto](url) com abertura segura em nova aba
+    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (match, linkText, url) => {
+      const safeText = (!linkText || linkText === 'undefined' || linkText.trim() === '' || linkText === 'null') ? 'Manual Oficial do ERP' : linkText;
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="aura-doc-link inline-flex items-center gap-1 text-cyan-400 hover:text-cyan-300 underline font-medium">${safeText} <svg class="w-3.5 h-3.5 inline opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg></a>`;
+    });
+
     return html;
   }
 
@@ -5836,10 +5880,8 @@ class AuraChatController {
    */
   applyProgressiveDisclosure(htmlContent, isStillStreaming = false, hasToolCard = false) {
     if (!htmlContent || typeof htmlContent !== 'string') return '';
-    if (isStillStreaming) return htmlContent;
-    // Apendice C - Fase 2: Com Tool Card/Companion Canvas acoplado, DESATIVA o disclosure no chat.
-    // O texto no chat e mantido como resumo fluido executivo, delegando o aprofundamento ao Canvas.
-    if (hasToolCard) return htmlContent;
+    // Entrega o texto completo no chat sem cortes artificiais ou colapso em accordion
+    return htmlContent;
 
     const isExpanded = (this.getReadingMode() === 'comfort');
     const openAttr = isExpanded ? ' open' : '';
@@ -5978,7 +6020,12 @@ class AuraChatController {
 
   sanitizeErpBrand(text) {
     if (!text || typeof text !== 'string') return text || '';
-    let t = text;
+    // Protege URLs completas (evita corromper links do Confluence ou rotas de API)
+    const urlPlaceholders = [];
+    let t = text.replace(/https?:\/\/[^\s)\]]+/gi, (matchedUrl) => {
+      urlPlaceholders.push(matchedUrl);
+      return `__AURA_URL_SAFE_${urlPlaceholders.length - 1}__`;
+    });
     t = t.replace(/\bwebposto\s*\(retaguarda\)/gi, 'Retaguarda do seu ERP');
     t = t.replace(/\bwebpostopdv\b/gi, 'PDV do Posto');
     t = t.replace(/\bwebpostopay(?:server)?\b/gi, 'Módulo de Pagamentos / TEF');
@@ -6011,6 +6058,11 @@ class AuraChatController {
     } else if (t.startsWith('no seu ERP')) {
       t = 'No seu ERP' + t.slice(10);
     }
+
+    urlPlaceholders.forEach((url, idx) => {
+      t = t.replace(`__AURA_URL_SAFE_${idx}__`, url);
+    });
+
     return t;
   }
 
@@ -6088,11 +6140,28 @@ class AuraChatController {
     const model = t.llm_model || 'Gemini 3.1 Flash';
     const lgpd = t.lgpd_sanitized_count || 0;
 
+    const tokens = t.tokens || {};
+    const totalTokens = tokens.total_tokens || t.total_tokens || 0;
+    const costBrl = tokens.cost_brl || t.cost_brl || 0;
+    const avoidedBrl = tokens.avoided_cost_brl || t.avoided_cost_brl || 0;
+    const budgetPct = (tokens.budget_percent_used !== undefined && tokens.budget_percent_used !== null) ? Number(tokens.budget_percent_used) : null;
+
+    let tokenHtml = '';
+    if (totalTokens > 0) {
+      const costFmt = costBrl < 0.01 ? '< R$ 0,01' : `R$ ${costBrl.toFixed(2).replace('.', ',')}`;
+      const budgetBadge = budgetPct !== null ? ` • Meta: ${budgetPct.toFixed(0)}%` : '';
+      tokenHtml = `<span class="text-slate-500">•</span><span class="text-cyan-400 font-medium inline-flex items-center gap-1">⚡ ${totalTokens.toLocaleString('pt-BR')} tokens (~${costFmt}${budgetBadge})</span>`;
+    } else if (avoidedBrl > 0 || tokens.contingency_zero_token) {
+      const avoidedFmt = `R$ ${avoidedBrl.toFixed(2).replace('.', ',')}`;
+      tokenHtml = `<span class="text-slate-500">•</span><span class="text-emerald-400 font-medium inline-flex items-center gap-1">⚡ 0 tokens (Cache Local: Economia ~${avoidedFmt})</span>`;
+    }
+
     const html = `
       <div class="flex flex-wrap items-center gap-3 opacity-60 hover:opacity-100 transition-opacity font-mono text-[10px]">
         ${e2e ? `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Resposta em <strong class="text-emerald-300 tabular-nums font-semibold">${e2e}</strong></span>` : ''}
         <span class="text-slate-500">•</span>
         <span>Motor: <strong class="text-purple-300 font-semibold">${model}</strong></span>
+        ${tokenHtml}
         ${lgpd > 0 ? `<span class="text-slate-500">•</span><span class="text-emerald-400/90 font-medium inline-flex items-center gap-1">${CHAT_ICONS.shield} LGPD: ${lgpd} dados protegidos</span>` : ''}
       </div>
     `;

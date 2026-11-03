@@ -54,6 +54,35 @@ def test_posto_tools_consultar_procedimento():
     assert len(res["results"]) > 0
     assert res.get("evidencia_insuficiente") is False
 
+def test_resolver_url_manual_e_porte_extenso():
+    """Valida resolucao de URL oficial do Confluence e deteccao de documento extenso."""
+    from core.aura_engine import AuraEngine
+    
+    # 1. URL explicita preservada
+    c1 = {"doc_url": "https://qualityautomacao.atlassian.net/wiki/spaces/seu ERP/pages/9999"}
+    assert AuraEngine._resolver_url_manual(c1) == "https://qualityautomacao.atlassian.net/wiki/spaces/seu ERP/pages/9999"
+
+    # 2. Derivacao automatica a partir de CONF-id
+    c2 = {"doc_id": "CONF-65699937"}
+    assert AuraEngine._resolver_url_manual(c2) == "https://qualityautomacao.atlassian.net/wiki/spaces/webposto/pages/65699937"
+
+    # 3. Fallback sem url
+    c3 = {"doc_id": "OUTRO-123"}
+    assert AuraEngine._resolver_url_manual(c3) == ""
+
+def test_prompt_procedimento_erp_dual_pacing():
+    """Valida que o prompt de procedimentos contem as diretrizes de Dual-Pacing e links."""
+    from core.prompts.system_prompts import build_procedimento_erp_prompt
+    prompt = build_procedimento_erp_prompt(
+        pergunta_sanitizada="como fazer fechamento de caixa",
+        contexto_sanitizado="Trecho de manual",
+        historico_formatado="",
+    )
+    assert "Dual-Pacing" in prompt
+    assert "EXTENSO" in prompt
+    assert "DIRETO" in prompt
+    assert "Manual Completo no Confluence" in prompt
+
 def test_zero_unicode_dashes_in_test():
     """Garante ausencia de travessoes proibidos neste arquivo de teste."""
     text = Path(__file__).read_text(encoding="utf-8")

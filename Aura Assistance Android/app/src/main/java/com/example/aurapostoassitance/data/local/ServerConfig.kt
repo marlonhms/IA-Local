@@ -17,6 +17,12 @@ class ServerConfig @Inject constructor(
             prefs.edit().putString("server_ip", value.trim()).apply()
         }
 
+    var hasConnected: Boolean
+        get() = prefs.getBoolean("has_connected", prefs.contains("server_ip"))
+        set(value) {
+            prefs.edit().putBoolean("has_connected", value).apply()
+        }
+
     fun getBaseUrl(): String {
         var cleanIp = serverIp.trim()
         if (!cleanIp.startsWith("http://") && !cleanIp.startsWith("https://")) {

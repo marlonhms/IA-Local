@@ -876,13 +876,23 @@ def sanitize_erp_brand_names(text: str) -> str:
     """
     Substitui terminologias comerciais proprietarias de ERPs por expressoes
     genericas e profissionais ('seu ERP', 'seu sistema', 'ERP do Posto').
+    Preserva URLs intactas para evitar corromper links do Confluence e rotas de API.
     Regra inegociavel: ZERO travessoes em todo o codigo.
     """
     if not text or not isinstance(text, str):
         return "" if text is None else str(text)
 
+    # 0. Preserva URLs intactas (evita quebrar links oficiais do Confluence e rotas de API)
+    url_placeholders = []
+
+    def _preserve_url(m):
+        url_placeholders.append(m.group(0))
+        return f"__AURA_URL_SAFE_{len(url_placeholders) - 1}__"
+
+    text_shielded = re.sub(r'https?://[^\s)\]]+', _preserve_url, text)
+
     # 1. Modulos e subsistemas especificos
-    t = re.sub(r'(?i)\bwebposto\s*\(retaguarda\)', 'Retaguarda do seu ERP', text)
+    t = re.sub(r'(?i)\bwebposto\s*\(retaguarda\)', 'Retaguarda do seu ERP', text_shielded)
     t = re.sub(r'(?i)\bwebpostopdv\b', 'PDV do Posto', t)
     t = re.sub(r'(?i)\bwebpostopay(?:server)?\b', 'Modulo de Pagamentos / TEF', t)
     t = re.sub(r'(?i)\bwebfrota\b', 'Modulo de Frotas', t)
@@ -918,8 +928,11 @@ def sanitize_erp_brand_names(text: str) -> str:
     elif t.startswith('no seu ERP'):
         t = 'No seu ERP' + t[10:]
 
-    return t
+    # 6. Restaura URLs originais intactas
+    for idx, orig_url in enumerate(url_placeholders):
+        t = t.replace(f'__AURA_URL_SAFE_{idx}__', orig_url)
 
+    return t
 
 def sanitize_erp_brand_data(obj: Any) -> Any:
     """Higieniza recursivamente nomes comerciais de ERP em dicionarios, listas e strings."""

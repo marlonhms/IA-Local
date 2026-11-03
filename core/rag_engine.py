@@ -950,6 +950,39 @@ class HybridRAGEngine:
             logger.warning("Falha na busca de procedimentos em chunks: %s", e)
             retrieval_mode = "error_fallback"
 
+        # Fallback de contingencia local FTS5 SQLite se pgvector falhar ou retornar vazio
+        if not results:
+            try:
+                from core.webposto_rag import get_webposto_rag
+                rag_local = get_webposto_rag()
+                locais = rag_local.buscar_geral(query_text, pilar="confluence", limit=top_k)
+                if not locais:
+                    locais = rag_local.buscar_geral(query_text, limit=top_k)
+                for r in (locais or []):
+                    cod = str(r.get("codigo_ref") or "")
+                    page_id = cod.split("-")[1] if (cod.startswith("CONF-") and len(cod.split("-")) > 1) else ""
+                    url_doc = f"https://qualityautomacao.atlassian.net/wiki/spaces/webposto/pages/{page_id}" if page_id else (r.get("doc_url") or "")
+                    resumo = str(r.get("resumo_executivo") or "").strip()
+                    conteudo_comp = str(r.get("conteudo_completo") or "").strip()
+                    corpo = f"{resumo}\n\n{conteudo_comp}".strip() or resumo
+                    results.append({
+                        "id": r.get("id"),
+                        "doc_id": cod or f"CONF-{r.get('id')}",
+                        "doc_titulo": r.get("titulo") or "Manual Operacional",
+                        "secao": r.get("subtitulo") or r.get("modulo") or "Geral",
+                        "breadcrumb": f"{r.get('modulo', 'ERP')} > {r.get('titulo')}" if r.get("modulo") else (r.get("titulo") or ""),
+                        "chunk_idx": 1,
+                        "chunk_total": 1,
+                        "conteudo": corpo,
+                        "doc_url": url_doc,
+                        "n_tokens": len(corpo) // 4,
+                        "rrf_score": float(r.get("bm25_rank") or 0.1),
+                    })
+                if results:
+                    retrieval_mode = "local_fts5_contingency"
+            except Exception as e_loc:
+                logger.warning("Falha no fallback local FTS5 de procedimentos: %s", e_loc)
+
         db_latency_ms = (time.perf_counter() - t_db_start) * 1000
         total_latency_ms = (time.perf_counter() - t0) * 1000
 

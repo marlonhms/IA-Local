@@ -17,26 +17,26 @@ Write-Host "[*] Permissao de Administrador confirmada." -ForegroundColor Green
 Write-Host "[*] Destravando processo do servico (STOP_PENDING)..." -ForegroundColor Cyan
 Write-Host "===================================================" -ForegroundColor Cyan
 
-# 1. Recupera o PID do servico caso esteja travado em STOP_PENDING
+# 1. Recupera o PID do servico e derruba arvore completa de processos
 try {
     $scOut = sc.exe queryex $serviceName
     $pidLine = $scOut | Where-Object { $_ -match 'PID\s*:\s*(\d+)' }
     if ($pidLine -and $matches[1] -ne '0') {
         $svcPid = $matches[1]
-        Write-Host "[*] Destravando processo PID $svcPid (NSSM)..." -ForegroundColor Yellow
-        Stop-Process -Id $svcPid -Force -ErrorAction SilentlyContinue
+        Write-Host "[*] Destravando processo PID $svcPid (NSSM) e arvore de processos..." -ForegroundColor Yellow
+        taskkill.exe /F /PID $svcPid /T 2>$null
     }
 } catch {
     # Ignora
 }
 
-# 2. Finaliza processos orfaos na porta 8000
+# 2. Finaliza processos orfaos na porta 8000 garantindo taskkill em arvore
 try {
     $conns = Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue
     foreach ($c in $conns) {
         if ($c.OwningProcess -and $c.OwningProcess -ne 0) {
             Write-Host "[*] Liberando porta 8000 (PID $($c.OwningProcess))..." -ForegroundColor Yellow
-            Stop-Process -Id $c.OwningProcess -Force -ErrorAction SilentlyContinue
+            taskkill.exe /F /PID $c.OwningProcess /T 2>$null
         }
     }
 } catch {

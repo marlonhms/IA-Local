@@ -1367,6 +1367,39 @@ async def get_telemetry_metrics_endpoint(
     return engine.telemetry.get_metrics_summary()
 
 
+class BudgetPolicyUpdateRequest(BaseModel):
+    monthly_budget_brl: Optional[float] = None
+    alert_threshold_pct: Optional[float] = None
+    enforcement_mode: Optional[str] = None
+
+
+@router.get("/telemetry/token-budget", summary="Status de Consumo de Tokens e Orcamento Mensal")
+async def get_token_budget_endpoint(
+    filial_id: Optional[str] = None,
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """Retorna o status atual de consumo de tokens, custos em R$ e politicas de orcamento."""
+    f_id = filial_id or engine.filial_id
+    return engine.token_budget.get_budget_status(filial_id=f_id)
+
+
+@router.post("/telemetry/token-budget/policy", summary="Atualiza Politica de Orcamento de Tokens da Filial")
+async def update_token_budget_policy_endpoint(
+    req: BudgetPolicyUpdateRequest,
+    filial_id: Optional[str] = None,
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """Atualiza metas de orcamento personalizaveis de uso de tokens."""
+    f_id = filial_id or engine.filial_id
+    res = engine.token_budget.update_budget_policy(
+        filial_id=f_id,
+        monthly_budget_brl=req.monthly_budget_brl,
+        alert_threshold_pct=req.alert_threshold_pct,
+        enforcement_mode=req.enforcement_mode,
+    )
+    return res
+
+
 @router.post("/telemetry/report", summary="Reporte de Metricas de UX pelo Cliente")
 async def report_telemetry_endpoint(
     req: TelemetryReportRequest,

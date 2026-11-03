@@ -25,7 +25,7 @@ import logging
 from contextlib import contextmanager
 
 logger = logging.getLogger("aura.engine")
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date, timedelta
 from pathlib import Path
 from enum import Enum
 from typing import AsyncIterator, Optional, Dict, Any, List, Tuple, Union
@@ -1261,6 +1261,76 @@ def extrair_data_turno(pergunta: str) -> Tuple[Optional[str], Optional[str]]:
     return data, turno
 
 
+def extrair_intervalo_datas(pergunta: str) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Extrai intervalo de datas (inicio e fim) a partir da pergunta do usuario.
+    Retorna: (data_inicio, data_fim) no formato YYYY-MM-DD ou (None, None).
+    """
+    p = pergunta.lower().strip()
+    hoje = date.today()
+
+    # 1. Palavras-chave relativas
+    if "hoje" in p:
+        d_str = hoje.strftime("%Y-%m-%d")
+        return d_str, d_str
+    if "ontem" in p:
+        ontem = hoje - timedelta(days=1)
+        d_str = ontem.strftime("%Y-%m-%d")
+        return d_str, d_str
+    if "anteontem" in p:
+        anteontem = hoje - timedelta(days=2)
+        d_str = anteontem.strftime("%Y-%m-%d")
+        return d_str, d_str
+    if "este mes" in p or "neste mes" in p or "mes atual" in p:
+        ini = hoje.replace(day=1).strftime("%Y-%m-%d")
+        fim = hoje.strftime("%Y-%m-%d")
+        return ini, fim
+    if "ultimos 7 dias" in p or "ultima semana" in p or "7 dias" in p:
+        ini = (hoje - timedelta(days=7)).strftime("%Y-%m-%d")
+        fim = hoje.strftime("%Y-%m-%d")
+        return ini, fim
+    if "ultimos 30 dias" in p or "30 dias" in p:
+        ini = (hoje - timedelta(days=30)).strftime("%Y-%m-%d")
+        fim = hoje.strftime("%Y-%m-%d")
+        return ini, fim
+
+    # 2. Meses nominais
+    meses_map = {
+        "janeiro": 1, "fevereiro": 2, "marco": 3, "abril": 4, "maio": 5, "junho": 6,
+        "julho": 7, "agosto": 8, "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12,
+        "jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6,
+        "jul": 7, "ago": 8, "set": 9, "out": 10, "nov": 11, "dez": 12
+    }
+    for m_nome, m_num in meses_map.items():
+        if re.search(r"\b" + m_nome + r"\b", p):
+            ano = 2026
+            m_ano = re.search(r"\b(202\d)\b", p)
+            if m_ano:
+                ano = int(m_ano.group(1))
+            ultimo_dia = 31 if m_num in (1, 3, 5, 7, 8, 10, 12) else (28 if m_num == 2 else 30)
+            return f"{ano:04d}-{m_num:02d}-01", f"{ano:04d}-{m_num:02d}-{ultimo_dia:02d}"
+
+    # 3. Intervalo explicito: "01/09 a 15/09", "de 01/09 a 15/09"
+    m_range = re.search(
+        r"\b(?:de\s+)?(\d{1,2})[-/.](\d{1,2})(?:[-/.](\d{2,4}))?\s*(?:a|ate|e|-)\s*(\d{1,2})[-/.](\d{1,2})(?:[-/.](\d{2,4}))?\b",
+        p
+    )
+    if m_range:
+        d1, m1, y1, d2, m2, y2 = m_range.groups()
+        ano1 = int(y1) if y1 else 2026
+        if ano1 < 100: ano1 += 2000
+        ano2 = int(y2) if y2 else ano1
+        if ano2 < 100: ano2 += 2000
+        return f"{ano1:04d}-{int(m1):02d}-{int(d1):02d}", f"{ano2:04d}-{int(m2):02d}-{int(d2):02d}"
+
+    # 4. Data unica
+    data_unica, _ = extrair_data_turno(pergunta)
+    if data_unica and data_unica not in ("hoje", "ontem", "anteontem"):
+        return data_unica, data_unica
+
+    return None, None
+
+
 def extrair_bico(pergunta: str) -> Optional[str]:
     """Extrai número de bico ou bomba a partir da pergunta."""
     p = pergunta.lower()
@@ -1938,12 +2008,44 @@ def build_canonical_genui_envelope(
                     payload={"perspective": "margens"},
                 )
             )
-        props["diagnosis"] = props.get("diagnosis") or executive_summary or "Diagnóstico de margem apurado no ERP."
-        props["confidence_score"] = float(props.get("confidence_score") or 0.95)
-        props["consolidated_margin_pct"] = float(props.get("consolidated_margin_pct") or 14.5)
-        props["fuel_margins"] = props.get("fuel_margins") or []
-        props["payment_fee_impact"] = props.get("payment_fee_impact") or []
-        props["suggested_actions"] = [a.model_dump(mode="json") for a in actions]
+        metricas_res = props.get("metricas_consolidadas") or {}
+        periodo_res = props.get("periodo") or {}
+        resumo_geral = props.get("resumo_geral") or {}
+        gross_rev = float(
+            metricas_res.get("faturamento_bruto")
+            or props.get("gross_revenue")
+            or resumo_geral.get("faturamento_total")
+            or 0.0
+        )
+        net_prof = float(
+            metricas_res.get("lucro_liquido")
+            or props.get("net_profit")
+            or metricas_res.get("lucro_bruto")
+            or 0.0
+        )
+        tot_tef = float(
+            metricas_res.get("taxas_tef_total")
+            or props.get("total_desconto_tef")
+            or 0.0
+        )
+        mg_consol = metricas_res.get("margem_liquida_consolidada_pct")
+        if mg_consol is None:
+            mg_consol = props.get("consolidated_margin_pct")
+
+        props["gross_revenue"] = gross_rev
+        props["net_profit"] = net_prof
+        props["total_desconto_tef"] = tot_tef
+        props["consolidated_margin_pct"] = float(mg_consol) if mg_consol is not None else None
+        props["periodo_analisado"] = periodo_res.get("descricao") or props.get("periodo_analisado") or ""
+        props["top_produtos_margem"] = props.get("produtos_mais_vendidos") or props.get("top_produtos_margem") or []
+        props["fuel_margins"] = props.get("combustiveis_margem") or props.get("fuel_margins") or []
+        props["payment_fee_impact"] = props.get("meios_pagamento_impacto") or props.get("payment_fee_impact") or []
+        props["diagnosis"] = props.get("diagnosis") or executive_summary or (
+            f"Diagnostico de rentabilidade apurado no ERP ({props['periodo_analisado']})."
+            if props["periodo_analisado"] else "Diagnostico de rentabilidade apurado no ERP."
+        )
+        props["confidence_score"] = float(props.get("confidence_score") or 0.98)
+        props["suggested_actions"] = [a.model_dump(mode="json") if hasattr(a, "model_dump") else a for a in actions]
 
     elif comp_name == "render_PredictiveScenarioUI" or intencao in ("cenario_preditivo", "simulacao_preditiva"):
         if not actions:
@@ -3183,6 +3285,7 @@ class AuraEngine:
         self._proactive_daemon = proactive_daemon
         self._watchdog = watchdog
         self._dados_filial: Optional[Dict[str, Any]] = None
+        self._token_budget = None
 
     @property
     def rag(self) -> HybridRAGEngine:
@@ -3220,6 +3323,25 @@ class AuraEngine:
         """Determina se a ferramenta ou intencao e analitica pesada para protecao do PDV."""
         norm = (tool_name or "").strip().lower().replace("-", "_").replace(" ", "_")
         return norm in HEAVY_ANALYTICAL_TOOLS or (tool_name or "").strip().lower() in HEAVY_ANALYTICAL_TOOLS
+
+    @staticmethod
+    def _resolver_url_manual(chunk: dict) -> str:
+        """Resolve a URL oficial do manual no Confluence a partir de doc_url ou doc_id."""
+        url = chunk.get("doc_url")
+        if url and str(url).strip().startswith("http"):
+            return str(url).strip()
+        doc_id = str(chunk.get("doc_id", "")).strip()
+        if doc_id.startswith("CONF-"):
+            page_id = doc_id.split("-")[1]
+            return f"https://qualityautomacao.atlassian.net/wiki/spaces/webposto/pages/{page_id}"
+        return ""
+
+    @property
+    def token_budget(self):
+        if self._token_budget is None:
+            from core.token_budget import TokenBudgetManager
+            self._token_budget = TokenBudgetManager(session_memory=self._session_memory)
+        return self._token_budget
 
     @property
     def compliance_manager(self):
@@ -3824,7 +3946,7 @@ class AuraEngine:
             elif intencao in ("procedimento_erp", "manuais_erp", "operacao_erp"):
                 busca = self.tools.consultar_procedimento_erp(
                     termo=pergunta,
-                    top_k=3,
+                    top_k=5,
                     query_vector=query_vector,
                 )
                 chunks = busca.get("results", [])
@@ -3850,10 +3972,22 @@ class AuraEngine:
                     )
                     for idx, c in enumerate(chunks, 1):
                         bcrumb = c.get("breadcrumb") or c.get("doc_titulo", "")
+                        chunk_total = int(c.get("chunk_total") or 1)
+                        conteudo = str(c.get("conteudo") or "").strip()
+                        url_manual = self._resolver_url_manual(c)
+                        is_extenso = chunk_total >= 3 or len(conteudo) > 1800
+                        classificacao = (
+                            "EXTENSO (Apresente Roteiro Executivo em 3-5 passos + Sugira o link oficial ao final)"
+                            if is_extenso
+                            else "DIRETO (Passo a passo integral + Link oficial de apoio ao final)"
+                        )
                         contexto_extra += (
                             f"[{idx}] Documento: {c.get('doc_titulo')} | Secao: {c.get('secao')} | Caminho: {bcrumb}\n"
-                            f"Conteudo do Trecho:\n{c.get('conteudo')}\n\n"
+                            f"Classificacao do Manual: {classificacao} | Total de Chunks: {chunk_total}\n"
                         )
+                        if url_manual:
+                            contexto_extra += f"URL Oficial do Manual: {url_manual}\n"
+                        contexto_extra += f"Conteudo do Trecho:\n{conteudo}\n\n"
                 else:
                     contexto_extra = (
                         "Manual Operacional do ERP: Nao foram encontradas instrucoes detalhadas para esta operacao especifica nos manuais indexados. "
@@ -3988,9 +4122,33 @@ class AuraEngine:
                 )
                 contexto_extra = f"Livro de Movimentação de Combustíveis (LMC ANP Portaria 26/1992):\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
 
-            elif intencao == "vendas_analitico":
-                resultado_bruto = self.tools.consultar_analise_vendas_erp(tipo="mais_vendidos")
-                contexto_extra = f"Consulta de Histórico de Vendas no ERP:\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+            elif intencao in ("vendas_analitico", "analise_margem"):
+                dt_ini, dt_fim = extrair_intervalo_datas(pergunta)
+                resultado_bruto = self.tools.consultar_analise_vendas_erp(
+                    tipo="mais_vendidos",
+                    data_inicio=dt_ini,
+                    data_fim=dt_fim,
+                    limite=150,
+                )
+                periodo_info = resultado_bruto.get("periodo") or {}
+                periodo_desc = periodo_info.get("descricao") or "Base recente do ERP"
+                orientacao_periodo = periodo_info.get("mensagem_orientacao") or ""
+                metricas = resultado_bruto.get("metricas_consolidadas") or {}
+                contexto_extra = (
+                    f"Consulta e Auditoria de Vendas e Rentabilidade no ERP:\n"
+                    f"- Periodo Analisado: {periodo_desc}\n"
+                )
+                if orientacao_periodo:
+                    contexto_extra += f"- Orientacao ao Usuario sobre Periodo: {orientacao_periodo}\n"
+                contexto_extra += (
+                    f"- Metricas Consolidadas Deterministicas: Faturamento Bruto R$ {metricas.get('faturamento_bruto', 0):,.2f} | "
+                    f"Custo Total R$ {metricas.get('custo_total', 0):,.2f} | "
+                    f"Lucro Bruto R$ {metricas.get('lucro_bruto', 0):,.2f} | "
+                    f"Taxas TEF -R$ {metricas.get('taxas_tef_total', 0):,.2f} | "
+                    f"Lucro Liquido R$ {metricas.get('lucro_liquido', 0):,.2f} | "
+                    f"Margem Liquida Real {metricas.get('margem_liquida_consolidada_pct', 0):.2f}%\n"
+                    f"Extrato Completo do ERP:\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+                )
 
             elif intencao in (
                 "conveniencia_vendas_cruzadas", "market_basket", "cesta_compras",
@@ -4864,12 +5022,27 @@ class AuraEngine:
             fat_total_hoje = fat_comb_hoje + fat_conv_hoje
 
             if genui_active:
-                return (
-                    "### Diagnostico Executivo de Vendas & Faturamento\n\n"
-                    f"Faturamento consolidado de hoje apurado em [verde]R$ {fat_total_hoje:,.2f}[/verde] ({data_str}).\n\n"
-                    f"- **Segmentacao:** Pista [ciano]R$ {fat_comb_hoje:,.2f}[/ciano] ({litros_hoje:,.2f} L) e Loja [verde]R$ {fat_conv_hoje:,.2f}[/verde] ({ped_conv_hoje} pedidos).\n"
-                    "- **Extrato de Vendas:** O ranking completo de produtos e os cupons detalhados estao projetados no **painel lateral**."
-                )
+                periodo_info = resultado_bruto.get("periodo") or {}
+                p_desc = periodo_info.get("descricao") or data_str
+                orientacao = periodo_info.get("mensagem_orientacao") or ""
+                metricas = resultado_bruto.get("metricas_consolidadas") or {}
+                fat_val = float(metricas.get("faturamento_bruto") or fat_total_hoje)
+                lucro_val = float(metricas.get("lucro_liquido") or 0.0)
+                mg_val = float(metricas.get("margem_liquida_consolidada_pct") or 0.0)
+                tef_val = float(metricas.get("taxas_tef_total") or 0.0)
+
+                linhas_resp = [
+                    "### Diagnostico Executivo de Vendas & Rentabilidade",
+                    "",
+                    f"Faturamento consolidado apurado em [verde]R$ {fat_val:,.2f}[/verde] ({p_desc}).",
+                    f"Lucro liquido real de [ciano]R$ {lucro_val:,.2f}[/ciano] com margem consolidada de [verde]{mg_val:.2f}%[/verde] (taxas TEF descontadas: [vermelho]-R$ {tef_val:,.2f}[/vermelho]).",
+                    "",
+                    f"- **Segmentacao:** Pista [ciano]R$ {fat_comb_hoje:,.2f}[/ciano] ({litros_hoje:,.2f} L) e Loja [verde]R$ {fat_conv_hoje:,.2f}[/verde] ({ped_conv_hoje} pedidos).",
+                    "- **Extrato Detalhado:** A matriz completa de rentabilidade por produto, combustivel e meios de pagamento esta projetada no **painel lateral**.",
+                ]
+                if orientacao:
+                    linhas_resp.append(f"\n> 💡 *{orientacao}*")
+                return "\n".join(linhas_resp)
 
             linhas = [
                 "### 📊 Diagnóstico Executivo de Vendas & Faturamento",
@@ -5343,29 +5516,39 @@ class AuraEngine:
             if not chunks:
                 return "Nao foram encontrados procedimentos operacionais cadastrados para esta consulta no momento."
             
-            def _format_contingency_steps(raw_text: str, max_chars: int = 1200) -> str:
-                # Remove marcadores de imagens internas
+            def _format_contingency_steps(raw_text: str) -> str:
+                # Remove marcadores de imagens internas preservando 100% dos passos
                 clean = re.sub(r'ret-[\w-]+', '', raw_text)
                 clean = re.sub(r'img-[\w-]+', '', clean)
                 clean = re.sub(r'\n{3,}', '\n\n', clean).strip()
-                if len(clean) <= max_chars:
-                    return clean
-                trunc = clean[:max_chars]
-                last_break = max(trunc.rfind('.\n'), trunc.rfind('. '), trunc.rfind('\n\n'))
-                if last_break > max_chars // 2:
-                    return trunc[:last_break + 1].strip()
-                return trunc.rstrip() + '.'
+                return clean
 
             linhas = ["### Roteiro Operacional (Manual do ERP)", ""]
-            for idx, c in enumerate(chunks[:2], 1):
+            for idx, c in enumerate(chunks[:3], 1):
                 tit = c.get("doc_titulo", "Manual").strip()
                 sec = c.get("secao", "").strip()
                 bcrumb = c.get("breadcrumb", "").strip()
                 cont = c.get("conteudo", "").strip()
+                url = self._resolver_url_manual(c)
+                chunk_total = int(c.get("chunk_total") or 1)
+                texto_formatado = _format_contingency_steps(cont)
+                is_extenso = chunk_total >= 3 or len(texto_formatado) > 1800
+
                 linhas.append(f"#### [{idx}] {tit} - {sec}")
                 if bcrumb:
                     linhas.append(f"*Caminho no ERP:* `{bcrumb}`\n")
-                linhas.append(_format_contingency_steps(cont, 1200))
+                
+                if is_extenso:
+                    linhas.append("*Roteiro Operacional Resumido:*")
+                    passos = [p for p in texto_formatado.split("\n") if p.strip()]
+                    resumo = "\n".join(passos[:6]) if len(passos) > 6 else texto_formatado
+                    linhas.append(resumo)
+                    if url:
+                        linhas.append(f"\n> 💡 *Esta rotina possui etapas detalhadas.* Consulte o [Manual Completo no Confluence]({url}) para conferir todas as telas e imagens passo a passo.\n")
+                else:
+                    linhas.append(texto_formatado)
+                    if url:
+                        linhas.append(f"\n🔗 [Manual Oficial no Confluence]({url})\n")
                 linhas.append("")
             return "\n".join(linhas)
 
@@ -5541,6 +5724,23 @@ class AuraEngine:
                 metadata={"cache_hit": True},
             )
 
+            token_record = self.token_budget.record_usage(
+                session_id=sess_id,
+                filial_id=f_id,
+                prompt_tokens=max(10, len(pergunta_efetiva) // 4),
+                completion_tokens=max(10, len(resposta_cache) // 4),
+                model_name="local-semantic-cache",
+                cached=True,
+            )
+            self.telemetry.record_token_usage(
+                prompt_tokens=0,
+                completion_tokens=0,
+                model_name="local-semantic-cache",
+                cost_brl=0.0,
+                avoided_cost_brl=token_record.get("avoided_cost_brl", 0.0),
+                session_id=sess_id,
+            )
+
             yield AuraChunk(
                 chunk_type=AuraChunkType.TELEMETRY,
                 data={
@@ -5549,6 +5749,7 @@ class AuraEngine:
                     "ttft_ms": round(cache_ttft_ms, 2),
                     "tool_latency_ms": round(tool_latency_ms, 2),
                     "total_e2e_ms": round(total_e2e_ms, 2),
+                    "tokens": token_record,
                 },
                 session_id=sess_id,
             )
@@ -5692,6 +5893,7 @@ class AuraEngine:
         for m_name in FALLBACK_MODELS[:2]:
             try:
                 model = genai.GenerativeModel(m_name)
+                last_chunk_obj = None
                 # Invoca streaming assincrono com timeout resiliente de 25 segundos
                 response_stream = await asyncio.wait_for(
                     model.generate_content_async(
@@ -5709,6 +5911,7 @@ class AuraEngine:
                 while True:
                     try:
                         chunk = await asyncio.wait_for(_get_next_chunk(stream_aiter), timeout=20.0)
+                        last_chunk_obj = chunk
                     except StopAsyncIteration:
                         break
                     except (asyncio.TimeoutError, Exception) as stream_step_err:
@@ -5859,6 +6062,33 @@ class AuraEngine:
             "total_e2e_ms": round(total_e2e_ms, 2),
             "lgpd_redacted_count": total_redacted,
         }
+        # Registro e medicao precisa de tokens consumidos
+        usage_meta = getattr(last_chunk_obj, "usage_metadata", None) if "last_chunk_obj" in locals() and last_chunk_obj else None
+        p_tokens = getattr(usage_meta, "prompt_token_count", None) if usage_meta else None
+        c_tokens = getattr(usage_meta, "candidates_token_count", None) if usage_meta else None
+        if p_tokens is None or p_tokens <= 0:
+            p_tokens = max(10, len(prompt_sistema) // 4)
+        if c_tokens is None or c_tokens <= 0:
+            c_tokens = max(5, len(resposta_final) // 4)
+
+        token_record = self.token_budget.record_usage(
+            session_id=sess_id,
+            filial_id=f_id,
+            prompt_tokens=p_tokens,
+            completion_tokens=c_tokens,
+            model_name=m_name if "m_name" in locals() else "gemini-flash",
+            cached=False,
+        )
+        self.telemetry.record_token_usage(
+            prompt_tokens=p_tokens,
+            completion_tokens=c_tokens,
+            model_name=m_name if "m_name" in locals() else "gemini-flash",
+            cost_brl=token_record.get("cost_brl", 0.0),
+            avoided_cost_brl=0.0,
+            session_id=sess_id,
+        )
+        telemetria_final["tokens"] = token_record
+
         if telemetria_retrieval:
             telemetria_final["retrieval"] = telemetria_retrieval
 

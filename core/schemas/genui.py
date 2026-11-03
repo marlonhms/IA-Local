@@ -525,7 +525,10 @@ class MarginAnalysisProps(BaseModel):
     target_margin_pct: Optional[float] = Field(default=None, description="Meta de margem da diretoria (%)")
     gross_revenue: Optional[float] = Field(default=None, description="Faturamento bruto apurado em R$")
     net_profit: Optional[float] = Field(default=None, description="Lucro líquido estimado em R$")
+    total_desconto_tef: Optional[float] = Field(default=None, description="Total descontado em taxas TEF em R$")
+    periodo_analisado: Optional[str] = Field(default=None, description="Periodo das transacoes apuradas no ERP")
     fuel_margins: List[FuelMarginItem] = Field(default_factory=list, description="Detalhamento por combustível")
+    top_produtos_margem: List[Dict[str, Any]] = Field(default_factory=list, description="Top produtos com margem e custo apurados")
     payment_fee_impact: List[PaymentFeeImpactItem] = Field(default_factory=list, description="Impacto de taxas financeiras")
     elasticity_projection: Optional[Union[str, Dict[str, Any], ExecutiveImpactProjection]] = Field(
         default=None,

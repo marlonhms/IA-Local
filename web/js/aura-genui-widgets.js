@@ -1065,29 +1065,36 @@
 
     renderLayer1() {
       const p = this.props || {};
-      const marginVal = Number(p.consolidated_margin_pct ?? 14.5);
+      const hasMargin = p.consolidated_margin_pct !== null && p.consolidated_margin_pct !== undefined && !isNaN(Number(p.consolidated_margin_pct));
+      const marginVal = hasMargin ? Number(p.consolidated_margin_pct) : null;
       const targetVal = p.target_margin_pct !== null && p.target_margin_pct !== undefined ? Number(p.target_margin_pct) : null;
       const diagnosisText = p.diagnosis || this.summary || 'Analise de margem liquida consolidada apurada no ERP.';
+      const periodoText = p.periodo_analisado || '';
 
-      const scoreColor = marginVal >= 15
-        ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10'
-        : (marginVal >= 10 ? 'text-amber-300 border-amber-500/40 bg-amber-500/10' : 'text-rose-300 border-rose-500/40 bg-rose-500/10');
+      const scoreColor = marginVal !== null
+        ? (marginVal >= 15
+            ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10'
+            : (marginVal >= 10 ? 'text-amber-300 border-amber-500/40 bg-amber-500/10' : 'text-rose-300 border-rose-500/40 bg-rose-500/10'))
+        : 'text-slate-400 border-slate-700 bg-slate-800/40';
+
+      const marginLabel = marginVal !== null ? `Margem Real: ${formatNumber(marginVal)}%` : 'Margem: Requer Custo';
 
       return `
         <div class="genui-layer genui-layer-1 mb-4 pb-3 border-b border-white/10">
           <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
               <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
               <h4 class="text-xs font-mono font-bold tracking-wider text-emerald-300 uppercase">
                 AURA Margin &amp; Profitability Analyst
               </h4>
+              ${periodoText ? `<span class="text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 font-medium">📅 ${escapeHtml(periodoText)}</span>` : ''}
               <span class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">
                 ${escapeHtml(this.toolCallId.substring(0, 14))}...
               </span>
             </div>
             <div class="flex items-center gap-2">
               <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full border ${scoreColor} font-semibold flex items-center gap-1">
-                <span>Margem Real: ${formatNumber(marginVal)}%</span>
+                <span>${marginLabel}</span>
               </span>
               ${targetVal !== null ? `<span class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">Meta: ${formatNumber(targetVal)}%</span>` : ''}
             </div>
@@ -1106,41 +1113,52 @@
       const p = this.props || {};
       const fuels = Array.isArray(p.fuel_margins) ? p.fuel_margins : [];
       const paymentFees = Array.isArray(p.payment_fee_impact) ? p.payment_fee_impact : [];
+      const topProducts = Array.isArray(p.top_produtos_margem) ? p.top_produtos_margem : [];
       const limitations = Array.isArray(p.limitations) ? p.limitations : [];
 
       let totalDesconto = 0;
       paymentFees.forEach(pf => {
         if (pf && pf.desconto_taxas_reais) totalDesconto += Number(pf.desconto_taxas_reais);
       });
+      if (!totalDesconto && p.total_desconto_tef) {
+        totalDesconto = Number(p.total_desconto_tef);
+      }
+
+      const hasMargin = p.consolidated_margin_pct !== null && p.consolidated_margin_pct !== undefined && !isNaN(Number(p.consolidated_margin_pct));
+      const marginVal = hasMargin ? Number(p.consolidated_margin_pct) : null;
 
       // 4 Cards de Sintese
+      const grossRev = p.gross_revenue || p.faturamento_bruto || p.faturamento_total || 0;
+      const netProf = p.net_profit || p.lucro_liquido || p.lucro_bruto || 0;
+      const tefVal = totalDesconto || p.total_desconto_tef || p.taxas_tef || 0;
+
       const cardsHtml = `
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
           <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
             <span class="text-[10px] text-slate-400 font-medium">Margem Liquida</span>
             <div class="text-sm sm:text-base font-bold font-mono text-emerald-300 tabular-nums">
-              ${formatNumber(p.consolidated_margin_pct ?? 14.5)}%
+              ${marginVal !== null ? formatNumber(marginVal) + '%' : '<span class="text-xs text-slate-400 font-normal">Requer Custo</span>'}
             </div>
             <span class="text-[10px] text-slate-500 font-mono">Real Consolidado</span>
           </div>
           <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
             <span class="text-[10px] text-slate-400 font-medium">Faturamento Bruto</span>
             <div class="text-sm sm:text-base font-bold font-mono text-white tabular-nums">
-              R$ ${formatNumber(p.gross_revenue || 0)}
+              R$ ${formatNumber(grossRev)}
             </div>
             <span class="text-[10px] text-slate-500 font-mono">Volume no ERP</span>
           </div>
           <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
             <span class="text-[10px] text-slate-400 font-medium">Lucro Liquido</span>
             <div class="text-sm sm:text-base font-bold font-mono text-cyan-300 tabular-nums">
-              R$ ${formatNumber(p.net_profit || 0)}
+              R$ ${formatNumber(netProf)}
             </div>
             <span class="text-[10px] text-slate-500 font-mono">Margem Real R$</span>
           </div>
           <div class="p-2.5 rounded-xl border border-rose-500/20 bg-rose-500/5 space-y-1">
             <span class="text-[10px] text-rose-300 font-medium">Taxas TEF / Cartao</span>
             <div class="text-sm sm:text-base font-bold font-mono text-rose-400 tabular-nums">
-              -R$ ${formatNumber(totalDesconto)}
+              -R$ ${formatNumber(tefVal)}
             </div>
             <span class="text-[10px] text-slate-500 font-mono">Desconto Meios</span>
           </div>
@@ -1152,25 +1170,25 @@
       if (fuels.length > 0) {
         fuelsHtml = `
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 mb-3 space-y-2">
-            <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Rentabilidade por Combustivel / Bico</span>
+            <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Rentabilidade por Combustivel / Pista</span>
             <div class="space-y-1.5">
               ${fuels.map(f => {
                 const nome = escapeHtml(f.combustivel || 'Combustivel');
                 const preco = formatNumber(f.preco_venda || 0);
                 const custo = formatNumber(f.custo_aquisicao || 0);
+                const vol = formatNumber(f.volume_litros || 0, 1);
+                const fat = formatNumber(f.faturamento_reais || 0);
                 const mg = Number(f.margem_liquida_pct || 0);
                 const mgFmt = formatNumber(mg);
                 const mgColor = mg >= 15 ? 'text-emerald-400' : (mg >= 10 ? 'text-amber-400' : 'text-rose-400');
-                const bench = f.benchmark_mercado ? `Meta Regiao: R$ ${formatNumber(f.benchmark_mercado)}` : '';
                 return `
                   <div class="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-white/5 text-xs">
                     <div>
                       <span class="font-bold text-white">${nome}</span>
-                      <span class="text-slate-400 text-[11px] font-mono ml-2">Venda: R$ ${preco} | Custo: R$ ${custo}</span>
+                      <span class="text-slate-400 text-[11px] font-mono ml-2">Venda: R$ ${preco} | Custo: R$ ${custo} | ${vol} L (R$ ${fat})</span>
                     </div>
                     <div class="text-right">
                       <span class="font-mono font-bold ${mgColor}">${mgFmt}%</span>
-                      ${bench ? `<div class="text-[9px] text-slate-500 font-mono">${bench}</div>` : ''}
                     </div>
                   </div>
                 `;
@@ -1180,12 +1198,50 @@
         `;
       }
 
-      // Detalhamento de Taxas Financeiras
+      // Grade de Top Produtos da Conveniencia & Margem
+      let productsHtml = '';
+      if (topProducts.length > 0) {
+        productsHtml = `
+          <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 mb-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Top Produtos de Conveniencia &amp; Margem</span>
+              <span class="text-[10px] text-slate-400 font-mono">${topProducts.length} itens apurados</span>
+            </div>
+            <div class="space-y-1.5">
+              ${topProducts.slice(0, 6).map(prod => {
+                const nome = escapeHtml(prod.nompro || 'Produto');
+                const cod = escapeHtml(prod.codpro || '');
+                const qtd = formatNumber(prod.qtd_total || 0, 1);
+                const rec = formatNumber(prod.receita_total || 0);
+                const custo = formatNumber(prod.custo_unitario || 0);
+                const temCusto = Boolean(prod.tem_custo || Number(prod.custo_unitario || 0) > 0);
+                const mg = prod.margem_pct !== null && prod.margem_pct !== undefined ? Number(prod.margem_pct) : null;
+                const mgColor = (mg !== null && mg >= 20) ? 'text-emerald-400' : ((mg !== null && mg >= 0) ? 'text-amber-400' : 'text-rose-400');
+                const mgBadge = (mg !== null) ? `${formatNumber(mg)}%` : '<span class="text-slate-500 font-normal">Sem Custo</span>';
+
+                return `
+                  <div class="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-white/5 text-xs">
+                    <div class="min-w-0 pr-2">
+                      <div class="font-bold text-white truncate">${nome}</div>
+                      <div class="text-slate-400 text-[11px] font-mono">SKU: ${cod} | Giro: ${qtd} un | Receita: R$ ${rec} | Custo Unit: ${temCusto ? 'R$ ' + custo : 'N/D'}</div>
+                    </div>
+                    <div class="text-right flex-shrink-0">
+                      <span class="font-mono font-bold ${mgColor}">${mgBadge}</span>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      // Detalhamento de Taxas Financeiras TEF
       let feesHtml = '';
       if (paymentFees.length > 0) {
         feesHtml = `
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 mb-3 space-y-2">
-            <span class="text-[10px] uppercase font-bold tracking-wider text-amber-400 font-mono">Impacto de Taxas por Meio de Pagamento</span>
+            <span class="text-[10px] uppercase font-bold tracking-wider text-amber-400 font-mono">Impacto de Taxas por Meio de Pagamento (TEF)</span>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
               ${paymentFees.map(pf => {
                 const mod = escapeHtml(pf.modalidade || 'Modalidade');
@@ -1221,6 +1277,7 @@
         <div class="genui-layer genui-layer-2 mb-4">
           ${cardsHtml}
           ${fuelsHtml}
+          ${productsHtml}
           ${feesHtml}
           ${limitationsHtml}
         </div>

@@ -8,9 +8,11 @@ Regra inegociavel: ZERO travessoes em todo o modulo.
 from core.prompts.system_prompts import (
     build_help_prompt,
     build_system_prompt,
+    build_procedimento_erp_prompt,
 )
 
 __all__ = [
     "build_help_prompt",
     "build_system_prompt",
+    "build_procedimento_erp_prompt",
 ]

@@ -22,6 +22,7 @@ import androidx.navigation.navArgument
 import com.example.aurapostoassitance.ui.chat.ChatScreen
 import com.example.aurapostoassitance.ui.dashboard.DashboardScreen
 import com.example.aurapostoassitance.ui.setup.SetupScreen
+import com.example.aurapostoassitance.ui.entrance.AuraEntranceScreen
 import com.example.aurapostoassitance.ui.theme.AuraPostoAssitanceTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -40,7 +41,7 @@ class MainActivity : ComponentActivity() {
 
                     NavHost(
                         navController = navController,
-                        startDestination = "setup",
+                        startDestination = "entrance",
                         enterTransition = {
                             fadeIn(animationSpec = tween(300)) + scaleIn(
                                 initialScale = 0.96f,
@@ -66,7 +67,30 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     ) {
-                        composable(
+                                                composable(
+                            route = "entrance",
+                            exitTransition = {
+                                fadeOut(animationSpec = tween(350)) + scaleOut(
+                                    targetScale = 1.06f,
+                                    animationSpec = tween(400, easing = FastOutSlowInEasing)
+                                )
+                            }
+                        ) {
+                            AuraEntranceScreen(
+                                onNavigateToDashboard = {
+                                    navController.navigate("dashboard") {
+                                        popUpTo("entrance") { inclusive = true }
+                                    }
+                                },
+                                onNavigateToSetup = {
+                                    navController.navigate("setup") {
+                                        popUpTo("entrance") { inclusive = true }
+                                    }
+                                }
+                            )
+                        }
+
+composable(
                             route = "setup",
                             exitTransition = {
                                 fadeOut(animationSpec = tween(250)) + scaleOut(

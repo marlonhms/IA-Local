@@ -45,7 +45,11 @@ class SetupViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val response = apiService.checkHealth()
-                onResult(response.status == "healthy" || response.status.isNotEmpty())
+                val success = response.status == "healthy" || response.status.isNotEmpty()
+                if (success) {
+                    serverConfig.hasConnected = true
+                }
+                onResult(success)
             } catch (e: Exception) {
                 e.printStackTrace()
                 onResult(false)

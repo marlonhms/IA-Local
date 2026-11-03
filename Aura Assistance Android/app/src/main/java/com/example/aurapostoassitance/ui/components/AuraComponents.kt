@@ -1176,19 +1176,6 @@ fun AuraLivingOrb(
                 )
             )
 
-            // Borda iridescente fina de vidro líquido contornando a onda
-            drawPath(
-                path = outerPath,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.85f),
-                        AuraCyan.copy(alpha = 0.40f),
-                        Color.White.copy(alpha = 0.75f)
-                    )
-                ),
-                style = Stroke(width = 1.4.dp.toPx())
-            )
-
             // Camada 2: Núcleo Secundário Contra-Rotativo (Efeito Moire Cósmico)
             val innerPath = buildLiquidPath(phaseOffset = 2.1f, rMultiplier = 0.78f, waveAmp = smoothRms * 0.8f)
             drawPath(

@@ -74,6 +74,10 @@ class AuraSRETelemetry:
         self._db_pool_wait_samples: deque[float] = deque(maxlen=max_samples)
         self._tool_execution_counts: dict[str, dict[str, int]] = {}
         self._tool_latency_samples: dict[str, deque[float]] = {}
+        self._total_prompt_tokens: int = 0
+        self._total_completion_tokens: int = 0
+        self._total_cost_brl: float = 0.0
+        self._total_avoided_cost_brl: float = 0.0
 
         with AuraSRETelemetry._instance_lock:
             if AuraSRETelemetry._instance is None:
@@ -155,6 +159,10 @@ class AuraSRETelemetry:
             self._total_actions_approved = 0
             self._total_actions_rolled_back = 0
             self._security_blocks = 0
+            self._total_prompt_tokens = 0
+            self._total_completion_tokens = 0
+            self._total_cost_brl = 0.0
+            self._total_avoided_cost_brl = 0.0
             self._router_cache_hits = 0
             self._router_cache_misses = 0
             self._db_pool_active_erp = 0
@@ -274,6 +282,22 @@ class AuraSRETelemetry:
                 )
             except Exception:
                 pass
+
+    def record_token_usage(
+        self,
+        prompt_tokens: int,
+        completion_tokens: int,
+        model_name: str = "",
+        cost_brl: float = 0.0,
+        avoided_cost_brl: float = 0.0,
+        session_id: str | None = None,
+    ) -> None:
+        """Registra telemetria de consumo de tokens e custos estimados."""
+        with self._lock:
+            self._total_prompt_tokens += max(0, prompt_tokens)
+            self._total_completion_tokens += max(0, completion_tokens)
+            self._total_cost_brl += max(0.0, cost_brl)
+            self._total_avoided_cost_brl += max(0.0, avoided_cost_brl)
 
     def record_security_block(
         self,
@@ -586,6 +610,13 @@ class AuraSRETelemetry:
                 "p99": round(vec_p99, 2),
                 "last": round(vec_last, 2),
                 "count": len(vec_list),
+            },
+            "token_usage": {
+                "total_tokens": self._total_prompt_tokens + self._total_completion_tokens,
+                "prompt_tokens": self._total_prompt_tokens,
+                "completion_tokens": self._total_completion_tokens,
+                "total_cost_brl": round(self._total_cost_brl, 4),
+                "total_avoided_cost_brl": round(self._total_avoided_cost_brl, 4),
             },
             "total_actions_requested": req,
             "total_actions_approved": appr,
