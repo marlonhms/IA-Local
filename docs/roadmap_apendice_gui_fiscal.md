@@ -197,9 +197,9 @@ Adicionar na secao final de `web/css/aura.css` as classes utilitarias para:
 
 ## 4. CHECKLIST DE EXECUCAO PARA O AGENTE
 
-- [ ] **Passo 1:** Atualizar `build_canonical_genui_envelope` em `core/aura_engine.py` para hidratar `chave_acesso`, `xml_documento` e `consulta_rejeicao_fiscal` com `access_key_anatomy` e `persona_views`.
-- [ ] **Passo 2:** Atualizar `web/js/aura-genui-widgets.js` para renderizar o Switch Dupla Persona (`Visao Gestor` vs `Visao Contador`), a Barra Anatomica de 44 digitos e a copia em 1-clique do laudo contabil para area de transferencia.
-- [ ] **Passo 3:** Adicionar o Smart Fiscal Paste Pill e botao de leitura local de `.xml` em `web/index.html` e `web/js/aura-chat.js`.
-- [ ] **Passo 4:** Adicionar o card `auditoria_fiscal_sefaz` e o formatador executivo correspondente em `web/js/aura-triggers.js`.
-- [ ] **Passo 5:** Adicionar as classes de estilo em `web/css/aura.css` respeitando `modo-pista` e `gpu-guard`.
-- [ ] **Passo 6:** Criar e executar os testes unitarios em `tests/unit/test_fiscal_engine.py` garantindo 100% de aprovacao e zero travessoes Unicode.
+- [x] **Passo 1:** Atualizar `build_canonical_genui_envelope` em `core/aura_engine.py` para hidratar `chave_acesso`, `xml_documento` e `consulta_rejeicao_fiscal` com `access_key_anatomy` e `persona_views`.
+- [x] **Passo 2:** Atualizar `web/js/aura-genui-widgets.js` para renderizar o Switch Dupla Persona (`Visao Gestor` vs `Visao Contador`), a Barra Anatomica de 44 digitos e a copia em 1-clique do laudo contabil para area de transferencia.
+- [x] **Passo 3:** Adicionar o Smart Fiscal Paste Pill e botao de leitura local de `.xml` em `web/index.html` e `web/js/aura-chat.js`.
+- [x] **Passo 4:** Adicionar o card `auditoria_fiscal_sefaz` e o formatador executivo correspondente em `web/js/aura-triggers.js`.
+- [x] **Passo 5:** Adicionar as classes de estilo em `web/css/aura.css` respeitando `modo-pista` e `gpu-guard`.
+- [x] **Passo 6:** Criar e executar os testes unitarios em `tests/unit/test_fiscal_engine.py` garantindo 100% de aprovacao e zero travessoes Unicode.

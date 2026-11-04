@@ -2188,7 +2188,7 @@
         <input 
           id="palette-search-input"
           type="text" 
-          placeholder="Digite um comando, diagnóstico ou pergunta para a AURA... (ex: tanques, ANP, fechamento de caixa, combos)" 
+          placeholder="Digite um comando, diagnóstico ou pergunta para a AURA... (ex: SEFAZ, chave 44d, PIS/COFINS, tanques, ANP, caixa)" 
           class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none font-sans"
         />
         <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-sans">ESC</kbd>
@@ -2248,6 +2248,39 @@
             </div>
           </div>
           <span class="text-[11px] text-auraCyan font-semibold">Executar ↵</span>
+        </div>
+
+        <div onclick="window.auraGlance.executePaletteAction('Quais as regras de ICMS Monofasico CST 61, PIS/COFINS CST 04 na conveniencia e principais rejeicoes SEFAZ?')" class="palette-item">
+          <div class="flex items-center gap-3">
+            <span class="p-1.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-width="1.75"/><polyline points="9 12 11 14 15 10" stroke-width="2"/></svg></span>
+            <div>
+              <div class="font-bold text-slate-100">Escudo Fiscal SEFAZ &amp; Tributacao Monofasica</div>
+              <div class="text-[11px] text-slate-400 font-sans">Auditoria de chave 44 digitos (Modulo 11), XML, ICMS CST 61 (LC 192) e Rejeicoes SEFAZ.</div>
+            </div>
+          </div>
+          <span class="text-[11px] text-auraCyan font-semibold">Auditar ↵</span>
+        </div>
+
+        <div onclick="window.auraGlance.executePaletteAction('Como evitar bitributacao de PIS/COFINS CST 04 em bebidas frias na conveniencia e lancar baixa de perda CFOP 5927?')" class="palette-item">
+          <div class="flex items-center gap-3">
+            <span class="p-1.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center justify-center"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-width="1.75"/><polyline points="14 2 14 8 20 8" stroke-width="1.75"/><path d="M9 15l2 2 4-4" stroke-width="1.75"/></svg></span>
+            <div>
+              <div class="font-bold text-slate-100">Auditor PIS/COFINS Conveniencia (CST 04) &amp; SPED</div>
+              <div class="text-[11px] text-slate-400 font-sans">Prevencao de bitributacao na Tabela 4.3.10, CFOP 5927 e Registros 1300/1310/1320.</div>
+            </div>
+          </div>
+          <span class="text-[11px] text-auraCyan font-semibold">Auditar ↵</span>
+        </div>
+
+        <div onclick="window.auraGlance.executePaletteAction('Como fazer a entrada de nota fiscal de fornecedor?')" class="palette-item">
+          <div class="flex items-center gap-3">
+            <span class="p-1.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke-width="1.75"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" stroke-width="1.75"/></svg></span>
+            <div>
+              <div class="font-bold text-slate-100">Roteiro de Entrada de Nota Fiscal (ERP Retaguarda)</div>
+              <div class="text-[11px] text-slate-400 font-sans">Passo a passo oficial para lancamento de NF-e e CT-e de fornecedor.</div>
+            </div>
+          </div>
+          <span class="text-[11px] text-auraCyan font-semibold">Consultar ↵</span>
         </div>
 
         <div onclick="window.auraGlance.executePaletteAction('O LMC de ontem fechou dentro da tolerância oficial da ANP?')" class="palette-item">

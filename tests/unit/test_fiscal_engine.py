@@ -962,3 +962,28 @@ def test_ausencia_absoluta_travessoes_arquivos_gui_fiscal():
             conteudo = f.read()
         assert "\u2014" not in conteudo, f"Em-dash detectado em {caminho}"
         assert "\u2013" not in conteudo, f"En-dash detectado em {caminho}"
+
+
+
+def test_gui_fiscal_deluxe_features_complete():
+    """Valida que todos os recursos deluxe de GUI Fiscal estao presentes e operacionais."""
+    import os
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+    widgets_js = open(os.path.join(base_dir, "web", "js", "aura-genui-widgets.js"), encoding="utf-8").read()
+    assert "btn-copy-full-key" in widgets_js
+    assert "fiscal-key-segment-detail" in widgets_js
+    assert "fiscal-canvas-quick-bar" in widgets_js
+    assert "Parecer Tecnico Contabil & SPED" in widgets_js
+
+    triggers_js = open(os.path.join(base_dir, "web", "js", "aura-triggers.js"), encoding="utf-8").read()
+    assert "id: 'auditoria_fiscal_sefaz'" in triggers_js
+    assert "id: 'conhecimento_fiscal'" in triggers_js
+
+    index_html = open(os.path.join(base_dir, "web", "index.html"), encoding="utf-8").read()
+    assert "Escudo Fiscal SEFAZ &amp; Tributacao Monofasica" in index_html
+    assert "Auditor PIS/COFINS Conveniencia (CST 04) &amp; SPED" in index_html
+
+    roadmap_md = open(os.path.join(base_dir, "docs", "roadmap_apendice_gui_fiscal.md"), encoding="utf-8").read()
+    assert "- [ ] **Passo" not in roadmap_md
+    assert "- [x] **Passo 1:**" in roadmap_md

@@ -152,7 +152,7 @@ class AuraTriggersController {
       },
       {
         id: 'auditoria_fiscal_sefaz',
-        aliases: ['conhecimento_fiscal', 'fiscal_sefaz', 'auditoria_sefaz', 'escudo_fiscal'],
+        aliases: ['fiscal_sefaz', 'auditoria_sefaz', 'escudo_fiscal'],
         name: 'Escudo Fiscal SEFAZ & Tributação Monofásica',
         category: 'fiscal',
         icon: 'shield-check',
@@ -160,6 +160,17 @@ class AuraTriggersController {
         badge: 'SEFAZ / LC 192 / SPED',
         desc: 'Auditoria determinística de chaves de 44 dígitos, XML, Rejeições SEFAZ (375, 629, 806, 958, 960), ICMS Monofásico (CST 61) e PIS/COFINS Conveniência (CST 04).',
         defaultParams: { query: 'Quais as regras de ICMS Monofasico CST 61, PIS/COFINS CST 04 na conveniencia e principais rejeicoes SEFAZ?' },
+      },
+      {
+        id: 'conhecimento_fiscal',
+        aliases: ['auditor_piscofins', 'piscofins_monofasico'],
+        name: 'Auditor PIS/COFINS & Bitributação Monofásica',
+        category: 'fiscal',
+        icon: 'file-check-2',
+        color: 'purple',
+        badge: 'Tabela 4.3.10 / CST 04',
+        desc: 'Auditoria tributária de bebidas frias, lubrificantes e conveniência (EFD Contribuições CST 04/06, baixa de perda CFOP 5927 e Registros SPED 1300/1310/1320).',
+        defaultParams: { query: 'Como evitar bitributacao de PIS/COFINS CST 04 em bebidas frias na conveniencia e lancar baixa de perda CFOP 5927?' },
       },
       {
         id: 'vendas_analitico',

@@ -568,13 +568,37 @@
         const alerta = blocks.find(b => b.block_type === 'alert_callout')?.alert?.message || '';
         const acao = blocks.find(b => b.block_type === 'alert_callout')?.alert?.action_label || '';
         const proc = blocks.find(b => b.block_id === 'blk_procedimento_erp')?.custom_content || '';
+        const personaViews = this.props?.persona_views || {};
+        const contadorParecer = personaViews.contador || '';
+        const basesLegais = Array.isArray(personaViews.base_legal) ? personaViews.base_legal.join(' | ') : '';
+        const anatomy = this.props?.access_key_anatomy || null;
+        const findingsBlock = blocks.find(b => b.block_type === 'fiscal_findings_list');
+        const findingsList = Array.isArray(findingsBlock?.findings) ? findingsBlock.findings : [];
+
+        let anatomyLine = '';
+        if (anatomy && typeof anatomy === 'object') {
+          anatomyLine = `Chave SEFAZ (44d): UF=${anatomy.c_uf || ''}(${anatomy.uf_sigla || ''}) | AAMM=${anatomy.aamm || ''} | CNPJ=${anatomy.cnpj_emitente || ''} | Mod=${anatomy.modelo || ''} | Serie=${anatomy.serie || ''} | NF=${anatomy.numero_nfe || ''} | Emis=${anatomy.tipo_emissao || ''} | Cod=${anatomy.codigo_numerico || ''} | DV=${anatomy.digito_verificador || ''} (Calc=${anatomy.dv_calculado || ''}, Modulo 11=${anatomy.is_dv_valido ? 'OK' : 'INVALIDO'})`;
+        }
+
+        let findingsLines = '';
+        if (findingsList.length > 0) {
+          findingsLines = '\nApontamentos e Regras Avaliadas:\n' + findingsList.map(f => {
+            const code = f.regra_id ? `[${f.regra_id}] ` : '';
+            const espObs = (f.valor_esperado || f.valor_observado) ? ` (Esperado: ${f.valor_esperado || '-'} | Observado: ${f.valor_observado || '-'})` : '';
+            return `- ${code}${f.titulo || 'Regra'}: ${f.explicacao_tecnica || f.explicacao_executiva || ''}${espObs}`;
+          }).join('\n');
+        }
 
         const clipboardText = [
           `=== PARECER FISCAL / DIAGNOSTICO SEFAZ (AURA INTELLIGENCE) ===`,
           `Titulo: ${title}`,
-          `Diagnostico: ${diag}`,
-          alerta ? `Impacto: ${alerta}` : '',
-          acao ? `Acao no seu ERP: ${acao}` : '',
+          `Diagnostico Executivo: ${diag}`,
+          anatomyLine,
+          alerta ? `Impacto Operacional: ${alerta}` : '',
+          acao ? `Acao Recomendada no ERP: ${acao}` : '',
+          contadorParecer ? `\nParecer Tecnico Contabil & SPED:\n${contadorParecer}` : '',
+          findingsLines,
+          basesLegais ? `\nBase Legal Normativa: ${basesLegais}` : '',
           proc ? `\nProcedimento Detalhado:\n${proc}` : '',
           `\nData/Hora: ${new Date().toLocaleString('pt-BR')}`,
           `Gerado pela AURA - Assistente de Prontidao do Posto`
@@ -3302,81 +3326,119 @@
           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50' 
           : 'bg-rose-500/20 text-rose-300 border-rose-500/50 animate-pulse';
 
+        const fullKey44 = [
+          anatomy.c_uf || '',
+          anatomy.aamm || '',
+          anatomy.cnpj_emitente || '',
+          anatomy.modelo || '',
+          String(anatomy.serie || '').padStart(3, '0'),
+          String(anatomy.numero_nfe || '').padStart(9, '0'),
+          anatomy.tipo_emissao || '',
+          anatomy.codigo_numerico || '',
+          anatomy.digito_verificador || ''
+        ].join('');
+
         anatomyHtml = `
-          <div class="p-3.5 rounded-xl bg-slate-900/80 border border-cyan-500/30 space-y-2 mb-3.5" data-block-id="blk_chave_anatomy_bar">
-            <div class="flex items-center justify-between text-xs border-b border-white/5 pb-1.5">
+          <div class="p-3.5 rounded-xl bg-slate-900/80 border border-cyan-500/30 space-y-2.5 mb-3.5" data-block-id="blk_chave_anatomy_bar">
+            <div class="flex flex-wrap items-center justify-between gap-2 text-xs border-b border-white/5 pb-1.5">
               <span class="font-bold text-slate-100 flex items-center gap-1.5">
                 <span>🔑</span>
                 <span>Anatomia dos 44 Digitos da Chave SEFAZ</span>
               </span>
-              <span class="text-[10px] font-mono text-cyan-300">Decomposicao Estrutural MOC 7.0</span>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-mono text-cyan-300 hidden sm:inline">Decomposicao Estrutural MOC 7.0</span>
+                <button type="button" class="btn-copy-full-key px-2 py-0.5 rounded bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-200 border border-cyan-500/30 text-[10px] font-mono font-semibold cursor-pointer transition-colors" data-full-key="${escapeHtml(fullKey44)}" title="Copiar os 44 digitos da chave de acesso">
+                  📋 Copiar 44d
+                </button>
+              </div>
             </div>
             <div class="overflow-x-auto pb-1">
               <div class="flex items-stretch gap-1.5 min-w-max text-center font-mono">
                 <!-- Segmento 1: UF -->
-                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10" title="Codigo IBGE da UF">
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10 cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 01-02 (2 digitos)" data-seg-tag="<cUF>" data-seg-desc="Codigo IBGE da Unidade Federativa do emitente (${escapeHtml(anatomy.uf_sigla || 'UF')})" title="Codigo IBGE da UF">
                   <div class="text-[9px] text-slate-400">UF</div>
                   <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.c_uf || '--')}</div>
                   <div class="text-[8px] text-slate-500">${escapeHtml(anatomy.uf_sigla || '')}</div>
                 </div>
                 <!-- Segmento 2: AAMM -->
-                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10" title="Ano e Mes de Emissao (AAMM)">
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10 cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 03-06 (4 digitos)" data-seg-tag="<dhEmi> AAMM" data-seg-desc="Ano e Mes de emissao da Nota Fiscal (20${escapeHtml(anatomy.ano || '--')}/${escapeHtml(anatomy.mes || '--')})" title="Ano e Mes de Emissao (AAMM)">
                   <div class="text-[9px] text-slate-400">AAMM</div>
                   <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.aamm || '----')}</div>
                   <div class="text-[8px] text-slate-500">${escapeHtml(anatomy.ano || '')}/${escapeHtml(anatomy.mes || '')}</div>
                 </div>
                 <!-- Segmento 3: CNPJ -->
-                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10" title="CNPJ do Emitente">
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10 cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 07-20 (14 digitos)" data-seg-tag="<CNPJ>" data-seg-desc="CNPJ do estabelecimento emissor da NF-e/NFC-e (${escapeHtml(anatomy.cnpj_emitente || '-')})" title="CNPJ do Emitente">
                   <div class="text-[9px] text-slate-400">CNPJ Emitente (14d)</div>
                   <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.cnpj_emitente || '--------------')}</div>
                   <div class="text-[8px] text-slate-500">Posto / Matriz</div>
                 </div>
                 <!-- Segmento 4: Modelo -->
-                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10" title="Modelo do Documento Fiscal">
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10 cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 21-22 (2 digitos)" data-seg-tag="<mod>" data-seg-desc="Modelo Fiscal: ${anatomy.modelo === '65' ? '65 (NFC-e Varejo/Pista)' : '55 (NF-e Danfe/Frota)'}" title="Modelo do Documento Fiscal">
                   <div class="text-[9px] text-slate-400">Mod</div>
                   <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.modelo || '--')}</div>
                   <div class="text-[8px] text-slate-500">${anatomy.modelo === '65' ? 'NFC-e' : 'NF-e'}</div>
                 </div>
                 <!-- Segmento 5: Serie -->
-                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10" title="Serie do Documento">
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10 cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 23-25 (3 digitos)" data-seg-tag="<serie>" data-seg-desc="Serie de numeracao do documento fiscal (Serie ${escapeHtml(anatomy.serie || '1')})" title="Serie do Documento">
                   <div class="text-[9px] text-slate-400">Serie</div>
                   <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.serie || '---')}</div>
                   <div class="text-[8px] text-slate-500">Serie</div>
                 </div>
                 <!-- Segmento 6: Numero -->
-                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10" title="Numero da Nota Fiscal">
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10 cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 26-34 (9 digitos)" data-seg-tag="<nNF>" data-seg-desc="Numero sequencial do Documento Fiscal (Nº ${escapeHtml(anatomy.numero_nfe || '-')})" title="Numero da Nota Fiscal">
                   <div class="text-[9px] text-slate-400">Numero NF (9d)</div>
                   <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.numero_nfe || '---------')}</div>
                   <div class="text-[8px] text-slate-500">Documento</div>
                 </div>
                 <!-- Segmento 7: Tipo Emissao -->
-                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10" title="Tipo de Emissao (1: Normal, 9: Contingencia)">
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10 cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 35 (1 digito)" data-seg-tag="<tpEmis>" data-seg-desc="Forma de Emissao: ${anatomy.tipo_emissao === '1' ? '1 (Emissao Normal Sincrona)' : '9 (Contingencia Offline NFC-e)'}" title="Tipo de Emissao (1: Normal, 9: Contingencia)">
                   <div class="text-[9px] text-slate-400">Emis</div>
                   <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.tipo_emissao || '-')}</div>
                   <div class="text-[8px] text-slate-500">${anatomy.tipo_emissao === '1' ? 'Normal' : 'Conting.'}</div>
                 </div>
                 <!-- Segmento 8: Codigo Numerico -->
-                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10" title="Codigo Numerico de Seguranca">
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10 cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 36-43 (8 digitos)" data-seg-tag="<cNF>" data-seg-desc="Codigo Numerico Aleatorio de Seguranca gerado pelo ERP (${escapeHtml(anatomy.codigo_numerico || '-')})" title="Codigo Numerico de Seguranca">
                   <div class="text-[9px] text-slate-400">Cod Num (8d)</div>
                   <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.codigo_numerico || '--------')}</div>
                   <div class="text-[8px] text-slate-500">Aleatorio</div>
                 </div>
                 <!-- Segmento 9: DV -->
-                <div class="fiscal-key-segment p-1.5 rounded-lg border ${dvStatusClass}" title="Digito Verificador (Modulo 11)">
+                <div class="fiscal-key-segment p-1.5 rounded-lg border ${dvStatusClass} cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 44 (1 digito)" data-seg-tag="<cDV>" data-seg-desc="Digito Verificador Modulo 11: Informado=${escapeHtml(anatomy.digito_verificador || '-')} | Calculado=${escapeHtml(anatomy.dv_calculado || '-')} (${isDvOk ? 'Integro' : 'Divergente - Rejeicao 253'})" title="Digito Verificador (Modulo 11)">
                   <div class="text-[9px] font-bold">DV Modulo 11</div>
                   <div class="text-xs font-black">${escapeHtml(anatomy.digito_verificador || '-')}</div>
                   <div class="text-[8px] font-semibold">${isDvOk ? '✔ Valido' : 'Falha: ' + escapeHtml(anatomy.dv_calculado || '')}</div>
                 </div>
               </div>
             </div>
+            <!-- Faixa de Inspecao Interativa de Segmento -->
+            <div class="fiscal-key-segment-detail px-3 py-1.5 rounded-lg bg-slate-950/90 border border-white/5 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-slate-300">
+              <span class="seg-detail-text">💡 Clique em qualquer um dos 9 segmentos acima para inspecionar a posicao MOC 7.0 e a tag XML correspondente.</span>
+              <span class="seg-detail-tag px-2 py-0.5 rounded bg-cyan-950/70 text-cyan-300 border border-cyan-500/30 text-[10px]">MOC 7.0 SEFAZ</span>
+            </div>
           </div>
         `;
       }
+
+      const quickSimulatorHtml = `
+        <div class="fiscal-canvas-quick-bar p-3 rounded-xl bg-slate-950/70 border border-white/10 space-y-2">
+          <div class="flex items-center justify-between text-[11px] font-mono text-slate-400">
+            <span class="text-cyan-300 font-semibold flex items-center gap-1.5">⚡ Simulador Fiscal Rapido no Canvas</span>
+            <span>44 digitos, Rejeicao ou CST</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="text" class="fiscal-canvas-quick-input flex-1 min-w-0 px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-mono" placeholder="Cole outra chave de 44d ou digite ex: Rejeicao 806, CST 61, CFOP 5927..." />
+            <button type="button" class="btn-fiscal-canvas-quick-submit px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/40 text-xs font-semibold cursor-pointer transition-colors flex-shrink-0">
+              Auditar ->
+            </button>
+          </div>
+        </div>
+      `;
 
       return `
         <div class="genui-layer genui-layer-2 mb-4 space-y-3.5">
           ${anatomyHtml}
           ${super.renderLayer2()}
+          ${quickSimulatorHtml}
         </div>
       `;
     }
@@ -3428,6 +3490,78 @@
           });
         }
       });
+
+      // Interatividade dos 9 segmentos da chave de 44 digitos
+      const segments = rootElement.querySelectorAll('.fiscal-key-segment');
+      const detailBox = rootElement.querySelector('.fiscal-key-segment-detail');
+      const detailText = detailBox ? detailBox.querySelector('.seg-detail-text') : null;
+      const detailTag = detailBox ? detailBox.querySelector('.seg-detail-tag') : null;
+
+      segments.forEach(seg => {
+        if (!seg._hasBoundSegClick) {
+          seg._hasBoundSegClick = true;
+          const activateSeg = () => {
+            segments.forEach(s => s.classList.remove('ring-1', 'ring-cyan-400', 'bg-slate-900'));
+            seg.classList.add('ring-1', 'ring-cyan-400', 'bg-slate-900');
+            const pos = seg.getAttribute('data-seg-pos') || '';
+            const tag = seg.getAttribute('data-seg-tag') || 'MOC 7.0';
+            const desc = seg.getAttribute('data-seg-desc') || '';
+            if (detailText && desc) {
+              detailText.textContent = `${pos}: ${desc}`;
+            }
+            if (detailTag && tag) {
+              detailTag.textContent = tag;
+            }
+          };
+          seg.addEventListener('click', activateSeg);
+          seg.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+              ev.preventDefault();
+              activateSeg();
+            }
+          });
+        }
+      });
+
+      // Botao de copiar os 44 digitos da chave
+      const copyKeyBtn = rootElement.querySelector('.btn-copy-full-key');
+      if (copyKeyBtn && !copyKeyBtn._hasBoundCopyKey) {
+        copyKeyBtn._hasBoundCopyKey = true;
+        copyKeyBtn.addEventListener('click', () => {
+          const fullKey = copyKeyBtn.getAttribute('data-full-key') || '';
+          if (fullKey && typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            navigator.clipboard.writeText(fullKey).then(() => {
+              const orig = copyKeyBtn.textContent;
+              copyKeyBtn.textContent = '✔ Chave Copiada!';
+              setTimeout(() => { copyKeyBtn.textContent = orig; }, 2500);
+            }).catch(() => {});
+          }
+        });
+      }
+
+      // Simulador Fiscal Rapido no proprio Canvas
+      const quickInput = rootElement.querySelector('.fiscal-canvas-quick-input');
+      const quickSubmit = rootElement.querySelector('.btn-fiscal-canvas-quick-submit');
+      const triggerQuickAudit = () => {
+        const val = (quickInput?.value || '').trim();
+        if (!val) return;
+        if (typeof window !== 'undefined' && window.auraChat && typeof window.auraChat.sendUserPrompt === 'function') {
+          window.auraChat.sendUserPrompt(val);
+        }
+      };
+      if (quickSubmit && !quickSubmit._hasBoundQuickSubmit) {
+        quickSubmit._hasBoundQuickSubmit = true;
+        quickSubmit.addEventListener('click', triggerQuickAudit);
+      }
+      if (quickInput && !quickInput._hasBoundQuickKey) {
+        quickInput._hasBoundQuickKey = true;
+        quickInput.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter') {
+            ev.preventDefault();
+            triggerQuickAudit();
+          }
+        });
+      }
     }
   }
 
