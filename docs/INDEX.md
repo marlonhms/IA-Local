@@ -27,6 +27,7 @@ docs/
 │
 ├── guides/                                <- [GUIAS OPERACIONAIS E INTEGRACOES]
 │   ├── GUIA_INTEGRACAO_PARCEIRO.md        <- Manual de Integracao com ERPs de Mercado (Opcao A / Partner API)
+│   ├── guia_ativacao_cerebro_central_vps_multitenant.md <- Ativacao do Cerebro Central na VPS, pgvector e RLS Multi-Tenant
 │   ├── guia_deploy_posto.md               <- Manual de Instalacao e Deploy Local em Ambiente de Borda
 │   ├── guia_operacional_apis_publicas.md  <- Catalogo e Operacao dos Conectores de Dados Publicos (ANP, BCB, Confaz)
 │   └── guia_ponte_desenvolvimento_remoto_tailscale.md <- Configuracao de Tunel Remoto de Engenharia
@@ -74,6 +75,7 @@ A tabela abaixo conecta cada documento ao seu papel no ciclo de vida da AURA:
 | **Dossie Tecnico** | [`dossie_tecnico.md`](dossie_tecnico.md) | Sistema | **ATIVO** | Sintese de componentes, requisitos, stack tecnologica e topologia de execucao. |
 | **Estrategia de Produto** | [`Estrategia de Produto IA AURA.md`](Estratégia%20de%20Produto%20IA%20AURA.md) | Produto | **ATIVO** | Posicionamento estrategico, abordagem nao-invasiva e canais de monetizacao. |
 | **Integracao Parceiros** | [`guides/GUIA_INTEGRACAO_PARCEIRO.md`](guides/GUIA_INTEGRACAO_PARCEIRO.md) | Guia | **ATIVO** | Especificacao tecnica do gateway para conexao com WebPosto e outros ERPs via `raw-sync` e `chat`. |
+| **Ativacao Cerebro Central** | [`guides/guia_ativacao_cerebro_central_vps_multitenant.md`](guides/guia_ativacao_cerebro_central_vps_multitenant.md) | Infra / RLS | **ATIVO** | Manual de implantacao da VPS, setup do pgvector, ativacao do RLS multi-tenant e conexao dos postos. |
 | **Deploy em Posto** | [`guides/guia_deploy_posto.md`](guides/guia_deploy_posto.md) | Operacao | **ATIVO** | Passo a passo de instalacao do servico Windows local e configuracao de servico. |
 | **Conectores Publicos** | [`guides/guia_operacional_apis_publicas.md`](guides/guia_operacional_apis_publicas.md) | Operacao | **ATIVO** | Procedimentos operacionais para integracoes com ANP, Bacen e Confaz. |
 | **Tunel Tailscale** | [`guides/guia_ponte_desenvolvimento_remoto_tailscale.md`](guides/guia_ponte_desenvolvimento_remoto_tailscale.md) | DevOps | **ATIVO** | Guia de acesso remoto seguro e pareamento ponto a ponto. |
