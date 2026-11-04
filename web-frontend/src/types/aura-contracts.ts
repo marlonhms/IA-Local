@@ -164,7 +164,10 @@ export interface MarginAnalysisProps {
   target_margin_pct?: number | null;
   gross_revenue?: number | null;
   net_profit?: number | null;
+  total_desconto_tef?: number | null;
+  periodo_analisado?: Record<string, unknown> | null;
   fuel_margins: FuelMarginItem[];
+  top_produtos_margem?: Array<Record<string, unknown>>;
   payment_fee_impact: PaymentFeeImpactItem[];
   elasticity_projection?: string | Record<string, unknown> | ExecutiveImpactProjection | null;
   limitations: string[];

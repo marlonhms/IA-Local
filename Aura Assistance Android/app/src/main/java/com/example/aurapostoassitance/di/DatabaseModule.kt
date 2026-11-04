@@ -24,6 +24,13 @@ object DatabaseModule {
         }
     }
 
+    // v4: adiciona a trilha de raciocinio (Chain-of-Thought) persistida por mensagem
+    private val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE chat_messages ADD COLUMN reasoningJson TEXT")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideAppDatabase(@ApplicationContext appContext: Context): AppDatabase {
@@ -32,7 +39,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "aura_database"
         )
-        .addMigrations(MIGRATION_2_3)
+        .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
         .fallbackToDestructiveMigration()
         .build()
     }

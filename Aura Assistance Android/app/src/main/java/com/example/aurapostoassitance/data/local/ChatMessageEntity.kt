@@ -11,5 +11,7 @@ data class ChatMessageEntity(
     val isFromUser: Boolean,
     val timestamp: Long = System.currentTimeMillis(),
     /** Envelope GenUI (JSON) associado a mensagem da AURA, quando houver card estruturado. */
-    val envelopeJson: String? = null
+    val envelopeJson: String? = null,
+    /** Trilha cronológica das etapas e ferramentas consultadas pela IA (JSON Array). */
+    val reasoningJson: String? = null
 )

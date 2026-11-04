@@ -1,5 +1,5 @@
 """
-Suíte de Testes Automatizada: Streaming Parser, Bufferização JSON & Skeleton UI (Fase 2 — P0)
+Suíte de Testes Automatizada: Streaming Parser, Bufferização JSON & Skeleton UI (Fase 2 - P0)
 (AuraApiClient, AuraChatController, GenUIFragmentBuffer, Ciclo de Vida DOM e Zero Regressão)
 
 Validações Obrigatórias:
@@ -729,8 +729,8 @@ def run_zero_regression_suites():
     print("\n3. Executando Validação de Regressão Zero nas Suítes Existentes...")
 
     suites = [
-        ("test_genui_baseline.py (Fase 0 — Baseline & Governança)", "scripts/test_genui_baseline.py"),
-        ("test_genui_engine_sse.py (Fase 1 — Backend SSE Multiplexado)", "scripts/test_genui_engine_sse.py"),
+        ("test_genui_baseline.py (Fase 0 - Baseline & Governança)", "scripts/test_genui_baseline.py"),
+        ("test_genui_engine_sse.py (Fase 1 - Backend SSE Multiplexado)", "scripts/test_genui_engine_sse.py"),
         ("test_aura_aux_panel.py (Companion Canvas & Split View)", "scripts/test_aura_aux_panel.py"),
         ("test_phase6_quality_resilience.py (Resiliência & Qualidade)", "scripts/test_phase6_quality_resilience.py"),
     ]
@@ -757,7 +757,7 @@ def run_zero_regression_suites():
 
 def main():
     print("=" * 78)
-    print("🚀 SUÍTE DE TESTES: STREAMING PARSER, BUFFER & SKELETON UI (FASE 2 — P0)")
+    print("🚀 SUÍTE DE TESTES: STREAMING PARSER, BUFFER & SKELETON UI (FASE 2 - P0)")
     print("   (AuraApiClient, AuraChatController, GenUIFragmentBuffer & Zero Regressão)")
     print("=" * 78)
 

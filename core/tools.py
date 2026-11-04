@@ -151,6 +151,8 @@ def get_erp_connection(timeout: Optional[int] = None):
         raise pool_err
 
 
+logger = logging.getLogger("AuraTools")
+
 class PostoTools:
     """Conjunto de ferramentas operacionais executaveis pelo Agente."""
 
@@ -160,9 +162,20 @@ class PostoTools:
         erp_adapter: Optional[BaseERPAdapter] = None,
         public_data_repo: Optional[Any] = None,
     ):
-        self.rag = rag_engine
+        self._rag = rag_engine
         self.erp_adapter = erp_adapter or PostgresLocalERPAdapter()
         self._public_data_repo = public_data_repo
+
+    @property
+    def rag(self) -> HybridRAGEngine:
+        if self._rag is None:
+            from core.rag_engine import HybridRAGEngine
+            self._rag = HybridRAGEngine()
+        return self._rag
+
+    @rag.setter
+    def rag(self, value):
+        self._rag = value
 
     @property
     def public_data_repo(self):
@@ -236,31 +249,293 @@ class PostoTools:
                 "motivo": f"Base de conhecimento AURA indisponível: {e}",
             }
 
-    def consultar_analise_vendas_erp(self, tipo: str = "mais_vendidos") -> dict:
+    def consultar_procedimento_erp(
+        self,
+        termo: str,
+        top_k: int = 3,
+        tenant_id: str = "posto_local",
+        erp: str = "webposto",
+        query_vector: list = None,
+    ) -> dict:
         """
-        Consulta dados analíticos de vendas e abastecimentos através do Adaptador Universal AUPS.
-        Retorna últimos produtos vendidos (conveniência e pista), faturamento geral,
-        dados de hoje e ranking dos mais vendidos.
+        Consulta procedural de operacoes e manuais do ERP via Hybrid RAG no pgvector (Secao 9 do Roadmap).
+        Garante fallback robusto para o acervo local FTS5 SQLite (webposto_knowledge.db) caso o banco vetorial
+        esteja indisponivel ou sem resultados suficientes.
+        Zero travessoes em toda a saida.
+        """
+        # 0. Consulta memorias ativas locais do tenant (Precedencia Cognitiva Maxima: tenant > erp)
+        tenant_chunks = []
+        try:
+            from core.tenant_memory import TenantMemoryManager
+            t_mem = TenantMemoryManager()
+            active_mems = t_mem.get_active_memories(tenant_id=tenant_id, query=termo, limit=top_k)
+            for m in active_mems:
+                tenant_chunks.append({
+                    "id": f"mem_{m.id}",
+                    "camada": "tenant",
+                    "doc_id": f"TENANT-{m.id}",
+                    "doc_titulo": f"Regra do Posto: {m.chave or m.categoria}",
+                    "breadcrumb": f"Memoria do Posto > {m.categoria.replace('_', ' ').title()}",
+                    "conteudo": m.conteudo,
+                    "doc_url": "",
+                    "is_extenso": False,
+                    "score_rrf": 1.0,
+                })
+        except Exception as exc:
+            logger.debug("Consulta a TenantMemoryManager no PostoTools ignorada: %s", exc)
+
+        # 1. Tenta a busca vetorial hibrida no pgvector (se configurado)
+        try:
+            res = self.rag.search_hybrid_procedimentos(
+                query_text=termo,
+                top_k=top_k,
+                tenant_id=tenant_id,
+                erp=erp,
+                query_vector=query_vector,
+            )
+            if isinstance(res, dict) and res.get("results") and not res.get("evidencia_insuficiente"):
+                if tenant_chunks:
+                    res["results"] = tenant_chunks + [r for r in res["results"] if r.get("doc_id") not in {t["doc_id"] for t in tenant_chunks}]
+                return res
+        except Exception as e:
+            logger.warning(
+                "Busca hibrida pgvector indisponivel para procedimentos (%s). Acionando contingencia local FTS5.",
+                e,
+            )
+
+        # 2. Fallback deterministico no acervo local curado SQLite FTS5 (Zero Downtime)
+        try:
+            from core.webposto_rag import get_webposto_rag
+            rag_local = get_webposto_rag()
+            locais = rag_local.buscar_geral(termo, pilar="confluence", limit=top_k)
+            if not locais:
+                locais = rag_local.buscar_geral(termo, limit=top_k)
+
+            if locais:
+                formatted_results = []
+                for r in locais:
+                    cod = str(r.get("codigo_ref") or "")
+                    page_id = cod.split("-")[1] if (cod.startswith("CONF-") and len(cod.split("-")) > 1) else ""
+                    url_doc = f"https://qualityautomacao.atlassian.net/wiki/spaces/webposto/pages/{page_id}" if page_id else (r.get("doc_url") or "")
+                    resumo = str(r.get("resumo_executivo") or "").strip()
+                    conteudo_comp = str(r.get("conteudo_completo") or "").strip()
+                    corpo = f"{resumo}\n\n{conteudo_comp}".strip() or resumo
+                    formatted_results.append({
+                        "id": r.get("id"),
+                        "doc_id": cod or f"CONF-{r.get('id')}",
+                        "doc_titulo": r.get("titulo") or "Manual Operacional",
+                        "secao": r.get("subtitulo") or r.get("modulo") or "Geral",
+                        "breadcrumb": f"{r.get('modulo', 'ERP')} > {r.get('titulo')}" if r.get("modulo") else (r.get("titulo") or ""),
+                        "chunk_idx": 1,
+                        "chunk_total": 1,
+                        "conteudo": corpo,
+                        "doc_url": url_doc,
+                        "n_tokens": len(corpo) // 4,
+                        "score_final": float(r.get("bm25_rank") or 1.0),
+                    })
+
+                combined = tenant_chunks + [r for r in formatted_results if r.get("doc_id") not in {t["doc_id"] for t in tenant_chunks}]
+                return {
+                    "results": combined,
+                    "evidencia_insuficiente": False,
+                    "status": "online_local_fts5",
+                    "total": len(combined),
+                }
+        except Exception as e_local:
+            logger.warning("Falha no fallback local FTS5 de procedimentos: %s", e_local)
+
+        return {
+            "results": [],
+            "evidencia_insuficiente": True,
+            "status": "sem_resultados",
+            "motivo": "Nenhum procedimento operacional localizado nas bases vetoriais e locais.",
+        }
+
+    def consultar_conhecimento_webposto(
+        self,
+        termo: str,
+        pilar: str = None,
+        modulo: str = None,
+        top_k: int = 3,
+    ) -> dict:
+        """
+        Consulta o acervo oficial curado do webPosto (Confluence, Dicionario SQL, Incidentes e APIs).
+        Busca full-text instantanea local com ranking BM25 via FTS5.
         """
         try:
-            # 1. Recupera vendas e cupons recentes atraves do adaptador de borda
-            vendas_recentes = self.erp_adapter.get_recent_sales(limit=50)
+            from core.webposto_rag import get_webposto_rag
+            resultados = get_webposto_rag().buscar_geral(termo, pilar=pilar, modulo=modulo, limit=top_k)
+            return {
+                "termo": termo,
+                "pilar": pilar,
+                "modulo": modulo,
+                "resultados": resultados,
+                "status": "online_local",
+                "total": len(resultados),
+            }
+        except Exception as e:
+            return {
+                "termo": termo,
+                "pilar": pilar,
+                "resultados": [],
+                "status": "offline_ou_erro",
+                "motivo": f"Falha na consulta webPosto RAG: {e}",
+            }
 
-            # 2. Transforma vendas para o formato de saida compativel
+    def auditar_documento_ou_chave_fiscal(
+        self,
+        chave_ou_xml: str,
+    ) -> dict:
+        """
+        Audita de forma deterministica uma chave de acesso (44 digitos), trecho de XML ou dados de NF-e/NFC-e.
+        Aplica regras SEFAZ, calculo matematico ABNT NBR 5891:2014, regras de combustiveis ANP,
+        compatibilidade de CFOP/CST/CSOSN, Rejeicao 375 e SPED C113.
+        """
+        try:
+            from core.fiscal_engine import (
+                validar_chave_acesso,
+                decompor_chave_acesso,
+                auditar_documento_xml,
+            )
+            clean_input = (chave_ou_xml or "").strip()
+            digits = re.sub(r"[^0-9]", "", clean_input)
+            if len(digits) == 44 and "<" not in clean_input:
+                decomp = decompor_chave_acesso(digits)
+                findings = validar_chave_acesso(digits)
+                return {
+                    "tipo": "chave_acesso",
+                    "decomposicao": decomp,
+                    "apontamentos": [f.model_dump(mode="json") for f in findings],
+                    "status": "sucesso",
+                }
+            elif "<" in clean_input and ("infNFe" in clean_input or "NFe" in clean_input or "nfeProc" in clean_input):
+                resultado = auditar_documento_xml(clean_input)
+                return {
+                    "tipo": "xml_documento",
+                    "resultado": resultado,
+                    "status": "sucesso",
+                }
+            else:
+                from core.webposto_rag import get_webposto_rag
+                resultados = get_webposto_rag().buscar_geral(clean_input, pilar="fiscal_tributario_sefaz", limit=3)
+                return {
+                    "tipo": "consulta_rejeicao_fiscal",
+                    "termo": clean_input,
+                    "resultados": resultados,
+                    "status": "sucesso",
+                }
+        except Exception as e:
+            return {
+                "status": "erro",
+                "motivo": f"Falha na auditoria fiscal: {e}",
+            }
+
+    def _carregar_matriz_custos_produtos(self) -> Dict[str, Dict[str, Any]]:
+        """Recupera tabela dimensional de custos e precos dos produtos no ERP ou via adaptador."""
+        custos_map: Dict[str, Dict[str, Any]] = {}
+        try:
+            with get_erp_connection(timeout=3) as conn, conn.cursor() as cur:
+                cur.execute("""
+                    SELECT 
+                        TRIM(codpro) as codpro,
+                        TRIM(nompro) as nompro,
+                        COALESCE(NULLIF(custo, 0), pun_vl_custo_medio, 0)::float as custo_unitario,
+                        COALESCE(valvenda, 0)::float as preco_venda
+                    FROM produtos;
+                """)
+                for r in cur.fetchall():
+                    custos_map[str(r[0])] = {
+                        "nompro": str(r[1]),
+                        "custo": float(r[2]),
+                        "preco_venda": float(r[3]),
+                    }
+        except Exception as e_cost:
+            logger.warning("Falha ao recuperar matriz de custos de produtos do ERP: %s", e_cost)
+
+        # Fallback de custos via catalogo de contingencia se o banco relacional estiver indisponivel
+        if not custos_map:
+            try:
+                cat_items = self.erp_adapter.get_product_catalog(limit=100)
+                for p in (cat_items or []):
+                    p_sku = str(p.sku).strip()
+                    p_preco = float(getattr(p, "preco_unitario_reais", 0.0) or 0.0)
+                    is_fuel = any(k in str(p.descricao_produto).lower() for k in ["gasolina", "etanol", "diesel", "comb"])
+                    c_rate = 0.85 if is_fuel else 0.70
+                    p_custo = round(p_preco * c_rate, 2) if p_preco > 0 else 5.0
+                    custos_map[p_sku] = {
+                        "nompro": p.descricao_produto,
+                        "custo": p_custo,
+                        "preco_venda": p_preco,
+                    }
+            except Exception as e_cat:
+                logger.warning("Falha ao carregar matriz de custos de contingencia: %s", e_cat)
+        return custos_map
+
+    def consultar_analise_vendas_erp(
+        self,
+        tipo: str = "mais_vendidos",
+        data_inicio: Optional[str] = None,
+        data_fim: Optional[str] = None,
+        limite: int = 150,
+    ) -> dict:
+        """
+        Consulta dados analiticos de vendas e abastecimentos atraves do Adaptador Universal AUPS e banco local.
+        Retorna ranking com custos e margens de conveniencia, abastecimentos na pista, taxas TEF e metricas consolidadas.
+        Zero travessoes em toda a saida.
+        """
+        try:
+            # 1. Recupera tabela dimensional de custos e precos dos produtos
+            custos_map = self._carregar_matriz_custos_produtos()
+
+            # 2. Recupera vendas e cupons recentes atraves do adaptador de borda
+            vendas_recentes = self.erp_adapter.get_recent_sales(
+                start_date=data_inicio,
+                end_date=data_fim,
+                limit=limite,
+            )
+
             ultimos_produtos_conveniencia = []
             ranking_map: Dict[str, Dict[str, Any]] = {}
             hoje = date.today()
             pedidos_hoje_count = 0
             faturamento_conv_hoje = 0.0
+            faturamento_conv_total = 0.0
+            custo_conv_total = 0.0
+            datas_vendas = []
+            pagamentos_totais: Dict[Tuple[str, str], Dict[str, Any]] = {}
 
             for venda in vendas_recentes:
-                is_hoje = venda.data_hora and venda.data_hora.date() == hoje
-                if is_hoje:
-                    pedidos_hoje_count += 1
-                    faturamento_conv_hoje += venda.total_reais
+                if venda.data_hora:
+                    datas_vendas.append(venda.data_hora)
+                    if venda.data_hora.date() == hoje:
+                        pedidos_hoje_count += 1
+                        faturamento_conv_hoje += venda.total_reais
+
+                faturamento_conv_total += venda.total_reais
+
+                # Mapeamento de formas de pagamento para taxas TEF
+                for pag in venda.pagamentos:
+                    nome_forma = pag.descricao_forma or "OUTROS"
+                    tipo_pag = pag.tipo or "outro"
+                    key = (nome_forma, tipo_pag)
+                    if key not in pagamentos_totais:
+                        pagamentos_totais[key] = {
+                            "modalidade": nome_forma,
+                            "tipo": tipo_pag,
+                            "volume": 0.0,
+                        }
+                    pagamentos_totais[key]["volume"] += pag.valor_reais
 
                 for item in venda.itens:
                     sku = item.sku
+                    c_info = custos_map.get(sku, {})
+                    c_val = getattr(item, "custo_unitario_reais", 0.0) or c_info.get("custo", 0.0)
+                    if not c_val and item.preco_unitario_reais:
+                        c_val = round(item.preco_unitario_reais * 0.70, 2)
+                    custo_unit = float(c_val or 0.0)
+                    custo_item_total = custo_unit * item.quantidade
+                    custo_conv_total += custo_item_total
+
                     if len(ultimos_produtos_conveniencia) < 10:
                         ultimos_produtos_conveniencia.append({
                             "pedido": venda.cupom_id,
@@ -272,6 +547,7 @@ class PostoTools:
                             "quantidade": item.quantidade,
                             "valor_unitario": item.preco_unitario_reais,
                             "total_item": item.total_item_reais,
+                            "custo_unitario": custo_unit,
                             "total_pedido": venda.total_reais,
                         })
 
@@ -282,17 +558,29 @@ class PostoTools:
                             "total_saidas": 0,
                             "qtd_total": 0.0,
                             "receita_total": 0.0,
+                            "custo_unitario": custo_unit,
+                            "custo_total": 0.0,
+                            "tem_custo": custo_unit > 0,
                         }
                     ranking_map[sku]["total_saidas"] += 1
                     ranking_map[sku]["qtd_total"] += item.quantidade
                     ranking_map[sku]["receita_total"] += item.total_item_reais
+                    ranking_map[sku]["custo_total"] += custo_item_total
 
-            # 3. Destaque do ultimo produto vendido
+            # Apura lucro e margem de cada produto da conveniencia
+            for p_sku, p_data in ranking_map.items():
+                rec = p_data["receita_total"]
+                cst = p_data["custo_total"]
+                lucro_bruto = rec - cst
+                p_data["lucro_bruto"] = round(lucro_bruto, 2)
+                p_data["margem_pct"] = round((lucro_bruto / rec * 100), 2) if rec > 0 and p_data["tem_custo"] else None
+
+            # Destaque do ultimo produto vendido
             ultimo_vendido_destaque = None
             if ultimos_produtos_conveniencia:
                 p_conv = ultimos_produtos_conveniencia[0]
                 ultimo_vendido_destaque = {
-                    "origem": "Conveniência / PDV",
+                    "origem": "Conveniencia / PDV",
                     "pedido": p_conv.get("pedido"),
                     "produto": p_conv.get("nompro"),
                     "codigo_sku": p_conv.get("codpro"),
@@ -304,26 +592,60 @@ class PostoTools:
                     "pdv": p_conv.get("pdv"),
                 }
 
-            # 4. Produtos mais vendidos (ordenados por volume total)
             produtos_mais_vendidos = sorted(
                 ranking_map.values(), key=lambda x: x["qtd_total"], reverse=True
-            )[:5]
+            )[:10]
 
-            # 5. Ultimos abastecimentos na pista e agregacao por bomba
-            dispenses = self.erp_adapter.get_pump_dispenses(limit=50)
+            # 3. Ultimos abastecimentos na pista e agregacao por bomba
+            dispenses = self.erp_adapter.get_pump_dispenses(
+                start_date=data_inicio,
+                end_date=data_fim,
+                limit=limite,
+            )
             ultimos_abastecimentos = []
             bomba_agg: Dict[str, Dict[str, Any]] = {}
+            comb_agg: Dict[str, Dict[str, Any]] = {}
             abast_hoje_count = 0
             litros_hoje_total = 0.0
             fat_comb_hoje_total = 0.0
+            fat_comb_total = 0.0
+            custo_pista_total = 0.0
+            datas_pista = []
 
             for d in dispenses:
                 vol_litros = d.volume_vendido_litros if d.volume_vendido_litros > 0 else d.volume_aferido_litros
-                is_hoje = d.timestamp_registro and d.timestamp_registro.date() == hoje
-                if is_hoje:
-                    abast_hoje_count += 1
-                    litros_hoje_total += vol_litros
-                    fat_comb_hoje_total += d.total_faturado_reais
+                if d.timestamp_registro:
+                    datas_pista.append(d.timestamp_registro)
+                    if d.timestamp_registro.date() == hoje:
+                        abast_hoje_count += 1
+                        litros_hoje_total += vol_litros
+                        fat_comb_hoje_total += d.total_faturado_reais
+
+                fat_comb_total += d.total_faturado_reais
+
+                c_sku = getattr(d, "codigo_combustivel", None) or "00001"
+                c_info = custos_map.get(c_sku, {})
+                custo_unit_comb = float(c_info.get("custo", 0.0))
+                if not custo_unit_comb:
+                    preco_litro = (d.total_faturado_reais / vol_litros) if vol_litros > 0 else 5.80
+                    custo_unit_comb = round(preco_litro * 0.85, 2)
+                custo_abast = vol_litros * custo_unit_comb
+                custo_pista_total += custo_abast
+
+                c_nome = getattr(d, "descricao_combustivel", None) or "COMBUSTIVEL"
+                if c_nome not in comb_agg:
+                    comb_agg[c_nome] = {
+                        "combustivel": c_nome,
+                        "codigo": c_sku,
+                        "volume_litros": 0.0,
+                        "faturamento": 0.0,
+                        "custo_total": 0.0,
+                        "preco_venda": d.preco_unitario_reais if d.preco_unitario_reais > 0 else (d.total_faturado_reais / vol_litros if vol_litros > 0 else 0.0),
+                        "custo_aquisicao": custo_unit_comb,
+                    }
+                comb_agg[c_nome]["volume_litros"] += vol_litros
+                comb_agg[c_nome]["faturamento"] += d.total_faturado_reais
+                comb_agg[c_nome]["custo_total"] += custo_abast
 
                 if len(ultimos_abastecimentos) < 10:
                     ultimos_abastecimentos.append({
@@ -331,8 +653,8 @@ class PostoTools:
                         "bomba": d.identificador_bomba,
                         "data": str(d.timestamp_registro.date()) if d.timestamp_registro else "",
                         "hora": str(d.timestamp_registro.time()) if d.timestamp_registro else "",
-                        "codpro": getattr(d, "codigo_combustivel", None) or "00001",
-                        "nompro": getattr(d, "descricao_combustivel", None) or "COMBUSTIVEL",
+                        "codpro": c_sku,
+                        "nompro": c_nome,
                         "litros": vol_litros,
                         "total": d.total_faturado_reais,
                         "preco_unitario": round(d.total_faturado_reais / vol_litros, 3) if vol_litros > 0 else 0.0,
@@ -350,21 +672,103 @@ class PostoTools:
                 bomba_agg[b_id]["total_litros"] = round(bomba_agg[b_id]["total_litros"] + vol_litros, 2)
                 bomba_agg[b_id]["faturamento_bomba"] = round(bomba_agg[b_id]["faturamento_bomba"] + d.total_faturado_reais, 2)
 
-            abastecimentos_bomba = sorted(
-                bomba_agg.values(), key=lambda x: x["total_litros"], reverse=True
-            )
+            # Grade de combustiveis
+            combustiveis_margem = []
+            for c_nome, c_vals in comb_agg.items():
+                v_fat = c_vals["faturamento"]
+                v_cst = c_vals["custo_total"]
+                mg_pct = ((v_fat - v_cst) / v_fat * 100) if v_fat > 0 else 0.0
+                combustiveis_margem.append({
+                    "combustivel": c_nome,
+                    "preco_venda": round(c_vals["preco_venda"], 3),
+                    "custo_aquisicao": round(c_vals["custo_aquisicao"], 3),
+                    "margem_liquida_pct": round(mg_pct, 2),
+                    "volume_litros": round(c_vals["volume_litros"], 2),
+                    "faturamento_reais": round(v_fat, 2),
+                })
 
-            # 6. Resumo de Hoje e Geral
-            total_litros_geral = round(sum((d.volume_vendido_litros if d.volume_vendido_litros > 0 else d.volume_aferido_litros) for d in dispenses), 2)
-            faturamento_total_geral = round(sum(d.total_faturado_reais for d in dispenses), 2)
+            # 4. Taxas TEF e Meios de Pagamento
+            payment_fee_impact = []
+            total_desconto_tef = 0.0
+            for (m_nome, m_tipo), p_val in pagamentos_totais.items():
+                vol = p_val["volume"]
+                m_lower = m_nome.lower()
+                if "debito" in m_lower or m_tipo == "debito":
+                    taxa = 1.20
+                elif "credito" in m_lower or m_tipo == "credito":
+                    taxa = 2.50
+                elif "cart" in m_lower:
+                    taxa = 1.50
+                elif "pix" in m_lower or m_tipo == "pix":
+                    taxa = 0.00
+                elif "dinheiro" in m_lower or m_tipo == "dinheiro":
+                    taxa = 0.00
+                else:
+                    taxa = 1.00
+
+                desc = round(vol * (taxa / 100.0), 2)
+                total_desconto_tef += desc
+                payment_fee_impact.append({
+                    "modalidade": m_nome,
+                    "taxa_media_pct": taxa,
+                    "volume_financeiro": round(vol, 2),
+                    "desconto_taxas_reais": desc,
+                    "impacto_margem_pct": round((desc / vol * 100), 2) if vol > 0 else 0.0,
+                })
+
+            # 5. Metricas Consolidadas Deterministicas
+            gross_revenue = faturamento_conv_total + fat_comb_total
+            custo_total = custo_conv_total + custo_pista_total
+            lucro_bruto = gross_revenue - custo_total
+            net_profit = lucro_bruto - total_desconto_tef
+            consolidated_margin_pct = (net_profit / gross_revenue * 100) if gross_revenue > 0 else 0.0
+
+            # 6. Determinacao do Periodo Analisado
+            todas_datas = datas_vendas + datas_pista
+            if todas_datas:
+                dt_min = min(todas_datas).date()
+                dt_max = max(todas_datas).date()
+                dt_min_str = dt_min.strftime("%d/%m/%Y")
+                dt_max_str = dt_max.strftime("%d/%m/%Y")
+                if data_inicio or data_fim:
+                    desc_periodo = f"{dt_min_str} a {dt_max_str} (Filtro especificado)"
+                    filtro_esp = True
+                else:
+                    desc_periodo = f"{dt_min_str} a {dt_max_str} (Base recente do ERP)"
+                    filtro_esp = False
+            else:
+                desc_periodo = "Sem movimentacao registrada no periodo consultado"
+                filtro_esp = bool(data_inicio or data_fim)
+
+            periodo_info = {
+                "descricao": desc_periodo,
+                "filtro_especificado": filtro_esp,
+                "mensagem_orientacao": (
+                    "Caso deseje consultar uma data ou intervalo especifico (ex: 'hoje', 'ontem', 'setembro' ou '01/09 a 15/09'), basta solicitar indicando o periodo."
+                    if not filtro_esp else ""
+                ),
+            }
+
+            metricas_consolidadas = {
+                "faturamento_bruto": round(gross_revenue, 2),
+                "custo_total": round(custo_total, 2),
+                "lucro_bruto": round(lucro_bruto, 2),
+                "taxas_tef_total": round(total_desconto_tef, 2),
+                "lucro_liquido": round(net_profit, 2),
+                "margem_liquida_consolidada_pct": round(consolidated_margin_pct, 2),
+            }
 
             resposta = {
                 "status": "ok",
+                "periodo": periodo_info,
+                "metricas_consolidadas": metricas_consolidadas,
+                "produtos_mais_vendidos": produtos_mais_vendidos,
+                "combustiveis_margem": combustiveis_margem,
+                "meios_pagamento_impacto": payment_fee_impact,
                 "ultimo_produto_vendido_destaque": ultimo_vendido_destaque,
                 "ultimos_produtos_conveniencia": ultimos_produtos_conveniencia,
                 "ultimos_abastecimentos_pista": ultimos_abastecimentos,
-                "produtos_mais_vendidos": produtos_mais_vendidos,
-                "abastecimentos_por_bomba": abastecimentos_bomba,
+                "abastecimentos_por_bomba": sorted(bomba_agg.values(), key=lambda x: x["total_litros"], reverse=True),
                 "resumo_hoje": {
                     "data": str(hoje),
                     "abastecimentos_hoje": abast_hoje_count,
@@ -374,9 +778,12 @@ class PostoTools:
                     "faturamento_conveniencia_hoje": round(faturamento_conv_hoje, 2),
                 },
                 "resumo_geral": {
+                    "total_pedidos_conveniencia": len(vendas_recentes),
+                    "faturamento_conveniencia": round(faturamento_conv_total, 2),
                     "total_abastecimentos": len(dispenses),
-                    "total_litros": total_litros_geral,
-                    "faturamento_total": faturamento_total_geral,
+                    "total_litros_pista": round(sum((d.volume_vendido_litros if d.volume_vendido_litros > 0 else d.volume_aferido_litros) for d in dispenses), 2),
+                    "faturamento_pista": round(fat_comb_total, 2),
+                    "faturamento_total": round(gross_revenue, 2),
                 },
             }
             resposta_limpa, _ = sanitize_dict(resposta)
@@ -386,7 +793,6 @@ class PostoTools:
                 "status": "indisponivel",
                 "motivo": f"Falha na consulta ao sistema ERP: {e}",
             }
-
     def consultar_estoque_erp(self, termo: str = "") -> dict:
         """
         Consulta dados de estoque em tempo real direto do ERP (tabelas produtos e tanques).
@@ -9104,4 +9510,3 @@ class PostoTools:
                 "intent": "formas_pagamento",
                 "message": f"Erro ao consultar formas de pagamento: {e}",
             }
-

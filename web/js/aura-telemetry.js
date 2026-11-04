@@ -1,7 +1,8 @@
 /**
- * AURA Telemetry & SRE Cockpit Coordinator (v1.0.0 - Fase P3-1)
+ * AURA Telemetry & SRE Cockpit Coordinator (v1.2.0 - FiscalLLM Governance)
  * Painel Nativo de Telemetria Ultraleve: 0 MB de RAM extra no servidor.
- * Consome /api/v1/aura/telemetry/metrics, /api/v1/aura/stations e /api/v1/aura/compliance/status.
+ * Consome /api/v1/aura/telemetry/metrics, /api/v1/aura/stations,
+ * /api/v1/aura/compliance/status e /api/v1/aura/telemetry/token-budget.
  * Renderiza graficos de latencia em Canvas nativo 100% puro JS sem nenhuma biblioteca externa.
  * Zero travessoes em todo o modulo.
  */
@@ -13,6 +14,7 @@ class AuraTelemetryCoordinator {
     this.autoRefreshEnabled = false;
     this.isFetching = false;
     this.lastMetrics = null;
+    this.lastBudget = null;
   }
 
   /**
@@ -22,7 +24,13 @@ class AuraTelemetryCoordinator {
     this.modal = document.getElementById('aura-telemetry-modal');
     if (!this.modal) return;
 
-    // 1. Botao no cabecalho (Header)
+    // 1. Barra de Acompanhamento de Tokens no cabecalho (Header)
+    const btnTokenTracking = document.getElementById('btn-header-token-tracking');
+    if (btnTokenTracking) {
+      btnTokenTracking.addEventListener('click', () => this.openModal());
+    }
+
+    // 1.1 Botao retrocompativel no cabecalho (Header)
     const btnHeader = document.getElementById('btn-open-telemetry');
     if (btnHeader) {
       btnHeader.addEventListener('click', () => this.openModal());
@@ -78,7 +86,34 @@ class AuraTelemetryCoordinator {
       });
     }
 
-    // 8. Carga inicial silenciosa para atualizar badge no header
+    // 8. Botao Salvar Meta Orcamentaria de Tokens
+    const btnSavePolicy = document.getElementById('btn-save-token-policy');
+    if (btnSavePolicy) {
+      btnSavePolicy.addEventListener('click', () => this.handleSaveBudgetPolicy());
+    }
+
+    // 8.1 Controles de Memoria Operacional do Posto (Fase 7)
+    const btnToggleAddMem = document.getElementById('btn-toggle-add-memory');
+    const formAddMem = document.getElementById('tenant-memory-add-form');
+    if (btnToggleAddMem && formAddMem) {
+      btnToggleAddMem.addEventListener('click', () => {
+        formAddMem.classList.toggle('hidden');
+      });
+    }
+
+    const btnCancelMem = document.getElementById('btn-cancel-add-memory');
+    if (btnCancelMem && formAddMem) {
+      btnCancelMem.addEventListener('click', () => {
+        formAddMem.classList.add('hidden');
+      });
+    }
+
+    const btnSaveMem = document.getElementById('btn-save-tenant-memory');
+    if (btnSaveMem) {
+      btnSaveMem.addEventListener('click', () => this.handleSaveTenantMemory());
+    }
+
+    // 9. Carga inicial silenciosa para atualizar badges e barra de tokens no header
     this.fetchSilentBadge();
   }
 
@@ -122,16 +157,23 @@ class AuraTelemetryCoordinator {
   }
 
   /**
-   * Atualizacao silenciosa do badge de latencia no topo da tela.
+   * Atualizacao silenciosa do badge de latencia e barra de tokens no topo da tela.
    */
   async fetchSilentBadge() {
     try {
-      const res = await fetch('/api/v1/aura/telemetry/metrics');
-      if (!res.ok) return;
-      const data = await res.json();
-      this.updateHeaderBadge(data);
+      const [metricsRes, budgetRes] = await Promise.allSettled([
+        fetch('/api/v1/aura/telemetry/metrics'),
+        fetch('/api/v1/aura/telemetry/token-budget'),
+      ]);
+      const metrics = metricsRes.status === 'fulfilled' && metricsRes.value.ok ? await metricsRes.value.json() : null;
+      const budget = budgetRes.status === 'fulfilled' && budgetRes.value.ok ? await budgetRes.value.json() : null;
+
+      if (metrics) {
+        this.updateHeaderBadge(metrics);
+      }
+      this.updateHeaderTokenTracking(budget, metrics);
     } catch {
-      // Falha silenciosa
+      // Falha silenciosa de telemetria
     }
   }
 
@@ -156,7 +198,59 @@ class AuraTelemetryCoordinator {
   }
 
   /**
-   * Busca dados consolidados de telemetria, estacoes e conformidade.
+   * Atualiza a Barra de Acompanhamento de Tokens no topo do layout principal.
+   */
+  updateHeaderTokenTracking(budget, metrics) {
+    const elCounter = document.getElementById('header-token-counter');
+    const elBar = document.getElementById('header-budget-progress-bar');
+    const elCost = document.getElementById('header-budget-cost-label');
+    const elAvoided = document.getElementById('header-budget-avoided-pill');
+    if (!elCounter) return;
+
+    const tokens = budget?.total_tokens_consumed ?? metrics?.token_usage?.total_tokens ?? 0;
+    const costBrl = budget?.monthly_consumed_brl ?? metrics?.token_usage?.total_cost_brl ?? 0.0;
+    const monthlyBudget = budget?.monthly_budget_brl ?? 30.00;
+    const avoidedBrl = budget?.total_avoided_cost_brl ?? metrics?.token_usage?.total_avoided_cost_brl ?? 0.0;
+    const pct = monthlyBudget > 0 ? (costBrl / monthlyBudget) * 100.0 : 0.0;
+
+    const tokensFmt = tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k tokens` : `${tokens} tokens`;
+    elCounter.textContent = tokensFmt;
+
+    if (elCost) {
+      elCost.textContent = `R$ ${costBrl.toFixed(2).replace('.', ',')} / R$ ${monthlyBudget.toFixed(0)}`;
+      if (pct >= 100) {
+        elCost.className = 'font-mono text-[10px] text-rose-400 font-bold';
+      } else if (pct >= 80) {
+        elCost.className = 'font-mono text-[10px] text-amber-400 font-bold';
+      } else {
+        elCost.className = 'font-mono text-[10px] text-emerald-400 font-semibold';
+      }
+    }
+
+    if (elBar) {
+      const displayPct = Math.min(100, Math.max(3, pct));
+      elBar.style.width = `${displayPct}%`;
+      if (pct >= 100) {
+        elBar.className = 'h-full bg-rose-500 rounded-full transition-all duration-500';
+      } else if (pct >= 80) {
+        elBar.className = 'h-full bg-amber-500 rounded-full transition-all duration-500';
+      } else {
+        elBar.className = 'h-full bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full transition-all duration-500';
+      }
+    }
+
+    if (elAvoided) {
+      if (avoidedBrl > 0) {
+        elAvoided.textContent = `Economia ~R$ ${avoidedBrl.toFixed(2).replace('.', ',')}`;
+        elAvoided.classList.remove('hidden');
+      } else {
+        elAvoided.textContent = 'Economia ~R$ 0,00';
+      }
+    }
+  }
+
+  /**
+   * Busca dados consolidados de telemetria, estacoes, conformidade e orcamento de tokens.
    */
   async fetchCockpitData(isBackground = false) {
     if (this.isFetching) return;
@@ -168,21 +262,31 @@ class AuraTelemetryCoordinator {
     }
 
     try {
-      const [metricsRes, stationsRes, complianceRes] = await Promise.allSettled([
+      const [metricsRes, stationsRes, complianceRes, budgetRes, memoryRes] = await Promise.allSettled([
         fetch('/api/v1/aura/telemetry/metrics'),
         fetch('/api/v1/aura/stations'),
         fetch('/api/v1/aura/compliance/status'),
+        fetch('/api/v1/aura/telemetry/token-budget'),
+        fetch('/api/v1/aura/memory/tenant'),
       ]);
 
       const metrics = metricsRes.status === 'fulfilled' && metricsRes.value.ok ? await metricsRes.value.json() : null;
       const stations = stationsRes.status === 'fulfilled' && stationsRes.value.ok ? await stationsRes.value.json() : null;
       const compliance = complianceRes.status === 'fulfilled' && complianceRes.value.ok ? await complianceRes.value.json() : null;
+      const budget = budgetRes.status === 'fulfilled' && budgetRes.value.ok ? await budgetRes.value.json() : null;
+      const memories = memoryRes.status === 'fulfilled' && memoryRes.value.ok ? await memoryRes.value.json() : null;
 
       this.lastMetrics = metrics;
-      this.renderCockpit(metrics, stations, compliance);
+      this.lastBudget = budget;
+      this.renderCockpit(metrics, stations, compliance, budget);
+      if (memories && memories.facts) {
+        this.renderTenantMemories(memories.facts);
+      }
+
       if (metrics) {
         this.updateHeaderBadge(metrics);
       }
+      this.updateHeaderTokenTracking(budget, metrics);
     } catch (err) {
       console.warn('[AuraTelemetry] Erro ao obter dados do cockpit:', err);
     } finally {
@@ -193,10 +297,16 @@ class AuraTelemetryCoordinator {
     }
   }
 
-  renderCockpit(metrics, stations, compliance) {
+  renderCockpit(metrics, stations, compliance, budget) {
+    // 1. Renderiza secao de Orcamento e Tokens
+    this.renderTokenBudget(budget, metrics);
+
+    // 2. Renderiza Insights Operacionais e de Desempenho
+    this.renderOperationalInsights(metrics, budget, stations);
+
     if (!metrics) return;
 
-    // 1. TTFT (Latencia da IA)
+    // 3. TTFT (Latencia da IA)
     const ttft = metrics.ttft_ms || {};
     const p50 = ttft.p50 || 0;
     const p90 = ttft.p90 || 0;
@@ -219,7 +329,7 @@ class AuraTelemetryCoordinator {
 
     if (elSpeedBadge) {
       if (p50 < 1500) {
-        elSpeedBadge.textContent = 'Ultrarrápida';
+        elSpeedBadge.textContent = 'Ultrarrapida';
         elSpeedBadge.className = 'px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
       } else if (p50 < 4000) {
         elSpeedBadge.textContent = 'Adequada';
@@ -230,14 +340,14 @@ class AuraTelemetryCoordinator {
       }
     }
 
-    // 2. Hidratacao GenUI
+    // 4. Hidratacao GenUI
     const hyd = metrics.hydration_ms || {};
     const elHydP50 = document.getElementById('sre-hyd-p50');
     const elHydAvg = document.getElementById('sre-hyd-avg');
     if (elHydP50) elHydP50.textContent = `${Math.round(hyd.p50 || 0)} ms`;
     if (elHydAvg) elHydAvg.textContent = `${Math.round(hyd.avg || 0)} ms`;
 
-    // 3. Pool e Banco ERP
+    // 5. Pool e Banco ERP
     const dbPool = metrics.db_pool || {};
     const stationInfo = Array.isArray(stations) && stations.length > 0 ? stations[0] : null;
 
@@ -254,7 +364,7 @@ class AuraTelemetryCoordinator {
     }
     if (elErpConn) elErpConn.textContent = `${dbPool.active_erp || 1} ativas`;
 
-    // 4. Governanca & Vouchers HITL
+    // 6. Governanca & Vouchers HITL
     const elActionsAppr = document.getElementById('sre-actions-approved');
     const elActionsReq = document.getElementById('sre-actions-requested');
     const elSecBlocks = document.getElementById('sre-security-blocks');
@@ -265,7 +375,7 @@ class AuraTelemetryCoordinator {
     if (elSecBlocks) elSecBlocks.textContent = metrics.security_blocks || 0;
     if (elSuccessRate) elSuccessRate.textContent = `${metrics.action_success_rate_pct || 100}%`;
 
-    // 5. Recursos de Processo Local
+    // 7. Recursos de Processo Local
     const proc = metrics.process_metrics || {};
     const elProcRam = document.getElementById('sre-proc-ram');
     const elProcUptime = document.getElementById('sre-proc-uptime');
@@ -280,18 +390,211 @@ class AuraTelemetryCoordinator {
       elProcUptime.textContent = `${h}h ${m}m`;
     }
 
-    // 6. Conformidade LGPD
+    // 8. Conformidade LGPD
     const elCompStatus = document.getElementById('sre-compliance-status');
     if (elCompStatus && compliance) {
       elCompStatus.textContent = compliance.compliant ? 'Opt-In Ativo (v1.1)' : 'Pendente de Opt-In';
       elCompStatus.className = compliance.compliant ? 'text-emerald-400 font-semibold' : 'text-amber-400 font-semibold';
     }
 
-    // 7. Renderizacao do Grafico Canvas de TTFT
+    // 9. Renderizacao do Grafico Canvas de TTFT
     const samples = Array.isArray(metrics.recent_ttft_samples) && metrics.recent_ttft_samples.length > 0
       ? metrics.recent_ttft_samples
       : [650, 720, 680, 810, 750, 700, 704];
     this.drawLatencyCanvas(samples);
+  }
+
+  /**
+   * Renderiza a secao de orcamento de tokens e custos do FiscalLLM no Cockpit.
+   */
+  renderTokenBudget(budget, metrics) {
+    const tokens = budget?.total_tokens_consumed ?? metrics?.token_usage?.total_tokens ?? 0;
+    const promptTokens = metrics?.token_usage?.prompt_tokens ?? 0;
+    const completionTokens = metrics?.token_usage?.completion_tokens ?? 0;
+    const costBrl = budget?.monthly_consumed_brl ?? metrics?.token_usage?.total_cost_brl ?? 0.0;
+    const costUsd = budget?.monthly_consumed_usd ?? 0.0;
+    const monthlyBudget = budget?.monthly_budget_brl ?? 30.00;
+    const avoidedBrl = budget?.total_avoided_cost_brl ?? metrics?.token_usage?.total_avoided_cost_brl ?? 0.0;
+    const cacheHits = budget?.cache_hits_count ?? 0;
+    const projectedBrl = budget?.projected_end_of_month_brl ?? costBrl;
+    const pct = monthlyBudget > 0 ? (costBrl / monthlyBudget) * 100.0 : 0.0;
+    const policyMode = budget?.enforcement_mode || budget?.policy_mode || 'smart_pacing';
+
+    // Status Pill
+    const elPill = document.getElementById('sre-budget-status-pill');
+    if (elPill) {
+      if (pct >= 100) {
+        elPill.textContent = 'Critico (Teto Excedido)';
+        elPill.className = 'px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30';
+      } else if (pct >= 80) {
+        elPill.textContent = 'Alerta Preventivo (80%)';
+        elPill.className = 'px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30';
+      } else {
+        elPill.textContent = 'Normal (Dentro da Meta)';
+        elPill.className = 'px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+      }
+    }
+
+    // Modo Badge
+    const elMode = document.getElementById('sre-budget-mode-badge');
+    if (elMode) {
+      const modeLabels = {
+        'smart_pacing': 'Modo: Smart Pacing',
+        'advisory': 'Modo: Consultivo',
+        'strict_local': 'Modo: Contingencia Estrita',
+      };
+      elMode.textContent = modeLabels[policyMode] || `Modo: ${policyMode}`;
+    }
+
+    // Barra de Progresso Ampla
+    const elPctLabel = document.getElementById('sre-budget-pct-label');
+    const elCostCurr = document.getElementById('sre-budget-cost-current');
+    const elCostLimit = document.getElementById('sre-budget-cost-limit');
+    const elMainBar = document.getElementById('sre-budget-main-progress-bar');
+
+    if (elPctLabel) elPctLabel.textContent = `${pct.toFixed(1)}%`;
+    if (elCostCurr) elCostCurr.textContent = `R$ ${costBrl.toFixed(2).replace('.', ',')}`;
+    if (elCostLimit) elCostLimit.textContent = `R$ ${monthlyBudget.toFixed(2).replace('.', ',')}`;
+    if (elMainBar) {
+      const displayPct = Math.min(100, Math.max(2, pct));
+      elMainBar.style.width = `${displayPct}%`;
+      if (pct >= 100) {
+        elMainBar.className = 'h-full bg-rose-500 rounded-full transition-all duration-700 shadow-inner';
+      } else if (pct >= 80) {
+        elMainBar.className = 'h-full bg-gradient-to-r from-emerald-500 via-amber-400 to-amber-500 rounded-full transition-all duration-700 shadow-inner';
+      } else {
+        elMainBar.className = 'h-full bg-gradient-to-r from-emerald-500 via-cyan-500 to-indigo-500 rounded-full transition-all duration-700 shadow-inner';
+      }
+    }
+
+    // 4 Cards de Metricas
+    const elTotCount = document.getElementById('sre-token-total-count');
+    const elSplit = document.getElementById('sre-token-split');
+    const elCostReal = document.getElementById('sre-token-cost-real');
+    const elCostUsd = document.getElementById('sre-token-cost-usd');
+    const elAvoided = document.getElementById('sre-token-avoided-brl');
+    const elCacheHits = document.getElementById('sre-token-cache-hits');
+    const elProj = document.getElementById('sre-token-projection-brl');
+
+    if (elTotCount) elTotCount.textContent = Number(tokens).toLocaleString('pt-BR');
+    if (elSplit) elSplit.textContent = `${Number(promptTokens).toLocaleString('pt-BR')} in / ${Number(completionTokens).toLocaleString('pt-BR')} out`;
+    if (elCostReal) elCostReal.textContent = `R$ ${costBrl.toFixed(2).replace('.', ',')}`;
+    if (elCostUsd) elCostUsd.textContent = `US$ ${costUsd.toFixed(4)}`;
+    if (elAvoided) elAvoided.textContent = `R$ ${avoidedBrl.toFixed(2).replace('.', ',')}`;
+    if (elCacheHits) elCacheHits.textContent = `${cacheHits} respostas locais`;
+    if (elProj) elProj.textContent = `R$ ${projectedBrl.toFixed(2).replace('.', ',')}`;
+
+    // Preenche campos do formulario
+    const inMonthly = document.getElementById('input-budget-monthly');
+    const inAlert = document.getElementById('input-budget-alert-pct');
+    const selMode = document.getElementById('select-budget-mode');
+    if (inMonthly && document.activeElement !== inMonthly) inMonthly.value = monthlyBudget.toFixed(2);
+    if (inAlert && document.activeElement !== inAlert) inAlert.value = (budget?.alert_threshold_pct ?? 80).toFixed(0);
+    if (selMode && document.activeElement !== selMode) selMode.value = policyMode;
+  }
+
+  /**
+   * Renderiza os insights operacionais e veredito inteligente de performance da AURA.
+   */
+  renderOperationalInsights(metrics, budget, stations) {
+    const elVerdict = document.getElementById('sre-operational-verdict');
+    const elHealth = document.getElementById('sre-insights-health-label');
+    const elCacheEff = document.getElementById('sre-cache-efficiency-rate');
+    const elRagStatus = document.getElementById('sre-rag-efficiency-status');
+    const elAvgTokens = document.getElementById('sre-avg-tokens-per-turn');
+
+    const ttftP50 = metrics?.ttft_ms?.p50 || 0;
+    const reqCount = metrics?.ttft_ms?.count || 0;
+    const cacheHits = metrics?.router_cache_hits || 0;
+    const cacheMisses = metrics?.router_cache_misses || 0;
+    const totalLookups = cacheHits + cacheMisses;
+    const hitRate = totalLookups > 0 ? (cacheHits / totalLookups) * 100.0 : 100.0;
+    const costBrl = budget?.monthly_consumed_brl ?? 0.0;
+    const monthlyBudget = budget?.monthly_budget_brl ?? 30.00;
+    const pct = monthlyBudget > 0 ? (costBrl / monthlyBudget) * 100.0 : 0.0;
+    const avoidedBrl = budget?.total_avoided_cost_brl ?? 0.0;
+    const stationOnline = stations && stations.length > 0 ? stations[0].erp_online : true;
+
+    if (elCacheEff) elCacheEff.textContent = `${hitRate.toFixed(0)}%`;
+    if (elRagStatus) elRagStatus.textContent = stationOnline ? 'Hibrido Ativo' : 'Contingencia FTS5';
+
+    const totalTokens = budget?.total_tokens_consumed || metrics?.token_usage?.total_tokens || 0;
+    const avgTok = reqCount > 0 ? Math.round(totalTokens / reqCount) : 450;
+    if (elAvgTokens) elAvgTokens.textContent = `~${avgTok}`;
+
+    if (elVerdict) {
+      let verdict = '';
+      if (pct >= 100) {
+        verdict = `Teto orcamentario mensal atingido (R$ ${costBrl.toFixed(2).replace('.', ',')} / R$ ${monthlyBudget.toFixed(2).replace('.', ',')}). A AURA ativou contingencia de contencao, operando em modo estrito de cache local e sintese compacta para preservar custos.`;
+        if (elHealth) {
+          elHealth.textContent = 'Alerta Orcamentario';
+          elHealth.className = 'text-[10px] font-mono text-rose-400 font-bold';
+        }
+      } else if (pct >= 80) {
+        verdict = `Operacao em atencao orcamentaria (${pct.toFixed(1)}% do teto consumido). O Smart Pacing esta balanceando chamadas externas e priorizando o acervo local FTS5 com latencia sub-15ms. Economia evitada ate agora: R$ ${avoidedBrl.toFixed(2).replace('.', ',')}.`;
+        if (elHealth) {
+          elHealth.textContent = 'Atencao Orcamentaria';
+          elHealth.className = 'text-[10px] font-mono text-amber-400 font-bold';
+        }
+      } else {
+        const speedText = ttftP50 < 1500 ? 'velocidade ultra-rapida' : 'performance estavel';
+        verdict = `Operacao saudavel com ${speedText} (P50 de ${Math.round(ttftP50 || 700)}ms). Consumo de tokens sob controle (${pct.toFixed(1)}% do teto mensal de R$ ${monthlyBudget.toFixed(2).replace('.', ',')}). O motor local evitou ~R$ ${avoidedBrl.toFixed(2).replace('.', ',')} em custos de nuvem.`;
+        if (elHealth) {
+          elHealth.textContent = 'Saudavel (Alta Eficiencia)';
+          elHealth.className = 'text-[10px] font-mono text-emerald-400 font-semibold';
+        }
+      }
+      elVerdict.textContent = verdict;
+    }
+  }
+
+  /**
+   * Envia atualizacao da politica orcamentaria para o backend.
+   */
+  async handleSaveBudgetPolicy() {
+    const inMonthly = document.getElementById('input-budget-monthly');
+    const inAlert = document.getElementById('input-budget-alert-pct');
+    const selMode = document.getElementById('select-budget-mode');
+    const feedback = document.getElementById('token-policy-save-feedback');
+    const btnSave = document.getElementById('btn-save-token-policy');
+
+    if (!inMonthly || !inAlert || !selMode) return;
+
+    const monthlyVal = parseFloat(inMonthly.value) || 30.0;
+    const alertVal = parseFloat(inAlert.value) || 80.0;
+    const modeVal = selMode.value || 'smart_pacing';
+
+    if (btnSave) {
+      btnSave.disabled = true;
+      btnSave.classList.add('opacity-50');
+    }
+
+    try {
+      const res = await fetch('/api/v1/aura/telemetry/token-budget/policy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          monthly_budget_brl: monthlyVal,
+          alert_threshold_pct: alertVal,
+          enforcement_mode: modeVal,
+        }),
+      });
+
+      if (res.ok) {
+        if (feedback) {
+          feedback.classList.remove('hidden');
+          setTimeout(() => feedback.classList.add('hidden'), 4000);
+        }
+        await this.fetchCockpitData();
+      }
+    } catch (e) {
+      console.warn('Falha ao salvar politica de orcamento:', e);
+    } finally {
+      if (btnSave) {
+        btnSave.disabled = false;
+        btnSave.classList.remove('opacity-50');
+      }
+    }
   }
 
   /**
@@ -404,3 +707,161 @@ window.auraTelemetry = new AuraTelemetryCoordinator();
 document.addEventListener('DOMContentLoaded', () => {
   window.auraTelemetry.init();
 });
+
+  /**
+   * Renderiza a secao de Memoria Operacional do Posto (Camada Tenant - Fase 7).
+   */
+  renderTenantMemories(facts = []) {
+    const elPill = document.getElementById('tenant-memory-count-pill');
+    const elList = document.getElementById('tenant-memory-items-list');
+    if (!elList) return;
+
+    const activeFacts = facts.filter(f => f.status === 'ativo');
+    const pendingFacts = facts.filter(f => f.status === 'pendente');
+
+    if (elPill) {
+      if (pendingFacts.length > 0) {
+        elPill.textContent = `${activeFacts.length} ativas • ${pendingFacts.length} pendentes`;
+        elPill.className = 'px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse';
+      } else {
+        elPill.textContent = `${activeFacts.length} regras ativas`;
+        elPill.className = 'px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30';
+      }
+    }
+
+    if (facts.length === 0) {
+      elList.innerHTML = `
+        <div class="p-3 rounded-lg bg-slate-900/40 border border-white/5 text-center text-xs text-slate-400">
+          Nenhuma regra personalizada cadastrada para este posto ainda. Clique em "+ Cadastrar Regra" acima.
+        </div>
+      `;
+      return;
+    }
+
+    const categoryLabels = {
+      regra_posto: 'Regra do Posto',
+      apelido_produto: 'Apelido Produto',
+      rotina_operacional: 'Rotina Operacional',
+      preferencia_gestor: 'Preferencia Gestor',
+      geral: 'Geral',
+    };
+
+    elList.innerHTML = facts.map(f => {
+      const isPending = f.status === 'pendente';
+      const catLabel = categoryLabels[f.categoria] || f.categoria;
+      const statusBadge = isPending
+        ? '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">Pendente Revisao</span>'
+        : '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Ativo</span>';
+
+      const actionButtons = isPending
+        ? `
+          <button onclick="window.auraTelemetry.handleApproveTenantMemory('${f.id}')" class="px-2 py-1 rounded bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 text-[11px] font-semibold transition-colors cursor-pointer" title="Aprovar esta regra para entrar em vigor imediatamente">
+            ✓ Aprovar
+          </button>
+          <button onclick="window.auraTelemetry.handleRejectTenantMemory('${f.id}')" class="px-2 py-1 rounded bg-rose-600/30 hover:bg-rose-600/50 text-rose-300 border border-rose-500/40 text-[11px] font-semibold transition-colors cursor-pointer" title="Rejeitar regra">
+            ✕ Rejeitar
+          </button>
+        `
+        : `
+          <button onclick="window.auraTelemetry.handleDeleteTenantMemory('${f.id}')" class="px-2 py-1 rounded bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-white/10 hover:border-rose-500/30 text-[11px] font-sans transition-colors cursor-pointer" title="Inativar regra">
+            Excluir
+          </button>
+        `;
+
+      return `
+        <div class="p-2.5 rounded-lg ${isPending ? 'bg-amber-950/20 border border-amber-500/30' : 'bg-slate-900/60 border border-white/5'} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <div class="space-y-1 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-1.5 py-0.5 rounded text-[9px] font-mono uppercase bg-purple-500/20 text-purple-300 border border-purple-500/30 font-semibold">${catLabel}</span>
+              ${f.chave ? `<strong class="text-xs text-white font-mono">${f.chave}</strong>` : ''}
+              ${statusBadge}
+              <span class="text-[10px] text-slate-500 font-sans">• Origem: ${f.origem || 'chat'}</span>
+            </div>
+            <p class="text-xs text-slate-300 font-sans leading-relaxed">${f.conteudo}</p>
+          </div>
+          <div class="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+            ${actionButtons}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async handleSaveTenantMemory() {
+    const elCat = document.getElementById('input-mem-categoria');
+    const elKey = document.getElementById('input-mem-chave');
+    const elContent = document.getElementById('input-mem-conteudo');
+    const formAddMem = document.getElementById('tenant-memory-add-form');
+
+    if (!elContent || !elContent.value.trim()) {
+      alert('Por favor, informe a instrucao ou conteudo da regra.');
+      return;
+    }
+
+    try {
+      const payload = {
+        categoria: elCat ? elCat.value : 'regra_posto',
+        chave: elKey ? elKey.value.trim() : '',
+        conteudo: elContent.value.trim(),
+        status: 'ativo',
+        origem: 'gestor',
+      };
+
+      const res = await fetch('/api/v1/aura/memory/tenant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      if (elKey) elKey.value = '';
+      if (elContent) elContent.value = '';
+      if (formAddMem) formAddMem.classList.add('hidden');
+
+      await this.fetchCockpitData(true);
+    } catch (err) {
+      alert(`Falha ao salvar regra: ${err.message}`);
+    }
+  }
+
+  async handleApproveTenantMemory(factId) {
+    try {
+      const res = await fetch(`/api/v1/aura/memory/tenant/${factId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approved_by: 'gestor_painel' }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await this.fetchCockpitData(true);
+    } catch (err) {
+      alert(`Falha ao aprovar regra: ${err.message}`);
+    }
+  }
+
+  async handleRejectTenantMemory(factId) {
+    try {
+      const res = await fetch(`/api/v1/aura/memory/tenant/${factId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Rejeitado pelo gestor no painel' }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await this.fetchCockpitData(true);
+    } catch (err) {
+      alert(`Falha ao rejeitar regra: ${err.message}`);
+    }
+  }
+
+  async handleDeleteTenantMemory(factId) {
+    if (!confirm('Deseja realmente inativar esta regra do posto?')) return;
+    try {
+      const res = await fetch(`/api/v1/aura/memory/tenant/${factId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await this.fetchCockpitData(true);
+    } catch (err) {
+      alert(`Falha ao excluir regra: ${err.message}`);
+    }
+  }

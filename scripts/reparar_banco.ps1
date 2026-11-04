@@ -31,7 +31,12 @@ function Restart-PostgreSqlService {
 
     # 3. Inicia o servico
     Write-Host "  Iniciando servico postgresql-x64-16..." -ForegroundColor Gray
-    Start-Service postgresql-x64-16
+    try {
+        Start-Service postgresql-x64-16 -ErrorAction Stop
+    } catch {
+        Write-Host "  Tentando iniciar via net start..." -ForegroundColor Yellow
+        net start postgresql-x64-16
+    }
     
     # 4. Aguarda o PostgreSQL iniciar e escutar na porta 5433
     Write-Host "  Aguardando PostgreSQL aceitar conexoes na porta $waitPort..." -ForegroundColor Gray
@@ -72,6 +77,10 @@ $psql = "C:\Program Files\PostgreSQL\16\bin\psql.exe"
 $sqlScript = Join-Path $PSScriptRoot "desbloquear_usuarios.sql"
 
 Write-Host "[2/6] Configurando autenticacao temporaria 'trust' no topo do pg_hba.conf..." -ForegroundColor Yellow
+if (-not (Test-Path $pgHba) -or (Get-Item $pgHba).Length -lt 500) {
+    Write-Host "  [AVISO] pg_hba.conf vazio. Restaurando copia integra de seguranca..." -ForegroundColor Yellow
+    Copy-Item "C:\Program Files\PostgreSQL\16\data\pg_hba.conf.bak_20261016_160509" $pgHba -Force
+}
 Copy-Item $pgHba $pgHbaBak -Force
 
 $trustHeader = @"
@@ -92,8 +101,9 @@ Restart-PostgreSqlService -waitPort 5433
 
 # 4. Executar SQL de desbloqueio sem pedir senha (-w)
 Write-Host "[4/6] Desbloqueando e renovando credenciais de suporte, postgres e aura_service_ro..." -ForegroundColor Yellow
-$env:PGPASSWORD = "123456"
-& $psql -h 127.0.0.1 -p 5433 -U postgres -d posto -w -f $sqlScript
+$env:PGPASSWORD = "364768"
+$sqlOut = & $psql -h 127.0.0.1 -p 5433 -U postgres -d posto -w -f $sqlScript 2>&1
+Write-Host ($sqlOut | Out-String) -ForegroundColor Cyan
 $sqlExit = $LASTEXITCODE
 if ($sqlExit -ne 0) {
     Write-Host "  Tentando conectar no database 'postgres'..." -ForegroundColor Gray
@@ -103,7 +113,11 @@ if ($sqlExit -ne 0) {
 
 # 5. Restaurar pg_hba.conf original (md5) e reiniciar
 Write-Host "[5/6] Restaurando seguranca md5 no pg_hba.conf e reiniciando..." -ForegroundColor Yellow
-Copy-Item $pgHbaBak $pgHba -Force
+if (-not (Test-Path $pgHbaBak) -or (Get-Item $pgHbaBak).Length -lt 500) {
+    Copy-Item "C:\Program Files\PostgreSQL\16\data\pg_hba.conf.bak_20261016_160509" $pgHba -Force
+} else {
+    Copy-Item $pgHbaBak $pgHba -Force
+}
 Restart-PostgreSqlService -waitPort 5433
 
 # 6. Teste de validacao final
@@ -115,9 +129,9 @@ Write-Host ""
 Write-Host "===============================================================================" -ForegroundColor Green
 if ($testAura -match "AURA_OK" -and $testSuporte -match "PDV_OK") {
     Write-Host "  [SUCESSO] BANCO POSTGRESQL DESBLOQUEADO COM EXITO!" -ForegroundColor Green
-    Write-Host "  - Usuario 'suporte' (PDV): senha '123456' renovada com validade infinita (CONECTADO)" -ForegroundColor Green
-    Write-Host "  - Usuario 'postgres': senha '123456' renovada com validade infinita (CONECTADO)" -ForegroundColor Green
-    Write-Host "  - Usuario 'aura_service_ro': senha '123456' ativa com permissoes somente-leitura (CONECTADO)" -ForegroundColor Green
+    Write-Host "  - Usuario 'suporte' (PDV): senha '364768' renovada com validade infinita (CONECTADO)" -ForegroundColor Green
+    Write-Host "  - Usuario 'postgres': senha '364768' renovada com validade infinita (CONECTADO)" -ForegroundColor Green
+    Write-Host "  - Usuario 'aura_service_ro': senha '364768' ativa com permissoes somente-leitura (CONECTADO)" -ForegroundColor Green
 } else {
     Write-Host "  [AVISO] Resultado da validacao:" -ForegroundColor Yellow
     Write-Host "  AURA: $testAura" -ForegroundColor Gray

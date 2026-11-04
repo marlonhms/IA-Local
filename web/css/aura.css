@@ -49,7 +49,7 @@
   --border-emerald: rgba(16, 185, 129, 0.35);
   --border-cyan: rgba(6, 182, 212, 0.35);
   --border-purple: rgba(124, 58, 237, 0.35);
-  
+
   --emerald-main: #10b981;
   --emerald-glow: rgba(16, 185, 129, 0.15);
   --cyan-main: #06b6d4;
@@ -101,8 +101,8 @@
 }
 
 html, body {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
   text-rendering: optimizeLegibility;
 }
 
@@ -111,7 +111,7 @@ body {
   color: #f1f5fa;
   font-family: var(--font-sans);
   overflow-x: hidden;
-  background-image: 
+  background-image:
     radial-gradient(circle at 12% 8%, rgba(6, 182, 212, 0.08) 0%, transparent 44%),
     radial-gradient(circle at 88% 14%, rgba(124, 58, 237, 0.09) 0%, transparent 48%),
     radial-gradient(circle at 50% 90%, rgba(16, 185, 129, 0.06) 0%, transparent 55%),
@@ -194,81 +194,93 @@ body {
   box-shadow: inset 1px 0 0 0 rgba(244, 63, 94, 0.2);
 }
 
-/* Núcleo Cognitivo Holográfico AURA (Sem neon brega) */
+/* ==========================================================================
+   AURA AVATAR DELUXE & BRAND TITLE (1:1 COM AURA ASSISTANCE ANDROID)
+   Paridade com AuraAvatar do ChatScreen.kt & Logo Deluxe do SetupScreen.kt
+   ========================================================================== */
+
+.aura-avatar-deluxe,
 .neural-core-orb {
   position: relative;
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #059669 0%, #0891b2 50%, #7c3aed 100%);
+  background: linear-gradient(135deg, #22d3ee 0%, #10b981 100%);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), 0 0 16px rgba(34, 211, 238, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  animation: pulseCore 3.5s ease-in-out infinite;
+  color: #07090e !important;
+  font-family: 'Newsreader', Georgia, serif !important;
+  font-weight: 700 !important;
+  font-size: 20px;
+  line-height: 1;
+  user-select: none;
+  -webkit-user-select: none;
   z-index: 1;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
 }
 
-.neural-core-orb > * {
+.neural-core-orb > *,
+.aura-avatar-deluxe > * {
   position: relative;
   z-index: 2;
+  color: #07090e !important;
+  font-family: 'Newsreader', Georgia, serif !important;
+  font-weight: 700 !important;
+  line-height: 1;
 }
 
-.neural-core-orb::after {
-  content: '';
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  background: #ffffff;
-  border-radius: 50%;
-  opacity: 0.9;
-  filter: blur(1px);
-  animation: coreSpark 2s ease-in-out infinite alternate;
-  z-index: 0;
-  pointer-events: none;
+/* Remocao definitiva da bolinha interna branca pulsante legada */
+.neural-core-orb::after,
+.aura-avatar-deluxe::after {
+  display: none !important;
 }
 
-/* Avatar pequeno da AURA (24px) */
+/* Avatar pequeno da AURA em mensagens de chat (24px) */
 .neural-core-orb.avatar-orb,
 .neural-core-orb.\!w-6 {
   width: 24px !important;
   height: 24px !important;
-  font-size: 10px;
+  font-size: 13px !important;
 }
 
-.neural-core-orb.avatar-orb::after,
-.neural-core-orb.\!w-6::after {
-  width: 8px !important;
-  height: 8px !important;
-  opacity: 0.8;
+.neural-core-orb.\!w-8 {
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 17px !important;
 }
 
-.neural-core-orb.avatar-orb.reasoning-active::after,
-.neural-core-orb.\!w-6.reasoning-active::after {
-  width: 8px !important;
-  height: 8px !important;
+/* Titulo de Marca AURA Brand (1:1 com AuraBrandTitle do Aura Assistance Android) */
+.aura-brand-title {
+  font-family: 'Newsreader', Georgia, serif !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.12em !important;
+  background: linear-gradient(90deg, #38bdf8 0%, #0d9488 50%, #a855f7 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+  display: inline-block;
 }
 
 @keyframes pulseCore {
   0%, 100% {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-    transform: scale(1);
   }
   50% {
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.25);
-    transform: scale(1.02);
+    box-shadow: 0 4px 16px rgba(34, 211, 238, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   }
 }
 
 @keyframes coreSpark {
-  0% { transform: scale(0.85); opacity: 0.7; }
-  100% { transform: scale(1.15); opacity: 1; }
+  0% { opacity: 0.7; }
+  100% { opacity: 1; }
 }
 
-/* Orbe de Raciocínio Cognitivo Durante Streaming (Cognitive Reasoning Orb) */
+/* Orbe de Raciocinio Cognitivo Durante Streaming (Cognitive Reasoning Orb) */
 .neural-core-orb.reasoning-active {
-  animation: cognitiveOrbPulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
 }
 
 .neural-core-orb.reasoning-active::after {
@@ -278,20 +290,91 @@ body {
 
 @keyframes cognitiveOrbPulse {
   0%, 100% {
-    transform: scale(1);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
     background: linear-gradient(135deg, #059669 0%, #0891b2 50%, #7c3aed 100%);
   }
   50% {
-    transform: scale(1.04);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 20px rgba(124, 58, 237, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     background: linear-gradient(135deg, #06b6d4 0%, #7c3aed 50%, #a855f7 100%);
   }
 }
 
 @keyframes coreSparkFast {
-  0% { transform: scale(0.85); opacity: 0.8; }
-  100% { transform: scale(1.25); opacity: 1; }
+  0% { opacity: 0.8; }
+  100% { opacity: 1; }
+}
+
+/* ==========================================================================
+   AURA ORB COSMICO & HUD FLUTUANTE (PARIDADE 1:1 COM ANDROID AURAORB)
+   ========================================================================== */
+
+.aura-orb-host {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  animation: none !important;
+}
+
+.aura-orb-host::after,
+.aura-orb-host::before {
+  display: none !important;
+}
+
+.aura-orb-canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: pointer;
+  outline: none;
+  border-radius: 50%;
+  transition: filter 0.2s ease;
+}
+
+.aura-orb-canvas:focus-visible {
+  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.6);
+}
+
+/* ==========================================================================
+   AURA VOICE ORB MODAL OVERLAY (EXPERIENCIA IMERSIVA ESTILO GEMINI / GPT)
+   Ao clicar no microfone, o fundo escurece e o orbe sobe flutuando no centro.
+   ========================================================================== */
+
+#aura-voice-modal-overlay {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#aura-voice-modal-overlay.modal-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#aura-voice-modal-card {
+  transform: translateY(36px) scale(0.92);
+  opacity: 0;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#aura-voice-modal-overlay.modal-active #aura-voice-modal-card {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
+#aura-voice-modal-orb-container {
+  width: 140px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
 }
 
 /* Chips de Etapas Cognitivas Dinâmicas */
@@ -354,7 +437,7 @@ body {
   border: 1.5px solid rgba(255, 255, 255, 0.16);
   border-radius: 29px;
   overflow: hidden;
-  box-shadow: 
+  box-shadow:
     inset 0 2px 4px rgba(255, 255, 255, 0.22),
     inset 0 -2px 8px rgba(0, 0, 0, 0.5),
     inset 0 0 16px rgba(0, 0, 0, 0.4),
@@ -583,10 +666,11 @@ body {
   transition: all 0.2s ease;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: subpixel-antialiased !important;
+  -moz-osx-font-smoothing: auto !important;
   text-rendering: optimizeLegibility;
   transform: none !important;
+  will-change: auto !important;
 }
 .chat-bubble-user:hover {
   border-color: rgba(6, 182, 212, 0.38);
@@ -605,10 +689,11 @@ body {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
   word-break: break-word;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: subpixel-antialiased !important;
+  -moz-osx-font-smoothing: auto !important;
   text-rendering: optimizeLegibility;
   transform: none !important;
+  will-change: auto !important;
 }
 
 /* Blindagem total contra qualquer embacamento ou desfoque de texto nos cards e bolhas do chat */
@@ -620,6 +705,11 @@ body {
 .chat-bubble-welcome * {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  -webkit-font-smoothing: subpixel-antialiased !important;
+  -moz-osx-font-smoothing: auto !important;
+  text-rendering: optimizeLegibility;
+  transform: none !important;
+  will-change: auto !important;
 }
 .chat-bubble-aura:hover {
   border-color: rgba(168, 180, 197, 0.22);
@@ -681,11 +771,24 @@ body {
   color: #6ee7b7;
 }
 
-/* Formatação de Markdown no Console Cognitivo */
+/* Formatacao de Markdown no Console Cognitivo (AURA Anti-Fadiga Editorial) */
 .prose-aura {
-  font-size: 0.92rem;
-  line-height: 1.6;
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 0.935rem;
+  line-height: 1.65;
+  letter-spacing: 0.005em;
   color: #e2e8f0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.prose-aura p,
+.prose-aura ul,
+.prose-aura ol,
+.prose-aura blockquote {
+  max-width: 68ch;
 }
 .prose-aura p {
   margin-bottom: 0.8rem;
@@ -693,11 +796,32 @@ body {
 .prose-aura p:last-child {
   margin-bottom: 0;
 }
+.prose-aura a,
+.aura-doc-link {
+  color: #38bdf8;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 500;
+  transition: color 0.15s ease-in-out;
+}
+.prose-aura a:hover,
+.aura-doc-link:hover {
+  color: #7dd3fc;
+  text-decoration: underline;
+}
+/* Veredito Inicial - Lead Paragraph BLUF */
+.prose-aura > p:first-of-type {
+  color: #f8fafc;
+  font-size: 0.96rem;
+  line-height: 1.6;
+  margin-bottom: 0.85rem;
+}
+/* Controle de Negrito sem Fadiga */
 .prose-aura strong,
 .prose-aura b {
-  color: #ffffff;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  color: #f8fafc;
+  font-weight: 600;
+  letter-spacing: -0.005em;
 }
 .prose-aura em,
 .prose-aura i {
@@ -713,21 +837,34 @@ body {
   font-weight: 500;
 }
 .prose-aura h1, .prose-aura h2, .prose-aura h3, .prose-aura h4 {
-  color: #ffffff;
-  font-weight: 700;
+  color: #f8fafc;
+  font-weight: 600;
+  letter-spacing: -0.015em;
   margin-top: 1rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.45rem;
 }
-.prose-aura h1 { font-size: 1.25rem; }
-.prose-aura h2 { font-size: 1.12rem; }
-.prose-aura h3 { font-size: 1.0rem; }
-.prose-aura h4 { font-size: 0.92rem; }
+.prose-aura h1 { font-size: 1.18rem; }
+.prose-aura h2 { font-size: 1.08rem; }
+.prose-aura h3 { font-size: 0.98rem; }
+.prose-aura h4 { font-size: 0.90rem; }
 .prose-aura ul, .prose-aura ol {
   margin-left: 1.4rem;
   margin-bottom: 0.8rem;
 }
 .prose-aura li {
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.45rem;
+  padding-left: 0.25rem;
+}
+.prose-aura ul li::marker {
+  color: #64748b;
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+}
+.prose-aura ol li::marker {
+  color: #64748b;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  font-weight: 600;
 }
 .prose-aura table {
   width: 100%;
@@ -752,7 +889,7 @@ body {
 .prose-aura td {
   padding: 6px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  color: #cbd5e1;
+  color: #e2e8f0;
   font-variant-numeric: tabular-nums;
   -webkit-font-feature-settings: "tnum" 1;
   font-feature-settings: "tnum" 1;
@@ -1353,13 +1490,13 @@ body {
   position: relative;
   width: 100%;
   height: 16px;
-  background: linear-gradient(90deg, 
-    rgba(244, 63, 94, 0.35) 0%, 
-    rgba(244, 63, 94, 0.15) 20%, 
-    rgba(16, 185, 129, 0.25) 25%, 
-    rgba(16, 185, 129, 0.4) 50%, 
-    rgba(16, 185, 129, 0.25) 75%, 
-    rgba(244, 63, 94, 0.15) 80%, 
+  background: linear-gradient(90deg,
+    rgba(244, 63, 94, 0.35) 0%,
+    rgba(244, 63, 94, 0.15) 20%,
+    rgba(16, 185, 129, 0.25) 25%,
+    rgba(16, 185, 129, 0.4) 50%,
+    rgba(16, 185, 129, 0.25) 75%,
+    rgba(244, 63, 94, 0.15) 80%,
     rgba(244, 63, 94, 0.35) 100%
   );
   border-radius: 8px;
@@ -1956,7 +2093,7 @@ body {
   backdrop-filter: blur(28px) saturate(190%) contrast(102%);
   -webkit-backdrop-filter: blur(28px) saturate(190%) contrast(102%);
   border-right: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 
+  box-shadow:
     inset 1px 0 0 0 rgba(255, 255, 255, 0.12),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.15),
     0 25px 60px -10px rgba(0, 0, 0, 0.85),
@@ -2485,8 +2622,8 @@ body.gpu-guard-active,
 .gpu-guard-active *::after {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  -webkit-font-smoothing: antialiased !important;
-  -moz-osx-font-smoothing: grayscale !important;
+  -webkit-font-smoothing: subpixel-antialiased !important;
+  -moz-osx-font-smoothing: auto !important;
   text-rendering: optimizeLegibility !important;
 }
 
@@ -2526,8 +2663,8 @@ body.gpu-guard-active,
   transform: none !important;
   will-change: auto !important;
   filter: none !important;
-  -webkit-font-smoothing: antialiased !important;
-  -moz-osx-font-smoothing: grayscale !important;
+  -webkit-font-smoothing: subpixel-antialiased !important;
+  -moz-osx-font-smoothing: auto !important;
   text-rendering: optimizeLegibility !important;
 }
 
@@ -3302,15 +3439,12 @@ body.modo-pista #btn-toggle-modo-pista {
 @keyframes pulse-voice {
   0% {
     box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-    transform: scale(1);
   }
   50% {
-    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
-    transform: scale(1.05);
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
   }
   100% {
     box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-    transform: scale(1);
   }
 }
 
@@ -3781,3 +3915,342 @@ body.modo-pista #btn-toggle-modo-pista {
   }
 }
 
+
+
+/* =========================================================================
+   ESTILOS PREMIUM GENUI: ESCUDO FISCAL SEFAZ & CHAVE 44 DIGITOS (FASE 4)
+   Compativel com Liquid Glass, GPU Guard e Modo Pista
+   ========================================================================= */
+
+.fiscal-key-segment {
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.15s ease;
+  min-width: 60px;
+}
+
+.fiscal-key-segment:hover {
+  transform: translateY(-1px);
+  border-color: rgba(6, 182, 212, 0.5);
+}
+
+.persona-switch-bar {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(3, 7, 18, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.75rem;
+  padding: 0.25rem;
+  gap: 0.25rem;
+}
+
+.persona-switch-btn {
+  min-height: 38px;
+  font-family: var(--font-sans);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  outline: none;
+  transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.persona-switch-btn:active {
+  transform: scale(0.98);
+}
+
+/* Otimizacao GPU Guard (60 FPS estrito sem repaints pesados) */
+.gpu-guard-active .fiscal-key-segment {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.gpu-guard-active .persona-switch-bar {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Modo Pista (Sol Forte / Alto Contraste) */
+body.modo-pista-active .fiscal-key-segment {
+  background: #000000 !important;
+  border: 2px solid #38bdf8 !important;
+  color: #ffffff !important;
+}
+
+body.modo-pista-active .fiscal-key-segment .text-cyan-300 {
+  color: #38bdf8 !important;
+  font-weight: 900 !important;
+}
+
+body.modo-pista-active .persona-switch-bar {
+  background: #000000 !important;
+  border: 2px solid #ffffff !important;
+}
+
+body.modo-pista-active .persona-switch-btn.persona-btn-gestor[aria-selected="true"] {
+  background: #059669 !important;
+  color: #ffffff !important;
+  border: 2px solid #34d399 !important;
+}
+
+body.modo-pista-active .persona-switch-btn.persona-btn-contador[aria-selected="true"] {
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  border: 2px solid #38bdf8 !important;
+}
+
+/* ==========================================================================
+   Aura Fiscal Status Floating Tooltip (Positioned strictly ABOVE the pointer)
+   ========================================================================== */
+.aura-status-tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.aura-status-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 0.16s cubic-bezier(0.16, 1, 0.3, 1), transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.16s;
+  z-index: 60;
+  white-space: nowrap;
+}
+
+.aura-status-tooltip-wrapper:hover .aura-status-tooltip,
+.aura-status-tooltip-wrapper:focus-visible .aura-status-tooltip,
+.aura-status-tooltip-wrapper:focus-within .aura-status-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.aura-status-tooltip-wrapper:hover .aura-status-icon {
+  transform: scale(1.1);
+}
+
+.aura-status-tooltip-arrow {
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  margin-right: 8px;
+  background-color: #020617;
+  transform: rotate(45deg);
+}
+
+/* ==========================================================================
+   Persona Views (Gestor & Contador): Monospace suave e legivel (anti-fadiga)
+   ========================================================================== */
+.persona-view-gestor p,
+.persona-view-contador p {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  color: #e2e8f0; /* slate-200 */
+}
+
+/* ==========================================================================
+   TIPOGRAFIA COGNITIVA & MICRO-TOKENS CHAT (APENDICE B - FASE 1)
+   ========================================================================== */
+
+/* 1. Micro-Tokens Tabulares e Precisao de Dados no Chat */
+.prose-aura .aura-data-token {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-feature-settings: "tnum" 1;
+  font-feature-settings: "tnum" 1;
+  font-size: 0.88em;
+  font-weight: 500;
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.08rem 0.35rem;
+  border-radius: 5px;
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: normal;
+  display: inline-block;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  vertical-align: baseline;
+}
+
+/* 2. Destaques Editoriais Confortaveis no Chat (Micro-Badges sem Halation e sem Quebra de Layout) */
+.prose-aura .text-emerald,
+.prose-aura .aura-text-emerald,
+.prose-aura .aura-hl-emerald,
+.prose-aura .text-green,
+.prose-aura .aura-text-green,
+.prose-aura .aura-hl-green {
+  color: #34d399 !important;
+  font-size: 0.9em;
+  font-weight: 500;
+  padding: 0.08rem 0.38rem;
+  border-radius: 5px;
+  background: rgba(52, 211, 153, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.22);
+  text-shadow: none !important;
+  white-space: normal;
+  display: inline;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.prose-aura .text-amber,
+.prose-aura .aura-text-amber,
+.prose-aura .aura-hl-amber,
+.prose-aura .text-yellow,
+.prose-aura .aura-text-yellow,
+.prose-aura .aura-hl-yellow {
+  color: #fbbf24 !important;
+  font-size: 0.9em;
+  font-weight: 500;
+  padding: 0.08rem 0.38rem;
+  border-radius: 5px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  text-shadow: none !important;
+  white-space: normal;
+  display: inline;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.prose-aura .text-rose,
+.prose-aura .aura-text-rose,
+.prose-aura .aura-hl-rose,
+.prose-aura .text-red,
+.prose-aura .aura-text-red,
+.prose-aura .aura-hl-red {
+  color: #f87171 !important;
+  font-size: 0.9em;
+  font-weight: 500;
+  padding: 0.08rem 0.38rem;
+  border-radius: 5px;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.22);
+  text-shadow: none !important;
+  white-space: normal;
+  display: inline;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.prose-aura .text-cyan,
+.prose-aura .aura-text-cyan,
+.prose-aura .aura-hl-cyan {
+  color: #22d3ee !important;
+  font-size: 0.9em;
+  font-weight: 500;
+  padding: 0.08rem 0.38rem;
+  border-radius: 5px;
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid rgba(34, 211, 238, 0.22);
+  text-shadow: none !important;
+  white-space: normal;
+  display: inline;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.prose-aura .text-purple,
+.prose-aura .aura-text-purple,
+.prose-aura .aura-hl-purple {
+  color: #c084fc !important;
+  font-size: 0.9em;
+  font-weight: 500;
+  padding: 0.08rem 0.38rem;
+  border-radius: 5px;
+  background: rgba(192, 132, 252, 0.08);
+  border: 1px solid rgba(192, 132, 252, 0.22);
+  text-shadow: none !important;
+  white-space: normal;
+  display: inline;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* 3. Container de Progressive Disclosure no Chat (Apêndice B) */
+.aura-chat-disclosure {
+  margin-top: 0.65rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(3, 7, 18, 0.4);
+  overflow: hidden;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.aura-chat-disclosure[open] {
+  border-color: rgba(6, 182, 212, 0.25);
+  background: rgba(3, 7, 18, 0.6);
+}
+
+.aura-chat-disclosure summary {
+  padding: 0.45rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+  transition: color 0.15s ease;
+}
+
+.aura-chat-disclosure summary:hover {
+  color: #67e8f9;
+}
+
+.aura-chat-disclosure .prose-aura,
+.aura-chat-disclosure > div {
+  font-size: 0.935rem;
+  line-height: 1.65;
+  color: #e2e8f0;
+}
+
+/* 4. Modo de Conforto de Leitura no Chat (Apendice B - Fase 4) */
+#chat-feed-container.reading-mode-comfort .prose-aura,
+#chat-feed-container.aura-reading-comfort .prose-aura,
+#chat-stream-column.reading-mode-comfort .prose-aura,
+#chat-stream-column.aura-reading-comfort .prose-aura,
+.reading-mode-comfort .prose-aura,
+.aura-reading-comfort .prose-aura,
+.reading-comfort .prose-aura {
+  font-size: 0.96rem;
+  line-height: 1.72;
+}
+
+#chat-feed-container.reading-mode-comfort .prose-aura > p:first-of-type,
+#chat-feed-container.aura-reading-comfort .prose-aura > p:first-of-type,
+#chat-stream-column.reading-mode-comfort .prose-aura > p:first-of-type,
+#chat-stream-column.aura-reading-comfort .prose-aura > p:first-of-type,
+.reading-mode-comfort .prose-aura > p:first-of-type,
+.aura-reading-comfort .prose-aura > p:first-of-type,
+.reading-comfort .prose-aura > p:first-of-type {
+  font-size: 0.99rem;
+  line-height: 1.65;
+}
+
+#btn-chat-reading-density.active,
+#btn-chat-reading-density[data-reading-mode="comfort"] {
+  background: rgba(6, 182, 212, 0.15);
+  border-color: rgba(6, 182, 212, 0.35);
+  color: #f1f5f9;
+}

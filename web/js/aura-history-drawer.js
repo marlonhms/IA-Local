@@ -61,13 +61,29 @@
 
     bindEvents() {
       if (this.openBtnEl) {
-        this.openBtnEl.addEventListener('click', () => this.toggle());
+        this.openBtnEl.addEventListener('click', (e) => {
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          this.toggle();
+        });
       }
       if (this.chatOpenBtnEl) {
-        this.chatOpenBtnEl.addEventListener('click', () => this.toggle());
+        this.chatOpenBtnEl.addEventListener('click', (e) => {
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          this.toggle();
+        });
       }
       if (this.sidebarOpenBtnEl) {
-        this.sidebarOpenBtnEl.addEventListener('click', () => {
+        this.sidebarOpenBtnEl.addEventListener('click', (e) => {
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
           const sidebar = document.getElementById('aura-sidebar-drawer');
           if (sidebar && sidebar.classList.contains('translate-x-0')) {
             const sidebarOverlay = document.getElementById('aura-sidebar-overlay');
@@ -229,7 +245,17 @@
     }
 
     toggle() {
-      if (this.isOpen) {
+      const now = Date.now();
+      if (this._lastToggle && (now - this._lastToggle) < 300) {
+        return;
+      }
+      this._lastToggle = now;
+
+      if (!this.drawerEl) {
+        this.drawerEl = document.getElementById('aura-history-drawer');
+      }
+      const isActuallyOpen = this.isOpen || (this.drawerEl && this.drawerEl.classList.contains('open'));
+      if (isActuallyOpen) {
         this.close();
       } else {
         this.open();

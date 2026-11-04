@@ -1,5 +1,5 @@
 """
-Suíte de Testes Automatizada: Fase 4 — Shell, Navegação e Mobile (Segundo Marco)
+Suíte de Testes Automatizada: Fase 4 - Shell, Navegação e Mobile (Segundo Marco)
 Validação de Header Executivo, NavigationDrawer, ConversationThread, MessageComposer e Ergonomia Mobile.
 
 Validações:
@@ -57,7 +57,7 @@ from core.aura_api import create_aura_app
 
 def run_phase4_tests():
     print("=" * 78)
-    print("🧪 SUÍTE DE TESTES: FASE 4 — SHELL, NAVEGAÇÃO E MOBILE (SEGUNDO MARCO)")
+    print("🧪 SUÍTE DE TESTES: FASE 4 - SHELL, NAVEGAÇÃO E MOBILE (SEGUNDO MARCO)")
     print("   (Header Executivo, NavigationDrawer, ConversationThread, Composer e Mobile)")
     print("=" * 78)
 

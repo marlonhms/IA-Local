@@ -25,7 +25,7 @@ import logging
 from contextlib import contextmanager
 
 logger = logging.getLogger("aura.engine")
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date, timedelta
 from pathlib import Path
 from enum import Enum
 from typing import AsyncIterator, Optional, Dict, Any, List, Tuple, Union
@@ -48,7 +48,7 @@ from core.rag_engine import HybridRAGEngine
 from core.tools import PostoTools, get_erp_connection
 from core.prompts import build_help_prompt, build_system_prompt
 from core.adapters.erp.base import BaseERPAdapter
-from core.sanitizer import central_log_sanitizer
+from core.sanitizer import central_log_sanitizer, sanitize_erp_brand_names, sanitize_erp_brand_data
 from core.semantic_router import SemanticRouter, classificar_intencao_heuristica, RETRY_REGEX
 from core.schemas.idempotency import generate_tool_call_id, generate_action_id
 from core.schemas.genui import (
@@ -1004,8 +1004,17 @@ def normalize_aura_color_markup(text: str) -> str:
 
     protected = re.sub(r"(```[\s\S]*?```|`[^`\r\n]+`)", _stash_code, text)
 
-    color_names = "verde|emerald|green|amarelo|amber|yellow|vermelho|rose|red|ciano|cyan|roxo|purple"
-    tag_names = rf"(?:badge-)?(?:{color_names})|u"
+    color_names = "verde|emerald|green|amarelo|amber|yellow|vermelho|rose|red|ciano|cyan|cyano|roxo|purple"
+    tag_names = rf"(?:badge-)?(?:{color_names})|u|sublinhado|underline|italic|italico|bold|negrito|i|b"
+
+    # Pre-limpeza de BBCode de formatacao rica para Markdown padrao
+    protected = re.sub(r"\[(?:italic|italico|i)\]([\s\S]*?)\[\/(?:italic|italico|i)\]", r"*\1*", protected, flags=re.IGNORECASE)
+    protected = re.sub(r"\[(?:bold|negrito|b)\]([\s\S]*?)\[\/(?:bold|negrito|b)\]", r"**\1**", protected, flags=re.IGNORECASE)
+
+    # Higienizacao defensiva contra links markdown com undefined ou corrompidos
+    protected = re.sub(r"\[undefined\]\((https?://[^\s)]+)\)", r"[Manual Oficial do ERP](\1)", protected, flags=re.IGNORECASE)
+    protected = re.sub(r"\[([^\]]+)\]\((?:undefined|null|URL_REAL_DO_CONTEXTO)\)", r"\1", protected, flags=re.IGNORECASE)
+    protected = re.sub(r"consulte o \[undefined\]", "consulte o manual correspondente no Confluence da empresa", protected, flags=re.IGNORECASE)
 
     # 2. Normaliza fechamentos quebrados de BBCode (ex: [vermelho]crítico /vermelho -> [vermelho]crítico[/vermelho])
     tolerant_pattern = re.compile(
@@ -1032,7 +1041,32 @@ def normalize_aura_color_markup(text: str) -> str:
     )
     protected = unclosed_pattern.sub(_fix_unclosed, protected)
 
-    # 4. Protege pares válidos não-vazios [tag]...[/tag] para higienizar apenas tags órfãs
+    # 3.5. Desempacota tags de cor sobredimensionadas (evita fita estourando layout)
+    def _unwrap_oversized(m: re.Match) -> str:
+        tag = m.group(1)
+        inner = m.group(2)
+        if len(inner) <= 45 and not re.search(r'[.;!?]', inner):
+            return m.group(0)
+        anchor_match = re.search(
+            r'(\*\*[^*]+\*\*|Rejei[cç][aã]o\s*\d+|CFOP\s*\d+|CST\s*\d+|CSOSN\s*\d+|NCM\s*\d+|[+\-]?\d+(?:[.,]\d+)?%|R\$\s*[\d.,]+)',
+            inner,
+            flags=re.IGNORECASE,
+        )
+        if anchor_match:
+            anchor = anchor_match.group(1)
+            prefix = inner[:anchor_match.start()]
+            suffix = inner[anchor_match.end():]
+            return f"{prefix}[{tag}]{anchor}[/{tag}]{suffix}"
+        return inner
+
+    protected = re.sub(
+        rf"\[({tag_names})\]([\s\S]*?)\[\/\1\]",
+        _unwrap_oversized,
+        protected,
+        flags=re.IGNORECASE,
+    )
+
+        # 4. Protege pares válidos não-vazios [tag]...[/tag] para higienizar apenas tags órfãs
     valid_tags: List[str] = []
     def _stash_valid(m: re.Match) -> str:
         content = m.group(2)
@@ -1070,6 +1104,9 @@ def normalize_aura_color_markup(text: str) -> str:
     # 7. Restaura blocos de código
     for idx, snippet in enumerate(code_snippets):
         protected = protected.replace(f"XAURACODE{idx}END", snippet)
+
+    # 8. Sanitiza qualquer menção comercial residual a ERPs proprietários
+    protected = sanitize_erp_brand_names(protected)
 
     return protected
 
@@ -1231,6 +1268,76 @@ def extrair_data_turno(pergunta: str) -> Tuple[Optional[str], Optional[str]]:
                             data = f"{ano:04d}-{meses[mes_prefix]:02d}-{int(d):02d}"
 
     return data, turno
+
+
+def extrair_intervalo_datas(pergunta: str) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Extrai intervalo de datas (inicio e fim) a partir da pergunta do usuario.
+    Retorna: (data_inicio, data_fim) no formato YYYY-MM-DD ou (None, None).
+    """
+    p = pergunta.lower().strip()
+    hoje = date.today()
+
+    # 1. Palavras-chave relativas
+    if "hoje" in p:
+        d_str = hoje.strftime("%Y-%m-%d")
+        return d_str, d_str
+    if "ontem" in p:
+        ontem = hoje - timedelta(days=1)
+        d_str = ontem.strftime("%Y-%m-%d")
+        return d_str, d_str
+    if "anteontem" in p:
+        anteontem = hoje - timedelta(days=2)
+        d_str = anteontem.strftime("%Y-%m-%d")
+        return d_str, d_str
+    if "este mes" in p or "neste mes" in p or "mes atual" in p:
+        ini = hoje.replace(day=1).strftime("%Y-%m-%d")
+        fim = hoje.strftime("%Y-%m-%d")
+        return ini, fim
+    if "ultimos 7 dias" in p or "ultima semana" in p or "7 dias" in p:
+        ini = (hoje - timedelta(days=7)).strftime("%Y-%m-%d")
+        fim = hoje.strftime("%Y-%m-%d")
+        return ini, fim
+    if "ultimos 30 dias" in p or "30 dias" in p:
+        ini = (hoje - timedelta(days=30)).strftime("%Y-%m-%d")
+        fim = hoje.strftime("%Y-%m-%d")
+        return ini, fim
+
+    # 2. Meses nominais
+    meses_map = {
+        "janeiro": 1, "fevereiro": 2, "marco": 3, "abril": 4, "maio": 5, "junho": 6,
+        "julho": 7, "agosto": 8, "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12,
+        "jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6,
+        "jul": 7, "ago": 8, "set": 9, "out": 10, "nov": 11, "dez": 12
+    }
+    for m_nome, m_num in meses_map.items():
+        if re.search(r"\b" + m_nome + r"\b", p):
+            ano = 2026
+            m_ano = re.search(r"\b(202\d)\b", p)
+            if m_ano:
+                ano = int(m_ano.group(1))
+            ultimo_dia = 31 if m_num in (1, 3, 5, 7, 8, 10, 12) else (28 if m_num == 2 else 30)
+            return f"{ano:04d}-{m_num:02d}-01", f"{ano:04d}-{m_num:02d}-{ultimo_dia:02d}"
+
+    # 3. Intervalo explicito: "01/09 a 15/09", "de 01/09 a 15/09"
+    m_range = re.search(
+        r"\b(?:de\s+)?(\d{1,2})[-/.](\d{1,2})(?:[-/.](\d{2,4}))?\s*(?:a|ate|e|-)\s*(\d{1,2})[-/.](\d{1,2})(?:[-/.](\d{2,4}))?\b",
+        p
+    )
+    if m_range:
+        d1, m1, y1, d2, m2, y2 = m_range.groups()
+        ano1 = int(y1) if y1 else 2026
+        if ano1 < 100: ano1 += 2000
+        ano2 = int(y2) if y2 else ano1
+        if ano2 < 100: ano2 += 2000
+        return f"{ano1:04d}-{int(m1):02d}-{int(d1):02d}", f"{ano2:04d}-{int(m2):02d}-{int(d2):02d}"
+
+    # 4. Data unica
+    data_unica, _ = extrair_data_turno(pergunta)
+    if data_unica and data_unica not in ("hoje", "ontem", "anteontem"):
+        return data_unica, data_unica
+
+    return None, None
 
 
 def extrair_bico(pergunta: str) -> Optional[str]:
@@ -1418,9 +1525,27 @@ CANONICAL_EXECUTIVE_TITLES: Dict[str, str] = {
     "sre_metricas": "Diagnóstico Operacional SRE",
     "ajuda_sistema": "Guia da Plataforma AURA",
     "conhecimento_aura": "Guia & Conhecimento AURA",
+    "auditoria_fiscal_sefaz": "Auditoria Fiscal & Regras SEFAZ",
+    "conhecimento_fiscal": "Auditoria Fiscal & Regras SEFAZ",
+    "fiscal_sefaz": "Auditoria Fiscal & Regras SEFAZ",
 }
 
 GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
+    "roi_diagnostic": {
+        "component_name": "render_RoiDiagnosticUI",
+        "client_component": "RoiDiagnosticUI",
+        "title": "Calculando diagnostico executivo de perdas e projecao de ROI...",
+    },
+    "pos_audit": {
+        "component_name": "render_PosAuditRadarUI",
+        "client_component": "PosAuditRadarUI",
+        "title": "Auditoria de cancelamentos (Z-Score) e fechamento de caixa...",
+    },
+    "zero_click_briefing": {
+        "component_name": "render_MorningBriefingUI",
+        "client_component": "MorningBriefingUI",
+        "title": "Consolidando briefing matinal zero-click (Cafe com o Dono)...",
+    },
     "formas_pagamento": {
         "component_name": "render_PaymentMethodsBreakdownUI",
         "client_component": "PaymentMethodsBreakdownUI",
@@ -1711,6 +1836,21 @@ GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
         "client_component": "ElasticityBatchSimulatorUI",
         "title": "Simulando elasticidade de demanda e otimizador de lote de compra...",
     },
+    "auditoria_fiscal_sefaz": {
+        "component_name": "render_FiscalShieldInspectorUI",
+        "client_component": "FiscalShieldInspectorUI",
+        "title": "Auditando regras fiscais, tributacao e rejeicoes SEFAZ...",
+    },
+    "conhecimento_fiscal": {
+        "component_name": "render_FiscalShieldInspectorUI",
+        "client_component": "FiscalShieldInspectorUI",
+        "title": "Auditando regras fiscais, tributacao e rejeicoes SEFAZ...",
+    },
+    "fiscal_sefaz": {
+        "component_name": "render_FiscalShieldInspectorUI",
+        "client_component": "FiscalShieldInspectorUI",
+        "title": "Auditando regras fiscais, tributacao e rejeicoes SEFAZ...",
+    },
 }
 
 
@@ -1877,12 +2017,44 @@ def build_canonical_genui_envelope(
                     payload={"perspective": "margens"},
                 )
             )
-        props["diagnosis"] = props.get("diagnosis") or executive_summary or "Diagnóstico de margem apurado no ERP."
-        props["confidence_score"] = float(props.get("confidence_score") or 0.95)
-        props["consolidated_margin_pct"] = float(props.get("consolidated_margin_pct") or 14.5)
-        props["fuel_margins"] = props.get("fuel_margins") or []
-        props["payment_fee_impact"] = props.get("payment_fee_impact") or []
-        props["suggested_actions"] = [a.model_dump(mode="json") for a in actions]
+        metricas_res = props.get("metricas_consolidadas") or {}
+        periodo_res = props.get("periodo") or {}
+        resumo_geral = props.get("resumo_geral") or {}
+        gross_rev = float(
+            metricas_res.get("faturamento_bruto")
+            or props.get("gross_revenue")
+            or resumo_geral.get("faturamento_total")
+            or 0.0
+        )
+        net_prof = float(
+            metricas_res.get("lucro_liquido")
+            or props.get("net_profit")
+            or metricas_res.get("lucro_bruto")
+            or 0.0
+        )
+        tot_tef = float(
+            metricas_res.get("taxas_tef_total")
+            or props.get("total_desconto_tef")
+            or 0.0
+        )
+        mg_consol = metricas_res.get("margem_liquida_consolidada_pct")
+        if mg_consol is None:
+            mg_consol = props.get("consolidated_margin_pct")
+
+        props["gross_revenue"] = gross_rev
+        props["net_profit"] = net_prof
+        props["total_desconto_tef"] = tot_tef
+        props["consolidated_margin_pct"] = float(mg_consol) if mg_consol is not None else None
+        props["periodo_analisado"] = periodo_res.get("descricao") or props.get("periodo_analisado") or ""
+        props["top_produtos_margem"] = props.get("produtos_mais_vendidos") or props.get("top_produtos_margem") or []
+        props["fuel_margins"] = props.get("combustiveis_margem") or props.get("fuel_margins") or []
+        props["payment_fee_impact"] = props.get("meios_pagamento_impacto") or props.get("payment_fee_impact") or []
+        props["diagnosis"] = props.get("diagnosis") or executive_summary or (
+            f"Diagnostico de rentabilidade apurado no ERP ({props['periodo_analisado']})."
+            if props["periodo_analisado"] else "Diagnostico de rentabilidade apurado no ERP."
+        )
+        props["confidence_score"] = float(props.get("confidence_score") or 0.98)
+        props["suggested_actions"] = [a.model_dump(mode="json") if hasattr(a, "model_dump") else a for a in actions]
 
     elif comp_name == "render_PredictiveScenarioUI" or intencao in ("cenario_preditivo", "simulacao_preditiva"):
         if not actions:
@@ -2667,6 +2839,341 @@ def build_canonical_genui_envelope(
         props["custo_mensal_carregamento_reais"] = float(props.get("custo_mensal_carregamento_reais") or 0.0)
         props["suggested_actions"] = [a.model_dump(mode="json") if hasattr(a, "model_dump") else a for a in actions]
 
+    elif intencao in ("auditoria_fiscal_sefaz", "conhecimento_fiscal", "fiscal_sefaz") or comp_name in ("render_FiscalShieldInspectorUI", "FiscalShieldInspectorUI", "render_FiscalAuditUI", "FiscalAuditUI"):
+        blocks = []
+        tipo = resultado_bruto.get("tipo") if isinstance(resultado_bruto, dict) else ""
+        persona_views = {}
+
+        if tipo == "chave_acesso":
+            decomp = resultado_bruto.get("decomposicao") or {}
+            apontamentos = resultado_bruto.get("apontamentos") or []
+            is_dv_valido = bool(decomp.get("is_dv_valido", False))
+            invalidos = [a for a in apontamentos if a.get("status") == "INVALID"]
+            tem_erro = len(invalidos) > 0 or not is_dv_valido
+            top_apont = invalidos[0] if invalidos else (apontamentos[0] if apontamentos else {})
+
+            titulo_alerta = top_apont.get("titulo") or ("Chave Invalida" if tem_erro else "Chave Autentica e Valida (Modulo 11 OK)")
+            msg_alerta = top_apont.get("explicacao_executiva") or "Estrutura de 44 digitos e digito verificador conferem com o padrao SEFAZ."
+            acao_alerta = (top_apont.get("acoes_recomendadas") or ["Chave pronta para escrituracao fiscal."])[0]
+
+            blocks.append({
+                "block_id": "blk_chave_status",
+                "block_type": "alert_callout",
+                "title": titulo_alerta,
+                "subtitle": f"{decomp.get('tipo_documento', 'NF-e')} : Serie {decomp.get('serie', '1')} : UF {decomp.get('uf_sigla', 'BR')}",
+                "alert": {
+                    "severity": "critical" if tem_erro else "success",
+                    "title": titulo_alerta,
+                    "message": msg_alerta,
+                    "action_label": acao_alerta,
+                }
+            })
+
+            anatomy = {
+                "c_uf": str(decomp.get("c_uf", "")),
+                "uf_sigla": str(decomp.get("uf_sigla", "")),
+                "aamm": str(decomp.get("aamm", "")),
+                "ano": str(decomp.get("ano", "")),
+                "mes": str(decomp.get("mes", "")),
+                "cnpj_emitente": str(decomp.get("cnpj_emitente", "")),
+                "modelo": str(decomp.get("modelo", "")),
+                "tipo_documento": str(decomp.get("tipo_documento", "")),
+                "serie": str(decomp.get("serie", "")),
+                "numero_nfe": str(decomp.get("numero_nfe", "")),
+                "tipo_emissao": str(decomp.get("tipo_emissao", "")),
+                "codigo_numerico": str(decomp.get("codigo_numerico", "")),
+                "digito_verificador": str(decomp.get("digito_verificador", "")),
+                "dv_calculado": str(decomp.get("dv_calculado", "")),
+                "is_dv_valido": is_dv_valido,
+            }
+            props["access_key_anatomy"] = anatomy
+
+            blocks.append({
+                "block_id": "blk_chave_anatomia",
+                "block_type": "custom_content",
+                "title": "Anatomia dos 44 Digitos da Chave SEFAZ",
+                "subtitle": "Segmentacao e Deteccao Estrutural",
+                "custom_content": f"Chave analisada: UF {decomp.get('uf_sigla', '-')} | AAMM {decomp.get('aamm', '-')} | CNPJ {decomp.get('cnpj_emitente', '-')} | Mod {decomp.get('modelo', '-')} | Serie {decomp.get('serie', '-')} | Num {decomp.get('numero_nfe', '-')} | Emissao {decomp.get('tipo_emissao', '-')} | Cod {decomp.get('codigo_numerico', '-')} | DV {decomp.get('digito_verificador', '-')} (Modulo 11: {'Valido' if is_dv_valido else 'Invalido'})",
+            })
+
+            blocks.append({
+                "block_id": "blk_chave_kpis",
+                "block_type": "kpi_grid",
+                "title": "Decomposicao Estrutural da Chave",
+                "subtitle": "44 digitos SEFAZ",
+                "kpis": [
+                    {"label": "UF Emissora", "value": f"{decomp.get('uf_sigla', '-')} ({decomp.get('c_uf', '-')})", "status": "neutral"},
+                    {"label": "Documento", "value": str(decomp.get("tipo_documento", "NF-e")), "status": "neutral"},
+                    {"label": "Numero / Serie", "value": f"Nº {decomp.get('numero_nfe', '-')} / Serie {decomp.get('serie', '-')}", "status": "neutral"},
+                    {"label": "CNPJ Emitente", "value": str(decomp.get("cnpj_emitente", "-")), "status": "neutral"},
+                    {"label": "Competencia", "value": f"20{decomp.get('ano', '--')}/{decomp.get('mes', '--')}", "status": "neutral"},
+                    {"label": "DV Modulo 11", "value": f"DV {decomp.get('digito_verificador')} (Calculado: {decomp.get('dv_calculado')})", "status": "success" if is_dv_valido else "danger"},
+                ]
+            })
+
+            persona_views = {
+                "gestor": top_apont.get("explicacao_executiva") or "Chave integra e autentica perante o algoritmo Modulo 11 da SEFAZ.",
+                "contador": top_apont.get("explicacao_tecnica") or f"Chave de 44 digitos validada com sucesso. DV observado {decomp.get('digito_verificador')} igual ao calculado {decomp.get('dv_calculado')}.",
+                "base_legal": top_apont.get("base_legal") or ["MOC 7.0 - Calculo do Digito Verificador (Modulo 11)"],
+            }
+            props["persona_views"] = persona_views
+
+        elif tipo == "xml_documento":
+            res_xml = resultado_bruto.get("resultado") or {}
+            valido = bool(res_xml.get("valido", False))
+            erros_count = int(res_xml.get("erros_impeditivos", 0))
+            alertas_count = int(res_xml.get("alertas_fiscais", 0))
+            conformidades_count = int(res_xml.get("conformidades", 0))
+            apontamentos = res_xml.get("apontamentos") or []
+
+            invalidos = [a for a in apontamentos if a.get("status") == "INVALID"]
+            alertas = [a for a in apontamentos if a.get("status") == "WARNING"]
+            top_crit = invalidos[0] if invalidos else (alertas[0] if alertas else (apontamentos[0] if apontamentos else {}))
+
+            sev = "critical" if erros_count > 0 else ("warning" if alertas_count > 0 else "success")
+            tit_status = "Documento XML com Rejeicoes Impeditivas" if erros_count > 0 else ("XML Autorizavel com Alertas de Bitributacao/SPED" if alertas_count > 0 else "Documento XML 100% Conforme e Homologado")
+            msg_status = top_crit.get("explicacao_executiva") or "Documento XML homologado e em conformidade fiscal perante regras SEFAZ e SPED."
+            acao_status = (top_crit.get("acoes_recomendadas") or ["Documento pronto para faturamento ou escrituracao."])[0]
+
+            blocks.append({
+                "block_id": "blk_xml_status",
+                "block_type": "alert_callout",
+                "title": tit_status,
+                "subtitle": f"Modelo {res_xml.get('modelo', '55')} : Emissor {res_xml.get('emit_uf', 'SP')} -> Destino {res_xml.get('dest_uf', 'SP')}",
+                "alert": {
+                    "severity": sev,
+                    "title": tit_status,
+                    "message": msg_status,
+                    "action_label": acao_status,
+                }
+            })
+
+            blocks.append({
+                "block_id": "blk_xml_kpis",
+                "block_type": "kpi_grid",
+                "title": "Resumo da Auditoria XML",
+                "subtitle": "SEFAZ MOC 7.0 + SPED",
+                "kpis": [
+                    {"label": "Modelo Documento", "value": f"Mod {res_xml.get('modelo', '55')}", "status": "neutral"},
+                    {"label": "Rota Fiscal", "value": f"{res_xml.get('emit_uf', 'SP')} -> {res_xml.get('dest_uf', 'SP')}", "status": "neutral"},
+                    {"label": "Erros Impeditivos", "value": str(erros_count), "status": "danger" if erros_count > 0 else "success"},
+                    {"label": "Alertas Fiscais", "value": str(alertas_count), "status": "warning" if alertas_count > 0 else "success"},
+                ]
+            })
+
+            if apontamentos:
+                findings_normalizados = []
+                for a in apontamentos:
+                    st_raw = str(a.get("status", "")).upper()
+                    if "INVALID" in st_raw:
+                        st_clean = "invalid"
+                    elif "WARN" in st_raw:
+                        st_clean = "warning"
+                    elif "VALID" in st_raw:
+                        st_clean = "valid"
+                    else:
+                        st_clean = "info"
+
+                    grav_raw = str(a.get("gravidade", "")).upper()
+                    if "CRITIC" in grav_raw:
+                        grav_clean = "critical"
+                    elif "HIGH" in grav_raw:
+                        grav_clean = "high"
+                    elif "MED" in grav_raw:
+                        grav_clean = "medium"
+                    else:
+                        grav_clean = "info"
+
+                    raw_tit = a.get("titulo", "Regra Fiscal")
+                    clean_tit = re.sub(r"^\[(REJEICAO|ALERTA|CONFORME|AVISO|ERRO)\]\s*", "", raw_tit, flags=re.IGNORECASE).strip()
+
+                    regra_raw = str(a.get("regra_id", "")).strip()
+                    base_legal_list = a.get("base_legal") or []
+                    tag_fiscal = None
+
+                    # Apenas exibir tag de identificacao se indicar rejeicao oficial SEFAZ ou lei/norma especifica
+                    m_rej = re.search(r'(?:REJ[-_]?)(\d{3,4})', regra_raw, re.IGNORECASE)
+                    if m_rej:
+                        tag_fiscal = f"Rejeicao {m_rej.group(1)}"
+                    elif "BITRIBUTACAO" in regra_raw.upper() or "PISCOFINS" in regra_raw.upper():
+                        tag_fiscal = "EFD Tabela 4.3.10"
+                    elif "DIFAL" in regra_raw.upper():
+                        tag_fiscal = "DIFAL ANP"
+                    else:
+                        for bl in base_legal_list:
+                            bl_clean = str(bl).strip()
+                            if any(term in bl_clean.upper() for term in ["LC ", "LEI ", "CONVENIO", "TABELA", "AJUSTE", "NT "]):
+                                tag_fiscal = bl_clean
+                                break
+
+                    findings_normalizados.append({
+                        "status": st_clean,
+                        "gravidade": grav_clean,
+                        "regra_id": regra_raw,
+                        "tag_fiscal": tag_fiscal,
+                        "titulo": clean_tit,
+                        "explicacao_executiva": a.get("explicacao_executiva") or "",
+                        "explicacao_tecnica": a.get("explicacao_tecnica") or "",
+                        "acoes_recomendadas": a.get("acoes_recomendadas") or [],
+                        "acao_recomendada": (a.get("acoes_recomendadas") or [""])[0] if a.get("acoes_recomendadas") else "",
+                        "campos_afetados": a.get("campos_afetados") or [],
+                        "valor_esperado": a.get("valor_esperado"),
+                        "valor_observado": a.get("valor_observado"),
+                        "base_legal": a.get("base_legal") or [],
+                    })
+
+                order_priority = {"invalid": 0, "warning": 1, "valid": 2, "info": 3}
+                findings_normalizados.sort(key=lambda x: order_priority.get(x["status"], 99))
+
+                blocks.append({
+                    "block_id": "blk_xml_apontamentos",
+                    "block_type": "fiscal_findings_list",
+                    "title": "Diagnostico de Regras Fiscais SEFAZ & SPED",
+                    "subtitle": f"{len(findings_normalizados)} regras avaliadas",
+                    "findings": findings_normalizados,
+                })
+
+            # FASE 4: Limpeza da Redundancia Interna no Canvas (Card Resumo de Impacto da Pista)
+            # Remove a repeticao em lista de todas as explicacoes executivas que ja aparecem nos cards abaixo
+            regras_nao_genericas = [
+                a.get("regra_id", "") for a in apontamentos
+                if a.get("regra_id") and not re.match(r"^SEFAZ-(VAL-NEG|W\d|I\d|CHAVE-LEN|CHAVE-01)", a.get("regra_id", ""))
+            ]
+            regras_ref = f" [{', '.join(regras_nao_genericas)}]" if regras_nao_genericas else ""
+
+            if invalidos:
+                gestor_text = (
+                    f"Impacto na Operacao: Documento bloqueado com {len(invalidos)} apontamento(s) impeditivo(s){regras_ref}. "
+                    "Faturamento retido no PDV/ERP. Resolucao guiada indicada nos cards abaixo."
+                )
+            elif alertas:
+                gestor_text = (
+                    f"Impacto na Operacao: Documento autorizavel com {len(alertas)} alerta(s) tributario(s){regras_ref}. "
+                    "Nao ha retencao imediata na pista, porem requer regularizacao cadastral na retaguarda."
+                )
+            else:
+                gestor_text = "Impacto na Operacao: Documento 100% conforme. Faturamento e emissao liberados perante a SEFAZ."
+
+            bases_legais = []
+            textos_contador = []
+            for a in apontamentos:
+                reg_id = a.get("regra_id", "")
+                is_generico = bool(re.match(r"^SEFAZ-(VAL-NEG|W\d|I\d|CHAVE-LEN|CHAVE-01)", reg_id))
+                prefixo = f"• [{reg_id}]: " if (reg_id and not is_generico) else "• "
+                if a.get("explicacao_tecnica"):
+                    textos_contador.append(f"{prefixo}{a.get('explicacao_tecnica')}")
+                for bl in (a.get("base_legal") or []):
+                    if bl not in bases_legais:
+                        bases_legais.append(bl)
+
+            persona_views = {
+                "gestor": gestor_text,
+                "contador": "\n".join(textos_contador) if textos_contador else "Documento validado com sucesso perante regras estruturais e de negocio.",
+                "base_legal": bases_legais if bases_legais else ["MOC 7.0", "NT SEFAZ"],
+                "faturamento_status": "Bloqueado para Autorizacao SEFAZ" if invalidos else ("Sob Alerta Tributario" if alertas else "Faturamento Liberado"),
+                "tempo_retencao": "~3 a 5 min na pista" if invalidos else ("Sem retencao imediata" if alertas else "0 min"),
+            }
+            props["persona_views"] = persona_views
+
+        elif tipo == "consulta_rejeicao_fiscal":
+            resultados = resultado_bruto.get("resultados") or []
+            top_res = resultados[0] if resultados else {}
+            cod_ref = top_res.get("codigo_ref") or "SEFAZ"
+            tit = top_res.get("titulo") or "Regra Fiscal SEFAZ"
+            impacto = top_res.get("impacto_financeiro") or "Faturamento ou emissao de documento fiscal afetado."
+            acao = top_res.get("acao_recomendada") or "Verifique o cadastro e a tributacao na retaguarda."
+
+            meta_raw = top_res.get("metadados_json") or {}
+            meta = {}
+            if isinstance(meta_raw, dict):
+                meta = meta_raw
+            elif isinstance(meta_raw, str) and meta_raw.strip():
+                try:
+                    import json
+                    meta = json.loads(meta_raw)
+                except Exception:
+                    meta = {}
+
+            base_legal_val = meta.get("base_legal") or "MOC 7.0 / Normativa SEFAZ & SPED"
+            campos_xml_list = meta.get("campos_xml") or []
+            campos_xml_str = ", ".join(campos_xml_list) if isinstance(campos_xml_list, list) else str(campos_xml_list or "")
+            gravidade_val = meta.get("gravidade") or "ALTA"
+
+            blocks.append({
+                "block_id": "blk_rejeicao_alerta",
+                "block_type": "alert_callout",
+                "title": f"{cod_ref}: Diagnostico de Bloqueio SEFAZ",
+                "subtitle": top_res.get("modulo") or "Faturamento e NF-e",
+                "alert": {
+                    "severity": "critical",
+                    "title": tit,
+                    "message": f"Impacto na Operacao: {impacto}",
+                    "action_label": f"Solucao no seu ERP: {acao}",
+                }
+            })
+            blocks.append({
+                "block_id": "blk_rejeicao_kpis",
+                "block_type": "kpi_grid",
+                "title": "Parametros do Bloqueio SEFAZ",
+                "subtitle": "MOC 7.0 / NT SEFAZ",
+                "kpis": [
+                    {"label": "Codigo SEFAZ", "value": str(cod_ref).replace("SEFAZ-REJ-", ""), "status": "danger"},
+                    {"label": "Modulo Afetado", "value": str(top_res.get("modulo") or "Faturamento").split("/")[0].strip(), "status": "warning"},
+                    {"label": "Impacto", "value": "Faturamento Travado", "status": "danger"},
+                    {"label": "Sistema", "value": "ERP do Posto", "status": "success"},
+                ]
+            })
+            if top_res.get("conteudo_completo") or acao:
+                procedimento_text = f"Acao imediata no seu ERP: {acao}\n\nBase Legal: {base_legal_val}\nRegistros / Tags afetadas: {campos_xml_str or top_res.get('tabelas_banco', 'Documento Fiscal')}"
+                blocks.append({
+                    "block_id": "blk_procedimento_erp",
+                    "block_type": "custom_content",
+                    "title": "Procedimento de Liberacao na Retaguarda do seu ERP",
+                    "subtitle": "Passo a passo operacional",
+                    "custom_content": procedimento_text,
+                })
+
+            persona_views = {
+                "gestor": f"{top_res.get('resumo_executivo', '')}\n\nImpacto Financeiro: {impacto}\n\nAcao recomendada no seu ERP: {acao}",
+                "contador": f"{top_res.get('conteudo_completo', '')}\n\nBase Legal: {base_legal_val}\nTags/Campos Afetados: {campos_xml_str or top_res.get('tabelas_banco', '')}",
+                "base_legal": [base_legal_val],
+            }
+            props["persona_views"] = persona_views
+
+        else:
+            blocks = props.get("blocks") or []
+
+        if not actions:
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="📋 Copiar Diagnostico para o Contador",
+                    action_type="inspection",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"intent": "copiar_diagnostico_contador", "origem": "auditoria_fiscal_sefaz"},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="📄 Consultar Modulo Faturamento",
+                    action_type="inspection",
+                    variant="secondary",
+                    is_destructive=False,
+                    requires_confirmation=False,
+                    payload={"intent": "ajuda_sistema", "modulo": "faturamento"},
+                )
+            )
+
+        props["title"] = "Diagnostico Fiscal & Regras SEFAZ"
+        props["subtitle"] = "Auditoria Fiscal e Normativas SEFAZ"
+        props["confidence_score"] = float(props.get("confidence_score") or 0.99)
+        props["diagnosis"] = props.get("diagnosis") or executive_summary or "Auditoria de rejeicao SEFAZ e procedimento de desbloqueio no seu ERP processados com sucesso."
+        props["blocks"] = blocks
+        props["suggested_actions"] = [a.model_dump(mode="json") if hasattr(a, "model_dump") else a for a in actions]
+
     elif comp_name == "render_GenerativeModularCardUI" or intencao in (
         "diagnostico_modular", "generative_modular_card", "modular_lego_card"
     ):
@@ -2732,13 +3239,14 @@ def build_canonical_genui_envelope(
                     clean_diag = clean_diag[:247] + "..."
             props["diagnosis"] = clean_diag
 
+    props = sanitize_erp_brand_data(props)
     return GenUIEnvelope(
         schema_version="1.0",
         tool_call_id=tool_call_id,
         component_name=mapping["component_name"],
         client_component=mapping.get("client_component"),
         intent=intencao,
-        executive_summary=executive_summary,
+        executive_summary=sanitize_erp_brand_names(executive_summary),
         props=props,
         actions=actions,
         ttl_seconds=900,
@@ -2786,6 +3294,7 @@ class AuraEngine:
         self._proactive_daemon = proactive_daemon
         self._watchdog = watchdog
         self._dados_filial: Optional[Dict[str, Any]] = None
+        self._token_budget = None
 
     @property
     def rag(self) -> HybridRAGEngine:
@@ -2823,6 +3332,34 @@ class AuraEngine:
         """Determina se a ferramenta ou intencao e analitica pesada para protecao do PDV."""
         norm = (tool_name or "").strip().lower().replace("-", "_").replace(" ", "_")
         return norm in HEAVY_ANALYTICAL_TOOLS or (tool_name or "").strip().lower() in HEAVY_ANALYTICAL_TOOLS
+
+    @staticmethod
+    def _resolver_url_manual(chunk: dict) -> str:
+        """Resolve a URL oficial do manual no Confluence a partir de doc_url, doc_id ou codigo_ref."""
+        url = chunk.get("doc_url")
+        if url and str(url).strip().startswith("http") and "undefined" not in str(url).lower():
+            return str(url).strip()
+        doc_id = str(chunk.get("doc_id") or chunk.get("codigo_ref") or "").strip()
+        if doc_id.startswith("CONF-"):
+            parts = doc_id.split("-")
+            if len(parts) > 1 and parts[1].isdigit():
+                return f"https://qualityautomacao.atlassian.net/wiki/spaces/webposto/pages/{parts[1]}"
+        return ""
+
+    @property
+    def token_budget(self):
+        if self._token_budget is None:
+            from core.token_budget import TokenBudgetManager
+            self._token_budget = TokenBudgetManager(session_memory=self._session_memory)
+        return self._token_budget
+
+    @property
+    def tenant_memory(self):
+        if not hasattr(self, "_tenant_memory") or self._tenant_memory is None:
+            from core.tenant_memory import TenantMemoryManager
+            db_path = getattr(self._session_memory, "db_path", None)
+            self._tenant_memory = TenantMemoryManager(db_path=db_path)
+        return self._tenant_memory
 
     @property
     def compliance_manager(self):
@@ -3250,6 +3787,40 @@ class AuraEngine:
                     elasticidade_estimada=float(p.get("elasticidade_estimada", -1.8)),
                 )
 
+            elif norm_name in (
+                "roi_diagnostic", "diagnostico_executivo_roi", "diagnostico_perdas", "roi_perdas"
+            ):
+                from core.partner_api import compute_station_roi_diagnostic, get_partner_staging_store
+                st = get_partner_staging_store()
+                st_id = p.get("station_id") or p.get("filial_id") or self.filial_id or "default"
+                sub_val = float(p.get("monthly_subscription_brl") or 490.0)
+                return compute_station_roi_diagnostic(station_id=st_id, staging_store=st, monthly_subscription_brl=sub_val)
+
+            elif norm_name in (
+                "pos_audit", "radar_anomalias_pdv", "auditoria_pdv_zscore", "auditoria_pos"
+            ):
+                from core.partner_api import audit_pos_and_cashier_anomalies, get_partner_staging_store
+                st = get_partner_staging_store()
+                st_id = p.get("station_id") or p.get("filial_id") or self.filial_id or "default"
+                return audit_pos_and_cashier_anomalies(station_id=st_id, staging_store=st)
+
+            elif norm_name in (
+                "zero_click_briefing", "briefing_matinal", "cafe_com_dono", "morning_briefing"
+            ):
+                from core.partner_api import generate_morning_briefing_payload, get_partner_staging_store
+                st = get_partner_staging_store()
+                st_id = p.get("station_id") or p.get("filial_id") or self.filial_id or "default"
+                return generate_morning_briefing_payload(station_id=st_id, staging_store=st)
+
+            elif norm_name in (
+                "auditoria_fiscal_sefaz", "conhecimento_fiscal", "fiscal_sefaz",
+                "auditoria_sefaz", "escudo_fiscal", "auditar_documento_ou_chave_fiscal"
+            ):
+                query_txt = (p.get("chave_ou_xml") or p.get("query") or p.get("termo") or p.get("pergunta") or "").strip()
+                if not query_txt:
+                    query_txt = "Quais as regras de ICMS Monofasico CST 61, PIS/COFINS CST 04 na conveniencia e principais rejeicoes SEFAZ?"
+                return self.tools.auditar_documento_ou_chave_fiscal(query_txt)
+
             else:
                 raise ValueError(f"Ferramenta desconhecida ou não suportada: '{tool_name}'")
 
@@ -3301,6 +3872,20 @@ class AuraEngine:
         genui_active: bool = False,
     ) -> str:
         dados_filial = self.get_dados_filial()
+        f_id = 1
+        try:
+            f_id = int(re.sub(r"\D", "", str(self.filial_id)) or 1)
+        except Exception:
+            f_id = 1
+
+        memoria_bloco = self.tenant_memory.format_memories_for_prompt(
+            tenant_id=self.tenant_id,
+            filial_id=f_id,
+            query=pergunta_sanitizada,
+        )
+        if memoria_bloco:
+            contexto_sanitizado = f"{memoria_bloco}\n\n{contexto_sanitizado}".strip()
+
         return build_system_prompt(
             pergunta_sanitizada=pergunta_sanitizada,
             contexto_sanitizado=contexto_sanitizado,
@@ -3319,6 +3904,7 @@ class AuraEngine:
         pergunta: str,
         intencao: str,
         query_vector: Optional[list] = None,
+        genui_active: bool = False,
     ) -> Tuple[str, Any, Optional[Dict[str, Any]], bool, float]:
         """
         Executa a ferramenta correspondente à intenção identificada e retorna o contexto formatado.
@@ -3388,6 +3974,72 @@ class AuraEngine:
                         f"Ação UI: {json.dumps(art.get('ui_action', {}), ensure_ascii=False)}\n"
                         f"Tags: {', '.join(art.get('tags', []) or [])}\n\n"
                     )
+
+            elif intencao in ("procedimento_erp", "manuais_erp", "operacao_erp"):
+                busca = self.tools.consultar_procedimento_erp(
+                    termo=pergunta,
+                    top_k=5,
+                    tenant_id=self.tenant_id,
+                    query_vector=query_vector,
+                )
+                chunks = busca.get("results", [])
+                telemetria_retrieval = busca.get("telemetry", {})
+                evidencia_insuficiente = busca.get("evidencia_insuficiente", False)
+
+                resultado_bruto = {
+                    "tipo": "procedimento_erp",
+                    "chunks": chunks,
+                    "total_encontrado": len(chunks),
+                    "evidencia_insuficiente": evidencia_insuficiente,
+                }
+
+                if chunks and not evidencia_insuficiente:
+                    contexto_extra = (
+                        "Manual Operacional Oficial do ERP (pgvector Chunks + GIN tsvector):\n"
+                        "[DIRETIVA DE RESPOSTA OPERACIONAL]: Responda ensinando o passo a passo com precisao e clareza, "
+                        "citando menus, botoes, opcoes e telas descritas nos manuais abaixo. "
+                        "Cite a referencia numerica [1], [2] ao lado de cada orientacao. "
+                        "NUNCA recuse o atendimento dizendo que o canal nao suporta operacoes fiscais, pois voce esta tirando "
+                        "uma duvida operacional sobre como usar o ERP. Se algum ponto nao estiver no manual, mencione apenas "
+                        "o que consta nas fontes oficiais.\n\n"
+                    )
+                    for idx, c in enumerate(chunks, 1):
+                        bcrumb = c.get("breadcrumb") or c.get("doc_titulo", "")
+                        chunk_total = int(c.get("chunk_total") or 1)
+                        conteudo = str(c.get("conteudo") or "").strip()
+                        url_manual = self._resolver_url_manual(c)
+                        is_extenso = chunk_total >= 3 or len(conteudo) > 1800
+                        classificacao = (
+                            "EXTENSO (Apresente Roteiro Executivo em 3-5 passos + Sugira o link oficial ao final)"
+                            if is_extenso
+                            else "DIRETO (Passo a passo integral + Link oficial de apoio ao final)"
+                        )
+                        contexto_extra += (
+                            f"[{idx}] Documento: {c.get('doc_titulo')} | Secao: {c.get('secao')} | Caminho: {bcrumb}\n"
+                            f"Classificacao do Manual: {classificacao} | Total de Chunks: {chunk_total}\n"
+                        )
+                        if url_manual:
+                            contexto_extra += f"URL Oficial do Manual: {url_manual}\n"
+                        contexto_extra += f"Conteudo do Trecho:\n{conteudo}\n\n"
+                else:
+                    contexto_extra = (
+                        "Manual Operacional do ERP: Nao foram encontradas instrucoes detalhadas para esta operacao especifica nos manuais indexados. "
+                        "Oriente o usuario a reformular a pergunta com o nome do modulo ou menu do ERP, ou contatar o suporte tecnico especialista.\n"
+                    )
+
+            elif intencao in ("auditoria_fiscal_sefaz", "conhecimento_fiscal", "fiscal_sefaz"):
+                resultado_bruto = self.tools.auditar_documento_ou_chave_fiscal(pergunta)
+                directive = ""
+                if genui_active:
+                    directive = (
+                        "\n[DIRETIVA DUAL-CHANNEL ATIVA]: O Companion Canvas esta ativo ao lado. "
+                        "NUNCA descreva itens individuais, produtos linha por linha ou tabelas repetitivas no texto. "
+                        "Agrupe os fatos geradores pela causa raiz e convide o gestor a inspecionar os detalhes tabulares no Canvas.\n"
+                    )
+                contexto_extra = (
+                    f"Auditoria Fiscal e Diagnostico Especialista SEFAZ (Agent Sefaz + ERP RAG):{directive}\n"
+                    f"{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+                )
 
             elif intencao in ("cenario_preditivo", "simulacao_preditiva"):
                 params_sim = extrair_parametros_simulacao(pergunta)
@@ -3503,9 +4155,33 @@ class AuraEngine:
                 )
                 contexto_extra = f"Livro de Movimentação de Combustíveis (LMC ANP Portaria 26/1992):\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
 
-            elif intencao == "vendas_analitico":
-                resultado_bruto = self.tools.consultar_analise_vendas_erp(tipo="mais_vendidos")
-                contexto_extra = f"Consulta de Histórico de Vendas no ERP:\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+            elif intencao in ("vendas_analitico", "analise_margem"):
+                dt_ini, dt_fim = extrair_intervalo_datas(pergunta)
+                resultado_bruto = self.tools.consultar_analise_vendas_erp(
+                    tipo="mais_vendidos",
+                    data_inicio=dt_ini,
+                    data_fim=dt_fim,
+                    limite=150,
+                )
+                periodo_info = resultado_bruto.get("periodo") or {}
+                periodo_desc = periodo_info.get("descricao") or "Base recente do ERP"
+                orientacao_periodo = periodo_info.get("mensagem_orientacao") or ""
+                metricas = resultado_bruto.get("metricas_consolidadas") or {}
+                contexto_extra = (
+                    f"Consulta e Auditoria de Vendas e Rentabilidade no ERP:\n"
+                    f"- Periodo Analisado: {periodo_desc}\n"
+                )
+                if orientacao_periodo:
+                    contexto_extra += f"- Orientacao ao Usuario sobre Periodo: {orientacao_periodo}\n"
+                contexto_extra += (
+                    f"- Metricas Consolidadas Deterministicas: Faturamento Bruto R$ {metricas.get('faturamento_bruto', 0):,.2f} | "
+                    f"Custo Total R$ {metricas.get('custo_total', 0):,.2f} | "
+                    f"Lucro Bruto R$ {metricas.get('lucro_bruto', 0):,.2f} | "
+                    f"Taxas TEF -R$ {metricas.get('taxas_tef_total', 0):,.2f} | "
+                    f"Lucro Liquido R$ {metricas.get('lucro_liquido', 0):,.2f} | "
+                    f"Margem Liquida Real {metricas.get('margem_liquida_consolidada_pct', 0):.2f}%\n"
+                    f"Extrato Completo do ERP:\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+                )
 
             elif intencao in (
                 "conveniencia_vendas_cruzadas", "market_basket", "cesta_compras",
@@ -3535,7 +4211,62 @@ class AuraEngine:
 
             elif intencao == "clientes_ranking":
                 resultado_bruto = self.tools.consultar_clientes_erp(termo=pergunta)
-                contexto_extra = f"Dados de Clientes e Histórico de Compras no ERP:\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+                contexto_extra = f"Dados de Clientes e Historico de Compras no ERP:\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+
+            elif intencao in ("roi_diagnostic", "diagnostico_executivo_roi", "diagnostico_perdas", "roi_perdas"):
+                from core.partner_api import compute_station_roi_diagnostic, get_partner_staging_store
+                st = get_partner_staging_store()
+                st_id = self.filial_id or "default"
+                resultado_bruto = compute_station_roi_diagnostic(station_id=st_id, staging_store=st)
+                summary = resultado_bruto.get("summary", {})
+                breakdown = resultado_bruto.get("breakdown_brl", {})
+                rec = summary.get("estimated_monthly_recovery_brl", 0.0)
+                net_90 = summary.get("roi_90_days_net_brl", 0.0)
+                mult = summary.get("roi_multiple", 0.0)
+                contexto_extra = (
+                    f"Diagnostico Executivo de ROI e Perdas (90 Dias):\n"
+                    f"- Perda Mensal Mapeada: R$ {summary.get('total_monthly_leakage_brl', 0.0):,.2f}\n"
+                    f"- Recuperacao Mensal Projetada: R$ {rec:,.2f}\n"
+                    f"- Retorno Liquido em 90 Dias: R$ {net_90:,.2f} ({mult:.1f}x o investimento)\n"
+                    f"- Garantia 3x Verificada: {'SIM' if summary.get('guarantee_3x_met') else 'NAO'}\n"
+                    f"- Detalhamento dos 5 Vetores:\n"
+                    f"  * LMC e Tanques: R$ {breakdown.get('lmc_and_tank_shrinkage', 0.0):,.2f}\n"
+                    f"  * Conveniencia e Cancelamentos PDV: R$ {breakdown.get('convenience_and_pos_cancellations', 0.0):,.2f}\n"
+                    f"  * Fechamento de Caixa: R$ {breakdown.get('cashier_shift_discrepancies', 0.0):,.2f}\n"
+                    f"  * Precificacao e Carreta: R$ {breakdown.get('pricing_and_carreta_arbitrage', 0.0):,.2f}\n"
+                    f"  * Custo SELIC Capital Morto: R$ {breakdown.get('working_capital_selic_cost', 0.0):,.2f}\n"
+                )
+
+            elif intencao in ("pos_audit", "radar_anomalias_pdv", "auditoria_pdv_zscore", "auditoria_pos"):
+                from core.partner_api import audit_pos_and_cashier_anomalies, get_partner_staging_store
+                st = get_partner_staging_store()
+                st_id = self.filial_id or "default"
+                resultado_bruto = audit_pos_and_cashier_anomalies(station_id=st_id, staging_store=st)
+                tot_op = resultado_bruto.get("total_operators_analyzed", 0)
+                anom_count = resultado_bruto.get("anomalous_operators_count", 0)
+                caixa = resultado_bruto.get("cashier_shift_audit", {})
+                contexto_extra = (
+                    f"Radar de Anomalias de PDV e Fechamento de Caixa (Z-Score):\n"
+                    f"- Total de Operadores Auditados: {tot_op}\n"
+                    f"- Operadores com Desvio Estatistico (Z-Score > 2.0): {anom_count}\n"
+                    f"- Status da Conciliacao de Caixa: {caixa.get('status')} (Divergencia: R$ {caixa.get('discrepancy_brl', 0.0):,.2f})\n"
+                    f"- Politica CLT Art. 462: Estritamente contabil e sem termos acusatorios.\n"
+                )
+
+            elif intencao in ("zero_click_briefing", "briefing_matinal", "cafe_com_dono", "morning_briefing"):
+                from core.partner_api import generate_morning_briefing_payload, get_partner_staging_store
+                st = get_partner_staging_store()
+                st_id = self.filial_id or "default"
+                resultado_bruto = generate_morning_briefing_payload(station_id=st_id, staging_store=st)
+                s24 = resultado_bruto.get("sales_summary_24h", {})
+                tank = resultado_bruto.get("tank_critical_runout", {})
+                contexto_extra = (
+                    f"Briefing Matinal Zero-Click (Cafe com o Dono):\n"
+                    f"- Faturamento 24h: R$ {s24.get('total_turnover_brl', 0.0):,.2f} ({s24.get('total_liters', 0):,.0f} L)\n"
+                    f"- Tanque Mais Critico: Tanque {tank.get('tank_id')} ({tank.get('fuel_type')}) - {tank.get('occupancy_pct', 0.0):.1f}% ocupacao\n"
+                    f"- Recomendacao de Compra: {tank.get('recommended_order_compartments', 0)} compartimento(s) de 5.000 L\n"
+                    f"Texto WhatsApp:\n{resultado_bruto.get('whatsapp_formatted_text', '')}\n"
+                )
 
             else:
                 # Catálogo de produtos (RAG Híbrido HNSW + GIN FTS) com Cache Semântico
@@ -3627,6 +4358,96 @@ class AuraEngine:
             motivo = resultado_bruto.get("motivo") or "Falha de conexão com a base de dados do posto."
             return f"🚨 **Atenção**: Dados operacionais temporariamente [vermelho]indisponíveis[/vermelho].\n\n*Diagnóstico:* {motivo}"
 
+        # 0. ROI DIAGNOSTIC & PERDAS (90 DIAS)
+        if intencao in ("roi_diagnostic", "diagnostico_executivo_roi", "diagnostico_perdas", "roi_perdas"):
+            summary = resultado_bruto.get("summary") or {}
+            breakdown = resultado_bruto.get("breakdown_brl") or {}
+            tot = float(summary.get("total_monthly_leakage_brl") or 0.0)
+            rec = float(summary.get("estimated_monthly_recovery_brl") or 0.0)
+            net_90 = float(summary.get("roi_90_days_net_brl") or 0.0)
+            mult = float(summary.get("roi_multiple") or 0.0)
+            g3x = summary.get("guarantee_3x_met", True)
+
+            if genui_active:
+                g_txt = "[verde]atendida[/verde]" if g3x else "[amarelo]em monitoramento[/amarelo]"
+                return (
+                    "### Diagnostico Executivo de ROI & Perdas\n\n"
+                    f"Perda mensal mapeada de [vermelho]R$ {tot:,.2f}[/vermelho] com recuperacao projetada de [verde]R$ {rec:,.2f}[/verde] ao mes.\n\n"
+                    f"- **Retorno em 90 dias:** [verde]R$ {net_90:,.2f}[/verde] ({mult:.1f}x o plano) com garantia contratual {g_txt}.\n"
+                    "- **Detalhamento Vetorial:** A decomposicao dos 5 vetores de perda e o plano de acao estao no **painel lateral**."
+                )
+
+            linhas = [
+                "### Diagnostico Executivo de ROI & Perdas (90 Dias)",
+                "",
+                f"**Perda Mensal Mapeada:** [vermelho]R$ {tot:,.2f}[/vermelho]",
+                f"- **Recuperacao Mensal Projetada:** [verde]R$ {rec:,.2f}[/verde]",
+                f"- **Retorno Liquido em 90 Dias:** [verde]R$ {net_90:,.2f}[/verde] ({mult:.1f}x o plano)",
+                f"- **Garantia Contratual de 3x:** {'[verde]VERIFICADA[/verde]' if g3x else '[amarelo]EM MONITORAMENTO[/amarelo]'}",
+                "",
+                "**Detalhamento dos 5 Vetores de Perdas:**",
+                f"- 1. Variacao LMC & Tanques (Port. 26 ANP): R$ {float(breakdown.get('lmc_and_tank_shrinkage') or 0):,.2f}",
+                f"- 2. Cancelamentos PDV & Conveniencia: R$ {float(breakdown.get('convenience_and_pos_cancellations') or 0):,.2f}",
+                f"- 3. Furos de Gaveta & Fechamento: R$ {float(breakdown.get('cashier_shift_discrepancies') or 0):,.2f}",
+                f"- 4. Arbitragem Carreta Fechada & Preco: R$ {float(breakdown.get('pricing_and_carreta_arbitrage') or 0):,.2f}",
+                f"- 5. Custo SELIC Capital de Giro: R$ {float(breakdown.get('working_capital_selic_cost') or 0):,.2f}",
+                "",
+                "*(Diagnostico deterministico AURA: Dados primarios apurados no banco local)*",
+            ]
+            return "\n".join(linhas)
+
+        # 0b. RADAR DE ANOMALIAS DE PDV & CAIXA (Z-SCORE)
+        if intencao in ("pos_audit", "radar_anomalias_pdv", "auditoria_pdv_zscore", "auditoria_pos"):
+            tot_op = int(resultado_bruto.get("total_operators_analyzed") or 0)
+            anom_count = int(resultado_bruto.get("anomalous_operators_count") or 0)
+            caixa = resultado_bruto.get("cashier_shift_audit") or {}
+            status_cx = caixa.get("status", "CONCILIADO")
+            disc_brl = float(caixa.get("discrepancy_brl") or 0.0)
+            cx_cor = "[verde]" if status_cx == "CONCILIADO" else "[vermelho]"
+            cx_cor_f = "[/verde]" if status_cx == "CONCILIADO" else "[/vermelho]"
+
+            if genui_active:
+                st_badge = f"{cx_cor}{status_cx}{cx_cor_f}"
+                return (
+                    "### Radar de Anomalias de PDV & Fechamento de Caixa\n\n"
+                    f"Auditoria concluida em {tot_op} operadores com {anom_count} operador(es) em desvio estatistico (Z-Score > 2.0).\n\n"
+                    f"- **Status da Conciliacao:** {st_badge} com divergencia de R$ {disc_brl:,.2f} (em conformidade com Art. 462 CLT).\n"
+                    "- **Ranking e Condutas:** O ranking completo de operadores e sugestoes de prevencao estao projetados no **painel lateral**."
+                )
+
+            linhas = [
+                "### Radar de Anomalias de PDV & Fechamento de Caixa",
+                "",
+                f"- **Total de Operadores Auditados:** {tot_op}",
+                f"- **Operadores com Desvio Estatistico (Z-Score > 2.0):** {anom_count}",
+                f"- **Status da Conciliacao do Turno:** {cx_cor}{status_cx}{cx_cor_f} (Divergencia: R$ {disc_brl:,.2f})",
+                f"- **Conformidade CLT:** Art. 462 CLT e OJ 251 TST (termos estritamente tecnicos e sem imputacao de dolo)",
+            ]
+            ops = resultado_bruto.get("operators_analysis") or []
+            if ops:
+                linhas.extend(["", "**Ranking de Operadores (Taxa de Cancelamento):**"])
+                for o in ops[:5]:
+                    op_id = o.get("operator_id", "N/A")
+                    c_rate = float(o.get("cancellation_rate_pct") or 0.0)
+                    z_sc = float(o.get("z_score") or 0.0)
+                    anom_tag = " [vermelho](ANOMALIA)[/vermelho]" if o.get("is_anomaly") else ""
+                    linhas.append(f"- Operador `{op_id}`: {c_rate:.1f}% cancelamentos (Z-Score: {z_sc:.2f}){anom_tag}")
+            return "\n".join(linhas)
+
+        # 0c. BRIEFING MATINAL ZERO-CLICK (CAFE COM O DONO)
+        if intencao in ("zero_click_briefing", "briefing_matinal", "cafe_com_dono", "morning_briefing"):
+            wp_text = resultado_bruto.get("whatsapp_formatted_text")
+            if wp_text:
+                return wp_text
+            s24 = resultado_bruto.get("sales_summary_24h") or {}
+            tank = resultado_bruto.get("tank_critical_runout") or {}
+            return (
+                f"### AURA Briefing Executivo Matinal\n\n"
+                f"- **Faturamento 24h:** R$ {float(s24.get('total_turnover_brl') or 0):,.2f} ({float(s24.get('total_liters') or 0):,.0f} L)\n"
+                f"- **Estoque Mais Critico:** Tanque {tank.get('tank_id')} ({tank.get('fuel_type')}) - {float(tank.get('occupancy_pct') or 0):.1f}% ocupacao\n"
+                f"- **Sugestao de Compra:** {tank.get('recommended_order_compartments', 0)} compartimento(s) de 5.000 L\n"
+            )
+
         # 0a. SIMULAÇÃO PREDITIVA WHAT-IF & PRECIFICAÇÃO DINÂMICA
         if intencao in ("cenario_preditivo", "simulacao_preditiva"):
             props = resultado_bruto.get("props") or resultado_bruto
@@ -3645,6 +4466,14 @@ class AuraEngine:
             rec_sinal = "+" if d_rec >= 0 else ""
             lucro_sinal = "+" if d_lucro >= 0 else ""
             mg_sinal = "+" if d_mg >= 0 else ""
+
+            if genui_active:
+                return (
+                    "### Cenario Preditivo & Precificacao Dinamica\n\n"
+                    f"{diag}\n\n"
+                    f"- **Projecao para {prod}:** Volume {vol_sinal}{d_vol:.1f}% com receita de **{rec_sinal}R$ {d_rec:,.2f}** (confianca de [verde]{int(score * 100)}%[/verde]).\n"
+                    "- **Simulacao e Decisao HITL:** O comparativo de precos e os botoes de repasse estao disponiveis no **painel lateral**."
+                )
 
             linhas = [
                 "### 📈 AURA Predictive Scenario & What-If (Precificação Dinâmica)",
@@ -3720,6 +4549,14 @@ class AuraEngine:
             cor = "[verde]" if abs(var_pct) <= tol else "[vermelho]"
             cor_f = "[/verde]" if abs(var_pct) <= tol else "[/vermelho]"
 
+            if genui_active:
+                return (
+                    "### Auditoria de Conformidade LMC ANP\n\n"
+                    f"{diag}\n\n"
+                    f"- **Status Regulatorio:** {cor}{status_str}{cor_f} (tolerancia legal +-0.60%) com variacao de {cor}{var_pct:+.2f}%{cor_f} ({var_litros:+.1f} L).\n"
+                    "- **Ficha Individualizada:** A abertura por tanque e o historico de movimentacao estao disponiveis no **painel lateral**."
+                )
+
             linhas = [
                 "### 📋 Auditoria de Conformidade LMC ANP (Portaria 26/1992)",
                 "",
@@ -3742,6 +4579,15 @@ class AuraEngine:
             c_diario_str = f"R$ {c_diario:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             c_mensal_str = f"R$ {c_mensal:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             spread_str = f"R$ {spread:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+            if genui_active:
+                return (
+                    "### Analise Macroeconomica de Custo de Estoque\n\n"
+                    f"{diag}\n\n"
+                    f"- **Capital Imobilizado:** {cap_str} sob Selic de {selic:.2f}% a.a. (carregamento mensal de {c_mensal_str}).\n"
+                    "- **Curva e Spread:** A analise de spread vs PMPF ICMS-ST esta detalhada no **painel lateral**."
+                )
+
             linhas = [
                 "### 📊 Analise Macroeconomica de Custo de Estoque (BACEN/CONFAZ)",
                 "",
@@ -3767,6 +4613,14 @@ class AuraEngine:
             cor_div = "[vermelho]" if tot_div > 0 else "[verde]"
             cor_div_f = "[/vermelho]" if tot_div > 0 else "[/verde]"
 
+            if genui_active:
+                return (
+                    "### Auditoria de Erosao Financeira & TEF\n\n"
+                    f"{diag}\n\n"
+                    f"- **Perda por Taxas:** {cor_div}R$ {tot_div:,.2f}{cor_div_f} com economia projetada de [verde]R$ {econ:,.2f}[/verde].\n"
+                    "- **Arbitragem e Cobertura:** A discriminacao por adquirente e a estrategia de caixa estao no **painel lateral**."
+                )
+
             linhas = [
                 "### 💳 Auditoria de Erosao Financeira & Arbitragem Selic (TEF/Recebiveis)",
                 "",
@@ -3787,6 +4641,14 @@ class AuraEngine:
             corrosao = float(props.get("total_custo_selic_acumulado_reais") or 0.0)
             selic_aa = float(props.get("taxa_selic_anual_pct") or 10.75)
             plano = props.get("plano_acao_desova") or ""
+
+            if genui_active:
+                return (
+                    "### Cacador de Capital Morto & Rupturas de Gondola\n\n"
+                    f"{diag}\n\n"
+                    f"- **Capital Imobilizado:** [vermelho]R$ {cap:,.2f}[/vermelho] sem giro (corrosao Selic de R$ {corrosao:,.2f}).\n"
+                    "- **Plano de Desova:** O ranking de itens encalhados e os combos promocionais estao no **painel lateral**."
+                )
 
             linhas = [
                 "### 📦 Cacador de Capital Morto & Ruptura Invisivel de Gondola",
@@ -3812,6 +4674,14 @@ class AuraEngine:
             cor_tot = "[vermelho]" if d_total < 0 else "[verde]"
             cor_tot_f = "[/vermelho]" if d_total < 0 else "[/verde]"
 
+            if genui_active:
+                return (
+                    "### Raio-X de Sangria de Margem (Waterfall)\n\n"
+                    f"{diag}\n\n"
+                    f"- **Variacao Total:** {cor_tot}R$ {d_total:,.2f} ({d_pct:+.2f}%){cor_tot_f}.\n"
+                    "- **Decomposicao Causal:** O grafico waterfall com os 4 vetores de impacto esta detalhado no **painel lateral**."
+                )
+
             linhas = [
                 "### 📉 Raio-X de Sangria de Margem (Decomposicao Causal Waterfall)",
                 "",
@@ -3833,6 +4703,14 @@ class AuraEngine:
             lote = float(props.get("lote_minimo_compra_litros") or 5000.0)
             econ = float(props.get("economia_potencial_lote_reais") or 0.0)
             rec = props.get("cenario_recomendado") or ""
+
+            if genui_active:
+                return (
+                    f"### Simulador de Elasticidade & Otimizador de Lote ({prod})\n\n"
+                    f"{diag}\n\n"
+                    f"- **Espaco Livre (Ullage):** {ullage:,.0f} L com economia potencial de [verde]R$ {econ:,.2f}[/verde].\n"
+                    "- **Cenarios de Compra:** O dimensionamento de compartimentos e a simulacao de lote estao no **painel lateral**."
+                )
 
             linhas = [
                 f"### 🚛 Simulador de Elasticidade & Otimizador de Lote ({prod})",
@@ -3946,6 +4824,14 @@ class AuraEngine:
             caixas_op = props.get("caixas_operadores") or []
             aviso = props.get("aviso_data")
 
+            if genui_active:
+                return (
+                    "### Formas de Pagamento & Fechamento de Caixas\n\n"
+                    f"Faturamento consolidado apurado em [verde]R$ {total_geral:,.2f}[/verde] ({total_tx} vendas, ticket medio R$ {ticket_medio:,.2f}).\n\n"
+                    f"- **Composicao:** Modalidades e gavetas auditadas para {len(caixas_op)} caixa(s) ({data_ref}).\n"
+                    "- **Auditoria por Operador:** O extrato completo de sangrias e TEF esta projetado no **painel lateral**."
+                )
+
             linhas = [
                 "### 💳 Formas de Pagamento & Caixas",
                 "",
@@ -4031,6 +4917,14 @@ class AuraEngine:
 
             sev_badge = "[vermelho]CRÍTICO[/vermelho]" if sev == "critical" else ("[amarelo]ATENÇÃO[/amarelo]" if sev == "attention" else "[verde]CONFORME[/verde]")
 
+            if genui_active:
+                return (
+                    "### Auditoria de Fuga Financeira & Conciliacao TEF\n\n"
+                    f"{diag}\n\n"
+                    f"- **Status de Risco:** {sev_badge} com perda total apurada de **R$ {total_leak:,.2f}** ({shift} : {cashier}).\n"
+                    "- **Acoes de Contencao:** A lista de terminais sob suspeita e os botoes de intervencao estao no **painel lateral**."
+                )
+
             linhas = [
                 "### 🚨 Auditoria de Fuga Financeira & Conciliação TEF",
                 "",
@@ -4084,6 +4978,14 @@ class AuraEngine:
             metrics = props.get("metrics") or []
             impacto = props.get("impact_projection") or {}
             impacto_txt = impacto.get("summary") if isinstance(impacto, dict) else (str(impacto) if impacto else "")
+
+            if genui_active:
+                return (
+                    "### Mentor Executivo de Decisoes\n\n"
+                    f"{diag}\n\n"
+                    f"- **Confiabilidade Analitica:** [verde]{int(score * 100)}%[/verde] com metricas apuradas no ERP.\n"
+                    "- **Painel de Decisao:** O detalhamento dos indicadores e os botoes de acao rapida estao no **painel lateral**."
+                )
 
             linhas = [
                 "### 🎯 Mentor de Decisões Executivo (Briefing Estratégico)",
@@ -4151,6 +5053,29 @@ class AuraEngine:
             ped_conv_hoje = resumo_hoje.get("pedidos_conveniencia_hoje", 0)
             fat_conv_hoje = float(resumo_hoje.get("faturamento_conveniencia_hoje", 0) or 0)
             fat_total_hoje = fat_comb_hoje + fat_conv_hoje
+
+            if genui_active:
+                periodo_info = resultado_bruto.get("periodo") or {}
+                p_desc = periodo_info.get("descricao") or data_str
+                orientacao = periodo_info.get("mensagem_orientacao") or ""
+                metricas = resultado_bruto.get("metricas_consolidadas") or {}
+                fat_val = float(metricas.get("faturamento_bruto") or fat_total_hoje)
+                lucro_val = float(metricas.get("lucro_liquido") or 0.0)
+                mg_val = float(metricas.get("margem_liquida_consolidada_pct") or 0.0)
+                tef_val = float(metricas.get("taxas_tef_total") or 0.0)
+
+                linhas_resp = [
+                    "### Diagnostico Executivo de Vendas & Rentabilidade",
+                    "",
+                    f"Faturamento consolidado apurado em [verde]R$ {fat_val:,.2f}[/verde] ({p_desc}).",
+                    f"Lucro liquido real de [ciano]R$ {lucro_val:,.2f}[/ciano] com margem consolidada de [verde]{mg_val:.2f}%[/verde] (taxas TEF descontadas: [vermelho]-R$ {tef_val:,.2f}[/vermelho]).",
+                    "",
+                    f"- **Segmentacao:** Pista [ciano]R$ {fat_comb_hoje:,.2f}[/ciano] ({litros_hoje:,.2f} L) e Loja [verde]R$ {fat_conv_hoje:,.2f}[/verde] ({ped_conv_hoje} pedidos).",
+                    "- **Extrato Detalhado:** A matriz completa de rentabilidade por produto, combustivel e meios de pagamento esta projetada no **painel lateral**.",
+                ]
+                if orientacao:
+                    linhas_resp.append(f"\n> 💡 *{orientacao}*")
+                return "\n".join(linhas_resp)
 
             linhas = [
                 "### 📊 Diagnóstico Executivo de Vendas & Faturamento",
@@ -4220,6 +5145,16 @@ class AuraEngine:
             tanque_crit_cod = assessment.get("tanque_mais_critico_cod")
 
             badge = assessment.get("badge_label", "Estoque Apurado")
+
+            if genui_active:
+                tanque_info = f" no Tanque {tanque_crit_cod}" if tanque_crit_cod else ""
+                return (
+                    "### Diagnostico de Autonomia dos Tanques\n\n"
+                    f"Autonomia mais critica estimada em [amarelo]{min_auto_h:.1f}h[/amarelo] (~{min_auto_d:.1f} dias){tanque_info} ({badge}).\n\n"
+                    f"- **Espaco Livre (Ullage):** [ciano]{ullage_tot:,.0f} L[/ciano] (~{bocas_5k} bocas de 5.000 L em carreta padrao).\n"
+                    "- **Mapa de Tanques:** A telemetria individual e os botoes de emissao de pedido estao no **painel lateral**."
+                )
+
             linhas = [
                 "### ⛽ Diagnóstico Executivo de Autonomia dos Tanques",
                 "",
@@ -4257,6 +5192,14 @@ class AuraEngine:
 
             cor_dif = "[verde]" if abs(dif_caixa) <= 5.0 else ("[vermelho]" if dif_caixa < 0 else "[amarelo]")
             cor_dif_f = "[/verde]" if abs(dif_caixa) <= 5.0 else ("[/vermelho]" if dif_caixa < 0 else "[/amarelo]")
+
+            if genui_active:
+                return (
+                    "### Conciliacao Executiva de Turno & Fechamento\n\n"
+                    f"Confronto de pista vs caixa com diferenca apurada de {cor_dif}R$ {dif_caixa:,.2f}{cor_dif_f}.\n\n"
+                    f"- **Faturamento Consolidado:** Pista [ciano]R$ {fat_pista:,.2f}[/ciano] ({vol_pista:,.2f} L) e PDV [verde]R$ {fat_caixa:,.2f}[/verde].\n"
+                    "- **Gaveta de Evidencias:** O extrato completo de cupons e encerrantes fisicos esta no **painel lateral**."
+                )
 
             linhas = [
                 "### 📋 Conciliação Executiva de Turno & Fechamento",
@@ -4308,6 +5251,14 @@ class AuraEngine:
             cor = "[verde]" if conforme else "[vermelho]"
             cor_f = "[/verde]" if conforme else "[/vermelho]"
 
+            if genui_active:
+                st_txt = "CONFORME ANP (+/-0.6%)" if conforme else "ALERTA FORA DA TOLERANCIA ANP"
+                return (
+                    "### Livro de Movimentacao de Combustiveis (LMC Oficial ANP)\n\n"
+                    f"Status de conformidade {cor}{st_txt}{cor_f} com variacao volumetrica de {var_l:+,.3f} L ({var_pct:+.2f}%).\n\n"
+                    "- **Demonstrativo Fisico-Contabil:** Os lancamentos livro a livro e perdas por tanque estao no **painel lateral**."
+                )
+
             linhas = [
                 "### ⚖️ Livro de Movimentação de Combustíveis (LMC Oficial ANP)",
                 "",
@@ -4336,6 +5287,21 @@ class AuraEngine:
                     if float(val or 0) > maior_lift:
                         maior_lift = float(val)
 
+            if genui_active:
+                destaque_combo = ""
+                if combos:
+                    c1 = combos[0]
+                    orig = c1.get("anchor_product") or c1.get("produto_origem") or "Produto"
+                    orig_nome = orig.get("nompro") if isinstance(orig, dict) else str(orig)
+                    rec = c1.get("recommended_product") or c1.get("produto_recomendado") or "Item"
+                    rec_nome = rec.get("nompro") if isinstance(rec, dict) else str(rec)
+                    destaque_combo = f" Destaque para combo **{orig_nome}** + **{rec_nome}**."
+                return (
+                    "### Inteligencia de Vendas Cruzadas (Market Basket PDV)\n\n"
+                    f"Mineracao concluida com maior Lift apurado em [roxo]{maior_lift:.2f}x[/roxo] em {len(combos)} oportunidades.{destaque_combo}\n\n"
+                    "- **Scripts e Promocoes:** Os scripts de balcao e disposicao de gondola estao no **painel lateral**."
+                )
+
             linhas = [
                 "### 🛒 Inteligência de Vendas Cruzadas (Market Basket PDV)",
                 "",
@@ -4362,6 +5328,175 @@ class AuraEngine:
                     f"- *Script para o Caixa:* {pitch}",
                 ])
             return "\n".join(linhas)
+
+        elif intencao in ("auditoria_fiscal_sefaz", "conhecimento_fiscal", "fiscal_sefaz"):
+            if not isinstance(resultado_bruto, dict):
+                return None
+            tipo = resultado_bruto.get("tipo")
+            if tipo == "chave_acesso":
+                decomp = resultado_bruto.get("decomposicao", {})
+                aponts = resultado_bruto.get("apontamentos", [])
+                erros = [a for a in aponts if a.get("status") == "INVALID"]
+                status_txt = "[vermelho]Chave Invalida[/vermelho]" if erros else "[verde]Chave Autentica e Valida[/verde]"
+
+                if genui_active:
+                    return (
+                        f"### Auditoria de Chave SEFAZ ({status_txt})\n\n"
+                        f"Chave analisada para Modelo {decomp.get('tipo_documento', 'NF-e')} da UF {decomp.get('uf_sigla')} (Nota {decomp.get('numero_nfe')}).\n\n"
+                        f"- **Apontamentos:** {len(erros)} inconsistencia(s) impeditiva(s) detectada(s).\n"
+                        "- **Decomposicao Tecnica:** Os campos da chave e a validacao do DV estao no **painel lateral**."
+                    )
+
+                linhas = [
+                    f"### 🔍 Auditoria de Chave de Acesso SEFAZ ({status_txt})",
+                    "",
+                    f"- **Tipo de Documento:** {decomp.get('tipo_documento')}",
+                    f"- **UF Emitente:** {decomp.get('uf_sigla')} (Codigo IBGE: {decomp.get('c_uf')})",
+                    f"- **CNPJ Emitente:** {decomp.get('cnpj_emitente')}",
+                    f"- **Numero da Nota:** {decomp.get('numero_nfe')} (Serie: {decomp.get('serie')})",
+                    f"- **Digito Verificador:** {decomp.get('digito_verificador')} (Calculado: {decomp.get('dv_calculado')})",
+                ]
+                if erros:
+                    linhas.extend(["", "**Apontamentos Impeditivos:**"])
+                    for e in erros:
+                        linhas.append(f"- [vermelho]{e.get('titulo')}:[/vermelho] {e.get('explicacao_executiva')}")
+                return "\n".join(linhas)
+
+            elif tipo == "xml_documento":
+                res = resultado_bruto.get("resultado", {})
+                valido = bool(res.get("valido", False))
+                erros = int(res.get("erros_impeditivos", 0))
+                alertas = int(res.get("alertas_fiscais", 0))
+                if erros > 0:
+                    status_badge = "[vermelho]Bloqueio SEFAZ (Rejeicao Impeditiva)[/vermelho]"
+                    conclusao = f"Foram identificados {erros} erro(s) impeditivo(s) de autorizacao."
+                elif alertas > 0:
+                    status_badge = "[amarelo]Autorizavel com Alertas Fiscais[/amarelo]"
+                    conclusao = f"Documento autorizavel perante a SEFAZ, porem com {alertas} alerta(s) de conformidade tributaria ou bitributacao."
+                else:
+                    status_badge = "[verde]100% Conforme e Homologado[/verde]"
+                    conclusao = "Documento em total conformidade perante regras SEFAZ MOC 7.0 e SPED."
+
+                if genui_active:
+                    # FASE 3: Contrato Zero Repeticao (Sintese Representativa e Observavel por Causa Raiz)
+                    # NUNCA lista produtos linha por linha ou itens individuais no texto do chat
+                    linhas = [
+                        f"### Auditoria de Documento XML ({status_badge})",
+                        "",
+                    ]
+                    # 1. Veredito macro
+                    if erros > 0:
+                        linhas.append(
+                            f"Documento Modelo {res.get('modelo', '55')} (rota {res.get('emit_uf', 'SP')} -> {res.get('dest_uf', 'SP')}) "
+                            f"bloqueado com **{erros} inconsistencia(s) impeditiva(s)** de autorizacao SEFAZ."
+                        )
+                    elif alertas > 0:
+                        linhas.append(
+                            f"Documento Modelo {res.get('modelo', '55')} (rota {res.get('emit_uf', 'SP')} -> {res.get('dest_uf', 'SP')}) "
+                            f"autorizavel perante a SEFAZ, com **{alertas} alerta(s) de conformidade tributaria**."
+                        )
+                    else:
+                        linhas.append(
+                            f"Documento Modelo {res.get('modelo', '55')} (rota {res.get('emit_uf', 'SP')} -> {res.get('dest_uf', 'SP')}) "
+                            "em **total conformidade fiscal** perante regras SEFAZ MOC 7.0 e SPED."
+                        )
+
+                    linhas.append("")
+
+                    # 2. Causa Raiz Geral (clusterizada)
+                    aponts = res.get("apontamentos", [])
+                    causas = []
+                    has_neg = any(
+                        a.get("status") == "INVALID" and (
+                            "negativo" in (a.get("titulo") or "").lower() or
+                            "negativo" in (a.get("explicacao_executiva") or "").lower()
+                        ) for a in aponts
+                    )
+                    has_prot = any(
+                        "protocolo" in (a.get("titulo") or "").lower() or
+                        "protocolo" in (a.get("explicacao_executiva") or "").lower()
+                        for a in aponts
+                    )
+                    has_cst = any(
+                        "cst" in (a.get("titulo") or "").lower() or
+                        "aliquota" in (a.get("explicacao_executiva") or "").lower()
+                        for a in aponts
+                    )
+
+                    if has_neg:
+                        causas.append("Descontos comerciais de aplicativo ou abatimentos foram declarados incorretamente como acrescimo negativo em campo nao permitido pelo MOC.")
+                    if has_prot:
+                        causas.append("Ausencia de protocolo de autorizacao valido ou lote pendente de processamento no ambiente autorizador.")
+                    if has_cst:
+                        causas.append("Divergencia entre regime tributario monofasico e aliquotas declaradas nos itens de combustiveis.")
+                    if not causas and (erros > 0 or alertas > 0):
+                        top_apont = aponts[0] if aponts else {}
+                        causas.append(top_apont.get("explicacao_executiva") or "Inconformidades de validacao estrutural ou regras de negocio SEFAZ.")
+
+                    if causas:
+                        linhas.append(f"- **Causa Raiz Geral:** {' '.join(causas)}")
+
+                    # 3. Resolucao no ERP webPosto
+                    if has_neg:
+                        linhas.append("- **Resolucao no seu ERP:** Acionar o suporte do seu ERP para correcao na emissao/fechamento com cupons de aplicativo (o sistema deve gerar a tag sem valor negativo). Voce pode usar o botao de chamado para envio rapido via WhatsApp.")
+                    elif has_prot:
+                        linhas.append("- **Resolucao no seu ERP:** Acesse o menu de gestao fiscal do seu sistema, execute Consulta de Lote ou retransmita o documento apos restabelecer a comunicacao com a SEFAZ.")
+                    elif erros > 0:
+                        linhas.append("- **Resolucao no seu ERP:** Acesse o cadastro de produtos ou regras tributarias do seu ERP, ajuste a tributacao indicada e revalide o documento.")
+                    else:
+                        linhas.append("- **Status Operacional:** Nenhuma correcao necessaria na retaguarda do seu ERP.")
+
+                    # 4. Ponte Contextual para o Canvas
+                    if erros > 0 or alertas > 0:
+                        qtd_itens = len(aponts)
+                        linhas.append(
+                            f"- **Ponte Contextual:** A matriz detalhada com os {qtd_itens} apontamento(s) individualizado(s), "
+                            "o totalizador de impacto e o parecer tecnico para o contador estao no **painel lateral** (Canvas)."
+                        )
+                    else:
+                        linhas.append("- **Ponte Contextual:** O espelho fiscal e a chave de acesso estao disponiveis no **painel lateral** (Canvas).")
+
+                    return "\n".join(linhas)
+
+                linhas = [
+                    f"### 📑 Auditoria de Documento XML ({status_badge})",
+                    f"- **Documento:** Modelo {res.get('modelo', '55')} | **Rota:** {res.get('emit_uf', 'SP')} -> {res.get('dest_uf', 'SP')}",
+                    f"- **Diagnostico:** {conclusao}",
+                    "",
+                    "Consulte o card interativo abaixo para diagnostico detalhado de cada regra e instrucoes para resolucao no seu ERP.",
+                ]
+                return "\n".join(linhas)
+
+            elif tipo == "consulta_rejeicao_fiscal":
+                resultados = resultado_bruto.get("resultados", [])
+                if not resultados:
+                    return f"Nenhuma regra fiscal correspondente encontrada no acervo oficial para: '{pergunta}'."
+                top = resultados[0]
+
+                if genui_active:
+                    return (
+                        f"### Parecer Fiscal SEFAZ ({top.get('codigo_ref')})\n\n"
+                        f"{top.get('resumo_executivo')}\n\n"
+                        f"- **Acao no seu ERP:** {top.get('acao_recomendada')}\n"
+                        "- **Base Normativa:** O parecer contabil completo para o contador esta projetado no **painel lateral**."
+                    )
+
+                linhas = [
+                    f"### ⚖️ Parecer Fiscal & Normativa SEFAZ ({top.get('codigo_ref')})",
+                    "",
+                    f"**{top.get('titulo')}**",
+                    f"*{top.get('subtitulo', '')}*",
+                    "",
+                    f"**Diagnostico / Resumo Executivo:**",
+                    f"{top.get('resumo_executivo')}",
+                    "",
+                    f"**Acao Recomendada no seu ERP:**",
+                    f"{top.get('acao_recomendada')}",
+                    "",
+                    f"**Impacto Financeiro / Operacional:**",
+                    f"{top.get('impacto_financeiro')}",
+                ]
+                return "\n".join(linhas)
 
         elif intencao in ("dados_filial", "empresa", "filial"):
             nome = resultado_bruto.get("nome", "Posto")
@@ -4407,6 +5542,47 @@ class AuraEngine:
                     linhas.append(f"- **{desc}:** [verde]{f_val}[/verde]")
             else:
                 linhas.append(f"Consulta ao catálogo executada para: '{pergunta}'. Nenhum item específico com saldo em estoque no momento.")
+            return "\n".join(linhas)
+
+        if intencao in ("procedimento_erp", "manuais_erp", "operacao_erp"):
+            chunks = resultado_bruto.get("chunks", []) if isinstance(resultado_bruto, dict) else []
+            if not chunks:
+                return "Nao foram encontrados procedimentos operacionais cadastrados para esta consulta no momento."
+            
+            def _format_contingency_steps(raw_text: str) -> str:
+                # Remove marcadores de imagens internas preservando 100% dos passos
+                clean = re.sub(r'ret-[\w-]+', '', raw_text)
+                clean = re.sub(r'img-[\w-]+', '', clean)
+                clean = re.sub(r'\n{3,}', '\n\n', clean).strip()
+                return clean
+
+            linhas = ["### Roteiro Operacional (Manual do ERP)", ""]
+            for idx, c in enumerate(chunks[:3], 1):
+                tit = c.get("doc_titulo", "Manual").strip()
+                sec = c.get("secao", "").strip()
+                bcrumb = c.get("breadcrumb", "").strip()
+                cont = c.get("conteudo", "").strip()
+                url = self._resolver_url_manual(c)
+                chunk_total = int(c.get("chunk_total") or 1)
+                texto_formatado = _format_contingency_steps(cont)
+                is_extenso = chunk_total >= 3 or len(texto_formatado) > 1800
+
+                linhas.append(f"#### [{idx}] {tit} - {sec}")
+                if bcrumb:
+                    linhas.append(f"*Caminho no ERP:* `{bcrumb}`\n")
+                
+                if is_extenso:
+                    linhas.append("*Roteiro Operacional Resumido:*")
+                    passos = [p for p in texto_formatado.split("\n") if p.strip()]
+                    resumo = "\n".join(passos[:6]) if len(passos) > 6 else texto_formatado
+                    linhas.append(resumo)
+                    if url:
+                        linhas.append(f"\n> 💡 *Esta rotina possui etapas detalhadas.* Consulte o [Manual Completo no Confluence]({url}) para conferir todas as telas e imagens passo a passo.\n")
+                else:
+                    linhas.append(texto_formatado)
+                    if url:
+                        linhas.append(f"\n🔗 [Manual Oficial no Confluence]({url})\n")
+                linhas.append("")
             return "\n".join(linhas)
 
         # Fallback genérico para qualquer ferramenta com dados válidos
@@ -4536,6 +5712,7 @@ class AuraEngine:
             pergunta_efetiva,
             intencao,
             query_vector,
+            (genui_meta is not None and genui_active),
         )
 
         # 3. Tratamento de Cache Hit Semântico
@@ -4580,6 +5757,23 @@ class AuraEngine:
                 metadata={"cache_hit": True},
             )
 
+            token_record = self.token_budget.record_usage(
+                session_id=sess_id,
+                filial_id=f_id,
+                prompt_tokens=max(10, len(pergunta_efetiva) // 4),
+                completion_tokens=max(10, len(resposta_cache) // 4),
+                model_name="local-semantic-cache",
+                cached=True,
+            )
+            self.telemetry.record_token_usage(
+                prompt_tokens=0,
+                completion_tokens=0,
+                model_name="local-semantic-cache",
+                cost_brl=0.0,
+                avoided_cost_brl=token_record.get("avoided_cost_brl", 0.0),
+                session_id=sess_id,
+            )
+
             yield AuraChunk(
                 chunk_type=AuraChunkType.TELEMETRY,
                 data={
@@ -4588,6 +5782,7 @@ class AuraEngine:
                     "ttft_ms": round(cache_ttft_ms, 2),
                     "tool_latency_ms": round(tool_latency_ms, 2),
                     "total_e2e_ms": round(total_e2e_ms, 2),
+                    "tokens": token_record,
                 },
                 session_id=sess_id,
             )
@@ -4668,7 +5863,7 @@ class AuraEngine:
                 telemetry=self.telemetry,
             )
             if envelope:
-                envelope_payload = envelope.to_sse_payload()
+                envelope_payload = sanitize_erp_brand_data(envelope.to_sse_payload())
                 if t_skeleton_emitted is not None:
                     backend_hydration_ms = (time.perf_counter() - t_skeleton_emitted) * 1000
                     self.telemetry.record_hydration(
@@ -4728,17 +5923,18 @@ class AuraEngine:
         texto_completo: List[str] = []
         sucesso_llm = False
 
-        for m_name in FALLBACK_MODELS[:1]:
+        for m_name in FALLBACK_MODELS[:2]:
             try:
                 model = genai.GenerativeModel(m_name)
-                # Invoca streaming assincrono com timeout agil de 3 segundos
+                last_chunk_obj = None
+                # Invoca streaming assincrono com timeout resiliente de 25 segundos
                 response_stream = await asyncio.wait_for(
                     model.generate_content_async(
                         prompt_sistema,
                         stream=True,
-                        request_options={"timeout": 3.0},
+                        request_options={"timeout": 25.0},
                     ),
-                    timeout=3.0,
+                    timeout=25.0,
                 )
 
                 async def _get_next_chunk(aiter_obj):
@@ -4747,7 +5943,8 @@ class AuraEngine:
                 stream_aiter = response_stream.__aiter__()
                 while True:
                     try:
-                        chunk = await asyncio.wait_for(_get_next_chunk(stream_aiter), timeout=2.5)
+                        chunk = await asyncio.wait_for(_get_next_chunk(stream_aiter), timeout=20.0)
+                        last_chunk_obj = chunk
                     except StopAsyncIteration:
                         break
                     except (asyncio.TimeoutError, Exception) as stream_step_err:
@@ -4830,7 +6027,7 @@ class AuraEngine:
                 telemetry=self.telemetry,
             )
             if envelope:
-                envelope_payload = envelope.to_sse_payload()
+                envelope_payload = sanitize_erp_brand_data(envelope.to_sse_payload())
                 if t_skeleton_emitted is not None:
                     backend_hydration_ms = (time.perf_counter() - t_skeleton_emitted) * 1000
                     self.telemetry.record_hydration(
@@ -4898,6 +6095,33 @@ class AuraEngine:
             "total_e2e_ms": round(total_e2e_ms, 2),
             "lgpd_redacted_count": total_redacted,
         }
+        # Registro e medicao precisa de tokens consumidos
+        usage_meta = getattr(last_chunk_obj, "usage_metadata", None) if "last_chunk_obj" in locals() and last_chunk_obj else None
+        p_tokens = getattr(usage_meta, "prompt_token_count", None) if usage_meta else None
+        c_tokens = getattr(usage_meta, "candidates_token_count", None) if usage_meta else None
+        if p_tokens is None or p_tokens <= 0:
+            p_tokens = max(10, len(prompt_sistema) // 4)
+        if c_tokens is None or c_tokens <= 0:
+            c_tokens = max(5, len(resposta_final) // 4)
+
+        token_record = self.token_budget.record_usage(
+            session_id=sess_id,
+            filial_id=f_id,
+            prompt_tokens=p_tokens,
+            completion_tokens=c_tokens,
+            model_name=m_name if "m_name" in locals() else "gemini-flash",
+            cached=False,
+        )
+        self.telemetry.record_token_usage(
+            prompt_tokens=p_tokens,
+            completion_tokens=c_tokens,
+            model_name=m_name if "m_name" in locals() else "gemini-flash",
+            cost_brl=token_record.get("cost_brl", 0.0),
+            avoided_cost_brl=0.0,
+            session_id=sess_id,
+        )
+        telemetria_final["tokens"] = token_record
+
         if telemetria_retrieval:
             telemetria_final["retrieval"] = telemetria_retrieval
 
@@ -5020,6 +6244,7 @@ class AuraEngine:
         resultado_bruto: Any,
         pergunta: str = "",
         session_id: Optional[str] = None,
+        genui_active: bool = False,
     ) -> Optional[str]:
         """Formata o texto de resposta determinística executiva (contingência e síntese GenUI)."""
         return self._gerar_sintese_contingencia_ferramenta(
@@ -5027,5 +6252,6 @@ class AuraEngine:
             resultado_bruto=resultado_bruto,
             pergunta=pergunta,
             session_id=session_id,
+            genui_active=genui_active,
         )
 

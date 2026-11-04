@@ -6,7 +6,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -25,15 +27,13 @@ class SseRepository @Inject constructor(
 ) {
     fun streamChat(query: String, sessionId: String = "android_session"): Flow<SseEvent> = callbackFlow {
         
-        val jsonBody = """
-            {
-                "query": "$query",
-                "session_id": "$sessionId",
-                "stream": true,
-                "tenant_id": "posto_01",
-                "filial_id": "59050"
-            }
-        """.trimIndent()
+        val jsonBody = buildJsonObject {
+            put("query", query)
+            put("session_id", sessionId)
+            put("stream", true)
+            put("tenant_id", "posto_01")
+            put("filial_id", "59050")
+        }.toString()
         
         val chatUrl = "${serverConfig.getBaseUrl()}api/v1/aura/chat"
         
@@ -120,8 +120,14 @@ class SseRepository @Inject constructor(
             }
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
-                Log.e("SSE", "Error: ${t?.message}")
-                close(t)
+                val errorMsg = when {
+                    t != null -> t.message
+                    response != null -> "Erro do servidor AURA (HTTP ${response.code})"
+                    else -> "Falha na conexão SSE"
+                }
+                Log.e("SSE", "Error: $errorMsg")
+                trySend(SseEvent.Error(errorMsg ?: "Falha na conexão"))
+                close(t ?: Exception(errorMsg))
             }
         }
 

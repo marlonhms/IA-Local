@@ -49,6 +49,19 @@ class AuraChatController {
     this.messages = [];
     this.userScrolledUp = false;
 
+    // FASE 4: Modo de Conforto de Leitura no Chat (concise vs comfort)
+    this.readingMode = 'concise';
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const savedMode = localStorage.getItem('aura_chat_reading_mode');
+        if (savedMode === 'comfort' || savedMode === 'expanded') {
+          this.readingMode = 'comfort';
+        } else if (savedMode === 'concise') {
+          this.readingMode = 'concise';
+        }
+      }
+    } catch (_) {}
+
     // F5-01: Registro Modular Centralizado de Renderizadores Especializados por Intent / Ferramenta
     this.responseRenderers = {
       'shift_reconciliation': this.renderTurnoWidget.bind(this),
@@ -161,7 +174,11 @@ class AuraChatController {
       for (let i = 0; i < msgs.length; i++) {
         const msg = msgs[i];
         if (msg.role === 'user') {
-          this.appendUserMessage(msg.text);
+          this.appendUserMessage(msg.text, {
+            isFile: msg.isFile,
+            filename: msg.filename,
+            fileSize: msg.fileSize,
+          });
         } else if (msg.role === 'assistant' || msg.role === 'aura') {
           const containerId = msg.id || ('aura-hist-msg-' + i);
           this.createAuraMessageBubble(containerId);
@@ -175,7 +192,8 @@ class AuraChatController {
             this.updateToolResultCard(containerId, msg.toolName, msg.toolResult, true);
           }
           if (msg.text) {
-            this.updateAuraText(containerId, msg.text, false);
+            const hasTool = !!(msg.genuiEnvelope || msg.toolName);
+            this.updateAuraText(containerId, msg.text, false, hasTool);
           }
           this.finalizeCognitiveStep(containerId, false);
         }
@@ -205,13 +223,38 @@ class AuraChatController {
   init() {
     if (window.marked && typeof window.marked.setOptions === 'function') {
       try {
+        const renderer = new window.marked.Renderer();
+        renderer.link = (token, titleArg, textArg) => {
+          let href = '';
+          let title = '';
+          let text = '';
+          if (token && typeof token === 'object') {
+            href = token.href || '';
+            title = token.title || '';
+            text = token.text || '';
+          } else {
+            href = token || '';
+            title = titleArg || '';
+            text = textArg || '';
+          }
+          if (!text || text === 'undefined' || text.trim() === '' || text === 'null') {
+            text = title || 'Manual Oficial do ERP';
+          }
+          if (!href || href === 'undefined' || href.trim() === '' || href === 'null' || href === 'URL' || href === 'URL_REAL_DO_CONTEXTO') {
+            return `<span class="aura-doc-link inline-flex items-center gap-1 text-cyan-400 font-medium">${text}</span>`;
+          }
+          const tAttr = title ? ` title="${title}"` : '';
+          return `<a href="${href}"${tAttr} target="_blank" rel="noopener noreferrer" class="aura-doc-link inline-flex items-center gap-1 text-cyan-400 hover:text-cyan-300 underline font-medium">${text} <svg class="w-3.5 h-3.5 inline opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg></a>`;
+        };
         window.marked.setOptions({
+          renderer: renderer,
           gfm: true,
           breaks: true,
         });
       } catch (_) {}
     }
     this.bindEvents();
+    this.setReadingMode(this.readingMode);
     this.renderSessionId();
     this.restoreChatHistory();
     this.expireStaleWidgets();
@@ -261,6 +304,15 @@ class AuraChatController {
     if (sendBtn) sendBtn.addEventListener('click', () => this.handleSendMessage());
     if (stopBtn) stopBtn.addEventListener('click', () => this.abortStreaming());
     if (clearBtn) clearBtn.addEventListener('click', () => this.clearSession());
+
+    // FASE 4: Toggle de Conforto de Leitura no Chat
+    const readingDensityBtn = document.getElementById('btn-chat-reading-density');
+    if (readingDensityBtn) {
+      readingDensityBtn.addEventListener('click', () => this.toggleReadingMode());
+    }
+
+    // FASE 2: Ligacao do Smart Fiscal Composer e Leitor Local de XML
+    this.setupSmartFiscalComposer();
 
     // F4-12 & F4-13: Detecção de rolagem e botão flutuante de mensagens recentes
     const chatFeed = document.getElementById('chat-feed-container');
@@ -429,17 +481,116 @@ class AuraChatController {
   /**
    * Dispara prompt vindo de atalhos rápidos ou outros módulos
    */
-  sendUserPrompt(text) {
+
+  /**
+   * FASE 2: Smart Fiscal Composer & Leitor Local de XML / Chave 44d
+   * Deteccao automatica ao colar 44 digitos ou XML e upload 100% offline via FileReader.
+   */
+  setupSmartFiscalComposer() {
+    const input = document.getElementById('chat-input-text');
+    const pill = document.getElementById('fiscal-smart-paste-pill');
+    const pillText = document.getElementById('fiscal-smart-pill-text');
+    const triggerBtn = document.getElementById('btn-trigger-smart-fiscal');
+    const uploadBtn = document.getElementById('btn-upload-fiscal-xml');
+    const fileInput = document.getElementById('fiscal-xml-file-input');
+    const composer = document.querySelector('.message-composer-container');
+
+    const checkFiscalInput = () => {
+      const val = (input?.value || '').trim();
+      const matchKey = val.match(/\b\d{44}\b/);
+      const isXml = /<infNFe|<nfeProc|<NFe/i.test(val);
+
+      if (matchKey) {
+        if (pill) pill.classList.remove('hidden');
+        if (pillText) pillText.textContent = `Chave SEFAZ detectada: ${matchKey[0].substring(0, 4)}...${matchKey[0].substring(40)} (Auditoria Modulo 11)`;
+        this._detectedFiscalQuery = matchKey[0];
+      } else if (isXml) {
+        if (pill) pill.classList.remove('hidden');
+        if (pillText) pillText.textContent = 'Documento XML Fiscal detectado (Auditoria Completa SEFAZ)';
+        this._detectedFiscalQuery = val;
+      } else {
+        if (pill) pill.classList.add('hidden');
+        this._detectedFiscalQuery = null;
+      }
+    };
+
+    if (input) {
+      input.addEventListener('input', checkFiscalInput);
+      input.addEventListener('paste', () => setTimeout(checkFiscalInput, 50));
+    }
+
+    if (triggerBtn) {
+      triggerBtn.addEventListener('click', () => {
+        if (this._detectedFiscalQuery) {
+          const q = this._detectedFiscalQuery;
+          this._detectedFiscalQuery = null;
+          if (pill) pill.classList.add('hidden');
+          if (input) input.value = '';
+          this.handleSendMessage(q);
+        }
+      });
+    }
+
+    if (uploadBtn && fileInput) {
+      uploadBtn.addEventListener('click', () => fileInput.click());
+
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target?.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const xmlContent = ev.target?.result;
+          if (xmlContent && typeof xmlContent === 'string') {
+            if (pill) pill.classList.add('hidden');
+            if (input) input.value = '';
+            this.handleSendMessage(xmlContent, { isFile: true, filename: file.name, fileSize: file.size });
+          }
+        };
+        reader.readAsText(file);
+        fileInput.value = '';
+      });
+    }
+
+    if (composer) {
+      composer.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        composer.classList.add('border-cyan-400');
+      });
+      composer.addEventListener('dragleave', () => {
+        composer.classList.remove('border-cyan-400');
+      });
+      composer.addEventListener('drop', (e) => {
+        e.preventDefault();
+        composer.classList.remove('border-cyan-400');
+        const file = e.dataTransfer?.files?.[0];
+        if (file && (file.name.endsWith('.xml') || file.type.includes('xml'))) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const xmlContent = ev.target?.result;
+            if (xmlContent && typeof xmlContent === 'string') {
+              if (pill) pill.classList.add('hidden');
+              if (input) input.value = '';
+              this.handleSendMessage(xmlContent, { isFile: true, filename: file.name, fileSize: file.size });
+            }
+          };
+          reader.readAsText(file);
+        }
+      });
+    }
+  }
+
+  sendUserPrompt(text, meta = null) {
     if (this.isSubmitting || this.isStreaming) return;
     const input = document.getElementById('chat-input-text');
     if (input) input.value = '';
-    this.handleSendMessage(text);
+    this.handleSendMessage(text, meta);
   }
 
   /**
    * Envia a mensagem do usuário e inicia a conexão SSE
    */
-  async handleSendMessage(promptText = null) {
+  async handleSendMessage(promptText = null, meta = null) {
     if (this.isSubmitting || this.isStreaming) return;
     this.isSubmitting = true;
 
@@ -499,12 +650,22 @@ class AuraChatController {
 
     this.setStreamingState(true);
 
+    const isRawXml = !meta?.isFile && typeof query === 'string' && (
+      query.includes('<infNFe') ||
+      query.includes('<nfeProc') ||
+      query.includes('<NFe') ||
+      (query.trim().startsWith('<?xml') && query.length > 150)
+    );
+
     // 1. Adiciona a mensagem do usuário na tela e persiste no cache local
-    this.appendUserMessage(query);
+    this.appendUserMessage(query, meta);
     if (typeof window !== 'undefined' && window.AuraStorage) {
       window.AuraStorage.saveMessage(this.sessionId, {
         role: 'user',
         text: query,
+        isFile: !!(meta?.isFile || isRawXml),
+        filename: meta?.filename || (isRawXml ? 'documento_fiscal.xml' : null),
+        fileSize: meta?.fileSize || (isRawXml ? query.length : null),
         timestamp: Date.now()
       });
     }
@@ -517,6 +678,9 @@ class AuraChatController {
     // Ativa pulso do Cognitive Reasoning Orb no header e define primeira etapa cognitiva
     const headerOrb = typeof document !== 'undefined' ? (document.getElementById('header-neural-core-orb') || document.querySelector('header .neural-core-orb')) : null;
     if (headerOrb) headerOrb.classList.add('reasoning-active');
+    if (typeof window !== 'undefined' && window.auraOrbManager) {
+      window.auraOrbManager.setEmotion('THINKING');
+    }
     this.updateCognitiveStep(messageContainerId, 'Consultando automação da pista...', 'cyan');
 
     // Força rolagem para o início da nova resposta
@@ -538,7 +702,8 @@ class AuraChatController {
 
     const handleDoneReconciliation = () => {
       if (hasStreamError) return;
-      this.updateAuraText(messageContainerId, fullResponseText, false);
+      const hasToolPayload = !!(currentToolResult || lastGenUIEnvelope);
+      this.updateAuraText(messageContainerId, fullResponseText, false, hasToolPayload);
       this.finalizeCognitiveStep(messageContainerId, true);
 
       const scheduleMount = (callback) => {
@@ -662,18 +827,18 @@ class AuraChatController {
             } else {
               this.updateCognitiveStep(messageContainerId, 'Processando raciocínio cognitivo...', 'cyan');
             }
-          } 
+          }
           else if (type === 'tool_start') {
             const toolName = chunk.data?.tool_name || chunk.data?.intent || chunk.tool_name || chunk.intent || 'ferramenta';
             this.updateToolStartStatus(messageContainerId, toolName);
-          } 
+          }
           else if (type === 'tool_result') {
             const toolName = chunk.data?.tool_name || chunk.data?.intent || chunk.tool_name || chunk.intent || 'ferramenta';
             currentToolName = toolName;
             currentToolResult = chunk.data?.result || chunk.data || {};
             // Registra os dados da ferramenta sem abrir card prematuro antes do texto
             this.updateCognitiveStep(messageContainerId, 'Confrontando dados e regras de negócio...', 'purple');
-          } 
+          }
           else if (
             type === 'ui_skeleton' ||
             type === 'ui_delta' ||
@@ -689,7 +854,7 @@ class AuraChatController {
             if (!fullResponseText && (chunk.text || '').trim()) {
               this.updateCognitiveStep(messageContainerId, 'Gerando diagnóstico executivo...', 'purple');
             }
-          } 
+          }
           else if (type === 'telemetry') {
             telemetryData = chunk.data || {};
             this.updateTelemetryBadge(messageContainerId, telemetryData);
@@ -915,7 +1080,7 @@ class AuraChatController {
         if (inlineWidget) {
           const entranceClass = options.animated ? 'genui-wow-entrance' : 'animate-fade-in';
           hydratedHtml = `
-            <div id="genui-card-${this.escapeHtml(toolCallId || 'default')}" 
+            <div id="genui-card-${this.escapeHtml(toolCallId || 'default')}"
                  class="genui-hydrated-card ${entranceClass} my-2"
                  data-tool-call-id="${this.escapeHtml(toolCallId || '')}"
                  data-component="${this.escapeHtml(envelopeData.component_name || '')}">
@@ -957,7 +1122,7 @@ class AuraChatController {
             intent: envelopeData.intent,
             data: envelopeData.props,
             html: widgetContentHtml,
-            autoOpen: !isMobile
+            autoOpen: false
           });
           if (art) {
             if (art.title) artifactTitle = this.sanitizeExecutiveTitle(art.title, envelopeData.intent || envelopeData.component_name);
@@ -1072,7 +1237,7 @@ class AuraChatController {
         ? 'bg-slate-800 text-slate-200 border-white/10 hover:bg-slate-700'
         : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/30';
       return `
-        <button type="button" 
+        <button type="button"
                 data-action-id="${this.escapeHtml(act.action_id || '')}"
                 data-tool-call-id="${this.escapeHtml(toolCallId || '')}"
                 class="genui-action-btn px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${variantClass} ${disabledClass}"
@@ -1090,7 +1255,7 @@ class AuraChatController {
     ` : '';
 
     return `
-      <div id="genui-card-${this.escapeHtml(toolCallId || 'default')}" 
+      <div id="genui-card-${this.escapeHtml(toolCallId || 'default')}"
            class="genui-hydrated-card p-4 sm:p-5 space-y-3.5 rounded-2xl border border-cyan-500/30 bg-slate-900/80 backdrop-blur-xl animate-fade-in my-2"
            data-tool-call-id="${this.escapeHtml(toolCallId)}"
            data-component="${this.escapeHtml(componentName)}">
@@ -1339,15 +1504,73 @@ class AuraChatController {
       document.querySelectorAll('.chat-bubble-aura .neural-core-orb.reasoning-active').forEach(orb => {
         orb.classList.remove('reasoning-active');
       });
+      if (typeof window !== 'undefined' && window.auraOrbManager) {
+        window.auraOrbManager.setEmotion('SUCCESS');
+        setTimeout(() => {
+          if (window.auraOrbManager && window.auraOrbManager.getEmotion() === 'SUCCESS') {
+            window.auraOrbManager.setEmotion('CALM');
+          }
+        }, 1800);
+      }
     }
   }
 
-  appendUserMessage(text) {
+  appendUserMessage(text, meta = null) {
     const feed = document.getElementById('chat-feed-container');
     if (!feed) return;
 
     const div = document.createElement('div');
     div.className = 'flex justify-end w-full animate-fade-in';
+
+    const isFileMeta = meta && (meta.isFile || meta.filename);
+    const isRawXml = !isFileMeta && typeof text === 'string' && (
+      text.includes('<infNFe') ||
+      text.includes('<nfeProc') ||
+      text.includes('<NFe') ||
+      (text.trim().startsWith('<?xml') && text.length > 150)
+    );
+
+    let contentHtml = '';
+
+    if (isFileMeta || isRawXml) {
+      const fileName = (meta && meta.filename) || 'documento_fiscal.xml';
+      const rawSize = meta && meta.fileSize ? Number(meta.fileSize) : (text ? text.length : 0);
+      let sizeFormatted = '';
+      if (rawSize >= 1048576) {
+        sizeFormatted = `${(rawSize / 1048576).toFixed(1)} MB`;
+      } else if (rawSize >= 1024) {
+        sizeFormatted = `${(rawSize / 1024).toFixed(1)} KB`;
+      } else if (rawSize > 0) {
+        sizeFormatted = `${rawSize} B`;
+      } else {
+        sizeFormatted = 'XML';
+      }
+
+      const fileDesc = isFileMeta
+        ? `Arquivo XML anexado (${sizeFormatted}) - Auditoria SEFAZ MOC 7.0`
+        : `XML Fiscal enviado (${sizeFormatted}) - Estrutura NFe/NFCe detectada`;
+
+      contentHtml = `
+        <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-900/90 border border-cyan-500/30 shadow-inner">
+          <div class="w-10 h-10 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center flex-shrink-0 text-cyan-400 font-mono font-bold text-xs tracking-wider">
+            XML
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-semibold text-slate-100 truncate">${this.escapeHtml(fileName)}</div>
+            <div class="text-[11px] font-mono text-cyan-300 mt-0.5">${this.escapeHtml(fileDesc)}</div>
+          </div>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-mono font-semibold text-emerald-300 flex-shrink-0">
+            <svg class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Anexado</span>
+          </span>
+        </div>
+      `;
+    } else {
+      contentHtml = `<div class="leading-relaxed whitespace-pre-wrap">${this.escapeHtml(text)}</div>`;
+    }
+
+    const timeStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
     div.innerHTML = `
       <div class="chat-bubble-user max-w-[85%] md:max-w-[70%] lg:max-w-[65%] ml-auto p-4 text-slate-100 text-sm">
         <div class="flex items-center justify-between text-[11px] font-sans font-medium text-slate-400 mb-1.5 pb-1 border-b border-white/5">
@@ -1355,9 +1578,9 @@ class AuraChatController {
             <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
             <span>OPERADOR</span>
           </span>
-          <span class="text-slate-400 tabular-nums">${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+          <span class="text-slate-400 tabular-nums">${timeStr}</span>
         </div>
-        <div class="leading-relaxed whitespace-pre-wrap">${this.escapeHtml(text)}</div>
+        ${contentHtml}
       </div>
     `;
     feed.appendChild(div);
@@ -1376,9 +1599,7 @@ class AuraChatController {
         <!-- Header da Resposta com Núcleo e Tags -->
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
           <div class="flex items-center gap-2">
-            <div id="${containerId}-orb" class="neural-core-orb !w-6 !h-6 reasoning-active text-[10px] font-bold text-white flex items-center justify-center">
-              <span class="relative z-10">A</span>
-            </div>
+            <div id="${containerId}-orb" class="neural-core-orb !w-6 !h-6 reasoning-active flex items-center justify-center shadow-sm"></div>
             <span class="font-bold font-sans text-xs text-white">AURA</span>
             <span class="px-1.5 py-0.5 rounded text-[9px] font-sans font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">AI</span>
           </div>
@@ -1427,9 +1648,7 @@ class AuraChatController {
       <div class="chat-bubble-aura ${opts.isWelcome ? 'chat-bubble-welcome w-full max-w-full h-full min-h-full flex-1 flex flex-col justify-between p-4 sm:p-5 text-slate-100 text-sm space-y-3' : 'w-full max-w-full p-4 sm:p-5 text-slate-100 text-sm space-y-3'}">
         <div class="flex items-center justify-between border-b border-white/10 pb-2 ${opts.isWelcome ? 'flex-shrink-0' : ''}">
           <div class="flex items-center gap-2">
-            <div class="neural-core-orb !w-6 !h-6 text-[10px] font-bold text-white flex items-center justify-center shadow-sm">
-              <span class="relative z-10">A</span>
-            </div>
+            <div class="neural-core-orb !w-6 !h-6 flex items-center justify-center shadow-sm"></div>
             <span class="font-bold font-sans text-xs text-white">AURA</span>
             <span class="px-1.5 py-0.5 rounded text-[9px] font-sans font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">AI</span>
           </div>
@@ -1676,7 +1895,7 @@ class AuraChatController {
     ids.forEach(id => {
       const chip = typeof document !== 'undefined' ? document.getElementById(id) : null;
       if (chip) {
-        const colorClass = mode === 'purple' 
+        const colorClass = mode === 'purple'
           ? 'bg-purple-500/10 text-purple-300 border-purple-500/30'
           : mode === 'emerald'
           ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
@@ -1788,7 +2007,7 @@ class AuraChatController {
             intent: resultData?.contrato?.intent || resultData?.intent,
             data: resultData,
             html: widgetHtml,
-            autoOpen: true
+            autoOpen: false
           });
           if (art && art.id) {
             artifactId = art.id;
@@ -1874,7 +2093,8 @@ class AuraChatController {
     const isHiddenClass = startExpanded ? '' : 'hidden';
     const labelText = startExpanded ? 'Esconder Widget ▴' : 'Ver no Chat ▾';
     const ariaExpanded = startExpanded ? 'true' : 'false';
-    const displayTitle = this.sanitizeExecutiveTitle(artifactTitle);
+    const displayTitle = this.sanitizeErpBrand(this.sanitizeExecutiveTitle(artifactTitle));
+    const displaySubtitle = this.sanitizeErpBrand(artifactSubtitle || '');
 
     const entranceClass = animated ? 'genui-wow-entrance' : 'animate-fade-in';
     return `
@@ -1893,7 +2113,7 @@ class AuraChatController {
                 <span>${this.escapeHtml(displayTitle)}</span>
                 <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Canvas</span>
               </div>
-              <p class="text-[11px] text-slate-400 font-sans truncate">${this.escapeHtml(artifactSubtitle)}</p>
+              <p class="text-[11px] text-slate-400 font-sans truncate">${this.escapeHtml(displaySubtitle)}</p>
             </div>
           </div>
 
@@ -1907,9 +2127,9 @@ class AuraChatController {
             <button type="button" onclick="window.auraChat && window.auraChat.toggleInlineArtifact('${containerId}')" id="${containerId}-btn-toggle-pc" aria-expanded="${ariaExpanded}" aria-controls="${containerId}-inline-widget" class="aux-btn-toggle-pc hidden md:inline-flex px-2.5 py-1.5 min-h-[36px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-medium transition-all items-center gap-1 active:scale-95 cursor-pointer" title="Mostrar ou esconder este card no feed de mensagens">
               <span id="${containerId}-btn-toggle-pc-label">${labelText}</span>
             </button>
-            <!-- PC / Desktop: Somente Ver no Painel lateral -->
-            <button type="button" onclick="window.auraAuxPanel && window.auraAuxPanel.open('${artifactId}', true, this)" id="${containerId}-btn-open-panel" class="aux-btn-view-panel hidden md:inline-flex px-3 py-1.5 min-h-[36px] rounded-xl bg-gradient-to-r from-cyan-500/20 to-purple-500/20 hover:from-cyan-500/30 hover:to-purple-500/30 text-cyan-200 hover:text-white border border-cyan-500/40 text-xs font-semibold items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer" title="Abrir no Painel Auxiliar">
-              <span>Ver no Painel</span>
+            <!-- PC / Desktop: Convite Contextual para o Canvas lateral (Apendice C - Fase 2) -->
+            <button type="button" onclick="window.auraAuxPanel && window.auraAuxPanel.open('${artifactId}', true, this)" id="${containerId}-btn-open-panel" class="aux-btn-view-panel hidden md:inline-flex px-3.5 py-1.5 min-h-[36px] rounded-xl bg-gradient-to-r from-cyan-500/25 via-cyan-500/30 to-blue-600/30 hover:from-cyan-500/40 hover:to-blue-600/40 text-cyan-200 hover:text-white border border-cyan-500/50 text-xs font-semibold items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer" title="Explorar matriz detalhada e acoes no Canvas lateral">
+              <span>Explorar no Canvas -></span>
               <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
@@ -1920,8 +2140,8 @@ class AuraChatController {
           ${widgetHtml}
           <!-- Barra rápida para esconder o widget no chat -->
           <div class="flex justify-end pt-1">
-            <button type="button" 
-                    onclick="window.auraChat && window.auraChat.toggleInlineArtifact('${containerId}')" 
+            <button type="button"
+                    onclick="window.auraChat && window.auraChat.toggleInlineArtifact('${containerId}')"
                     class="text-[11px] text-slate-400 hover:text-cyan-300 transition-colors flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-white/10 cursor-pointer"
                     title="Recolher visualização deste card no chat">
               <span>Esconder este widget ▴</span>
@@ -2148,18 +2368,18 @@ class AuraChatController {
         </div>
 
         <div class="decision-actions">
-          <button 
-            type="button" 
-            class="decision-btn-primary" 
+          <button
+            type="button"
+            class="decision-btn-primary"
             onclick="if (window.auraChat) window.auraChat.sendUserPrompt('${escapedPrompt}');"
             title="Tentar executar a consulta novamente">
             <span>${CHAT_ICONS.refresh}</span>
             <span>Tentar Novamente</span>
           </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
+          <button
+            type="button"
+            class="decision-btn-secondary"
             onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como verificar a integridade da conexão do ERP e banco local?');"
             title="Verificar status e procedimento manual de contingência">
             <span>${CHAT_ICONS.wrench}</span>
@@ -2214,9 +2434,9 @@ class AuraChatController {
       const label = action.label || 'Acessar Funcionalidade';
       if (action.action === 'switch_tab' && action.target) {
         actionButtonHtml = `
-          <button 
+          <button
             type="button"
-            onclick="if (window.auraAudio) window.auraAudio.playChime(650, 0.05); if (window.auraApp) window.auraApp.switchTab('${this.escapeHtml(action.target)}');" 
+            onclick="if (window.auraAudio) window.auraAudio.playChime(650, 0.05); if (window.auraApp) window.auraApp.switchTab('${this.escapeHtml(action.target)}');"
             class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
             <span class="inline-flex">${CHAT_ICONS.rocket}</span>
             <span>${this.escapeHtml(label)}</span>
@@ -2227,9 +2447,9 @@ class AuraChatController {
         `;
       } else if (action.action === 'open_sidebar') {
         actionButtonHtml = `
-          <button 
+          <button
             type="button"
-            onclick="if (window.auraApp) window.auraApp.openSidebar();" 
+            onclick="if (window.auraApp) window.auraApp.openSidebar();"
             class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
             <span class="inline-flex">${CHAT_ICONS.folder}</span>
             <span>${this.escapeHtml(label)}</span>
@@ -2237,9 +2457,9 @@ class AuraChatController {
         `;
       } else if (action.action === 'open_command_palette') {
         actionButtonHtml = `
-          <button 
+          <button
             type="button"
-            onclick="const btn = document.getElementById('btn-open-palette'); if (btn) btn.click();" 
+            onclick="const btn = document.getElementById('btn-open-palette'); if (btn) btn.click();"
             class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
             <span class="inline-flex">${CHAT_ICONS.terminal}</span>
             <span>${this.escapeHtml(label)}</span>
@@ -2247,9 +2467,9 @@ class AuraChatController {
         `;
       } else if (action.action === 'toggle_audio') {
         actionButtonHtml = `
-          <button 
+          <button
             type="button"
-            onclick="const btn = document.getElementById('sidebar-btn-toggle-sfx') || document.getElementById('btn-toggle-sfx'); if (btn) { btn.click(); } else if (window.auraAudio) { const m = window.auraAudio.toggleMute(); if (window.auraApp) window.auraApp.syncSfxButtons(m); }" 
+            onclick="const btn = document.getElementById('sidebar-btn-toggle-sfx') || document.getElementById('btn-toggle-sfx'); if (btn) { btn.click(); } else if (window.auraAudio) { const m = window.auraAudio.toggleMute(); if (window.auraApp) window.auraApp.syncSfxButtons(m); }"
             class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
             <span class="inline-flex">${CHAT_ICONS.volume}</span>
             <span>${this.escapeHtml(label)}</span>
@@ -2257,9 +2477,9 @@ class AuraChatController {
         `;
       } else {
         actionButtonHtml = `
-          <button 
+          <button
             type="button"
-            onclick="if (window.auraApp) window.auraApp.switchTab('cockpit');" 
+            onclick="if (window.auraApp) window.auraApp.switchTab('cockpit');"
             class="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-purple-600/25 hover:from-cyan-500/40 hover:to-purple-600/40 border border-cyan-400/40 hover:border-cyan-300 text-cyan-200 hover:text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer">
             <span class="inline-flex">${CHAT_ICONS.pulse}</span>
             <span>${this.escapeHtml(label)}</span>
@@ -2593,53 +2813,53 @@ class AuraChatController {
         <!-- Ações Permitidas -->
         <div class="decision-actions">
           ${isUnavailable ? `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual a previsão de esgotamento e a autonomia estimada dos tanques?');"
               title="Tentar executar a consulta novamente">
               <span>${CHAT_ICONS.refresh}</span>
               <span>Tentar Novamente</span>
             </button>
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar estoque de combustível sem telemetria eletrônica?');"
               title="Procedimento de contingência">
               <span>${CHAT_ICONS.wrench}</span>
               <span>Procedimento de Contingência</span>
             </button>
           ` : `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual a melhor sugestão de pedido de carreta para o Tanque ${codCritico}?');"
               title="Sugerir compra imediata com base no Ullage">
               ${CHAT_ICONS.truck}
               <span>${this.escapeHtml(recLabel)}</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
               title="Ver fórmulas matemáticas de consumo médio e run-out">
               ${CHAT_ICONS.formula}
               <span>Como foi calculado</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'tanques');"
               title="Ver detalhamento completo dos tanques">
               ${CHAT_ICONS.tank}
               <span>Ver Tanques & Detalhes</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
               title="Ver fontes de telemetria e diagnóstico">
               ${CHAT_ICONS.audit}
@@ -2926,53 +3146,53 @@ class AuraChatController {
         <!-- Ações Permitidas -->
         <div class="decision-actions">
           ${isUnavailable ? `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('O LMC de ontem fechou dentro da tolerância oficial da ANP?');"
               title="Tentar executar a consulta novamente">
               <span>${CHAT_ICONS.refresh}</span>
               <span>Tentar Novamente</span>
             </button>
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como preencher o LMC em contingência sem sistema ERP?');"
               title="Procedimento de contingência">
               <span>${CHAT_ICONS.wrench}</span>
               <span>Procedimento de Contingência</span>
             </button>
           ` : `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar a divergência física no tanque de combustíveis?');"
               title="Abrir procedimento de conferência de sonda e régua">
               ${CHAT_ICONS.search}
               <span>${this.escapeHtml(recLabel)}</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
               title="Ver definição regulatória da Portaria 26 da ANP">
               ${CHAT_ICONS.formula}
               <span>Como foi calculado</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'tanques');"
               title="Ver balanço físico-contábil completo dos tanques">
               ${CHAT_ICONS.tank}
               <span>Ver Tanques & ANP</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
               title="Ver fontes fiscais e telemetria">
               ${CHAT_ICONS.audit}
@@ -3259,35 +3479,35 @@ class AuraChatController {
         <!-- Ações Permitidas (Uma primária + botões de evidência) -->
         <div class="decision-actions">
           ${isUnavailable ? `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual a conciliação do turno de hoje?');"
               title="Tentar executar a consulta novamente">
               <span>${CHAT_ICONS.refresh}</span>
               <span>Tentar Novamente</span>
             </button>
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar fechamento de turno em contingência sem ERP?');"
               title="Procedimento de contingência">
               <span>${CHAT_ICONS.wrench}</span>
               <span>Procedimento de Contingência</span>
             </button>
           ` : `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
               title="Abrir painel lateral com proveniência e detalhamento">
               ${CHAT_ICONS.audit}
               <span>${this.escapeHtml(recLabel)} ↗</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
               title="Ver fórmula matemática e definição do cálculo">
               ${CHAT_ICONS.formula}
@@ -3295,9 +3515,9 @@ class AuraChatController {
             </button>
 
             ${pendingItems.length > 0 ? `
-              <button 
-                type="button" 
-                class="decision-btn-secondary" 
+              <button
+                type="button"
+                class="decision-btn-secondary"
                 onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
                 title="Ver lista de pendências impeditivas">
                 ${CHAT_ICONS.alert}
@@ -3305,9 +3525,9 @@ class AuraChatController {
               </button>
             ` : ''}
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'bicos');"
               title="Ver todos os bicos da pista e encerrantes">
               ${CHAT_ICONS.nozzle}
@@ -3683,7 +3903,7 @@ class AuraChatController {
           <div class="p-3 rounded-xl glass-subcard border border-white/5 font-sans text-xs space-y-2">
             <div class="text-cyan-400 font-bold font-mono">Divergência Pista = Volume Automação - Encerrantes Faturados</div>
             <div class="text-slate-300">
-              ${this.formatLiters(autVol, 3)} (Pista) - ${this.formatLiters(0, 3)} (fechabomba) = 
+              ${this.formatLiters(autVol, 3)} (Pista) - ${this.formatLiters(0, 3)} (fechabomba) =
               <strong class="text-emerald-400 tabular-nums">${this.formatLiters(0, 3)}</strong>
             </div>
           </div>
@@ -3697,7 +3917,7 @@ class AuraChatController {
           <div class="p-3 rounded-xl glass-subcard border border-white/5 font-sans text-xs space-y-2">
             <div class="text-cyan-400 font-bold font-mono">Divergência Pista = Volume Automação - Encerrantes Faturados</div>
             <div class="text-slate-300">
-              ${this.formatLiters(autVol, 3)} (Pista) - ${this.formatLiters(encVol, 3)} (fechabomba) = 
+              ${this.formatLiters(autVol, 3)} (Pista) - ${this.formatLiters(encVol, 3)} (fechabomba) =
               <strong class="${Math.abs(diffVol) < 0.01 ? 'text-emerald-400' : 'text-amber-400'} tabular-nums">${diffVol > 0 ? '+' : ''}${this.formatLiters(diffVol, 3)}</strong>
             </div>
           </div>
@@ -3716,7 +3936,7 @@ class AuraChatController {
             <div class="p-3 rounded-xl glass-subcard border border-white/5 font-sans text-xs space-y-2">
               <div class="text-cyan-400 font-bold font-mono">Diferença = Faturamento PDV - Automação da Pista</div>
               <div class="text-slate-300">
-                ${this.formatBRL(posRev)} (PDV) - ${this.formatBRL(autRev)} (Pista) = 
+                ${this.formatBRL(posRev)} (PDV) - ${this.formatBRL(autRev)} (Pista) =
                 <strong class="${diff < 0 ? 'text-amber-400' : 'text-emerald-400'} tabular-nums">${this.formatSignedBRL(diff)}</strong>
               </div>
             </div>
@@ -4458,53 +4678,53 @@ class AuraChatController {
         <!-- Ações Permitidas -->
         <div class="decision-actions">
           ${isUnavailable ? `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Quais os combos de conveniência com maior afinidade?');"
               title="Tentar executar a consulta novamente">
               <span>${CHAT_ICONS.refresh}</span>
               <span>Tentar Novamente</span>
             </button>
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar vendas de conveniência em contingência?');"
               title="Procedimento de contingência">
               <span>${CHAT_ICONS.wrench}</span>
               <span>Procedimento de Contingência</span>
             </button>
           ` : `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Quais os scripts de balcão recomendados para a equipe do caixa?');"
               title="Capacitar operadores com roteiro persuasivo no PDV">
               ${CHAT_ICONS.store}
               <span>${this.escapeHtml(recLabel)}</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
               title="Ver definições matemáticas de Suporte, Confiança e Lift">
               ${CHAT_ICONS.formula}
               <span>Como foi calculado</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'caixas');"
               title="Ver tabela detalhada de todas as regras mineradas">
               ${CHAT_ICONS.chart}
               <span>Ver Regras Detalhadas</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
               title="Ver fontes de dados e diagnósticos">
               ${CHAT_ICONS.audit}
@@ -4792,53 +5012,53 @@ class AuraChatController {
         <!-- Ações Permitidas -->
         <div class="decision-actions">
           ${isUnavailable ? `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Qual o desempenho da pista e vazão de bicos hoje?');"
               title="Tentar executar a consulta novamente">
               <span>${CHAT_ICONS.refresh}</span>
               <span>Tentar Novamente</span>
             </button>
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como auditar vazão de bicos manualmente em contingência?');"
               title="Procedimento de contingência">
               <span>${CHAT_ICONS.wrench}</span>
               <span>Procedimento de Contingência</span>
             </button>
           ` : `
-            <button 
-              type="button" 
-              class="decision-btn-primary" 
+            <button
+              type="button"
+              class="decision-btn-primary"
               onclick="if (window.auraChat) window.auraChat.sendUserPrompt('Como programar a manutenção preventiva dos filtros de bicos de combustíveis?');"
               title="Abrir diretrizes de manutenção de bicos e bombas">
               <span class="text-xs inline-flex">${CHAT_ICONS.wrench}</span>
               <span>${this.escapeHtml(recLabel)}</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'formula');"
               title="Ver fórmulas de vazão e conversão de aditivada">
               <span class="text-xs inline-flex">${CHAT_ICONS.formula}</span>
               <span>Como foi calculado</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'bicos');"
               title="Ver detalhamento de todos os bicos da pista">
               <span class="text-xs inline-flex">${CHAT_ICONS.nozzle}</span>
               <span>Ver Bicos & Pista</span>
             </button>
 
-            <button 
-              type="button" 
-              class="decision-btn-secondary" 
+            <button
+              type="button"
+              class="decision-btn-secondary"
               onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
               title="Ver fontes de dados e diagnósticos">
               <span class="text-xs inline-flex">${CHAT_ICONS.audit}</span>
@@ -5013,27 +5233,27 @@ class AuraChatController {
 
         <!-- Ações do Card -->
         <div class="decision-actions">
-          <button 
-            type="button" 
-            class="decision-btn-primary" 
+          <button
+            type="button"
+            class="decision-btn-primary"
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'resumo');"
             title="Abrir extrato analítico com cupons e histórico">
             ${CHAT_ICONS.audit}
             <span>Extrato Completo de Vendas ↗</span>
           </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
+          <button
+            type="button"
+            class="decision-btn-secondary"
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'caixas');"
             title="Ver cupons fiscais da conveniência">
             ${CHAT_ICONS.store}
             <span>Cupons da Loja</span>
           </button>
 
-          <button 
-            type="button" 
-            class="decision-btn-secondary" 
+          <button
+            type="button"
+            class="decision-btn-secondary"
             onclick="if (window.auraChat) window.auraChat.openEvidence('${evId}', 'bicos');"
             title="Ver histórico de abastecimentos da pista">
             ${CHAT_ICONS.nozzle}
@@ -5143,9 +5363,10 @@ class AuraChatController {
     const stack = [];
     const tokenRegex = /(\*\*|__|(?<!\*)\*(?!\*)|\[(\/?)([a-zA-Z0-9_\-]+)\]|<(\/?)([a-zA-Z0-9]+)(?:\s+[^>]*)?>)/g;
     const bbTags = new Set([
-      'verde', 'emerald', 'green', 'amarelo', 'amber', 'yellow', 'vermelho', 'rose', 'red', 'ciano', 'cyan', 'roxo', 'purple',
+      'verde', 'emerald', 'green', 'amarelo', 'amber', 'yellow', 'vermelho', 'rose', 'red', 'ciano', 'cyan', 'cyano', 'roxo', 'purple',
       'badge-verde', 'badge-emerald', 'badge-green', 'badge-amarelo', 'badge-amber', 'badge-yellow',
-      'badge-vermelho', 'badge-rose', 'badge-red', 'badge-ciano', 'badge-cyan', 'badge-roxo', 'badge-purple', 'u'
+      'badge-vermelho', 'badge-rose', 'badge-red', 'badge-ciano', 'badge-cyan', 'badge-cyano', 'badge-roxo', 'badge-purple',
+      'u', 'sublinhado', 'underline', 'italic', 'italico', 'bold', 'negrito', 'i', 'b'
     ]);
     const htmlTags = new Set(['span', 'u', 'strong', 'em', 'b', 'i', 'mark']);
 
@@ -5304,13 +5525,14 @@ class AuraChatController {
 
       'ciano': { hl: 'text-cyan aura-hl-cyan', badge: 'badge-cyan aura-badge-cyan' },
       'cyan': { hl: 'text-cyan aura-hl-cyan', badge: 'badge-cyan aura-badge-cyan' },
+      'cyano': { hl: 'text-cyan aura-hl-cyan', badge: 'badge-cyan aura-badge-cyan' },
 
       'roxo': { hl: 'text-purple aura-hl-purple', badge: 'badge-purple aura-badge-purple' },
       'purple': { hl: 'text-purple aura-hl-purple', badge: 'badge-purple aura-badge-purple' },
     };
 
     const allColors = Object.keys(colorMap).join('|');
-    const allTags = `(?:badge-)?(?:${allColors})|u|sublinhado|underline`;
+    const allTags = `(?:badge-)?(?:${allColors})|u|sublinhado|underline|italic|italico|bold|negrito|i|b`;
 
     // 4.1. Normaliza fechamentos quebrados e tolerantes de BBCode (ex: [cor]texto /cor ou [cor]texto[/ cor])
     text = text.replace(
@@ -5329,6 +5551,23 @@ class AuraChatController {
         const rightTrimmed = content.replace(/\s+$/, '');
         const trailing = content.slice(rightTrimmed.length);
         return `[${tag}]${rightTrimmed}[/${tag}]${trailing}`;
+      }
+    );
+
+    // 4.2.5. Desempacota tags de cor sobredimensionadas (evita pintar oracoes inteiras que estouram o layout)
+    text = text.replace(
+      new RegExp('\\[(' + allColors + ')\\]([\\s\\S]*?)\\[\\/\\1\\]', 'gi'),
+      (match, tag, inner) => {
+        if (inner.length <= 45 && !/[.;!?]/.test(inner)) return match;
+        const anchorMatch = inner.match(/(\b\*\*[^*]+\*\*|Rejei[cç][aã]o\s*\d+|CFOP\s*\d+|CST\s*\d+|CSOSN\s*\d+|NCM\s*\d+|[+\-]?\d+(?:[.,]\d+)?%|R\$\s*[\d.,]+)/i);
+        if (anchorMatch) {
+          const anchor = anchorMatch[0];
+          const idx = anchorMatch.index;
+          const prefix = inner.slice(0, idx);
+          const suffix = inner.slice(idx + anchor.length);
+          return `${prefix}[${tag}]${anchor}[/${tag}]${suffix}`;
+        }
+        return inner;
       }
     );
 
@@ -5358,6 +5597,18 @@ class AuraChatController {
 
     // 4.6. Transforma Markdown de sublinhado: __texto__ (permite underlines no meio de palavras compostas)
     text = text.replace(/(^|[^\w])__(?!_)([^\r\n]+?)(?<!_)__([^\w]|$)/g, '$1<u class="aura-underline">$2</u>$3');
+
+    // 4.6.1. Transforma BBCode de italico: [italic]...[/italic], [italico]...[/italico], [i]...[/i]
+    text = text.replace(/\[(?:italic|italico|i)\]([\s\S]*?)\[\/(?:italic|italico|i)\]/gi, (match, content) => {
+      if (!content.trim()) return '';
+      return `<em>${content}</em>`;
+    });
+
+    // 4.6.2. Transforma BBCode de negrito: [bold]...[/bold], [negrito]...[/negrito], [b]...[/b]
+    text = text.replace(/\[(?:bold|negrito|b)\]([\s\S]*?)\[\/(?:bold|negrito|b)\]/gi, (match, content) => {
+      if (!content.trim()) return '';
+      return `<strong>${content}</strong>`;
+    });
 
     // 4.7. Higienizacao estrita de tags orfas restantes (nunca deixando /vermelho, [ciano], [/vermelho] soltos)
     // Remove tags de fechamento orfas: [/vermelho], [/ciano], etc.
@@ -5568,6 +5819,12 @@ class AuraChatController {
     // Inline code (`código`)
     html = html.replace(/`([^`\n]+)`/g, '<code class="px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300 font-mono text-xs">$1</code>');
 
+    // Links em Markdown [Texto](url) com abertura segura em nova aba
+    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (match, linkText, url) => {
+      const safeText = (!linkText || linkText === 'undefined' || linkText.trim() === '' || linkText === 'null') ? 'Manual Oficial do ERP' : linkText;
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="aura-doc-link inline-flex items-center gap-1 text-cyan-400 hover:text-cyan-300 underline font-medium">${safeText} <svg class="w-3.5 h-3.5 inline opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg></a>`;
+    });
+
     return html;
   }
 
@@ -5577,8 +5834,245 @@ class AuraChatController {
    * destaques coloridos ([verde], [amarelo], [vermelho], [ciano], [roxo]), badges e tags seguras.
    * Garante renderização suave no streaming token-a-token e sanitização estrita contra XSS.
    */
-  formatMarkdown(rawMarkdown, isStillStreaming = false) {
+  /**
+   * Auto-Tokenizacao inteligente de dados operacionais (Apendice B - Fase 2).
+   * Identifica padroes numericos, moedas, volumes e codigos fiscais fora de tags e code blocks,
+   * envolvendo-os em <span class="aura-data-token"> com fonte tabular monoespacada.
+   */
+  applySmartTypographyTokens(htmlContent) {
+    if (!htmlContent || typeof htmlContent !== 'string') return '';
+    const parts = htmlContent.split(/(<[^>]+>)/g);
+    let inCodeOrPre = 0;
+    let inDataToken = 0;
+    const tokenRegex = /(R\$\s?-?\d{1,3}(?:\.\d{3})*(?:,\d{2})?|\b\d{1,3}(?:\.\d{3})*(?:,\d+)?\s?(?:L\/min|L\/h|L|litros)\b|[+\-]?\d+(?:[.,]\d+)?%|\b(?:CFOP\s?\d{4}|CST\s?\d{2,3}|NCM\s?\d{4,8}|Rejeicao\s?\d{3}|cStat\s?=\s?\d{3})\b)/gi;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      if (!part) continue;
+
+      if (part.startsWith('<')) {
+        const lower = part.toLowerCase();
+        if (lower.startsWith('<pre') || lower.startsWith('<code')) {
+          inCodeOrPre++;
+        } else if (lower.startsWith('</pre') || lower.startsWith('</code')) {
+          inCodeOrPre = Math.max(0, inCodeOrPre - 1);
+        }
+        if (lower.startsWith('<span') && lower.includes('aura-data-token')) {
+          inDataToken++;
+        } else if (lower.startsWith('</span') && inDataToken > 0) {
+          inDataToken--;
+        }
+        continue;
+      }
+
+      if (inCodeOrPre === 0 && inDataToken === 0 && part.trim()) {
+        parts[i] = part.replace(tokenRegex, '<span class="aura-data-token">$1</span>');
+      }
+    }
+    return parts.join('');
+  }
+
+  /**
+   * Progressive Disclosure no Chat (Apendice B - Fase 2 & Fase 4).
+   * Quando uma resposta possui card na GUI (Companion Canvas) e mais de 3 blocos textuais,
+   * mantem os 2 primeiros blocos visiveis (BLUF) e agrupa o restante em container colapsavel.
+   * No modo 'comfort', abre o disclosure automaticamente via atributo 'open'.
+   */
+  applyProgressiveDisclosure(htmlContent, isStillStreaming = false, hasToolCard = false) {
+    if (!htmlContent || typeof htmlContent !== 'string') return '';
+    if (isStillStreaming) return htmlContent;
+    if (hasToolCard) return htmlContent;
+    // Em manuais operacionais passo a passo ou com links de documentacao, preserva o roteiro completo visivel
+    if (htmlContent.includes('aura-doc-link') || /Roteiro Executivo|Passo a Passo/i.test(htmlContent)) {
+      return htmlContent;
+    }
+
+    const isExpanded = (this.getReadingMode() === 'comfort');
+    const openAttr = isExpanded ? ' open' : '';
+
+    // 1. Em navegadores com DOMParser nativo
+    if (typeof DOMParser !== 'undefined') {
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(`<body>${htmlContent}</body>`, 'text/html');
+        const children = Array.from(doc.body.children);
+        if (children.length > 3) {
+          const visibleBlocks = children.slice(0, 2).map(el => el.outerHTML).join('\n');
+          const hiddenBlocks = children.slice(2).map(el => el.outerHTML).join('\n');
+          return `
+            ${visibleBlocks}
+            <details class="aura-chat-disclosure mt-2.5 rounded-xl border border-white/10 bg-slate-950/40 overflow-hidden"${openAttr}>
+              <summary class="px-3 py-1.5 text-[11px] font-mono text-slate-400 hover:text-cyan-300 cursor-pointer flex items-center justify-between select-none transition-colors">
+                <span>Explorar detalhamento textual completo</span>
+                <span class="text-[10px] bg-slate-800/80 px-1.5 py-0.5 rounded text-slate-300">+Detalhes</span>
+              </summary>
+              <div class="p-3 pt-2 border-t border-white/5 space-y-2 text-[0.935rem] leading-relaxed text-slate-200">
+                ${hiddenBlocks}
+              </div>
+            </details>
+          `;
+        }
+        return htmlContent;
+      } catch (err) {
+        // Fallback para Node.js / regex
+      }
+    }
+
+    // 2. Fallback regex para testes headless em Node.js
+    const blockMatches = htmlContent.match(/(<(?:p|ul|ol|table|blockquote|div)[\s\S]*?<\/(?:p|ul|ol|table|blockquote|div)>)/gi);
+    if (blockMatches && blockMatches.length > 3) {
+      const visibleBlocks = blockMatches.slice(0, 2).join('\n');
+      const hiddenBlocks = blockMatches.slice(2).join('\n');
+      return `
+        ${visibleBlocks}
+        <details class="aura-chat-disclosure mt-2.5 rounded-xl border border-white/10 bg-slate-950/40 overflow-hidden"${openAttr}>
+          <summary class="px-3 py-1.5 text-[11px] font-mono text-slate-400 hover:text-cyan-300 cursor-pointer flex items-center justify-between select-none transition-colors">
+            <span>Explorar detalhamento textual completo</span>
+            <span class="text-[10px] bg-slate-800/80 px-1.5 py-0.5 rounded text-slate-300">+Detalhes</span>
+          </summary>
+          <div class="p-3 pt-2 border-t border-white/5 space-y-2 text-[0.935rem] leading-relaxed text-slate-200">
+            ${hiddenBlocks}
+          </div>
+        </details>
+      `;
+    }
+
+    return htmlContent;
+  }
+
+  /**
+   * FASE 4: Toggle e Gerenciador de Conforto de Leitura no Chat.
+   * Alterna entre os modos 'concise' (68ch, progressive disclosure fechado)
+   * e 'comfort' (corpo 0.96rem, progressive disclosure aberto automaticamente).
+   */
+  getReadingMode() {
+    return this.readingMode || 'concise';
+  }
+
+  setReadingMode(mode) {
+    this.readingMode = (mode === 'comfort' || mode === 'expanded') ? 'comfort' : 'concise';
+
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('aura_chat_reading_mode', this.readingMode);
+      }
+    } catch (_) {}
+
+    if (typeof document !== 'undefined') {
+      const feed = document.getElementById('chat-feed-container');
+      const streamCol = document.getElementById('chat-stream-column');
+      const btn = document.getElementById('btn-chat-reading-density');
+      const label = document.getElementById('label-chat-reading-density');
+
+      const isComfort = (this.readingMode === 'comfort');
+
+      if (feed) {
+        if (isComfort) {
+          feed.classList.add('reading-mode-comfort', 'aura-reading-comfort');
+        } else {
+          feed.classList.remove('reading-mode-comfort', 'aura-reading-comfort');
+        }
+      }
+
+      if (streamCol) {
+        if (isComfort) {
+          streamCol.classList.add('reading-mode-comfort', 'aura-reading-comfort');
+        } else {
+          streamCol.classList.remove('reading-mode-comfort', 'aura-reading-comfort');
+        }
+      }
+
+      if (btn) {
+        btn.setAttribute('data-reading-mode', this.readingMode);
+        btn.setAttribute('aria-pressed', isComfort ? 'true' : 'false');
+        if (isComfort) {
+          btn.classList.add('active', 'border-cyan-500/40', 'bg-cyan-500/10', 'text-cyan-200');
+          btn.classList.remove('text-slate-300');
+          btn.title = 'Modo de Leitura: Conforto Editorial (Fonte 0.96rem, detalhes abertos) - Clique para Conciso';
+        } else {
+          btn.classList.remove('active', 'border-cyan-500/40', 'bg-cyan-500/10', 'text-cyan-200');
+          btn.classList.add('text-slate-300');
+          btn.title = 'Modo de Leitura: Conciso (Resumo Executivo, 68ch) - Clique para Conforto Editorial';
+        }
+      }
+
+      if (label) {
+        label.textContent = isComfort ? 'Conforto' : 'Conciso';
+        if (isComfort) {
+          label.classList.add('text-cyan-300');
+          label.classList.remove('text-slate-400');
+        } else {
+          label.classList.remove('text-cyan-300');
+          label.classList.add('text-slate-400');
+        }
+      }
+
+      // Sincroniza estado de todos os blocos de disclosure presentes no DOM
+      const disclosures = document.querySelectorAll('.aura-chat-disclosure');
+      disclosures.forEach(d => {
+        d.open = isComfort;
+      });
+    }
+
+    return this.readingMode;
+  }
+
+  toggleReadingMode() {
+    const nextMode = (this.readingMode === 'comfort') ? 'concise' : 'comfort';
+    return this.setReadingMode(nextMode);
+  }
+
+  sanitizeErpBrand(text) {
+    if (!text || typeof text !== 'string') return text || '';
+    // Protege URLs completas (evita corromper links do Confluence ou rotas de API)
+    const urlPlaceholders = [];
+    let t = text.replace(/https?:\/\/[^\s)\]]+/gi, (matchedUrl) => {
+      urlPlaceholders.push(matchedUrl);
+      return `__AURA_URL_SAFE_${urlPlaceholders.length - 1}__`;
+    });
+    t = t.replace(/\bwebposto\s*\(retaguarda\)/gi, 'Retaguarda do seu ERP');
+    t = t.replace(/\bwebpostopdv\b/gi, 'PDV do Posto');
+    t = t.replace(/\bwebpostopay(?:server)?\b/gi, 'Módulo de Pagamentos / TEF');
+    t = t.replace(/\bwebfrota\b/gi, 'Módulo de Frotas');
+    t = t.replace(/\bweboil(?:\s*app)?\b/gi, 'App de Lubrificantes/Pista');
+
+    t = t.replace(/\bNo\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'No seu ERP');
+    t = t.replace(/(?<=[a-zA-Z0-9,;]\s)No seu ERP\b/g, 'no seu ERP');
+
+    t = t.replace(/\bDo\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'Do seu ERP');
+    t = t.replace(/(?<=[a-zA-Z0-9,;]\s)Do seu ERP\b/g, 'do seu ERP');
+
+    t = t.replace(/\bpelo\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'pelo seu ERP');
+    t = t.replace(/\bao\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'ao seu ERP');
+    t = t.replace(/\bpara\s+o\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'para o seu ERP');
+    t = t.replace(/\bcom\s+o\s+webposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'com o seu ERP');
+
+    t = t.replace(/\bdesbloqueio\s+webposto\b/gi, 'desbloqueio no seu ERP');
+    t = t.replace(/\bsuporte\s+webposto\b/gi, 'suporte do seu ERP');
+    t = t.replace(/\bapi\s+webposto\b/gi, 'API do seu ERP');
+    t = t.replace(/\bapis\s+webposto\b/gi, 'APIs do seu ERP');
+    t = t.replace(/\bsistema\s+webposto\b/gi, 'seu sistema ERP');
+    t = t.replace(/\berp\s+webposto(?:\s+v?\d+(?:\.\d+)*\+?)?\b/gi, 'ERP do Posto');
+    t = t.replace(/\bvers[aã]o\s+erp\s*:\s*webposto(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'Versao ERP: ERP do Posto');
+
+    t = t.replace(/\bwebposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'seu ERP');
+
+    if (t.startsWith('seu ERP')) {
+      t = 'Seu ERP' + t.slice(7);
+    } else if (t.startsWith('no seu ERP')) {
+      t = 'No seu ERP' + t.slice(10);
+    }
+
+    urlPlaceholders.forEach((url, idx) => {
+      t = t.replace(`__AURA_URL_SAFE_${idx}__`, url);
+    });
+
+    return t;
+  }
+
+  formatMarkdown(rawMarkdown, isStillStreaming = false, hasToolCard = false) {
     if (!rawMarkdown || typeof rawMarkdown !== 'string') return '';
+    rawMarkdown = this.sanitizeErpBrand(rawMarkdown);
 
     // 1. Auto-balanceia tags abertas SEMPRE (inclusive na renderização final isStillStreaming === false)
     let preparedText = this.balanceStreamingText(rawMarkdown, isStillStreaming);
@@ -5605,12 +6099,29 @@ class AuraChatController {
       html = this.renderFallbackMarkdown(finalText);
     }
 
+    // 6. Auto-Tokenizacao Inteligente de Dados Operacionais (Apendice B - Fase 2)
+    html = this.applySmartTypographyTokens(html);
+
+    // 7. Progressive Disclosure no Chat (Apendice B - Fase 2)
+    html = this.applyProgressiveDisclosure(html, isStillStreaming, hasToolCard);
+
     return html;
   }
 
-  updateAuraText(containerId, fullMarkdown, isStillStreaming) {
+  updateAuraText(containerId, fullMarkdown, isStillStreaming, hasToolCardParam = null) {
     const textIds = [containerId + '-text', containerId + '-split-text'];
-    const html = this.formatMarkdown(fullMarkdown, isStillStreaming);
+
+    // Auto-detecta presenca de card de ferramenta/GUI associado ao container
+    let hasToolCard = hasToolCardParam;
+    if (hasToolCard === null && typeof document !== 'undefined') {
+      const toolCardEl = document.getElementById(containerId + '-tool-card');
+      const splitCardEl = document.getElementById(containerId + '-split-tool-card');
+      const hasChildren = (toolCardEl && toolCardEl.children.length > 0 && !toolCardEl.classList.contains('hidden')) ||
+                          (splitCardEl && splitCardEl.children.length > 0 && !splitCardEl.classList.contains('hidden'));
+      hasToolCard = !!hasChildren;
+    }
+
+    const html = this.formatMarkdown(fullMarkdown, isStillStreaming, hasToolCard);
 
     textIds.forEach(id => {
       const textEl = document.getElementById(id);
@@ -5633,11 +6144,28 @@ class AuraChatController {
     const model = t.llm_model || 'Gemini 3.1 Flash';
     const lgpd = t.lgpd_sanitized_count || 0;
 
+    const tokens = t.tokens || {};
+    const totalTokens = tokens.total_tokens || t.total_tokens || 0;
+    const costBrl = tokens.cost_brl || t.cost_brl || 0;
+    const avoidedBrl = tokens.avoided_cost_brl || t.avoided_cost_brl || 0;
+    const budgetPct = (tokens.budget_percent_used !== undefined && tokens.budget_percent_used !== null) ? Number(tokens.budget_percent_used) : null;
+
+    let tokenHtml = '';
+    if (totalTokens > 0) {
+      const costFmt = costBrl < 0.01 ? '< R$ 0,01' : `R$ ${costBrl.toFixed(2).replace('.', ',')}`;
+      const budgetBadge = budgetPct !== null ? ` • Meta: ${budgetPct.toFixed(0)}%` : '';
+      tokenHtml = `<span class="text-slate-500">•</span><span class="text-cyan-400 font-medium inline-flex items-center gap-1">⚡ ${totalTokens.toLocaleString('pt-BR')} tokens (~${costFmt}${budgetBadge})</span>`;
+    } else if (avoidedBrl > 0 || tokens.contingency_zero_token) {
+      const avoidedFmt = `R$ ${avoidedBrl.toFixed(2).replace('.', ',')}`;
+      tokenHtml = `<span class="text-slate-500">•</span><span class="text-emerald-400 font-medium inline-flex items-center gap-1">⚡ 0 tokens (Cache Local: Economia ~${avoidedFmt})</span>`;
+    }
+
     const html = `
-      <div class="flex flex-wrap items-center gap-3">
-        ${e2e ? `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Resposta em <strong class="text-emerald-300 font-sans tabular-nums font-semibold">${e2e}</strong></span>` : ''}
+      <div class="flex flex-wrap items-center gap-3 opacity-60 hover:opacity-100 transition-opacity font-mono text-[10px]">
+        ${e2e ? `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Resposta em <strong class="text-emerald-300 tabular-nums font-semibold">${e2e}</strong></span>` : ''}
         <span class="text-slate-500">•</span>
-        <span>Motor: <strong class="text-purple-300">${model}</strong></span>
+        <span>Motor: <strong class="text-purple-300 font-semibold">${model}</strong></span>
+        ${tokenHtml}
         ${lgpd > 0 ? `<span class="text-slate-500">•</span><span class="text-emerald-400/90 font-medium inline-flex items-center gap-1">${CHAT_ICONS.shield} LGPD: ${lgpd} dados protegidos</span>` : ''}
       </div>
     `;
@@ -5649,6 +6177,10 @@ class AuraChatController {
         el.classList.remove('hidden');
       }
     });
+
+    if (window.auraTelemetry && typeof window.auraTelemetry.fetchSilentBadge === 'function') {
+      window.auraTelemetry.fetchSilentBadge();
+    }
 
     this.scrollToBottom();
   }

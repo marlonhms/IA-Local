@@ -216,7 +216,7 @@ def test_semantic_router_cesta_conveniencia_queries():
 @pytest.mark.asyncio
 async def test_aura_engine_execute_tool_direct_basket(posto_tools):
     """Valida a execucao direta de ferramenta no AuraEngine para cesta de compras e seus aliases."""
-    engine = AuraEngine(tools=posto_tools)
+    engine = AuraEngine(rag_engine=MagicMock(), tools=posto_tools)
 
     # 1. Execucao direta com nome oficial (protegido contra picos de CPU do host de teste)
     with patch.object(engine.watchdog, "is_heavy_operation_allowed", return_value=True):
@@ -249,7 +249,7 @@ async def test_aura_engine_execute_tool_direct_basket(posto_tools):
 
 def test_aura_engine_sintese_contingencia_and_build_response_text(posto_tools):
     """Valida a formatacao da sintese executiva deterministica no AuraEngine."""
-    engine = AuraEngine(tools=posto_tools)
+    engine = AuraEngine(rag_engine=MagicMock(), tools=posto_tools)
     resultado = posto_tools.auditar_cesta_conveniencia_vendas_cruzadas()
 
     sintese = engine._gerar_sintese_contingencia_ferramenta(
@@ -276,7 +276,7 @@ def test_no_em_dash_or_en_dash_in_cesta_artifacts(posto_tools):
     assert "\u2014" not in json_str, "Payload contem travessao em-dash proibido!"
     assert "\u2013" not in json_str, "Payload contem travessao en-dash proibido!"
 
-    engine = AuraEngine(tools=posto_tools)
+    engine = AuraEngine(rag_engine=MagicMock(), tools=posto_tools)
     sintese = engine._gerar_sintese_contingencia_ferramenta(
         intencao="conveniencia_vendas_cruzadas",
         resultado_bruto=resultado,
@@ -435,7 +435,7 @@ def test_build_canonical_genui_envelope_legacy_preserves_kpis():
 
 def test_aura_engine_sintese_contingencia_with_pydantic_props(posto_tools):
     """Valida geracao de sintese textual quando resultado_bruto e um modelo Pydantic BasketUpsellStrategyProps."""
-    engine = AuraEngine(tools=posto_tools)
+    engine = AuraEngine(rag_engine=MagicMock(), tools=posto_tools)
     resultado = posto_tools.auditar_cesta_conveniencia_vendas_cruzadas()
     props_obj = BasketUpsellStrategyProps(**resultado["props"])
 

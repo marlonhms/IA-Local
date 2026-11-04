@@ -138,7 +138,7 @@ def test_semantic_router_benchmark_queries(mock_router):
 @pytest.mark.asyncio
 async def test_aura_engine_execute_tool_benchmark(posto_tools):
     """Valida a execucao direta (headless intent call) de benchmark_comparativo no AuraEngine."""
-    engine = AuraEngine(tools=posto_tools)
+    engine = AuraEngine(rag_engine=MagicMock(), tools=posto_tools)
     res = await engine.execute_tool_direct("benchmark_comparativo")
 
     assert res["status"] == "success"
@@ -152,7 +152,7 @@ async def test_aura_engine_execute_tool_benchmark(posto_tools):
 
 def test_aura_engine_sintese_contingencia_benchmark(posto_tools):
     """Valida a formatacao executiva de contingencia deterministica no AuraEngine."""
-    engine = AuraEngine(tools=posto_tools)
+    engine = AuraEngine(rag_engine=MagicMock(), tools=posto_tools)
     resultado_bruto = posto_tools.comparar_benchmark_concorrencia()
 
     sintese = engine._gerar_sintese_contingencia_ferramenta(
@@ -176,7 +176,7 @@ def test_no_em_dash_or_en_dash_in_benchmark_artifacts(posto_tools):
     assert "\u2014" not in json_str, "Payload contem travessao em-dash proibido!"
     assert "\u2013" not in json_str, "Payload contem travessao en-dash proibido!"
 
-    engine = AuraEngine(tools=posto_tools)
+    engine = AuraEngine(rag_engine=MagicMock(), tools=posto_tools)
     sintese = engine._gerar_sintese_contingencia_ferramenta(
         intencao="benchmark_comparativo",
         resultado_bruto=resultado,
@@ -191,7 +191,7 @@ def test_no_em_dash_or_en_dash_in_benchmark_artifacts(posto_tools):
 @pytest.mark.asyncio
 async def test_aura_engine_query_and_build_response_text(posto_tools):
     """Valida os metodos query() e _build_response_text() do AuraEngine para benchmark."""
-    engine = AuraEngine(tools=posto_tools)
+    engine = AuraEngine(rag_engine=MagicMock(), tools=posto_tools)
     resultado = posto_tools.comparar_benchmark_concorrencia()
 
     # Valida _build_response_text para benchmark_comparativo e comparativo_turnos

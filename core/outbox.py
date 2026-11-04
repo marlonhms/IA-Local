@@ -306,11 +306,13 @@ class AuraTransactionalOutbox:
 
     @staticmethod
     def _apply_pragmas(conn: sqlite3.Connection) -> None:
-        """Aplica as diretivas de resiliencia SQLite WAL e concorrencia."""
+        """Aplica as diretivas de resiliencia SQLite WAL, autocheckpoint e limite de tamanho em disco (Modulo 5)."""
         try:
             conn.execute("PRAGMA busy_timeout=5000;")
             conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("PRAGMA synchronous=NORMAL;")
+            conn.execute("PRAGMA wal_autocheckpoint=1000;")
+            conn.execute("PRAGMA journal_size_limit=67108864;")  # Limite estrito de 64 MB no arquivo .wal
         except sqlite3.OperationalError:
             pass
 
@@ -368,10 +370,14 @@ class AuraTransactionalOutbox:
             jm = conn.execute("PRAGMA journal_mode;").fetchone()
             sync = conn.execute("PRAGMA synchronous;").fetchone()
             bt = conn.execute("PRAGMA busy_timeout;").fetchone()
+            wal_ac = conn.execute("PRAGMA wal_autocheckpoint;").fetchone()
+            js_limit = conn.execute("PRAGMA journal_size_limit;").fetchone()
             return {
                 "journal_mode": str(jm[0]).lower() if jm else "unknown",
                 "synchronous": int(sync[0]) if sync else -1,
                 "busy_timeout": int(bt[0]) if bt else 0,
+                "wal_autocheckpoint": int(wal_ac[0]) if wal_ac else -1,
+                "journal_size_limit": int(js_limit[0]) if js_limit else -1,
             }
 
     @staticmethod

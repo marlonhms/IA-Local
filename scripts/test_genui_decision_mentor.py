@@ -1,5 +1,5 @@
 """
-Suíte de Testes Automatizada: Micro-Widget Piloto ExecutiveDecisionMentorUI (Fase 3 — P0)
+Suíte de Testes Automatizada: Micro-Widget Piloto ExecutiveDecisionMentorUI (Fase 3 - P0)
 (ExecutiveDecisionProps, ExecutiveDecisionMentorUI, 3 Camadas Concêntricas, Companion Canvas & Zero Regressão)
 
 Validações Obrigatórias:
@@ -774,10 +774,10 @@ def test_zero_regression():
     print("\n5. Executando Validação de Regressão Zero nas 5 Suítes Analíticas Anteriores...")
 
     suites = [
-        ("test_genui_baseline.py", "Fase 0 — Linha de Base GenUI, Registry & OWASP LLM03"),
-        ("test_genui_engine_sse.py", "Fase 1 — Backend SSE Multiplexado & Envelopes"),
-        ("test_genui_frontend_streaming.py", "Fase 2 — Streaming Parser, Buffer & Skeleton UI"),
-        ("test_aura_aux_panel.py", "Companion Canvas — Split View, 4 Perspectivas & Responsividade"),
+        ("test_genui_baseline.py", "Fase 0 - Linha de Base GenUI, Registry & OWASP LLM03"),
+        ("test_genui_engine_sse.py", "Fase 1 - Backend SSE Multiplexado & Envelopes"),
+        ("test_genui_frontend_streaming.py", "Fase 2 - Streaming Parser, Buffer & Skeleton UI"),
+        ("test_aura_aux_panel.py", "Companion Canvas - Split View, 4 Perspectivas & Responsividade"),
         ("test_phase6_quality_resilience.py", "Resiliência Operacional, WCAG 2.1 AA & Qualidade"),
     ]
 
@@ -806,7 +806,7 @@ def test_zero_regression():
 
 def main():
     print("=" * 78)
-    print("🚀 SUÍTE DE TESTES: MICRO-WIDGET PILOTO ExecutiveDecisionMentorUI (FASE 3 — P0)")
+    print("🚀 SUÍTE DE TESTES: MICRO-WIDGET PILOTO ExecutiveDecisionMentorUI (FASE 3 - P0)")
     print("   (Contratos Pydantic, 3 Camadas Deluxe, DOM, Streaming & Zero Regressão)")
     print("=" * 78)
 

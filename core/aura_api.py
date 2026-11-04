@@ -79,6 +79,7 @@ from core.schemas.genui import (
     generate_action_voucher_signature,
 )
 from core.schemas.idempotency import generate_uuid4
+from core.tenancy import TenantContext, TenantInfo
 from core.webhooks import (
     AlertaTanquePayload,
     TurnoResumoPayload,
@@ -89,6 +90,8 @@ from core.webhooks import (
 # Router oficial da AURA
 router = APIRouter(prefix="/api/v1/aura", tags=["AURA Core Engine"])
 cockpit_router = APIRouter(prefix="/api/v1/cockpit", tags=["AURA Cockpit Zero-Click"])
+from core.partner_api import partner_router
+from core.voice_api import voice_router
 
 # Instância Singleton do Motor (pode ser injetada externamente)
 _engine_instance: AuraEngine | None = None
@@ -1365,6 +1368,39 @@ async def get_telemetry_metrics_endpoint(
     return engine.telemetry.get_metrics_summary()
 
 
+class BudgetPolicyUpdateRequest(BaseModel):
+    monthly_budget_brl: Optional[float] = None
+    alert_threshold_pct: Optional[float] = None
+    enforcement_mode: Optional[str] = None
+
+
+@router.get("/telemetry/token-budget", summary="Status de Consumo de Tokens e Orcamento Mensal")
+async def get_token_budget_endpoint(
+    filial_id: Optional[str] = None,
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """Retorna o status atual de consumo de tokens, custos em R$ e politicas de orcamento."""
+    f_id = filial_id or engine.filial_id
+    return engine.token_budget.get_budget_status(filial_id=f_id)
+
+
+@router.post("/telemetry/token-budget/policy", summary="Atualiza Politica de Orcamento de Tokens da Filial")
+async def update_token_budget_policy_endpoint(
+    req: BudgetPolicyUpdateRequest,
+    filial_id: Optional[str] = None,
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """Atualiza metas de orcamento personalizaveis de uso de tokens."""
+    f_id = filial_id or engine.filial_id
+    res = engine.token_budget.update_budget_policy(
+        filial_id=f_id,
+        monthly_budget_brl=req.monthly_budget_brl,
+        alert_threshold_pct=req.alert_threshold_pct,
+        enforcement_mode=req.enforcement_mode,
+    )
+    return res
+
+
 @router.post("/telemetry/report", summary="Reporte de Metricas de UX pelo Cliente")
 async def report_telemetry_endpoint(
     req: TelemetryReportRequest,
@@ -1389,6 +1425,132 @@ async def get_prometheus_metrics_endpoint(
         content=payload,
         media_type="text/plain; version=0.0.4; charset=utf-8",
     )
+
+
+# =============================================================================
+# ENDPOINTS DE MEMORIA AUDITAVEL DA CAMADA TENANT (FASE 7)
+# =============================================================================
+
+class TenantMemoryCreateRequest(BaseModel):
+    categoria: str = "regra_posto"
+    chave: str = ""
+    conteudo: str
+    status: str | None = "ativo"
+    filial_id: int | None = 1
+    origem: str | None = "gestor"
+    metadata: dict[str, Any] | None = None
+
+
+class TenantMemoryApproveRequest(BaseModel):
+    approved_by: str | None = "gestor"
+
+
+class TenantMemoryRejectRequest(BaseModel):
+    reason: str | None = None
+
+TenantMemoryCreateRequest.model_rebuild()
+TenantMemoryApproveRequest.model_rebuild()
+TenantMemoryRejectRequest.model_rebuild()
+
+
+@router.get("/memory/tenant", summary="Listagem de Memorias e Regras do Tenant (Fase 7)")
+async def list_tenant_memories_endpoint(
+    filial_id: int | None = None,
+    status: str | None = None,
+    categoria: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """Retorna fatos e regras operacionais duraveis aprendidos para o posto/filial."""
+    active_tenant = TenantContext.get_tenant_id() or engine.tenant_id
+    effective_filial = filial_id if filial_id is not None else TenantContext.get_filial_id()
+    facts = engine.tenant_memory.list_facts(
+        tenant_id=active_tenant,
+        filial_id=effective_filial,
+        status=status,
+        categoria=categoria,
+        limit=limit,
+        offset=offset,
+    )
+    return {
+        "tenant_id": active_tenant,
+        "filial_id": effective_filial,
+        "total": len(facts),
+        "facts": [f.to_dict() for f in facts],
+    }
+
+
+@router.post("/memory/tenant", summary="Cadastro Direto de Regra ou Memoria do Tenant (Fase 7)")
+async def create_tenant_memory_endpoint(
+    req: TenantMemoryCreateRequest,
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """Cadastra regra, rotina ou apelido para o posto com status configuravel (padrao: ativo)."""
+    active_tenant = TenantContext.get_tenant_id() or engine.tenant_id
+    f_id = req.filial_id or TenantContext.get_filial_id() or 1
+    fact = engine.tenant_memory.learn_fact(
+        tenant_id=active_tenant,
+        filial_id=f_id,
+        categoria=req.categoria,
+        chave=req.chave,
+        conteudo=req.conteudo,
+        status=req.status or "ativo",
+        origem=req.origem or "gestor",
+        metadata=req.metadata,
+    )
+    return {"status": "ok", "fact": fact.to_dict()}
+
+
+@router.post("/memory/tenant/{fact_id}/approve", summary="Aprovacao de Regra/Memoria Pendente (Fase 7)")
+async def approve_tenant_memory_endpoint(
+    fact_id: str,
+    req: TenantMemoryApproveRequest | None = None,
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """Promove fato de 'pendente' para 'ativo', habilitando-o com precedencia maxima no prompt."""
+    active_tenant = TenantContext.get_tenant_id() or engine.tenant_id
+    approved_by = req.approved_by if req and req.approved_by else "gestor"
+    fact = engine.tenant_memory.approve_fact(
+        fact_id=fact_id,
+        approved_by=approved_by,
+        tenant_id=active_tenant,
+    )
+    if not fact:
+        raise HTTPException(status_code=404, detail="Memoria ou fato nao encontrado para este tenant.")
+    return {"status": "ok", "fact": fact.to_dict()}
+
+
+@router.post("/memory/tenant/{fact_id}/reject", summary="Rejeicao de Regra/Memoria Pendente (Fase 7)")
+async def reject_tenant_memory_endpoint(
+    fact_id: str,
+    req: TenantMemoryRejectRequest | None = None,
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """Rejeita sugestao de regra ou memoria pendente."""
+    active_tenant = TenantContext.get_tenant_id() or engine.tenant_id
+    reason = req.reason if req else None
+    fact = engine.tenant_memory.reject_fact(
+        fact_id=fact_id,
+        reason=reason,
+        tenant_id=active_tenant,
+    )
+    if not fact:
+        raise HTTPException(status_code=404, detail="Memoria ou fato nao encontrado para este tenant.")
+    return {"status": "ok", "fact": fact.to_dict()}
+
+
+@router.delete("/memory/tenant/{fact_id}", summary="Inativacao/Exclusao de Regra do Tenant (Fase 7)")
+async def delete_tenant_memory_endpoint(
+    fact_id: str,
+    engine: AuraEngine = Depends(get_aura_engine),
+):
+    """Inativa regra do posto marcando como obsoleta."""
+    active_tenant = TenantContext.get_tenant_id() or engine.tenant_id
+    ok = engine.tenant_memory.delete_fact(fact_id=fact_id, tenant_id=active_tenant)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Memoria ou fato nao encontrado para este tenant.")
+    return {"status": "ok", "deleted": True, "fact_id": fact_id}
 
 
 
@@ -2454,6 +2616,34 @@ def create_aura_app(
         d = get_proactive_daemon()
         await d.stop()
 
+    # Middleware de Isolamento Multi-Tenant e RLS (Fase 8)
+    @app.middleware("http")
+    async def multi_tenant_isolation_middleware(request: Request, call_next):
+        raw_tenant = (
+            request.headers.get("x-tenant-id")
+            or request.headers.get("x-customer-id")
+            or os.getenv("AURA_TENANT_ID", "posto_local")
+        )
+        raw_filial = (
+            request.headers.get("x-filial-id")
+            or request.headers.get("x-station-id")
+            or "1"
+        )
+        try:
+            f_id = int(re.sub(r"\D", "", str(raw_filial)) or 1)
+        except Exception:
+            f_id = 1
+        t_id = raw_tenant.strip() if raw_tenant else "posto_local"
+
+        tokens = TenantContext.set(filial_id=f_id, tenant_id=t_id)
+        try:
+            response = await call_next(request)
+            response.headers["X-Tenant-ID"] = t_id
+            response.headers["X-Filial-ID"] = str(f_id)
+            return response
+        finally:
+            TenantContext.reset(tokens)
+
     # Middleware de Correlacao X-Request-ID e Logging Estruturado JSON (P1-6)
     @app.middleware("http")
     async def request_correlation_logging_middleware(request: Request, call_next):
@@ -2522,6 +2712,8 @@ def create_aura_app(
     # Registra rotas da API
     app.include_router(router)
     app.include_router(cockpit_router)
+    app.include_router(partner_router)
+    app.include_router(voice_router)
 
     @app.get(
         "/metrics",

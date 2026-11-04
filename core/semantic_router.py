@@ -295,6 +295,30 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
             "O que vender junto para aumentar o ticket?",
         ]
     },
+    "auditoria_fiscal_sefaz": {
+        "descricao": "Auditoria fiscal e tributaria, rejeicoes da SEFAZ (375, 629, 805, 508, 960, 958, 806, etc.), validacao de chaves de acesso de 44 digitos, XML e regras de postos",
+        "exemplos": [
+            "AURA, travou uma nota de frota com Rejeicao 375, o que significa?",
+            "Minha nota deu rejeicao 629 no posto",
+            "Rejeicao 508 SEFAZ o que fazer?",
+            "Rejeicao 805 cliente isento",
+            "Como calcular DIFAL de combustivel interestadual",
+            "O que significa rejeicao 760 na NFC-e?",
+            "Auditar chave de acesso da nota fiscal",
+            "35261001173538000160550040000039571624115433",
+            "Auditar nota fiscal XML",
+            "Por que a nota deu erro na SEFAZ?",
+            "CFOP 5929 com cupom referenciado",
+            "Nota fiscal de frota travada na SEFAZ",
+            "Qual o CST e CFOP correto para revenda de Gasolina Monofasica segundo a LC 192?",
+            "Como funciona PIS e COFINS monofasico na loja de conveniencia?",
+            "O que significa a Rejeicao 960 da SEFAZ para combustiveis?",
+            "Como funciona a escrituracao do LMC no SPED Fiscal registros 1300 e 1310?",
+            "Tratamento tributario de perdas e evaporacao de tanques e CFOP 5927",
+            "Reforma tributaria LC 214 regime monofasico de IBS e CBS sobre combustiveis",
+            "Rejeicao 806 falta do codigo CEST obrigatorio",
+        ]
+    },
     "ajuda_sistema": {
         "descricao": "Auto-conhecimento da AURA, funcionamento do sistema, explicações de telas, módulos, atalhos de teclado e interface",
         "exemplos": [
@@ -318,6 +342,29 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
             "O que essa tela mostra e como operar o sistema?",
             "Como navegar nas abas e atalhos da AURA?",
             "Quais são as funcionalidades e módulos do sistema AURA?",
+        ]
+    },
+    "procedimento_erp": {
+        "descricao": "Procedimentos operacionais, manuais do ERP e rotinas de sistema (como emitir notas, como dar entrada em NF-e, fechamento de caixa, cadastro, cancelamento, etc.)",
+        "exemplos": [
+            "Como fazer a entrada de uma nota fiscal de fornecedor?",
+            "Como dar entrada em NFe no retaguarda?",
+            "Passo a passo para emitir nota fiscal de saida",
+            "Como fazer uma importacao de XML de nota fiscal?",
+            "Onde fica a rotina de recebimento de notas fiscais?",
+            "Como cadastrar novo produto no ERP?",
+            "Como cancelar uma venda ou cupom fiscal?",
+            "Como fazer o fechamento de caixa e sangria no PDV?",
+            "Como dar entrada em CTe com rateio de frete?",
+            "Como lancar nota fiscal de combustivel?",
+            "Como gerar o SPED Fiscal no sistema?",
+            "Como cadastrar bico e tanque no retaguarda?",
+            "Qual o procedimento para estorno de nota fiscal?",
+            "Onde configuro as regras de preco e promocao no ERP?",
+            "Como fazer a conciliacao de cartoes no retaguarda?",
+            "Como dar entrada em compras de mercadorias?",
+            "Como importar XML em lote no sistema?",
+            "Onde vejo o relatorio de notas fiscais?",
         ]
     },
     "benchmark_comparativo": {
@@ -480,6 +527,43 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
             "Formas de pagamento por funcionario",
         ],
     },
+    "roi_diagnostic": {
+        "descricao": "Diagnostico executivo de 5 vetores de perdas operacionais, projecao de retorno liquido em 90 dias e garantia de 3x",
+        "exemplos": [
+            "Qual o meu diagnostico de ROI e perdas?",
+            "Quanto o posto esta perdendo por mes?",
+            "Diagnostico executivo de perdas operacionais",
+            "Calculo do retorno liquido em 90 dias",
+            "Projecao de ROI do posto",
+            "Estudo dos 5 vetores de perdas financeiras",
+            "Garantia de 3x do plano AURA",
+            "Quanto posso economizar com a AURA?",
+        ],
+    },
+    "pos_audit": {
+        "descricao": "Auditoria estatistica e contabil de cancelamentos com Z-Score por operador e checklist Art. 462 CLT",
+        "exemplos": [
+            "Radar de anomalias no PDV",
+            "Auditoria de cancelamentos de operadores de caixa",
+            "Z-Score de cancelamentos por operador",
+            "Conferencia de cancelamentos e estornos",
+            "Auditoria trabalhista CLT de fechamento de caixa",
+            "Divergencia entre pista e fechamento de caixa",
+            "Operadores com volume de cancelamento anormal",
+        ],
+    },
+    "zero_click_briefing": {
+        "descricao": "Briefing matinal executivo consolidado das ultimas 24h pronto para envio no WhatsApp",
+        "exemplos": [
+            "Briefing matinal do posto",
+            "Cafe com o dono",
+            "Resumo executivo do dia",
+            "Briefing do posto para WhatsApp",
+            "Resumo das ultimas 24 horas de vendas e estoques",
+            "Como fechou o posto ontem?",
+            "Panorama matinal executivo",
+        ],
+    },
 }
 
 
@@ -514,6 +598,47 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     if re.search(r"\b(?:preciso\s+de\s+ajuda|me\s+ajuda|quero\s+ajuda|ajuda\s+aqui|ajuda\s+a[ií]|d[aá]\s+(?:uma\s+)?ajuda|ajuda\s+com\s+o\s+sistema|estou\s+com\s+d[uú]vida|pode\s+me\s+ajudar)\b", p):
         return "ajuda_sistema"
 
+    # -2.75 Procedimentos operacionais e manuais do ERP
+    if re.search(
+        r"\b(como\s+(?:dar\s+(?:a\s+|na\s+)?entrada|fazer\s+(?:a\s+|o\s+)?(?:entrada|fechamento)|emitir|lan[cç]ar|cadastrar|cancelar|estornar|consultar|configurar|importar|imprimir|gerar|fechar)|"
+        r"passo\s+a\s+passo|onde\s+fica|onde\s+(?:acho|encontro|vejo|configuro|lan[cç]o)|"
+        r"entrada\s+(?:de\s+(?:uma\s+)?|da\s+|na\s+)?(?:nota|nfe|nf-e|xml|cte|ct-e|mercadoria)|"
+        r"importa[cç][aã]o\s+(?:de\s+(?:um\s+)?|do\s+)?xml|"
+        r"manifesta[cç][aã]o\s+(?:de\s+(?:uma\s+)?|da\s+)?(?:nfe|nf-e|destinat[aá]rio)|"
+        r"rateio\s+(?:de\s+)?frete|"
+        r"fechamento\s+(?:de\s+)?caixa|"
+        r"como\s+funciona\s+(?:a\s+tela|o\s+m[oó]dulo|o\s+menu|o\s+retaguarda))\b",
+        p,
+        re.IGNORECASE,
+    ):
+        return "procedimento_erp"
+
+    # -2.7 Conhecimento operacional do webPosto, manuais, procedimentos, incidentes e schemas
+    if re.search(
+        r"\b(?:abastecimento\s+preso|bico\s+(?:preso|travado)|bico\s+inoperante|erro\s+no\s+pdv|"
+        r"como\s+(?:emitir|gerar|tirar|fazer|configurar|lan[cç]ar|consultar)|"
+        r"onde\s+(?:fica|encontro|vejo|configuro)|webposto|confluence|runbook|dicionario\s+sql|"
+        r"tabela\s+(?:abastecimentos|pedido|nfce|itemped|tanque)|flag\s+imprimiu|api\s+webposto)\b",
+        p
+    ):
+        return "ajuda_sistema"
+
+    # -2.6 Auditoria fiscal, regras SEFAZ, chave de acesso de 44 digitos, rejeicoes e legislacao tributaria
+    if re.search(
+        r"\b(?:\d{44}|rejei[cç][aã]o\s*\d+|rejeicao|erro\s+sefaz|sefaz|chave\s+de\s+acesso|"
+        r"nota\s+(?:fiscal\s+)?(?:de\s+frota\s+)?(?:travada|bloqueada|rejeitada)|travou\s+(?:uma\s+)?nota|"
+        r"nfe\s+rejeitada|nfce\s+rejeitada|cfop\s+(?:5929|6929|5656|5655|5927|5102|6102)|"
+        r"monof[aá]sic[ao]|monofasia|icms\s+monof[aá]sico|"
+        r"pis\s*(?:e\s*|\/\s*)?cofins\s+monof[aá]sico|pis\s*(?:e\s*|\/\s*)?cofins|"
+        r"lc\s*192|lc\s*214|cst\s*(?:61|60|04|02|01|03)|"
+        r"sped\s+(?:c113|fiscal|contribui[cç][oõ]es)|registro\s*(?:1300|1310|1320)|"
+        r"tabela\s+4\.3\.10|reforma\s+tribut[aá]ria|cest|abnt\s+nbr\s+5891|arredondamento\s+sefaz|"
+        r"indiedest|isento\s+de\s+ie|difal|auditar\s+xml|auditar\s+nota|"
+        r"tributa[cç][aã]o(?:\s+(?:de\s+)?combust[ií]ve[li]s)?|bitributa[cç][aã]o)\b",
+        p
+    ):
+        return "auditoria_fiscal_sefaz"
+
     # -2.5 Meta-perguntas sobre funcionamento do sistema, UI, telas, módulos e atalhos
     padrao_meta_pergunta = re.compile(
         r"\b(?:onde\s+(?:(?:eu|voc[eê]|a\s+gente)\s+)?(?:fica|vejo|encontro|est[aá]|olho)|"
@@ -541,6 +666,18 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     # -2. Comandos de repetição / saudações neutras não devem disparar ferramentas operacionais
     if RETRY_REGEX.match(p) or p in CONVERSATIONAL_WORDS:
         return "catalogo_produtos"
+
+    # -1.87 Diagnostico Executivo de ROI e Perdas (90 Dias)
+    if re.search(r"\b(?:roi|diagnostico\s+de\s+roi|diagnostico\s+executivo|perdas\s+operacionais|quanto\s+(?:o\s+posto\s+)?est[a?]\s+perdendo|quanto\s+estou\s+perdendo|projecao\s+de\s+roi|retorno\s+em\s+90\s+dias|garantia\s+de\s+3x|garantia\s+3x|recuperar\s+perdas|recuperacao\s+de\s+perdas)\b", p):
+        return "roi_diagnostic"
+
+    # -1.86 Radar de Anomalias de PDV & Caixa (Z-Score)
+    if re.search(r"\b(?:radar\s+de\s+anomalias|anomalias\s+de\s+pdv|anomalias\s+no\s+pdv|z-score|zscore|cancelamentos?\s+por\s+operador(?:es)?|operador(?:es)?\s+com\s+cancelamentos?|auditoria\s+de\s+cancelamentos?|art\s*462|artigo\s+462\s+clt|quebra\s+de\s+caixa\s+clt)\b", p):
+        return "pos_audit"
+
+    # -1.85 Briefing Matinal Zero-Click (Cafe com o Dono)
+    if re.search(r"\b(?:briefing\s+matinal|caf[e?]\s+com\s+o\s+dono|cafe\s+com\s+dono|morning\s+briefing|resumo\s+matinal|briefing\s+do\s+dia|briefing\s+(?:de\s+)?hoje|resumo\s+das\s+24h|resumo\s+de\s+24\s+horas|briefing\s+whatsapp|resumo\s+executivo.*whatsapp|briefing.*whatsapp)\b", p):
+        return "zero_click_briefing"
 
     # -1.9 Formas de Pagamento & Caixas por Operador
     termos_pagamento_exatos = [
@@ -1344,6 +1481,39 @@ class SemanticRouter:
                     self._memory_cache[query_norm] = ("ajuda_sistema", 1.0, telemetry)
             return "ajuda_sistema", 1.0, telemetry
 
+        # 0.06 Deteccao deterministica de procedimentos operacionais e manuais do ERP
+        is_procedural = bool(
+            re.search(
+                r"\b(como\s+(?:dar\s+(?:a\s+|na\s+)?entrada|fazer\s+(?:a\s+|o\s+)?(?:entrada|fechamento)|emitir|lan[cç]ar|cadastrar|cancelar|estornar|consultar|configurar|importar|imprimir|gerar|fechar)|"
+                r"passo\s+a\s+passo|onde\s+fica|onde\s+(?:acho|encontro|vejo|configuro|lan[cç]o)|"
+                r"entrada\s+(?:de\s+(?:uma\s+)?|da\s+|na\s+)?(?:nota|nfe|nf-e|xml|cte|ct-e|mercadoria)|"
+                r"importa[cç][aã]o\s+(?:de\s+(?:um\s+)?|do\s+)?xml|"
+                r"manifesta[cç][aã]o\s+(?:de\s+(?:uma\s+)?|da\s+)?(?:nfe|nf-e|destinat[aá]rio)|"
+                r"rateio\s+(?:de\s+)?frete|"
+                r"fechamento\s+(?:de\s+)?caixa|"
+                r"como\s+funciona\s+(?:a\s+tela|o\s+m[oó]dulo|o\s+menu|o\s+retaguarda))\b",
+                query_norm,
+                re.IGNORECASE
+            )
+        )
+        if is_procedural:
+            total_ms = (time.perf_counter() - t0) * 1000
+            telemetry = {
+                "intent": "procedimento_erp",
+                "confidence": 0.98,
+                "method": "procedural_erp_heuristics",
+                "matched_phrase": "Padrao procedural identificado",
+                "pgvector_latency_ms": 0.0,
+                "embedding_latency_ms": 0.0,
+                "total_routing_latency_ms": round(total_ms, 3),
+                "confidence_threshold": self.confidence_threshold,
+                "query_vector": None,
+            }
+            if use_cache:
+                with self._cache_lock:
+                    self._memory_cache[query_norm] = ("procedimento_erp", 0.98, telemetry)
+            return "procedimento_erp", 0.98, telemetry
+
         # 0.1 Comandos de repeticao / saudacoes genericas - neutralizacao de falsos positivos operacionais
         if RETRY_REGEX.match(query_norm) or query_norm in CONVERSATIONAL_WORDS:
             total_ms = (time.perf_counter() - t0) * 1000
@@ -1430,6 +1600,9 @@ class SemanticRouter:
                     "analisar_custo_estoque_macroeconomico",
                     "diagnostico_modular",
                     "formas_pagamento",
+                    "roi_diagnostic",
+                    "pos_audit",
+                    "zero_click_briefing",
                 ):
                     intencao_detectada = intencao_h
                     similarity = max(similarity, 0.95)

@@ -58,6 +58,26 @@ def validate_filial_id(filial_id: Any) -> int:
     return filial_id
 
 
+_TENANT_ID_SAFE_REGEX = re.compile(r"^[a-zA-Z0-9_\-\.]{1,64}$")
+
+
+def validate_tenant_id(tenant_id: Any) -> str:
+    """
+    Valida que tenant_id e uma string alfanumerica segura (sem caracteres de injecao SQL).
+    Lanca CrossTenantAccessError se invalido, vazio ou fora do padrao seguro.
+    """
+    if not isinstance(tenant_id, str):
+        raise CrossTenantAccessError(
+            f"Identificador de tenant_id invalido (tipo {type(tenant_id).__name__}): esperado str."
+        )
+    tid = tenant_id.strip()
+    if not tid or not _TENANT_ID_SAFE_REGEX.match(tid):
+        raise CrossTenantAccessError(
+            f"Identificador de tenant_id invalido ou contendo caracteres proibidos: '{tid}'."
+        )
+    return tid
+
+
 class TenantContext:
     """
     Gerenciador de contexto thread-safe e async-safe (baseado em contextvars)
@@ -66,9 +86,7 @@ class TenantContext:
 
     def __init__(self, filial_id: int, tenant_id: str = "default") -> None:
         self.filial_id: int = validate_filial_id(filial_id)
-        if not isinstance(tenant_id, str) or not tenant_id.strip():
-            raise CrossTenantAccessError("Identificador de tenant_id invalido ou vazio.")
-        self.tenant_id: str = tenant_id.strip()
+        self.tenant_id: str = validate_tenant_id(tenant_id)
         self._filial_token: contextvars.Token[int | None] | None = None
         self._tenant_token: contextvars.Token[str] | None = None
 
@@ -97,10 +115,9 @@ class TenantContext:
     ) -> tuple[contextvars.Token[int | None], contextvars.Token[str]]:
         """Define diretamente a filial e o tenant ativos no contexto de execucao atual."""
         valid_filial = validate_filial_id(filial_id)
-        if not isinstance(tenant_id, str) or not tenant_id.strip():
-            raise CrossTenantAccessError("Identificador de tenant_id invalido ou vazio.")
+        valid_tenant = validate_tenant_id(tenant_id)
         t_filial = _current_filial_var.set(valid_filial)
-        t_tenant = _current_tenant_var.set(tenant_id.strip())
+        t_tenant = _current_tenant_var.set(valid_tenant)
         return t_filial, t_tenant
 
     @classmethod
@@ -193,6 +210,49 @@ def inject_rls_filial_context(
     return valid_filial
 
 
+def inject_rls_tenant_context(
+    conn: Any,
+    tenant_id: str | None = None,
+    session_scope: bool = False,
+) -> str:
+    """
+    Injeta o identificador do tenant ativo na sessao/transacao PostgreSQL
+    executando 'SET LOCAL aura.tenant_id = %s' (ou 'SET SESSION' se session_scope=True).
+    Se tenant_id nao for informado, tenta obter do TenantContext ativo.
+    Utilizado para politicas RLS em tabelas centrais pgvector da VPS (Fase 8).
+    """
+    resolved_tenant = tenant_id if tenant_id is not None else TenantContext.get_tenant_id()
+    valid_tenant = validate_tenant_id(resolved_tenant)
+
+    sql_cmd = (
+        "SET SESSION aura.tenant_id = %s"
+        if session_scope
+        else "SET LOCAL aura.tenant_id = %s"
+    )
+    param_val = (valid_tenant,)
+
+    cursor_obj = conn.cursor()
+    if hasattr(cursor_obj, "__enter__") and hasattr(cursor_obj, "__exit__"):
+        with cursor_obj as cur:
+            cur.execute(sql_cmd, param_val)
+    else:
+        try:
+            cursor_obj.execute(sql_cmd, param_val)
+        finally:
+            if hasattr(cursor_obj, "close"):
+                cursor_obj.close()
+
+    with contextlib.suppress(AttributeError, TypeError):
+        conn._rls_tenant_id = valid_tenant
+
+    logger.debug(
+        "Contexto RLS tenant injetado com sucesso: aura.tenant_id=%s (session_scope=%s)",
+        valid_tenant,
+        session_scope,
+    )
+    return valid_tenant
+
+
 # Padroes proibidos de injecao SQL ou bypass de politica de isolamento RLS
 _SQL_INJECTION_PATTERNS = [
     re.compile(r"--"),
@@ -204,6 +264,8 @@ _SQL_INJECTION_PATTERNS = [
     re.compile(r"\bUNION\b\s+(?:ALL\s+)?\bSELECT\b", re.IGNORECASE),
     re.compile(r"\bSET\b\s+(?:LOCAL\s+|SESSION\s+)?app\.current_filial", re.IGNORECASE),
     re.compile(r"\bRESET\b\s+app\.current_filial", re.IGNORECASE),
+    re.compile(r"\bSET\b\s+(?:LOCAL\s+|SESSION\s+)?aura\.tenant_id", re.IGNORECASE),
+    re.compile(r"\bRESET\b\s+aura\.tenant_id", re.IGNORECASE),
     re.compile(r"\bDISABLE\s+ROW\s+LEVEL\s+SECURITY\b", re.IGNORECASE),
     re.compile(r"\bDROP\s+(?:POLICY|TABLE)\b", re.IGNORECASE),
     re.compile(r"\b(?:[a-zA-Z_][a-zA-Z0-9_]*\.)?codfilial\s*(?:!=|<>|>|<|>=|<=)", re.IGNORECASE),
@@ -400,4 +462,12 @@ def load_rls_migration_sql(sql_path: Path | None = None) -> str:
     if sql_path is None:
         base_dir = Path(__file__).resolve().parent.parent
         sql_path = base_dir / "scripts" / "rls_multi_tenant.sql"
+    return sql_path.read_text(encoding="utf-8")
+
+
+def load_pgvector_rls_sql(sql_path: Path | None = None) -> str:
+    """Carrega o script SQL de Row-Level Security para pgvector na VPS (scripts/setup_pgvector_rls.sql)."""
+    if sql_path is None:
+        base_dir = Path(__file__).resolve().parent.parent
+        sql_path = base_dir / "scripts" / "setup_pgvector_rls.sql"
     return sql_path.read_text(encoding="utf-8")

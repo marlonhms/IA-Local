@@ -82,7 +82,7 @@
     }
   </script>
 </head>
-<body class="min-h-screen flex flex-col bg-obsidian text-slate-200 antialiased selection:bg-auraCyan/30 selection:text-white overflow-x-hidden">
+<body class="min-h-screen flex flex-col bg-obsidian text-slate-200 subpixel-antialiased selection:bg-auraCyan/30 selection:text-white overflow-x-hidden">
 
   <!-- =========================================================================
        MENU LATERAL HAMBÚRGUER (LIQUID GLASS ACRÍLICO DELUXE)
@@ -94,10 +94,10 @@
     <!-- Topo do Menu: Identidade & Botão Fechar -->
     <div class="p-4 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
       <div class="flex items-center gap-3">
-        <div class="neural-core-orb !w-8 !h-8"></div>
+        <div id="drawer-neural-core-orb" class="neural-core-orb !w-8 !h-8"></div>
         <div>
           <div class="flex items-center gap-2">
-            <span class="font-display-title font-bold text-base tracking-wider bg-gradient-to-r from-cyan-400 via-sky-300 to-purple-400 bg-clip-text text-transparent">AURA</span>
+            <span class="aura-brand-title font-display-title font-bold text-base tracking-wider">AURA</span>
             <span class="px-2 py-0.5 rounded-full text-[9px] font-sans font-semibold bg-auraEmerald/15 text-auraEmerald-light border border-auraEmerald/30">
               Deluxe
             </span>
@@ -194,7 +194,7 @@
           </button>
 
           <!-- 1.5 Historico de Conversas -->
-          <button id="sidebar-btn-open-history" onclick="if(window.toggleAuraHistory){window.toggleAuraHistory();}else if(window.auraHistoryDrawer){window.auraHistoryDrawer.toggle();} if(window.auraApp){window.auraApp.closeSidebar();}" class="sidebar-nav-item min-h-[48px] flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-cyan-500/30 transition-all text-left text-xs group" aria-label="Historico de Conversas">
+          <button id="sidebar-btn-open-history" class="sidebar-nav-item min-h-[48px] flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-cyan-500/30 transition-all text-left text-xs group" aria-label="Historico de Conversas">
             <div class="flex items-center gap-3">
               <div class="p-1.5 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <i data-lucide="history" class="w-4 h-4 text-cyan-400"></i>
@@ -258,6 +258,20 @@
               </div>
             </div>
             <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">Perdas</span>
+          </button>
+
+          <!-- 2.5 Escudo Fiscal & SEFAZ (LC 192 / PIS-COFINS CST 04) -->
+          <button onclick="if(window.auraApp){window.auraApp.askFrequent('Quais os pontos criticos de ICMS Monofasico CST 61, PIS/COFINS CST 04 na conveniencia e rejeicoes SEFAZ?'); window.auraApp.closeSidebar();}" class="sidebar-nav-item min-h-[48px] flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-cyan-500/30 transition-all text-left text-xs group" aria-label="Escudo Fiscal e Regras SEFAZ">
+            <div class="flex items-center gap-3">
+              <div class="p-1.5 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <svg class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-width="1.75"/><polyline points="9 12 11 14 15 10" stroke-width="2"/></svg>
+              </div>
+              <div class="flex-1">
+                <div class="font-semibold text-slate-100">Escudo Fiscal &amp; SEFAZ</div>
+                <div class="text-[10px] text-slate-400 font-normal">Auditoria CST 61, PIS/COFINS e SPED</div>
+              </div>
+            </div>
+            <span class="px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Fiscal</span>
           </button>
 
           <!-- 2.4 Analitico de Faturamento e Margem -->
@@ -488,7 +502,7 @@
           
           <div>
             <div class="flex items-center gap-2">
-              <span class="font-display-title font-bold text-lg tracking-wider bg-gradient-to-r from-cyan-400 via-sky-300 to-purple-400 bg-clip-text text-transparent">AURA</span>
+              <span class="aura-brand-title font-display-title font-bold text-lg tracking-wider">AURA</span>
               <span class="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-sans font-semibold bg-auraEmerald/15 text-auraEmerald-light border border-auraEmerald/30">
                 Assistente Executiva
               </span>
@@ -514,6 +528,26 @@
           <svg class="w-3 h-3 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         </a>
       </div>
+
+      <!-- 2.1 Barra de Acompanhamento de Tokens & Telemetria AURA (FiscalLLM) -->
+      <button id="btn-header-token-tracking" class="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 text-xs border border-white/10 hover:border-cyan-500/30 transition-all cursor-pointer shadow-sm active:scale-95 group" title="Monitor de Tokens e Orcamento FiscalLLM (Clique para abrir Telemetria)">
+        <div class="flex items-center gap-1.5">
+          <span class="text-cyan-400 text-xs group-hover:scale-110 transition-transform">⚡</span>
+          <span id="header-token-counter" class="font-mono text-[11px] text-slate-200 font-semibold">0 tokens</span>
+        </div>
+        <span class="text-slate-600 text-[10px]">•</span>
+        <!-- Mini Barra de Progresso com Custo -->
+        <div class="flex items-center gap-1.5" title="Consumo acumulado em relacao a meta mensal">
+          <div class="w-14 sm:w-16 h-1.5 rounded-full bg-slate-800 overflow-hidden border border-white/5">
+            <div id="header-budget-progress-bar" class="h-full bg-emerald-500 rounded-full transition-all duration-500" style="width: 2%;"></div>
+          </div>
+          <span id="header-budget-cost-label" class="font-mono text-[10px] text-emerald-400 font-medium">R$ 0,00</span>
+        </div>
+        <span class="text-slate-600 text-[10px] hidden xl:inline">•</span>
+        <span id="header-budget-avoided-pill" class="hidden xl:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20" title="Economia financeira gerada por respostas do cache local semantico">
+          Economia ~R$ 0,00
+        </span>
+      </button>
 
       <!-- 3. Extremo Direito: Grupo de Produtividade (Regra dos 5 Itens Ancoras) -->
       <div id="header-productive-actions" class="flex items-center gap-2">
@@ -542,8 +576,14 @@
           <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-mono hidden lg:inline">Alt+P</kbd>
         </button>
 
-        <!-- 3.3 Botao Nova Conversa (Header Superior Direito - min-h: 44px) -->
-        <button id="btn-new-chat" class="btn-new-chat flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 font-sans text-xs transition-all shadow-sm active:scale-95 group" title="Iniciar Nova Conversa (Limpar Chat)" aria-label="Nova Conversa">
+        <!-- 3.3 Botao Historico / Lista de Conversas (Header Superior Direito - min-h: 44px) -->
+        <button id="btn-open-history" class="btn-open-history flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 font-sans text-xs transition-all shadow-sm active:scale-95 group cursor-pointer" title="Lista de Conversas (Historico)" aria-label="Lista de Conversas">
+          <i data-lucide="history" class="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform"></i>
+          <span class="text-[11px] font-medium hidden sm:inline">Conversas</span>
+        </button>
+
+        <!-- 3.4 Botao Nova Conversa (Header Superior Direito - min-h: 44px) -->
+        <button id="btn-new-chat" class="btn-new-chat flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 font-sans text-xs transition-all shadow-sm active:scale-95 group cursor-pointer" title="Iniciar Nova Conversa (Limpar Chat)" aria-label="Nova Conversa">
           <i data-lucide="plus-circle" class="w-4 h-4 text-auraEmerald group-hover:rotate-90 transition-transform"></i>
           <span class="text-[11px] font-medium hidden sm:inline">Nova Conversa</span>
         </button>
@@ -554,7 +594,6 @@
           <button id="btn-open-compliance" tabindex="-1"><span id="header-compliance-pill"><span>v1.1</span></span></button>
           <button id="btn-open-telemetry" tabindex="-1"><span id="header-telemetry-badge"><span id="header-telemetry-ttft-label">Pulso</span></span></button>
           <button id="btn-toggle-modo-pista" tabindex="-1"><span id="modo-pista-badge">OFF</span></button>
-          <button id="btn-open-history" class="btn-open-history" tabindex="-1"></button>
           <button id="btn-chat-clear" tabindex="-1"></button>
           <span id="chat-session-badge">Sessao Ativa</span>
         </div>
@@ -975,15 +1014,27 @@
           <!-- Container de Alertas Proativos In-App da AURA (P3-2) -->
           <div id="aura-in-app-alerts-container" class="empty:hidden flex flex-col gap-2 z-20"></div>
 
-<!-- Feed de Mensagens (Scrollable) - Ocupa 100% da altura e largura -->
+          <!-- Cabecalho Superior da Coluna do Chat (Ergonomia e Conforto de Leitura) -->
+          <div id="chat-column-header" class="flex items-center justify-between px-3.5 py-1.5 rounded-xl bg-slate-900/60 border border-white/5 text-xs flex-shrink-0">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="font-sans font-medium text-xs text-slate-300">Console Conversacional</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="btn-chat-reading-density" type="button" class="btn-chat-reading-density flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors text-xs font-mono select-none cursor-pointer" title="Alternar Densidade de Leitura: Conciso (Resumo Executivo, 68ch) vs Conforto (Editorial 0.96rem)" aria-label="Alternar densidade de leitura do chat" data-reading-mode="concise">
+                <span class="font-bold text-xs tracking-tighter text-cyan-400">Aa</span>
+                <span id="label-chat-reading-density" class="text-[11px] text-slate-400 font-sans">Conciso</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Feed de Mensagens (Scrollable) - Ocupa 100% da altura e largura -->
           <div id="chat-feed-container" class="glass-panel flex-1 min-h-0 p-4 sm:p-5 overflow-y-auto space-y-4 font-sans rounded-2xl relative scroll-smooth flex flex-col">
             <div id="welcome-message-bubble" class="flex justify-start w-full h-full min-h-full flex-1 animate-fade-in welcome-message-wrapper">
               <div class="chat-bubble-aura chat-bubble-welcome w-full max-w-full h-full min-h-full flex-1 flex flex-col justify-between p-4 sm:p-5 text-slate-100 text-sm space-y-3">
                 <div class="flex items-center justify-between border-b border-white/10 pb-2 flex-shrink-0">
                   <div class="flex items-center gap-2">
-                    <div class="neural-core-orb !w-6 !h-6 text-[10px] font-bold text-white flex items-center justify-center shadow-sm">
-                      <span class="relative z-10">A</span>
-                    </div>
+                    <div class="neural-core-orb !w-6 !h-6 flex items-center justify-center shadow-sm"></div>
                     <span class="font-bold font-sans text-xs text-white">AURA</span>
                     <span class="px-1.5 py-0.5 rounded text-[9px] font-sans font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">AI</span>
                   </div>
@@ -1018,6 +1069,9 @@
                       Sugestões executivas para iniciar:
                     </span>
                     <div class="welcome-suggestions-grid grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                      <button onclick="if(window.auraChat){ window.auraChat.sendUserPrompt('Quais os pontos criticos de ICMS Monofasico CST 61, PIS/COFINS CST 04 na conveniencia e rejeicoes SEFAZ?'); }" class="quick-prompt-chip !border-cyan-500/40 text-cyan-200 hover:text-white" aria-label="Consultar Escudo Fiscal e SEFAZ">
+                        <svg class="w-3.5 h-3.5 text-cyan-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-width="1.75"/><polyline points="9 12 11 14 15 10" stroke-width="2"/></svg> <span>Escudo Fiscal &amp; SEFAZ</span>
+                      </button>
                       <button onclick="window.auraChat.sendUserPrompt('Qual o diagnóstico executivo do meu negócio hoje?')" class="quick-prompt-chip !border-cyan-500/40 text-cyan-200 hover:text-white" aria-label="Consultar Mentor de Decisões Executivo">
                         <svg class="w-3.5 h-3.5 text-cyan-400 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L20.5 7.2V16.8L12 22L3.5 16.8V7.2L12 2Z" stroke-width="1.75" stroke-linejoin="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg> <span>Mentor de Decisões</span>
                       </button>
@@ -1058,11 +1112,22 @@
             </button>
           </div>
 
-          <!-- Indicador Pulsante de Entrada por Voz (Web Speech API) -->
-          <div id="voice-recording-indicator" class="hidden px-3.5 py-2 rounded-xl bg-rose-950/90 border border-rose-500/50 items-center gap-2.5 text-xs text-rose-200 backdrop-blur-md shadow-2xl animate-fade-in mb-2">
-            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping flex-shrink-0"></span>
-            <i data-lucide="mic" class="w-4 h-4 text-rose-400 animate-pulse"></i>
+          <!-- Indicador de Entrada por Voz Sincronizado ao Aura Orb -->
+          <div id="voice-recording-indicator" class="hidden px-3.5 py-2 rounded-xl bg-slate-900/95 border border-cyan-500/50 items-center gap-2.5 text-xs text-cyan-200 backdrop-blur-md shadow-2xl animate-fade-in mb-2">
+            <i data-lucide="mic" class="w-4 h-4 text-cyan-400"></i>
             <span id="voice-recording-label" class="font-semibold tracking-wide">Ouvindo comando de pista...</span>
+          </div>
+
+          <!-- Pilula Inteligente de Deteccao Fiscal (Chave 44d / XML) -->
+          <div id="fiscal-smart-paste-pill" class="hidden px-3.5 py-2 rounded-xl bg-slate-900/95 border border-cyan-500/40 flex items-center justify-between gap-2 text-xs text-cyan-300 backdrop-blur-md shadow-2xl animate-fade-in mb-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping flex-shrink-0"></span>
+              <span id="fiscal-smart-pill-text" class="font-medium truncate">Chave SEFAZ de 44 digitos detectada</span>
+            </div>
+            <button id="btn-trigger-smart-fiscal" type="button" class="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-white text-[11px] font-semibold border border-cyan-500/30 transition-all flex-shrink-0 flex items-center gap-1 cursor-pointer">
+              <span>Auditar Agora</span>
+              <span>&rarr;</span>
+            </button>
           </div>
 
           <!-- Barra de Entrada de Mensagem HUD (Refatorada Mobile-First - F4-06 & F4-07) -->
@@ -1076,6 +1141,17 @@
               enterkeyhint="send"
               autocomplete="off"
             ></textarea>
+
+            <!-- Input oculto e Botao de Inspecao Local de XML -->
+            <input type="file" id="fiscal-xml-file-input" accept=".xml,text/xml" class="hidden" />
+            <button 
+              id="btn-upload-fiscal-xml" 
+              type="button"
+              class="min-h-[48px] min-w-[48px] p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 border border-slate-700 transition-all flex items-center justify-center shadow-md active:scale-95 flex-shrink-0"
+              aria-label="Importar e Auditar XML Fiscal"
+              title="Importar e Auditar XML Fiscal (100% Offline)">
+              <i data-lucide="file-code-2" class="w-4 h-4"></i>
+            </button>
 
             <!-- Botão de Microfone / Entrada por Voz (Web Speech API pt-BR) -->
             <button 
@@ -1767,6 +1843,179 @@
 
         </div>
 
+        <!-- ============================================================= -->
+        <!-- SECAO: GOVERNANCA E MONITORAMENTO DE TOKENS (FISCAL-LLM)     -->
+        <!-- ============================================================= -->
+        <div class="p-4 rounded-xl bg-slate-950/70 border border-cyan-500/20 shadow-lg space-y-3.5">
+          <!-- Topo da Secao: Titulo e Status da Politica -->
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-2.5">
+              <div class="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center">
+                <span class="text-sm">⚡</span>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-xs sm:text-sm font-bold text-white font-sans">Acompanhamento de Tokens &amp; Orcamento FiscalLLM</h3>
+                  <span id="sre-budget-status-pill" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    Normal (Dentro da Meta)
+                  </span>
+                </div>
+                <p class="text-[11px] text-slate-400 font-sans">Tabela oficial Google AI Studio • Custo transparente por token e filial</p>
+              </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+              <span id="sre-budget-mode-badge" class="px-2 py-1 rounded-lg text-[10px] font-mono font-semibold bg-slate-800 text-cyan-300 border border-slate-700">
+                Modo: Smart Pacing
+              </span>
+            </div>
+          </div>
+
+          <!-- Barra de Acompanhamento e Progresso Ampla -->
+          <div class="space-y-1.5 p-3 rounded-lg bg-slate-900/80 border border-white/5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-300 font-medium font-sans flex items-center gap-1.5">
+                <span>Progresso do Teto Mensal:</span>
+                <strong id="sre-budget-pct-label" class="text-white font-mono">0.0%</strong>
+              </span>
+              <span class="text-[11px] font-mono text-slate-400">
+                <span id="sre-budget-cost-current" class="text-emerald-400 font-bold">R$ 0,00</span> / <span id="sre-budget-cost-limit">R$ 30,00</span>
+              </span>
+            </div>
+            <div class="w-full h-3 rounded-full bg-slate-950 overflow-hidden border border-white/10 relative">
+              <!-- Marcador de Alerta 80% -->
+              <div class="absolute top-0 bottom-0 left-[80%] w-[2px] bg-amber-400/60 z-10" title="Limiar de Alerta Preventivo (80%)"></div>
+              <div id="sre-budget-main-progress-bar" class="h-full bg-gradient-to-r from-emerald-500 via-cyan-500 to-indigo-500 rounded-full transition-all duration-700 shadow-inner" style="width: 2%;"></div>
+            </div>
+            <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono">
+              <span>0% (Inicio)</span>
+              <span class="text-amber-400/80">▲ Alerta 80%</span>
+              <span class="text-rose-400/80">Meta 100% (Teto)</span>
+            </div>
+          </div>
+
+          <!-- Grid de 4 Indicadores Estruturados -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <!-- 1. Tokens Consumidos -->
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-white/5">
+              <span class="text-[10px] text-slate-400 font-sans block">Tokens no Mes</span>
+              <div id="sre-token-total-count" class="text-lg font-bold text-white font-mono">0</div>
+              <span class="text-[9px] text-slate-500 font-mono block mt-0.5" id="sre-token-split">0 in / 0 out</span>
+            </div>
+            
+            <!-- 2. Custo Financeiro Real -->
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-white/5">
+              <span class="text-[10px] text-slate-400 font-sans block">Custo Apurado</span>
+              <div id="sre-token-cost-real" class="text-lg font-bold text-cyan-400 font-mono">R$ 0,00</div>
+              <span class="text-[9px] text-slate-500 font-mono block mt-0.5" id="sre-token-cost-usd">US$ 0.00</span>
+            </div>
+
+            <!-- 3. Economia Gerada (Cache Local) -->
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-emerald-500/20 bg-emerald-500/[0.03]">
+              <span class="text-[10px] text-emerald-300 font-sans block flex items-center gap-1">
+                <span>🛡️ Economia Cache</span>
+              </span>
+              <div id="sre-token-avoided-brl" class="text-lg font-bold text-emerald-400 font-mono">R$ 0,00</div>
+              <span class="text-[9px] text-emerald-400/70 font-mono block mt-0.5" id="sre-token-cache-hits">0 respostas sem custo</span>
+            </div>
+
+            <!-- 4. Projecao Fim do Mes -->
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-white/5">
+              <span class="text-[10px] text-slate-400 font-sans block">Projecao Fechamento</span>
+              <div id="sre-token-projection-brl" class="text-lg font-bold text-slate-200 font-mono">R$ 0,00</div>
+              <span class="text-[9px] text-slate-500 font-sans block mt-0.5">Run-rate linear simples</span>
+            </div>
+          </div>
+
+          <!-- Form de Metas Personalizaveis de Uso -->
+          <div class="p-3 rounded-lg bg-slate-900/60 border border-white/5 space-y-2.5">
+            <div class="flex items-center justify-between cursor-pointer" onclick="document.getElementById('token-policy-form-container').classList.toggle('hidden');">
+              <span class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" stroke-width="1.75"/><circle cx="12" cy="12" r="3" stroke-width="1.75"/></svg>
+                Personalizar Metas Orcamentarias da Filial
+              </span>
+              <span class="text-[10px] text-cyan-400 font-mono">Editar Parametros ▼</span>
+            </div>
+
+            <div id="token-policy-form-container" class="hidden pt-2 border-t border-white/5 grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+              <div>
+                <label class="text-[10px] text-slate-400 block mb-1">Meta Mensal (R$)</label>
+                <input id="input-budget-monthly" type="number" step="0.50" min="5" max="1000" value="30.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:border-cyan-400 focus:outline-none" />
+              </div>
+              <div>
+                <label class="text-[10px] text-slate-400 block mb-1">Limiar Alerta (%)</label>
+                <input id="input-budget-alert-pct" type="number" step="5" min="10" max="95" value="80" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:border-cyan-400 focus:outline-none" />
+              </div>
+              <div>
+                <label class="text-[10px] text-slate-400 block mb-1">Modo de Acao</label>
+                <select id="select-budget-mode" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-sans focus:border-cyan-400 focus:outline-none">
+                  <option value="smart_pacing">Smart Pacing (Prioriza cache/sintese)</option>
+                  <option value="advisory">Consultivo (Apenas Alerta)</option>
+                  <option value="strict_local">Contingencia Estrita (100% Local)</option>
+                </select>
+              </div>
+              <div>
+                <button id="btn-save-token-policy" type="button" class="w-full py-1.5 px-3 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-colors flex items-center justify-center gap-1 active:scale-95 cursor-pointer">
+                  <span>Salvar Meta</span>
+                </button>
+              </div>
+            </div>
+            <div id="token-policy-save-feedback" class="hidden text-[10px] text-emerald-400 font-semibold text-right">
+              ✓ Meta orcamentaria atualizada com sucesso!
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SECAO: INSIGHTS OPERACIONAIS E DE DESEMPENHO DA AURA         -->
+        <!-- ============================================================= -->
+        <div class="p-4 rounded-xl bg-slate-950/70 border border-white/5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-white flex items-center gap-1.5">
+              <span>🧠</span> Insights Operacionais &amp; Inteligencia da AURA
+            </span>
+            <span class="text-[10px] font-mono text-emerald-400 font-semibold" id="sre-insights-health-label">Saudavel</span>
+          </div>
+
+          <!-- Veredito Executivo em Destaque -->
+          <div class="p-3 rounded-lg bg-cyan-950/20 border border-cyan-500/20 flex items-start gap-2.5">
+            <div class="text-cyan-400 text-base mt-0.5">💡</div>
+            <div class="space-y-0.5 text-xs">
+              <div class="font-bold text-cyan-300">Veredito Operacional Executivo:</div>
+              <p id="sre-operational-verdict" class="text-slate-300 leading-relaxed font-sans">
+                Analisando performance das ultimas requisicoes e taxa de aderencia de dados locais...
+              </p>
+            </div>
+          </div>
+
+          <!-- 3 Metricas de Desempenho Operacional -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-white/5 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] text-slate-400 block">Eficiencia Cache Local</span>
+                <span id="sre-cache-efficiency-rate" class="text-sm font-bold text-emerald-400 font-mono">100%</span>
+              </div>
+              <span class="text-xs text-slate-500 font-sans">Zero Latencia API</span>
+            </div>
+
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-white/5 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] text-slate-400 block">Motor RAG &amp; FTS5</span>
+                <span id="sre-rag-efficiency-status" class="text-sm font-bold text-cyan-400 font-mono">Hibrido Ativo</span>
+              </div>
+              <span class="text-xs text-slate-500 font-sans">Borda Conectada</span>
+            </div>
+
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-white/5 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] text-slate-400 block">Media Tokens / Turno</span>
+                <span id="sre-avg-tokens-per-turn" class="text-sm font-bold text-purple-400 font-mono">~450</span>
+              </div>
+              <span class="text-xs text-slate-500 font-sans">Alta Concisao</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Secao Central: Grafico Canvas de Latencia TTFT em Tempo Real -->
         <div class="p-4 rounded-xl bg-slate-950/60 border border-white/5 space-y-2">
           <div class="flex items-center justify-between">
@@ -1819,6 +2068,68 @@
               </div>
             </div>
           </div>
+
+        <!-- ============================================================= -->
+        <!-- SECAO: MEMORIA OPERACIONAL DO POSTO & REVISAO TENANT (FASE 7) -->
+        <!-- ============================================================= -->
+        <div class="p-4 rounded-xl bg-slate-950/70 border border-purple-500/20 shadow-lg space-y-3.5">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-2.5">
+              <div class="p-1.5 rounded-lg bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center justify-center">
+                <span class="text-sm">🏢</span>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-xs sm:text-sm font-bold text-white font-sans">Memoria Operacional do Posto (Camada Tenant)</h3>
+                  <span id="tenant-memory-count-pill" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                    0 regras ativas
+                  </span>
+                </div>
+                <p class="text-[11px] text-slate-400 font-sans">Regras especificas desta filial com precedencia maxima sobre manuais do ERP</p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button id="btn-toggle-add-memory" type="button" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 transition-colors flex items-center gap-1.5 cursor-pointer">
+                <span>+</span> Cadastrar Regra
+              </button>
+            </div>
+          </div>
+
+          <!-- Form Oculto de Cadastro Rapido de Regra -->
+          <div id="tenant-memory-add-form" class="hidden p-3 rounded-lg bg-slate-900/90 border border-purple-500/30 space-y-2.5">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div>
+                <label class="text-[10px] text-slate-400 block mb-1">Categoria</label>
+                <select id="input-mem-categoria" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-purple-400 focus:outline-none">
+                  <option value="regra_posto">Regra do Posto</option>
+                  <option value="apelido_produto">Apelido de Produto</option>
+                  <option value="rotina_operacional">Rotina Operacional</option>
+                  <option value="preferencia_gestor">Preferencia do Gestor</option>
+                </select>
+              </div>
+              <div class="sm:col-span-2">
+                <label class="text-[10px] text-slate-400 block mb-1">Termo / Chave (Ex: coca lata, turno 3)</label>
+                <input id="input-mem-chave" type="text" placeholder="Ex: diesel s10 ou fechamento de caixa" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-purple-400 focus:outline-none" />
+              </div>
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-400 block mb-1">Conteudo / Instrucao da Regra</label>
+              <textarea id="input-mem-conteudo" rows="2" placeholder="Descreva o procedimento exclusivo deste posto..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-purple-400 focus:outline-none"></textarea>
+            </div>
+            <div class="flex items-center justify-end gap-2 pt-1">
+              <button id="btn-cancel-add-memory" type="button" class="px-3 py-1 rounded-lg text-xs text-slate-400 hover:text-white transition-colors cursor-pointer">Cancelar</button>
+              <button id="btn-save-tenant-memory" type="button" class="px-3 py-1 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white transition-colors cursor-pointer">Salvar Regra Ativa</button>
+            </div>
+          </div>
+
+          <!-- Lista de Memorias com Fatos Pendentes e Ativos -->
+          <div id="tenant-memory-items-list" class="space-y-2 max-h-52 overflow-y-auto pr-1">
+            <div class="p-3 rounded-lg bg-slate-900/50 text-center text-xs text-slate-400">
+              Carregando regras da memoria do posto...
+            </div>
+          </div>
+        </div>
 
           <!-- Card 6: Blindagem LGPD & Backup -->
           <div class="p-3.5 rounded-xl bg-slate-950/60 border border-white/5 space-y-1.5">
@@ -1877,7 +2188,7 @@
         <input 
           id="palette-search-input"
           type="text" 
-          placeholder="Digite um comando, diagnóstico ou pergunta para a AURA... (ex: tanques, ANP, fechamento de caixa, combos)" 
+          placeholder="Digite um comando, diagnóstico ou pergunta para a AURA... (ex: SEFAZ, chave 44d, PIS/COFINS, tanques, ANP, caixa)" 
           class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none font-sans"
         />
         <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-sans">ESC</kbd>
@@ -1937,6 +2248,39 @@
             </div>
           </div>
           <span class="text-[11px] text-auraCyan font-semibold">Executar ↵</span>
+        </div>
+
+        <div onclick="window.auraGlance.executePaletteAction('Quais as regras de ICMS Monofasico CST 61, PIS/COFINS CST 04 na conveniencia e principais rejeicoes SEFAZ?')" class="palette-item">
+          <div class="flex items-center gap-3">
+            <span class="p-1.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-width="1.75"/><polyline points="9 12 11 14 15 10" stroke-width="2"/></svg></span>
+            <div>
+              <div class="font-bold text-slate-100">Escudo Fiscal SEFAZ &amp; Tributacao Monofasica</div>
+              <div class="text-[11px] text-slate-400 font-sans">Auditoria de chave 44 digitos (Modulo 11), XML, ICMS CST 61 (LC 192) e Rejeicoes SEFAZ.</div>
+            </div>
+          </div>
+          <span class="text-[11px] text-auraCyan font-semibold">Auditar ↵</span>
+        </div>
+
+        <div onclick="window.auraGlance.executePaletteAction('Como evitar bitributacao de PIS/COFINS CST 04 em bebidas frias na conveniencia e lancar baixa de perda CFOP 5927?')" class="palette-item">
+          <div class="flex items-center gap-3">
+            <span class="p-1.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center justify-center"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-width="1.75"/><polyline points="14 2 14 8 20 8" stroke-width="1.75"/><path d="M9 15l2 2 4-4" stroke-width="1.75"/></svg></span>
+            <div>
+              <div class="font-bold text-slate-100">Auditor PIS/COFINS Conveniencia (CST 04) &amp; SPED</div>
+              <div class="text-[11px] text-slate-400 font-sans">Prevencao de bitributacao na Tabela 4.3.10, CFOP 5927 e Registros 1300/1310/1320.</div>
+            </div>
+          </div>
+          <span class="text-[11px] text-auraCyan font-semibold">Auditar ↵</span>
+        </div>
+
+        <div onclick="window.auraGlance.executePaletteAction('Como fazer a entrada de nota fiscal de fornecedor?')" class="palette-item">
+          <div class="flex items-center gap-3">
+            <span class="p-1.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke-width="1.75"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" stroke-width="1.75"/></svg></span>
+            <div>
+              <div class="font-bold text-slate-100">Roteiro de Entrada de Nota Fiscal (ERP Retaguarda)</div>
+              <div class="text-[11px] text-slate-400 font-sans">Passo a passo oficial para lancamento de NF-e e CT-e de fornecedor.</div>
+            </div>
+          </div>
+          <span class="text-[11px] text-auraCyan font-semibold">Consultar ↵</span>
         </div>
 
         <div onclick="window.auraGlance.executePaletteAction('O LMC de ontem fechou dentro da tolerância oficial da ANP?')" class="palette-item">
@@ -2285,11 +2629,61 @@
   </div>
 
   <!-- =========================================================================
+       AURA VOICE ORB MODAL (Experiencia Imersiva estilo Gemini / GPT)
+       Ao clicar no microfone, o fundo escurece e o orbe sobe flutuando no centro.
+       ========================================================================= -->
+  <div id="aura-voice-modal-overlay" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-300" aria-modal="true" role="dialog" aria-label="Comando de Voz AURA">
+    <!-- Scrim Escuro de Fundo com Blur Atmosferico -->
+    <div id="aura-voice-scrim" class="absolute inset-0 bg-slate-950/85 backdrop-blur-xl transition-opacity duration-300"></div>
+
+    <!-- Container Flutuante Centralizado do Orbe e Transcricao -->
+    <div id="aura-voice-modal-card" class="relative z-10 w-full max-w-lg flex flex-col items-center text-center p-6 sm:p-8 rounded-3xl bg-slate-900/75 border border-white/10 shadow-[0_0_80px_rgba(34,211,238,0.22)] backdrop-blur-2xl transform transition-all duration-350 scale-90 translate-y-10 opacity-0">
+      
+      <!-- Topo: Status de Sintonizacao e Botao Fechar/Cancelar -->
+      <div class="w-full flex items-center justify-between pb-4 border-b border-white/10">
+        <div class="flex items-center gap-2.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
+          <span id="aura-voice-status-label" class="text-xs font-sans font-bold uppercase tracking-widest text-cyan-300">
+            AURA SINTONIZADA • OUVINDO
+          </span>
+        </div>
+        <button id="btn-voice-modal-close" type="button" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-xs font-sans font-medium transition-colors cursor-pointer" aria-label="Cancelar comando de voz">
+          Cancelar (Esc)
+        </button>
+      </div>
+
+      <!-- O Orbe Vivo Majestoso Flutuando no Centro (Tamanho 140px, paridade AuraVoiceOrbSheet) -->
+      <div class="relative py-4 sm:py-6 flex items-center justify-center">
+        <div id="aura-voice-modal-orb-container" class="w-36 h-36 flex items-center justify-center relative"></div>
+      </div>
+
+      <!-- Pre-visualizacao do Texto Transcrito em Tempo Real -->
+      <div class="w-full p-4 rounded-2xl bg-slate-950/75 border border-white/10 shadow-inner min-h-[92px] flex items-center justify-center text-center mb-6 transition-all">
+        <p id="aura-voice-transcription-preview" class="text-sm sm:text-base font-sans text-slate-400 transition-colors leading-relaxed">
+          AURA esta ouvindo... Fale sobre bombas, tanques ou auditoria fiscal
+        </p>
+      </div>
+
+      <!-- Botoes de Acao Inferiores -->
+      <div class="w-full flex items-center justify-between gap-3">
+        <button id="btn-voice-modal-clear" type="button" class="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-sans font-medium text-xs sm:text-sm border border-white/5 transition-all cursor-pointer">
+          Limpar
+        </button>
+        <button id="btn-voice-modal-send" type="button" class="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-auraEmerald via-cyan-500 to-auraCyan hover:brightness-110 text-slate-950 font-sans font-bold text-xs sm:text-sm shadow-lg hover:shadow-cyan-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+          <span>Concluir e Enviar</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- =========================================================================
        SCRIPTS JAVASCRIPT MODULARES DA AURA
        ========================================================================= -->
   <script src="/static/js/aura-genui.js?v=2.10.22" defer></script>
   <script src="/static/js/aura-state-manager.js?v=2.10.22" defer></script>
-  <script src="/static/js/aura-genui-widgets.js?v=2.10.22" defer></script>
+  <script src="/static/js/aura-genui-widgets.js?v=2.10.23" defer></script>
   <script src="/static/js/aura-api.js?v=2.10.22"></script>
   <script src="/static/js/aura-cockpit.js?v=2.10.22"></script>
   <script src="/static/js/aura-triggers.js?v=2.10.22"></script>
@@ -2301,8 +2695,9 @@
   <script src="/static/js/aura-storage.js?v=2.10.22"></script>
   <script src="/static/js/aura-history-drawer.js?v=2.10.22"></script>
   <script src="/static/js/aura-welcome-cockpit.js?v=2.10.22"></script>
+  <script src="/static/js/aura-orb.js?v=2.10.22"></script>
   <script src="/static/js/aura-chat.js?v=2.10.22"></script>
-  <script src="/static/js/aura-voice.js?v=2.10.22"></script>
+  <script src="/static/js/aura-voice.js?v=2.10.23"></script>
   <script src="/static/js/aura-app.js?v=2.10.22"></script>
   <script src="/static/js/aura-fx.js?v=2.10.22"></script>
 

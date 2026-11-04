@@ -54,6 +54,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.aurapostoassitance.ui.components.AuraAmbientBackground
+import com.example.aurapostoassitance.ui.components.AuraBrandTitle
 import com.example.aurapostoassitance.ui.components.AuraCard
 import com.example.aurapostoassitance.ui.components.AuraGhostButton
 import com.example.aurapostoassitance.ui.components.AuraGradientButton
@@ -102,12 +104,12 @@ fun SetupScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(ObsidianBase)
-            .padding(horizontal = 24.dp)
-    ) {
+    AuraAmbientBackground {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp)
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -139,13 +141,12 @@ fun SetupScreen(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            Text(
-                text = "AURA Cockpit",
+            AuraBrandTitle(
+                text = "AURA",
                 style = MaterialTheme.typography.displayMedium.copy(
-                    fontFamily = NewsreaderFamily,
-                    letterSpacing = (-0.5).sp
+                    fontFamily = NewsreaderFamily
                 ),
-                color = TextPrimary
+                letterSpacing = 2.sp
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -374,4 +375,5 @@ fun SetupScreen(
             Spacer(modifier = Modifier.height(36.dp))
         }
     }
+}
 }

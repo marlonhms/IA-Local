@@ -42,6 +42,22 @@
       .replace(/`/g, '&#96;');
   }
 
+    function formatFiscalHighlightText(str, accentColor) {
+    if (str === null || str === undefined) return '';
+    const color = accentColor === 'emerald' ? 'emerald' : 'cyan';
+    let safe = escapeHtml(str);
+    const tagColor = color === 'emerald' ? 'text-emerald-400' : 'text-cyan-400';
+    // 1. Destacar tags de regras no inicio com bullet: • [REGRA]: ou [REGRA]:
+    safe = safe.replace(/([\u2022\*\-]?\s*)(\[[A-Za-z0-9_\-\.\/]+\]:?)/g, '$1<strong class="font-bold ' + tagColor + '">$2</strong>');
+    // 2. Destacar tags xml escapadas <tag>
+    safe = safe.replace(/(&lt;[a-zA-Z0-9_\-]+&gt;)/g, '<span class="font-semibold text-slate-100">$1</span>');
+    // 3. Destacar parametros e campos chave (ex: cStat=100, vOutro=-1066.69, vProd=251.79)
+    safe = safe.replace(/\b([a-zA-Z]{1,10}=[-0-9\.,]+)\b/g, '<span class="font-semibold text-slate-100">$1</span>');
+    // 4. Destacar tags de severidade [REJEICAO] / [ALERTA] se presentes
+    safe = safe.replace(/(\[(?:REJEICAO|ALERTA|ERRO|CONFORME|AVISO)[^\]]*\])/gi, '<strong class="font-bold text-rose-400">$1</strong>');
+    return safe;
+  }
+
   function formatNumber(num, decimals = 2) {
     const n = Number(num);
     if (isNaN(n)) return String(num || '0');
@@ -497,6 +513,22 @@
       if (stateMgr && typeof stateMgr.isActionExecuted === 'function' && stateMgr.isActionExecuted(actionId)) return false;
       if (this.isExpired() && actionType !== 'inspection') return false;
 
+      // 0. Investigacao Forense de Causa-Raiz (RCA): avaliada ANTES da inspecao, pois o botao
+      // e do tipo 'inspection' mas deve disparar uma nova consulta no chat.
+      const rcaPayload = (this.actions || []).find(a => a.action_id === actionId)?.payload || {};
+      const isRcaAction = actionId === 'act_investigar_rca' ||
+                          btnElement?.getAttribute?.('data-action-id') === 'act_investigar_rca' ||
+                          btnElement?.getAttribute?.('data-intent') === 'investigar_causa_raiz' ||
+                          rcaPayload.intent === 'investigar_causa_raiz';
+      if (isRcaAction && typeof window !== 'undefined' && window.auraChat && typeof window.auraChat.sendUserPrompt === 'function') {
+        const turnoAud = rcaPayload.turno || this.props?.turno_auditado || '';
+        const dataAud = rcaPayload.data || this.props?.data_auditada || '';
+        const shift = turnoAud && !String(turnoAud).toUpperCase().includes('TODOS') ? ` do ${turnoAud}` : '';
+        const dataA = dataAud ? ` de ${dataAud}` : '';
+        window.auraChat.sendUserPrompt(`Investigar causa raiz da quebra${shift}${dataA}`);
+        return true;
+      }
+
       // 1. Acoes de inspecao no Companion Canvas com protecao de debounce
       const btnText = (btnElement && typeof btnElement.textContent === 'string') ? btnElement.textContent : '';
       const isInspection = actionType === 'inspection' || btnText.includes('Canvas') || btnText.includes('Projetar');
@@ -527,12 +559,77 @@
         return true;
       }
 
-      // Acao especial: Disparo de Investigacao Forense de Causa-Raiz (RCA)
-      if (actionId === 'act_investigar_rca' || btnElement?.getAttribute('data-action-id') === 'act_investigar_rca') {
-        if (typeof window !== 'undefined' && window.auraChat && typeof window.auraChat.sendMessage === 'function') {
-          const shift = this.props?.turno_auditado && !this.props.turno_auditado.includes('TODOS') ? ` do ${this.props.turno_auditado}` : '';
-          const dataA = this.props?.data_auditada ? ` de ${this.props.data_auditada}` : '';
-          window.auraChat.sendMessage(`Investigar causa raiz da quebra${shift}${dataA}`);
+      // Acao especial: Copiar Diagnostico Fiscal para o Contador (Area de Transferencia)
+      const actionPayload = (this.actions || []).find(a => a.action_id === actionId)?.payload || {};
+      if (actionPayload.intent === 'copiar_diagnostico_contador' || actionId.includes('copiar_diagnostico') || btnElement?.textContent?.includes('Copiar Diagnostico')) {
+        const title = this.props?.title || 'Parecer Fiscal AURA';
+        const diag = this.props?.diagnosis || '';
+        const blocks = Array.isArray(this.props?.blocks) ? this.props.blocks : [];
+        const alerta = blocks.find(b => b.block_type === 'alert_callout')?.alert?.message || '';
+        const acao = blocks.find(b => b.block_type === 'alert_callout')?.alert?.action_label || '';
+        const proc = blocks.find(b => b.block_id === 'blk_procedimento_erp')?.custom_content || '';
+        const personaViews = this.props?.persona_views || {};
+        const contadorParecer = personaViews.contador || '';
+        const basesLegais = Array.isArray(personaViews.base_legal) ? personaViews.base_legal.join(' | ') : '';
+        const anatomy = this.props?.access_key_anatomy || null;
+        const findingsBlock = blocks.find(b => b.block_type === 'fiscal_findings_list');
+        const findingsList = Array.isArray(findingsBlock?.findings) ? findingsBlock.findings : [];
+
+        let anatomyLine = '';
+        if (anatomy && typeof anatomy === 'object') {
+          anatomyLine = `Chave SEFAZ (44d): UF=${anatomy.c_uf || ''}(${anatomy.uf_sigla || ''}) | AAMM=${anatomy.aamm || ''} | CNPJ=${anatomy.cnpj_emitente || ''} | Mod=${anatomy.modelo || ''} | Serie=${anatomy.serie || ''} | NF=${anatomy.numero_nfe || ''} | Emis=${anatomy.tipo_emissao || ''} | Cod=${anatomy.codigo_numerico || ''} | DV=${anatomy.digito_verificador || ''} (Calc=${anatomy.dv_calculado || ''}, Modulo 11=${anatomy.is_dv_valido ? 'OK' : 'INVALIDO'})`;
+        }
+
+        let findingsLines = '';
+        if (findingsList.length > 0) {
+          findingsLines = '\nApontamentos e Regras Avaliadas:\n' + findingsList.map(f => {
+            const code = f.regra_id ? `[${f.regra_id}] ` : '';
+            const espObs = (f.valor_esperado || f.valor_observado) ? ` (Esperado: ${f.valor_esperado || '-'} | Observado: ${f.valor_observado || '-'})` : '';
+            return `- ${code}${f.titulo || 'Regra'}: ${f.explicacao_tecnica || f.explicacao_executiva || ''}${espObs}`;
+          }).join('\n');
+        }
+
+        const clipboardText = [
+          `=== PARECER FISCAL / DIAGNOSTICO SEFAZ (AURA INTELLIGENCE) ===`,
+          `Titulo: ${title}`,
+          `Diagnostico Executivo: ${diag}`,
+          anatomyLine,
+          alerta ? `Impacto Operacional: ${alerta}` : '',
+          acao ? `Acao Recomendada no ERP: ${acao}` : '',
+          contadorParecer ? `\nParecer Tecnico Contabil & SPED:\n${contadorParecer}` : '',
+          findingsLines,
+          basesLegais ? `\nBase Legal Normativa: ${basesLegais}` : '',
+          proc ? `\nProcedimento Detalhado:\n${proc}` : '',
+          `\nData/Hora: ${new Date().toLocaleString('pt-BR')}`,
+          `Gerado pela AURA - Assistente de Prontidao do Posto`
+        ].filter(Boolean).join('\n');
+
+        if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          navigator.clipboard.writeText(clipboardText).then(() => {
+            if (btnElement) {
+              const origHtml = btnElement.innerHTML;
+              btnElement.innerHTML = '<span>✔ Laudo Copiado para Area de Transferencia!</span>';
+              setTimeout(() => {
+                if (btnElement) btnElement.innerHTML = origHtml;
+              }, 4000);
+            }
+            const fx = (typeof window !== 'undefined' && window.auraFx) || null;
+            if (fx && typeof fx.showToast === 'function') {
+              fx.showToast({
+                title: 'Parecer Copiado!',
+                message: 'Diagnostico fiscal copiado para a area de transferencia. Pronto para enviar ao contador.',
+                type: 'success'
+              });
+            }
+          }).catch(() => {});
+        }
+        return true;
+      }
+
+      // Acao especial: Consultar Modulo de Faturamento
+      if (actionPayload.intent === 'ajuda_sistema' && actionPayload.modulo === 'faturamento') {
+        if (typeof window !== 'undefined' && window.auraChat && typeof window.auraChat.sendUserPrompt === 'function') {
+          window.auraChat.sendUserPrompt('Como operar o Modulo de Faturamento e Notas Fiscais no seu ERP?');
           return true;
         }
       }
@@ -837,7 +934,7 @@
           </div>
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
             <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Diagnostico Executivo</span>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -992,36 +1089,43 @@
 
     renderLayer1() {
       const p = this.props || {};
-      const marginVal = Number(p.consolidated_margin_pct ?? 14.5);
+      const hasMargin = p.consolidated_margin_pct !== null && p.consolidated_margin_pct !== undefined && !isNaN(Number(p.consolidated_margin_pct));
+      const marginVal = hasMargin ? Number(p.consolidated_margin_pct) : null;
       const targetVal = p.target_margin_pct !== null && p.target_margin_pct !== undefined ? Number(p.target_margin_pct) : null;
       const diagnosisText = p.diagnosis || this.summary || 'Analise de margem liquida consolidada apurada no ERP.';
+      const periodoText = p.periodo_analisado || '';
 
-      const scoreColor = marginVal >= 15
-        ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10'
-        : (marginVal >= 10 ? 'text-amber-300 border-amber-500/40 bg-amber-500/10' : 'text-rose-300 border-rose-500/40 bg-rose-500/10');
+      const scoreColor = marginVal !== null
+        ? (marginVal >= 15
+            ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10'
+            : (marginVal >= 10 ? 'text-amber-300 border-amber-500/40 bg-amber-500/10' : 'text-rose-300 border-rose-500/40 bg-rose-500/10'))
+        : 'text-slate-400 border-slate-700 bg-slate-800/40';
+
+      const marginLabel = marginVal !== null ? `Margem Real: ${formatNumber(marginVal)}%` : 'Margem: Requer Custo';
 
       return `
         <div class="genui-layer genui-layer-1 mb-4 pb-3 border-b border-white/10">
           <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
               <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
               <h4 class="text-xs font-mono font-bold tracking-wider text-emerald-300 uppercase">
                 AURA Margin &amp; Profitability Analyst
               </h4>
+              ${periodoText ? `<span class="text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 font-medium">📅 ${escapeHtml(periodoText)}</span>` : ''}
               <span class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">
                 ${escapeHtml(this.toolCallId.substring(0, 14))}...
               </span>
             </div>
             <div class="flex items-center gap-2">
               <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full border ${scoreColor} font-semibold flex items-center gap-1">
-                <span>Margem Real: ${formatNumber(marginVal)}%</span>
+                <span>${marginLabel}</span>
               </span>
               ${targetVal !== null ? `<span class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">Meta: ${formatNumber(targetVal)}%</span>` : ''}
             </div>
           </div>
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
             <span class="text-[10px] uppercase font-bold tracking-wider text-emerald-400 font-mono">Diagnostico de Rentabilidade</span>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -1033,41 +1137,52 @@
       const p = this.props || {};
       const fuels = Array.isArray(p.fuel_margins) ? p.fuel_margins : [];
       const paymentFees = Array.isArray(p.payment_fee_impact) ? p.payment_fee_impact : [];
+      const topProducts = Array.isArray(p.top_produtos_margem) ? p.top_produtos_margem : [];
       const limitations = Array.isArray(p.limitations) ? p.limitations : [];
 
       let totalDesconto = 0;
       paymentFees.forEach(pf => {
         if (pf && pf.desconto_taxas_reais) totalDesconto += Number(pf.desconto_taxas_reais);
       });
+      if (!totalDesconto && p.total_desconto_tef) {
+        totalDesconto = Number(p.total_desconto_tef);
+      }
+
+      const hasMargin = p.consolidated_margin_pct !== null && p.consolidated_margin_pct !== undefined && !isNaN(Number(p.consolidated_margin_pct));
+      const marginVal = hasMargin ? Number(p.consolidated_margin_pct) : null;
 
       // 4 Cards de Sintese
+      const grossRev = p.gross_revenue || p.faturamento_bruto || p.faturamento_total || 0;
+      const netProf = p.net_profit || p.lucro_liquido || p.lucro_bruto || 0;
+      const tefVal = totalDesconto || p.total_desconto_tef || p.taxas_tef || 0;
+
       const cardsHtml = `
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
           <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
             <span class="text-[10px] text-slate-400 font-medium">Margem Liquida</span>
             <div class="text-sm sm:text-base font-bold font-mono text-emerald-300 tabular-nums">
-              ${formatNumber(p.consolidated_margin_pct ?? 14.5)}%
+              ${marginVal !== null ? formatNumber(marginVal) + '%' : '<span class="text-xs text-slate-400 font-normal">Requer Custo</span>'}
             </div>
             <span class="text-[10px] text-slate-500 font-mono">Real Consolidado</span>
           </div>
           <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
             <span class="text-[10px] text-slate-400 font-medium">Faturamento Bruto</span>
             <div class="text-sm sm:text-base font-bold font-mono text-white tabular-nums">
-              R$ ${formatNumber(p.gross_revenue || 0)}
+              R$ ${formatNumber(grossRev)}
             </div>
             <span class="text-[10px] text-slate-500 font-mono">Volume no ERP</span>
           </div>
           <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
             <span class="text-[10px] text-slate-400 font-medium">Lucro Liquido</span>
             <div class="text-sm sm:text-base font-bold font-mono text-cyan-300 tabular-nums">
-              R$ ${formatNumber(p.net_profit || 0)}
+              R$ ${formatNumber(netProf)}
             </div>
             <span class="text-[10px] text-slate-500 font-mono">Margem Real R$</span>
           </div>
           <div class="p-2.5 rounded-xl border border-rose-500/20 bg-rose-500/5 space-y-1">
             <span class="text-[10px] text-rose-300 font-medium">Taxas TEF / Cartao</span>
             <div class="text-sm sm:text-base font-bold font-mono text-rose-400 tabular-nums">
-              -R$ ${formatNumber(totalDesconto)}
+              -R$ ${formatNumber(tefVal)}
             </div>
             <span class="text-[10px] text-slate-500 font-mono">Desconto Meios</span>
           </div>
@@ -1079,25 +1194,25 @@
       if (fuels.length > 0) {
         fuelsHtml = `
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 mb-3 space-y-2">
-            <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Rentabilidade por Combustivel / Bico</span>
+            <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Rentabilidade por Combustivel / Pista</span>
             <div class="space-y-1.5">
               ${fuels.map(f => {
                 const nome = escapeHtml(f.combustivel || 'Combustivel');
                 const preco = formatNumber(f.preco_venda || 0);
                 const custo = formatNumber(f.custo_aquisicao || 0);
+                const vol = formatNumber(f.volume_litros || 0, 1);
+                const fat = formatNumber(f.faturamento_reais || 0);
                 const mg = Number(f.margem_liquida_pct || 0);
                 const mgFmt = formatNumber(mg);
                 const mgColor = mg >= 15 ? 'text-emerald-400' : (mg >= 10 ? 'text-amber-400' : 'text-rose-400');
-                const bench = f.benchmark_mercado ? `Meta Regiao: R$ ${formatNumber(f.benchmark_mercado)}` : '';
                 return `
                   <div class="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-white/5 text-xs">
                     <div>
                       <span class="font-bold text-white">${nome}</span>
-                      <span class="text-slate-400 text-[11px] font-mono ml-2">Venda: R$ ${preco} | Custo: R$ ${custo}</span>
+                      <span class="text-slate-400 text-[11px] font-mono ml-2">Venda: R$ ${preco} | Custo: R$ ${custo} | ${vol} L (R$ ${fat})</span>
                     </div>
                     <div class="text-right">
                       <span class="font-mono font-bold ${mgColor}">${mgFmt}%</span>
-                      ${bench ? `<div class="text-[9px] text-slate-500 font-mono">${bench}</div>` : ''}
                     </div>
                   </div>
                 `;
@@ -1107,12 +1222,50 @@
         `;
       }
 
-      // Detalhamento de Taxas Financeiras
+      // Grade de Top Produtos da Conveniencia & Margem
+      let productsHtml = '';
+      if (topProducts.length > 0) {
+        productsHtml = `
+          <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 mb-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Top Produtos de Conveniencia &amp; Margem</span>
+              <span class="text-[10px] text-slate-400 font-mono">${topProducts.length} itens apurados</span>
+            </div>
+            <div class="space-y-1.5">
+              ${topProducts.slice(0, 6).map(prod => {
+                const nome = escapeHtml(prod.nompro || 'Produto');
+                const cod = escapeHtml(prod.codpro || '');
+                const qtd = formatNumber(prod.qtd_total || 0, 1);
+                const rec = formatNumber(prod.receita_total || 0);
+                const custo = formatNumber(prod.custo_unitario || 0);
+                const temCusto = Boolean(prod.tem_custo || Number(prod.custo_unitario || 0) > 0);
+                const mg = prod.margem_pct !== null && prod.margem_pct !== undefined ? Number(prod.margem_pct) : null;
+                const mgColor = (mg !== null && mg >= 20) ? 'text-emerald-400' : ((mg !== null && mg >= 0) ? 'text-amber-400' : 'text-rose-400');
+                const mgBadge = (mg !== null) ? `${formatNumber(mg)}%` : '<span class="text-slate-500 font-normal">Sem Custo</span>';
+
+                return `
+                  <div class="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-white/5 text-xs">
+                    <div class="min-w-0 pr-2">
+                      <div class="font-bold text-white truncate">${nome}</div>
+                      <div class="text-slate-400 text-[11px] font-mono">SKU: ${cod} | Giro: ${qtd} un | Receita: R$ ${rec} | Custo Unit: ${temCusto ? 'R$ ' + custo : 'N/D'}</div>
+                    </div>
+                    <div class="text-right flex-shrink-0">
+                      <span class="font-mono font-bold ${mgColor}">${mgBadge}</span>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      // Detalhamento de Taxas Financeiras TEF
       let feesHtml = '';
       if (paymentFees.length > 0) {
         feesHtml = `
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 mb-3 space-y-2">
-            <span class="text-[10px] uppercase font-bold tracking-wider text-amber-400 font-mono">Impacto de Taxas por Meio de Pagamento</span>
+            <span class="text-[10px] uppercase font-bold tracking-wider text-amber-400 font-mono">Impacto de Taxas por Meio de Pagamento (TEF)</span>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
               ${paymentFees.map(pf => {
                 const mod = escapeHtml(pf.modalidade || 'Modalidade');
@@ -1148,6 +1301,7 @@
         <div class="genui-layer genui-layer-2 mb-4">
           ${cardsHtml}
           ${fuelsHtml}
+          ${productsHtml}
           ${feesHtml}
           ${limitationsHtml}
         </div>
@@ -1221,7 +1375,7 @@
               <span class="text-[10px] uppercase font-bold tracking-wider text-purple-400 font-mono">Hipotese Simulada</span>
               <span class="text-[11px] font-mono font-semibold text-slate-300">${escapeHtml(title)}</span>
             </div>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -1380,7 +1534,7 @@
               <span class="text-blue-400 uppercase font-bold">${escapeHtml(entity)}</span>
               <span class="text-slate-400">vs ${escapeHtml(group)}</span>
             </div>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -1574,7 +1728,7 @@
           </div>
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
             <span class="text-[10px] uppercase font-bold tracking-wider text-rose-400 font-mono">Diagnostico de Perdas</span>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -1703,7 +1857,7 @@
         diagnosisText = diagnosisText.text || diagnosisText.summary || JSON.stringify(diagnosisText);
       }
       if (!diagnosisText || typeof diagnosisText !== 'string') {
-        diagnosisText = 'Faturamento de R$ ' + totGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ' apurado no ERP webPosto.';
+        diagnosisText = 'Faturamento de R$ ' + totGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ' apurado no seu ERP.';
       }
 
       return `
@@ -1936,7 +2090,7 @@
           ` : ''}
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
             <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Diagnóstico do Fechamento</span>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -2093,7 +2247,7 @@
           </div>
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
             <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Diagnostico Pericial de Causa-Raiz</span>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-sans font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagPrincipal)}
             </p>
           </div>
@@ -2262,7 +2416,7 @@
           </div>
           <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
             <span class="text-[10px] uppercase font-bold tracking-wider text-amber-400 font-mono">Estrategia de Vendas Cruzadas</span>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -2537,7 +2691,7 @@
               <span class="text-cyan-400 font-bold uppercase">${escapeHtml(subtitle)}</span>
               <span class="text-slate-400">Intelligent UI : Blocos Lego</span>
             </div>
-            <p class="text-xs sm:text-sm font-sans font-medium text-slate-100 leading-relaxed">
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
               ${escapeHtml(diagnosisText)}
             </p>
           </div>
@@ -2581,6 +2735,7 @@
       if (bType === 'kpi_grid') icon = '📊';
       else if (bType === 'comparison_table') icon = '⚖️';
       else if (bType === 'ranking_list') icon = '🏆';
+      else if (bType === 'fiscal_findings_list') icon = '🛡️';
       else if (bType === 'timeline_feed') icon = '⏱️';
       else if (bType === 'alert_callout') icon = '🚨';
 
@@ -2607,8 +2762,8 @@
               const trendArrow = k.trend === 'up' ? '↗' : (k.trend === 'down' ? '↘' : '→');
               return `
                 <div class="p-2.5 rounded-lg bg-slate-950/60 border ${statusBorder} flex flex-col justify-between">
-                  <div class="text-[11px] text-slate-400 truncate">${escapeHtml(k.label || 'Métrica')}</div>
-                  <div class="font-mono font-bold text-base ${valueColor} my-0.5">${escapeHtml(String(k.value || '0'))}</div>
+                  <div class="text-[11px] text-slate-400 truncate">${escapeHtml((k.label || 'Métrica').replace(/\bwebposto\b/gi, 'ERP'))}</div>
+                  <div class="font-mono font-bold text-base ${valueColor} my-0.5">${escapeHtml(String(k.value || '0').replace(/\bwebposto(?:\s*vers[aã]o)?(?:\s+v?\d+(?:\.\d+)*\+?)?/gi, 'ERP do Posto'))}</div>
                   <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
                     ${k.delta ? `<span class="text-slate-300">${trendArrow} ${escapeHtml(k.delta)}</span>` : '<span></span>'}
                     ${k.subtext ? `<span class="truncate ml-1 text-slate-400">${escapeHtml(k.subtext)}</span>` : ''}
@@ -2644,6 +2799,222 @@
             }).join('')}
           </div>
         `;
+      } else if (bType === 'fiscal_findings_list') {
+        const rawFindings = Array.isArray(b.findings) ? b.findings : (Array.isArray(b.ranking_items) ? b.ranking_items : []);
+
+        const isConformeItem = (item) => {
+          const st = String(item.status || item.value || '').toUpperCase();
+          return st.includes('VALID') || st.includes('CONFORM');
+        };
+
+        const pendencias = rawFindings.filter(item => !isConformeItem(item));
+        const conformes = rawFindings.filter(item => isConformeItem(item));
+
+        const renderFindingCard = (item, isConforme = false) => {
+          const stRaw = String(item.status || item.value || '').toUpperCase();
+          let isInvalid = stRaw.includes('INVALID') || stRaw.includes('REJEIC');
+          let isWarning = stRaw.includes('WARN') || stRaw.includes('ALERTA');
+          let isValid = stRaw.includes('VALID') || stRaw.includes('CONFORM');
+
+          let cardBorderClass = 'border-white/5 bg-slate-950/50';
+          let statusBadgeClass = 'bg-slate-800 text-slate-300 border-slate-700';
+          let statusBadgeLabel = 'Fiscal';
+          let statusBtnHtml = '';
+
+          if (isInvalid) {
+            cardBorderClass = 'border-rose-500/25 bg-rose-950/10 hover:border-rose-500/40';
+            statusBadgeClass = 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+            statusBadgeLabel = 'Bloqueio de Emissao';
+            statusBtnHtml = `
+              <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                <div class="w-6 h-6 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 flex items-center justify-center shadow-[0_0_8px_rgba(244,63,94,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
+                  <svg class="w-3 h-3 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </div>
+                <div class="aura-status-tooltip">
+                  <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-rose-500/50 shadow-2xl text-center backdrop-blur-md">
+                    <div class="text-[9px] font-bold text-rose-300 font-mono uppercase tracking-wider">Rejeicao SEFAZ</div>
+                    <div class="text-[10px] text-slate-200 font-medium">Bloqueio Impeditivo de Emissao</div>
+                  </div>
+                  <div class="aura-status-tooltip-arrow border-r border-b border-rose-500/50"></div>
+                </div>
+              </div>
+            `;
+          } else if (isWarning) {
+            cardBorderClass = 'border-amber-500/25 bg-amber-950/10 hover:border-amber-500/40';
+            statusBadgeClass = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+            statusBadgeLabel = 'Alerta de Conformidade';
+            statusBtnHtml = `
+              <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                <div class="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-[0_0_8px_rgba(245,158,11,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
+                  <svg class="w-3 h-3 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                  </svg>
+                </div>
+                <div class="aura-status-tooltip">
+                  <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-amber-500/50 shadow-2xl text-center backdrop-blur-md">
+                    <div class="text-[9px] font-bold text-amber-300 font-mono uppercase tracking-wider">Alerta Fiscal</div>
+                    <div class="text-[10px] text-slate-200 font-medium">Risco de Bitributacao ou SPED</div>
+                  </div>
+                  <div class="aura-status-tooltip-arrow border-r border-b border-amber-500/50"></div>
+                </div>
+              </div>
+            `;
+          } else {
+            cardBorderClass = 'border-emerald-500/25 bg-emerald-950/10 hover:border-emerald-500/40';
+            statusBadgeClass = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+            statusBadgeLabel = 'Aprovado SEFAZ';
+            statusBtnHtml = `
+              <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                <div class="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shadow-[0_0_8px_rgba(16,185,129,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
+                  <svg class="w-3 h-3 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+                <div class="aura-status-tooltip">
+                  <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-emerald-500/50 shadow-2xl text-center backdrop-blur-md">
+                    <div class="text-[9px] font-bold text-emerald-300 font-mono uppercase tracking-wider">Conforme</div>
+                    <div class="text-[10px] text-slate-200 font-medium">Validado perante SEFAZ e SPED</div>
+                  </div>
+                  <div class="aura-status-tooltip-arrow border-r border-b border-emerald-500/50"></div>
+                </div>
+              </div>
+            `;
+          }
+
+          let rawTit = item.titulo || item.title || 'Regra Fiscal';
+          let cleanTit = rawTit.replace(/^\[(REJEICAO|ALERTA|CONFORME|AVISO|ERRO)\]\s*/i, '').trim();
+
+          const ruleCode = String(item.regra_id || item.tag || '').trim();
+          const execMsg = item.explicacao_executiva || item.subtitle || '';
+          const acaoMsg = item.acao_recomendada || (Array.isArray(item.acoes_recomendadas) && item.acoes_recomendadas[0]) || '';
+          const fields = Array.isArray(item.campos_afetados) ? item.campos_afetados : [];
+          const isSuporteErp = isInvalid || (acaoMsg && acaoMsg.toLowerCase().includes('suporte')) || (item.canal_acao === 'suporte_webposto');
+
+          const ticketPayload = JSON.stringify({
+            titulo: cleanTit,
+            regra: ruleCode,
+            causa: execMsg,
+            tecnica: item.explicacao_tecnica || '',
+            campos: fields.join(', '),
+            obs: String(item.valor_observado || ''),
+            esp: String(item.valor_esperado || '')
+          }).replace(/'/g, "&apos;");
+
+          return `
+            <div class="p-3.5 rounded-xl border ${cardBorderClass} transition-all space-y-2.5">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0 flex-1 space-y-1">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-sans font-semibold border ${statusBadgeClass}">
+                      ${statusBadgeLabel}
+                    </span>
+                    <span class="finding-rule-code hidden text-[10px] text-slate-400 font-mono">
+                      Regra: ${escapeHtml(ruleCode)}
+                    </span>
+                  </div>
+                  <h5 class="text-xs sm:text-sm font-semibold text-slate-100 leading-snug">
+                    ${escapeHtml(cleanTit)}
+                  </h5>
+                </div>
+                <div class="text-right flex-shrink-0">
+                  ${statusBtnHtml}
+                </div>
+              </div>
+
+              <!-- FASE 4/5: Visualizacao Diferenciada por Persona (Gestor vs. Contador) -->
+              <!-- Modo Gestor (Foco de Pista & Destravamento) -->
+              <div class="finding-view-gestor space-y-2">
+                ${execMsg ? `
+                  <p class="text-xs text-slate-300 leading-relaxed font-sans">
+                    ${escapeHtml(execMsg)}
+                  </p>
+                ` : ''}
+                ${acaoMsg ? `
+                  <div class="p-2.5 rounded-lg bg-emerald-950/30 border border-emerald-500/30 text-xs text-emerald-200 space-y-2">
+                    <div class="flex items-start gap-2 leading-relaxed">
+                      <span class="text-emerald-400 flex-shrink-0 text-sm">💡</span>
+                      <div>
+                        <strong class="text-emerald-300 font-semibold">Como destravar no seu ERP: </strong>
+                        <span>${escapeHtml(acaoMsg)}</span>
+                      </div>
+                    </div>
+                    ${isSuporteErp ? `
+                      <button
+                        type="button"
+                        class="btn-suporte-webposto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 text-xs font-semibold transition-all active:scale-95 shadow-sm cursor-pointer"
+                        data-ticket='${ticketPayload}'
+                        title="Copiar chamado formatado para enviar no WhatsApp do Suporte do seu ERP"
+                      >
+                        <svg class="w-3.5 h-3.5 text-emerald-300 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                        </svg>
+                        <span>Copiar Chamado Suporte do ERP (WhatsApp)</span>
+                      </button>
+                    ` : ''}
+                  </div>
+                ` : ''}
+              </div>
+
+              <!-- Modo Contador (Foco Contabil, Tags XML & SPED) -->
+              <div class="finding-view-contador hidden space-y-2">
+                ${item.explicacao_tecnica ? `
+                  <p class="text-xs text-cyan-200/90 leading-relaxed font-mono">
+                    ${escapeHtml(item.explicacao_tecnica)}
+                  </p>
+                ` : (execMsg ? `
+                  <p class="text-xs text-slate-300 leading-relaxed font-mono">
+                    ${escapeHtml(execMsg)}
+                  </p>
+                ` : '')}
+                ${fields.length > 0 ? `
+                  <div class="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-slate-400">
+                    <span class="text-cyan-400 font-semibold">Tags XML:</span>
+                    ${fields.map(f => `<span class="bg-slate-900 px-1.5 py-0.5 rounded border border-cyan-500/30 text-cyan-300">${escapeHtml(f)}</span>`).join('')}
+                  </div>
+                ` : ''}
+                ${(Array.isArray(item.base_legal) && item.base_legal.length > 0) ? `
+                  <div class="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-slate-400">
+                    <span class="text-slate-500">Fundamentacao:</span>
+                    ${item.base_legal.map(b => `<span class="bg-slate-900 px-1.5 py-0.5 rounded border border-white/5 text-slate-300">${escapeHtml(b)}</span>`).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        };
+
+        if (pendencias.length > 0) {
+          bodyHtml = `
+            <div class="space-y-2.5">
+              ${pendencias.map(item => renderFindingCard(item, false)).join('')}
+            </div>
+          `;
+        } else {
+          bodyHtml = `
+            <div class="space-y-2.5">
+              <div class="p-4 rounded-xl border border-emerald-500/30 bg-emerald-950/20 text-center space-y-2">
+                <div class="w-10 h-10 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 flex items-center justify-center mx-auto shadow-[0_0_12px_rgba(16,185,129,0.25)]">
+                  <svg class="w-5 h-5 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </div>
+                <h5 class="text-sm font-bold text-emerald-200">Documento Fiscal 100% Conforme</h5>
+                <p class="text-xs text-slate-300 max-w-md mx-auto">Todas as regras tributarias e de schema foram validadas com sucesso perante a SEFAZ e SPED. Emissao liberada na pista.</p>
+                ${conformes.length > 0 ? `
+                  <button type="button" class="btn-toggle-conformes text-xs font-mono text-cyan-400 hover:text-cyan-300 underline mt-1">
+                    Ver as ${conformes.length} regras aprovadas
+                  </button>
+                  <div class="container-conformes-list hidden space-y-2 text-left pt-3">
+                    ${conformes.map(item => renderFindingCard(item, true)).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }
       } else if (bType === 'ranking_list') {
         const items = Array.isArray(b.ranking_items) ? b.ranking_items : [];
         bodyHtml = `
@@ -2651,18 +3022,92 @@
             ${items.map((item, idx) => {
               const rankNum = item.rank || (idx + 1);
               const medal = rankNum === 1 ? '🥇 1º' : (rankNum === 2 ? '🥈 2º' : (rankNum === 3 ? '🥉 3º' : `${rankNum}º`));
+              const rawVal = String(item.value || '').toUpperCase();
+              let isInv = rawVal.includes('INVALID') || rawVal.includes('REJEIC');
+              let isWarn = rawVal.includes('WARN') || rawVal.includes('ALERTA');
+              let isVal = rawVal.includes('VALID') || rawVal.includes('CONFORM');
+              let isFiscal = isInv || isWarn || isVal;
+
+              let valHtml = '';
+              if (isInv) {
+                valHtml = `
+                  <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                    <div class="w-6 h-6 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 flex items-center justify-center shadow-[0_0_8px_rgba(244,63,94,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
+                      <svg class="w-3 h-3 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </div>
+                    <div class="aura-status-tooltip">
+                      <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-rose-500/50 shadow-2xl text-center backdrop-blur-md">
+                        <div class="text-[9px] font-bold text-rose-300 font-mono uppercase tracking-wider">Rejeicao SEFAZ</div>
+                        <div class="text-[10px] text-slate-200 font-medium">Bloqueio Impeditivo de Emissao</div>
+                      </div>
+                      <div class="aura-status-tooltip-arrow border-r border-b border-rose-500/50"></div>
+                    </div>
+                  </div>
+                `;
+              } else if (isWarn) {
+                valHtml = `
+                  <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                    <div class="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-[0_0_8px_rgba(245,158,11,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
+                      <svg class="w-3 h-3 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                      </svg>
+                    </div>
+                    <div class="aura-status-tooltip">
+                      <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-amber-500/50 shadow-2xl text-center backdrop-blur-md">
+                        <div class="text-[9px] font-bold text-amber-300 font-mono uppercase tracking-wider">Alerta Fiscal</div>
+                        <div class="text-[10px] text-slate-200 font-medium">Risco de Bitributacao ou SPED</div>
+                      </div>
+                      <div class="aura-status-tooltip-arrow border-r border-b border-amber-500/50"></div>
+                    </div>
+                  </div>
+                `;
+              } else if (isVal) {
+                valHtml = `
+                  <div class="aura-status-tooltip-wrapper flex-shrink-0" tabindex="0">
+                    <div class="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shadow-[0_0_8px_rgba(16,185,129,0.3)] transition-all duration-200 cursor-pointer aura-status-icon">
+                      <svg class="w-3 h-3 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    </div>
+                    <div class="aura-status-tooltip">
+                      <div class="px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-emerald-500/50 shadow-2xl text-center backdrop-blur-md">
+                        <div class="text-[9px] font-bold text-emerald-300 font-mono uppercase tracking-wider">Conforme</div>
+                        <div class="text-[10px] text-slate-200 font-medium">Validado perante SEFAZ e SPED</div>
+                      </div>
+                      <div class="aura-status-tooltip-arrow border-r border-b border-emerald-500/50"></div>
+                    </div>
+                  </div>
+                `;
+              } else {
+                valHtml = `<div class="font-mono font-bold text-emerald-400 text-sm">${escapeHtml(String(item.value || ''))}</div>`;
+              }
+
+              // Limpa prefixo [REJEICAO] ou [CONFORME] do titulo
+              let rawItemTitle = item.title || 'Entidade';
+              let cleanItemTitle = rawItemTitle.replace(/^\[(REJEICAO|ALERTA|CONFORME|AVISO|ERRO)\]\s*/i, '').trim();
+
+              // Subtitulo padronizado: Regra: <CODIGO> (sem GravidadeApontamento.CRITICAL)
+              let rawSub = item.subtitle || '';
+              let cleanSub = rawSub.replace(/\|?\s*Gravidade:\s*(?:GravidadeApontamento\.)?[A-Z]+/gi, '').trim();
+              if (cleanSub.startsWith('|')) cleanSub = cleanSub.substring(1).trim();
+              if (cleanSub.endsWith('|')) cleanSub = cleanSub.substring(0, cleanSub.length - 1).trim();
+
               return `
-                <div class="p-2 rounded-lg bg-slate-950/50 border border-white/5 flex items-center justify-between gap-2 text-xs">
-                  <div class="flex items-center gap-2 min-w-0">
-                    <span class="font-mono font-bold text-amber-300 text-[11px]">${medal}</span>
+                <div class="p-2.5 rounded-lg bg-slate-950/50 border border-white/5 flex items-center justify-between gap-2 text-xs">
+                  <div class="flex items-center gap-2 min-w-0 flex-1">
+                    ${!isFiscal ? `<span class="font-mono font-bold text-amber-300 text-[11px] flex-shrink-0">${medal}</span>` : ''}
                     <div class="min-w-0">
-                      <div class="font-semibold text-slate-100 truncate">${escapeHtml(item.title || 'Entidade')}</div>
-                      ${item.subtitle ? `<div class="text-[10px] text-slate-400 font-mono truncate">${escapeHtml(item.subtitle)}</div>` : ''}
+                      <div class="font-semibold text-slate-100">${escapeHtml(cleanItemTitle)}</div>
+                      ${cleanSub ? `<div class="text-[10px] text-slate-400 font-mono mt-0.5">${escapeHtml(cleanSub)}</div>` : ''}
                     </div>
                   </div>
                   <div class="text-right flex-shrink-0">
-                    <div class="font-mono font-bold text-emerald-400 text-sm">${escapeHtml(String(item.value || ''))}</div>
-                    ${item.tag ? `<span class="text-[9px] text-slate-400 font-mono bg-slate-800 px-1 py-0.5 rounded">${escapeHtml(item.tag)}</span>` : ''}
+                    ${valHtml}
                   </div>
                 </div>
               `;
@@ -2703,7 +3148,7 @@
         `;
       } else {
         bodyHtml = `
-          <div class="text-xs text-slate-300 leading-relaxed">
+          <div class="text-xs text-slate-300 leading-relaxed whitespace-pre-line">
             ${escapeHtml(b.custom_content || '')}
           </div>
         `;
@@ -2739,6 +3184,933 @@
     }
   }
 
+
+  // =========================================================================
+  // MICRO-WIDGET FISCAL: FiscalShieldInspectorUI (Escudo Fiscal SEFAZ & SPED)
+  // =========================================================================
+
+  class FiscalShieldInspectorUI extends GenerativeModularCardUI {
+    constructor(payload = {}) {
+      super(payload);
+      this.intent = escapeHtml(payload.intent || "auditoria_fiscal_sefaz");
+      this.componentName = escapeHtml(payload.component_name || "render_FiscalShieldInspectorUI");
+      this.cardClass = "genui-fiscal-shield-card genui-modular-lego-card";
+      this.ariaLabel = "Escudo Fiscal SEFAZ e Auditoria de Regras Tributarias AURA";
+      this.activePersona = "gestor"; // "gestor" | "contador"
+    }
+
+    renderLayer1() {
+      const p = this.props || {};
+      const title = p.title || "Escudo Fiscal SEFAZ & Auditoria Tributaria";
+      const subtitle = p.subtitle || "Auditoria Fiscal e Normativas SEFAZ";
+      const scoreRaw = p.confidence_score !== undefined ? Number(p.confidence_score) : 0.99;
+      const scorePct = Math.round(scoreRaw * 100);
+      const diagnosisText = p.diagnosis || this.summary || "Auditoria fiscal processada com sucesso.";
+      const personaViews = p.persona_views || {};
+
+      const gestorText = personaViews.gestor || diagnosisText;
+      const contadorText = personaViews.contador || diagnosisText;
+      const basesLegais = Array.isArray(personaViews.base_legal) ? personaViews.base_legal : [];
+
+      const scoreColor = scorePct >= 90
+        ? "text-emerald-300 border-emerald-500/40 bg-emerald-500/10"
+        : (scorePct >= 75 ? "text-amber-300 border-amber-500/40 bg-amber-500/10" : "text-slate-300 border-slate-600 bg-slate-800/40");
+
+      return `
+        <div class="genui-layer genui-layer-1 mb-4 pb-3 border-b border-white/10">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse flex-shrink-0"></span>
+              <h4 class="text-xs font-mono font-bold tracking-wider text-cyan-300 uppercase">
+                ${escapeHtml(title)}
+              </h4>
+              <span class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">
+                ${escapeHtml(this.toolCallId.substring(0, 14))}...
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full border ${scoreColor} font-semibold flex items-center gap-1">
+                <svg class="w-3 h-3 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+                <span>${scorePct}% Confiabilidade</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Switch Dupla Persona: Gestor / Pista vs Contador / SPED -->
+          <div class="persona-switch-bar inline-flex p-1 rounded-xl bg-slate-950/80 border border-white/10 my-2 gap-1 w-full sm:w-auto" role="tablist">
+            <button type="button" 
+                    role="tab" 
+                    aria-selected="${this.activePersona === 'gestor' ? 'true' : 'false'}"
+                    class="persona-switch-btn persona-btn-gestor flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${this.activePersona === 'gestor' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm' : 'text-slate-400 hover:text-slate-200'}" 
+                    data-persona="gestor">
+              <span>💼</span>
+              <span>Visao Gestor &amp; Pista</span>
+            </button>
+            <button type="button" 
+                    role="tab" 
+                    aria-selected="${this.activePersona === 'contador' ? 'true' : 'false'}"
+                    class="persona-switch-btn persona-btn-contador flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${this.activePersona === 'contador' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm' : 'text-slate-400 hover:text-slate-200'}" 
+                    data-persona="contador">
+              <span>💻</span>
+              <span>Visao Contador &amp; SPED</span>
+            </button>
+          </div>
+
+          <!-- Painel Visao Gestor: Card Resumo de Impacto da Pista (Apendice C - Fase 4) -->
+          <div class="persona-view-panel persona-view-gestor ${this.activePersona === 'gestor' ? '' : 'hidden'} p-3.5 rounded-xl bg-slate-950/60 border border-emerald-500/30 space-y-2.5 animate-fade-in">
+            <div class="flex items-center justify-between text-[11px] font-mono border-b border-white/5 pb-1.5">
+              <span class="text-emerald-400 font-bold uppercase flex items-center gap-1.5">
+                <span>⛽</span>
+                <span>Resumo de Impacto na Pista &amp; Faturamento</span>
+              </span>
+              <span class="text-emerald-400/90 font-semibold px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/30">
+                Operacao Direta
+              </span>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-sans">
+              <div class="p-2.5 rounded-lg bg-slate-900/80 border border-white/5 space-y-0.5">
+                <span class="text-[10px] text-slate-400 font-mono uppercase">Impacto no Faturamento:</span>
+                <p class="font-semibold text-slate-100 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full ${personaViews.faturamento_status && personaViews.faturamento_status.toLowerCase().includes('bloqueado') ? 'bg-rose-400 animate-pulse' : 'bg-emerald-400'}"></span>
+                  <span>${escapeHtml(personaViews.faturamento_status || 'Operacao Normal')}</span>
+                </p>
+              </div>
+              <div class="p-2.5 rounded-lg bg-slate-900/80 border border-white/5 space-y-0.5">
+                <span class="text-[10px] text-slate-400 font-mono uppercase">Tempo Estimado na Pista:</span>
+                <p class="font-semibold text-slate-100 flex items-center gap-1.5">
+                  <span>⏱</span>
+                  <span>${escapeHtml(personaViews.tempo_retencao || '0 min')}</span>
+                </p>
+              </div>
+            </div>
+
+            <p class="text-xs text-slate-300 leading-relaxed font-sans">
+              ${formatFiscalHighlightText(gestorText, 'emerald')}
+            </p>
+          </div>
+
+          <!-- Painel Visao Contador: Auditoria Tecnica MOC 7.0 & SPED -->
+          <div class="persona-view-panel persona-view-contador ${this.activePersona === 'contador' ? '' : 'hidden'} p-3.5 rounded-xl bg-slate-950/60 border border-cyan-500/30 space-y-2.5 animate-fade-in">
+            <div class="flex items-center justify-between text-[11px] font-mono border-b border-white/5 pb-1.5">
+              <span class="text-cyan-400 font-bold uppercase flex items-center gap-1.5">
+                <span>💻</span>
+                <span>Auditoria Tecnica MOC 7.0 &amp; EFD / SPED Fiscal</span>
+              </span>
+              <span class="text-cyan-400/90 font-semibold px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-500/30">
+                Escrituracao Contabil
+              </span>
+            </div>
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed whitespace-pre-line">
+              ${formatFiscalHighlightText(contadorText, 'cyan')}
+            </p>
+            ${basesLegais.length > 0 ? `
+              <div class="pt-2 border-t border-white/5 flex flex-wrap gap-1.5 items-center">
+                <span class="text-[10px] font-mono text-slate-400">Base Legal:</span>
+                ${basesLegais.map(bl => `<span class="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-950/60 text-cyan-300 border border-cyan-500/30">${escapeHtml(bl)}</span>`).join('')}
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const p = this.props || {};
+      const anatomy = p.access_key_anatomy;
+      let anatomyHtml = '';
+
+      if (anatomy && typeof anatomy === 'object') {
+        const isDvOk = !!anatomy.is_dv_valido;
+        const dvStatusClass = isDvOk 
+          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50' 
+          : 'bg-rose-500/20 text-rose-300 border-rose-500/50 animate-pulse';
+
+        const fullKey44 = [
+          anatomy.c_uf || '',
+          anatomy.aamm || '',
+          anatomy.cnpj_emitente || '',
+          anatomy.modelo || '',
+          String(anatomy.serie || '').padStart(3, '0'),
+          String(anatomy.numero_nfe || '').padStart(9, '0'),
+          anatomy.tipo_emissao || '',
+          anatomy.codigo_numerico || '',
+          anatomy.digito_verificador || ''
+        ].join('');
+
+        anatomyHtml = `
+          <div class="p-3.5 rounded-xl bg-slate-900/80 border border-cyan-500/30 space-y-2.5 mb-3.5" data-block-id="blk_chave_anatomy_bar">
+            <div class="flex flex-wrap items-center justify-between gap-2 text-xs border-b border-white/5 pb-1.5">
+              <span class="font-bold text-slate-100 flex items-center gap-1.5">
+                <span>🔑</span>
+                <span>Anatomia dos 44 Digitos da Chave SEFAZ</span>
+              </span>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-mono text-cyan-300 hidden sm:inline">Decomposicao Estrutural MOC 7.0</span>
+                <button type="button" class="btn-copy-full-key px-2 py-0.5 rounded bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-200 border border-cyan-500/30 text-[10px] font-mono font-semibold cursor-pointer transition-colors" data-full-key="${escapeHtml(fullKey44)}" title="Copiar os 44 digitos da chave de acesso">
+                  📋 Copiar 44d
+                </button>
+              </div>
+            </div>
+            <div class="overflow-x-auto pb-1">
+              <div class="flex items-stretch gap-1.5 min-w-max text-center font-mono">
+                <!-- Segmento 1: UF -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10 cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 01-02 (2 digitos)" data-seg-tag="<cUF>" data-seg-desc="Codigo IBGE da Unidade Federativa do emitente (${escapeHtml(anatomy.uf_sigla || 'UF')})" title="Codigo IBGE da UF">
+                  <div class="text-[9px] text-slate-400">UF</div>
+                  <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.c_uf || '--')}</div>
+                  <div class="text-[8px] text-slate-500">${escapeHtml(anatomy.uf_sigla || '')}</div>
+                </div>
+                <!-- Segmento 2: AAMM -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10 cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 03-06 (4 digitos)" data-seg-tag="<dhEmi> AAMM" data-seg-desc="Ano e Mes de emissao da Nota Fiscal (20${escapeHtml(anatomy.ano || '--')}/${escapeHtml(anatomy.mes || '--')})" title="Ano e Mes de Emissao (AAMM)">
+                  <div class="text-[9px] text-slate-400">AAMM</div>
+                  <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.aamm || '----')}</div>
+                  <div class="text-[8px] text-slate-500">${escapeHtml(anatomy.ano || '')}/${escapeHtml(anatomy.mes || '')}</div>
+                </div>
+                <!-- Segmento 3: CNPJ -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10 cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 07-20 (14 digitos)" data-seg-tag="<CNPJ>" data-seg-desc="CNPJ do estabelecimento emissor da NF-e/NFC-e (${escapeHtml(anatomy.cnpj_emitente || '-')})" title="CNPJ do Emitente">
+                  <div class="text-[9px] text-slate-400">CNPJ Emitente (14d)</div>
+                  <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.cnpj_emitente || '--------------')}</div>
+                  <div class="text-[8px] text-slate-500">Posto / Matriz</div>
+                </div>
+                <!-- Segmento 4: Modelo -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10 cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 21-22 (2 digitos)" data-seg-tag="<mod>" data-seg-desc="Modelo Fiscal: ${anatomy.modelo === '65' ? '65 (NFC-e Varejo/Pista)' : '55 (NF-e Danfe/Frota)'}" title="Modelo do Documento Fiscal">
+                  <div class="text-[9px] text-slate-400">Mod</div>
+                  <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.modelo || '--')}</div>
+                  <div class="text-[8px] text-slate-500">${anatomy.modelo === '65' ? 'NFC-e' : 'NF-e'}</div>
+                </div>
+                <!-- Segmento 5: Serie -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10 cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 23-25 (3 digitos)" data-seg-tag="<serie>" data-seg-desc="Serie de numeracao do documento fiscal (Serie ${escapeHtml(anatomy.serie || '1')})" title="Serie do Documento">
+                  <div class="text-[9px] text-slate-400">Serie</div>
+                  <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.serie || '---')}</div>
+                  <div class="text-[8px] text-slate-500">Serie</div>
+                </div>
+                <!-- Segmento 6: Numero -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10 cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 26-34 (9 digitos)" data-seg-tag="<nNF>" data-seg-desc="Numero sequencial do Documento Fiscal (Nº ${escapeHtml(anatomy.numero_nfe || '-')})" title="Numero da Nota Fiscal">
+                  <div class="text-[9px] text-slate-400">Numero NF (9d)</div>
+                  <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.numero_nfe || '---------')}</div>
+                  <div class="text-[8px] text-slate-500">Documento</div>
+                </div>
+                <!-- Segmento 7: Tipo Emissao -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10 cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 35 (1 digito)" data-seg-tag="<tpEmis>" data-seg-desc="Forma de Emissao: ${anatomy.tipo_emissao === '1' ? '1 (Emissao Normal Sincrona)' : '9 (Contingencia Offline NFC-e)'}" title="Tipo de Emissao (1: Normal, 9: Contingencia)">
+                  <div class="text-[9px] text-slate-400">Emis</div>
+                  <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.tipo_emissao || '-')}</div>
+                  <div class="text-[8px] text-slate-500">${anatomy.tipo_emissao === '1' ? 'Normal' : 'Conting.'}</div>
+                </div>
+                <!-- Segmento 8: Codigo Numerico -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg bg-slate-950 border border-white/10 cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 36-43 (8 digitos)" data-seg-tag="<cNF>" data-seg-desc="Codigo Numerico Aleatorio de Seguranca gerado pelo ERP (${escapeHtml(anatomy.codigo_numerico || '-')})" title="Codigo Numerico de Seguranca">
+                  <div class="text-[9px] text-slate-400">Cod Num (8d)</div>
+                  <div class="text-xs font-bold text-cyan-300">${escapeHtml(anatomy.codigo_numerico || '--------')}</div>
+                  <div class="text-[8px] text-slate-500">Aleatorio</div>
+                </div>
+                <!-- Segmento 9: DV -->
+                <div class="fiscal-key-segment p-1.5 rounded-lg border ${dvStatusClass} cursor-pointer" tabindex="0" role="button" data-seg-pos="Pos 44 (1 digito)" data-seg-tag="<cDV>" data-seg-desc="Digito Verificador Modulo 11: Informado=${escapeHtml(anatomy.digito_verificador || '-')} | Calculado=${escapeHtml(anatomy.dv_calculado || '-')} (${isDvOk ? 'Integro' : 'Divergente - Rejeicao 253'})" title="Digito Verificador (Modulo 11)">
+                  <div class="text-[9px] font-bold">DV Modulo 11</div>
+                  <div class="text-xs font-black">${escapeHtml(anatomy.digito_verificador || '-')}</div>
+                  <div class="text-[8px] font-semibold">${isDvOk ? '✔ Valido' : 'Falha: ' + escapeHtml(anatomy.dv_calculado || '')}</div>
+                </div>
+              </div>
+            </div>
+            <!-- Faixa de Inspecao Interativa de Segmento -->
+            <div class="fiscal-key-segment-detail px-3 py-1.5 rounded-lg bg-slate-950/90 border border-white/5 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-slate-300">
+              <span class="seg-detail-text">💡 Clique em qualquer um dos 9 segmentos acima para inspecionar a posicao MOC 7.0 e a tag XML correspondente.</span>
+              <span class="seg-detail-tag px-2 py-0.5 rounded bg-cyan-950/70 text-cyan-300 border border-cyan-500/30 text-[10px]">MOC 7.0 SEFAZ</span>
+            </div>
+          </div>
+        `;
+      }
+
+      const quickSimulatorHtml = `
+        <div class="fiscal-canvas-quick-bar p-3 rounded-xl bg-slate-950/70 border border-white/10 space-y-2">
+          <div class="flex items-center justify-between text-[11px] font-mono text-slate-400">
+            <span class="text-cyan-300 font-semibold flex items-center gap-1.5">⚡ Simulador Fiscal Rapido no Canvas</span>
+            <span>44 digitos, Rejeicao ou CST</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="text" class="fiscal-canvas-quick-input flex-1 min-w-0 px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-mono" placeholder="Cole outra chave de 44d ou digite ex: Rejeicao 806, CST 61, CFOP 5927..." />
+            <button type="button" class="btn-fiscal-canvas-quick-submit px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/40 text-xs font-semibold cursor-pointer transition-colors flex-shrink-0">
+              Auditar ->
+            </button>
+          </div>
+        </div>
+      `;
+
+      return `
+        <div class="genui-layer genui-layer-2 mb-4 space-y-3.5">
+          ${anatomyHtml}
+          ${super.renderLayer2()}
+          ${quickSimulatorHtml}
+        </div>
+      `;
+    }
+
+    bindEvents(rootElement) {
+      super.bindEvents(rootElement);
+      if (!rootElement || typeof rootElement.querySelectorAll !== 'function') return;
+
+      const personaBtns = rootElement.querySelectorAll('.persona-switch-btn');
+      personaBtns.forEach(btn => {
+        if (!btn._hasBoundPersonaClick) {
+          btn._hasBoundPersonaClick = true;
+          btn.addEventListener('click', () => {
+            const targetPersona = btn.getAttribute('data-persona');
+            if (!targetPersona || targetPersona === this.activePersona) return;
+            this.activePersona = targetPersona;
+
+            personaBtns.forEach(b => {
+              const isTarget = b.getAttribute('data-persona') === targetPersona;
+              b.setAttribute('aria-selected', isTarget ? 'true' : 'false');
+              if (isTarget) {
+                if (targetPersona === 'gestor') {
+                  b.className = 'persona-switch-btn persona-btn-gestor flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm';
+                } else {
+                  b.className = 'persona-switch-btn persona-btn-contador flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm';
+                }
+              } else {
+                b.className = 'persona-switch-btn flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer text-slate-400 hover:text-slate-200';
+              }
+            });
+
+            const gestorPanel = rootElement.querySelector('.persona-view-gestor');
+            const contadorPanel = rootElement.querySelector('.persona-view-contador');
+            if (gestorPanel) gestorPanel.classList.toggle('hidden', targetPersona !== 'gestor');
+            if (contadorPanel) contadorPanel.classList.toggle('hidden', targetPersona !== 'contador');
+
+            // FASE 4/5: Alterna o detalhamento interno dos cards de findings
+            const isGestor = (targetPersona === 'gestor');
+            rootElement.querySelectorAll('.finding-view-gestor').forEach(el => el.classList.toggle('hidden', !isGestor));
+            rootElement.querySelectorAll('.finding-view-contador').forEach(el => el.classList.toggle('hidden', isGestor));
+            rootElement.querySelectorAll('.finding-rule-code').forEach(el => el.classList.toggle('hidden', isGestor));
+            if (!isGestor) {
+              rootElement.querySelectorAll('.container-conformes-list').forEach(el => el.classList.remove('hidden'));
+              rootElement.querySelectorAll('.btn-toggle-conformes').forEach(el => {
+                el.textContent = 'Ocultar conformes';
+                el.setAttribute('data-state', 'open');
+              });
+            }
+          });
+        }
+      });
+
+      // Interatividade dos 9 segmentos da chave de 44 digitos
+      const segments = rootElement.querySelectorAll('.fiscal-key-segment');
+      const detailBox = rootElement.querySelector('.fiscal-key-segment-detail');
+      const detailText = detailBox ? detailBox.querySelector('.seg-detail-text') : null;
+      const detailTag = detailBox ? detailBox.querySelector('.seg-detail-tag') : null;
+
+      segments.forEach(seg => {
+        if (!seg._hasBoundSegClick) {
+          seg._hasBoundSegClick = true;
+          const activateSeg = () => {
+            segments.forEach(s => s.classList.remove('ring-1', 'ring-cyan-400', 'bg-slate-900'));
+            seg.classList.add('ring-1', 'ring-cyan-400', 'bg-slate-900');
+            const pos = seg.getAttribute('data-seg-pos') || '';
+            const tag = seg.getAttribute('data-seg-tag') || 'MOC 7.0';
+            const desc = seg.getAttribute('data-seg-desc') || '';
+            if (detailText && desc) {
+              detailText.textContent = `${pos}: ${desc}`;
+            }
+            if (detailTag && tag) {
+              detailTag.textContent = tag;
+            }
+          };
+          seg.addEventListener('click', activateSeg);
+          seg.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+              ev.preventDefault();
+              activateSeg();
+            }
+          });
+        }
+      });
+
+      // Botao de copiar os 44 digitos da chave
+      const copyKeyBtn = rootElement.querySelector('.btn-copy-full-key');
+      if (copyKeyBtn && !copyKeyBtn._hasBoundCopyKey) {
+        copyKeyBtn._hasBoundCopyKey = true;
+        copyKeyBtn.addEventListener('click', () => {
+          const fullKey = copyKeyBtn.getAttribute('data-full-key') || '';
+          if (fullKey && typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            navigator.clipboard.writeText(fullKey).then(() => {
+              const orig = copyKeyBtn.textContent;
+              copyKeyBtn.textContent = '✔ Chave Copiada!';
+              setTimeout(() => { copyKeyBtn.textContent = orig; }, 2500);
+            }).catch(() => {});
+          }
+        });
+      }
+
+      // Simulador Fiscal Rapido no proprio Canvas
+      const quickInput = rootElement.querySelector('.fiscal-canvas-quick-input');
+      const quickSubmit = rootElement.querySelector('.btn-fiscal-canvas-quick-submit');
+      const triggerQuickAudit = () => {
+        const val = (quickInput?.value || '').trim();
+        if (!val) return;
+        if (typeof window !== 'undefined' && window.auraChat && typeof window.auraChat.sendUserPrompt === 'function') {
+          window.auraChat.sendUserPrompt(val);
+        }
+      };
+      if (quickSubmit && !quickSubmit._hasBoundQuickSubmit) {
+        quickSubmit._hasBoundQuickSubmit = true;
+        quickSubmit.addEventListener('click', triggerQuickAudit);
+      }
+      if (quickInput && !quickInput._hasBoundQuickKey) {
+        quickInput._hasBoundQuickKey = true;
+        quickInput.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter') {
+            ev.preventDefault();
+            triggerQuickAudit();
+          }
+        });
+      }
+    }
+  }
+
+  // =========================================================================
+  // MÓDULO 1: DIAGNÓSTICO EXECUTIVO DE ROI & PERDAS (90 DIAS)
+  // =========================================================================
+
+  class RoiDiagnosticUI extends BaseGenUIWidget {
+    constructor(payload = {}) {
+      super(payload, 'roi_diagnostic', 'render_RoiDiagnosticUI');
+      this.rawPayload = payload;
+      this.cardClass = 'genui-roi-diagnostic-card';
+      this.ariaLabel = 'Diagnostico Executivo de ROI e Perdas AURA';
+    }
+
+    renderLayer1() {
+      const p = (this.props && (this.props.summary || this.props.breakdown_brl))
+        ? this.props
+        : ((this.rawPayload && (this.rawPayload.props || this.rawPayload.data || this.rawPayload)) || {});
+      const summary = p.summary || {};
+      const totalLeak = Number(summary.total_monthly_leakage_brl || 0);
+      const estRecovery = Number(summary.estimated_monthly_recovery_brl || 0);
+      const net90 = Number(summary.roi_90_days_net_brl || 0);
+      const multiple = Number(summary.roi_multiple || 0);
+      const guarantee3x = summary.guarantee_3x_met !== false;
+      const diagnosisText = p.diagnosis || this.summary || 'Diagnostico deterministico de perdas operacionais e projecao de retorno liquido em 90 dias com rampa de adocao.';
+
+      return `
+        <div class="genui-layer genui-layer-1 mb-4 pb-3 border-b border-white/10">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
+              <h4 class="text-xs font-mono font-bold tracking-wider text-emerald-300 uppercase">
+                AURA ROI Diagnostic &amp; Loss Recovery Mentor
+              </h4>
+              <span class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">
+                ${escapeHtml(this.toolCallId.substring(0, 14))}...
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full border ${guarantee3x ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10' : 'text-amber-300 border-amber-500/40 bg-amber-500/10'} font-semibold flex items-center gap-1">
+                <span>Garantia Contratual 3x: ${guarantee3x ? 'Verificada' : 'Em Calibracao'}</span>
+              </span>
+              <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full border text-purple-300 border-purple-500/40 bg-purple-500/10 font-bold">
+                Retorno: ${formatNumber(multiple)}x
+              </span>
+            </div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-emerald-400 font-mono">Diagnostico Executivo de Perdas</span>
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
+              ${escapeHtml(diagnosisText)}
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const p = (this.props && (this.props.summary || this.props.breakdown_brl))
+        ? this.props
+        : ((this.rawPayload && (this.rawPayload.props || this.rawPayload.data || this.rawPayload)) || {});
+      const summary = p.summary || {};
+      const breakdown = p.breakdown_brl || {};
+      const shield = p.regulatory_shield || {};
+
+      const totalLeak = Number(summary.total_monthly_leakage_brl || 0);
+      const estRecovery = Number(summary.estimated_monthly_recovery_brl || 0);
+      const net90 = Number(summary.roi_90_days_net_brl || 0);
+      const multiple = Number(summary.roi_multiple || 0);
+
+      const vLmc = Number(breakdown.lmc_and_tank_shrinkage || 0);
+      const vPdv = Number(breakdown.convenience_and_pos_cancellations || 0);
+      const vCaixa = Number(breakdown.cashier_shift_discrepancies || 0);
+      const vPricing = Number(breakdown.pricing_and_carreta_arbitrage || 0);
+      const vSelic = Number(breakdown.working_capital_selic_cost || 0);
+
+      const cardsHtml = `
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Perda Mensal Mapeada</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-rose-400 tabular-nums">
+              R$ ${formatNumber(totalLeak)}
+            </div>
+            <span class="text-[10px] text-slate-500 font-mono">Vazamento Operacional</span>
+          </div>
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Recuperacao Mensal</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-emerald-400 tabular-nums">
+              R$ ${formatNumber(estRecovery)}
+            </div>
+            <span class="text-[10px] text-slate-500 font-mono">Projecao AURA</span>
+          </div>
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Retorno Liquido (90d)</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-cyan-300 tabular-nums">
+              R$ ${formatNumber(net90)}
+            </div>
+            <span class="text-[10px] text-slate-500 font-mono">Lucro Liquido Extra</span>
+          </div>
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Multiplo de Retorno</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-purple-300 tabular-nums">
+              ${formatNumber(multiple)}x
+            </div>
+            <span class="text-[10px] text-slate-500 font-mono">Sobre o Plano</span>
+          </div>
+        </div>
+      `;
+
+      const vectorsHtml = `
+        <div class="p-3 rounded-xl border border-white/5 bg-slate-950/30 mb-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 font-mono">Detalhamento dos 5 Vetores de Perda Financeira</span>
+            <span class="text-[10px] font-mono text-slate-500">Apuracao 100% Deterministica</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex justify-between items-center">
+              <span class="text-slate-300">1. LMC &amp; Variacao Tanques (ANP 26)</span>
+              <span class="font-mono font-bold text-rose-400">R$ ${formatNumber(vLmc)}</span>
+            </div>
+            <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex justify-between items-center">
+              <span class="text-slate-300">2. Cancelamentos PDV &amp; Loja</span>
+              <span class="font-mono font-bold text-rose-400">R$ ${formatNumber(vPdv)}</span>
+            </div>
+            <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex justify-between items-center">
+              <span class="text-slate-300">3. Furos de Gaveta &amp; Fechamento</span>
+              <span class="font-mono font-bold text-rose-400">R$ ${formatNumber(vCaixa)}</span>
+            </div>
+            <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex justify-between items-center">
+              <span class="text-slate-300">4. Arbitragem Carreta &amp; Preco</span>
+              <span class="font-mono font-bold text-rose-400">R$ ${formatNumber(vPricing)}</span>
+            </div>
+            <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex justify-between items-center sm:col-span-2">
+              <span class="text-slate-300">5. Custo SELIC Capital Morto (Estoque > 30d)</span>
+              <span class="font-mono font-bold text-rose-400">R$ ${formatNumber(vSelic)}</span>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const shieldHtml = `
+        <div class="p-3 rounded-xl border border-emerald-500/20 bg-emerald-950/20 mb-3 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span class="text-emerald-300 font-medium">Blindagem Regulatoria ANP (Portaria 26 / Lei 9.847/99)</span>
+          </div>
+          <span class="text-[10px] font-mono text-emerald-400/90 font-semibold">Multa Minima Evitada: R$ 20.000,00</span>
+        </div>
+      `;
+
+      return `
+        <div class="genui-layer genui-layer-2">
+          ${cardsHtml}
+          ${vectorsHtml}
+          ${shieldHtml}
+        </div>
+      `;
+    }
+
+    getDefaultActionsHtml() {
+      const shouldDisable = this.state.isLocked || this.isExpired();
+      return `
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold hover:brightness-110 ${shouldDisable ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
+                data-action-id="act_roi_revisar_precificacao"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}"
+                ${shouldDisable ? 'disabled' : ''}>
+          <span>Revisar Precificacao &amp; Margens</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-emerald-200 border border-emerald-500/30 hover:bg-slate-700"
+                data-action-id="act_roi_auditar_tanques"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>Auditar LMC dos Tanques</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 text-slate-300 border border-white/10 hover:bg-slate-800"
+                data-action-id="act_roi_canvas"
+                data-action-type="inspection"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>Inspecionar no Canvas</span>
+        </button>
+      `;
+    }
+  }
+
+  // =========================================================================
+  // MÓDULO 4: RADAR DE ANOMALIAS DE PDV & CAIXA (Z-SCORE)
+  // =========================================================================
+
+  class PosAuditRadarUI extends BaseGenUIWidget {
+    constructor(payload = {}) {
+      super(payload, 'pos_audit', 'render_PosAuditRadarUI');
+      this.rawPayload = payload;
+      this.cardClass = 'genui-pos-audit-card';
+      this.ariaLabel = 'Radar de Anomalias de PDV e Caixa AURA';
+    }
+
+    renderLayer1() {
+      const p = (this.props && (this.props.total_operators_analyzed !== undefined || this.props.cashier_shift_audit))
+        ? this.props
+        : ((this.rawPayload && (this.rawPayload.props || this.rawPayload.data || this.rawPayload)) || {});
+      const totOp = Number(p.total_operators_analyzed || 0);
+      const anomCount = Number(p.anomalous_operators_count || 0);
+      const shift = p.cashier_shift_audit || {};
+      const isConciliado = shift.status === 'CONCILIADO';
+      const diagnosisText = p.diagnosis || this.summary || 'Auditoria estatistica e contabil de PDV com calculo de Z-Score e blindagem CLT Art. 462.';
+
+      return `
+        <div class="genui-layer genui-layer-1 mb-4 pb-3 border-b border-white/10">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full ${anomCount > 0 ? 'bg-amber-400' : 'bg-cyan-400'} animate-pulse flex-shrink-0"></span>
+              <h4 class="text-xs font-mono font-bold tracking-wider text-cyan-300 uppercase">
+                AURA POS Anomaly &amp; Cashier Audit Radar
+              </h4>
+              <span class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">
+                ${escapeHtml(this.toolCallId.substring(0, 14))}...
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full border ${isConciliado ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10' : 'text-rose-300 border-rose-500/40 bg-rose-500/10'} font-semibold">
+                Caixa: ${isConciliado ? 'CONCILIADO' : 'DIVERGENCIA PENDENTE'}
+              </span>
+              <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full border ${anomCount > 0 ? 'text-rose-300 border-rose-500/40 bg-rose-500/10' : 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10'} font-bold">
+                Desvios: ${anomCount}
+              </span>
+            </div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-cyan-400 font-mono">Diagnostico de Fechamento &amp; Cancelamentos</span>
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
+              ${escapeHtml(diagnosisText)}
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const p = (this.props && (this.props.total_operators_analyzed !== undefined || this.props.cashier_shift_audit))
+        ? this.props
+        : ((this.rawPayload && (this.rawPayload.props || this.rawPayload.data || this.rawPayload)) || {});
+      const totOp = Number(p.total_operators_analyzed || 0);
+      const anomCount = Number(p.anomalous_operators_count || 0);
+      const shift = p.cashier_shift_audit || {};
+      const discBrl = Number(shift.discrepancy_brl || 0);
+      const ops = Array.isArray(p.operators_analysis) ? p.operators_analysis : [];
+      const clt = p.clt_compliance_checklist || {};
+
+      const cardsHtml = `
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Operadores Auditados</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-white tabular-nums">${totOp}</div>
+            <span class="text-[10px] text-slate-500 font-mono">Pista &amp; Loja</span>
+          </div>
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Anomalias (|Z| > 2.0)</span>
+            <div class="text-sm sm:text-base font-bold font-mono ${anomCount > 0 ? 'text-rose-400' : 'text-emerald-400'} tabular-nums">${anomCount}</div>
+            <span class="text-[10px] text-slate-500 font-mono">Desvio Gaussiano</span>
+          </div>
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Divergencia de Caixa</span>
+            <div class="text-sm sm:text-base font-bold font-mono ${discBrl === 0 ? 'text-slate-300' : 'text-rose-400'} tabular-nums">R$ ${formatNumber(discBrl)}</div>
+            <span class="text-[10px] text-slate-500 font-mono">Pista vs Fechamento</span>
+          </div>
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Politica CLT 462</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-cyan-300">ATIVA</div>
+            <span class="text-[10px] text-slate-500 font-mono">Zero Termos Acusatorios</span>
+          </div>
+        </div>
+      `;
+
+      let opsRows = '';
+      if (ops.length === 0) {
+        opsRows = '<tr><td colspan="5" class="py-2 text-center text-slate-500 text-xs">Nenhum operador com registros no periodo.</td></tr>';
+      } else {
+        ops.forEach(o => {
+          const isAnom = o.is_anomaly;
+          const zSc = Number(o.z_score || 0).toFixed(2);
+          const cRate = Number(o.cancellation_rate_pct || 0).toFixed(1);
+          opsRows += `
+            <tr class="border-b border-slate-800/60">
+              <td class="py-1.5 px-2 font-mono text-slate-200 font-semibold">${escapeHtml(o.operator_id)}</td>
+              <td class="py-1.5 px-2 text-right font-mono text-slate-300">${o.total_orders || 0}</td>
+              <td class="py-1.5 px-2 text-right font-mono text-slate-300">${o.cancelled_orders || 0}</td>
+              <td class="py-1.5 px-2 text-right font-mono ${isAnom ? 'text-rose-400 font-bold' : 'text-slate-300'}">${cRate}%</td>
+              <td class="py-1.5 px-2 text-right font-mono ${isAnom ? 'text-rose-400 font-bold' : 'text-slate-400'}">${zSc}</td>
+            </tr>
+          `;
+        });
+      }
+
+      const tableHtml = `
+        <div class="p-3 rounded-xl border border-white/5 bg-slate-950/30 mb-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 font-mono">Ranking de Operadores &amp; Z-Score de Cancelamento</span>
+            <span class="text-[10px] font-mono text-slate-500">Corte |Z| &gt; 2.0</span>
+          </div>
+          <div class="overflow-x-auto max-h-48 overflow-y-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="border-b border-slate-800 text-[10px] text-slate-400 uppercase tracking-wider">
+                  <th class="py-1 px-2">Operador</th>
+                  <th class="py-1 px-2 text-right">Pedidos</th>
+                  <th class="py-1 px-2 text-right">Cancelados</th>
+                  <th class="py-1 px-2 text-right">Taxa %</th>
+                  <th class="py-1 px-2 text-right">Z-Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${opsRows}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      const cltReqs = clt.mandatory_requirements_for_deduction || [
+        'Comprovacao de pagamento do Adicional de Quebra de Caixa em folha',
+        'Previsao contratual expressa autorizando desconto em caso de divergencia conferida',
+        'Bordero fisico de fechamento assinado pelo operador no ato'
+      ];
+      const cltListHtml = cltReqs.map(r => `
+        <li class="flex items-start gap-1.5 text-[11px] text-slate-300">
+          <span class="text-cyan-400 font-bold mt-0.5">&#10003;</span>
+          <span>${escapeHtml(r)}</span>
+        </li>
+      `).join('');
+
+      const cltBoxHtml = `
+        <div class="p-3 rounded-xl border border-cyan-500/20 bg-cyan-950/20 mb-3 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-cyan-300">Requisitos Cumulativos para Desconto (Art. 462 CLT &amp; TST OJ 251)</span>
+            <span class="text-[10px] font-mono text-cyan-400">TST-OJ-251 OK</span>
+          </div>
+          <ul class="space-y-1">
+            ${cltListHtml}
+          </ul>
+        </div>
+      `;
+
+      return `
+        <div class="genui-layer genui-layer-2">
+          ${cardsHtml}
+          ${tableHtml}
+          ${cltBoxHtml}
+        </div>
+      `;
+    }
+
+    getDefaultActionsHtml() {
+      const shouldDisable = this.state.isLocked || this.isExpired();
+      return `
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold hover:brightness-110 ${shouldDisable ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
+                data-action-id="act_pos_gerar_termo"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}"
+                ${shouldDisable ? 'disabled' : ''}>
+          <span>Gerar Termo Conferencia Turno</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-cyan-200 border border-cyan-500/30 hover:bg-slate-700"
+                data-action-id="act_pos_auditar_turno"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>Auditar Turno Completo</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 text-slate-300 border border-white/10 hover:bg-slate-800"
+                data-action-id="act_pos_canvas"
+                data-action-type="inspection"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>Inspecionar no Canvas</span>
+        </button>
+      `;
+    }
+  }
+
+  // =========================================================================
+  // MÓDULO 4 / MOBILE: BRIEFING MATINAL ZERO-CLICK (CAFÉ COM O DONO)
+  // =========================================================================
+
+  class MorningBriefingUI extends BaseGenUIWidget {
+    constructor(payload = {}) {
+      super(payload, 'zero_click_briefing', 'render_MorningBriefingUI');
+      this.rawPayload = payload;
+      this.cardClass = 'genui-morning-briefing-card';
+      this.ariaLabel = 'Briefing Executivo Matinal AURA';
+    }
+
+    renderLayer1() {
+      const p = (this.props && (this.props.sales_summary_24h || this.props.tank_critical_runout))
+        ? this.props
+        : ((this.rawPayload && (this.rawPayload.props || this.rawPayload.data || this.rawPayload)) || {});
+      const s24 = p.sales_summary_24h || {};
+      const tank = p.tank_critical_runout || {};
+      const faturamento = Number(s24.total_turnover_brl || 0);
+      const diagnosisText = p.diagnosis || this.summary || 'Resumo executivo consolidado das ultimas 24h pronto para envio no WhatsApp do proprietario.';
+
+      return `
+        <div class="genui-layer genui-layer-1 mb-4 pb-3 border-b border-white/10">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-purple-400 animate-pulse flex-shrink-0"></span>
+              <h4 class="text-xs font-mono font-bold tracking-wider text-purple-300 uppercase">
+                AURA Morning Executive Briefing (Cafe com o Dono)
+              </h4>
+              <span class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">
+                ${escapeHtml(this.toolCallId.substring(0, 14))}...
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full border text-emerald-300 border-emerald-500/40 bg-emerald-500/10 font-bold">
+                Faturamento 24h: R$ ${formatNumber(faturamento)}
+              </span>
+            </div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-purple-400 font-mono">Panorama Executivo Matinal</span>
+            <p class="text-xs sm:text-sm font-mono font-normal text-slate-300 leading-relaxed">
+              ${escapeHtml(diagnosisText)}
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const p = (this.props && (this.props.sales_summary_24h || this.props.tank_critical_runout))
+        ? this.props
+        : ((this.rawPayload && (this.rawPayload.props || this.rawPayload.data || this.rawPayload)) || {});
+      const s24 = p.sales_summary_24h || {};
+      const tank = p.tank_critical_runout || {};
+      const faturamento = Number(s24.total_turnover_brl || 0);
+      const volumeLitros = Number(s24.total_liters || 0);
+      const tankId = tank.tank_id || '1';
+      const fuelName = tank.fuel_type || 'Combustivel';
+      const occPct = Number(tank.occupancy_pct || 0);
+      const orderBoxes = Number(tank.recommended_order_compartments || 0);
+      const wpText = p.whatsapp_formatted_text || '';
+      const encodedWp = encodeURIComponent(wpText);
+
+      const cardsHtml = `
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Faturamento 24h</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-emerald-300 tabular-nums">
+              R$ ${formatNumber(faturamento)}
+            </div>
+            <span class="text-[10px] text-slate-500 font-mono">Consolidado do Posto</span>
+          </div>
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1">
+            <span class="text-[10px] text-slate-400 font-medium">Volume Total de Pista</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-cyan-300 tabular-nums">
+              ${formatNumber(volumeLitros)} L
+            </div>
+            <span class="text-[10px] text-slate-500 font-mono">Litragem Vendida</span>
+          </div>
+          <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40 space-y-1 col-span-2 sm:col-span-1">
+            <span class="text-[10px] text-slate-400 font-medium">Tanque Mais Critico</span>
+            <div class="text-sm sm:text-base font-bold font-mono text-amber-300">
+              Tanque ${tankId} (${occPct.toFixed(1)}%)
+            </div>
+            <span class="text-[10px] text-slate-500 font-mono">${escapeHtml(fuelName)}</span>
+          </div>
+        </div>
+      `;
+
+      const alertHtml = `
+        <div class="p-3 rounded-xl border border-amber-500/30 bg-amber-950/20 mb-3 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse flex-shrink-0"></span>
+            <div>
+              <span class="text-amber-200 font-bold block">Sugestao Logistica de Reposicao</span>
+              <p class="text-[11px] text-slate-300">Tanque ${tankId} (${escapeHtml(fuelName)}) requer pedido de <strong>${orderBoxes} compartimento(s)</strong> de 5.000 L.</p>
+            </div>
+          </div>
+          <span class="text-[11px] font-mono font-bold text-amber-300 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/30 whitespace-nowrap">
+            ${orderBoxes * 5000} L sugeridos
+          </span>
+        </div>
+      `;
+
+      const wpBubbleHtml = `
+        <div class="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-950/30 mb-3 space-y-2">
+          <div class="flex items-center justify-between pb-1.5 border-b border-emerald-500/20">
+            <div class="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+              <span>Preview para WhatsApp do Dono</span>
+            </div>
+            <a href="https://api.whatsapp.com/send?text=${encodedWp}" target="_blank" rel="noopener noreferrer"
+               class="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] transition-colors flex items-center gap-1">
+              <span>Disparar WhatsApp</span>
+            </a>
+          </div>
+          <div class="p-2.5 rounded-lg bg-emerald-950/60 border border-emerald-500/20 text-slate-200 text-xs font-mono whitespace-pre-wrap leading-relaxed shadow-inner">
+            ${escapeHtml(wpText)}
+          </div>
+        </div>
+      `;
+
+      return `
+        <div class="genui-layer genui-layer-2">
+          ${cardsHtml}
+          ${alertHtml}
+          ${wpBubbleHtml}
+        </div>
+      `;
+    }
+
+    getDefaultActionsHtml() {
+      const shouldDisable = this.state.isLocked || this.isExpired();
+      return `
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold hover:brightness-110 ${shouldDisable ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
+                data-action-id="act_briefing_aprovar_combustivel"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}"
+                ${shouldDisable ? 'disabled' : ''}>
+          <span>Aprovar Pedido Combustivel</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-purple-200 border border-purple-500/30 hover:bg-slate-700"
+                data-action-id="act_briefing_justificativa_lmc"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>Emitir Justificativa LMC</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 text-slate-300 border border-white/10 hover:bg-slate-800"
+                data-action-id="act_briefing_canvas"
+                data-action-type="inspection"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>Inspecionar no Canvas</span>
+        </button>
+      `;
+    }
+  }
+
+  const RoiDiagnosticWidget = RoiDiagnosticUI;
+  const PosAuditRadarWidget = PosAuditRadarUI;
+  const MorningBriefingWidget = MorningBriefingUI;
+
   const ExecutiveBriefingWidget = ExecutiveDecisionMentorUI;
   const MarginProfitabilityWidget = MarginAnalysisUI;
   const PredictiveScenarioWidget = PredictiveScenarioUI;
@@ -2770,7 +4142,7 @@
       {
         name: 'render_PredictiveScenarioUI',
         cls: PredictiveScenarioUI,
-        aliases: ['PredictiveScenarioUI', 'PredictiveScenarioWidget'],
+        aliases: ['PredictiveScenarioUI', 'PredictiveScenarioWidget', 'render_TankRunOutForecastUI', 'TankRunOutForecastUI', 'render_TankRunOutPredictionUI', 'TankRunOutPredictionUI'],
         intent: 'cenario_preditivo'
       },
       {
@@ -2810,6 +4182,18 @@
         intent: 'investigar_causa_raiz'
       },
       {
+        name: 'render_FiscalShieldInspectorUI',
+        cls: FiscalShieldInspectorUI,
+        aliases: [
+          'FiscalShieldInspectorUI',
+          'FiscalShieldWidget',
+          'render_FiscalShieldWidget',
+          'render_FiscalAuditUI',
+          'FiscalAuditUI'
+        ],
+        intent: 'auditoria_fiscal_sefaz'
+      },
+      {
         name: 'render_ComplianceStatusUI',
         cls: ComplianceStatusUI,
         aliases: ['ComplianceStatusUI', 'ComplianceStatusWidget', 'render_ComplianceUI'],
@@ -2818,8 +4202,35 @@
       {
         name: 'render_GenerativeModularCardUI',
         cls: GenerativeModularCardUI,
-        aliases: ['GenerativeModularCardUI', 'DynamicLegoCardUI', 'render_ModularLegoCardUI'],
+        aliases: [
+          'GenerativeModularCardUI',
+          'DynamicLegoCardUI',
+          'render_ModularLegoCardUI',
+          'render_AuraSystemGuideUI',
+          'AuraSystemGuideWidget',
+          'AuraSystemGuideUI',
+          'render_FiscalAuditUI',
+          'FiscalAuditUI'
+        ],
         intent: 'diagnostico_modular'
+      },
+      {
+        name: 'render_RoiDiagnosticUI',
+        cls: RoiDiagnosticUI,
+        aliases: ['RoiDiagnosticUI', 'render_RoiDiagnosticWidget', 'RoiDiagnosticWidget'],
+        intent: 'roi_diagnostic'
+      },
+      {
+        name: 'render_PosAuditRadarUI',
+        cls: PosAuditRadarUI,
+        aliases: ['PosAuditRadarUI', 'render_PosAuditRadarWidget', 'PosAuditRadarWidget'],
+        intent: 'pos_audit'
+      },
+      {
+        name: 'render_MorningBriefingUI',
+        cls: MorningBriefingUI,
+        aliases: ['MorningBriefingUI', 'render_MorningBriefingWidget', 'MorningBriefingWidget'],
+        intent: 'zero_click_briefing'
       }
     ];
 
@@ -2953,6 +4364,14 @@
     window.AuraGenUI.BasketUpsellWidget = BasketUpsellWidget;
     window.AuraGenUI.ComplianceStatusUI = ComplianceStatusUI;
     window.AuraGenUI.GenerativeModularCardUI = GenerativeModularCardUI;
+    window.AuraGenUI.FiscalShieldInspectorUI = FiscalShieldInspectorUI;
+    window.AuraGenUI.FiscalShieldWidget = FiscalShieldInspectorUI;
+    window.AuraGenUI.RoiDiagnosticUI = RoiDiagnosticUI;
+    window.AuraGenUI.RoiDiagnosticWidget = RoiDiagnosticWidget;
+    window.AuraGenUI.PosAuditRadarUI = PosAuditRadarUI;
+    window.AuraGenUI.PosAuditRadarWidget = PosAuditRadarWidget;
+    window.AuraGenUI.MorningBriefingUI = MorningBriefingUI;
+    window.AuraGenUI.MorningBriefingWidget = MorningBriefingWidget;
     window.AuraGenUI.ComplianceStatusWidget = ComplianceStatusWidget;
     window.AuraGenUI.PaymentMethodsBreakdownUI = PaymentMethodsBreakdownUI;
     window.AuraGenUI.PaymentMethodsBreakdownWidget = PaymentMethodsBreakdownWidget;
@@ -2994,11 +4413,82 @@
       BasketUpsellWidget,
       ComplianceStatusUI,
       ComplianceStatusWidget,
+      FiscalShieldInspectorUI,
       registerWidgets,
       initGlobalGenUIActionDelegation,
       escapeHtml,
       formatNumber
     };
+  }
+
+
+  // Delegacao global de cliques para botoes interativos do Fiscal Shield (AURA Apendice C)
+  if (typeof document !== 'undefined' && !window._auraFiscalShieldListenersBound) {
+    window._auraFiscalShieldListenersBound = true;
+    document.addEventListener('click', (e) => {
+      // 1. Botao de copiar chamado para Suporte webPosto (WhatsApp)
+      const btnSuporte = e.target.closest('.btn-suporte-webposto');
+      if (btnSuporte) {
+        e.preventDefault();
+        try {
+          const rawTicket = btnSuporte.getAttribute('data-ticket') || '{}';
+          const t = JSON.parse(rawTicket);
+          const texto =
+`[AURA - Abertura de Chamado Suporte do ERP]
+Documento: Cupom Fiscal / NFC-e
+Problema: ${t.titulo || "Inconsistencia de Emissao"}
+Causa Operacional: ${t.causa || "Divergencia na rotina de fechamento de venda"}
+
+Diagnostico Tecnico:
+- Regra SEFAZ: ${t.regra || "N/A"}
+- Campo(s) Afetado(s): ${t.campos || "Cabecalho/Total"}
+- Valor Observado: ${t.obs || "N/A"} (Esperado: ${t.esp || ">= 0.00"})
+- Detalhes Tecnicos: ${t.tecnica || "Erro de schema/validacao gerado no XML pelo PDV"}
+
+Solicitacao: Favor orientar ajuste na rotina de emissao de cupons/descontos no PDV para liberar a autorizacao da nota.`;
+
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            navigator.clipboard.writeText(texto).then(() => {
+              const origHtml = btnSuporte.innerHTML;
+              btnSuporte.innerHTML = `
+                <svg class="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-white font-bold">✓ Chamado Copiado! Pronto para WhatsApp</span>
+              `;
+              btnSuporte.classList.add('!bg-emerald-600', '!border-emerald-400');
+              setTimeout(() => {
+                btnSuporte.innerHTML = origHtml;
+                btnSuporte.classList.remove('!bg-emerald-600', '!border-emerald-400');
+              }, 3500);
+            });
+          }
+        } catch (err) {
+          console.warn('[AuraGenUI] Erro ao copiar chamado suporte do ERP:', err);
+        }
+        return;
+      }
+
+      // 2. Botao de alternar visualizacao das regras conformes
+      const btnToggleConformes = e.target.closest('.btn-toggle-conformes');
+      if (btnToggleConformes) {
+        e.preventDefault();
+        const parentBox = btnToggleConformes.closest('.finding-conformes-box') || btnToggleConformes.closest('.p-4');
+        const container = parentBox ? parentBox.querySelector('.container-conformes-list') : null;
+        if (container) {
+          const isHidden = container.classList.contains('hidden');
+          if (isHidden) {
+            container.classList.remove('hidden');
+            btnToggleConformes.textContent = 'Ocultar conformes';
+            btnToggleConformes.setAttribute('data-state', 'open');
+          } else {
+            container.classList.add('hidden');
+            const count = container.children.length;
+            btnToggleConformes.textContent = `Ver conformes (+${count})`;
+            btnToggleConformes.setAttribute('data-state', 'closed');
+          }
+        }
+        return;
+      }
+    });
   }
 
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : this));

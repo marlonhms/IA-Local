@@ -1,5 +1,5 @@
 """
-Suíte de Testes Automatizada: Fase 6 — Qualidade, Resiliência a Falhas & Auditoria de Lançamento
+Suíte de Testes Automatizada: Fase 6 - Qualidade, Resiliência a Falhas & Auditoria de Lançamento
 Validação Integral dos 17 Cenários da Matriz de Testes (Seção 11 do Roadmap),
 Degradação Graciosa, Acessibilidade WCAG 2.1 AA, Focus Trap, Escape em Overlays,
 Mobile Reflow (320px-375px), Scroll-Guard e Governança de Telemetria sem PII.
@@ -44,7 +44,7 @@ from core.tools import PostoTools
 
 def run_phase6_quality_tests():
     print("=" * 78)
-    print("🛡️ SUÍTE DE TESTES: FASE 6 — QUALIDADE, RESILIÊNCIA & AUDITORIA DE LANÇAMENTO")
+    print("🛡️ SUÍTE DE TESTES: FASE 6 - QUALIDADE, RESILIÊNCIA & AUDITORIA DE LANÇAMENTO")
     print("   (Matriz de 17 Cenários, WCAG 2.1 AA, Degradação Graciosa e Governança)")
     print("=" * 78)
 

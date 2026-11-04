@@ -1,5 +1,5 @@
 """
-Suíte de Testes Automatizada: Protocolo SSE Multiplexado & Envelopes GenUI (Fase 1 — P0)
+Suíte de Testes Automatizada: Protocolo SSE Multiplexado & Envelopes GenUI (Fase 1 - P0)
 (AuraEngine, ask_stream, GenUIEnvelope, GenUIActionOption, FastAPI TestClient & Zero Regressão)
 
 Validações Obrigatórias:
@@ -606,9 +606,9 @@ async def test_non_genui_intent_backward_compatibility(engine: AuraEngine):
 def run_regression_suites():
     print("\n10. Executando Validação de Regressão Zero nas Suítes Existentes...")
     regression_scripts = [
-        ("test_genui_baseline.py", "Fase 0 — Linha de Base GenUI, Registry & OWASP LLM03"),
-        ("test_aura_engine.py", "Fase 1 — Motor Headless, Memória Durável & Streaming"),
-        ("test_phase5_specialized_responses.py", "Fase 5 — DecisionCards & Respostas Especializadas"),
+        ("test_genui_baseline.py", "Fase 0 - Linha de Base GenUI, Registry & OWASP LLM03"),
+        ("test_aura_engine.py", "Fase 1 - Motor Headless, Memória Durável & Streaming"),
+        ("test_phase5_specialized_responses.py", "Fase 5 - DecisionCards & Respostas Especializadas"),
     ]
 
     for script_name, desc in regression_scripts:
@@ -653,7 +653,7 @@ async def _run_all_async():
 
 def run_all_tests():
     print("=" * 78)
-    print("🚀 SUÍTE DE TESTES: PROTOCOLO SSE MULTIPLEXADO & ENVELOPES GENUI (FASE 1 — P0)")
+    print("🚀 SUÍTE DE TESTES: PROTOCOLO SSE MULTIPLEXADO & ENVELOPES GENUI (FASE 1 - P0)")
     print("   (AuraEngine, ask_stream, GenUIEnvelope, TestClient & Zero Regressão)")
     print("=" * 78)
 

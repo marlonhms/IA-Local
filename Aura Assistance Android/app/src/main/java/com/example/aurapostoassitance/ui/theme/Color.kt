@@ -51,6 +51,14 @@ val StatusDanger = Color(0xFFF87171)
 val StatusInfo = Color(0xFF38BDF8)
 
 // Gradientes de marca
+val AuraBrandBlue = Color(0xFF38BDF8) // Azul celeste vibrante
+val AuraBrandPetroleum = Color(0xFF0D9488) // Verde Petroleo / Teal escuro
+val AuraBrandPurple = Color(0xFFA855F7) // Roxo elegante
+
+val AuraBrandGradient: Brush = Brush.horizontalGradient(
+    colors = listOf(AuraBrandBlue, AuraBrandPetroleum, AuraBrandPurple)
+)
+
 val AuroraBrush: Brush = Brush.linearGradient(listOf(AuraCyan, AuraEmerald))
 val AuroraBrushSoft: Brush = Brush.linearGradient(
     listOf(AuraCyan.copy(alpha = 0.18f), AuraEmerald.copy(alpha = 0.18f))
@@ -61,4 +69,36 @@ val GlassCardBrush: Brush = Brush.verticalGradient(
 val GlassBorderBrush: Brush = Brush.verticalGradient(
     listOf(GlassBorderStrong, GlassBorderSoft)
 )
+
+// Liquid Glassmorphism & Spatial UI Tokens
+val LiquidSpecularHighlight = Color(0x48FFFFFF)
+val AuraAmbientCyan = Color(0x1C22D3EE)
+val AuraAmbientPurple = Color(0x18A855F7)
+val AuraAmbientPetroleum = Color(0x150D9488)
+
+val LiquidGlassSurfaceBrush: Brush = Brush.verticalGradient(
+    listOf(ObsidianHigh.copy(alpha = 0.75f), ObsidianLow.copy(alpha = 0.90f))
+)
+
+val LiquidGlassElevatedBrush: Brush = Brush.verticalGradient(
+    listOf(ObsidianBright.copy(alpha = 0.82f), ObsidianMid.copy(alpha = 0.94f))
+)
+
+val LiquidIridescentBorderBrush: Brush = Brush.linearGradient(
+    colors = listOf(
+        AuraCyan.copy(alpha = 0.55f),
+        Color.White.copy(alpha = 0.25f),
+        AuraBrandPurple.copy(alpha = 0.45f),
+        AuraEmerald.copy(alpha = 0.35f)
+    )
+)
+
+val LiquidIridescentSubtleBrush: Brush = Brush.linearGradient(
+    colors = listOf(
+        AuraCyan.copy(alpha = 0.25f),
+        Color.White.copy(alpha = 0.12f),
+        AuraBrandPurple.copy(alpha = 0.20f)
+    )
+)
+
 

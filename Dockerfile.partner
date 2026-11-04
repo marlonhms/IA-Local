@@ -1,0 +1,39 @@
+# =============================================================================
+# AURA Core Engine: Dockerfile para Partner API Gateway (Opcao A)
+# Provisionamento isolado para ingestao de dados brutos e chat sem instalacao local.
+# Zero travessoes em todo o arquivo.
+# =============================================================================
+
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    AURA_PARTNER_MODE=1 \
+    PARTNER_STAGING_DIR=/app/data/staging
+
+WORKDIR /app
+
+# Instalar dependencias minimas do sistema operacional
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar dependencias Python e instalar
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar codigo-fonte da aplicacao
+COPY . /app/
+
+# Criar diretorio de staging isolado para persistencia de volumes
+RUN mkdir -p /app/data/staging && chmod 777 /app/data/staging
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/api/v1/partner/health || exit 1
+
+CMD ["uvicorn", "core.aura_api:app", "--host", "0.0.0.0", "--port", "8000"]

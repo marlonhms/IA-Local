@@ -295,14 +295,15 @@ class TestFrontendOfflineFirst:
         assert "Motor Local 100% Offline" in content
         assert "bg-auraEmerald animate-pulse" in content
 
-        # 3. Extremo Direito: Grupo de Produtividade com exatamente 3 botoes visiveis
+        # 3. Extremo Direito: Grupo de Produtividade com 4 botoes visiveis (Comandos, Canvas, Conversas e Nova Conversa)
         assert 'id="header-productive-actions"' in content
         assert 'id="btn-open-palette"' in content
         assert 'id="btn-toggle-aux-panel"' in content
         assert 'id="aux-toggle-beacon"' in content
+        assert 'id="btn-open-history"' in content
         assert 'id="btn-new-chat"' in content
 
-        # Extrai o bloco do grupo de produtividade e valida que os botoes visiveis sao exatamente 3
+        # Extrai o bloco do grupo de produtividade e valida que os botoes visiveis sao exatamente 4
         match_prod = re.search(
             r'<div id="header-productive-actions"[^>]*>([\s\S]*?)</div>\s*</div>\s*</header>',
             content
@@ -313,8 +314,8 @@ class TestFrontendOfflineFirst:
         # Separa os botoes visiveis (fora do bloco hidden)
         visible_part = prod_html.split('<div class="hidden"')[0]
         visible_buttons = re.findall(r'<button\s+id="([^"]+)"', visible_part)
-        assert len(visible_buttons) == 3, f"Esperado 3 botoes visiveis no grupo de produtividade, encontrado: {visible_buttons}"
-        assert set(visible_buttons) == {"btn-open-palette", "btn-toggle-aux-panel", "btn-new-chat"}
+        assert len(visible_buttons) == 4, f"Esperado 4 botoes visiveis no grupo de produtividade, encontrado: {visible_buttons}"
+        assert set(visible_buttons) == {"btn-open-palette", "btn-toggle-aux-panel", "btn-open-history", "btn-new-chat"}
 
         # Touch targets no header com minimo de 44px
         for btn_id in visible_buttons:
@@ -500,22 +501,26 @@ class TestFrontendOfflineFirst:
         generated_html = build_showcase_page.generate_showcase_html()
         assert generated_html == content, "scripts/build_showcase_page.py e web/showcase.html nao estao perfeitamente sincronizados"
 
-        # Headline Problem-First universal (sem nichar em postos de combustivel)
-        assert "Perdas financeiras invisíveis, furos de caixa e desvios de estoque custam caro para o seu negócio." in content
-        assert "conectando a qualquer banco de dados sem trocar o seu sistema atual" in content
+        # Headline Executiva Deluxe com foco em Inteligencia de Gestao e degrade AURA sem repeticao
+        assert "from-cyan-400 via-sky-300 to-purple-400 bg-clip-text text-transparent" in content
+        assert "AURA</span> transforma os dados que sua empresa já gera em" in content
+        assert "lucro recuperado" in content
+        assert "todos os dias." in content
+        assert "Acompanhe sua operação em tempo real" in content
         assert "perda de combustível" not in content
         assert "multas da ANP" not in content
         for erp_brand in ("WebPosto", "Linx", "Totvs", "Sankhya", "Alterdata"):
             assert erp_brand not in content, f"Marca de ERP citada no showcase: {erp_brand}"
 
-        # 3 Badges de Autoridade Tecnica
-        assert "Zero gravação no sistema de gestão (100% somente leitura)" in content
-        assert "Economia de até 95% em custos de IA" in content
-        assert "Resposta local sub-100ms na rede da sua empresa" in content
+        # 3 Selos de Confianca Monocromaticos Discretos
+        assert "Sem trocar de sistema" in content
+        assert "Operação 100% segura e somente leitura" in content
+        assert "Diagnósticos em segundos" in content
 
-        # CTAs Duplos
+        # CTAs Duplos Alto Contraste Executivo (Estilo Linear / Stripe - Branco Solido #f8fafc sem neon)
         assert "Testar Diagnóstico ao Vivo" in content
-        assert "Inspecionar Script SQL Auditável" in content
+        assert "bg-[#f8fafc]" in content
+        assert "Arquitetura de Segurança e Auditoria" in content
         assert "window.auraTour.scrollToSection('sec-chat-graph')" in content
         assert "window.auraSecurityArchitecture.openModal()" in content
 
