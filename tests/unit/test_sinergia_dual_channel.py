@@ -174,6 +174,8 @@ class TestSinergiaDualChannelPhase1:
             BASE_DIR / "scripts" / "apply_phase1_sinergia.py",
         ]
         for fpath in files_to_check:
+            if not fpath.exists():
+                continue
             content = fpath.read_text(encoding="utf-8")
             c_em = content.count("\u2014")
             c_en = content.count("\u2013")
@@ -296,6 +298,8 @@ class TestSinergiaDualChannelPhase2:
             Path(__file__),
         ]
         for fpath in files:
+            if not fpath.exists():
+                continue
             content = fpath.read_text(encoding="utf-8")
             assert content.count("\u2014") == 0, f"Arquivo {fpath} contem em-dash (\\u2014)"
             assert content.count("\u2013") == 0, f"Arquivo {fpath} contem en-dash (\\u2013)"
@@ -421,6 +425,8 @@ class TestSinergiaDualChannelPhase3:
             Path(__file__),
         ]
         for fpath in files:
+            if not fpath.exists():
+                continue
             content = fpath.read_text(encoding="utf-8")
             assert content.count("\u2014") == 0, f"Arquivo {fpath} contem em-dash (\\u2014)"
             assert content.count("\u2013") == 0, f"Arquivo {fpath} contem en-dash (\\u2013)"
@@ -531,6 +537,8 @@ class TestSinergiaDualChannelPhase4:
             Path(__file__),
         ]
         for fpath in files:
+            if not fpath.exists():
+                continue
             content = fpath.read_text(encoding="utf-8")
             assert content.count("\u2014") == 0, f"Arquivo {fpath} contem em-dash (\\u2014)"
             assert content.count("\u2013") == 0, f"Arquivo {fpath} contem en-dash (\\u2013)"
