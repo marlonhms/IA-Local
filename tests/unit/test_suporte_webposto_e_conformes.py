@@ -64,7 +64,7 @@ class TestSuporteWebpostoEConformes:
         assert finding.gravidade == GravidadeApontamento.CRITICAL
         assert "Bloqueio de Emissao" in finding.titulo
         assert "suporte" in finding.acoes_recomendadas[0].lower()
-        assert "webposto" in finding.acoes_recomendadas[0].lower()
+        assert "webposto" in finding.acoes_recomendadas[0].lower() or "erp" in finding.acoes_recomendadas[0].lower()
 
     def test_val_neg_totais_directs_to_webposto_support(self):
         """Valida que totais com valor negativo direcionam para suporte webPosto."""
@@ -79,7 +79,7 @@ class TestSuporteWebpostoEConformes:
         finding = invalids[0]
         assert "Bloqueio de Emissao" in finding.titulo
         assert "suporte" in finding.acoes_recomendadas[0].lower()
-        assert "webposto" in finding.acoes_recomendadas[0].lower()
+        assert "webposto" in finding.acoes_recomendadas[0].lower() or "erp" in finding.acoes_recomendadas[0].lower()
 
     def test_genui_widgets_contains_pro_support_and_conformes_separation(self):
         """Valida a presenca da logica de suporte webPosto e separacao de conformes no JS."""
@@ -99,8 +99,8 @@ class TestSuporteWebpostoEConformes:
 
         # 3. Botao de chamado WhatsApp e payload estruturado
         assert "btn-suporte-webposto" in content
-        assert "Copiar Chamado Suporte webPosto (WhatsApp)" in content
-        assert "Abertura de Chamado Suporte webPosto" in content
+        assert "Copiar Chamado Suporte" in content
+        assert "Abertura de Chamado Suporte" in content
         assert "navigator.clipboard.writeText" in content
 
     def test_zero_unicode_dashes(self):

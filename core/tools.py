@@ -430,6 +430,47 @@ class PostoTools:
                 "motivo": f"Falha na auditoria fiscal: {e}",
             }
 
+    def _carregar_matriz_custos_produtos(self) -> Dict[str, Dict[str, Any]]:
+        """Recupera tabela dimensional de custos e precos dos produtos no ERP ou via adaptador."""
+        custos_map: Dict[str, Dict[str, Any]] = {}
+        try:
+            with get_erp_connection(timeout=3) as conn, conn.cursor() as cur:
+                cur.execute("""
+                    SELECT 
+                        TRIM(codpro) as codpro,
+                        TRIM(nompro) as nompro,
+                        COALESCE(NULLIF(custo, 0), pun_vl_custo_medio, 0)::float as custo_unitario,
+                        COALESCE(valvenda, 0)::float as preco_venda
+                    FROM produtos;
+                """)
+                for r in cur.fetchall():
+                    custos_map[str(r[0])] = {
+                        "nompro": str(r[1]),
+                        "custo": float(r[2]),
+                        "preco_venda": float(r[3]),
+                    }
+        except Exception as e_cost:
+            logger.warning("Falha ao recuperar matriz de custos de produtos do ERP: %s", e_cost)
+
+        # Fallback de custos via catalogo de contingencia se o banco relacional estiver indisponivel
+        if not custos_map:
+            try:
+                cat_items = self.erp_adapter.get_product_catalog(limit=100)
+                for p in (cat_items or []):
+                    p_sku = str(p.sku).strip()
+                    p_preco = float(getattr(p, "preco_unitario_reais", 0.0) or 0.0)
+                    is_fuel = any(k in str(p.descricao_produto).lower() for k in ["gasolina", "etanol", "diesel", "comb"])
+                    c_rate = 0.85 if is_fuel else 0.70
+                    p_custo = round(p_preco * c_rate, 2) if p_preco > 0 else 5.0
+                    custos_map[p_sku] = {
+                        "nompro": p.descricao_produto,
+                        "custo": p_custo,
+                        "preco_venda": p_preco,
+                    }
+            except Exception as e_cat:
+                logger.warning("Falha ao carregar matriz de custos de contingencia: %s", e_cat)
+        return custos_map
+
     def consultar_analise_vendas_erp(
         self,
         tipo: str = "mais_vendidos",
@@ -443,44 +484,8 @@ class PostoTools:
         Zero travessoes em toda a saida.
         """
         try:
-            # 1. Recupera tabela dimensional de custos e precos dos produtos no ERP
-            custos_map: Dict[str, Dict[str, Any]] = {}
-            try:
-                with get_erp_connection(timeout=3) as conn, conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT 
-                            TRIM(codpro) as codpro,
-                            TRIM(nompro) as nompro,
-                            COALESCE(NULLIF(custo, 0), pun_vl_custo_medio, 0)::float as custo_unitario,
-                            COALESCE(valvenda, 0)::float as preco_venda
-                        FROM produtos;
-                    """)
-                    for r in cur.fetchall():
-                        custos_map[str(r[0])] = {
-                            "nompro": str(r[1]),
-                            "custo": float(r[2]),
-                            "preco_venda": float(r[3]),
-                        }
-            except Exception as e_cost:
-                logger.warning("Falha ao recuperar matriz de custos de produtos do ERP: %s", e_cost)
-
-            # Fallback de custos via catalogo de contingencia se o banco relacional estiver indisponivel
-            if not custos_map:
-                try:
-                    cat_items = self.erp_adapter.get_product_catalog(limit=100)
-                    for p in (cat_items or []):
-                        p_sku = str(p.sku).strip()
-                        p_preco = float(getattr(p, "preco_unitario_reais", 0.0) or 0.0)
-                        is_fuel = any(k in str(p.descricao_produto).lower() for k in ["gasolina", "etanol", "diesel", "comb"])
-                        c_rate = 0.85 if is_fuel else 0.70
-                        p_custo = round(p_preco * c_rate, 2) if p_preco > 0 else 5.0
-                        custos_map[p_sku] = {
-                            "nompro": p.descricao_produto,
-                            "custo": p_custo,
-                            "preco_venda": p_preco,
-                        }
-                except Exception as e_cat:
-                    logger.warning("Falha ao carregar matriz de custos de contingencia: %s", e_cat)
+            # 1. Recupera tabela dimensional de custos e precos dos produtos
+            custos_map = self._carregar_matriz_custos_produtos()
 
             # 2. Recupera vendas e cupons recentes atraves do adaptador de borda
             vendas_recentes = self.erp_adapter.get_recent_sales(

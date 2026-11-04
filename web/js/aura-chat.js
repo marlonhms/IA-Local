@@ -5880,8 +5880,12 @@ class AuraChatController {
    */
   applyProgressiveDisclosure(htmlContent, isStillStreaming = false, hasToolCard = false) {
     if (!htmlContent || typeof htmlContent !== 'string') return '';
-    // Entrega o texto completo no chat sem cortes artificiais ou colapso em accordion
-    return htmlContent;
+    if (isStillStreaming) return htmlContent;
+    if (hasToolCard) return htmlContent;
+    // Em manuais operacionais passo a passo ou com links de documentacao, preserva o roteiro completo visivel
+    if (htmlContent.includes('aura-doc-link') || /Roteiro Executivo|Passo a Passo/i.test(htmlContent)) {
+      return htmlContent;
+    }
 
     const isExpanded = (this.getReadingMode() === 'comfort');
     const openAttr = isExpanded ? ' open' : '';

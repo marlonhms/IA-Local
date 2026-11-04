@@ -72,7 +72,8 @@ async def test_voice_transcribe_success_mock(monkeypatch):
 
 def test_zero_unicode_dashes_in_voice_api():
     """Garante zero travessoes unicode em core/voice_api.py."""
-    with open("ia-banco-local/core/voice_api.py", "r", encoding="utf-8") as f:
-        txt = f.read()
+    from pathlib import Path
+    voice_file = Path(__file__).resolve().parent.parent.parent / "core" / "voice_api.py"
+    txt = voice_file.read_text(encoding="utf-8")
     assert "\u2014" not in txt, "Em-dash encontrado em voice_api.py"
     assert "\u2013" not in txt, "En-dash encontrado em voice_api.py"

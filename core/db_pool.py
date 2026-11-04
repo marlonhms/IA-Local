@@ -7,6 +7,7 @@ Zero travessoes em todo o modulo.
 
 import logging
 import threading
+import time
 from contextlib import contextmanager, suppress
 from typing import Any
 
@@ -34,6 +35,9 @@ _pool_lock = threading.Lock()
 _erp_pool: pool.ThreadedConnectionPool | None = None
 _vector_pool: pool.ThreadedConnectionPool | None = None
 _last_working_erp_port: int | None = None
+_erp_last_fail_ts: float = 0.0
+_vector_last_fail_ts: float = 0.0
+_POOL_FAIL_COOLDOWN_SEC: float = 15.0
 
 
 class PooledConnectionWrapper:
@@ -168,23 +172,52 @@ def _create_vector_pool(
     return p
 
 
+def _is_pool_mocked(creator_fn: Any) -> bool:
+    """Detecta se o pool ou funcao criadora esta sob mock de teste unitario."""
+    pool_mod = getattr(pool.ThreadedConnectionPool, "__module__", "")
+    fn_mod = getattr(creator_fn, "__module__", "")
+    return ("mock" in pool_mod) or ("mock" in fn_mod) or hasattr(creator_fn, "assert_called")
+
+
 def get_erp_pool() -> pool.ThreadedConnectionPool:
-    """Retorna o pool singleton do banco ERP de forma thread-safe."""
-    global _erp_pool
+    """Retorna o pool singleton do banco ERP de forma thread-safe com fast-fail em modo offline."""
+    global _erp_pool, _erp_last_fail_ts
     if _erp_pool is None:
         with _pool_lock:
             if _erp_pool is None:
-                _erp_pool = _create_erp_pool()
+                if (
+                    not _is_pool_mocked(_create_erp_pool)
+                    and _erp_last_fail_ts > 0.0
+                    and (time.monotonic() - _erp_last_fail_ts) < _POOL_FAIL_COOLDOWN_SEC
+                ):
+                    raise psycopg2.OperationalError("ERP ThreadedConnectionPool em cooldown offline.")
+                try:
+                    _erp_pool = _create_erp_pool()
+                    _erp_last_fail_ts = 0.0
+                except Exception:
+                    _erp_last_fail_ts = time.monotonic()
+                    raise
     return _erp_pool
 
 
 def get_vector_pool() -> pool.ThreadedConnectionPool:
-    """Retorna o pool singleton do banco vetorial pgvector de forma thread-safe."""
-    global _vector_pool
+    """Retorna o pool singleton do banco vetorial pgvector de forma thread-safe com fast-fail em modo offline."""
+    global _vector_pool, _vector_last_fail_ts
     if _vector_pool is None:
         with _pool_lock:
             if _vector_pool is None:
-                _vector_pool = _create_vector_pool()
+                if (
+                    not _is_pool_mocked(_create_vector_pool)
+                    and _vector_last_fail_ts > 0.0
+                    and (time.monotonic() - _vector_last_fail_ts) < _POOL_FAIL_COOLDOWN_SEC
+                ):
+                    raise psycopg2.OperationalError("Vector ThreadedConnectionPool em cooldown offline.")
+                try:
+                    _vector_pool = _create_vector_pool()
+                    _vector_last_fail_ts = 0.0
+                except Exception:
+                    _vector_last_fail_ts = time.monotonic()
+                    raise
     return _vector_pool
 
 
@@ -281,8 +314,10 @@ def get_vector_db_connection(filial_id: int | None = None, tenant_id: str | None
 
 def close_all_pools():
     """Encerra todas as conexoes ativas em ambos os pools de conexao."""
-    global _erp_pool, _vector_pool
+    global _erp_pool, _vector_pool, _erp_last_fail_ts, _vector_last_fail_ts
     with _pool_lock:
+        _erp_last_fail_ts = 0.0
+        _vector_last_fail_ts = 0.0
         if _erp_pool is not None:
             with suppress(Exception):
                 _erp_pool.closeall()

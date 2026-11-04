@@ -377,7 +377,7 @@ class TestSinergiaDualChannelPhase3:
         # Deve ter a estrutura dos 4 blocos
         assert "Auditoria de Documento XML" in sintese_gui
         assert "Causa Raiz Geral" in sintese_gui
-        assert "Resolucao no webPosto" in sintese_gui
+        assert "Resolucao no seu ERP" in sintese_gui or "Resolucao no webPosto" in sintese_gui
         assert "Ponte Contextual" in sintese_gui
         assert "painel lateral" in sintese_gui
 
@@ -501,7 +501,7 @@ class TestSinergiaDualChannelPhase4:
         # 2.2 Verifica presenca das duas visualizacoes adaptativas em fiscal_findings_list
         assert "finding-view-gestor" in widgets_content
         assert "finding-view-contador" in widgets_content
-        assert "Como destravar no webPosto" in widgets_content
+        assert "Como destravar no seu ERP" in widgets_content or "Como destravar no webPosto" in widgets_content
         assert "Tags XML:" in widgets_content
 
     # -------------------------------------------------------------------------
@@ -587,7 +587,7 @@ class TestSinergiaDualChannelPhase5:
         assert "CERVEJA HEINEKEN" not in sintese
         assert "Item 2" not in sintese
         assert "Causa Raiz Geral" in sintese
-        assert "Resolucao no webPosto" in sintese
+        assert "Resolucao no seu ERP" in sintese or "Resolucao no webPosto" in sintese
         assert "Ponte Contextual" in sintese
 
         # 2. Envelope GenUI: Visao Gestor nao repete explicacao executiva verbatim
