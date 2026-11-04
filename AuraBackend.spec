@@ -45,7 +45,7 @@ hiddenimports = [
     'pydantic_core',
     'dotenv',
 
-    # Database Drivers & Tools
+    # Database Drivers, XML & Config Tools
     'psycopg2',
     'psycopg2.extensions',
     'psycopg2.extras',
@@ -53,11 +53,16 @@ hiddenimports = [
     'sqlglot',
     'sqlglot.dialects',
     'sqlglot.dialects.postgres',
+    'defusedxml',
+    'defusedxml.minidom',
+    'lxml',
+    'lxml.etree',
+    'yaml',
 
     # LLM & AI
     'google.generativeai',
 
-    # Core Architecture Modules
+    # Core Architecture Modules (v2.0.0-PRO)
     'core.service',
     'core.identity_vault',
     'core.resource_watchdog',
@@ -66,9 +71,17 @@ hiddenimports = [
     'core.command_journal',
     'core.aura_api',
     'core.aura_engine',
+    'core.confluence_chunker',
+    'core.fiscal_engine',
+    'core.partner_api',
+    'core.roi_calculator',
     'core.semantic_router',
     'core.rag_engine',
+    'core.tenant_memory',
+    'core.token_budget',
     'core.tools',
+    'core.voice_api',
+    'core.webposto_rag',
     'core.db_pool',
     'core.tenancy',
     'core.backup_manager',
@@ -83,6 +96,8 @@ hiddenimports = [
     'core.logger',
     'core.sanitizer',
     'core.installer_wizard',
+    'core.prompts',
+    'core.prompts.system_prompts',
     'core.schemas',
     'core.schemas.genui',
     'core.schemas.compliance',
@@ -110,6 +125,10 @@ datas = [
     ('config/erp_mappings', 'config/erp_mappings'),
 ]
 
+if os.path.exists('config/domain_packs'):
+    datas.append(('config/domain_packs', 'config/domain_packs'))
+if os.path.exists('data/webposto_knowledge.db'):
+    datas.append(('data/webposto_knowledge.db', 'data'))
 if os.path.exists('alembic'):
     datas.append(('alembic', 'alembic'))
 if os.path.exists('.env.example'):
@@ -127,7 +146,19 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['tkinter', 'matplotlib', 'scipy', 'IPython', 'pytest', 'unittest'],
+    excludes=[
+        'tkinter',
+        'matplotlib',
+        'scipy',
+        'IPython',
+        'pytest',
+        'pandas',
+        'pyarrow',
+        'polars',
+        'torch',
+        'tensorflow',
+        'sklearn',
+    ],
     noarchive=False,
     optimize=0,
 )

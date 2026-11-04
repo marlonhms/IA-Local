@@ -64,6 +64,51 @@ def test_aurabackend_spec_datas():
 
     assert "('web', 'web')" in spec_text or '("web", "web")' in spec_text
     assert "('config/erp_mappings', 'config/erp_mappings')" in spec_text or '("config/erp_mappings", "config/erp_mappings")' in spec_text
+    assert "config/domain_packs" in spec_text
+    assert "data/webposto_knowledge.db" in spec_text
+
+
+def test_aurabackend_spec_v2_pro_modules_and_memory_trimmer():
+    """Valida inclusao dos modulos v2.0.0-PRO no spec e compactador de Working Set no servidor."""
+    spec_text = (PROJECT_ROOT / "AuraBackend.spec").read_text(encoding="utf-8")
+    for mod in (
+        "core.fiscal_engine",
+        "core.partner_api",
+        "core.confluence_chunker",
+        "core.webposto_rag",
+        "core.tenant_memory",
+        "core.token_budget",
+        "core.voice_api",
+        "defusedxml",
+        "lxml",
+    ):
+        assert f"'{mod}'" in spec_text or f'"{mod}"' in spec_text, f"Modulo v2.0.0-PRO ausente no spec: {mod}"
+
+    server_text = (PROJECT_ROOT / "server.py").read_text(encoding="utf-8")
+    assert 'sys.modules.setdefault("server"' in server_text
+    assert "trim_process_working_set" in server_text
+
+    from core.resource_watchdog import trim_process_working_set
+
+    assert callable(trim_process_working_set)
+    # Execucao segura em qualquer SO
+    res = trim_process_working_set()
+    assert isinstance(res, bool)
+
+
+def test_edge_recovery_scripts_exist_and_zero_dashes():
+    """Valida presenca e conformidade dos scripts de recuperacao de borda."""
+    recovery_scripts = [
+        PROJECT_ROOT / "reiniciar_servico_aura.bat",
+        PROJECT_ROOT / "reiniciar_servico_aura.ps1",
+        PROJECT_ROOT / "reparar_banco_posto.bat",
+        PROJECT_ROOT / "scripts" / "reparar_banco.ps1",
+    ]
+    for script_path in recovery_scripts:
+        assert script_path.is_file(), f"Script de recuperacao ausente: {script_path}"
+        content = script_path.read_text(encoding="utf-8", errors="ignore")
+        assert "\u2014" not in content
+        assert "\u2013" not in content
 
 
 def test_build_aura_standalone_script_structure():

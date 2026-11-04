@@ -57,8 +57,10 @@ def get_app() -> Any:
     global _app_instance
     if _app_instance is None:
         from core.aura_api import create_aura_app
+        from core.resource_watchdog import trim_process_working_set
 
         _app_instance = create_aura_app()
+        trim_process_working_set()
     return _app_instance
 
 
@@ -218,6 +220,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     try:
         import uvicorn
 
+        sys.modules.setdefault("server", sys.modules[__name__])
         uvicorn.run(
             "server:app",
             host=host,

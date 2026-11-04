@@ -515,3 +515,36 @@ def reset_resource_watchdog() -> None:
     global _GLOBAL_WATCHDOG
     with _WATCHDOG_LOCK:
         _GLOBAL_WATCHDOG = None
+
+
+def trim_process_working_set() -> bool:
+    """
+    Compacta o Working Set do processo atual no Windows via Win32 SetProcessWorkingSetSize(-1, -1),
+    devolvendo ao SO as paginas de memoria de importacao inicial (mantendo consumo < 150 MB na borda).
+    Seguro e no-op em Linux/macOS.
+    """
+    import gc
+
+    gc.collect()
+    if not sys.platform.lower().startswith("win"):
+        return False
+    try:
+        import ctypes
+
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.GetCurrentProcess.restype = ctypes.c_void_p
+        k32.SetProcessWorkingSetSize.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_size_t,
+            ctypes.c_size_t,
+        ]
+        k32.SetProcessWorkingSetSize.restype = ctypes.wintypes.BOOL
+        res = k32.SetProcessWorkingSetSize(
+            k32.GetCurrentProcess(),
+            ctypes.c_size_t(-1),
+            ctypes.c_size_t(-1),
+        )
+        return bool(res)
+    except Exception as exc:
+        logger.debug("Falha benigna ao compactar WorkingSet: %s", exc)
+        return False
