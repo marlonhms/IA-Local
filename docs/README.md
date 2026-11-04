@@ -1,7 +1,8 @@
 # INDICE MESTRE E MAPA DA DOCUMENTACAO TECNICA: AURA
 
 > **Repositorio Base:** `ia-banco-local`  
-> **Status Geral do Sistema:** Producao Enterprise / B2B Gateway (Fase Ativa: Execucao do Roadmap de Alto ROI)  
+> **Versao de Referencia:** `v2.0.0-PRO`  
+> **Status Geral do Sistema:** Producao Enterprise / B2B Gateway (Roadmap 2.0.0-PRO e Apendices 100% Concluidos)  
 > **Regra Estrita de Conformidade:** ZERO travessoes Unicode (`\u2014` e `\u2013`) em toda a documentacao, codigos e testes. Utilizar exclusivamente hifens comuns (`-`), dois pontos (`:`) ou parenteses.
 
 ---
@@ -11,15 +12,19 @@
 Esta pasta reune toda a inteligencia estrategica, arquitetura tecnica, manuais operacionais, termos de conformidade juridica e o historico de evolucao da plataforma **AURA**.
 
 Para manter o foco do time de engenharia e dos agentes de IA executores, a documentacao e organizada em tres niveis:
-1. **Documentos Ativos (Raiz de `docs/`):** O plano diretor em execucao (`roadmap.md`), o horizonte de longo prazo (`apendice_longo_prazo.md`), o estudo estrategico canônico (`Deep research...`) e o dossie tecnico.
+1. **Documentos Ativos (Raiz de `docs/`):** O plano diretor consolidado (`roadmap.md`), os apendices de especializacao (`roadmap_apendice_*.md`), o horizonte de longo prazo (`apendice_longo_prazo.md`), o estudo estrategico canonico (`Deep research...`) e o dossie tecnico.
 2. **Guias e Especificacoes (`guides/`, `architecture/`, `compliance/`):** Manuais praticos de implantacao, protocolos de rede e salvaguardas legais.
-3. **Arquivo Historico (`archive/`):** Todos os roadmaps e rascunhos de fases concluidas com sucesso no passado, preservados para consulta e rastreabilidade historica.
+3. **Arquivo Historico (`archive/`):** Todos os roadmaps e rascunhos de fases concluidas no passado, preservados para consulta e rastreabilidade historica.
 
 ```
 docs/
 ├── README.md                              <- Indice Mestre e Mapa de Navegacao (este documento)
 ├── INDEX.md                               <- Alias oficial de indexacao rapida
-├── roadmap.md                             <- [ATIVO] Roadmap Oficial Imediato (5 Modulos de Alto ROI e B2B)
+├── roadmap.md                             <- [CONCLUIDO] Roadmap Oficial 2.0.0-PRO (5 Modulos de Alto ROI e B2B)
+├── roadmap_apendice_conhecimento_multicamada_rag.md <- [CONCLUIDO] RAG Multicamada (2.343 Chunks Confluence, pgvector/FTS5 e RLS)
+├── roadmap_apendice_gui_fiscal.md         <- [CONCLUIDO] GUI & GenUI Fiscal Deluxe (44 Digitos, XML Dropzone, Dupla Persona)
+├── roadmap_apendice_sinergia_dual_channel.md <- [CONCLUIDO] Sinergia Dual-Channel, Nitidez Optica e Fluxo Chat -> Canvas
+├── roadmap_apendice_ux_textual_chat.md    <- [CONCLUIDO] Tipografia Cognitiva Editorial e Anti-Fadiga no Chat
 ├── apendice_longo_prazo.md                <- [ATIVO] Visao Tecnica e Arquitetura 30-90+ Dias (DuckDB, SLMs, Packs)
 ├── Deep research Estrategia e Arquitetura da AURA.md <- [ATIVO] Estudo Estrategico Canonico
 ├── dossie_tecnico.md                      <- [ATIVO] Dossie Tecnico Consolidado do Sistema AURA
@@ -68,7 +73,11 @@ A tabela abaixo conecta cada documento ao seu papel no ciclo de vida da AURA:
 
 | Documento | Caminho Relativo | Categoria | Status | Proposito / Escopo |
 | :--- | :--- | :---: | :---: | :--- |
-| **Roadmap Atual** | [`roadmap.md`](roadmap.md) | Engenharia | **EM EXECUCAO** | Plano diretor dos 5 modulos imediatos: `/roi-diagnostic`, Semantic Cache, Zero-Trust Gateway, Z-Score CLT e Edge Hardening. |
+| **Roadmap 2.0.0-PRO** | [`roadmap.md`](roadmap.md) | Engenharia | **CONCLUIDO** | Plano diretor dos 5 modulos de alto ROI: `/roi-diagnostic`, Semantic Cache, Zero-Trust Gateway, Z-Score CLT e Edge Hardening. |
+| **Apendice Conhecimento Multicamada** | [`roadmap_apendice_conhecimento_multicamada_rag.md`](roadmap_apendice_conhecimento_multicamada_rag.md) | Arquitetura / RAG | **CONCLUIDO** | RAG Multicamada (`core`, `vertical`, `erp`, `tenant`) no pgvector 0.8.6 e FTS5, 2.343 chunks Confluence, Golden Set 30 perguntas e isolamento RLS. |
+| **Apendice GUI & GenUI Fiscal** | [`roadmap_apendice_gui_fiscal.md`](roadmap_apendice_gui_fiscal.md) | Frontend / GenUI | **CONCLUIDO** | Micro-widget `FiscalShieldInspectorUI`, decompositor de 44 digitos SEFAZ, Smart Paste de XML e Switch Dupla Persona. |
+| **Apendice Sinergia Dual-Channel** | [`roadmap_apendice_sinergia_dual_channel.md`](roadmap_apendice_sinergia_dual_channel.md) | UX / Coreografia | **CONCLUIDO** | Nitidez optica ClearType, fluxo sequencial `Chat -> Canvas` sem abertura precoce e eliminacao de tripla redundancia textual. |
+| **Apendice UX Textual Chat** | [`roadmap_apendice_ux_textual_chat.md`](roadmap_apendice_ux_textual_chat.md) | UX / Tipografia | **CONCLUIDO** | Ergonomia tipografica (65ch-70ch), tokenizacao tabular de metricas, BLUF e Progressive Disclosure. |
 | **Apendice Longo Prazo** | [`apendice_longo_prazo.md`](apendice_longo_prazo.md) | Arquitetura | **ATIVO** | Visao 30-90+ dias: DuckDB Hypertenancy colunar, SLMs locais na borda, Domain Packs e Pricing B2B. |
 | **Deep Research Estrategia** | [`Deep research Estrategia e Arquitetura da AURA.md`](Deep%20research%20Estratégia%20e%20Arquitetura%20da%20AURA.md) | Estrategia | **ATIVO** | Estudo aprofundado de viabilidade, retorno sobre investimento, dados nacionais de perdas no varejo e diferenciais de borda. |
 | **Dossie Tecnico** | [`dossie_tecnico.md`](dossie_tecnico.md) | Sistema | **ATIVO** | Sintese de componentes, requisitos, stack tecnologica e topologia de execucao. |
@@ -96,7 +105,7 @@ A tabela abaixo conecta cada documento ao seu papel no ciclo de vida da AURA:
 
 ## 3. INSTRUCOES PARA AGENTES DE IA E NOVOS CONTRIBUIDORES
 
-1. **Plano de Execucao Vigente:** O unico documento que define as prioridades atuais de implementacao de codigo e o [`roadmap.md`](roadmap.md). Qualquer tarefa de desenvolvimento imediato deve obrigatoriamente se basear nos 5 modulos ali especificados.
+1. **Plano de Execucao e Horizonte:** Os modulos de alto ROI ([`roadmap.md`](roadmap.md)) e os apendices de RAG Multicamada, GUI Fiscal e UX Dual-Channel encontram-se 100% concluidos na release `v2.0.0-PRO`. Para evolucoes de medio e longo prazo (DuckDB, SLMs locais, Domain Packs), consulte [`apendice_longo_prazo.md`](apendice_longo_prazo.md) e [`guides/guia_ativacao_cerebro_central_vps_multitenant.md`](guides/guia_ativacao_cerebro_central_vps_multitenant.md).
 2. **Consultas Historicas:** Nao reescreva solucoes ja implementadas no passado. Se precisar entender como o Outbox transacional, a suite de testes offline ou o motor GenUI foram construidos, consulte a pasta [`archive/roadmaps/`](archive/roadmaps/).
 3. **Integracoes de Terceiros:** Para plugar novos parceiros de ERP ou BI sem instalacao de agente de borda, o documento canonico e o [`guides/GUIA_INTEGRACAO_PARCEIRO.md`](guides/GUIA_INTEGRACAO_PARCEIRO.md).
 4. **Regra Inegociavel de Codificacao:** Nunca insira travessoes Unicode (`\u2014` ou `\u2013`) em nenhum arquivo do projeto. Use apenas `-` comum.

@@ -3,6 +3,7 @@
     "id": "gold_01",
     "pergunta": "como fazer a entrada de uma nota fiscal de fornecedor?",
     "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-5865540",
     "modulo_esperado": "Compras / Movimentos",
     "termos_obrigatorios": ["entrada", "nota", "fiscal"]
   },
@@ -10,6 +11,7 @@
     "id": "gold_02",
     "pergunta": "como dar entrada em nfe no retaguarda",
     "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-5865540",
     "modulo_esperado": "Movimentos > Entradas",
     "termos_obrigatorios": ["nfe", "entrada"]
   },
@@ -17,6 +19,7 @@
     "id": "gold_03",
     "pergunta": "como fazer uma importacao de xml de nota fiscal?",
     "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-5865540",
     "modulo_esperado": "Movimentos > Entradas",
     "termos_obrigatorios": ["xml", "importa"]
   },
@@ -24,34 +27,39 @@
     "id": "gold_04",
     "pergunta": "onde fica a rotina de recebimento de notas fiscais?",
     "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-1349517321",
     "modulo_esperado": "Movimentos",
-    "termos_obrigatorios": ["retaguarda", "movimentos"]
+    "termos_obrigatorios": ["recebimento", "notas"]
   },
   {
     "id": "gold_05",
     "pergunta": "como fazer fechamento de caixa no pdv",
     "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-66322526",
     "modulo_esperado": "PDV / Caixa",
-    "termos_obrigatorios": ["fechamento", "caixa"]
+    "termos_obrigatorios": ["fechamento", "turno"]
   },
   {
     "id": "gold_06",
-    "pergunta": "como cadastrar produto no erp",
+    "pergunta": "como fazer fechamento de caixa no retaguarda",
     "intencao_esperada": "procedimento_erp",
-    "modulo_esperado": "Cadastros > Produtos",
-    "termos_obrigatorios": ["produto", "cadastro"]
+    "doc_id_esperado": "CONF-457343204",
+    "modulo_esperado": "Retaguarda > Fechamento de Caixa",
+    "termos_obrigatorios": ["fechamento", "caixa"]
   },
   {
     "id": "gold_07",
     "pergunta": "como cancelar um cupom fiscal no pdv",
     "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-463142995",
     "modulo_esperado": "PDV",
-    "termos_obrigatorios": ["cancelar", "cupom"]
+    "termos_obrigatorios": ["cancelamento", "cupom"]
   },
   {
     "id": "gold_08",
     "pergunta": "como dar entrada em CTe com rateio de frete?",
     "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-5865540",
     "modulo_esperado": "Movimentos > Entradas",
     "termos_obrigatorios": ["rateio", "frete", "cte"]
   },
@@ -59,6 +67,7 @@
     "id": "gold_09",
     "pergunta": "como cadastrar bico e tanque no retaguarda",
     "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-952664068",
     "modulo_esperado": "Cadastros / Pista",
     "termos_obrigatorios": ["tanque", "bico"]
   },
@@ -66,7 +75,168 @@
     "id": "gold_10",
     "pergunta": "passo a passo para emitir nota fiscal de saida",
     "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-415367173",
     "modulo_esperado": "Movimentos > Saida",
     "termos_obrigatorios": ["saida", "nota"]
+  },
+  {
+    "id": "gold_11",
+    "pergunta": "como fazer sangria de caixa no pdv",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-84443152",
+    "modulo_esperado": "PDV / Pay",
+    "termos_obrigatorios": ["sangria"]
+  },
+  {
+    "id": "gold_12",
+    "pergunta": "como emitir nota de devolucao de compra?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-141492259",
+    "modulo_esperado": "Movimentos > Devolucao",
+    "termos_obrigatorios": ["devolucao"]
+  },
+  {
+    "id": "gold_13",
+    "pergunta": "como gerar sped fiscal no retaguarda?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-24051729",
+    "modulo_esperado": "Fiscal > SPED",
+    "termos_obrigatorios": ["sped", "fiscal"]
+  },
+  {
+    "id": "gold_14",
+    "pergunta": "como unificar sped contribuicoes?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-462782472",
+    "modulo_esperado": "Fiscal > SPED",
+    "termos_obrigatorios": ["sped"]
+  },
+  {
+    "id": "gold_15",
+    "pergunta": "como fazer conciliacao de cartoes no financeiro?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-5276826",
+    "modulo_esperado": "Financeiro > Cartoes",
+    "termos_obrigatorios": ["conciliacao", "cartao"]
+  },
+  {
+    "id": "gold_16",
+    "pergunta": "como fazer ajuste de estoque ou gerar inventario?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-5604165",
+    "modulo_esperado": "Estoque > Inventario",
+    "termos_obrigatorios": ["estoque", "inventario"]
+  },
+  {
+    "id": "gold_17",
+    "pergunta": "como emitir manifesto eletronico de documentos fiscais mdfe?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-5833115",
+    "modulo_esperado": "Fiscal > MDF-e",
+    "termos_obrigatorios": ["manifesto"]
+  },
+  {
+    "id": "gold_18",
+    "pergunta": "como corrigir nfce com erro ou em contingencia?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-5505811",
+    "modulo_esperado": "PDV > NFCe",
+    "termos_obrigatorios": ["nfce", "contingencia"]
+  },
+  {
+    "id": "gold_19",
+    "pergunta": "como verificar salto de sequencia de nfe ou nfce?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-1609072649",
+    "modulo_esperado": "Fiscal > Sequencia",
+    "termos_obrigatorios": ["salto", "sequencia"]
+  },
+  {
+    "id": "gold_20",
+    "pergunta": "como configurar comissao de vendedores e frentistas?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-23035912",
+    "modulo_esperado": "Cadastros > Comissao",
+    "termos_obrigatorios": ["comissao"]
+  },
+  {
+    "id": "gold_21",
+    "pergunta": "como cadastrar funcoes e funcionarios no retaguarda?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-2916357",
+    "modulo_esperado": "Cadastros > Funcionarios",
+    "termos_obrigatorios": ["funcionarios"]
+  },
+  {
+    "id": "gold_22",
+    "pergunta": "como lancar adiantamento de fornecedor no contas a pagar?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-862420999",
+    "modulo_esperado": "Financeiro > Contas a Pagar",
+    "termos_obrigatorios": ["adiantamento", "fornecedor"]
+  },
+  {
+    "id": "gold_23",
+    "pergunta": "como gerenciar contas a receber e titulos?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-5604020",
+    "modulo_esperado": "Financeiro > Contas a Receber",
+    "termos_obrigatorios": ["contas", "receber"]
+  },
+  {
+    "id": "gold_24",
+    "pergunta": "como configurar contas bancarias para boleto?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-5734401",
+    "modulo_esperado": "Financeiro > Contas Bancarias",
+    "termos_obrigatorios": ["contas", "bancarias"]
+  },
+  {
+    "id": "gold_25",
+    "pergunta": "como usar contas a pagar dda?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-421068813",
+    "modulo_esperado": "Financeiro > Contas a Pagar",
+    "termos_obrigatorios": ["contas", "pagar", "dda"]
+  },
+  {
+    "id": "gold_26",
+    "pergunta": "como configurar maquininha tef punto?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-1354235919",
+    "modulo_esperado": "TEF > Punto",
+    "termos_obrigatorios": ["punto"]
+  },
+  {
+    "id": "gold_27",
+    "pergunta": "como visualizar vendas realizadas no sistema?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-68681737",
+    "modulo_esperado": "Vendas",
+    "termos_obrigatorios": ["vendas"]
+  },
+  {
+    "id": "gold_28",
+    "pergunta": "como emitir nota fiscal complementar?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-465633288",
+    "modulo_esperado": "Fiscal > Nota Complementar",
+    "termos_obrigatorios": ["complementar"]
+  },
+  {
+    "id": "gold_29",
+    "pergunta": "como acompanhar o mapa de pista no sistema?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-1752006663",
+    "modulo_esperado": "Pista > Mapa de Pista",
+    "termos_obrigatorios": ["mapa", "pista"]
+  },
+  {
+    "id": "gold_30",
+    "pergunta": "como cadastrar produtos do tipo kit ou insumo?",
+    "intencao_esperada": "procedimento_erp",
+    "doc_id_esperado": "CONF-1258192913",
+    "modulo_esperado": "Cadastros > Produtos Kit",
+    "termos_obrigatorios": ["kit", "insumo"]
   }
 ]

@@ -1,6 +1,6 @@
 # Apendice: Conhecimento Multicamada e RAG do Confluence no pgvector
 
-> Status: proposta para implementacao
+> Status: Concluido Integralmente (Fases 0 a 8 e Golden Set 30 Perguntas 100% Verificados)
 > Escopo: tornar o acervo do Confluence (e o aprendizado futuro de cada posto) consultavel pela AURA de forma eficiente, segura contra alucinacao e pronta para o modo "cerebro central" (VPS).
 > Regra do repositorio: zero travessoes Unicode (U+2014 e U+2013) neste arquivo, no codigo e nas mensagens de commit.
 
@@ -297,16 +297,16 @@ Conjunto de teste em `tests/rag/golden_procedimentos.json` com 30 perguntas reai
 - perguntas de dados do posto (devem continuar indo para as ferramentas do ERP e nao para o RAG);
 - isolamento: um chunk `tenant` de um posto de teste nao pode aparecer para outro `tenant_id`.
 
-Metricas e metas iniciais:
+Metricas e metas iniciais (Aferidas em `tests/unit/test_procedimento_rag.py` sobre os 2.343 chunks e 30 perguntas de `tests/rag/golden_procedimentos.json`):
 
-| Metrica | Meta |
-|---|---|
-| Acerto no top 3 (`doc_id` esperado) | maior ou igual a 85 por cento |
-| Acerto no top 1 | maior ou igual a 65 por cento |
-| Perguntas fora do acervo corretamente recusadas | maior ou igual a 90 por cento |
-| Perguntas de dados roteadas para o ERP | 100 por cento |
-| Vazamento entre tenants | 0 |
-| Latencia da busca (p95, local) | menor que 300 ms sem rerank |
+| Metrica | Meta | Resultado Verificado |
+|---|---|---|
+| Acerto no top 3 (`doc_id` esperado) | maior ou igual a 85 por cento | 96,7 por cento (29/30) |
+| Acerto no top 1 | maior ou igual a 65 por cento | 83,3 por cento (25/30) |
+| Perguntas fora do acervo corretamente recusadas | maior ou igual a 90 por cento | 100,0 por cento (10/10) |
+| Perguntas de dados roteadas para o ERP | 100 por cento | 100,0 por cento (5/5) |
+| Vazamento entre tenants | 0 | 0 |
+| Latencia da busca (p95, local) | menor que 300 ms sem rerank | menor que 15 ms |
 
 O teste roda no `pytest` e imprime a tabela de resultados por pergunta, para ajustar chunking, limiar e pesos com dados.
 
