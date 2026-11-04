@@ -32,10 +32,11 @@ backups/*
 *.sql
 !scripts/*.sql
 *.db
+!data/webposto_knowledge.db
 *.sqlite
 *.sqlite3
-/data/
-/data/*
+data/*
+!data/webposto_knowledge.db
 
 # Logs e arquivos temporários
 *.log

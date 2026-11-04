@@ -140,6 +140,8 @@ class TestSinergiaDualChannelPhase1:
     # -------------------------------------------------------------------------
     def test_dist_web_synchronization(self) -> None:
         """Garante sincronizacao byte a byte entre web/ e dist/AuraBackend/_internal/web/."""
+        if not self.dist_web_dir.exists():
+            pytest.skip("dist/web nao disponivel em ambiente de CI limpo sem build standalone previo")
         assert self.dist_css_file.exists(), f"CSS em dist ausente: {self.dist_css_file}"
         assert self.dist_js_file.exists(), f"JS em dist ausente: {self.dist_js_file}"
         assert self.dist_html_file.exists(), f"HTML em dist ausente: {self.dist_html_file}"
@@ -272,6 +274,8 @@ class TestSinergiaDualChannelPhase2:
     # -------------------------------------------------------------------------
     def test_dist_sync_phase2(self) -> None:
         """Garante sincronizacao byte a byte dos arquivos da Fase 2 com dist/."""
+        if not self.dist_web_dir.exists():
+            pytest.skip("dist/web nao disponivel em ambiente de CI limpo sem build standalone previo")
         assert self.dist_chat_js.exists(), f"Arquivo dist ausente: {self.dist_chat_js}"
         assert self.dist_aux_js.exists(), f"Arquivo dist ausente: {self.dist_aux_js}"
 
@@ -509,6 +513,8 @@ class TestSinergiaDualChannelPhase4:
     # -------------------------------------------------------------------------
     def test_dist_sync_phase4(self) -> None:
         """Garante sincronizacao byte a byte de aura-genui-widgets.js com dist/."""
+        if not self.dist_web_dir.exists():
+            pytest.skip("dist/web nao disponivel em ambiente de CI limpo sem build standalone previo")
         assert self.dist_widgets_js.exists(), f"Arquivo dist ausente: {self.dist_widgets_js}"
         assert self.widgets_js.read_text(encoding="utf-8") == self.dist_widgets_js.read_text(encoding="utf-8")
 
@@ -631,6 +637,8 @@ class TestSinergiaDualChannelPhase5:
     # -------------------------------------------------------------------------
     def test_complete_dist_web_integrity(self) -> None:
         """Garante paridade 100% byte a byte entre todos os arquivos web/ e dist/."""
+        if not self.dist_web_dir.exists():
+            pytest.skip("dist/web nao disponivel em ambiente de CI limpo sem build standalone previo")
         synced_files = [
             "css/aura.css",
             "js/aura-chat.js",
