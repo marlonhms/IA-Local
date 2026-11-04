@@ -3344,6 +3344,14 @@ class AuraEngine:
         return self._token_budget
 
     @property
+    def tenant_memory(self):
+        if not hasattr(self, "_tenant_memory") or self._tenant_memory is None:
+            from core.tenant_memory import TenantMemoryManager
+            db_path = getattr(self._session_memory, "db_path", None)
+            self._tenant_memory = TenantMemoryManager(db_path=db_path)
+        return self._tenant_memory
+
+    @property
     def compliance_manager(self):
         if self._compliance_manager is None:
             from core.compliance_manager import ComplianceManager
@@ -3854,6 +3862,20 @@ class AuraEngine:
         genui_active: bool = False,
     ) -> str:
         dados_filial = self.get_dados_filial()
+        f_id = 1
+        try:
+            f_id = int(re.sub(r"\D", "", str(self.filial_id)) or 1)
+        except Exception:
+            f_id = 1
+
+        memoria_bloco = self.tenant_memory.format_memories_for_prompt(
+            tenant_id=self.tenant_id,
+            filial_id=f_id,
+            query=pergunta_sanitizada,
+        )
+        if memoria_bloco:
+            contexto_sanitizado = f"{memoria_bloco}\n\n{contexto_sanitizado}".strip()
+
         return build_system_prompt(
             pergunta_sanitizada=pergunta_sanitizada,
             contexto_sanitizado=contexto_sanitizado,
@@ -3947,6 +3969,7 @@ class AuraEngine:
                 busca = self.tools.consultar_procedimento_erp(
                     termo=pergunta,
                     top_k=5,
+                    tenant_id=self.tenant_id,
                     query_vector=query_vector,
                 )
                 chunks = busca.get("results", [])

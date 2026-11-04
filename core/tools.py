@@ -263,6 +263,27 @@ class PostoTools:
         esteja indisponivel ou sem resultados suficientes.
         Zero travessoes em toda a saida.
         """
+        # 0. Consulta memorias ativas locais do tenant (Precedencia Cognitiva Maxima: tenant > erp)
+        tenant_chunks = []
+        try:
+            from core.tenant_memory import TenantMemoryManager
+            t_mem = TenantMemoryManager()
+            active_mems = t_mem.get_active_memories(tenant_id=tenant_id, query=termo, limit=top_k)
+            for m in active_mems:
+                tenant_chunks.append({
+                    "id": f"mem_{m.id}",
+                    "camada": "tenant",
+                    "doc_id": f"TENANT-{m.id}",
+                    "doc_titulo": f"Regra do Posto: {m.chave or m.categoria}",
+                    "breadcrumb": f"Memoria do Posto > {m.categoria.replace('_', ' ').title()}",
+                    "conteudo": m.conteudo,
+                    "doc_url": "",
+                    "is_extenso": False,
+                    "score_rrf": 1.0,
+                })
+        except Exception as exc:
+            logger.debug("Consulta a TenantMemoryManager no PostoTools ignorada: %s", exc)
+
         # 1. Tenta a busca vetorial hibrida no pgvector (se configurado)
         try:
             res = self.rag.search_hybrid_procedimentos(
@@ -273,6 +294,8 @@ class PostoTools:
                 query_vector=query_vector,
             )
             if isinstance(res, dict) and res.get("results") and not res.get("evidencia_insuficiente"):
+                if tenant_chunks:
+                    res["results"] = tenant_chunks + [r for r in res["results"] if r.get("doc_id") not in {t["doc_id"] for t in tenant_chunks}]
                 return res
         except Exception as e:
             logger.warning(
@@ -311,11 +334,12 @@ class PostoTools:
                         "score_final": float(r.get("bm25_rank") or 1.0),
                     })
 
+                combined = tenant_chunks + [r for r in formatted_results if r.get("doc_id") not in {t["doc_id"] for t in tenant_chunks}]
                 return {
-                    "results": formatted_results,
+                    "results": combined,
                     "evidencia_insuficiente": False,
                     "status": "online_local_fts5",
-                    "total": len(formatted_results),
+                    "total": len(combined),
                 }
         except Exception as e_local:
             logger.warning("Falha no fallback local FTS5 de procedimentos: %s", e_local)

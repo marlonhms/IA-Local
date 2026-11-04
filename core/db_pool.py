@@ -21,7 +21,9 @@ from config.settings import (
 from core.tenancy import (
     TenantContext,
     inject_rls_filial_context,
+    inject_rls_tenant_context,
     validate_filial_id,
+    validate_tenant_id,
 )
 
 logger = logging.getLogger("AuraDBPool")
@@ -46,10 +48,12 @@ class PooledConnectionWrapper:
         real_conn,
         pool_instance: pool.ThreadedConnectionPool,
         rls_filial_id: int | None = None,
+        rls_tenant_id: str | None = None,
     ):
         self._real_conn = real_conn
         self._pool = pool_instance
         self._rls_filial_id = rls_filial_id
+        self._rls_tenant_id = rls_tenant_id
         self._returned = False
         self._lock = threading.Lock()
 
@@ -57,6 +61,11 @@ class PooledConnectionWrapper:
     def rls_filial_id(self) -> int | None:
         """Retorna o identificador de filial RLS injetado nesta sessao, se houver."""
         return self._rls_filial_id
+
+    @property
+    def rls_tenant_id(self) -> str | None:
+        """Retorna o identificador de tenant RLS injetado nesta sessao, se houver."""
+        return self._rls_tenant_id
 
     def close(self):
         """Devolve a conexao de volta ao pool de forma idempotente."""
@@ -194,16 +203,23 @@ def get_erp_connection(timeout: int | None = None) -> PooledConnectionWrapper:
     return PooledConnectionWrapper(conn, p)
 
 
-def get_vector_connection(filial_id: int | None = None) -> PooledConnectionWrapper:
+def get_vector_connection(
+    filial_id: int | None = None,
+    tenant_id: str | None = None,
+) -> PooledConnectionWrapper:
     """
     Obtem conexao do pool pgvector envolvida em PooledConnectionWrapper.
-    Quando filial_id e informado (ou esta ativo no TenantContext), injeta
-    automaticamente 'SET SESSION app.current_filial = ...' para isolamento RLS.
+    Injeta automaticamente 'SET SESSION app.current_filial = ...' e
+    'SET SESSION aura.tenant_id = ...' para isolamento RLS multi-tenant (Fase 8).
     Ao chamar .close() ou sair de bloco 'with', a conexao retorna ao pool.
     """
     effective_filial = filial_id if filial_id is not None else TenantContext.get_filial_id()
     if effective_filial is not None:
         effective_filial = validate_filial_id(effective_filial)
+
+    effective_tenant = tenant_id if tenant_id is not None else (TenantContext.get_tenant_id() if TenantContext.get_current() is not None else None)
+    if effective_tenant is not None:
+        effective_tenant = validate_tenant_id(effective_tenant)
 
     p = get_vector_pool()
     conn = p.getconn()
@@ -221,7 +237,20 @@ def get_vector_connection(filial_id: int | None = None) -> PooledConnectionWrapp
                 p.putconn(conn)
             raise
 
-    return PooledConnectionWrapper(conn, p, rls_filial_id=effective_filial)
+    if effective_tenant is not None:
+        try:
+            inject_rls_tenant_context(conn, effective_tenant, session_scope=True)
+        except Exception:
+            with suppress(Exception):
+                p.putconn(conn)
+            raise
+
+    return PooledConnectionWrapper(
+        conn,
+        p,
+        rls_filial_id=effective_filial,
+        rls_tenant_id=effective_tenant,
+    )
 
 
 @contextmanager
@@ -238,12 +267,12 @@ def get_erp_db_connection(timeout: int | None = None):
 
 
 @contextmanager
-def get_vector_db_connection(filial_id: int | None = None):
+def get_vector_db_connection(filial_id: int | None = None, tenant_id: str | None = None):
     """
     Context manager thread-safe para obtencao de conexao com o banco vetorial pgvector a partir do pool.
     Garante devolucao automatica ao pool no bloco finally.
     """
-    wrapper = get_vector_connection(filial_id=filial_id)
+    wrapper = get_vector_connection(filial_id=filial_id, tenant_id=tenant_id)
     try:
         yield wrapper
     finally:

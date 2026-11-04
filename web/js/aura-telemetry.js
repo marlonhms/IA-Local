@@ -92,6 +92,27 @@ class AuraTelemetryCoordinator {
       btnSavePolicy.addEventListener('click', () => this.handleSaveBudgetPolicy());
     }
 
+    // 8.1 Controles de Memoria Operacional do Posto (Fase 7)
+    const btnToggleAddMem = document.getElementById('btn-toggle-add-memory');
+    const formAddMem = document.getElementById('tenant-memory-add-form');
+    if (btnToggleAddMem && formAddMem) {
+      btnToggleAddMem.addEventListener('click', () => {
+        formAddMem.classList.toggle('hidden');
+      });
+    }
+
+    const btnCancelMem = document.getElementById('btn-cancel-add-memory');
+    if (btnCancelMem && formAddMem) {
+      btnCancelMem.addEventListener('click', () => {
+        formAddMem.classList.add('hidden');
+      });
+    }
+
+    const btnSaveMem = document.getElementById('btn-save-tenant-memory');
+    if (btnSaveMem) {
+      btnSaveMem.addEventListener('click', () => this.handleSaveTenantMemory());
+    }
+
     // 9. Carga inicial silenciosa para atualizar badges e barra de tokens no header
     this.fetchSilentBadge();
   }
@@ -241,21 +262,26 @@ class AuraTelemetryCoordinator {
     }
 
     try {
-      const [metricsRes, stationsRes, complianceRes, budgetRes] = await Promise.allSettled([
+      const [metricsRes, stationsRes, complianceRes, budgetRes, memoryRes] = await Promise.allSettled([
         fetch('/api/v1/aura/telemetry/metrics'),
         fetch('/api/v1/aura/stations'),
         fetch('/api/v1/aura/compliance/status'),
         fetch('/api/v1/aura/telemetry/token-budget'),
+        fetch('/api/v1/aura/memory/tenant'),
       ]);
 
       const metrics = metricsRes.status === 'fulfilled' && metricsRes.value.ok ? await metricsRes.value.json() : null;
       const stations = stationsRes.status === 'fulfilled' && stationsRes.value.ok ? await stationsRes.value.json() : null;
       const compliance = complianceRes.status === 'fulfilled' && complianceRes.value.ok ? await complianceRes.value.json() : null;
       const budget = budgetRes.status === 'fulfilled' && budgetRes.value.ok ? await budgetRes.value.json() : null;
+      const memories = memoryRes.status === 'fulfilled' && memoryRes.value.ok ? await memoryRes.value.json() : null;
 
       this.lastMetrics = metrics;
       this.lastBudget = budget;
       this.renderCockpit(metrics, stations, compliance, budget);
+      if (memories && memories.facts) {
+        this.renderTenantMemories(memories.facts);
+      }
 
       if (metrics) {
         this.updateHeaderBadge(metrics);
@@ -681,3 +707,161 @@ window.auraTelemetry = new AuraTelemetryCoordinator();
 document.addEventListener('DOMContentLoaded', () => {
   window.auraTelemetry.init();
 });
+
+  /**
+   * Renderiza a secao de Memoria Operacional do Posto (Camada Tenant - Fase 7).
+   */
+  renderTenantMemories(facts = []) {
+    const elPill = document.getElementById('tenant-memory-count-pill');
+    const elList = document.getElementById('tenant-memory-items-list');
+    if (!elList) return;
+
+    const activeFacts = facts.filter(f => f.status === 'ativo');
+    const pendingFacts = facts.filter(f => f.status === 'pendente');
+
+    if (elPill) {
+      if (pendingFacts.length > 0) {
+        elPill.textContent = `${activeFacts.length} ativas • ${pendingFacts.length} pendentes`;
+        elPill.className = 'px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse';
+      } else {
+        elPill.textContent = `${activeFacts.length} regras ativas`;
+        elPill.className = 'px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30';
+      }
+    }
+
+    if (facts.length === 0) {
+      elList.innerHTML = `
+        <div class="p-3 rounded-lg bg-slate-900/40 border border-white/5 text-center text-xs text-slate-400">
+          Nenhuma regra personalizada cadastrada para este posto ainda. Clique em "+ Cadastrar Regra" acima.
+        </div>
+      `;
+      return;
+    }
+
+    const categoryLabels = {
+      regra_posto: 'Regra do Posto',
+      apelido_produto: 'Apelido Produto',
+      rotina_operacional: 'Rotina Operacional',
+      preferencia_gestor: 'Preferencia Gestor',
+      geral: 'Geral',
+    };
+
+    elList.innerHTML = facts.map(f => {
+      const isPending = f.status === 'pendente';
+      const catLabel = categoryLabels[f.categoria] || f.categoria;
+      const statusBadge = isPending
+        ? '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">Pendente Revisao</span>'
+        : '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Ativo</span>';
+
+      const actionButtons = isPending
+        ? `
+          <button onclick="window.auraTelemetry.handleApproveTenantMemory('${f.id}')" class="px-2 py-1 rounded bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 text-[11px] font-semibold transition-colors cursor-pointer" title="Aprovar esta regra para entrar em vigor imediatamente">
+            ✓ Aprovar
+          </button>
+          <button onclick="window.auraTelemetry.handleRejectTenantMemory('${f.id}')" class="px-2 py-1 rounded bg-rose-600/30 hover:bg-rose-600/50 text-rose-300 border border-rose-500/40 text-[11px] font-semibold transition-colors cursor-pointer" title="Rejeitar regra">
+            ✕ Rejeitar
+          </button>
+        `
+        : `
+          <button onclick="window.auraTelemetry.handleDeleteTenantMemory('${f.id}')" class="px-2 py-1 rounded bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-white/10 hover:border-rose-500/30 text-[11px] font-sans transition-colors cursor-pointer" title="Inativar regra">
+            Excluir
+          </button>
+        `;
+
+      return `
+        <div class="p-2.5 rounded-lg ${isPending ? 'bg-amber-950/20 border border-amber-500/30' : 'bg-slate-900/60 border border-white/5'} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <div class="space-y-1 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-1.5 py-0.5 rounded text-[9px] font-mono uppercase bg-purple-500/20 text-purple-300 border border-purple-500/30 font-semibold">${catLabel}</span>
+              ${f.chave ? `<strong class="text-xs text-white font-mono">${f.chave}</strong>` : ''}
+              ${statusBadge}
+              <span class="text-[10px] text-slate-500 font-sans">• Origem: ${f.origem || 'chat'}</span>
+            </div>
+            <p class="text-xs text-slate-300 font-sans leading-relaxed">${f.conteudo}</p>
+          </div>
+          <div class="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+            ${actionButtons}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async handleSaveTenantMemory() {
+    const elCat = document.getElementById('input-mem-categoria');
+    const elKey = document.getElementById('input-mem-chave');
+    const elContent = document.getElementById('input-mem-conteudo');
+    const formAddMem = document.getElementById('tenant-memory-add-form');
+
+    if (!elContent || !elContent.value.trim()) {
+      alert('Por favor, informe a instrucao ou conteudo da regra.');
+      return;
+    }
+
+    try {
+      const payload = {
+        categoria: elCat ? elCat.value : 'regra_posto',
+        chave: elKey ? elKey.value.trim() : '',
+        conteudo: elContent.value.trim(),
+        status: 'ativo',
+        origem: 'gestor',
+      };
+
+      const res = await fetch('/api/v1/aura/memory/tenant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      if (elKey) elKey.value = '';
+      if (elContent) elContent.value = '';
+      if (formAddMem) formAddMem.classList.add('hidden');
+
+      await this.fetchCockpitData(true);
+    } catch (err) {
+      alert(`Falha ao salvar regra: ${err.message}`);
+    }
+  }
+
+  async handleApproveTenantMemory(factId) {
+    try {
+      const res = await fetch(`/api/v1/aura/memory/tenant/${factId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approved_by: 'gestor_painel' }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await this.fetchCockpitData(true);
+    } catch (err) {
+      alert(`Falha ao aprovar regra: ${err.message}`);
+    }
+  }
+
+  async handleRejectTenantMemory(factId) {
+    try {
+      const res = await fetch(`/api/v1/aura/memory/tenant/${factId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Rejeitado pelo gestor no painel' }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await this.fetchCockpitData(true);
+    } catch (err) {
+      alert(`Falha ao rejeitar regra: ${err.message}`);
+    }
+  }
+
+  async handleDeleteTenantMemory(factId) {
+    if (!confirm('Deseja realmente inativar esta regra do posto?')) return;
+    try {
+      const res = await fetch(`/api/v1/aura/memory/tenant/${factId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await this.fetchCockpitData(true);
+    } catch (err) {
+      alert(`Falha ao excluir regra: ${err.message}`);
+    }
+  }

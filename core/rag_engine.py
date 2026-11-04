@@ -89,11 +89,11 @@ class HybridRAGEngine:
             except Exception:
                 genai.configure(api_key=self.api_key)
 
-    def _get_connection(self):
-        """Abre conexao com o PostgreSQL do pgvector a partir do pool gerenciado (P0-4)."""
+    def _get_connection(self, tenant_id: str | None = None, filial_id: int | None = None):
+        """Abre conexao com o PostgreSQL do pgvector a partir do pool gerenciado com escopo RLS (Fase 8)."""
         if self.db_config == DB_VECTOR_CONFIG:
             try:
-                return get_vector_connection()
+                return get_vector_connection(filial_id=filial_id, tenant_id=tenant_id)
             except Exception:
                 pass
         conn = psycopg2.connect(**self.db_config)
@@ -476,7 +476,7 @@ class HybridRAGEngine:
         results = []
 
         try:
-            with self._get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with self._get_connection(tenant_id=tenant_id) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
                 if query_vector is not None:
                     sql_rrf = f"""
                     SET LOCAL hnsw.ef_search = {ef};
@@ -784,7 +784,7 @@ class HybridRAGEngine:
         results = []
 
         try:
-            with self._get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with self._get_connection(tenant_id=tenant_id) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
                 if query_vector is not None:
                     sql_rrf = f"""
                     SET LOCAL hnsw.ef_search = {ef};
