@@ -1004,8 +1004,17 @@ def normalize_aura_color_markup(text: str) -> str:
 
     protected = re.sub(r"(```[\s\S]*?```|`[^`\r\n]+`)", _stash_code, text)
 
-    color_names = "verde|emerald|green|amarelo|amber|yellow|vermelho|rose|red|ciano|cyan|roxo|purple"
-    tag_names = rf"(?:badge-)?(?:{color_names})|u"
+    color_names = "verde|emerald|green|amarelo|amber|yellow|vermelho|rose|red|ciano|cyan|cyano|roxo|purple"
+    tag_names = rf"(?:badge-)?(?:{color_names})|u|sublinhado|underline|italic|italico|bold|negrito|i|b"
+
+    # Pre-limpeza de BBCode de formatacao rica para Markdown padrao
+    protected = re.sub(r"\[(?:italic|italico|i)\]([\s\S]*?)\[\/(?:italic|italico|i)\]", r"*\1*", protected, flags=re.IGNORECASE)
+    protected = re.sub(r"\[(?:bold|negrito|b)\]([\s\S]*?)\[\/(?:bold|negrito|b)\]", r"**\1**", protected, flags=re.IGNORECASE)
+
+    # Higienizacao defensiva contra links markdown com undefined ou corrompidos
+    protected = re.sub(r"\[undefined\]\((https?://[^\s)]+)\)", r"[Manual Oficial do ERP](\1)", protected, flags=re.IGNORECASE)
+    protected = re.sub(r"\[([^\]]+)\]\((?:undefined|null|URL_REAL_DO_CONTEXTO)\)", r"\1", protected, flags=re.IGNORECASE)
+    protected = re.sub(r"consulte o \[undefined\]", "consulte o manual correspondente no Confluence da empresa", protected, flags=re.IGNORECASE)
 
     # 2. Normaliza fechamentos quebrados de BBCode (ex: [vermelho]crítico /vermelho -> [vermelho]crítico[/vermelho])
     tolerant_pattern = re.compile(
@@ -3326,14 +3335,15 @@ class AuraEngine:
 
     @staticmethod
     def _resolver_url_manual(chunk: dict) -> str:
-        """Resolve a URL oficial do manual no Confluence a partir de doc_url ou doc_id."""
+        """Resolve a URL oficial do manual no Confluence a partir de doc_url, doc_id ou codigo_ref."""
         url = chunk.get("doc_url")
-        if url and str(url).strip().startswith("http"):
+        if url and str(url).strip().startswith("http") and "undefined" not in str(url).lower():
             return str(url).strip()
-        doc_id = str(chunk.get("doc_id", "")).strip()
+        doc_id = str(chunk.get("doc_id") or chunk.get("codigo_ref") or "").strip()
         if doc_id.startswith("CONF-"):
-            page_id = doc_id.split("-")[1]
-            return f"https://qualityautomacao.atlassian.net/wiki/spaces/webposto/pages/{page_id}"
+            parts = doc_id.split("-")
+            if len(parts) > 1 and parts[1].isdigit():
+                return f"https://qualityautomacao.atlassian.net/wiki/spaces/webposto/pages/{parts[1]}"
         return ""
 
     @property

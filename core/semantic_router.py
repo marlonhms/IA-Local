@@ -598,6 +598,21 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     if re.search(r"\b(?:preciso\s+de\s+ajuda|me\s+ajuda|quero\s+ajuda|ajuda\s+aqui|ajuda\s+a[ií]|d[aá]\s+(?:uma\s+)?ajuda|ajuda\s+com\s+o\s+sistema|estou\s+com\s+d[uú]vida|pode\s+me\s+ajudar)\b", p):
         return "ajuda_sistema"
 
+    # -2.75 Procedimentos operacionais e manuais do ERP
+    if re.search(
+        r"\b(como\s+(?:dar\s+(?:a\s+|na\s+)?entrada|fazer\s+(?:a\s+|o\s+)?(?:entrada|fechamento)|emitir|lan[cç]ar|cadastrar|cancelar|estornar|consultar|configurar|importar|imprimir|gerar|fechar)|"
+        r"passo\s+a\s+passo|onde\s+fica|onde\s+(?:acho|encontro|vejo|configuro|lan[cç]o)|"
+        r"entrada\s+(?:de\s+(?:uma\s+)?|da\s+|na\s+)?(?:nota|nfe|nf-e|xml|cte|ct-e|mercadoria)|"
+        r"importa[cç][aã]o\s+(?:de\s+(?:um\s+)?|do\s+)?xml|"
+        r"manifesta[cç][aã]o\s+(?:de\s+(?:uma\s+)?|da\s+)?(?:nfe|nf-e|destinat[aá]rio)|"
+        r"rateio\s+(?:de\s+)?frete|"
+        r"fechamento\s+(?:de\s+)?caixa|"
+        r"como\s+funciona\s+(?:a\s+tela|o\s+m[oó]dulo|o\s+menu|o\s+retaguarda))\b",
+        p,
+        re.IGNORECASE,
+    ):
+        return "procedimento_erp"
+
     # -2.7 Conhecimento operacional do webPosto, manuais, procedimentos, incidentes e schemas
     if re.search(
         r"\b(?:abastecimento\s+preso|bico\s+(?:preso|travado)|bico\s+inoperante|erro\s+no\s+pdv|"
