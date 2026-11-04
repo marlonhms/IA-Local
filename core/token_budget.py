@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 from contextlib import contextmanager
-from datetime import UTC, datetime, date
+from datetime import UTC, datetime, date, timedelta
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Union
 
@@ -150,9 +150,20 @@ class TokenBudgetManager:
                     cost_usd REAL DEFAULT 0.0,
                     cost_brl REAL DEFAULT 0.0,
                     cache_hit INTEGER DEFAULT 0,
-                    avoided_cost_brl REAL DEFAULT 0.0
+                    avoided_cost_brl REAL DEFAULT 0.0,
+                    agent_role TEXT DEFAULT 'general_assistant',
+                    intent_category TEXT DEFAULT 'general',
+                    vertical_pack TEXT DEFAULT 'fuel_convenience'
                 );
             """)
+            cur_cols = conn.execute("PRAGMA table_info(aura_token_ledger);").fetchall()
+            col_names = {r["name"] for r in cur_cols}
+            if "agent_role" not in col_names:
+                conn.execute("ALTER TABLE aura_token_ledger ADD COLUMN agent_role TEXT DEFAULT 'general_assistant';")
+            if "intent_category" not in col_names:
+                conn.execute("ALTER TABLE aura_token_ledger ADD COLUMN intent_category TEXT DEFAULT 'general';")
+            if "vertical_pack" not in col_names:
+                conn.execute("ALTER TABLE aura_token_ledger ADD COLUMN vertical_pack TEXT DEFAULT 'fuel_convenience';")
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_token_ledger_filial_ts 
                 ON aura_token_ledger(filial_id, timestamp);
@@ -160,6 +171,14 @@ class TokenBudgetManager:
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_token_ledger_session 
                 ON aura_token_ledger(session_id);
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_token_ledger_role 
+                ON aura_token_ledger(filial_id, agent_role);
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_token_ledger_vertical 
+                ON aura_token_ledger(vertical_pack);
             """)
 
             conn.execute("""
@@ -267,6 +286,9 @@ class TokenBudgetManager:
         avoided_prompt_tokens: int = 0,
         avoided_completion_tokens: int = 0,
         timestamp: Optional[str] = None,
+        agent_role: str = "general_assistant",
+        intent_category: str = "general",
+        vertical_pack: str = "fuel_convenience",
     ) -> Dict[str, Any]:
         """
         Registra uma transacao de consumo de tokens no livro-razao (ledger).
@@ -309,12 +331,15 @@ class TokenBudgetManager:
                 INSERT INTO aura_token_ledger (
                     session_id, filial_id, tenant_id, timestamp, model_name,
                     prompt_tokens, completion_tokens, total_tokens, cost_usd, cost_brl,
-                    cache_hit, avoided_cost_brl
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    cache_hit, avoided_cost_brl, agent_role, intent_category, vertical_pack
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """, (
                 s_id, f_id, t_id, ts, model_name,
                 p_tokens, c_tokens, total_tokens, cost_usd, cost_brl,
                 1 if is_cache else 0, avoided_brl,
+                agent_role or "general_assistant",
+                intent_category or "general",
+                vertical_pack or "fuel_convenience",
             ))
             conn.commit()
 
@@ -338,6 +363,9 @@ class TokenBudgetManager:
             "status": status["status"],
             "is_alert": status["is_alert"],
             "is_exceeded": status["is_exceeded"],
+            "agent_role": agent_role,
+            "intent_category": intent_category,
+            "vertical_pack": vertical_pack,
         }
 
     def get_budget_status(
@@ -439,3 +467,74 @@ class TokenBudgetManager:
             "is_exceeded": is_exceeded,
             "projected_end_of_month_brl": projected_cost,
         }
+    def get_usage_by_agent_role(self, filial_id: str, days: int = 30) -> list[Dict[str, Any]]:
+        """Retorna o breakdown percentual e absoluto de tokens e custo agrupado por agent_role e intent_category."""
+        f_id = filial_id or "00001"
+        cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+        with self._connection() as conn:
+            cur = conn.execute("""
+                SELECT 
+                    agent_role,
+                    intent_category,
+                    vertical_pack,
+                    COUNT(*) as request_count,
+                    SUM(prompt_tokens) as sum_prompt_tokens,
+                    SUM(completion_tokens) as sum_completion_tokens,
+                    SUM(total_tokens) as sum_total_tokens,
+                    SUM(cost_brl) as sum_cost_brl,
+                    SUM(cost_usd) as sum_cost_usd,
+                    SUM(avoided_cost_brl) as sum_avoided_cost_brl
+                FROM aura_token_ledger
+                WHERE filial_id = ? AND timestamp >= ?
+                GROUP BY agent_role, intent_category, vertical_pack
+                ORDER BY sum_cost_brl DESC;
+            """, (f_id, cutoff))
+            rows = [dict(r) for r in cur.fetchall()]
+            total_cost = sum(r.get("sum_cost_brl", 0.0) or 0.0 for r in rows)
+            for r in rows:
+                c = r.get("sum_cost_brl", 0.0) or 0.0
+                r["cost_pct"] = round((c / total_cost * 100.0), 2) if total_cost > 0 else 0.0
+            return rows
+
+    def recommend_model_for_role(
+        self,
+        filial_id: str,
+        agent_role: str,
+        requested_model: str = "gemini-2.5-flash",
+    ) -> Dict[str, Any]:
+        """
+        Implementa roteamento economico de modelos:
+        - Micro-agentes de triagem operacional sao fixados em gemini-2.5-flash.
+        - Se o consumo da filial ultrapassar alert_threshold_pct, aplica downgrade de pro para flash.
+        """
+        f_id = filial_id or "00001"
+        status = self.get_budget_status(filial_id=f_id)
+        is_alert = status.get("is_alert", False)
+        is_exceeded = status.get("is_exceeded", False)
+
+        target_role = (agent_role or "").strip().lower()
+        low_cost_roles = {"erp_sop_triage_bot", "pos_productivity_bot"}
+
+        chosen_model = requested_model
+        downgrade_applied = False
+        reason = "Modelo solicitado compativel com orcamento"
+
+        if target_role in low_cost_roles:
+            chosen_model = "gemini-2.5-flash"
+            reason = "Papel operacional fixado em modelo de baixo custo"
+        elif (is_alert or is_exceeded) and "pro" in (requested_model or "").lower():
+            chosen_model = "gemini-2.5-flash"
+            downgrade_applied = True
+            reason = f"Downgrade preventivo ativo devido a orcamento em alerta ({status.get('percentage_used', 0.0)}% consumido)"
+
+        return {
+            "filial_id": f_id,
+            "agent_role": target_role,
+            "requested_model": requested_model,
+            "recommended_model": chosen_model,
+            "downgrade_applied": downgrade_applied,
+            "reason": reason,
+            "budget_status": status.get("status", "normal"),
+            "percentage_used": status.get("percentage_used", 0.0),
+        }
+

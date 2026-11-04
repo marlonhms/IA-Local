@@ -1,0 +1,62 @@
+# Domain Pack: Autocenters, Troca de Oleo e Autopecas
+# Define vocabulario, regras de oleo a granel, margem combinada de OS e pecas paradas.
+# Zero travessoes em todo o arquivo.
+
+pack_id: "autocenter_parts"
+pack_name: "Autocenters, Troca de Oleo e Autopecas"
+vertical: "autocenter_retail"
+version: "1.0.0"
+description: "Domain Pack para centros automotivos, troca de oleo e lojas de autopecas."
+
+vocabulary:
+  inventory_node: "prateleira_box"
+  inventory_node_plural: "prateleiras_boxes"
+  equipment: "elevador_box"
+  equipment_plural: "elevadores_boxes"
+  component: "tanque_oleo_granel"
+  component_plural: "tanques_oleo_granel"
+  operator: "mecanico_aplicador"
+  operator_plural: "mecanicos_aplicadores"
+  cashier_session: "fechamento_ordem_servico"
+  stock_alert: "ruptura_filtro_oleo"
+  stock_unit: "UN"
+  flow_unit: "os/dia"
+
+tolerances:
+  default_lot_multiple: 1.0  # Lote unitario de pecas e filtros
+  bulk_fluid_tolerance_pct: 1.0  # Tolerancia volumetrica para perdas/sobras em fluidos a granel (%)
+  inventory_shrinkage_tolerance_pct: 0.80  # Perda operacional global aceitavel (% sobre faturamento)
+  target_markup_margin_pct: 42.0  # Margem bruta media em autopecas e lubrificantes (%)
+  blended_margin_target_pct: 48.0  # Margem combinada meta (pecas + servicos/mao de obra) (%)
+  dead_stock_days: 90  # Dias sem giro para classificar peca como capital imobilizado
+
+intent_mappings:
+  auditoria_turno_caixa: "conciliacao_fechamento_os"
+  previsao_runout_estoque: "runout_oleo_granel_filtros"
+  desempenho_equipe_conversao: "produtividade_box_mecanicos"
+  market_basket_cross_sell: "combo_revisao_oleo_filtros"
+  erosao_financeira_tef_selic: "capital_parado_pecas_curva_c"
+  raio_x_causal_margem: "margem_combinada_pecas_servico"
+
+specific_intents:
+  - id: "auditoria_oleo_lubrificante_granel"
+    descricao: "Conciliacao fisica de oleo lubrificante em tambor/granel vs litros aplicados em OS"
+    keywords:
+      - "oleo a granel"
+      - "desvio tambor oleo"
+      - "litros oleo aplicados"
+      - "sobra lubrificante"
+  - id: "margem_combinada_os"
+    descricao: "Analise de margem combinada (Blended Margin) entre pecas e mao de obra por OS"
+    keywords:
+      - "margem os"
+      - "blended margin pecas servico"
+      - "lucro mao de obra"
+      - "margem peca automotiva"
+  - id: "obsolescencia_pecas_curva_c"
+    descricao: "Deteccao de pecas de baixa rotatividade (>90 dias sem saida) drenando capital de giro"
+    keywords:
+      - "pecas paradas curva c"
+      - "estoque obsoleto autopecas"
+      - "giro filtros correias"
+      - "capital imobilizado pecas"

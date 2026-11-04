@@ -1,0 +1,63 @@
+# Domain Pack: Farmacias, Drogarias e Perfumarias
+# Define vocabulario, regras de SNGPC/ANVISA, vencimento FEFO e controle de perdas.
+# Zero travessoes em todo o arquivo.
+
+pack_id: "pharmacy_health"
+pack_name: "Farmacias, Drogarias e Perfumarias"
+vertical: "pharmacy_retail"
+version: "1.0.0"
+description: "Domain Pack para farmacias, drogarias e perfumarias com foco em SNGPC/ANVISA e FEFO."
+
+vocabulary:
+  inventory_node: "prateleira_gaveteiro"
+  inventory_node_plural: "prateleiras_gaveteiros"
+  equipment: "balcao_dispensacao"
+  equipment_plural: "balcoes_dispensacao"
+  component: "gaveta_controlados"
+  component_plural: "gavetas_controlados"
+  operator: "farmaceutico_balconista"
+  operator_plural: "farmaceuticos_balconistas"
+  cashier_session: "fechamento_caixa_farmacia"
+  stock_alert: "vencimento_fefo_lote"
+  stock_unit: "UN"
+  flow_unit: "atendimentos/hora"
+
+tolerances:
+  default_lot_multiple: 1.0  # Lote padrao de reposicao unitaria
+  inventory_shrinkage_tolerance_pct: 0.30  # Perda operacional tolerada (% sobre faturamento)
+  perishability_alert_days: 30  # Alerta antecipado para vencimento de lotes FEFO (dias)
+  high_risk_loss_pct: 1.20  # Indice de perda aceitavel para produtos de alto risco / PAR (%)
+  target_markup_margin_pct: 36.0  # Margem bruta media meta para a operacao farmaceutica (%)
+  cash_tolerance_reais: 10.0  # Tolerancia de diferenca de fechamento de caixa por operador (R$)
+
+intent_mappings:
+  auditoria_turno_caixa: "fechamento_caixa_pbm"
+  previsao_runout_estoque: "vencimento_fefo_controlados"
+  desempenho_equipe_conversao: "conversao_balcao_dermocosmeticos"
+  market_basket_cross_sell: "receita_medicamento_agregados"
+  erosao_financeira_tef_selic: "auditoria_repasses_pbm_cartao"
+  raio_x_causal_margem: "margem_genericos_referencia"
+
+specific_intents:
+  - id: "conformidade_sngpc_anvisa"
+    descricao: "Conciliacao regulatoria de medicamentos controlados (Portaria 344/98 e SNGPC)"
+    keywords:
+      - "sngpc anvisa"
+      - "medicamentos controlados"
+      - "receita retida"
+      - "balanco sngpc"
+      - "portaria 344"
+  - id: "alerta_perdas_par_glp1"
+    descricao: "Monitoramento de furto e perda de produtos de alto risco (canetas emagrecedoras, dermocosmeticos)"
+    keywords:
+      - "perdas par"
+      - "canetas glp1"
+      - "furto perfumaria"
+      - "dermocosmeticos alto valor"
+  - id: "reajuste_tabela_cmed"
+    descricao: "Impacto de reajuste de precos maximos ao consumidor (PMC) da CMED"
+    keywords:
+      - "tabela cmed"
+      - "preco maximo consumidor"
+      - "pmc medicamentos"
+      - "reajuste anual cmed"

@@ -699,14 +699,6 @@ class AuraTelemetryCoordinator {
     ctx.lineWidth = 1.5;
     ctx.stroke();
   }
-}
-
-// Instancia singleton disponivel globalmente
-window.auraTelemetry = new AuraTelemetryCoordinator();
-
-document.addEventListener('DOMContentLoaded', () => {
-  window.auraTelemetry.init();
-});
 
   /**
    * Renderiza a secao de Memoria Operacional do Posto (Camada Tenant - Fase 7).
@@ -865,3 +857,11 @@ document.addEventListener('DOMContentLoaded', () => {
       alert(`Falha ao excluir regra: ${err.message}`);
     }
   }
+}
+
+// Instancia singleton disponivel globalmente
+window.auraTelemetry = new AuraTelemetryCoordinator();
+
+document.addEventListener('DOMContentLoaded', () => {
+  window.auraTelemetry.init();
+});

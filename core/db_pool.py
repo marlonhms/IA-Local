@@ -1,7 +1,8 @@
 """
 Gerenciador Centralizado de Connection Pools para PostgreSQL (ERP e pgvector).
 Implementa psycopg2.pool.ThreadedConnectionPool com recuperacao automatica,
-isolamento por thread e devolucao garantida via context managers e proxies gerenciados.
+Dual-Role Fallback (aura_service_ro <-> suporte), isolamento por thread
+e devolucao garantida via context managers e proxies gerenciados.
 Zero travessoes em todo o modulo.
 """
 
@@ -35,6 +36,7 @@ _pool_lock = threading.Lock()
 _erp_pool: pool.ThreadedConnectionPool | None = None
 _vector_pool: pool.ThreadedConnectionPool | None = None
 _last_working_erp_port: int | None = None
+_last_working_erp_cred: tuple[str, str] | None = None
 _erp_last_fail_ts: float = 0.0
 _vector_last_fail_ts: float = 0.0
 _POOL_FAIL_COOLDOWN_SEC: float = 15.0
@@ -105,44 +107,101 @@ class PooledConnectionWrapper:
             self.close()
 
 
+def _format_pg_exc(exc: Exception) -> str:
+    """Formata excecoes do psycopg2/libpq decodificando mensagens Latin-1 do Windows."""
+    if isinstance(exc, UnicodeDecodeError):
+        raw = getattr(exc, "object", b"")
+        if isinstance(raw, (bytes, bytearray)):
+            return raw.decode("latin1", errors="replace").strip()
+        return str(exc)
+    try:
+        return str(exc)
+    except Exception:
+        return repr(exc)
+
+
+def _build_role_candidates(primary_user: str, primary_password: str) -> list[tuple[str, str]]:
+    """
+    Constroi a lista ordenada de credenciais para Dual-Role Fallback:
+    Prioriza a ultima credencial validada, seguida da configurada, da role
+    permanente somente-leitura 'aura_service_ro' e da role 'suporte'.
+    Em ambiente mockado de testes unitarios, retorna apenas a credencial primaria.
+    """
+    if _is_pool_mocked(pool.ThreadedConnectionPool):
+        return [(primary_user, primary_password)]
+
+    service_ro_pass = "364768"
+    with suppress(Exception):
+        from core.identity_vault import get_vault_secret
+
+        vault_ro = get_vault_secret("aura_service_ro_password")
+        if vault_ro:
+            service_ro_pass = vault_ro
+
+    raw_candidates: list[tuple[str, str]] = []
+    if _last_working_erp_cred is not None:
+        raw_candidates.append(_last_working_erp_cred)
+    raw_candidates.extend(
+        [
+            ("aura_service_ro", service_ro_pass),
+            ("aura_service_ro", primary_password),
+            (primary_user, primary_password),
+            ("suporte", primary_password),
+        ]
+    )
+
+    seen: set[tuple[str, str]] = set()
+    ordered: list[tuple[str, str]] = []
+    for cand in raw_candidates:
+        if cand[0] and cand[1] is not None and cand not in seen:
+            seen.add(cand)
+            ordered.append(cand)
+    return ordered or [(primary_user, primary_password)]
+
+
 def _create_erp_pool(
     minconn: int = 2,
     maxconn: int = 10,
     timeout: int = 2,
 ) -> pool.ThreadedConnectionPool:
     """
-    Cria pool gerenciado para o banco ERP com deteccao automatica da porta funcional.
-    Tenta primeiramente a porta configurada (5433).
+    Cria pool gerenciado para o banco ERP com deteccao automatica da porta funcional
+    e Dual-Role Fallback entre 'aura_service_ro' e 'suporte'.
     """
-    global _last_working_erp_port
+    global _last_working_erp_port, _last_working_erp_cred
     config = dict(DB_ERP_CONFIG)
-    config["password"] = get_erp_password()
+    primary_pass = get_erp_password()
+    primary_user = str(config.get("user", "suporte"))
     configured_port = int(config.get("port", 5433))
 
     ports_to_try = [configured_port]
     if _last_working_erp_port and _last_working_erp_port not in ports_to_try:
         ports_to_try.insert(0, _last_working_erp_port)
 
+    candidates = _build_role_candidates(primary_user, primary_pass)
     last_exc = None
     for port in ports_to_try:
-        try_config = dict(config)
-        try_config["port"] = port
-        try_config["connect_timeout"] = timeout
-        try:
-            p = pool.ThreadedConnectionPool(
-                minconn=minconn,
-                maxconn=maxconn,
-                **try_config,
-            )
-            _last_working_erp_port = port
-            logger.info(f"ERP ThreadedConnectionPool inicializado na porta {port} (min={minconn}, max={maxconn}).")
-            return p
-        except (psycopg2.Error, OSError, RuntimeError, UnicodeDecodeError) as exc:
+        for cand_user, cand_pass in candidates:
+            try_config = dict(config)
+            try_config["port"] = port
+            try_config["user"] = cand_user
+            try_config["password"] = cand_pass
+            try_config["connect_timeout"] = timeout
             try:
-                last_exc = str(exc)
-            except Exception:
-                last_exc = repr(exc)
-            continue
+                p = pool.ThreadedConnectionPool(
+                    minconn=minconn,
+                    maxconn=maxconn,
+                    **try_config,
+                )
+                _last_working_erp_port = port
+                _last_working_erp_cred = (cand_user, cand_pass)
+                logger.info(
+                    f"ERP ThreadedConnectionPool inicializado na porta {port} com role '{cand_user}' (min={minconn}, max={maxconn})."
+                )
+                return p
+            except (psycopg2.Error, OSError, RuntimeError, UnicodeDecodeError) as exc:
+                last_exc = _format_pg_exc(exc)
+                continue
 
     raise psycopg2.OperationalError(
         f"Falha ao inicializar ERP ThreadedConnectionPool em todas as portas testadas {ports_to_try}: {last_exc}"
@@ -155,21 +214,40 @@ def _create_vector_pool(
     timeout: int = 2,
 ) -> pool.ThreadedConnectionPool:
     """
-    Cria pool gerenciado para o banco vetorial posto_ai (porta 5433).
+    Cria pool gerenciado para o banco vetorial posto_ai (porta 5433) com Dual-Role Fallback.
     Aplica search_path=aura_core,public e isolamento de schemas com o Sentinel (n3_sre).
     """
+    global _last_working_erp_cred
     config = dict(DB_VECTOR_CONFIG)
-    config["connect_timeout"] = timeout
-    p = pool.ThreadedConnectionPool(
-        minconn=minconn,
-        maxconn=maxconn,
-        **config,
-    )
+    primary_pass = get_erp_password()
+    primary_user = str(config.get("user", "suporte"))
     port = config.get("port", 5433)
-    logger.info(
-        f"Vector ThreadedConnectionPool inicializado no posto_ai:{port} com schema aura_core (min={minconn}, max={maxconn})."
+
+    candidates = _build_role_candidates(primary_user, primary_pass)
+    last_exc = None
+    for cand_user, cand_pass in candidates:
+        try_config = dict(config)
+        try_config["user"] = cand_user
+        try_config["password"] = cand_pass
+        try_config["connect_timeout"] = timeout
+        try:
+            p = pool.ThreadedConnectionPool(
+                minconn=minconn,
+                maxconn=maxconn,
+                **try_config,
+            )
+            _last_working_erp_cred = (cand_user, cand_pass)
+            logger.info(
+                f"Vector ThreadedConnectionPool inicializado no posto_ai:{port} com role '{cand_user}' e schema aura_core (min={minconn}, max={maxconn})."
+            )
+            return p
+        except (psycopg2.Error, OSError, RuntimeError, UnicodeDecodeError) as exc:
+            last_exc = _format_pg_exc(exc)
+            continue
+
+    raise psycopg2.OperationalError(
+        f"Falha ao inicializar Vector ThreadedConnectionPool no posto_ai:{port}: {last_exc}"
     )
-    return p
 
 
 def _is_pool_mocked(creator_fn: Any) -> bool:
@@ -314,10 +392,11 @@ def get_vector_db_connection(filial_id: int | None = None, tenant_id: str | None
 
 def close_all_pools():
     """Encerra todas as conexoes ativas em ambos os pools de conexao."""
-    global _erp_pool, _vector_pool, _erp_last_fail_ts, _vector_last_fail_ts
+    global _erp_pool, _vector_pool, _erp_last_fail_ts, _vector_last_fail_ts, _last_working_erp_cred
     with _pool_lock:
         _erp_last_fail_ts = 0.0
         _vector_last_fail_ts = 0.0
+        _last_working_erp_cred = None
         if _erp_pool is not None:
             with suppress(Exception):
                 _erp_pool.closeall()
@@ -334,6 +413,7 @@ def get_pool_status() -> dict[str, Any]:
     status = {
         "erp_pool": {"active": False},
         "vector_pool": {"active": False},
+        "active_role": _last_working_erp_cred[0] if _last_working_erp_cred else None,
     }
     with _pool_lock:
         if _erp_pool is not None:

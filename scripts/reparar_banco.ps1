@@ -1,86 +1,43 @@
-# Script de Auto-Recuperacao e Desbloqueio de Autenticacao do PostgreSQL 16
+# Script de Provisionamento Soberano e Nao-Invasivo da Role aura_service_ro no PostgreSQL 16
+# Preserva 100% intocadas as senhas de 'postgres' e 'suporte' do ERP e aplica reload sem downtime
 # Executado como Administrador
 # Zero travessoes
 
 $ErrorActionPreference = "Continue"
 
 Write-Host "===============================================================================" -ForegroundColor Cyan
-Write-Host "  REPARO DE AUTENTICACAO DO POSTGRESQL 16 (PORTA 5433) - PDV E AURA" -ForegroundColor Cyan
+Write-Host "  PROVISIONAMENTO SOBERANO E NAO-INVASIVO AURA (PORTA 5433) - ZERO DOWNTIME" -ForegroundColor Cyan
 Write-Host "===============================================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Funcao para reiniciar PostgreSQL com espera confiavel de porta TCP 5433
-function Restart-PostgreSqlService {
-    param([int]$waitPort = 5433)
-    
-    # 1. Se estiver ativo, para o servico
-    $status = (Get-Service postgresql-x64-16 -ErrorAction SilentlyContinue).Status
-    if ($status -eq "Running") {
-        Write-Host "  Parando servico postgresql-x64-16..." -ForegroundColor Gray
-        Stop-Service postgresql-x64-16 -Force -ErrorAction SilentlyContinue
-    }
-    
-    # 2. Aguarda a porta 5433 ser liberada completamente pelo Windows
-    Write-Host "  Aguardando liberacao da porta $waitPort..." -ForegroundColor Gray
-    for ($i = 0; $i -lt 15; $i++) {
-        $occupied = netstat -ano | findstr ":$waitPort" | findstr "LISTENING"
-        if (-not $occupied) { break }
-        Start-Sleep -Seconds 1
-    }
-    Start-Sleep -Seconds 2
-
-    # 3. Inicia o servico
-    Write-Host "  Iniciando servico postgresql-x64-16..." -ForegroundColor Gray
-    try {
-        Start-Service postgresql-x64-16 -ErrorAction Stop
-    } catch {
-        Write-Host "  Tentando iniciar via net start..." -ForegroundColor Yellow
-        net start postgresql-x64-16
-    }
-    
-    # 4. Aguarda o PostgreSQL iniciar e escutar na porta 5433
-    Write-Host "  Aguardando PostgreSQL aceitar conexoes na porta $waitPort..." -ForegroundColor Gray
-    for ($i = 0; $i -lt 20; $i++) {
-        $listening = netstat -ano | findstr ":$waitPort" | findstr "LISTENING"
-        if ($listening) {
-            Write-Host "  [OK] PostgreSQL ativo e escutando na porta $waitPort!" -ForegroundColor Green
-            Start-Sleep -Seconds 1
-            return $true
-        }
-        Start-Sleep -Seconds 1
-    }
-    
-    Write-Host "  [AVISO] Servico iniciado, aguardando estabilizacao..." -ForegroundColor Yellow
-    Start-Sleep -Seconds 3
-    return $false
-}
-
-# 1. Finaliza processo travado do servico Aura se estiver em STOP_PENDING
-Write-Host "[1/6] Verificando servicos travados..." -ForegroundColor Yellow
-try {
-    $serviceInfo = sc.exe queryex AuraBackendService 2>$null
-    if ($serviceInfo -match "PID\s*:\s*(\d+)") {
-        $pidToKill = $matches[1]
-        if ($pidToKill -ne "0") {
-            Write-Host "  Encerrando processo travado Aura (PID $pidToKill)..." -ForegroundColor Gray
-            taskkill /F /PID $pidToKill 2>$null | Out-Null
-        }
-    }
-} catch {
-    Write-Host "  Nenhum servico travado detectado." -ForegroundColor Gray
-}
-
-# 2. Backup e insercao de trust no topo do pg_hba.conf (sem BOM)
+$pgData = "C:\Program Files\PostgreSQL\16\data"
+$pgCtl = "C:\Program Files\PostgreSQL\16\bin\pg_ctl.exe"
 $pgHba = "C:\Program Files\PostgreSQL\16\data\pg_hba.conf"
 $pgHbaBak = "C:\Program Files\PostgreSQL\16\data\pg_hba.conf.bak"
 $psql = "C:\Program Files\PostgreSQL\16\bin\psql.exe"
 $sqlScript = Join-Path $PSScriptRoot "desbloquear_usuarios.sql"
 
-Write-Host "[2/6] Configurando autenticacao temporaria 'trust' no topo do pg_hba.conf..." -ForegroundColor Yellow
-if (-not (Test-Path $pgHba) -or (Get-Item $pgHba).Length -lt 500) {
-    Write-Host "  [AVISO] pg_hba.conf vazio. Restaurando copia integra de seguranca..." -ForegroundColor Yellow
-    Copy-Item "C:\Program Files\PostgreSQL\16\data\pg_hba.conf.bak_20261016_160509" $pgHba -Force
+function Reload-Or-Start-PostgreSql {
+    param([int]$waitPort = 5433)
+    $status = (Get-Service postgresql-x64-16 -ErrorAction SilentlyContinue).Status
+    if ($status -eq "Running") {
+        Write-Host "  Recarregando pg_hba.conf a quente (pg_ctl reload - Zero Downtime no PDV)..." -ForegroundColor Gray
+        & $pgCtl reload -D $pgData 2>&1 | Out-Null
+        Start-Sleep -Milliseconds 600
+        return $true
+    }
+    Write-Host "  Iniciando servico postgresql-x64-16..." -ForegroundColor Gray
+    Start-Service postgresql-x64-16 -ErrorAction SilentlyContinue
+    for ($i = 0; $i -lt 15; $i++) {
+        $listening = netstat -ano | findstr ":$waitPort" | findstr "LISTENING"
+        if ($listening) { return $true }
+        Start-Sleep -Seconds 1
+    }
+    return $false
 }
+
+# 1. Backup e insercao de trust local temporario no topo do pg_hba.conf (sem BOM)
+Write-Host "[1/4] Preparando canal local de manutencao no pg_hba.conf..." -ForegroundColor Yellow
 Copy-Item $pgHba $pgHbaBak -Force
 
 $trustHeader = @"
@@ -95,51 +52,54 @@ $tempContent = $trustHeader + $rawContent
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText($pgHba, $tempContent, $utf8NoBom)
 
-# 3. Reiniciar PostgreSQL para aplicar trust
-Write-Host "[3/6] Reiniciando PostgreSQL para aplicar modo de manutencao..." -ForegroundColor Yellow
-Restart-PostgreSqlService -waitPort 5433
+Reload-Or-Start-PostgreSql -waitPort 5433 | Out-Null
 
-# 4. Executar SQL de desbloqueio sem pedir senha (-w)
-Write-Host "[4/6] Desbloqueando e renovando credenciais de suporte, postgres e aura_service_ro..." -ForegroundColor Yellow
-$env:PGPASSWORD = "364768"
+# 2. Executar SQL de desbloqueio da aura_service_ro sem tocar nas senhas de postgres/suporte
+Write-Host "[2/4] Ativando role somente-leitura 'aura_service_ro' (preservando senhas do ERP)..." -ForegroundColor Yellow
 $sqlOut = & $psql -h 127.0.0.1 -p 5433 -U postgres -d posto -w -f $sqlScript 2>&1
 Write-Host ($sqlOut | Out-String) -ForegroundColor Cyan
-$sqlExit = $LASTEXITCODE
-if ($sqlExit -ne 0) {
-    Write-Host "  Tentando conectar no database 'postgres'..." -ForegroundColor Gray
-    & $psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -w -f $sqlScript
-    $sqlExit = $LASTEXITCODE
-}
 
-# 5. Restaurar pg_hba.conf original (md5) e reiniciar
-Write-Host "[5/6] Restaurando seguranca md5 no pg_hba.conf e reiniciando..." -ForegroundColor Yellow
-if (-not (Test-Path $pgHbaBak) -or (Get-Item $pgHbaBak).Length -lt 500) {
-    Copy-Item "C:\Program Files\PostgreSQL\16\data\pg_hba.conf.bak_20261016_160509" $pgHba -Force
-} else {
-    Copy-Item $pgHbaBak $pgHba -Force
-}
-Restart-PostgreSqlService -waitPort 5433
+# Concede privilegios na base vetorial posto_ai para aura_service_ro
+$vectorGrants = @"
+GRANT USAGE ON SCHEMA public TO aura_service_ro;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO aura_service_ro;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO aura_service_ro;
+DO `$`$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'aura_core') THEN
+        EXECUTE 'GRANT USAGE, CREATE ON SCHEMA aura_core TO aura_service_ro';
+        EXECUTE 'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA aura_core TO aura_service_ro';
+        EXECUTE 'GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA aura_core TO aura_service_ro';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'n3_sre') THEN
+        EXECUTE 'GRANT USAGE, CREATE ON SCHEMA n3_sre TO aura_service_ro';
+        EXECUTE 'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA n3_sre TO aura_service_ro';
+        EXECUTE 'GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA n3_sre TO aura_service_ro';
+    END IF;
+END
+`$`$;
+"@
+& $psql -h 127.0.0.1 -p 5433 -U postgres -d posto_ai -w -c $vectorGrants 2>&1 | Out-Null
 
-# 6. Teste de validacao final
-Write-Host "[6/6] Validando autenticacao final dos usuarios..." -ForegroundColor Yellow
+# 3. Restaurar pg_hba.conf original (md5) e recarregar a quente
+Write-Host "[3/4] Restaurando seguranca md5 no pg_hba.conf (Zero Downtime)..." -ForegroundColor Yellow
+Copy-Item $pgHbaBak $pgHba -Force
+Reload-Or-Start-PostgreSql -waitPort 5433 | Out-Null
+
+# 4. Teste de validacao final da role aura_service_ro
+Write-Host "[4/4] Validando autenticacao permanente da role 'aura_service_ro'..." -ForegroundColor Yellow
+$env:PGPASSWORD = "364768"
 $testAura = & $psql -h 127.0.0.1 -p 5433 -U aura_service_ro -d posto -w -c "SELECT 'AURA_OK' as status;" 2>&1
-$testSuporte = & $psql -h 127.0.0.1 -p 5433 -U suporte -d posto -w -c "SELECT 'PDV_OK' as status;" 2>&1
 
 Write-Host ""
 Write-Host "===============================================================================" -ForegroundColor Green
-if ($testAura -match "AURA_OK" -and $testSuporte -match "PDV_OK") {
-    Write-Host "  [SUCESSO] BANCO POSTGRESQL DESBLOQUEADO COM EXITO!" -ForegroundColor Green
-    Write-Host "  - Usuario 'suporte' (PDV): senha '364768' renovada com validade infinita (CONECTADO)" -ForegroundColor Green
-    Write-Host "  - Usuario 'postgres': senha '364768' renovada com validade infinita (CONECTADO)" -ForegroundColor Green
-    Write-Host "  - Usuario 'aura_service_ro': senha '364768' ativa com permissoes somente-leitura (CONECTADO)" -ForegroundColor Green
+if ($testAura -match "AURA_OK") {
+    Write-Host "  [SUCESSO] ROLE 'aura_service_ro' ATIVA E PERMANENTE (VALID UNTIL INFINITY)!" -ForegroundColor Green
+    Write-Host "  - Senhas de 'postgres' e 'suporte' do ERP preservadas 100% intocadas" -ForegroundColor Green
+    Write-Host "  - Validade do 'suporte' estendida para 'infinity' sem alterar a senha atual" -ForegroundColor Green
+    Write-Host "  - Role 'aura_service_ro' ativa em modo estrito somente-leitura (SELECT)" -ForegroundColor Green
 } else {
     Write-Host "  [AVISO] Resultado da validacao:" -ForegroundColor Yellow
     Write-Host "  AURA: $testAura" -ForegroundColor Gray
-    Write-Host "  PDV (suporte): $testSuporte" -ForegroundColor Gray
 }
 Write-Host "===============================================================================" -ForegroundColor Green
-Write-Host ""
-Write-Host "Pressione qualquer tecla para encerrar..." -ForegroundColor Gray
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-
-

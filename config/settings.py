@@ -157,7 +157,7 @@ DB_VECTOR_CONFIG = {
     "port": int(os.getenv("VECTOR_DB_PORT", "5433")),
     "dbname": os.getenv("VECTOR_DB_NAME", "posto_ai"),
     "user": os.getenv("VECTOR_DB_USER", "suporte"),
-    "password": os.getenv("VECTOR_DB_PASSWORD") or get_erp_password(),
+    "password": (os.getenv("VECTOR_DB_PASSWORD") if os.getenv("VECTOR_DB_PASSWORD") not in (None, "", "DPAPI_ENCRYPTED") else get_erp_password()),
     "connect_timeout": int(os.getenv("VECTOR_DB_CONNECT_TIMEOUT", "5")),
     "options": VECTOR_DB_DRIVER_OPTIONS,
 }

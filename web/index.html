@@ -329,7 +329,7 @@
           </button>
 
           <!-- 3.3 Telemetria SRE & Pulso -->
-          <button id="sidebar-btn-open-telemetry" class="sidebar-nav-item min-h-[48px] flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-cyan-500/30 transition-all text-left text-xs group" aria-label="Telemetria SRE e Saude da AURA">
+          <button id="sidebar-btn-open-telemetry" onclick="if(window.auraTelemetry) { window.auraTelemetry.openModal(); if(window.auraApp && typeof window.auraApp.closeSidebar === 'function') window.auraApp.closeSidebar(); }" class="sidebar-nav-item min-h-[48px] flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-cyan-500/30 transition-all text-left text-xs group" aria-label="Telemetria SRE e Saude da AURA">
             <div class="flex items-center gap-3">
               <div class="p-1.5 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <svg class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -2689,7 +2689,7 @@
   <script src="/static/js/aura-triggers.js?v=2.10.22"></script>
   <script src="/static/js/aura-automations.js?v=2.10.22"></script>
   <script src="/static/js/aura-compliance.js?v=2.10.22"></script>
-  <script src="/static/js/aura-telemetry.js?v=2.10.22"></script>
+  <script src="/static/js/aura-telemetry.js?v=2.10.23"></script>
   <script src="/static/js/aura-security-architecture.js?v=2.10.22"></script>
   <script src="/static/js/aura-aux-panel.js?v=2.10.22"></script>
   <script src="/static/js/aura-storage.js?v=2.10.22"></script>

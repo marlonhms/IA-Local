@@ -122,6 +122,8 @@ def salvar_senha(senha: str):
                 elif line.startswith("ERP_SERVICE_PASS="):
                     new_lines.append("ERP_SERVICE_PASS=DPAPI_ENCRYPTED\n")
                     updated_svc = True
+                elif line.startswith("VECTOR_DB_PASSWORD="):
+                    new_lines.append("VECTOR_DB_PASSWORD=DPAPI_ENCRYPTED\n")
                 else:
                     new_lines.append(line)
             if not updated_db:

@@ -1040,7 +1040,7 @@ def verify_partner_auth(
 
     # 3. Validacao do station_id
     station_id = x_station_id.strip() if x_station_id else None
-    path_station_id = request.path_params.get("station_id")
+    path_station_id = request.path_params.get("station_id") or request.path_params.get("store_id")
 
     if path_station_id and station_id and path_station_id != station_id:
         raise HTTPException(
@@ -1972,6 +1972,7 @@ async def partner_get_sales_endpoint(
 async def partner_roi_diagnostic_endpoint(
     station_id: str = FPath(..., description="Identificador da estacao"),
     monthly_fee: float = Query(default=490.0, ge=0.0, description="Mensalidade de assinatura contratada em R$"),
+    domain_pack: str | None = Query(default="fuel_convenience", description="Cartucho da vertical (padrao: fuel_convenience)"),
     auth_info: dict[str, str] = Depends(verify_partner_auth),
     staging_store: PartnerStagingStore = Depends(get_partner_staging_store),
 ):
@@ -1983,6 +1984,29 @@ async def partner_roi_diagnostic_endpoint(
         monthly_subscription_brl=monthly_fee,
     )
     return diagnostic
+
+
+@partner_router.get(
+    "/stores/{store_id}/roi-diagnostic",
+    summary="Calculadora Universal de ROI para Varejo Multi-Vertical",
+    description="Calcula deterministicamente o diagnostico de perdas operacionais e ROI para Supermercados, Farmacias, Atacarejos e Varejo em Geral.",
+)
+async def partner_universal_retail_roi_endpoint(
+    store_id: str = FPath(..., description="Identificador da loja ou filial"),
+    monthly_fee: float = Query(default=490.0, ge=0.0, description="Mensalidade de assinatura contratada em R$"),
+    domain_pack: str = Query(default="retail_supermarket", description="Cartucho da vertical (retail_supermarket, pharmacy_health, wholesale_distribution, autocenter_parts, fuel_convenience)"),
+    auth_info: dict[str, str] = Depends(verify_partner_auth),
+    staging_store: PartnerStagingStore = Depends(get_partner_staging_store),
+):
+    """Retorna diagnostico financeiro multi-vertical e garantia de ROI 3x em 90 dias."""
+    clean_store = staging_store.sanitize_station_id(store_id)
+    from core.retail_roi_engine import compute_universal_retail_roi
+    return compute_universal_retail_roi(
+        store_id=clean_store,
+        staging_store=staging_store,
+        domain_pack=domain_pack,
+        monthly_subscription_brl=monthly_fee,
+    )
 
 
 @partner_router.get(
