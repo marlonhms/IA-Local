@@ -13,7 +13,7 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import UTC, datetime, date
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 logger = logging.getLogger("aura.token_budget")
 

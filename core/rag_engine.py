@@ -441,6 +441,7 @@ class HybridRAGEngine:
         sparse_weight: float = 0.5,
         ef_search: Optional[int] = None,
         query_vector: Optional[List[float]] = None,
+        tenant_id: str = "posto_local",
     ) -> Dict[str, Any]:
         """
         Busca híbrida de auto-conhecimento da AURA na tabela `aura_conhecimento_vetores`
