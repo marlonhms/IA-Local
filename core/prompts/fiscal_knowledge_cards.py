@@ -9,7 +9,7 @@ Regra inegociavel: ZERO travessoes em todo o modulo.
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 # Biblioteca Canonica de Fichas Fiscais (Micro-SOPs)
 FISCAL_KNOWLEDGE_CARDS: Dict[str, Dict[str, Any]] = {
