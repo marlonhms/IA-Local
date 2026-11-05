@@ -588,7 +588,7 @@ PADRAO_FISCAL_DETERMINISTICO = re.compile(
     r"\d{44}|"
     r"cst(?:\s*(?:0[0-9]|[1-9][0-9]))?|"
     r"cfop(?:\s*[1-7][0-9]{3})?|"
-    r"icms(?:\s+monof[aá]sico|\s+st|\s+diferido)?|"
+    r"icms\s+monof[aá]sico|icms\s+diferido|"
     r"pis(?:\s*(?:e\s*|/\s*)?cofins)?|"
     r"cofins|"
     r"sefaz|"
@@ -928,7 +928,7 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     if any(t in p for t in termos_margem_analise):
         return "analise_margem"
 
-    if ("diagnóstico" in p or "diagnostico" in p) and any(w in p for w in ["negócio", "negocio", "posto", "operação", "operacao", "executivo", "geral", "hoje", "empresa"]):
+    if ("diagnóstico" in p or "diagnostico" in p) and any(w in p for w in ["negócio", "negocio", "posto", "operação", "operacao", "executivo", "geral", "hoje", "empresa", "rentabilidade", "pista", "margem", "atenção", "atencao"]):
         return "mentoria_decisao"
 
     if ("margem" in p or "lucro" in p) and any(w in p for w in ["perdendo", "perco", "onde", "vazando", "prejuízo", "prejuizo", "queda", "gap"]):
@@ -970,13 +970,13 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
         "relatório de fechamento", "relatorio de fechamento", "divergência na pista", "divergencia na pista",
         "divergência de pista", "divergencia de pista", "diferença de caixa", "diferenca de caixa",
         "diferença no turno", "diferenca no turno", "sobrou ou faltou", "o encerrante bateu", "bateu os bicos",
-        "bateu o turno"
+        "bateu o turno", "fechamento de pista", "fechamento de caixa", "caixa fechado", "fechado pelo operador"
     ]
     if any(t in p for t in termos_auditoria_exatos):
         return "auditoria_turno"
 
     tem_raiz_auditoria = any(k in p for k in [
-        "turno", "fechamento", "concilia", "furo", "quebra", "auditar", "auditoria", 
+        "turno", "fechamento", "fechado", "concilia", "furo", "quebra", "auditar", "auditoria", "sangria", 
         "conferência", "conferencia", "encerramento", "divergência", "divergencia", "encerrante"
     ])
     if ("frentista" in p or "frentistas" in p) and not any(k in p for k in ["furo", "quebra", "bateu", "sobra", "falta", "concilia"]):
@@ -986,7 +986,8 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
             "hoje", "ontem", "anteontem", "como foi", "como fechou", "qual foi", "qual o", "resumo",
             "bateu", "caixa", "bomba", "bico", "sobra", "sobro", "sobrou", "falta", "faltou", "troco",
             "1º", "2º", "3º", "1o", "2o", "3o", "1", "2", "3",
-            "primeiro", "segundo", "terceiro", "manhã", "manha", "tarde", "noite", "madrugada", "teve", "houve"
+            "primeiro", "segundo", "terceiro", "manhã", "manha", "tarde", "noite", "madrugada", "teve", "houve",
+            "pista", "pdv", "operador", "diferença", "diferenca", "diferenças", "diferencas", "sangria"
         ]):
             return "auditoria_turno"
 
