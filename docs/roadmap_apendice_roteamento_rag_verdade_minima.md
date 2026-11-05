@@ -266,4 +266,4 @@ Criar [`tests/unit/test_golden_intent_routing.py`](file:///c:/Users/Marlon/Docum
 | **Etapa 2: Semeador pgvector HNSW** | `scripts/seed_intent_vectors.py` | **CONCLUIDA** | 164 vetores indexados, 30/30 intencoes no PostgreSQL 16, pgvector sim=0.7077. |
 | **Etapa 3: Fichas Tecnicas Canonicas** | `core/prompts/fiscal_knowledge_cards.py`, `core/prompts/micro_sops.py`, `tests/unit/test_fiscal_knowledge_cards.py` | **CONCLUIDA** | 5 Micro-SOPs canonicos, bot `fiscal_compliance_bot`, 100% aprovado. |
 | **Etapa 4: Scoped Tooling AuraEngine** | `core/aura_engine.py`, `tests/unit/test_scoped_tooling_isolation.py` | **CONCLUIDA** | Interceptacao de ferramentas de pista, injecao de Fichas Canonicas, zero contaminacao de tanques. |
-| **Etapa 5: Golden Dataset de Regressao**| `tests/unit/test_golden_intent_routing.py` | **PENDENTE** | 35 perguntas cruzadas com validacao no chat. |
+| **Etapa 5: Golden Dataset de Regressao**| `tests/unit/test_golden_intent_routing.py` | **CONCLUIDA** | 35/35 perguntas aprovadas no Golden Dataset, 934 testes verdes no CI, validacao live com zero mencao a tanques. |
