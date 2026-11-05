@@ -136,6 +136,9 @@ INTENT_EXEMPLARS: Dict[str, Dict[str, Any]] = {
     "mentoria_decisao": {
         "descricao": "Mentoria executiva de decisão, briefing estratégico, diagnóstico de rentabilidade e gaps do negócio",
         "exemplos": [
+            "Como estamos hoje?",
+            "Como está o posto hoje?",
+            "Situação e panorama do posto hoje?",
             "Qual o diagnóstico do meu negócio hoje?",
             "Onde estou perdendo margem?",
             "Briefing executivo do dia",
@@ -806,6 +809,13 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
 
     # -0.5 Mentoria Executiva de Decisao & Briefing Estrategico (GenUI Fase 3 e Fase 6)
     termos_mentoria_exatos = [
+        "como estamos hoje", "como estamos", "como está hoje", "como esta hoje",
+        "como está o posto hoje", "como esta o posto hoje", "como está o posto", "como esta o posto",
+        "como vai o posto hoje", "como vai o posto", "como estamos no posto",
+        "situação de hoje", "situacao de hoje", "situação do posto", "situacao do posto",
+        "panorama de hoje", "panorama do posto", "resumo de hoje", "resumo do posto hoje",
+        "status de hoje", "status do posto hoje", "status do posto",
+        "o que temos para hoje", "visão geral de hoje", "visao geral de hoje",
         "diagnóstico do meu negócio", "diagnostico do meu negócio", "diagnóstico de negócio", "diagnostico do negocio",
         "diagnóstico do meu posto", "diagnostico do meu posto", "diagnóstico geral", "diagnostico geral",
         "diagnóstico executivo", "diagnostico executivo", "briefing executivo", "briefing do dia",

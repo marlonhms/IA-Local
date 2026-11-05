@@ -4107,6 +4107,337 @@
     }
   }
 
+  // =========================================================================
+  // 9. AUDITORIA REGULATORIA LMC ANP (Portaria ANP 26/1992 e Res. 894/2022)
+  // =========================================================================
+
+  class LMCComplianceReportUI extends BaseGenUIWidget {
+    constructor(payload = {}) {
+      super(payload, 'auditar_conformidade_lmc_anp', 'render_LMCComplianceReportUI');
+      this.rawPayload = payload;
+      this.cardClass = 'genui-lmc-compliance-card';
+      this.ariaLabel = 'Auditoria Oficial LMC e Conformidade Portaria ANP 26/1992';
+    }
+
+    renderLayer1() {
+      const p = (this.props && (this.props.diagnosis || this.props.data_analise))
+        ? this.props
+        : ((this.rawPayload && (this.rawPayload.props || this.rawPayload.data || this.rawPayload)) || {});
+      const status = String(p.status || (p.status_conformidade || 'CONFORME')).toUpperCase();
+      const isConforme = status === 'CONFORME';
+      const score = Math.round(Number(p.confidence_score ?? 0.98) * 100);
+      const varPct = Number(p.variacao_geral_pct ?? p.variacao_volumetrica_pct ?? 0);
+      const tolLegal = Number(p.tolerancia_legal_pct ?? 0.60);
+      const totalVarL = Number(p.total_variacao_litros ?? 0);
+      const totalVendas = Number(p.total_vendas_litros ?? 0);
+      const dataAnalise = p.data_analise || p.data || new Date().toISOString().slice(0, 10);
+      const diagnosisText = p.diagnosis || this.summary || `Auditoria LMC ANP (${dataAnalise}): Status ${status} com variacao volumetrica frente a tolerancia de +/-${tolLegal.toFixed(2)}%.`;
+
+      const statusBadge = isConforme
+        ? `<span class="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>LMC CONFORME (+/-${tolLegal.toFixed(2)}%)</span>`
+        : `<span class="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-400"></span>ALERTA FORA DA TOLERANCIA ANP</span>`;
+
+      return `
+        <div class="genui-layer genui-layer-1 mb-4 pb-3 border-b border-white/10">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full ${isConforme ? 'bg-emerald-400' : 'bg-rose-500 animate-ping'} flex-shrink-0"></span>
+              <h4 class="text-xs font-mono font-bold tracking-wider text-cyan-300 uppercase">
+                AURA LMC COMPLIANCE &bull; PORTARIA ANP 26/1992
+              </h4>
+              <span class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">
+                ${escapeHtml(this.toolCallId.substring(0, 14))}...
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-mono text-slate-400">Ref: ${escapeHtml(dataAnalise)}</span>
+              ${statusBadge}
+            </div>
+          </div>
+
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5 mb-3 text-xs leading-relaxed text-slate-200">
+            <span class="text-slate-400 font-semibold block mb-1 uppercase tracking-wider text-[10px] font-mono">Parecer de Conformidade Volumetrica:</span>
+            ${escapeHtml(diagnosisText)}
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+            <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40">
+              <span class="text-[10px] text-slate-400 font-medium block">Variacao Geral</span>
+              <div class="text-sm sm:text-base font-bold font-mono ${isConforme ? 'text-emerald-400' : 'text-rose-400'} tabular-nums">
+                ${varPct > 0 ? '+' : ''}${formatNumber(varPct)}%
+              </div>
+              <span class="text-[10px] text-slate-500 font-mono">Limite Legal: +/-${tolLegal.toFixed(2)}%</span>
+            </div>
+            <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40">
+              <span class="text-[10px] text-slate-400 font-medium block">Divergencia Total</span>
+              <div class="text-sm sm:text-base font-bold font-mono ${isConforme ? 'text-slate-200' : 'text-rose-300'} tabular-nums">
+                ${totalVarL > 0 ? '+' : ''}${formatNumber(totalVarL)} L
+              </div>
+              <span class="text-[10px] text-slate-500 font-mono">Fisico vs Escriturado</span>
+            </div>
+            <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40">
+              <span class="text-[10px] text-slate-400 font-medium block">Vendas dos Bicos</span>
+              <div class="text-sm sm:text-base font-bold font-mono text-cyan-300 tabular-nums">
+                ${formatNumber(totalVendas)} L
+              </div>
+              <span class="text-[10px] text-slate-500 font-mono">Base Encerrantes</span>
+            </div>
+            <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40">
+              <span class="text-[10px] text-slate-400 font-medium block">Confiabilidade</span>
+              <div class="text-sm sm:text-base font-bold font-mono text-teal-300 tabular-nums">
+                ${score}%
+              </div>
+              <span class="text-[10px] text-slate-500 font-mono">Telemetria Sondas</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const p = (this.props && (this.props.diagnosis || this.props.data_analise))
+        ? this.props
+        : ((this.rawPayload && (this.rawPayload.props || this.rawPayload.data || this.rawPayload)) || {});
+      const tanques = p.tanques || p.tank_audits || [];
+      const tolLegal = Number(p.tolerancia_legal_pct ?? 0.60);
+
+      let tanksHtml = '';
+      if (Array.isArray(tanques) && tanques.length > 0) {
+        tanksHtml = `
+          <div class="mb-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-mono font-semibold text-slate-300 uppercase tracking-wider">
+                Auditoria Individualizada por Tanque (${tanques.length} Tanques)
+              </span>
+              <span class="text-[10px] font-mono text-slate-500">Tolerancia Legal: +/-${tolLegal.toFixed(2)}%</span>
+            </div>
+            <div class="space-y-2">
+              ${tanques.map(t => {
+                const tId = t.tanque_id ?? t.tanque ?? '-';
+                const comb = t.combustivel || t.produto || 'Combustivel';
+                const varP = Number(t.variacao_pct ?? 0);
+                const varL = Number(t.variacao_litros ?? 0);
+                const tStatus = String(t.status || (Math.abs(varP) <= tolLegal ? 'CONFORME' : 'CRITICO')).toUpperCase();
+                const isTConforme = tStatus === 'CONFORME';
+                const estCont = Number(t.estoque_contabil_l ?? t.estoque_contabil ?? 0);
+                const estFis = Number(t.estoque_fisico_l ?? t.estoque_fisico ?? 0);
+                const vendasB = Number(t.vendas_bicos_l ?? t.vendas ?? 0);
+
+                return `
+                  <div class="p-3 rounded-xl border ${isTConforme ? 'border-slate-800 bg-slate-900/60' : 'border-rose-500/30 bg-rose-950/20'} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                      <div class="w-8 h-8 rounded-lg ${isTConforme ? 'bg-slate-800 text-slate-300' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'} flex items-center justify-center font-mono font-bold text-xs">
+                        TQ-${tId}
+                      </div>
+                      <div>
+                        <div class="text-xs font-bold text-slate-200">${escapeHtml(comb)}</div>
+                        <div class="text-[10px] text-slate-400 font-mono">
+                          Escriturado: ${formatNumber(estCont)} L &bull; Fisico: ${formatNumber(estFis)} L &bull; Vendas: ${formatNumber(vendasB)} L
+                        </div>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-3 self-end sm:self-center">
+                      <div class="text-right font-mono">
+                        <div class="text-xs font-bold ${isTConforme ? 'text-emerald-400' : 'text-rose-400'}">
+                          ${varP > 0 ? '+' : ''}${formatNumber(varP)}% (${varL > 0 ? '+' : ''}${formatNumber(varL)} L)
+                        </div>
+                        <span class="text-[10px] text-slate-500">${isTConforme ? 'Dentro da margem' : 'Fora da tolerancia'}</span>
+                      </div>
+                      <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold ${isTConforme ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'}">
+                        ${isTConforme ? 'CONFORME' : 'CRITICO'}
+                      </span>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      } else {
+        tanksHtml = `
+          <div class="p-3 rounded-xl border border-white/5 bg-slate-950/30 mb-3 text-xs text-slate-400 font-mono text-center">
+            Nenhum tanque individualizado com desvio detectado para a data selecionada.
+          </div>
+        `;
+      }
+
+      const parecerHtml = p.parecer_regulatorio ? `
+        <div class="p-3 rounded-xl border border-cyan-500/20 bg-cyan-950/20 mb-3 text-xs text-cyan-200/90 leading-relaxed">
+          <span class="font-bold block text-cyan-300 mb-1 text-[11px] font-mono uppercase tracking-wider">&bull; Parecer Juridico-Regulatorio Portaria ANP 26/1992:</span>
+          ${escapeHtml(p.parecer_regulatorio)}
+        </div>
+      ` : '';
+
+      return `
+        <div class="genui-layer genui-layer-2">
+          ${tanksHtml}
+          ${parecerHtml}
+        </div>
+      `;
+    }
+
+    getDefaultActionsHtml() {
+      const shouldDisable = this.state.isLocked || this.isExpired();
+      return `
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold hover:brightness-110 ${shouldDisable ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
+                data-action-id="act_briefing_justificativa_lmc"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>Emitir Justificativa Tecnica ANP</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 ${shouldDisable ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
+                data-action-id="act_abrir_chamado_sonda"
+                data-action-type="delegation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>Calibrar Sonda / Telemetria</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 text-slate-300 border border-white/10 hover:bg-slate-800"
+                data-action-id="act_conferir_encerrantes"
+                data-action-type="inspection"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>Conferir Encerrantes nos Bicos</span>
+        </button>
+      `;
+    }
+  }
+
+  // =========================================================================
+  // 9.1 CUSTO FINANCEIRO DE ESTOQUE & INDICADORES MACRO (BACEN/CONFAZ)
+  // =========================================================================
+
+  class MacroeconomicInventoryCostUI extends BaseGenUIWidget {
+    constructor(payload = {}) {
+      super(payload, 'custo_estoque_macro', 'render_MacroeconomicInventoryCostUI');
+      this.rawPayload = payload;
+      this.cardClass = 'genui-macro-inventory-card';
+      this.ariaLabel = 'Custo Financeiro Selic de Estoque e Pauta CONFAZ';
+    }
+
+    renderLayer1() {
+      const p = (this.props && (this.props.diagnosis || this.props.taxa_selic_aa))
+        ? this.props
+        : ((this.rawPayload && (this.rawPayload.props || this.rawPayload.data || this.rawPayload)) || {});
+      const diagnosisText = p.diagnosis || this.summary || 'Analise de custo de oportunidade e capital imobilizado em estoque.';
+      const selic = Number(p.taxa_selic_aa ?? 10.75);
+      const ptax = Number(p.ptax_usd_brl ?? 5.75);
+      const custoDiario = Number(p.custo_carregamento_diario_brl ?? 0);
+      const custoMensal = Number(p.custo_carregamento_mensal_brl ?? 0);
+      const capitalImobilizado = Number(p.capital_imobilizado_total_brl ?? 0);
+
+      return `
+        <div class="genui-layer genui-layer-1 mb-4 pb-3 border-b border-white/10">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0 animate-pulse"></span>
+              <h4 class="text-xs font-mono font-bold tracking-wider text-amber-300 uppercase">
+                AURA MACROECONOMIC INVENTORY &bull; BACEN &amp; CONFAZ
+              </h4>
+              <span class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-white/5">
+                ${escapeHtml(this.toolCallId.substring(0, 14))}...
+              </span>
+            </div>
+            <span class="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              Taxa Selic: ${selic.toFixed(2)}% a.a.
+            </span>
+          </div>
+
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5 mb-3 text-xs leading-relaxed text-slate-200">
+            <span class="text-slate-400 font-semibold block mb-1 uppercase tracking-wider text-[10px] font-mono">Diagnostico de Capital Imobilizado:</span>
+            ${escapeHtml(diagnosisText)}
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+            <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40">
+              <span class="text-[10px] text-slate-400 font-medium block">Capital Imobilizado</span>
+              <div class="text-sm sm:text-base font-bold font-mono text-slate-100 tabular-nums">
+                R$ ${formatNumber(capitalImobilizado)}
+              </div>
+              <span class="text-[10px] text-slate-500 font-mono">Nos Tanques</span>
+            </div>
+            <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40">
+              <span class="text-[10px] text-slate-400 font-medium block">Custo Selic Mensal</span>
+              <div class="text-sm sm:text-base font-bold font-mono text-rose-400 tabular-nums">
+                R$ ${formatNumber(custoMensal)}
+              </div>
+              <span class="text-[10px] text-slate-500 font-mono">Oportunidade perdida</span>
+            </div>
+            <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40">
+              <span class="text-[10px] text-slate-400 font-medium block">Custo Diario</span>
+              <div class="text-sm sm:text-base font-bold font-mono text-amber-300 tabular-nums">
+                R$ ${formatNumber(custoDiario)}
+              </div>
+              <span class="text-[10px] text-slate-500 font-mono">Por 24 horas</span>
+            </div>
+            <div class="p-2.5 rounded-xl border border-white/5 bg-slate-950/40">
+              <span class="text-[10px] text-slate-400 font-medium block">Cotacao PTAX</span>
+              <div class="text-sm sm:text-base font-bold font-mono text-cyan-300 tabular-nums">
+                R$ ${formatNumber(ptax)}
+              </div>
+              <span class="text-[10px] text-slate-500 font-mono">Dolar Comercial</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const p = (this.props && (this.props.diagnosis || this.props.taxa_selic_aa))
+        ? this.props
+        : ((this.rawPayload && (this.rawPayload.props || this.rawPayload.data || this.rawPayload)) || {});
+      const pauta = p.pauta_fiscal_pmpf || p.pmpf_confaz || {};
+
+      let pautaHtml = '';
+      if (typeof pauta === 'object' && Object.keys(pauta).length > 0) {
+        pautaHtml = `
+          <div class="p-3 rounded-xl border border-white/5 bg-slate-950/30 mb-3 space-y-2">
+            <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 font-mono block">
+              Pauta Fiscal PMPF CONFAZ Referencial
+            </span>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+              ${Object.entries(pauta).map(([k, v]) => `
+                <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex justify-between items-center">
+                  <span class="text-slate-300 uppercase">${escapeHtml(k)}</span>
+                  <span class="font-mono font-bold text-amber-300">R$ ${formatNumber(v)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="genui-layer genui-layer-2">
+          ${pautaHtml}
+        </div>
+      `;
+    }
+
+    getDefaultActionsHtml() {
+      const shouldDisable = this.state.isLocked || this.isExpired();
+      return `
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 font-bold hover:brightness-110 ${shouldDisable ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
+                data-action-id="act_otimizar_giro_estoque"
+                data-action-type="mutation"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>Otimizar Giro de Estoque</span>
+        </button>
+        <button type="button"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 ${shouldDisable ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
+                data-action-id="act_simular_impacto_selic"
+                data-action-type="inspection"
+                data-tool-call-id="${escapeHtml(this.toolCallId)}">
+          <span>Simular Impacto Selic</span>
+        </button>
+      `;
+    }
+  }
+
+  const LMCComplianceReportWidget = LMCComplianceReportUI;
+  const MacroeconomicInventoryCostWidget = MacroeconomicInventoryCostUI;
   const RoiDiagnosticWidget = RoiDiagnosticUI;
   const PosAuditRadarWidget = PosAuditRadarUI;
   const MorningBriefingWidget = MorningBriefingUI;
@@ -4231,6 +4562,32 @@
         cls: MorningBriefingUI,
         aliases: ['MorningBriefingUI', 'render_MorningBriefingWidget', 'MorningBriefingWidget'],
         intent: 'zero_click_briefing'
+      },
+      {
+        name: 'render_LMCComplianceReportUI',
+        cls: LMCComplianceReportUI,
+        aliases: [
+          'LMCComplianceReportUI',
+          'LMCComplianceReportWidget',
+          'render_LMCComplianceWidget',
+          'LMCComplianceWidget',
+          'auditar_conformidade_lmc_anp',
+          'lmc_anp',
+          'lmc_compliance'
+        ],
+        intent: 'auditar_conformidade_lmc_anp'
+      },
+      {
+        name: 'render_MacroeconomicInventoryCostUI',
+        cls: MacroeconomicInventoryCostUI,
+        aliases: [
+          'MacroeconomicInventoryCostUI',
+          'MacroeconomicInventoryCostWidget',
+          'render_MacroeconomicInventoryCostWidget',
+          'custo_estoque_macro',
+          'analisar_custo_estoque_macroeconomico'
+        ],
+        intent: 'custo_estoque_macro'
       }
     ];
 
@@ -4372,6 +4729,10 @@
     window.AuraGenUI.PosAuditRadarWidget = PosAuditRadarWidget;
     window.AuraGenUI.MorningBriefingUI = MorningBriefingUI;
     window.AuraGenUI.MorningBriefingWidget = MorningBriefingWidget;
+    window.AuraGenUI.LMCComplianceReportUI = LMCComplianceReportUI;
+    window.AuraGenUI.LMCComplianceReportWidget = LMCComplianceReportWidget;
+    window.AuraGenUI.MacroeconomicInventoryCostUI = MacroeconomicInventoryCostUI;
+    window.AuraGenUI.MacroeconomicInventoryCostWidget = MacroeconomicInventoryCostWidget;
     window.AuraGenUI.ComplianceStatusWidget = ComplianceStatusWidget;
     window.AuraGenUI.PaymentMethodsBreakdownUI = PaymentMethodsBreakdownUI;
     window.AuraGenUI.PaymentMethodsBreakdownWidget = PaymentMethodsBreakdownWidget;
@@ -4414,6 +4775,10 @@
       ComplianceStatusUI,
       ComplianceStatusWidget,
       FiscalShieldInspectorUI,
+      LMCComplianceReportUI,
+      LMCComplianceReportWidget,
+      MacroeconomicInventoryCostUI,
+      MacroeconomicInventoryCostWidget,
       registerWidgets,
       initGlobalGenUIActionDelegation,
       escapeHtml,

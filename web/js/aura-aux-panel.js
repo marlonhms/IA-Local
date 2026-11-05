@@ -2160,7 +2160,7 @@ class AuraAuxPanel {
     ) {
       title = '📋 Auditoria LMC & Portaria ANP 26/1992';
       subtitle = c.diagnosis || data?.props?.diagnosis || 'Conformidade volumetrica de tanques e tolerancia legal de 0,60%';
-      const overallStatus = String(c.overall_status || data?.props?.overall_status || 'CONFORME').toUpperCase();
+      const overallStatus = String(c.overall_status || c.status || data?.props?.overall_status || data?.props?.status || 'CONFORME').toUpperCase();
       const isConforme = overallStatus === 'CONFORME';
 
       statusChip = {
