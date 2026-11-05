@@ -31,6 +31,7 @@ from core.schemas.genui import (
 def mock_watchdog() -> HardwareCircuitBreaker:
     """Watchdog com circuito fechado e metricas estaveis para testes."""
     wb = HardwareCircuitBreaker(force_os="linux")
+    wb.set_simulated_metrics(cpu_percent=15.0, ram_percent=35.0, ram_available_mb=4096.0)
     wb.reset()
     return wb
 

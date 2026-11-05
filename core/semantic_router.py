@@ -808,14 +808,23 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
         return "lmc_anp"
 
     # -0.5 Mentoria Executiva de Decisao & Briefing Estrategico (GenUI Fase 3 e Fase 6)
-    termos_mentoria_exatos = [
-        "como estamos hoje", "como estamos", "como está hoje", "como esta hoje",
+    perguntas_checkin_geral = {
+        "como estamos hoje", "como estamos", "como esta hoje", "como está hoje",
         "como está o posto hoje", "como esta o posto hoje", "como está o posto", "como esta o posto",
         "como vai o posto hoje", "como vai o posto", "como estamos no posto",
         "situação de hoje", "situacao de hoje", "situação do posto", "situacao do posto",
-        "panorama de hoje", "panorama do posto", "resumo de hoje", "resumo do posto hoje",
+        "situação do posto hoje", "situacao do posto hoje",
+        "panorama de hoje", "panorama do posto", "panorama do posto hoje",
+        "resumo de hoje", "resumo do posto hoje", "resumo do posto",
         "status de hoje", "status do posto hoje", "status do posto",
         "o que temos para hoje", "visão geral de hoje", "visao geral de hoje",
+    }
+    p_checkin = p.strip("?!. ").lower()
+    if p_checkin in perguntas_checkin_geral or re.match(r"^como (?:estamos|est[aá]|vai)(?:\s+(?:no|o)\s+posto)?(?:\s+hoje)?$", p_checkin):
+        if not any(w in p for w in ["posicionado", "posicionados", "mercado", "concorr", "ranking", "preco", "preço"]):
+            return "mentoria_decisao"
+
+    termos_mentoria_exatos = [
         "diagnóstico do meu negócio", "diagnostico do meu negócio", "diagnóstico de negócio", "diagnostico do negocio",
         "diagnóstico do meu posto", "diagnostico do meu posto", "diagnóstico geral", "diagnostico geral",
         "diagnóstico executivo", "diagnostico executivo", "briefing executivo", "briefing do dia",
