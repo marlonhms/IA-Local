@@ -5963,11 +5963,15 @@ class AuraEngine:
         ttft_ms = None
         texto_completo: List[str] = []
         sucesso_llm = False
+        stream_interrompida = False
 
         for m_name in FALLBACK_MODELS[:2]:
             try:
                 model = genai.GenerativeModel(m_name)
                 last_chunk_obj = None
+                texto_modelo: List[str] = []
+                stream_interrompida = False
+
                 # Invoca streaming assincrono com timeout resiliente de 25 segundos
                 response_stream = await asyncio.wait_for(
                     model.generate_content_async(
@@ -5987,6 +5991,7 @@ class AuraEngine:
                         chunk = await asyncio.wait_for(_get_next_chunk(stream_aiter), timeout=20.0)
                         last_chunk_obj = chunk
                     except StopAsyncIteration:
+                        # Streaming concluiu naturalmente com sucesso
                         break
                     except (asyncio.TimeoutError, Exception) as stream_step_err:
                         logger.warning(
@@ -5994,6 +5999,7 @@ class AuraEngine:
                             m_name,
                             stream_step_err,
                         )
+                        stream_interrompida = True
                         break
 
                     try:
@@ -6008,6 +6014,7 @@ class AuraEngine:
                         ttft_ms = (time.perf_counter() - t_global_start) * 1000
                         self.telemetry.record_ttft(ttft_ms, session_id=sess_id)
 
+                    texto_modelo.append(chunk_text)
                     texto_completo.append(chunk_text)
                     yield AuraChunk(
                         chunk_type=AuraChunkType.DELTA,
@@ -6015,9 +6022,22 @@ class AuraEngine:
                         session_id=sess_id,
                     )
 
-                if texto_completo:
+                texto_parcial = "".join(texto_modelo).strip()
+                pontuacao_valida = ('.', '!', '?', ')', '"', "'", ':', ']')
+                frase_truncada = stream_interrompida or (
+                    len(texto_parcial) < 180 and not texto_parcial.endswith(pontuacao_valida)
+                )
+
+                if texto_modelo and not frase_truncada:
                     sucesso_llm = True
                     break
+                elif stream_interrompida:
+                    logger.warning(
+                        "AuraEngine: Stream do modelo %s interrompida prematuramente (%d chars: '%s...'). Testando contingencia.",
+                        m_name,
+                        len(texto_parcial),
+                        texto_parcial[:50],
+                    )
 
             except Exception as llm_init_err:
                 logger.info(
@@ -6028,9 +6048,17 @@ class AuraEngine:
                 continue
 
         total_llm_ms = (time.perf_counter() - t_llm_start) * 1000
-        resposta_final = normalize_aura_color_markup("".join(texto_completo))
+        texto_acumulado_str = "".join(texto_completo).strip()
+        resposta_final = normalize_aura_color_markup(texto_acumulado_str)
+        pontuacao_valida = ('.', '!', '?', ')', '"', "'", ':', ']')
+        precisa_contingencia = (
+            not sucesso_llm
+            or not resposta_final
+            or stream_interrompida
+            or (len(resposta_final) < 180 and not resposta_final.endswith(pontuacao_valida))
+        )
 
-        if not sucesso_llm or not resposta_final:
+        if precisa_contingencia:
             # Contingência determinística de alta fidelidade a partir dos dados apurados no ERP
             sintese_contingencia = self._gerar_sintese_contingencia_ferramenta(
                 intencao=intencao,
@@ -6045,12 +6073,13 @@ class AuraEngine:
                 if ttft_ms is None:
                     ttft_ms = (time.perf_counter() - t_global_start) * 1000
                     self.telemetry.record_ttft(ttft_ms, session_id=sess_id)
+                # Emite o complemento final ou a sintese completa corrigida sem truncamento
                 yield AuraChunk(
                     chunk_type=AuraChunkType.DELTA,
-                    text=resposta_final,
+                    text=f"\n\n{resposta_final}" if texto_completo else resposta_final,
                     session_id=sess_id,
                 )
-            else:
+            elif not resposta_final:
                 resposta_final = "Não foi possível obter resposta dos modelos da AURA no momento. Por favor, tente novamente em instantes."
                 yield AuraChunk(
                     chunk_type=AuraChunkType.ERROR,

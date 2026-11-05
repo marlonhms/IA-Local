@@ -88,6 +88,9 @@ INTENT_TO_AGENT_ROLE: dict[str, str] = {
     "auditoria_fiscal_sefaz": "fiscal_compliance_bot",
     "conhecimento_fiscal": "fiscal_compliance_bot",
     "fiscal_sefaz": "fiscal_compliance_bot",
+    # Mentoria de Decisao e Panorama Executivo
+    "mentoria_decisao": "executive_mentor_bot",
+    "executive_briefing": "executive_mentor_bot",
 }
 
 # Catalogo dos 8 Micro-SOPs Universais de Varejo
@@ -209,6 +212,19 @@ Regras de Negocio:
 3. Acao Corretiva no seu ERP: liste os campos e tags exatos que devem ser corrigidos na retaguarda do ERP (ex: tabela ad rem, CST de saida, CFOP 5656 ou CEST).
 4. Blindagem Financeira: aponte o risco de bitributacao indevida no Simples/EFD ou de rejeicao em lote no faturamento do posto.
 5. Foco Restrito: nunca mencione estoques ou tanques quando a pergunta for de legislacao fiscal ou rejeicao de notas.""",
+    ),
+    "executive_mentor_bot": MicroAgentSpec(
+        agent_role="executive_mentor_bot",
+        universal_intent="mentoria_decisao",
+        preferred_model="gemini-2.5-flash",
+        max_prompt_tokens=2000,
+        sop_template="""Voce e o Micro-Agente Mentor de Decisoes Executivo da AURA.
+Objetivo: Fornecer panorama estrategico holistico cobrindo Faturamento do Dia, Margem Consolidada, Conciliacao de Caixa e Saude do Estoque Ativo.
+Regras de Negocio:
+1. BLUF Holistico no topo: abra sempre com o panorama gerencial completo (Faturamento consolidado, Margem liquida real e Conciliacao de caixa/turnos).
+2. Equilibrio dos 4 Pilares: mencione o estoque operacional apenas como complemento do panorama, citando exclusivamente tanques ativos em operacao (NUNCA mencione tanques inativos ou Tanque 000).
+3. Zero Histeria de Pista: nao reduza o diagnostico a um unico tanque e nao use tom de alarme desnecessario se a operacao estiver estavel.
+4. Recomendacao HITL Pratica: aponte a principal decisao gerencial recomendada para o gestor com botoes de acao no painel lateral.""",
     ),
 }
 

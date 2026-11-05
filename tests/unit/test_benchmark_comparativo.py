@@ -139,6 +139,7 @@ def test_semantic_router_benchmark_queries(mock_router):
 async def test_aura_engine_execute_tool_benchmark(posto_tools):
     """Valida a execucao direta (headless intent call) de benchmark_comparativo no AuraEngine."""
     engine = AuraEngine(rag_engine=MagicMock(), tools=posto_tools)
+    engine.watchdog.is_heavy_operation_allowed = MagicMock(return_value=True)
     res = await engine.execute_tool_direct("benchmark_comparativo")
 
     assert res["status"] == "success"
@@ -191,7 +192,10 @@ def test_no_em_dash_or_en_dash_in_benchmark_artifacts(posto_tools):
 @pytest.mark.asyncio
 async def test_aura_engine_query_and_build_response_text(posto_tools):
     """Valida os metodos query() e _build_response_text() do AuraEngine para benchmark."""
-    engine = AuraEngine(rag_engine=MagicMock(), tools=posto_tools)
+    mock_rag = MagicMock()
+    mock_rag.gerar_embedding.return_value = [0.0] * 1536
+    engine = AuraEngine(rag_engine=mock_rag, tools=posto_tools)
+    engine.watchdog.is_heavy_operation_allowed = MagicMock(return_value=True)
     resultado = posto_tools.comparar_benchmark_concorrencia()
 
     # Valida _build_response_text para benchmark_comparativo e comparativo_turnos

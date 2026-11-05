@@ -2814,9 +2814,18 @@ class PostoTools:
                 saldo = Decimal(str(t['saldo_atual_litros'] or 0.0))
                 bicos = bicos_por_tanque.get(codtan, [])
 
-                # Se o tanque for mini-tanque ou reserva inativa (capacidade <= 1000 e saldo == 0)
-                is_inativo = (cap <= Decimal("1000.0") and saldo == Decimal("0.0"))
-                tanques_cat_op = [tk for tk in tanques_por_cat.get(cat, []) if not (Decimal(str(tk['capacidade_litros'] or 0)) <= Decimal("1000.0") and Decimal(str(tk['saldo_atual_litros'] or 0)) == Decimal("0.0"))]
+                # Se o tanque for mini-tanque ou reserva inativa/sem operacao (capacidade <= 1000 e saldo == 0, ou saldo 0 sem bicos e sem giro)
+                is_inativo = (
+                    (cap <= Decimal("1000.0") and saldo == Decimal("0.0"))
+                    or (saldo == Decimal("0.0") and not bicos and codtan not in dispenses_por_tanque)
+                )
+                tanques_cat_op = [
+                    tk for tk in tanques_por_cat.get(cat, [])
+                    if not (
+                        (Decimal(str(tk['capacidade_litros'] or 0)) <= Decimal("1000.0") and Decimal(str(tk['saldo_atual_litros'] or 0)) == Decimal("0.0"))
+                        or (Decimal(str(tk['saldo_atual_litros'] or 0)) == Decimal("0.0") and not bicos_por_tanque.get(tk['codtan'], []) and tk['codtan'] not in dispenses_por_tanque)
+                    )
+                ]
 
                 # Consumo específico do tanque (ou override por código de tanque)
                 consumo_tanque_custom = None
@@ -3053,6 +3062,15 @@ class PostoTools:
             tot_vol_sugerido = sum(s['volume_sugerido_litros'] for s in sugestoes_retorno)
             tot_bocas_5k = sum(s['compartimentos_5k'] for s in sugestoes_retorno)
 
+            # Ordenacao prioritária: tanques operacionais com giro no topo, inativos por ultimo
+            tanques_processados.sort(
+                key=lambda tk: (
+                    1 if tk['status_operacional'] == 'INATIVO' else 0,
+                    0 if tk['saldo_atual_litros'] > 0 else 1,
+                    tk['autonomia_runout_horas'],
+                )
+            )
+
             # Tanque Mais Crítico (calculado no escopo filtrado do retorno)
             tanques_ativos = [t for t in tanques_retorno if t['status_operacional'] != 'INATIVO']
             tanque_mais_critico = None
@@ -3060,8 +3078,8 @@ class PostoTools:
             tanques_zerados_secos = [t['codtan'] for t in tanques_ativos if t['saldo_atual_litros'] <= 0]
 
             if tanques_ativos:
-                tanque_mais_critico = min(tanques_ativos, key=lambda t: (t['autonomia_runout_horas'], t['ocupacao_pct']))
                 tanques_com_saldo = [t for t in tanques_ativos if t['saldo_atual_litros'] > 0]
+                tanque_mais_critico = min(tanques_com_saldo or tanques_ativos, key=lambda t: (t['autonomia_runout_horas'], t['ocupacao_pct']))
                 if tanques_com_saldo:
                     tanque_operacional_mais_critico = min(tanques_com_saldo, key=lambda t: (t['autonomia_runout_horas'], t['ocupacao_pct']))
                 else:
@@ -3092,8 +3110,11 @@ class PostoTools:
 
             # Construção do Contrato Estruturado AURA Precision Glass v1.0 (F5-03 & F5-04)
             queried_at_iso = agora.astimezone().isoformat()
-            has_crit_hours = any(t.get('autonomia_runout_horas', 999) < 24 for t in tanques_retorno)
-            has_crit_alert = any(t.get('alerta_critico') for t in tanques_retorno)
+            tanques_base_alerta = tanques_ativos if tanques_ativos else tanques_retorno
+            tanques_ref_calculo = [t for t in tanques_ativos if t['saldo_atual_litros'] > 0] or tanques_base_alerta
+
+            has_crit_hours = any(t.get('autonomia_runout_horas', 999) < 24 for t in tanques_base_alerta)
+            has_crit_alert = any(t.get('alerta_critico') for t in tanques_base_alerta)
 
             if not tanques_retorno:
                 status_geral_tanks = "SEM_REGISTROS"
@@ -3101,7 +3122,7 @@ class PostoTools:
                 title_tanks = f"Nenhum Tanque Localizado ({filtro_combustivel})" if filtro_combustivel else "Nenhum Tanque Cadastrado"
                 badge_tanks = "Filtro Sem Resultados" if filtro_combustivel else "Sem Registros"
             else:
-                status_geral_tanks = "ALERTA_ESTOQUE_CRITICO" if any(t.get('alerta_critico') for t in tanques_retorno) else "ESTOQUE_ESTAVEL"
+                status_geral_tanks = "ALERTA_ESTOQUE_CRITICO" if any(t.get('alerta_critico') for t in tanques_base_alerta) else "ESTOQUE_ESTAVEL"
                 severity_tanks = "critical" if (tanques_zerados_secos or has_crit_hours) else ("attention" if (alerta_fim_de_semana or has_crit_alert) else "normal")
                 title_tanks = "Alerta Crítico: Risco de Esgotamento de Tanques" if severity_tanks == "critical" else ("Atenção: Tanques em Nível de Reserva" if severity_tanks == "attention" else "Autonomia dos Tanques Estável")
                 badge_tanks = "🚨 Crítico / Risco de Falta" if severity_tanks == "critical" else ("⚠️ Risco Fim de Semana" if alerta_fim_de_semana else ("⚠️ Nível de Reserva" if severity_tanks == "attention" else "✓ Confortável / Estável"))
@@ -3112,12 +3133,13 @@ class PostoTools:
             tot_cap = sum(t['capacidade_litros'] for t in tanques_retorno)
             ocup_geral = round((tot_saldo / tot_cap * 100.0), 2) if tot_cap > 0 else 0.0
 
-            min_auto_crit_h = min([t['autonomia_critica_horas'] for t in tanques_retorno], default=0.0) if tanques_retorno else 0.0
-            min_auto_crit_d = min([t['autonomia_critica_dias'] for t in tanques_retorno], default=0.0) if tanques_retorno else 0.0
-            min_auto_ro_h = min([t['autonomia_runout_horas'] for t in tanques_retorno], default=0.0) if tanques_retorno else 0.0
-            min_auto_ro_d = min([t['autonomia_runout_dias'] for t in tanques_retorno], default=0.0) if tanques_retorno else 0.0
+            min_auto_crit_h = min([t['autonomia_critica_horas'] for t in tanques_ref_calculo], default=0.0) if tanques_ref_calculo else 0.0
+            min_auto_crit_d = min([t['autonomia_critica_dias'] for t in tanques_ref_calculo], default=0.0) if tanques_ref_calculo else 0.0
+            min_auto_ro_h = min([t['autonomia_runout_horas'] for t in tanques_ref_calculo], default=0.0) if tanques_ref_calculo else 0.0
+            min_auto_ro_d = min([t['autonomia_runout_dias'] for t in tanques_ref_calculo], default=0.0) if tanques_ref_calculo else 0.0
             tot_ullage = sum(t['espaco_livre_ullage_litros'] for t in tanques_retorno)
 
+            tanque_referencia_final = tanque_operacional_mais_critico or tanque_mais_critico
             assessment_tanks = TankForecastAssessment(
                 status_code=status_geral_tanks,
                 severity=severity_tanks,
@@ -3125,9 +3147,9 @@ class PostoTools:
                 limitation=limitation_tanks,
                 badge_label=badge_tanks,
                 alerta_fim_de_semana=alerta_fim_de_semana,
-                horizonte_critico_horas=tanque_mais_critico['autonomia_critica_horas'] if tanque_mais_critico else None,
-                horizonte_runout_horas=tanque_mais_critico['autonomia_runout_horas'] if tanque_mais_critico else None,
-                tanque_mais_critico_cod=tanque_mais_critico['codtan'] if tanque_mais_critico else None,
+                horizonte_critico_horas=tanque_referencia_final['autonomia_critica_horas'] if tanque_referencia_final else None,
+                horizonte_runout_horas=tanque_referencia_final['autonomia_runout_horas'] if tanque_referencia_final else None,
+                tanque_mais_critico_cod=tanque_referencia_final['codtan'] if tanque_referencia_final else None,
             )
 
             metrics_tanks = TankForecastMetrics(
@@ -8650,30 +8672,45 @@ class PostoTools:
         comb_critico = "Gasolina Comum"
         if isinstance(dados_tanques, dict):
             metr_tq = dados_tanques.get("metrics") or {}
-            if metr_tq.get("autonomia_critica_horas") is not None:
-                autonomia_min_h = float(metr_tq["autonomia_critica_horas"])
             detalhes_tq = dados_tanques.get("tanks") or dados_tanques.get("detalhamento_tanques") or []
-            if detalhes_tq and isinstance(detalhes_tq, list):
-                t_top = detalhes_tq[0]
+            # Seleciona exclusivamente tanques operacionais com saldo e giro ativo
+            t_ativos = [
+                t for t in detalhes_tq
+                if isinstance(t, dict) and t.get("status_operacional") != "INATIVO" and float(t.get("saldo_atual_litros") or 0) > 0
+            ]
+            if t_ativos:
+                # Tanque operacional ativo com menor autonomia
+                t_top = min(t_ativos, key=lambda tk: (float(tk.get("autonomia_runout_horas", 999)), float(tk.get("ocupacao_pct", 100))))
                 tanque_critico = str(t_top.get("tanque") or t_top.get("codtan") or "01")
                 comb_critico = str(t_top.get("combustivel") or "Gasolina Comum")
+                autonomia_min_h = float(t_top.get("autonomia_critica_horas") or t_top.get("autonomia_runout_horas") or 24.0)
+            elif metr_tq.get("autonomia_critica_horas") is not None:
+                autonomia_min_h = float(metr_tq["autonomia_critica_horas"])
 
-        status_geral = "warning" if (diff_caixa < -50 or autonomia_min_h < 12) else "success"
+        fat_fmt = f"R$ {fat_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        diff_fmt = f"R$ {diff_caixa:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        status_geral = "warning" if (diff_caixa < -50 or (0 < autonomia_min_h < 12)) else "success"
+
+        # Construcao Holistica e Equilibrada do Diagnostico (4 Pilares)
         if diff_caixa < -50:
+            diff_abs_fmt = f"R$ {abs(diff_caixa):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             diagnostico = (
-                f"Atenção à quebra de caixa de R$ {abs(diff_caixa):,.2f} no turno e gap de margem líquida ({margem_estimada_pct}% vs meta de {benchmark_margem_pct}%). "
-                f"Faturamento consolidado em R$ {fat_total:,.2f}."
-            ).replace(",", "X").replace(".", ",").replace("X", ".")
-        elif autonomia_min_h < 12:
+                f"Panorama do dia: Faturamento acumulado em {fat_fmt} e margem consolidada em {margem_estimada_pct:.1f}%, "
+                f"com alerta de diferença de caixa de {diff_abs_fmt} no turno. "
+                f"Autonomia operacional mínima em {autonomia_min_h:.1f}h no Tanque {tanque_critico} ({comb_critico})."
+            )
+        elif 0 < autonomia_min_h < 18:
             diagnostico = (
-                f"Tanque {tanque_critico} ({comb_critico}) atingirá nível crítico em {autonomia_min_h:.1f}h. "
-                f"Margem consolidada em {margem_estimada_pct}%, faturamento diário em R$ {fat_total:,.2f}."
-            ).replace(",", "X").replace(".", ",").replace("X", ".")
+                f"Panorama do dia: Faturamento em {fat_fmt}, margem líquida consolidada em {margem_estimada_pct:.1f}% "
+                f"e conciliação de caixa regular ({diff_fmt}). "
+                f"Atenção de reposição para {comb_critico} (Tanque {tanque_critico} com {autonomia_min_h:.1f}h de autonomia)."
+            )
         else:
             diagnostico = (
-                f"Operação estável com margem consolidada em {margem_estimada_pct}%, "
-                f"faturamento de R$ {fat_total:,.2f} e conciliação de turnos sem furos graves."
-            ).replace(",", "X").replace(".", ",").replace("X", ".")
+                f"Panorama do dia: Faturamento acumulado em {fat_fmt}, margem líquida consolidada em {margem_estimada_pct:.1f}% "
+                f"(meta de {benchmark_margem_pct:.1f}%) e conciliação de caixa sem divergências ({diff_fmt}). "
+                f"Estoque operacional estável com {autonomia_min_h:.1f}h de autonomia no Tanque {tanque_critico} ({comb_critico})."
+            )
 
         metrics_list = [
             ExecutiveMetric(
