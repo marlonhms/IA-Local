@@ -583,6 +583,40 @@ CONVERSATIONAL_WORDS = {
 }
 
 
+PADRAO_FISCAL_DETERMINISTICO = re.compile(
+    r"\b("
+    r"\d{44}|"
+    r"cst(?:\s*(?:0[0-9]|[1-9][0-9]))?|"
+    r"cfop(?:\s*[1-7][0-9]{3})?|"
+    r"icms(?:\s+monof[aá]sico|\s+st|\s+diferido)?|"
+    r"pis(?:\s*(?:e\s*|/\s*)?cofins)?|"
+    r"cofins|"
+    r"sefaz|"
+    r"rejei(?:[cç][aã]o|[cç][oõ]es|cao|coes)(?:\s*\d+)?|"
+    r"erro\s+sefaz|"
+    r"chave\s+(?:de\s+acesso|da\s+nota)|"
+    r"nota\s+(?:fiscal\s+)?(?:de\s+frota\s+)?(?:travada|bloqueada|rejeitada)|travou\s+(?:uma\s+)?nota|"
+    r"nfe\s+rejeitada|nfce\s+rejeitada|"
+    r"danfe|"
+    r"difal|"
+    r"cest|"
+    r"monof[aá]sic[ao]|monofasia|"
+    r"substitui(?:[cç][aã]o|cao)\s+tribut[aá]ria|"
+    r"tributa(?:[cç][aã]o|cao)\s+(?:monof[aá]sica|na\s+conveni[eê]ncia|fiscal|de\s+combust[ií]veis)|"
+    r"bitributa(?:[cç][aã]o|cao)|"
+    r"lc\s*192|lc\s*214|"
+    r"sped\s+(?:c113|fiscal|contribui(?:[cç][oõ]es|coes))|"
+    r"registro\s*(?:1300|1310|1320)|"
+    r"tabela\s+4\.3\.10|"
+    r"reforma\s+tribut[aá]ria|"
+    r"abnt\s+nbr\s+5891|arredondamento\s+sefaz|"
+    r"indiedest|isento\s+de\s+ie|"
+    r"auditar\s+xml|auditar\s+nota"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
 def classificar_intencao_heuristica(pergunta: str) -> str:
     """
     Classificador determinístico baseado em regras léxicas e heurísticas de posto.
@@ -624,19 +658,7 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
         return "ajuda_sistema"
 
     # -2.6 Auditoria fiscal, regras SEFAZ, chave de acesso de 44 digitos, rejeicoes e legislacao tributaria
-    if re.search(
-        r"\b(?:\d{44}|rejei[cç][aã]o\s*\d+|rejeicao|erro\s+sefaz|sefaz|chave\s+de\s+acesso|"
-        r"nota\s+(?:fiscal\s+)?(?:de\s+frota\s+)?(?:travada|bloqueada|rejeitada)|travou\s+(?:uma\s+)?nota|"
-        r"nfe\s+rejeitada|nfce\s+rejeitada|cfop\s+(?:5929|6929|5656|5655|5927|5102|6102)|"
-        r"monof[aá]sic[ao]|monofasia|icms\s+monof[aá]sico|"
-        r"pis\s*(?:e\s*|\/\s*)?cofins\s+monof[aá]sico|pis\s*(?:e\s*|\/\s*)?cofins|"
-        r"lc\s*192|lc\s*214|cst\s*(?:61|60|04|02|01|03)|"
-        r"sped\s+(?:c113|fiscal|contribui[cç][oõ]es)|registro\s*(?:1300|1310|1320)|"
-        r"tabela\s+4\.3\.10|reforma\s+tribut[aá]ria|cest|abnt\s+nbr\s+5891|arredondamento\s+sefaz|"
-        r"indiedest|isento\s+de\s+ie|difal|auditar\s+xml|auditar\s+nota|"
-        r"tributa[cç][aã]o(?:\s+(?:de\s+)?combust[ií]ve[li]s)?|bitributa[cç][aã]o)\b",
-        p
-    ):
+    if PADRAO_FISCAL_DETERMINISTICO.search(p):
         return "auditoria_fiscal_sefaz"
 
     # -2.5 Meta-perguntas sobre funcionamento do sistema, UI, telas, módulos e atalhos
@@ -1514,6 +1536,25 @@ class SemanticRouter:
                     self._memory_cache[query_norm] = ("procedimento_erp", 0.98, telemetry)
             return "procedimento_erp", 0.98, telemetry
 
+        # 0.07 Deteccao deterministica de auditoria fiscal e regras SEFAZ (Fast-path lexico)
+        if PADRAO_FISCAL_DETERMINISTICO.search(query_norm):
+            total_ms = (time.perf_counter() - t0) * 1000
+            telemetry = {
+                "intent": "auditoria_fiscal_sefaz",
+                "confidence": 0.99,
+                "method": "deterministic_fiscal_fastpath",
+                "matched_phrase": "Padrao deterministico fiscal/SEFAZ identificado",
+                "pgvector_latency_ms": 0.0,
+                "embedding_latency_ms": 0.0,
+                "total_routing_latency_ms": round(total_ms, 3),
+                "confidence_threshold": self.confidence_threshold,
+                "query_vector": None,
+            }
+            if use_cache:
+                with self._cache_lock:
+                    self._memory_cache[query_norm] = ("auditoria_fiscal_sefaz", 0.99, telemetry)
+            return "auditoria_fiscal_sefaz", 0.99, telemetry
+
         # 0.1 Comandos de repeticao / saudacoes genericas - neutralizacao de falsos positivos operacionais
         if RETRY_REGEX.match(query_norm) or query_norm in CONVERSATIONAL_WORDS:
             total_ms = (time.perf_counter() - t0) * 1000
@@ -1587,6 +1628,9 @@ class SemanticRouter:
                 # Priorizacao deterministica de Micro-Widgets GenUI, Mentoria Executiva e Dados Publicos
                 intencao_h = classificar_intencao_heuristica(query_text)
                 if intencao_h in (
+                    "auditoria_fiscal_sefaz",
+                    "conhecimento_fiscal",
+                    "procedimento_erp",
                     "mentoria_decisao",
                     "cenario_preditivo",
                     "simulacao_preditiva",

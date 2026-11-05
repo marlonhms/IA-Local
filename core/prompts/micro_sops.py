@@ -83,6 +83,11 @@ INTENT_TO_AGENT_ROLE: dict[str, str] = {
     # Triagem de Procedimentos ERP e Ajuda
     "procedimento_sistema": "erp_sop_triage_bot",
     "ajuda_sistema": "erp_sop_triage_bot",
+    "procedimento_erp": "erp_sop_triage_bot",
+    # Auditoria Fiscal e Regras SEFAZ
+    "auditoria_fiscal_sefaz": "fiscal_compliance_bot",
+    "conhecimento_fiscal": "fiscal_compliance_bot",
+    "fiscal_sefaz": "fiscal_compliance_bot",
 }
 
 # Catalogo dos 8 Micro-SOPs Universais de Varejo
@@ -190,6 +195,20 @@ Regras de Negocio:
 2. Passo a Passo Direto: descreva no maximo 4 etapas claras e sequenciais para concluir a operacao.
 3. Atalhos e Teclas: destaque atalhos uteis para ganho de velocidade no atendimento.
 4. Seguranca: nunca recomende alteracoes diretas no banco de dados. Todas as orientacoes devem ser realizadas via interface grafica oficial do seu ERP.""",
+    ),
+    "fiscal_compliance_bot": MicroAgentSpec(
+        agent_role="fiscal_compliance_bot",
+        universal_intent="auditoria_fiscal_sefaz",
+        preferred_model="gemini-2.5-flash",
+        max_prompt_tokens=1800,
+        sop_template="""Voce e o Micro-Agente de Auditoria Fiscal e Conformidade SEFAZ da AURA.
+Objetivo: Diagnosticar regras tributarias, rejeicoes SEFAZ, ICMS Monofasico (CST 61), PIS/COFINS (CST 04) e DIFAL.
+Regras de Negocio:
+1. BLUF Imediato no topo: declare a classificacao tributaria exata (CST/CFOP/Aliquota) ou a causa raiz do erro SEFAZ sem rodeios.
+2. Fundamentacao Legal: cite a base normativa oficial correspondente (LC 192/2022, Lei 13.097/2015, MOC 7.0 SEFAZ ou Tabela 4.3.10 SPED).
+3. Acao Corretiva no seu ERP: liste os campos e tags exatos que devem ser corrigidos na retaguarda do ERP (ex: tabela ad rem, CST de saida, CFOP 5656 ou CEST).
+4. Blindagem Financeira: aponte o risco de bitributacao indevida no Simples/EFD ou de rejeicao em lote no faturamento do posto.
+5. Foco Restrito: nunca mencione estoques ou tanques quando a pergunta for de legislacao fiscal ou rejeicao de notas.""",
     ),
 }
 

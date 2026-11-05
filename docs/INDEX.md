@@ -26,6 +26,7 @@ docs/
 ├── roadmap_apendice_sinergia_dual_channel.md <- [CONCLUIDO] Sinergia Dual-Channel, Nitidez Optica e Fluxo Chat -> Canvas
 ├── roadmap_apendice_ux_textual_chat.md    <- [CONCLUIDO] Tipografia Cognitiva Editorial e Anti-Fadiga no Chat
 ├── roadmap_apendice_micro_agents_roi_varejo.md <- [CONCLUIDO] Micro-Agentes de Baixo Custo e Motor Universal de ROI Varejo
+├── roadmap_apendice_roteamento_rag_verdade_minima.md <- [ATIVO] Roteamento Hibrido, RAG Facetado e Verdade Minima para Modelos SLM/Flash
 ├── apendice_longo_prazo.md                <- [ATIVO] Visao Tecnica e Arquitetura 30-90+ Dias (DuckDB, SLMs, Packs)
 ├── Deep research Estrategia e Arquitetura da AURA.md <- [ATIVO] Estudo Estrategico Canonico
 ├── dossie_tecnico.md                      <- [ATIVO] Dossie Tecnico Consolidado do Sistema AURA
@@ -80,6 +81,7 @@ A tabela abaixo conecta cada documento ao seu papel no ciclo de vida da AURA:
 | **Apendice Sinergia Dual-Channel** | [`roadmap_apendice_sinergia_dual_channel.md`](roadmap_apendice_sinergia_dual_channel.md) | UX / Coreografia | **CONCLUIDO** | Nitidez optica ClearType, fluxo sequencial `Chat -> Canvas` sem abertura precoce e eliminacao de tripla redundancia textual. |
 | **Apendice UX Textual Chat** | [`roadmap_apendice_ux_textual_chat.md`](roadmap_apendice_ux_textual_chat.md) | UX / Tipografia | **CONCLUIDO** | Ergonomia tipografica (65ch-70ch), tokenizacao tabular de metricas, BLUF e Progressive Disclosure. |
 | **Apendice Micro-Agentes & ROI Varejo** | [`roadmap_apendice_micro_agents_roi_varejo.md`](roadmap_apendice_micro_agents_roi_varejo.md) | Arquitetura / ROI | **CONCLUIDO** | Micro-SOPs por intencao, orcamento por `agent_role`, estado YAML compacto e Motor Universal de ROI Multi-Vertical (Supermercados, Farmacias, Atacado, Autocenters e Postos). |
+| **Apendice Verdade Minima SLM** | [`roadmap_apendice_roteamento_rag_verdade_minima.md`](roadmap_apendice_roteamento_rag_verdade_minima.md) | Engenharia / RAG | **ATIVO** | Gate lexico deterministico (< 0.2ms), seeding de vetores de intencao, fichas tecnicas canonicas de ICMS/PIS/COFINS/SEFAZ e Scoped Tooling para modelos Flash sem dependencia de APIs PRO. |
 | **Apendice Longo Prazo** | [`apendice_longo_prazo.md`](apendice_longo_prazo.md) | Arquitetura | **ATIVO** | Visao 30-90+ dias: DuckDB Hypertenancy colunar, SLMs locais na borda, Domain Packs e Pricing B2B. |
 | **Deep Research Estrategia** | [`Deep research Estrategia e Arquitetura da AURA.md`](Deep%20research%20Estratégia%20e%20Arquitetura%20da%20AURA.md) | Estrategia | **ATIVO** | Estudo aprofundado de viabilidade, retorno sobre investimento, dados nacionais de perdas no varejo e diferenciais de borda. |
 | **Dossie Tecnico** | [`dossie_tecnico.md`](dossie_tecnico.md) | Sistema | **ATIVO** | Sintese de componentes, requisitos, stack tecnologica e topologia de execucao. |

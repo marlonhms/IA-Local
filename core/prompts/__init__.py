@@ -10,9 +10,19 @@ from core.prompts.system_prompts import (
     build_system_prompt,
     build_procedimento_erp_prompt,
 )
+from core.prompts.fiscal_knowledge_cards import (
+    FISCAL_KNOWLEDGE_CARDS,
+    obter_card_fiscal,
+    obter_todos_cards_relevantes,
+    formatar_fichas_para_prompt,
+)
 
 __all__ = [
     "build_help_prompt",
     "build_system_prompt",
     "build_procedimento_erp_prompt",
+    "FISCAL_KNOWLEDGE_CARDS",
+    "obter_card_fiscal",
+    "obter_todos_cards_relevantes",
+    "formatar_fichas_para_prompt",
 ]

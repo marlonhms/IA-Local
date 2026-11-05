@@ -3917,6 +3917,25 @@ class AuraEngine:
         cache_hit = False
 
         # Protecao de Hardware do PDV (Fase 3: Circuit Breaker)
+        # Scoped Tooling Guard: se a pergunta contiver termos fiscais inequivocos,
+        # impede que ferramentas operacionais de pista/tanques/frentistas sejam executadas por engano
+        from core.semantic_router import PADRAO_FISCAL_DETERMINISTICO
+        if PADRAO_FISCAL_DETERMINISTICO.search(pergunta) and intencao in (
+            "mentoria_decisao",
+            "previsao_tanques",
+            "previsao_runout_estoque",
+            "estoque_posicao",
+            "desempenho_pista_frentistas",
+            "desempenho_equipe_conversao",
+            "vendas_analitico",
+            "vendas_consolidado",
+        ):
+            logger.warning(
+                "AuraEngine [SCOPED TOOLING]: Redirecionando intencao operacional '%s' para 'auditoria_fiscal_sefaz' devido a termos fiscais inequivocos.",
+                intencao,
+            )
+            intencao = "auditoria_fiscal_sefaz"
+
         if self._is_heavy_tool(intencao) and not self.watchdog.is_heavy_operation_allowed():
             logger.warning(
                 "Hardware Circuit Breaker OPEN para intencao '%s': ativando sintese de protecao do PDV",
@@ -4036,7 +4055,10 @@ class AuraEngine:
                         "NUNCA descreva itens individuais, produtos linha por linha ou tabelas repetitivas no texto. "
                         "Agrupe os fatos geradores pela causa raiz e convide o gestor a inspecionar os detalhes tabulares no Canvas.\n"
                     )
+                from core.prompts.fiscal_knowledge_cards import formatar_fichas_para_prompt
+                bloco_fichas = formatar_fichas_para_prompt(pergunta)
                 contexto_extra = (
+                    f"{bloco_fichas}\n\n"
                     f"Auditoria Fiscal e Diagnostico Especialista SEFAZ (Agent Sefaz + ERP RAG):{directive}\n"
                     f"{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
                 )
@@ -5648,6 +5670,25 @@ class AuraEngine:
 
         # 2. Roteamento Semântico Vetorial / Heurístico (sobre a pergunta efetiva)
         intencao, confianca, telemetria_rota = self.router.route(pergunta_efetiva)
+        # Scoped Tooling Guard: previne que falsos positivos operacionais sobreponham termos fiscais
+        from core.semantic_router import PADRAO_FISCAL_DETERMINISTICO
+        if PADRAO_FISCAL_DETERMINISTICO.search(pergunta_efetiva) and intencao in (
+            "mentoria_decisao",
+            "previsao_tanques",
+            "previsao_runout_estoque",
+            "estoque_posicao",
+            "desempenho_pista_frentistas",
+            "desempenho_equipe_conversao",
+            "vendas_analitico",
+            "vendas_consolidado",
+        ):
+            logger.warning(
+                "AuraEngine [SCOPED TOOLING]: Redirecionando intencao preliminar '%s' para 'auditoria_fiscal_sefaz'.",
+                intencao,
+            )
+            intencao = "auditoria_fiscal_sefaz"
+            confianca = max(confianca, 0.99)
+
         query_vector = telemetria_rota.get("query_vector")
         tool_call_id = generate_tool_call_id()
 
