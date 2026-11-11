@@ -109,20 +109,11 @@
 
     /**
      * Inicia uma nova conversa e define como sessao ativa.
+     * Nao persiste registro fantasma no indice ate que a primeira mensagem seja enviada.
      */
     async startNewSession(title = 'Nova Conversa') {
       const newId = this.generateSessionId();
       this.setActiveSessionId(newId);
-
-      const sessionObj = {
-        session_id: newId,
-        title: title,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        message_count: 0
-      };
-
-      await this._putSession(sessionObj);
       return newId;
     }
 

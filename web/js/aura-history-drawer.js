@@ -518,7 +518,7 @@
         }
       }
 
-      let sessions = Array.from(sessionMap.values());
+      let sessions = Array.from(sessionMap.values()).filter(s => (s.message_count || 0) > 0);
       sessions.sort((a, b) => parseDateSafe(b.updated_at || b.created_at).getTime() - parseDateSafe(a.updated_at || a.created_at).getTime());
 
       const activeSessionId = (window.AuraStorage && typeof window.AuraStorage.getActiveSessionId === 'function')
@@ -576,7 +576,7 @@
           const isActive = (s.session_id === activeSessionId);
           const domain = this.classifyDomain(s);
           const timeFormatted = this.formatSessionTime(s.updated_at || s.created_at);
-          const msgCount = s.message_count || 1;
+          const msgCount = (typeof s.message_count === 'number') ? s.message_count : 0;
           const displayTitle = this.escapeHtml(s.title || 'Conversa sem titulo');
 
           html += `

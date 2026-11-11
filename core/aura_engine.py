@@ -941,6 +941,7 @@ class AuraSessionMemory:
                 FROM aura_sessions s
                 LEFT JOIN aura_messages m ON s.session_id = m.session_id
                 GROUP BY s.session_id
+                HAVING COUNT(m.id) > 0
                 ORDER BY s.updated_at DESC
                 LIMIT ?;
             """, (limit,))
