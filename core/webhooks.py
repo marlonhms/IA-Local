@@ -20,6 +20,9 @@ from config.settings import (
     EVOLUTION_API_URL,
     EVOLUTION_INSTANCE,
     N8N_WEBHOOK_URL,
+    PAINEL_WHATSAPP_AURA_KEY,
+    PAINEL_WHATSAPP_EVENTS_URL,
+    PAINEL_WHATSAPP_TENANT_SLUG,
     WHATSAPP_MANAGER_PHONE,
 )
 from core.logger import logger
@@ -519,6 +522,174 @@ def format_alerta_lmc_whatsapp_message(payload: AlertaLMCCompliancePayload) -> s
     return "\n".join(lines)
 
 
+async def dispatch_painel_whatsapp_event(
+    event_type: str,
+    filial_id: str,
+    metrics: dict[str, Any],
+    aura_raw_context: dict[str, Any] | None = None,
+    severity: str = "warning",
+    phone: str | None = None,
+    client_name: str | None = None,
+    company_name: str | None = None,
+    auto_synthesize_voice: bool = True,
+    auto_dispatch_whatsapp: bool = True,
+    auto_create_campaign: bool = False,
+    events_url: str | None = None,
+    api_key: str | None = None,
+    tenant_slug: str | None = None,
+    timeout_seconds: float = 8.0,
+    outbox: AuraTransactionalOutbox | None = None,
+    idempotency_key: str | None = None,
+    max_attempts: int = 5,
+) -> WebhookDispatchResult:
+    """
+    Persiste na Transactional Outbox (SQLite WAL) e despacha evento operacional para
+    o Hub de Eventos do Painel WhatsApp CRM (POST /api/aura/events).
+    Garante integracao resiliente (Persist-Before-Send) com sintese de voz neural e campanhas.
+    """
+    target_url = (events_url or PAINEL_WHATSAPP_EVENTS_URL or "").strip()
+    key = api_key or PAINEL_WHATSAPP_AURA_KEY or "whsec_partner_fuel_bi_2026"
+    slug = tenant_slug or PAINEL_WHATSAPP_TENANT_SLUG or "partner-fuel-bi"
+    target_phone = phone or WHATSAPP_MANAGER_PHONE or ""
+
+    if not target_url:
+        logger.info("PAINEL_WHATSAPP_EVENTS_URL nao configurada. Disparo ao CRM ignorado.")
+        return WebhookDispatchResult(
+            success=False,
+            service="painel_whatsapp",
+            target_url="",
+            error="PAINEL_WHATSAPP_EVENTS_URL nao definida no ambiente",
+        )
+
+    clean_phone = target_phone.replace("+", "").replace("-", "").replace(" ", "").strip()
+    station_title = company_name or f"Posto {filial_id.upper()}"
+
+    body = {
+        "eventType": event_type,
+        "segment": "postos_redes",
+        "tenantSlug": slug,
+        "stationCode": filial_id,
+        "stationName": station_title,
+        "businessUnit": filial_id,
+        "unitName": station_title,
+        "clientName": client_name or "Gestor do Posto",
+        "clientPhone": clean_phone,
+        "severity": severity,
+        "metrics": metrics,
+        "autoSynthesizeVoice": auto_synthesize_voice,
+        "autoDispatchWhatsApp": bool(auto_dispatch_whatsapp and clean_phone),
+        "autoCreateCampaign": auto_create_campaign,
+        "auraRawContext": aura_raw_context or {},
+        "timestamp": datetime.now(UTC).isoformat(),
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "X-Aura-Key": key,
+        "X-Tenant-Key": key,
+        "X-Station-ID": filial_id,
+    }
+
+    active_outbox = outbox if outbox is not None else get_transactional_outbox()
+    msg = active_outbox.enqueue(
+        event_type=f"painel_whatsapp_{event_type.lower()}",
+        destination_url=target_url,
+        payload=body,
+        headers=headers,
+        idempotency_key=idempotency_key,
+        max_attempts=max_attempts,
+    )
+
+    if msg.status == OutboxStatus.DELIVERED.value:
+        return WebhookDispatchResult(
+            success=True,
+            service="painel_whatsapp",
+            target_url=target_url,
+            status_code=200,
+            response_body="Mensagem ja entregue anteriormente (idempotency_key)",
+            outbox_message_id=msg.message_id,
+            outbox_status=msg.status,
+        )
+
+    if msg.status == OutboxStatus.DEAD_LETTER.value:
+        return WebhookDispatchResult(
+            success=False,
+            service="painel_whatsapp",
+            target_url=target_url,
+            error=msg.last_error or "Mensagem em DEAD_LETTER (max_attempts esgotado)",
+            outbox_message_id=msg.message_id,
+            outbox_status=msg.status,
+        )
+
+    processing_msg = active_outbox.mark_processing(msg.message_id)
+    if processing_msg is None:
+        current = active_outbox.get_message(msg.message_id) or msg
+        if current.status == OutboxStatus.DELIVERED.value:
+            return WebhookDispatchResult(
+                success=True,
+                service="painel_whatsapp",
+                target_url=target_url,
+                status_code=200,
+                response_body="Mensagem ja entregue anteriormente (idempotency_key)",
+                outbox_message_id=current.message_id,
+                outbox_status=current.status,
+            )
+        return WebhookDispatchResult(
+            success=False,
+            service="painel_whatsapp",
+            target_url=target_url,
+            error=current.last_error or "Mensagem ja em processamento concorrente na Outbox",
+            outbox_message_id=current.message_id,
+            outbox_status=current.status,
+        )
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+            resp = await client.post(target_url, json=body, headers=headers)
+            success = 200 <= resp.status_code < 300
+            if success:
+                updated = active_outbox.mark_delivered(msg.message_id)
+                return WebhookDispatchResult(
+                    success=True,
+                    service="painel_whatsapp",
+                    target_url=target_url,
+                    status_code=resp.status_code,
+                    response_body=resp.text[:500],
+                    outbox_message_id=msg.message_id,
+                    outbox_status=updated.status if updated else OutboxStatus.DELIVERED.value,
+                )
+
+            err_text = f"HTTP {resp.status_code}: {resp.text[:300]}"
+            logger.error(
+                f"Falha no webhook do Painel WhatsApp ({resp.status_code}): {resp.text}",
+                extra={"event_type": event_type, "status_code": resp.status_code},
+            )
+            updated = active_outbox.mark_failed_attempt(msg.message_id, error=err_text)
+            return WebhookDispatchResult(
+                success=False,
+                service="painel_whatsapp",
+                target_url=target_url,
+                status_code=resp.status_code,
+                response_body=resp.text[:500],
+                error=err_text,
+                outbox_message_id=msg.message_id,
+                outbox_status=updated.status if updated else OutboxStatus.FAILED_RETRY.value,
+            )
+    except Exception as exc:
+        logger.error(
+            f"Excecao no disparo ao Painel WhatsApp: {exc}",
+            extra={"event_type": event_type, "error": str(exc)},
+        )
+        updated = active_outbox.mark_failed_attempt(msg.message_id, error=str(exc))
+        return WebhookDispatchResult(
+            success=False,
+            service="painel_whatsapp",
+            target_url=target_url,
+            error=str(exc),
+            outbox_message_id=msg.message_id,
+            outbox_status=updated.status if updated else OutboxStatus.FAILED_RETRY.value,
+        )
+
+
 # =============================================================================
 # FUNCOES DE ALTO NIVEL PARA NOTIFICACOES INTEGRADAS
 # =============================================================================
@@ -561,6 +732,26 @@ async def notify_fechamento_turno(
         )
         results["evolution"] = evo_res.model_dump()
 
+    # 3. Despacho proativo para o Hub de Eventos do Painel WhatsApp CRM
+    if PAINEL_WHATSAPP_EVENTS_URL:
+        idem_crm = f"{idempotency_key}:crm" if idempotency_key else None
+        crm_res = await dispatch_painel_whatsapp_event(
+            event_type="ALERTA_MARGEM_RENTABILIDADE",
+            filial_id=payload.filial_id,
+            severity="info" if payload.status_conciliacao == "CONCILIADO" else "warning",
+            phone=target_phone,
+            metrics={
+                "periodo": f"Fechamento de Turno {payload.turno_id} ({payload.data})",
+                "indicadorPrincipal": f"Faturamento Total: R$ {payload.faturamento_total:,.2f}",
+                "variacaoPct": 0.0,
+                "detalheOperacional": f"Volume: {payload.litros_vendidos:,.0f} L em {payload.bicos_analisados} bicos. Quebra de caixa: R$ {payload.quebra_caixa:,.2f}. Status: {payload.status_conciliacao}.",
+            },
+            aura_raw_context=payload.model_dump(),
+            outbox=outbox,
+            idempotency_key=idem_crm,
+        )
+        results["painel_whatsapp"] = crm_res.model_dump()
+
     return results
 
 
@@ -598,6 +789,27 @@ async def notify_alerta_tanque(
             event_type="alerta_tanque",
         )
         results["evolution"] = evo_res.model_dump()
+
+    # 3. Despacho proativo para o Hub de Eventos do Painel WhatsApp CRM
+    if PAINEL_WHATSAPP_EVENTS_URL:
+        idem_crm = f"{idempotency_key}:crm" if idempotency_key else None
+        pct_diff = -round((1.0 - (payload.volume_atual_litros / max(1.0, payload.capacidade_total_litros))) * 100.0, 1)
+        crm_res = await dispatch_painel_whatsapp_event(
+            event_type="ANOMALIA_OPERACIONAL_ESTOQUE",
+            filial_id=payload.filial_id,
+            severity="critical" if payload.urgencia.upper() in ("ALTA", "CRITICA") else "warning",
+            phone=target_phone,
+            metrics={
+                "periodo": "Telemetria de Pista em Tempo Real",
+                "indicadorPrincipal": f"Autonomia Critica - Tanque {payload.tanque_id} ({payload.combustivel})",
+                "variacaoPct": pct_diff,
+                "detalheOperacional": f"Saldo: {payload.volume_atual_litros:,.0f} L de {payload.capacidade_total_litros:,.0f} L. Autonomia estimada: {payload.autonomia_horas:.1f}h. Esgotamento: {payload.previsao_esgotamento}.",
+            },
+            aura_raw_context=payload.model_dump(),
+            outbox=outbox,
+            idempotency_key=idem_crm,
+        )
+        results["painel_whatsapp"] = crm_res.model_dump()
 
     return results
 
@@ -637,6 +849,26 @@ async def notify_alerta_sangria(
         )
         results["evolution"] = evo_res.model_dump()
 
+    # 3. Despacho proativo para o Hub de Eventos do Painel WhatsApp CRM
+    if PAINEL_WHATSAPP_EVENTS_URL:
+        idem_crm = f"{idempotency_key}:crm" if idempotency_key else None
+        crm_res = await dispatch_painel_whatsapp_event(
+            event_type="ANOMALIA_OPERACIONAL_ESTOQUE",
+            filial_id=payload.filial_id,
+            severity="critical" if payload.urgencia.upper() in ("ALTA", "CRITICA") else "warning",
+            phone=target_phone,
+            metrics={
+                "periodo": "Monitoramento de Retencao de Caixa",
+                "indicadorPrincipal": f"Retencao de Gaveta - Caixa {payload.caixa_id}",
+                "variacaoPct": round((payload.excesso_dinheiro / max(1.0, payload.teto_seguro)) * 100.0, 1),
+                "detalheOperacional": f"Saldo em dinheiro: R$ {payload.saldo_dinheiro:,.2f} (teto seguro: R$ {payload.teto_seguro:,.2f}). Excesso retido: R$ {payload.excesso_dinheiro:,.2f} ha {payload.minutos_sem_sangria} minutos sem sangria.",
+            },
+            aura_raw_context=payload.model_dump(),
+            outbox=outbox,
+            idempotency_key=idem_crm,
+        )
+        results["painel_whatsapp"] = crm_res.model_dump()
+
     return results
 
 
@@ -674,5 +906,25 @@ async def notify_alerta_lmc(
             event_type="alerta_lmc",
         )
         results["evolution"] = evo_res.model_dump()
+
+    # 3. Despacho proativo para o Hub de Eventos do Painel WhatsApp CRM
+    if PAINEL_WHATSAPP_EVENTS_URL:
+        idem_crm = f"{idempotency_key}:crm" if idempotency_key else None
+        crm_res = await dispatch_painel_whatsapp_event(
+            event_type="ANOMALIA_OPERACIONAL_ESTOQUE",
+            filial_id=payload.filial_id,
+            severity="critical",
+            phone=target_phone,
+            metrics={
+                "periodo": "Conformidade LMC Portaria ANP 26/1992",
+                "indicadorPrincipal": f"Variacao LMC no Tanque {payload.tanque_id} ({payload.combustivel}): {payload.variacao_volumetrica_pct:.2f}%",
+                "variacaoPct": payload.variacao_volumetrica_pct,
+                "detalheOperacional": f"Tolerancia legal ANP: +-0.60%. Diagnostico: {payload.tipo_variacao}. {payload.sugestao or 'Vistoriar estanqueidade e bicos medidores.'}",
+            },
+            aura_raw_context=payload.model_dump(),
+            outbox=outbox,
+            idempotency_key=idem_crm,
+        )
+        results["painel_whatsapp"] = crm_res.model_dump()
 
     return results

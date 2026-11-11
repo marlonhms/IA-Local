@@ -123,6 +123,15 @@ EVOLUTION_API_KEY = os.getenv("EVOLUTION_API_KEY", "")
 EVOLUTION_INSTANCE = os.getenv("EVOLUTION_INSTANCE", "posto_aura")
 WHATSAPP_MANAGER_PHONE = os.getenv("WHATSAPP_MANAGER_PHONE", "")
 
+# Integracao com Painel WhatsApp CRM (Hub Omnichannel e Campanhas)
+PAINEL_WHATSAPP_EVENTS_URL = os.getenv("PAINEL_WHATSAPP_EVENTS_URL", "http://localhost:3000/api/aura/events")
+PAINEL_WHATSAPP_AURA_KEY = os.getenv(
+    "PAINEL_WHATSAPP_AURA_KEY",
+    os.getenv("PARTNER_BI_WEBHOOK_SECRET", "whsec_partner_fuel_bi_2026"),
+)
+PAINEL_WHATSAPP_TENANT_SLUG = os.getenv("PAINEL_WHATSAPP_TENANT_SLUG", "partner-fuel-bi")
+AURA_PARTNER_API_KEY = os.getenv("AURA_PARTNER_API_KEY", "aura-partner-default-key")
+
 # Configuracao do Banco ERP (PostgreSQL 16 Windows Service - Porta 5433)
 # Prioriza a role tecnica dedicada aura_service_ro (P1-1)
 ERP_USER = os.getenv("ERP_SERVICE_USER") or os.getenv("ERP_DB_USER", "aura_service_ro")
