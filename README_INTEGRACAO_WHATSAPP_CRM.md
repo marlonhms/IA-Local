@@ -147,5 +147,26 @@ O script:
    ```
 3. **Rodar Testes de Integracao da AURA Local (pytest):**
    ```powershell
-   pytest -q "G:\Projetos\Aila - pgvector\tests\unit\test_partner_whatsapp_integration.py" "G:\Projetos\Aila - pgvector\tests\unit\test_webhooks.py"
+   pytest -q "G:\Projetos\Aila - pgvector\tests\unit\test_partner_whatsapp_integration.py" "G:\Projetos\Aila - pgvector\tests\unit\test_partner_predictive_engine.py"
    ```
+
+---
+
+## 5. Super-Inteligencia Executiva Universal (Multi-Segmento)
+
+A integracao conta com 5 motores universais agnosticos de segmento (Lojas/Varejo, Escritorios/SaaS, Clinicas, E-commerce, Logistica e Postos):
+
+1. **Briefing Matinal Voice-First de 45s ("Modo Socio"):**
+   - `POST /api/aura/morning-briefing`: consolida indicadores, gera roteiro oral consultivo e sintetiza audio neural transmitido via WhatsApp (PTT).
+2. **Motor Preditivo de Ruptura & Capacidade (Run-Out Engine):**
+   - `POST /api/v1/partner/predictive-runout` e `src/lib/aura/predictive-engine.ts`: projeta esgotamento de estoque/horas tecnicas e calcula a **Economia de Antecipacao (R$)**.
+3. **Detector de Fuga Invisivel de Lucro (Loss Prevention):**
+   - `POST /api/v1/partner/predictive-leakage`: quantifica em R$/mes perdas com descontos sem alcada, leads abandonados, no-show, horas nao faturadas e quebras.
+4. **Maquina Anti-Churn RFM (Reativacao 1-Clique):**
+   - `POST /api/v1/partner/predictive-rfm`: identifica clientes VIP em risco de abandono com lote de mensagens individualizadas e Spintax Anti-Ban.
+5. **Closed-Loop Action com Menu 1, 2, 3 no WhatsApp:**
+   - Respostas interceptadas pelo `autonomous-responder.ts` com recibo no **Command Journal**:
+     - `1`: Aprovar & Executar Acao Preventiva.
+     - `2`: Delegar Meta / Cobrar Equipe Responsavel.
+     - `3`: Silenciar Alertas Operacionais por 6 horas.
+

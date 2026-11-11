@@ -2251,8 +2251,38 @@ async def partner_quick_action_endpoint(
             "timestamp": now_iso,
         }
 
-    # Opcao 2: Snooze / Silenciar alerta por cooldown
-    if opt in ("2", "silenciar", "snooze", "pausar", "depois"):
+    # Opcao 2: Delegar para a equipe / cobrar responsavel
+    if opt in ("delegar", "cobrar", "equipe", "vendedor", "gerente") or action_type == "DELEGAR_EQUIPE":
+        confirmation_text = (
+            f"[DELEGADO] Ordem registrada no Command Journal ({voucher_ref}) para a equipe responsavel. "
+            f"Alerta operacional para {clean_station.upper()} encaminhado e silenciado temporariamente por 6 horas para cobranca em segundo plano."
+        )
+
+        if claim.acquired:
+            journal.complete_command(
+                command_key=command_key,
+                result_payload={
+                    "status": "DELEGATED",
+                    "executed_at": now_iso,
+                    "confirmation": confirmation_text,
+                },
+            )
+
+        return {
+            "success": True,
+            "action_executed": "DELEGAR_EQUIPE",
+            "option_key": payload.option_key,
+            "station_id": clean_station,
+            "voucher_id": voucher_ref,
+            "journal_id": claim.entry.journal_id if claim.entry else None,
+            "status": "DELEGATED",
+            "confirmation_text": confirmation_text,
+            "replayed": claim.replayed,
+            "timestamp": now_iso,
+        }
+
+    # Opcao 3 (ou 2 legado): Snooze / Silenciar alerta por cooldown
+    if opt in ("2", "3", "silenciar", "snooze", "pausar", "depois", "adiar"):
         confirmation_text = (
             f"Alerta operacional para {clean_station.upper()} silenciado temporariamente por 6 horas. "
             f"O monitoramento continuara em segundo plano."
@@ -2418,3 +2448,637 @@ async def partner_get_memory_facts_endpoint(
         "count": len(facts),
         "facts": [f.to_dict() for f in facts],
     }
+
+
+# =============================================================================
+# MODULO: MOTOR PREDITIVO UNIVERSAL & AUDITORIA DE FUGA INVISIVEL (SPRINT 1)
+# =============================================================================
+
+UNIVERSAL_SEGMENT_CONFIGS: dict[str, dict[str, Any]] = {
+    "varejo": {
+        "segment": "varejo",
+        "label": "Loja / Comercio Varejista",
+        "subtitle": "Roupas, Calcados, Autopecas, Materiais e Varejo Fisico",
+        "icon": "🛍️",
+        "critical_resource_name": "Estoque de Produtos Curva A (Giro Rapido)",
+        "unit_label": "unidades",
+        "default_burn_rate_per_hour": 4.5,
+        "typical_avg_ticket_brl": 185.0,
+        "typical_hourly_rate_brl": 65.0,
+        "lead_conversion_rate_pct": 22.0,
+        "inactivity_threshold_days": 30,
+        "primary_quick_action_text": "Aprovar reposicao automatica com fornecedor parceiro",
+        "secondary_quick_action_text": "Disparar oferta relampago de giro rapido no WhatsApp",
+    },
+    "saas_b2b": {
+        "segment": "saas_b2b",
+        "label": "Escritorio e Servicos B2B",
+        "subtitle": "Contabilidade, Advocacia, Consultoria, Agencias e Software",
+        "icon": "💼",
+        "critical_resource_name": "Horas Tecnicas e Capacidade de Consultoria",
+        "unit_label": "horas tecnicas",
+        "default_burn_rate_per_hour": 2.8,
+        "typical_avg_ticket_brl": 2450.0,
+        "typical_hourly_rate_brl": 190.0,
+        "lead_conversion_rate_pct": 18.0,
+        "inactivity_threshold_days": 45,
+        "primary_quick_action_text": "Acionar lembrete preventivo de proposta aos clientes quentes",
+        "secondary_quick_action_text": "Ofertar horarios livres da equipe com condicao especial",
+    },
+    "saude_clinicas": {
+        "segment": "saude_clinicas",
+        "label": "Clinica e Consultorio de Saude",
+        "subtitle": "Medicina, Odontologia, Veterinaria, Estetica e Terapias",
+        "icon": "🩺",
+        "critical_resource_name": "Agenda Medica e Horarios de Procedimentos",
+        "unit_label": "horarios/vagas",
+        "default_burn_rate_per_hour": 1.8,
+        "typical_avg_ticket_brl": 320.0,
+        "typical_hourly_rate_brl": 220.0,
+        "lead_conversion_rate_pct": 28.0,
+        "inactivity_threshold_days": 60,
+        "primary_quick_action_text": "Confirmar agenda de amanha com aviso amigavel de liberacao de vaga",
+        "secondary_quick_action_text": "Chamar pacientes da fila de espera para preenchimento imediato",
+    },
+    "ecommerce": {
+        "segment": "ecommerce",
+        "label": "E-commerce e D2C",
+        "subtitle": "Lojas Virtuais, Marcas Proprias e Marketplaces",
+        "icon": "📦",
+        "critical_resource_name": "Estoque do Produto Campeao de Vendas (Hero SKU)",
+        "unit_label": "pedidos/unidades",
+        "default_burn_rate_per_hour": 8.2,
+        "typical_avg_ticket_brl": 165.0,
+        "typical_hourly_rate_brl": 80.0,
+        "lead_conversion_rate_pct": 15.0,
+        "inactivity_threshold_days": 21,
+        "primary_quick_action_text": "Disparar fluxo de recuperacao de carrinhos de alto valor",
+        "secondary_quick_action_text": "Pausar campanha paga do SKU em risco ou emitir compra emergencial",
+    },
+    "logistica": {
+        "segment": "logistica",
+        "label": "Distribuidora e Logistica",
+        "subtitle": "Centros de Distribuicao, Atacado e Frotas de Entrega",
+        "icon": "🚚",
+        "critical_resource_name": "Capacidade de Carga da Frota e Janelas de Cais",
+        "unit_label": "posicoes/rotas",
+        "default_burn_rate_per_hour": 3.5,
+        "typical_avg_ticket_brl": 4800.0,
+        "typical_hourly_rate_brl": 140.0,
+        "lead_conversion_rate_pct": 20.0,
+        "inactivity_threshold_days": 15,
+        "primary_quick_action_text": "Consolidar rotas e encaixar carga pendente para zerar frete ocioso",
+        "secondary_quick_action_text": "Contatar compradores B2B que nao emitiram o pedido habitual da semana",
+    },
+    "postos_redes": {
+        "segment": "postos_redes",
+        "label": "Postos de Combustiveis e Conveniencia",
+        "subtitle": "Pista de Abastecimento, Lubrificantes, LMC e Loja de Conveniencia",
+        "icon": "⛽",
+        "critical_resource_name": "Volume Fisico nos Tanques e Autonomia de Pista",
+        "unit_label": "litros",
+        "default_burn_rate_per_hour": 280.0,
+        "typical_avg_ticket_brl": 145.0,
+        "typical_hourly_rate_brl": 45.0,
+        "lead_conversion_rate_pct": 35.0,
+        "inactivity_threshold_days": 20,
+        "primary_quick_action_text": "Aprovar pedido fracionado com distribuidora antes da virada de preco",
+        "secondary_quick_action_text": "Ativar campanha relampago de aditivacao para motoristas de aplicativo",
+    },
+}
+
+
+class PredictiveRunOutPayload(BaseModel):
+    segment: str = Field(default="postos_redes", description="Segmento de negocio")
+    current_stock_or_capacity: float = Field(default=0.0, description="Volume ou capacidade disponivel")
+    burn_rate_per_hour: float | None = Field(default=None, description="Consumo ou giro horario medio")
+    reorder_lead_time_hours: float | None = Field(default=None, description="Prazo de entrega do fornecedor em horas")
+    cost_per_unit_or_hour: float | None = Field(default=None, description="Custo unitario de reposicao")
+    urgency_price_delta_pct: float | None = Field(default=None, description="Impacto percentual de compra de ultima hora")
+    resource_name: str | None = Field(default=None, description="Nome do recurso monitorado")
+    unit_label: str | None = Field(default=None, description="Unidade de medida")
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class PredictiveLeakagePayload(BaseModel):
+    segment: str = Field(default="postos_redes", description="Segmento de negocio")
+    gross_monthly_revenue_brl: float | None = Field(default=None, description="Faturamento bruto mensal")
+    discounts_given_without_approval_brl: float | None = Field(default=None, description="Descontos sem alcada no PDV")
+    unbilled_or_wasted_hours: float | None = Field(default=None, description="Horas tecnicas nao faturadas")
+    hourly_rate_brl: float | None = Field(default=None, description="Valor da hora tecnica")
+    cold_abandoned_leads_count: int | None = Field(default=None, description="Leads quentes sem retorno")
+    average_ticket_brl: float | None = Field(default=None, description="Ticket medio de venda")
+    lead_to_sale_conversion_rate_pct: float | None = Field(default=None, description="Taxa de conversao de leads")
+    inventory_discrepancy_brl: float | None = Field(default=None, description="Divergencia fisica de estoque/tanques")
+    no_show_count: int | None = Field(default=None, description="Faltas sem aviso em consultas")
+    no_show_cost_per_appointment_brl: float | None = Field(default=None, description="Custo medio por no-show")
+    return_or_idle_freight_cost_brl: float | None = Field(default=None, description="Frete ocioso e devolucoes")
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class RfmCustomerRecordPayload(BaseModel):
+    id: str
+    name: str
+    phone: str
+    last_purchase_days_ago: int
+    frequency_tier: str = Field(default="regular")
+    average_spend_brl: float = Field(default=0.0)
+    preferred_item_or_service: str | None = None
+    notes: str | None = None
+
+
+class PredictiveRfmPayload(BaseModel):
+    segment: str = Field(default="postos_redes")
+    customers: list[RfmCustomerRecordPayload] = Field(default_factory=list)
+    inactivity_threshold_days: int | None = None
+
+
+@partner_router.get(
+    "/segments",
+    summary="Listagem de Perfis dos Segmentos Universais",
+    description="Retorna os metadados dos 6 segmentos universais (Varejo, B2B, Clinicas, E-commerce, Logistica, Postos).",
+)
+async def partner_list_segments_endpoint(
+    auth_info: dict[str, str] = Depends(verify_partner_auth),
+):
+    """Retorna os metadados e configuracoes padrao de cada segmento de negocio."""
+    return {
+        "success": True,
+        "count": len(UNIVERSAL_SEGMENT_CONFIGS),
+        "segments": list(UNIVERSAL_SEGMENT_CONFIGS.values()),
+    }
+
+
+@partner_router.post(
+    "/predictive-runout",
+    summary="Calculo Universal de Ruptura e Capacidade",
+    description="Calcula a autonomia preditiva de estoque ou capacidade para qualquer segmento de negocio.",
+)
+async def partner_predictive_runout_endpoint(
+    payload: PredictiveRunOutPayload = Body(...),
+    auth_info: dict[str, str] = Depends(verify_partner_auth),
+):
+    """Calcula horas restantes, economia de antecipacao e acoes de reposicao."""
+    seg_key = payload.segment.lower().strip()
+    cfg = UNIVERSAL_SEGMENT_CONFIGS.get(seg_key, UNIVERSAL_SEGMENT_CONFIGS["varejo"])
+
+    resource_name = payload.resource_name or cfg["critical_resource_name"]
+    unit_label = payload.unit_label or cfg["unit_label"]
+    raw_burn = payload.burn_rate_per_hour if payload.burn_rate_per_hour is not None else cfg["default_burn_rate_per_hour"]
+    burn_rate = max(0.001, float(raw_burn))
+    current_capacity = max(0.0, float(payload.current_stock_or_capacity))
+    lead_time = float(payload.reorder_lead_time_hours) if payload.reorder_lead_time_hours is not None else 24.0
+    unit_cost = float(payload.cost_per_unit_or_hour) if payload.cost_per_unit_or_hour is not None else float(cfg["typical_hourly_rate_brl"])
+    urgency_pct = float(payload.urgency_price_delta_pct) if payload.urgency_price_delta_pct is not None else 10.0
+
+    hours_rem = round(current_capacity / burn_rate, 1)
+    days_rem = round(hours_rem / 24.0, 1)
+
+    now_ts = time.time()
+    depletion_ts = now_ts + (hours_rem * 3600.0)
+    depletion_iso = datetime.fromtimestamp(depletion_ts, tz=UTC).isoformat()
+
+    status_code = "safe"
+    if current_capacity <= 0:
+        status_code = "depleted"
+    elif hours_rem <= lead_time:
+        status_code = "critical"
+    elif hours_rem <= lead_time * 2.0:
+        status_code = "warning"
+
+    anticipation_savings = round(current_capacity * unit_cost * (urgency_pct / 100.0), 2)
+
+    if status_code in ("critical", "depleted"):
+        headline = f"Alerta Critico: {resource_name} esgota em {hours_rem}h ({days_rem} dias)"
+        consultative = (
+            f"O ritmo de demanda consumira a capacidade antes do prazo operacional de reposicao ({lead_time:.0f}h). "
+            f"Antecipar a ordem hoje gera economia imediata estimada em R$ {anticipation_savings:,.2f}."
+        )
+        cmd_code = "1"
+        action_desc = cfg["primary_quick_action_text"]
+    else:
+        headline = f"Nivel Operacional Estavel: {hours_rem}h de autonomia para {resource_name}"
+        consultative = (
+            f"Fluxo regular com consumo medio de {burn_rate:.1f} {unit_label}/hora. Capacidade segura por {days_rem} dias."
+        )
+        cmd_code = "2"
+        action_desc = cfg["secondary_quick_action_text"]
+
+    return {
+        "success": True,
+        "segment": seg_key,
+        "resourceName": resource_name,
+        "unitLabel": unit_label,
+        "currentStockOrCapacity": current_capacity,
+        "burnRatePerHour": burn_rate,
+        "hoursRemaining": hours_rem,
+        "daysRemaining": days_rem,
+        "projectedDepletionDate": depletion_iso,
+        "status": status_code,
+        "anticipationSavingsBrl": anticipation_savings,
+        "headline": headline,
+        "consultativeRecommendation": consultative,
+        "suggestedQuickAction": {
+            "commandCode": cmd_code,
+            "description": action_desc,
+            "actionPayload": {
+                "segment": seg_key,
+                "resourceName": resource_name,
+                "hoursRemaining": hours_rem,
+                "anticipationSavingsBrl": anticipation_savings,
+            },
+        },
+    }
+
+
+@partner_router.post(
+    "/predictive-leakage",
+    summary="Auditoria Universal de Fuga Invisivel de Lucro",
+    description="Quantifica vazamento de margem, descontos sem alcada, leads abandonados e quebras.",
+)
+async def partner_predictive_leakage_endpoint(
+    payload: PredictiveLeakagePayload = Body(...),
+    auth_info: dict[str, str] = Depends(verify_partner_auth),
+):
+    """Calcula a perda financeira oculta e monta o plano de estancamento de lucro."""
+    seg_key = payload.segment.lower().strip()
+    cfg = UNIVERSAL_SEGMENT_CONFIGS.get(seg_key, UNIVERSAL_SEGMENT_CONFIGS["varejo"])
+
+    breakdown: list[dict[str, Any]] = []
+
+    # 1. Descontos sem alcada
+    disc = payload.discounts_given_without_approval_brl or 0.0
+    if disc > 0:
+        breakdown.append({
+            "category": "Descontos sem Alcada no PDV",
+            "description": "Concessao de descontos acima da margem permitida sem validacao da gerencia.",
+            "monthlyBrl": round(disc, 2),
+            "severity": "critical" if disc > 3000 else "high" if disc > 1000 else "medium",
+        })
+
+    # 2. Horas tecnicas nao faturadas
+    whours = payload.unbilled_or_wasted_hours or 0.0
+    hrate = payload.hourly_rate_brl if payload.hourly_rate_brl is not None else float(cfg["typical_hourly_rate_brl"])
+    wasted_brl = round(whours * hrate, 2)
+    if wasted_brl > 0:
+        breakdown.append({
+            "category": "Horas Tecnicas Nao Faturadas",
+            "description": f"{whours:.1f}h de trabalho tecnico/consultoria sem faturamento emitido.",
+            "monthlyBrl": wasted_brl,
+            "severity": "critical" if wasted_brl > 5000 else "high",
+        })
+
+    # 3. Leads frios no WhatsApp
+    cold_leads = payload.cold_abandoned_leads_count or 0
+    aticket = payload.average_ticket_brl if payload.average_ticket_brl is not None else float(cfg["typical_avg_ticket_brl"])
+    conv_pct = (payload.lead_to_sale_conversion_rate_pct if payload.lead_to_sale_conversion_rate_pct is not None else float(cfg["lead_conversion_rate_pct"])) / 100.0
+    leads_brl = round(cold_leads * aticket * conv_pct, 2)
+    if leads_brl > 0:
+        breakdown.append({
+            "category": "Leads Quentes Abandonados no WhatsApp",
+            "description": f"{cold_leads} contatos solicitaram proposta e ficaram sem follow-up da equipe.",
+            "monthlyBrl": leads_brl,
+            "severity": "critical" if leads_brl > 4000 else "high",
+        })
+
+    # 4. Divergencia fisica de estoque/tanques
+    inv_disc = payload.inventory_discrepancy_brl or 0.0
+    if inv_disc > 0:
+        cat_name = "Divergencia Regua Fisica vs Encerrante" if seg_key == "postos_redes" else "Divergencia de Inventario Fisico"
+        breakdown.append({
+            "category": cat_name,
+            "description": "Descompasso entre medicao fisica e registros de vendas faturadas.",
+            "monthlyBrl": round(inv_disc, 2),
+            "severity": "critical" if inv_disc > 3500 else "high",
+        })
+
+    # 5. No-Show
+    ns_count = payload.no_show_count or 0
+    ns_cost = payload.no_show_cost_per_appointment_brl if payload.no_show_cost_per_appointment_brl is not None else float(cfg["typical_avg_ticket_brl"])
+    ns_brl = round(ns_count * ns_cost, 2)
+    if ns_brl > 0:
+        breakdown.append({
+            "category": "Faltas e Cancelamentos sem Aviso (No-Show)",
+            "description": f"{ns_count} horarios reservados que ficaram ociosos sem aviso previo.",
+            "monthlyBrl": ns_brl,
+            "severity": "critical" if ns_brl > 2500 else "medium",
+        })
+
+    # 6. Frete ocioso
+    freight_loss = payload.return_or_idle_freight_cost_brl or 0.0
+    if freight_loss > 0:
+        breakdown.append({
+            "category": "Frete Ocioso e Reentregas Evitaveis",
+            "description": "Custos logisticos com rotas de baixa cubagem ou reentregas.",
+            "monthlyBrl": round(freight_loss, 2),
+            "severity": "critical" if freight_loss > 3000 else "medium",
+        })
+
+    total_monthly = round(sum(item["monthlyBrl"] for item in breakdown), 2)
+    annualized = round(total_monthly * 12.0, 2)
+    projected_recovery = round(total_monthly * 0.65, 2)
+
+    headline = f"Detector de Fuga: R$ {total_monthly:,.2f}/mes escapando do caixa"
+    diagnosis = (
+        f"A auditoria automatica identificou {len(breakdown)} fontes invisiveis de perda de margem "
+        f"que somam R$ {total_monthly:,.2f}/mes (R$ {annualized:,.2f} anualizados). "
+        f"A ativacao do protocolo autonomo AURA estanca ate R$ {projected_recovery:,.2f} no primeiro ciclo."
+    )
+
+    return {
+        "success": True,
+        "segment": seg_key,
+        "totalMonthlyLeakageBrl": total_monthly,
+        "annualizedLeakageBrl": annualized,
+        "leakageBreakdown": breakdown,
+        "headline": headline,
+        "consultativeDiagnosis": diagnosis,
+        "stoppagePlan": {
+            "actionName": f"Ativar Protocolo Anti-Vazamento ({cfg['label']})",
+            "projectedRecoveryBrl": projected_recovery,
+            "quickActionCode": "1",
+        },
+    }
+
+
+@partner_router.post(
+    "/predictive-rfm",
+    summary="Segmentacao RFM e Lote Anti-Churn",
+    description="Identifica clientes VIP em risco de abandono e gera lote de reativacao com Spintax.",
+)
+async def partner_predictive_rfm_endpoint(
+    payload: PredictiveRfmPayload = Body(...),
+    auth_info: dict[str, str] = Depends(verify_partner_auth),
+):
+    """Calcula risco de churn RFM e gera mensagens de reativacao individualizadas."""
+    seg_key = payload.segment.lower().strip()
+    cfg = UNIVERSAL_SEGMENT_CONFIGS.get(seg_key, UNIVERSAL_SEGMENT_CONFIGS["varejo"])
+    thresh = payload.inactivity_threshold_days or cfg["inactivity_threshold_days"]
+
+    target_batch: list[dict[str, Any]] = []
+    total_risk_brl = 0.0
+
+    for c in payload.customers:
+        if c.last_purchase_days_ago >= thresh:
+            preferred = c.preferred_item_or_service or "seus servicos habituais"
+            est_loss = round(c.average_spend_brl * 1.5, 2)
+            total_risk_brl += est_loss
+
+            msg = (
+                f"Ola, {c.name}! Tudo bem com voce? Sentimos sua falta nos ultimos dias "
+                f"em relacao a {preferred}. Preparamos uma condicao especial exclusiva para "
+                f"o seu retorno esta semana. Vamos conversar?"
+            )
+
+            target_batch.append({
+                "customerId": c.id,
+                "customerName": c.name,
+                "phone": c.phone,
+                "lastSeenDaysAgo": c.last_purchase_days_ago,
+                "preferredItemOrService": preferred,
+                "personalizedMessage": msg,
+                "estimatedLossRiskBrl": est_loss,
+            })
+
+    target_batch.sort(key=lambda x: x["estimatedLossRiskBrl"], reverse=True)
+    projected_rec = round(total_risk_brl * 0.32, 2)
+
+    return {
+        "success": True,
+        "segment": seg_key,
+        "totalCustomersAudited": len(payload.customers),
+        "atRiskCustomersCount": len(target_batch),
+        "totalRevenueAtRiskBrl": round(total_risk_brl, 2),
+        "projectedRecoverableRevenueBrl": projected_rec,
+        "targetAudienceDescription": f"Clientes Recorrentes e VIPs sem interacao ha mais de {thresh} dias ({cfg['label']})",
+        "readyToSendBatch": target_batch,
+        "spintaxTemplate": (
+            "{Ola|Oi|Como vai}, [Nome]! Sentimos sua falta em relacao a [ItemPreferido]. "
+            "Preparamos uma condicao VIP exclusiva para o seu retorno esta semana."
+        ),
+        "antiBanRecommendation": {
+            "minIntervalSeconds": 15,
+            "maxIntervalSeconds": 35,
+            "batchSize": 12,
+        },
+        "actionSuggestion": {
+            "commandCode": "1",
+            "text": f"Digite 1 para disparar o lote de {len(target_batch)} clientes e recuperar ate R$ {projected_rec:,.2f}.",
+        },
+    }
+
+
+@partner_router.get(
+    "/segments/{segment}/baseline",
+    summary="Baseline Demonstrativo Hiper-Realista por Segmento",
+    description="Retorna snapshot preditivo completo para demonstracao imediata de qualquer segmento.",
+)
+async def partner_segment_baseline_endpoint(
+    segment: str = FPath(..., description="Segmento de negocio desejado"),
+    auth_info: dict[str, str] = Depends(verify_partner_auth),
+):
+    """Retorna dados de telemetria preditiva realistas para demonstracao de vendas no MVP."""
+    seg_key = segment.lower().strip()
+    cfg = UNIVERSAL_SEGMENT_CONFIGS.get(seg_key, UNIVERSAL_SEGMENT_CONFIGS["varejo"])
+
+    # Gera baseline deterministico coerente
+    runout_req = PredictiveRunOutPayload(
+        segment=seg_key,
+        current_stock_or_capacity=100.0 if seg_key != "postos_redes" else 6800.0,
+        burn_rate_per_hour=cfg["default_burn_rate_per_hour"],
+        reorder_lead_time_hours=24.0,
+        cost_per_unit_or_hour=cfg["typical_hourly_rate_brl"],
+        urgency_price_delta_pct=10.0,
+        resource_name=cfg["critical_resource_name"],
+        unit_label=cfg["unit_label"],
+    )
+    runout_res = await partner_predictive_runout_endpoint(payload=runout_req, auth_info=auth_info)
+
+    leakage_req = PredictiveLeakagePayload(
+        segment=seg_key,
+        gross_monthly_revenue_brl=150000.0,
+        discounts_given_without_approval_brl=2400.0,
+        cold_abandoned_leads_count=20,
+        average_ticket_brl=cfg["typical_avg_ticket_brl"],
+        lead_to_sale_conversion_rate_pct=cfg["lead_conversion_rate_pct"],
+        inventory_discrepancy_brl=1800.0,
+    )
+    leakage_res = await partner_predictive_leakage_endpoint(payload=leakage_req, auth_info=auth_info)
+
+    sample_customers = [
+        RfmCustomerRecordPayload(
+            id="samp-1",
+            name="Carlos Eduardo",
+            phone="5527992277217",
+            last_purchase_days_ago=cfg["inactivity_threshold_days"] + 8,
+            frequency_tier="vip",
+            average_spend_brl=cfg["typical_avg_ticket_brl"] * 3.5,
+            preferred_item_or_service="Itens Curva A e Atendimento VIP",
+        ),
+        RfmCustomerRecordPayload(
+            id="samp-2",
+            name="Juliana Castro",
+            phone="5527988887766",
+            last_purchase_days_ago=cfg["inactivity_threshold_days"] + 4,
+            frequency_tier="regular",
+            average_spend_brl=cfg["typical_avg_ticket_brl"] * 1.8,
+            preferred_item_or_service="Servicos Complementares e Fidelidade",
+        ),
+    ]
+    rfm_req = PredictiveRfmPayload(
+        segment=seg_key,
+        customers=sample_customers,
+        inactivity_threshold_days=cfg["inactivity_threshold_days"],
+    )
+    rfm_res = await partner_predictive_rfm_endpoint(payload=rfm_req, auth_info=auth_info)
+
+    return {
+        "success": True,
+        "segment": seg_key,
+        "profile": cfg,
+        "sampleBusinessName": f"Empresa Referencia ({cfg['label']})",
+        "sampleManagerName": "Marlon Henrique",
+        "samplePhone": "5527992277217",
+        "runOutTelemetry": runout_res,
+        "leakageTelemetry": leakage_res,
+        "rfmTelemetry": rfm_res,
+    }
+
+
+class MorningBriefingPayload(BaseModel):
+    segment: str = Field(default="postos_redes", description="Segmento de negocio")
+    manager_name: str | None = Field(default="Marlon Henrique", description="Nome do gestor")
+    business_name: str | None = Field(default=None, description="Nome da empresa/filial")
+    station_id: str | None = Field(default="posto_01", description="Codigo da filial")
+    manager_phone: str | None = Field(default=None, description="Telefone de destino")
+
+
+@partner_router.post(
+    "/morning-briefing",
+    summary="Geracao de Briefing Matinal Voice-First (Modo Socio)",
+    description="Gera o roteiro oral de 45s e texto executivo para WhatsApp de qualquer segmento.",
+)
+async def partner_morning_briefing_endpoint(
+    payload: MorningBriefingPayload = Body(...),
+    auth_info: dict[str, str] = Depends(verify_partner_auth),
+):
+    """
+    Consolida indicadores do segmento e gera o roteiro falado executivo de 45 segundos
+    no tom de socio consultor e o texto mobile com menu de 1 toque (1, 2, 3).
+    """
+    seg_key = payload.segment.lower().strip()
+    cfg = UNIVERSAL_SEGMENT_CONFIGS.get(seg_key, UNIVERSAL_SEGMENT_CONFIGS["postos_redes"])
+
+    manager_name = (payload.manager_name or "Marlon Henrique").strip()
+    business_name = (payload.business_name or cfg["label"]).strip()
+
+    baseline_res = await partner_segment_baseline_endpoint(segment=seg_key, auth_info=auth_info)
+    run_out = baseline_res["runOutTelemetry"]
+    leakage = baseline_res["leakageTelemetry"]
+    rfm = baseline_res["rfmTelemetry"]
+
+    savings_val = run_out.get("anticipationSavingsBrl", 0.0)
+    savings_txt = (
+        f"economiza cerca de R$ {savings_val:,.2f} em compras emergenciais"
+        if savings_val > 0
+        else "mantem a margem liquida protegida"
+    )
+    leakage_txt = f"R$ {leakage.get('totalMonthlyLeakageBrl', 0.0):,.2f}/mes"
+
+    if seg_key == "varejo":
+        oral_script = (
+            f"Bom dia, {manager_name}. Aqui e seu copiloto da AURA com o fechamento executivo da {business_name}. "
+            f"Nosso ponto de atencao de hoje e o estoque de {run_out.get('resourceName')}, que atinge ruptura em apenas {run_out.get('hoursRemaining')} horas. "
+            f"A auditoria automatica identificou uma fuga invisivel de {leakage_txt} em descontos sem alcada no caixa. "
+            f"Antecipando o pedido com o fornecedor parceiro agora, voce {savings_txt}. "
+            f"Para agir de imediato: digite 1 para aprovar a reposicao preventiva, 2 para cobrar a equipe de vendas no WhatsApp, ou 3 para silenciar por 6 horas."
+        )
+    elif seg_key == "saas_b2b":
+        oral_script = (
+            f"Bom dia, {manager_name}. Passando com seu radar matinal de gestao da {business_name}. "
+            f"A equipe tecnica possui {run_out.get('hoursRemaining')} horas livres para novos projetos, enquanto a auditoria identificou um vazamento de {leakage_txt} em horas nao faturadas e propostas sem retorno. "
+            f"Temos {rfm.get('atRiskCustomersCount')} contratos em risco de descontinuidade. "
+            f"Para resolver: digite 1 para disparar o follow-up preventivo com os clientes, 2 para delegar a cobranca aos consultores responsaveis, ou 3 para silenciar por 6 horas."
+        )
+    elif seg_key == "saude_clinicas":
+        oral_script = (
+            f"Bom dia, {manager_name}. Diagnostico matinal da {business_name}. "
+            f"Temos {run_out.get('currentStockOrCapacity')} horarios vagos na agenda desta semana que podem ser preenchidos imediatamente. "
+            f"A auditoria de perdas apontou {leakage_txt} de impacto em faltas sem aviso previo e pacientes sem retorno preventivo. "
+            f"Digite 1 para acionar a confirmacao da fila de espera, 2 para orientar a recepcao a cobrar os retornos, ou 3 para silenciar por 6 horas."
+        )
+    elif seg_key == "ecommerce":
+        oral_script = (
+            f"Bom dia, {manager_name}. Radar executivo do e-commerce {business_name}. "
+            f"O produto lider {run_out.get('resourceName')} esgota em {run_out.get('hoursRemaining')} horas com risco de estoque zero nos anuncios ativos. "
+            f"Detectamos perda de {leakage_txt} em carrinhos abandonados de alto ticket sem contato. "
+            f"Digite 1 para autorizar a compra emergencial de reposicao, 2 para disparar a recuperacao de carrinhos no WhatsApp, ou 3 para silenciar por 6 horas."
+        )
+    elif seg_key == "logistica":
+        oral_script = (
+            f"Bom dia, {manager_name}. Atualizacao operacional da {business_name}. "
+            f"Temos {run_out.get('currentStockOrCapacity')} {run_out.get('unitLabel')} disponiveis para expedicao. "
+            f"A auditoria de rota identificou custo de frete ocioso de {leakage_txt}. "
+            f"Alem disso, {rfm.get('atRiskCustomersCount')} compradores corporativos estao com pedidos atrasados. "
+            f"Digite 1 para consolidar as cargas, 2 para acionar os representantes comerciais, ou 3 para silenciar por 6 horas."
+        )
+    else:
+        oral_script = (
+            f"Bom dia, {manager_name}. Radar executivo matinal da AURA para o {business_name}. "
+            f"O tanque de {run_out.get('resourceName')} esta com autonomia para {run_out.get('hoursRemaining')} horas de pista. "
+            f"Antecipar a compra do caminhao-tanque antes do fechamento de pauta {savings_txt}. "
+            f"Nossa auditoria tambem identificou uma fuga invisivel de {leakage_txt} entre desvios de medicao e descontos sem alcada. "
+            f"Digite 1 para aprovar a compra fracionada com a distribuidora, 2 para alinhar a meta com a equipe de pista, ou 3 para silenciar o alerta por 6 horas."
+        )
+
+    wpp_text = (
+        f"*{cfg['icon']} RADAR COGNITIVO EXECUTIVO (AURA ENGINE)*\n"
+        f"*Empresa:* {business_name} ({cfg['label']})\n"
+        f"*Horario da Auditoria:* {datetime.now(UTC).strftime('%H:%M')} UTC\n\n"
+        f"*1. Previsao de Ruptura & Autonomia*\n"
+        f"• *Recurso:* {run_out.get('resourceName')}\n"
+        f"• *Autonomia:* {run_out.get('hoursRemaining')}h ({run_out.get('daysRemaining')} dias)\n"
+        f"• *Economia de Antecipacao:* R$ {savings_val:,.2f}\n\n"
+        f"*2. Auditoria de Fuga Invisivel de Lucro*\n"
+        f"• *Vazamento Identificado:* {leakage_txt} (R$ {leakage.get('annualizedLeakageBrl', 0.0):,.2f}/ano)\n"
+        f"• *Recuperacao Imediata Projetada:* R$ {leakage.get('stoppagePlan', {}).get('projectedRecoveryBrl', 0.0):,.2f}/mes\n\n"
+        f"*3. Maquina Anti-Churn RFM*\n"
+        f"• *Clientes em Risco:* {rfm.get('atRiskCustomersCount')} clientes VIPs\n"
+        f"• *Receita em Risco:* R$ {rfm.get('totalRevenueAtRiskBrl', 0.0):,.2f}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"*COMO DESEJA AGIR AGORA?*\n"
+        f"*1* ➔ {run_out.get('suggestedQuickAction', {}).get('description')}\n"
+        f"*2* ➔ Delegar meta e cobranca para a equipe responsavel\n"
+        f"*3* ➔ Silenciar alertas operacionais por 6 horas\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"_Responda apenas 1, 2 ou 3 para execucao imediata com protocolo Command Journal._"
+    )
+
+    return {
+        "success": True,
+        "segment": seg_key,
+        "profile": cfg,
+        "managerName": manager_name,
+        "businessName": business_name,
+        "oralVoiceScript": oral_script,
+        "whatsappExecutiveText": wpp_text,
+        "baseline": baseline_res,
+        "suggestedActions": [
+            {
+                "code": "1",
+                "label": "Aprovar e Executar Acao Principal",
+                "description": run_out.get("suggestedQuickAction", {}).get("description"),
+            },
+            {
+                "code": "2",
+                "label": "Cobrar Responsavel / Delegar para Equipe",
+                "description": "Encaminhar meta de vendas ou cobranca com protocolo",
+            },
+            {
+                "code": "3",
+                "label": "Silenciar por 6 Horas",
+                "description": "Suspender alertas temporariamente mantendo auditoria em background",
+            },
+        ],
+    }
+

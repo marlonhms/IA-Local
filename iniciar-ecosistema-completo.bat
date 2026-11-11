@@ -52,39 +52,39 @@ echo      [OK] Containers Docker prontos!
 echo.
 
 REM ----------------------------------------------------------------------
-REM 2. VERIFICAR E INICIAR MOTOR AURA LOCAL [PORTA 8000]
+REM 2. VERIFICAR E INICIAR MOTOR AURA LOCAL [127.0.0.1:8000]
 REM ----------------------------------------------------------------------
-echo [2/4] Verificando Motor AURA Local na porta 8000...
-netstat -ano | findstr :8000 | findstr LISTENING >nul 2>&1
+echo [2/4] Verificando Motor AURA Local em http://127.0.0.1:8000...
+curl.exe -s -f -o nul --max-time 2 http://127.0.0.1:8000/api/v1/partner/health >nul 2>&1
 if %errorlevel% equ 0 goto AURA_ALREADY_RUNNING
 
 echo   - Iniciando AURA Local [Python 3.12 / FastAPI] em janela dedicada...
-start "AURA Engine - Porta 8000" /D "G:\Projetos\Aila - pgvector" cmd /k "python server.py"
-timeout /t 4 /nobreak >nul
+start "AURA Engine - Porta 8000" /D "G:\Projetos\Aila - pgvector" cmd /k "set AURA_HOST=127.0.0.1&& set AURA_AUTO_OPEN=0&& python server.py"
+timeout /t 5 /nobreak >nul
 echo      [OK] Motor AURA Local inicializado!
 goto CHECK_NEXTJS
 
 :AURA_ALREADY_RUNNING
-echo      [OK] Motor AURA Local ja esta ativo e escutando na porta 8000!
+echo      [OK] Motor AURA Local ja esta ativo e respondendo em 127.0.0.1:8000!
 
 :CHECK_NEXTJS
 echo.
 
 REM ----------------------------------------------------------------------
-REM 3. VERIFICAR E INICIAR PAINEL CRM WHATSAPP [PORTA 3000]
+REM 3. VERIFICAR E INICIAR PAINEL CRM WHATSAPP [127.0.0.1:3000]
 REM ----------------------------------------------------------------------
-echo [3/4] Verificando Painel WhatsApp CRM na porta 3000...
-netstat -ano | findstr :3000 | findstr LISTENING >nul 2>&1
+echo [3/4] Verificando Painel WhatsApp CRM em http://localhost:3000...
+curl.exe -s -f -o nul --max-time 2 http://127.0.0.1:3000/api/aura/events >nul 2>&1
 if %errorlevel% equ 0 goto NEXTJS_ALREADY_RUNNING
 
 echo   - Iniciando Painel WhatsApp [Next.js 16] em janela dedicada...
 start "Painel WhatsApp - Porta 3000" /D "G:\Projetos\Painel Whatsapp" cmd /k "npm run dev"
-timeout /t 4 /nobreak >nul
+timeout /t 5 /nobreak >nul
 echo      [OK] Servidor Next.js 16 inicializado!
 goto OPEN_BROWSER
 
 :NEXTJS_ALREADY_RUNNING
-echo      [OK] Painel WhatsApp ja esta ativo na porta 3000!
+echo      [OK] Painel WhatsApp ja esta ativo e respondendo em localhost:3000!
 
 :OPEN_BROWSER
 echo.
