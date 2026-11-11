@@ -1240,7 +1240,7 @@ def generate_showcase_html():
                 </div>
                 <div>
                   <h4 class="card-title-serif font-serif text-[15px] sm:text-base font-normal text-white flex items-center gap-2">
-                    <span>2. Telemetria de Pista, PDVs & Concentrador de Dados</span>
+                    <span>2. Telemetria de PDVs, Estoques & Concentrador de Dados</span>
                     <span class="px-1.5 py-0.2 rounded text-[9px] bg-cyan-500/15 text-cyan-300 font-mono">Borda Local</span>
                   </h4>
                   <p class="card-desc-geist text-[11px] sm:text-xs text-slate-400">Leitura direta de terminais PDV, estoques físicos, gôndolas e telemetria da operação</p>
@@ -1843,10 +1843,10 @@ def generate_showcase_html():
             <span>Auditoria Nacional de Perdas no Varejo 2025/2026 • Fonte: Abrappe & KPMG</span>
           </div>
           <h3 class="heading-medium home_agents-title font-display-title text-2xl sm:text-3xl text-white">
-            Perdas no Varejo Atingem <span class="text-rose-400 font-semibold">R$ 42,1 Bilhões</span> com Impacto Crítico em Conveniência e Pista
+            Perdas no Varejo Atingem <span class="text-rose-400 font-semibold">R$ 42,1 Bilhões</span> com Impacto Crítico em Margem e Quebras Operacionais
           </h3>
           <p class="body-regular home_agents-feature-desc max-w-3xl text-slate-300 text-sm sm:text-base leading-relaxed">
-            O avanço das perdas operacionais e quebras no varejo brasileiro (<strong class="text-rose-300">+15,3% a/a</strong>) supera em mais do que o dobro o crescimento da receita (+6,4%). As lojas de conveniência lideram o ranking de perdas (<strong class="text-rose-300">3,86% do faturamento</strong>), impulsionadas por quebras de perecibilidade em categorias que paradoxalmente detêm as maiores margens brutas (cafeteria até 70% e bebidas até 60%). A AURA estanca esses ralos invisíveis com conciliação contínua e cálculos matemáticos exatos no banco de dados.
+            O avanço das perdas operacionais e quebras no varejo brasileiro (<strong class="text-rose-300">+15,3% a/a</strong>) supera em mais do que o dobro o crescimento da receita (+6,4%). Redes de lojas e varejo de conveniência/proximidade lideram o ranking de perdas (<strong class="text-rose-300">até 3,86% do faturamento</strong>), impulsionadas por quebras de perecibilidade em categorias de alta margem bruta, desvios de caixa e rupturas de inventário. A AURA estanca esses ralos invisíveis com conciliação contínua e cálculos matemáticos exatos no banco de dados.
           </p>
         </div>
         <div class="flex-shrink-0 flex items-center gap-3">
@@ -1876,10 +1876,10 @@ def generate_showcase_html():
           </p>
         </div>
 
-        <!-- CARD 2: LOJAS CONVENIÊNCIA -->
+        <!-- CARD 2: CONVENIÊNCIA & PROXIMIDADE -->
         <div class="p-5 rounded-2xl bg-slate-900/90 border border-rose-500/30 space-y-2 relative overflow-hidden group hover:border-rose-500/50 transition-all">
           <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 uppercase tracking-wider">
-            <span>Lojas Conveniência</span>
+            <span>Conveniência & Proximidade</span>
             <i data-lucide="store" class="w-4 h-4 text-rose-400"></i>
           </div>
           <div class="text-3xl sm:text-4xl font-bold font-mono text-white tracking-tight">3,86%</div>
@@ -2059,13 +2059,13 @@ def generate_showcase_html():
           </div>
         </div>
 
-        <!-- GRÁFICO 2: POTENCIAL DE MARGEM BRUTA NA CONVENIÊNCIA POR CATEGORIA -->
+        <!-- GRÁFICO 2: POTENCIAL DE MARGEM BRUTA NO VAREJO POR CATEGORIA -->
         <div class="p-5 sm:p-6 rounded-2xl bg-slate-950/70 border border-white/[0.08] space-y-4 flex flex-col justify-between">
           <div>
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
               <div>
                 <h4 class="card-title-serif font-serif text-base sm:text-lg text-white font-normal">
-                  Potencial de Margem Bruta na Conveniência por Categoria (%)
+                  Potencial de Margem Bruta no Varejo & Conveniência por Categoria (%)
                 </h4>
                 <p class="text-xs text-slate-400 font-sans">Onde o lucro real é gerado e onde as quebras acontecem</p>
               </div>
@@ -2165,7 +2165,7 @@ def generate_showcase_html():
               <span>O Paradoxo da Rentabilidade: Onde a Margem é Maior, a Perda é Mais Destrutiva</span>
             </div>
             <p class="text-xs text-slate-300 leading-relaxed font-sans">
-              Cafeteria, panificação e bebidas representam margem bruta de até 70%, mas são os itens mais vulneráveis a vencimentos, avarias e desvios de caixa. A AURA estanca a perda nessas categorias através de controle preventivo de validade (FEFO) e precificação combinada com a pista.
+              Cafeteria, panificação, perecíveis e bebidas representam margem bruta de até 70%, mas são os itens mais vulneráveis a vencimentos, avarias e desvios de caixa. A AURA estanca a perda nessas categorias através de controle preventivo de validade (FEFO), auditoria de inventário e precificação dinâmica inteligente.
             </p>
           </div>
         </div>
@@ -2192,7 +2192,7 @@ def generate_showcase_html():
         <!-- Grid dos 5 Motores de Recuperação -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           
-          <!-- Motor 1: Estancamento de Perecibilidade -->
+          <!-- Motor 1: Estancamento de Validade e Perecibilidade -->
           <div class="p-4 sm:p-5 rounded-xl bg-slate-900/80 border border-white/[0.08] space-y-2 hover:border-emerald-500/30 transition-all">
             <div class="flex items-center justify-between">
               <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300">RECUPERAÇÃO: 35% A 55%</span>
@@ -2200,55 +2200,55 @@ def generate_showcase_html():
             </div>
             <h5 class="text-sm font-bold text-white">1. Estancamento de Validade e Perecibilidade</h5>
             <p class="text-xs text-slate-300 leading-relaxed font-sans">
-              Algoritmo FEFO (First Expired, First Out) monitora lotes e prazos de validade da conveniência. Dispara combos automáticos na pista ("Café + Pão de Queijo") para itens a 5 dias do vencimento, recuperando o capital antes da quebra.
+              Algoritmo FEFO (First Expired, First Out) monitora lotes e prazos de validade em tempo real. Dispara sugestões preventivas de queima estratégica e promoções casadas para produtos próximos do vencimento, recuperando capital de giro antes da perda operacional.
             </p>
             <div class="text-[11px] text-emerald-400 font-mono font-semibold pt-1">
-              ✓ Economia estimada: R$ 2.700 a R$ 4.250 / mês por loja
+              ✓ Economia estimada: R$ 2.700 a R$ 6.500 / mês por filial
             </div>
           </div>
 
-          <!-- Motor 2: Auditoria Horária de Tanques e Escudo LMC -->
+          <!-- Motor 2: Auditoria Contínua de Estoques & Divergências Fiscais -->
           <div class="p-4 sm:p-5 rounded-xl bg-slate-900/80 border border-white/[0.08] space-y-2 hover:border-emerald-500/30 transition-all">
             <div class="flex items-center justify-between">
               <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300">RECUPERAÇÃO: 75% A 90%</span>
-              <i data-lucide="fuel" class="w-4 h-4 text-cyan-400"></i>
+              <i data-lucide="package-check" class="w-4 h-4 text-cyan-400"></i>
             </div>
-            <h5 class="text-sm font-bold text-white">2. Auditoria de Tanques & Escudo LMC da ANP</h5>
+            <h5 class="text-sm font-bold text-white">2. Auditoria Contínua de Estoques & Divergências Fiscais</h5>
             <p class="text-xs text-slate-300 leading-relaxed font-sans">
-              Conciliação contínua entre encerrantes dos bicos, telemetria/régua física e NF-e de descarga corrigida a 20°C. Fim das perdas camufladas abaixo de 0,6% e blindagem contra multas fiscais da Lei 9.847/99 (iniciando em R$ 20.000).
+              Conciliação matemática automática entre notas fiscais de entrada (XML/NF-e), saídas nos PDVs (NFC-e/SAT) e saldos físicos apurados. Detecta perdas camufladas, furos de inventário e inconsistências tributárias antes que gerem autuações fiscais ou quebras graves.
             </p>
             <div class="text-[11px] text-cyan-300 font-mono font-semibold pt-1">
-              ✓ Economia estimada: R$ 1.850 a R$ 6.660 / mês por posto
+              ✓ Economia estimada: R$ 3.800 a R$ 8.900 / mês por filial
             </div>
           </div>
 
-          <!-- Motor 3: Prevenção de Ruptura por Seta de Carreta -->
+          <!-- Motor 3: Previsão Preditiva de Ruptura & Ponto de Pedido -->
           <div class="p-4 sm:p-5 rounded-xl bg-slate-900/80 border border-white/[0.08] space-y-2 hover:border-emerald-500/30 transition-all">
             <div class="flex items-center justify-between">
               <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300">RECUPERAÇÃO: 50% A 70%</span>
-              <i data-lucide="truck" class="w-4 h-4 text-blue-400"></i>
+              <i data-lucide="trending-up" class="w-4 h-4 text-blue-400"></i>
             </div>
-            <h5 class="text-sm font-bold text-white">3. Previsão de Run-Out por Seta de Carreta</h5>
+            <h5 class="text-sm font-bold text-white">3. Previsão Preditiva de Ruptura & Ponto de Pedido</h5>
             <p class="text-xs text-slate-300 leading-relaxed font-sans">
-              Previsão de esgotamento de combustível restrita à geometria física dos compartimentos de carreta (setas de 5.000 L) e capacidade livre (ullage), cruzada com preço regional da ANP e taxa Selic para momento ótimo de compra.
+              Calcula a velocidade real de esgotamento (run-out rate) por categoria considerando sazonalidade, curva ABC e lead time de fornecedores. Elimina o capital parado em excesso de estoque e impede o lucro cessante decorrente de gôndolas desabastecidas.
             </p>
             <div class="text-[11px] text-blue-300 font-mono font-semibold pt-1">
-              ✓ Lucro cessante evitado: R$ 2.900 a R$ 9.450 / mês
+              ✓ Lucro cessante evitado: R$ 3.200 a R$ 11.400 / mês por loja
             </div>
           </div>
 
-          <!-- Motor 4: Fechamento Cego de Caixa e Trava CLT -->
+          <!-- Motor 4: Fechamento Cego de Caixa & Conformidade CLT -->
           <div class="p-4 sm:p-5 rounded-xl bg-slate-900/80 border border-white/[0.08] space-y-2 hover:border-emerald-500/30 transition-all">
             <div class="flex items-center justify-between">
               <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300">RECUPERAÇÃO: 60% A 80%</span>
               <i data-lucide="scale" class="w-4 h-4 text-purple-400"></i>
             </div>
-            <h5 class="text-sm font-bold text-white">4. Fechamento Cego de Caixa & Trava CLT</h5>
+            <h5 class="text-sm font-bold text-white">4. Fechamento Cego de Caixa & Conformidade CLT</h5>
             <p class="text-xs text-slate-300 leading-relaxed font-sans">
-              Reconciliação centavo a centavo por turno e operador cruzando TEF, Pix e dinheiro com encerrantes de bico. Emite termo de conferência auditado com checklist do Art. 462 da CLT para blindar o posto contra processos trabalhistas.
+              Reconciliação centavo a centavo por turno, operador e PDV, cruzando adquirentes TEF, liquidação Pix, vouchers e dinheiro com as vendas registradas. Emite termo de conferência auditado com checklist do Art. 462 da CLT para blindar a operação contra litígios trabalhistas.
             </p>
             <div class="text-[11px] text-purple-300 font-mono font-semibold pt-1">
-              ✓ Prejuízo estancado: R$ 1.100 a R$ 3.690 / mês por turno
+              ✓ Prejuízo estancado: R$ 1.500 a R$ 4.200 / mês por operação
             </div>
           </div>
 
@@ -2256,137 +2256,15 @@ def generate_showcase_html():
           <div class="p-4 sm:p-5 rounded-xl bg-slate-900/80 border border-white/[0.08] space-y-2 hover:border-emerald-500/30 transition-all md:col-span-2 lg:col-span-2">
             <div class="flex items-center justify-between">
               <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300">GANHO MARGINAL LÍQUIDO</span>
-              <i data-lucide="trending-up" class="w-4 h-4 text-amber-400"></i>
+              <i data-lucide="layers" class="w-4 h-4 text-amber-400"></i>
             </div>
             <h5 class="text-sm font-bold text-white">5. Precificação Elástica & Margem Combinada (Blended Margin)</h5>
             <p class="text-xs text-slate-300 leading-relaxed font-sans">
-              Mapeia a elasticidade-preço local em 12 semanas. Permite ajustar centavos na bomba sem perder galonagem, promovendo a venda de itens de alta margem na conveniência (cafeteria 70% e bebidas 60%) para maximizar o lucro total em reais no final do dia.
+              Mapeia a elasticidade-preço por categoria em janelas de 12 semanas. Permite calibrar a margem de produtos geradores de fluxo sem perder volume, estimulando a venda casada de itens de alta margem (ticket médio expandido) para maximizar o lucro líquido total no final do dia.
             </p>
             <div class="text-[11px] text-amber-300 font-mono font-semibold pt-1">
-              ✓ Ganho marginal estimado: R$ 2.950 a R$ 9.960 / mês por posto
+              ✓ Ganho marginal estimado: R$ 3.400 a R$ 12.500 / mês por estabelecimento
             </div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- SIMULADOR INTERATIVO EXECUTIVO DE ROI DA AURA (SHOW ME THE MONEY) -->
-      <div class="p-6 sm:p-8 rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-cyan-500/30 space-y-6">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.08] pb-4">
-          <div>
-            <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[10px] font-mono uppercase tracking-wider mb-1">
-              Simulador Interativo em Tempo Real
-            </div>
-            <h4 class="heading-small text-xl sm:text-2xl font-serif font-normal text-white font-display-title">
-              Calcule o Retorno Real (ROI) para o Tamanho da Sua Operação
-            </h4>
-            <p class="text-xs text-slate-400 font-sans">Ajuste os controles abaixo para simular o volume da sua rede e veja o impacto financeiro auditado.</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="px-3 py-1 rounded-lg text-xs font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-              Garantia Auditada de 3x em 90 Dias
-            </span>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-          
-          <!-- Coluna da Esquerda: Controles de Ajuste (Sliders Interativos) -->
-          <div class="lg:col-span-6 space-y-6">
-            
-            <!-- Controle 1: Volume de Combustível da Pista -->
-            <div class="p-4 rounded-xl bg-black/40 border border-white/[0.06] space-y-3 font-sans">
-              <div class="flex items-center justify-between">
-                <label for="sim-fuel-slider" class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                  <i data-lucide="fuel" class="w-4 h-4 text-cyan-400"></i>
-                  <span>Volume Mensal de Combustíveis (Pista)</span>
-                </label>
-                <span id="sim-fuel-display" class="text-sm font-mono font-bold text-cyan-300 tabular-nums">250.000 L / mês</span>
-              </div>
-              <input type="range" id="sim-fuel-slider" min="100000" max="1000000" step="10000" value="250000" class="w-full accent-cyan-400 cursor-pointer h-2 bg-slate-800 rounded-lg">
-              <div class="flex items-center justify-between text-[10px] font-mono text-slate-500">
-                <span>100k Litros (Pequeno)</span>
-                <span>500k Litros (Médio)</span>
-                <span>1M Litros (Rede Grande)</span>
-              </div>
-            </div>
-
-            <!-- Controle 2: Faturamento da Loja de Conveniência -->
-            <div class="p-4 rounded-xl bg-black/40 border border-white/[0.06] space-y-3 font-sans">
-              <div class="flex items-center justify-between">
-                <label for="sim-store-slider" class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                  <i data-lucide="store" class="w-4 h-4 text-emerald-400"></i>
-                  <span>Faturamento Mensal da Loja de Conveniência</span>
-                </label>
-                <span id="sim-store-display" class="text-sm font-mono font-bold text-emerald-300 tabular-nums">R$ 200.000 / mês</span>
-              </div>
-              <input type="range" id="sim-store-slider" min="30000" max="600000" step="5000" value="200000" class="w-full accent-emerald-400 cursor-pointer h-2 bg-slate-800 rounded-lg">
-              <div class="flex items-center justify-between text-[10px] font-mono text-slate-500">
-                <span>R$ 30k (Básica)</span>
-                <span>R$ 200k (Média Nacional)</span>
-                <span>R$ 600k (Grande Porte)</span>
-              </div>
-            </div>
-
-            <div class="p-3 rounded-lg bg-white/[0.02] border border-white/[0.05] text-[11px] text-slate-400 flex items-center gap-2">
-              <i data-lucide="info" class="w-4 h-4 text-cyan-400 flex-shrink-0"></i>
-              <span>Simulação auditada com base nos parâmetros estatísticos conservadores da pesquisa Abrappe/KPMG e Resolução ANP 884/2022.</span>
-            </div>
-
-          </div>
-
-          <!-- Coluna da Direita: Painel de Resultados do ROI em Tempo Real -->
-          <div class="lg:col-span-6 p-5 sm:p-6 rounded-2xl bg-black/60 border border-white/10 space-y-5">
-            <div class="flex items-center justify-between text-xs text-slate-400 font-mono border-b border-white/[0.08] pb-3">
-              <span>DEMONSTRATIVO DE RETORNO EM TEMPO REAL</span>
-              <span class="text-emerald-400 font-bold flex items-center gap-1">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Live Calculation
-              </span>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              
-              <!-- Prejuízo Oculto Atual -->
-              <div class="p-3.5 rounded-xl bg-rose-950/20 border border-rose-500/25 space-y-1">
-                <div class="text-[10px] font-mono text-rose-300 uppercase">Prejuízo Oculto Atual</div>
-                <div id="sim-leakage-value" class="text-2xl font-bold font-mono text-rose-400 tabular-nums">R$ 24.845 / mês</div>
-                <div class="text-[10px] text-slate-400 leading-tight">Perdas em LMC, quebras de conveniência e diferenças de caixa.</div>
-              </div>
-
-              <!-- Recuperação Líquida com a AURA -->
-              <div class="p-3.5 rounded-xl bg-emerald-950/25 border border-emerald-500/35 space-y-1">
-                <div class="text-[10px] font-mono text-emerald-300 uppercase">Recuperação Estimada</div>
-                <div id="sim-recovery-value" class="text-2xl font-bold font-mono text-emerald-400 tabular-nums">+R$ 13.480 / mês</div>
-                <div class="text-[10px] text-emerald-300/80 leading-tight">Lucro líquido adicional direto no caixa da filial.</div>
-              </div>
-
-            </div>
-
-            <!-- Retorno Líquido em 90 Dias e Múltiplo de ROI -->
-            <div class="p-4 rounded-xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-cyan-950/40 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div class="text-[10px] font-mono text-slate-300 uppercase">Retorno Líquido Acumulado em 90 Dias</div>
-                <div id="sim-90days-value" class="text-3xl font-extrabold font-mono text-white tabular-nums">R$ 38.300 líquidos</div>
-                <div class="text-[10px] text-slate-400">Já descontando 100% da assinatura do software e rampa de implantação.</div>
-              </div>
-              <div class="text-right flex-shrink-0">
-                <div class="text-[10px] font-mono text-cyan-300 uppercase">Múltiplo de ROI</div>
-                <div id="sim-multiplier-value" class="text-3xl font-black font-mono text-cyan-400 tabular-nums">14.2x</div>
-                <span class="text-[9px] text-emerald-300 font-bold">SOBRE O INVESTIMENTO</span>
-              </div>
-            </div>
-
-            <!-- Call to Action Direto -->
-            <div class="pt-1 flex flex-col sm:flex-row items-center gap-3">
-              <button onclick="window.auraTour.scrollToSection('sec-chat-graph')" class="w-full sm:w-auto flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 active:scale-[0.98] cursor-pointer">
-                <i data-lucide="play" class="w-4 h-4 fill-slate-950"></i>
-                <span>Ver a Demonstração ao Vivo</span>
-              </button>
-              <a href="/docs" target="_blank" class="w-full sm:w-auto py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-semibold text-center transition-all">
-                <span>Especificação da API</span>
-              </a>
-            </div>
-
           </div>
 
         </div>
@@ -2395,7 +2273,7 @@ def generate_showcase_html():
       <!-- Rodapé Oficial de Fontes e Citações Estatísticas -->
       <div class="pt-4 border-t border-white/[0.06] text-center text-xs text-slate-500 font-sans space-y-1">
         <p>
-          <strong class="text-slate-400">Fontes Oficiais de Dados:</strong> 9ª Pesquisa Abrappe / Reppor de Prevenção de Perdas no Varejo Brasileiro, Giro News, Mercado & Consumo, CNDL / Varejo S.A., KPMG Brasil, Negócios Brasil, Agência Nacional do Petróleo (ANP / Resolução nº 884/2022 e Lei nº 9.847/99), Banco Central do Brasil (BACEN).
+          <strong class="text-slate-400">Fontes Oficiais de Dados:</strong> 9ª Pesquisa Abrappe / Relatório de Prevenção de Perdas no Varejo Brasileiro, Giro News, Mercado & Consumo, CNDL / Varejo S.A., KPMG Brasil, Negócios Brasil, Banco Central do Brasil (BACEN).
         </p>
       </div>
 
@@ -2461,7 +2339,7 @@ def generate_showcase_html():
           <div class="text-[10px] text-emerald-300 font-semibold pt-1 font-sans">✓ Prejuízo evitado: R$ 3.800 a R$ 12.000 / mês</div>
         </div>
 
-        <!-- CARD 2: DESVIOS DE ESTOQUE (Com Mini Barra de Calibração Volumétrica) -->
+        <!-- CARD 2: DESVIOS DE ESTOQUE (Com Mini Barra de Calibração Físico vs Fiscal) -->
         <div class="roi-card p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-cyan-500/25 space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-[10px] font-mono text-cyan-400 uppercase">Controle Físico Real</span>
@@ -2469,10 +2347,10 @@ def generate_showcase_html():
           </div>
           <h4 class="card-title-serif heading-small text-lg sm:text-[19px] font-serif font-normal text-white">Auditoria de Desvios de Estoque</h4>
           <p class="card-desc-geist body-small leading-relaxed">
-            Cruzamento contínuo entre saídas fiscais registradas e estoque físico real em tanques, balcões e gôndolas. Fim da "perda aceita".
+            Cruzamento contínuo entre saídas fiscais registradas e estoque físico apurado em depósitos, balcões e gôndolas. Fim da "perda aceita".
           </p>
 
-          <!-- Mini Barra de Calibração Volumétrica Físico vs Fiscal -->
+          <!-- Mini Barra de Calibração Físico vs Fiscal -->
           <div class="p-2.5 rounded-xl bg-black/50 border border-white/[0.05] space-y-1.5 font-sans">
             <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
               <span>Calibração Físico x Fiscal</span>
@@ -2482,7 +2360,7 @@ def generate_showcase_html():
               <div class="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 rounded-full roi-gauge-fill" style="--target-width: 99.8%;"></div>
             </div>
             <div class="flex items-center justify-between text-[9px] text-slate-400 font-mono">
-              <span>Estoque Tanque: 4.820 L</span>
+              <span>Estoque Físico: 4.820 un.</span>
               <span class="text-emerald-400">Conforme Regras</span>
             </div>
           </div>
@@ -2743,7 +2621,7 @@ def generate_showcase_html():
             <span>A AURA substitui o sistema ERP atual da minha empresa?</span>
           </h4>
           <p class="card-desc-geist body-small leading-relaxed">
-            Não. A AURA atua como uma supervisora de inteligência e auditoria contínua que se conecta ao seu ERP e automação existente, acelerando a tomada de decisões no dia a dia em postos, lojas, bares ou padarias.
+            Não. A AURA atua como uma supervisora de inteligência e auditoria contínua que se conecta ao seu ERP e automação existente, acelerando a tomada de decisões no dia a dia em redes de varejo, lojas, franquias, farmácias, mercados ou postos.
           </p>
         </div>
 
@@ -3521,8 +3399,8 @@ def generate_showcase_html():
 
         const descriptions = {
           prompt: '1. Compreensao da Pergunta: Interpretacao semantica direta sem formulas, codigos ou relatorios manuais.',
-          motor: '2. Telemetria de Pista & Concentrador: Leitura direta de encerrantes, bicos, tanques e estoques em tempo real.',
-          pista: '2. Telemetria de Pista & Concentrador: Leitura direta de encerrantes, bicos, tanques e estoques em tempo real.',
+          motor: '2. Telemetria de PDVs & Concentrador: Leitura direta de terminais PDV, estoques físicos, gôndolas e telemetria da operação em tempo real.',
+          pista: '2. Telemetria de PDVs & Concentrador: Leitura direta de terminais PDV, estoques físicos, gôndolas e telemetria da operação em tempo real.',
           lgpd: '3. Escudo AURA Guard™: Desintegracao em poeira de dados confidenciais (CNPJ, CPF e saldos) em menos de 4ms.',
           regras: '4. Auditoria & Conferencia Exata: Conferencia matematica direta de estoques, notas fiscais e fechamento de caixa.',
           anp: '4. Auditoria & Conferencia Exata: Conferencia matematica direta de estoques, notas fiscais e fechamento de caixa.',
@@ -3774,63 +3652,6 @@ def generate_showcase_html():
 
       // API Pública window.auraTour
 
-      // =========================================================================
-      // SIMULADOR INTERATIVO EXECUTIVO DE ROI DA AURA (ABRAPPE & KPMG MODEL)
-      // =========================================================================
-      function initAuraRoiSimulator() {
-        const fuelSlider = document.getElementById('sim-fuel-slider');
-        const storeSlider = document.getElementById('sim-store-slider');
-        if (!fuelSlider || !storeSlider) return;
-
-        const fuelDisplay = document.getElementById('sim-fuel-display');
-        const storeDisplay = document.getElementById('sim-store-display');
-        const leakageVal = document.getElementById('sim-leakage-value');
-        const recoveryVal = document.getElementById('sim-recovery-value');
-        const ninetyDaysVal = document.getElementById('sim-90days-value');
-        const multiplierVal = document.getElementById('sim-multiplier-value');
-
-        function formatBrl(val) {
-          return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
-        }
-
-        function calculateRoi() {
-          const fuelLiters = parseFloat(fuelSlider.value) || 250000;
-          const storeRevenue = parseFloat(storeSlider.value) || 200000;
-
-          if (fuelDisplay) fuelDisplay.textContent = new Intl.NumberFormat('pt-BR').format(fuelLiters) + ' L / mês';
-          if (storeDisplay) storeDisplay.textContent = formatBrl(storeRevenue) + ' / mês';
-
-          const fuelRevenue = fuelLiters * 6.58;
-          const lmcLoss = fuelRevenue * 0.0035;
-          const storeLoss = storeRevenue * 0.0386;
-          const cashierLoss = (fuelRevenue + storeRevenue) * 0.0018;
-          const pricingLoss = fuelLiters * 0.035;
-
-          const totalMonthlyLeakage = lmcLoss + storeLoss + cashierLoss + pricingLoss;
-          const monthlyRecovery = (lmcLoss * 0.80) + (storeLoss * 0.45) + (cashierLoss * 0.70) + (pricingLoss * 0.50);
-
-          const monthlyFee = 490.0;
-          const totalRecovery90d = monthlyRecovery * 2.30;
-          const net90Days = totalRecovery90d - (3 * monthlyFee);
-          const multiplier = Math.max(1.0, totalRecovery90d / (3 * monthlyFee));
-
-          if (leakageVal) leakageVal.textContent = formatBrl(totalMonthlyLeakage) + ' / mês';
-          if (recoveryVal) recoveryVal.textContent = '+' + formatBrl(monthlyRecovery) + ' / mês';
-          if (ninetyDaysVal) ninetyDaysVal.textContent = formatBrl(net90Days) + ' líquidos';
-          if (multiplierVal) multiplierVal.textContent = multiplier.toFixed(1) + 'x';
-        }
-
-        fuelSlider.addEventListener('input', calculateRoi);
-        storeSlider.addEventListener('input', calculateRoi);
-        calculateRoi();
-      }
-
-      // Dispara ao carregar o DOM ou de imediato
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initAuraRoiSimulator);
-      } else {
-        initAuraRoiSimulator();
-      }
 
       window.auraTour = {
         runAutonomousShowcase,
@@ -3940,7 +3761,7 @@ def generate_showcase_html():
             </div>
             <h5 class="text-xs font-bold text-white">Banco Local do ERP</h5>
             <p class="text-[11px] text-slate-300 font-sans leading-relaxed">
-              Banco transacional do posto permanece 100% intacto. Nenhum trigger ou gravacao e permitida.
+              Banco transacional da empresa permanece 100% intacto. Nenhum trigger ou gravacao e permitida.
             </p>
           </div>
 
