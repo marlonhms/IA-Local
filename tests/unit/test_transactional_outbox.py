@@ -671,6 +671,7 @@ class TestAuraWebhookDispatcherOutboxIntegration:
         monkeypatch.setattr("core.webhooks.EVOLUTION_API_URL", "http://evo.local:8080")
         monkeypatch.setattr("core.webhooks.EVOLUTION_API_KEY", "evo_key")
         monkeypatch.setattr("core.webhooks.WHATSAPP_MANAGER_PHONE", "5511977776666")
+        monkeypatch.setattr("core.webhooks.PAINEL_WHATSAPP_EVENTS_URL", "")
 
         with patch(
             "httpx.AsyncClient.post",
@@ -703,6 +704,57 @@ class TestAuraWebhookDispatcherOutboxIntegration:
         stats = outbox.get_stats()
         assert stats["failed_retry"] == 4
         assert stats["total"] == 4
+        outbox.close()
+
+    @pytest.mark.asyncio
+    async def test_notify_functions_persist_all_three_destinations_with_crm(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """
+        Garante persistencia na Outbox para os 3 destinos quando o Painel WhatsApp CRM
+        esta configurado (n8n, Evolution API e Painel WhatsApp CRM).
+        """
+        outbox = AuraTransactionalOutbox(db_path=tmp_path / "three_dests.db")
+        set_transactional_outbox(outbox)
+
+        monkeypatch.setattr("core.webhooks.N8N_WEBHOOK_URL", "http://n8n.local/webhook")
+        monkeypatch.setattr("core.webhooks.EVOLUTION_API_URL", "http://evo.local:8080")
+        monkeypatch.setattr("core.webhooks.EVOLUTION_API_KEY", "evo_key")
+        monkeypatch.setattr("core.webhooks.WHATSAPP_MANAGER_PHONE", "5511977776666")
+        monkeypatch.setattr("core.webhooks.PAINEL_WHATSAPP_EVENTS_URL", "http://crm.local/api/aura/events")
+
+        with patch(
+            "httpx.AsyncClient.post",
+            new_callable=AsyncMock,
+            side_effect=httpx.ConnectError("Sem rota para o host"),
+        ):
+            turno_payload = TurnoResumoPayload(
+                turno_id="TURNO-01",
+                filial_id="posto_01",
+                faturamento_total=25000.0,
+                litros_vendidos=4200.0,
+            )
+            res = await notify_fechamento_turno(payload=turno_payload)
+            assert res["n8n"]["outbox_status"] == "FAILED_RETRY"
+            assert res["evolution"]["outbox_status"] == "FAILED_RETRY"
+            assert res["painel_whatsapp"]["outbox_status"] == "FAILED_RETRY"
+
+            tanque_payload = AlertaTanquePayload(
+                tanque_id="TQ-01",
+                combustivel="DIESEL S10",
+                volume_atual_litros=1200.0,
+                capacidade_total_litros=15000.0,
+                autonomia_horas=4.0,
+                previsao_esgotamento="Hoje 19h",
+            )
+            res_tq = await notify_alerta_tanque(payload=tanque_payload)
+            assert res_tq["n8n"]["outbox_status"] == "FAILED_RETRY"
+            assert res_tq["evolution"]["outbox_status"] == "FAILED_RETRY"
+            assert res_tq["painel_whatsapp"]["outbox_status"] == "FAILED_RETRY"
+
+        stats = outbox.get_stats()
+        assert stats["failed_retry"] == 6
+        assert stats["total"] == 6
         outbox.close()
 
 
