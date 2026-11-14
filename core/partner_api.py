@@ -3621,7 +3621,10 @@ async def partner_handoff_reply_endpoint(
         key = evo_data.get("key") or {}
         if key.get("fromMe") is True:
             return {"success": True, "accepted": False, "ingested": False, "reason": "from_me_ignored"}
-        raw_phone = raw_phone or key.get("remoteJid")
+        jid = str(key.get("remoteJid") or "")
+        alt_jid = str(key.get("remoteJidAlt") or "")
+        effective_jid = alt_jid if (alt_jid and (not jid or jid.endswith("@lid"))) else (jid or alt_jid)
+        raw_phone = raw_phone or effective_jid
         ext_id = ext_id or key.get("id")
         sender_name = sender_name or evo_data.get("pushName")
         if evo_data.get("messageTimestamp"):

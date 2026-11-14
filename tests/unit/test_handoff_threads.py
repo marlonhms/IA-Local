@@ -340,3 +340,139 @@ def test_tools_auditar_documento_xml_with_prefix_prompt():
     assert res["status"] == "sucesso"
     assert res["tipo"] == "xml_documento"
     assert res["resultado"]["modelo"] == "55"
+
+
+def test_handoff_reply_accepts_evolution_lid_with_remote_jid_alt(
+    partner_client: TestClient,
+    isolated_journal: AuraCommandJournal,
+):
+    isolated_journal.record_handoff_message(
+        thread_phone="5527992277217",
+        direction="OUTBOUND",
+        sender_label="Gestor AURA",
+        message_text="Envio XML para conferencia.",
+        contact_name="Contador",
+        role_label="Contador",
+        epoch_ts=int(time.time()),
+    )
+
+    lid_push = partner_client.post(
+        "/api/v1/partner/handoff-reply",
+        headers=_auth_headers(),
+        json={
+            "event": "messages.upsert",
+            "data": {
+                "key": {
+                    "id": "EVO_LID_MSG_001",
+                    "fromMe": False,
+                    "remoteJid": "193256348495933@lid",
+                    "remoteJidAlt": "5527992277217@s.whatsapp.net",
+                    "addressingMode": "lid",
+                },
+                "pushName": "Contador",
+                "message": {"conversation": "ok"},
+                "messageTimestamp": int(time.time()) + 5,
+            },
+        },
+    )
+    assert lid_push.status_code == 200
+    body = lid_push.json()
+    assert body["accepted"] is True
+    assert body["ingested"] is True
+
+    listing = partner_client.get(
+        "/api/v1/partner/handoffs?sync_evolution=false",
+        headers=_auth_headers(),
+    ).json()
+    assert listing["total_unread"] == 1
+    assert listing["threads"][0]["messages"][-1]["message_text"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_evolution_find_messages_sync_queries_remote_jid_alt_for_lid_replies(
+    isolated_journal: AuraCommandJournal,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import json
+
+    now_epoch = int(time.time())
+    isolated_journal.record_handoff_message(
+        thread_phone="5527992277217",
+        direction="OUTBOUND",
+        sender_label="Gestor AURA",
+        message_text="Favor confirmar lancamento.",
+        contact_name="Contador",
+        role_label="Contador",
+        epoch_ts=now_epoch,
+    )
+
+    alt_records = [
+        {
+            "key": {
+                "id": "AC5DF614A46460084D8B630CE22D3878",
+                "fromMe": False,
+                "remoteJid": "193256348495933@lid",
+                "remoteJidAlt": "5527992277217@s.whatsapp.net",
+                "addressingMode": "lid",
+            },
+            "pushName": "Contador",
+            "message": {"conversation": "ok"},
+            "messageTimestamp": now_epoch + 21,
+        },
+        {
+            "key": {
+                "id": "AC60DA21E5C08AE26E59F5B7D0EB42FC",
+                "fromMe": False,
+                "remoteJid": "193256348495933@lid",
+                "remoteJidAlt": "5527992277217@s.whatsapp.net",
+                "addressingMode": "lid",
+            },
+            "pushName": "Contador",
+            "message": {"conversation": "obrigado"},
+            "messageTimestamp": now_epoch + 60,
+        },
+        {
+            "key": {
+                "id": "OTHER_CONTACT_MSG",
+                "fromMe": False,
+                "remoteJid": "999999999999999@lid",
+                "remoteJidAlt": "5511999998888@s.whatsapp.net",
+                "addressingMode": "lid",
+            },
+            "pushName": "Outro",
+            "message": {"conversation": "nao deve entrar"},
+            "messageTimestamp": now_epoch + 65,
+        },
+    ]
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/chat/findMessages/webposto-n3"):
+            payload = json.loads(request.content.decode("utf-8"))
+            key_filter = (payload.get("where") or {}).get("key") or {}
+            if key_filter.get("remoteJidAlt") == "5527992277217@s.whatsapp.net":
+                return httpx.Response(200, json={"messages": {"total": len(alt_records), "records": alt_records}})
+            return httpx.Response(200, json={"messages": {"total": 0, "records": []}})
+        return httpx.Response(404)
+
+    monkeypatch.setattr(webhooks_mod, "EVOLUTION_API_URL", "http://mock-evo:8080")
+    monkeypatch.setattr(webhooks_mod, "EVOLUTION_INSTANCE", "webposto-n3")
+    monkeypatch.setattr(webhooks_mod, "_last_evolution_sync_ts", 0.0)
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        sync_res = await sync_inbound_messages_from_evolution(
+            isolated_journal,
+            force=True,
+            http_client=client,
+        )
+
+    assert sync_res["synced"] is True
+    assert sync_res["ingested"] == 2
+    threads = isolated_journal.list_handoff_threads()
+    assert len(threads) == 1
+    assert threads[0]["unread_count"] == 2
+    texts = [m["message_text"] for m in threads[0]["messages"]]
+    assert "ok" in texts
+    assert "obrigado" in texts
+    assert "nao deve entrar" not in texts
+

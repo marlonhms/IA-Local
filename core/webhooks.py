@@ -26,7 +26,7 @@ from config.settings import (
     PAINEL_WHATSAPP_TENANT_SLUG,
     WHATSAPP_MANAGER_PHONE,
 )
-from core.command_journal import AuraCommandJournal, whatsapp_jid_candidates
+from core.command_journal import AuraCommandJournal, phone_match_key, whatsapp_jid_candidates
 from core.logger import logger
 from core.outbox import (
     AuraTransactionalOutbox,
@@ -1140,64 +1140,72 @@ async def sync_inbound_messages_from_evolution(
             threads_checked += 1
             first_epoch = int(thread.get("first_outbound_epoch") or 0)
             thread_phone = str(thread["thread_phone"])
+            thread_match_key = str(thread.get("match_key") or phone_match_key(thread_phone))
             candidates = whatsapp_jid_candidates(thread_phone)
             for jid in candidates:
-                try:
-                    resp = await client.post(
-                        endpoint,
-                        headers=headers,
-                        json={"where": {"key": {"remoteJid": jid}}, "limit": 15},
-                    )
-                    if resp.status_code >= 400:
-                        errors.append(f"{jid}: HTTP {resp.status_code}")
-                        continue
-                    payload = resp.json()
-                    msgs_block = payload.get("messages") if isinstance(payload, dict) else None
-                    if isinstance(msgs_block, dict):
-                        records = msgs_block.get("records") or []
-                    elif isinstance(msgs_block, list):
-                        records = msgs_block
-                    elif isinstance(payload, list):
-                        records = payload
-                    else:
-                        records = []
-
-                    for rec in records:
-                        if not isinstance(rec, dict):
-                            continue
-                        key = rec.get("key") or {}
-                        if key.get("fromMe") is not False:
-                            continue
-                        raw_ts = rec.get("messageTimestamp") or 0
-                        try:
-                            msg_ts = int(raw_ts)
-                        except (TypeError, ValueError):
-                            msg_ts = 0
-                        if msg_ts <= 0 or msg_ts < (first_epoch - 5):
-                            continue
-
-                        ext_id = key.get("id") or rec.get("id")
-                        msg_text, has_media = extract_evolution_message_content(rec.get("message"))
-                        push_name = str(rec.get("pushName") or thread.get("contact_name") or thread_phone).strip()
-                        saved = journal.record_handoff_message(
-                            thread_phone=thread_phone,
-                            direction="INBOUND",
-                            sender_label=push_name,
-                            message_text=msg_text,
-                            contact_name=thread.get("contact_name"),
-                            role_label=thread.get("role_label"),
-                            station_id=str(thread.get("station_id") or "posto_01"),
-                            command_key=thread.get("last_command_key"),
-                            has_media=has_media,
-                            source="evolution_find_messages",
-                            external_msg_id=str(ext_id) if ext_id else None,
-                            epoch_ts=msg_ts,
-                            is_read=False,
+                for key_field in ("remoteJid", "remoteJidAlt"):
+                    try:
+                        resp = await client.post(
+                            endpoint,
+                            headers=headers,
+                            json={"where": {"key": {key_field: jid}}, "limit": 20},
                         )
-                        if not saved.get("already_exists"):
-                            ingested_count += 1
-                except Exception as exc:
-                    errors.append(f"{jid}: {exc}")
+                        if resp.status_code >= 400:
+                            errors.append(f"{jid} ({key_field}): HTTP {resp.status_code}")
+                            continue
+                        payload = resp.json()
+                        msgs_block = payload.get("messages") if isinstance(payload, dict) else None
+                        if isinstance(msgs_block, dict):
+                            records = msgs_block.get("records") or []
+                        elif isinstance(msgs_block, list):
+                            records = msgs_block
+                        elif isinstance(payload, list):
+                            records = payload
+                        else:
+                            records = []
+
+                        for rec in records:
+                            if not isinstance(rec, dict):
+                                continue
+                            key = rec.get("key") or {}
+                            if key.get("fromMe") is not False:
+                                continue
+                            rec_match_keys = {
+                                phone_match_key(key.get("remoteJid")),
+                                phone_match_key(key.get("remoteJidAlt")),
+                            } - {""}
+                            if thread_match_key and rec_match_keys and thread_match_key not in rec_match_keys:
+                                continue
+                            raw_ts = rec.get("messageTimestamp") or 0
+                            try:
+                                msg_ts = int(raw_ts)
+                            except (TypeError, ValueError):
+                                msg_ts = 0
+                            if msg_ts <= 0 or msg_ts < (first_epoch - 5):
+                                continue
+
+                            ext_id = key.get("id") or rec.get("id")
+                            msg_text, has_media = extract_evolution_message_content(rec.get("message"))
+                            push_name = str(rec.get("pushName") or thread.get("contact_name") or thread_phone).strip()
+                            saved = journal.record_handoff_message(
+                                thread_phone=thread_phone,
+                                direction="INBOUND",
+                                sender_label=push_name,
+                                message_text=msg_text,
+                                contact_name=thread.get("contact_name"),
+                                role_label=thread.get("role_label"),
+                                station_id=str(thread.get("station_id") or "posto_01"),
+                                command_key=thread.get("last_command_key"),
+                                has_media=has_media,
+                                source="evolution_find_messages",
+                                external_msg_id=str(ext_id) if ext_id else None,
+                                epoch_ts=msg_ts,
+                                is_read=False,
+                            )
+                            if not saved.get("already_exists"):
+                                ingested_count += 1
+                    except Exception as exc:
+                        errors.append(f"{jid} ({key_field}): {exc}")
 
     if http_client is not None:
         await _poll_threads(http_client)
