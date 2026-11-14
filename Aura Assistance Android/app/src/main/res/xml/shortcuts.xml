@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:shortcutId="shortcut_briefing"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_briefing_short"
+        android:shortcutLongLabel="@string/shortcut_briefing_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.example.aurapostoassitance"
+            android:targetClass="com.example.aurapostoassitance.MainActivity">
+            <extra android:name="aura_shortcut_action" android:value="play_briefing" />
+        </intent>
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="shortcut_assist"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_assist_short"
+        android:shortcutLongLabel="@string/shortcut_assist_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.example.aurapostoassitance"
+            android:targetClass="com.example.aurapostoassitance.ui.assist.AuraAssistActivity" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="shortcut_ruptura"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_ruptura_short"
+        android:shortcutLongLabel="@string/shortcut_ruptura_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.example.aurapostoassitance"
+            android:targetClass="com.example.aurapostoassitance.MainActivity">
+            <extra android:name="aura_query" android:value="Faça a previsão de esgotamento (Run-Out) e compras antecipadas dos estoques." />
+        </intent>
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="shortcut_fuga"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_fuga_short"
+        android:shortcutLongLabel="@string/shortcut_fuga_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.example.aurapostoassitance"
+            android:targetClass="com.example.aurapostoassitance.MainActivity">
+            <extra android:name="aura_query" android:value="Audite as fugas invisíveis de lucro, desvios de caixa e descontos sem alçada." />
+        </intent>
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+</shortcuts>

@@ -192,3 +192,70 @@ def test_quick_action_snooze_option_3(client):
     assert "silenciado" in data["confirmation_text"]
     assert "6 horas" in data["confirmation_text"]
 
+
+def test_partner_universal_quick_action(client):
+    headers = {"X-Partner-Key": DEFAULT_PARTNER_API_KEY}
+    payload = {
+        "action_type": "APROVAR_COMPRA",
+        "option_key": "1",
+        "parameters": {
+            "station_id": "posto_01",
+            "volume_litros": 5000,
+        },
+        "actor_name": "Marlon Gestor",
+    }
+    resp = client.post("/api/v1/partner/quick-actions", json=payload, headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert "status" in data
+
+
+def test_partner_handoff_endpoint(client):
+    headers = {"X-Partner-Key": DEFAULT_PARTNER_API_KEY}
+    payload = {
+        "action_id": "act_rfm_reengagement_vip",
+        "segment": "postos_redes",
+        "phone": "5527999991234",
+        "contact_name": "Carlos VIP",
+        "initial_message": "Ola Carlos, notamos sua ausencia e separamos uma condicao especial.",
+        "session_handoff_context": "Cliente VIP inativo ha 45 dias. Oferecer 5% de cashback na gasolina aditivada.",
+        "station_id": "posto_01",
+    }
+    resp = client.post("/api/v1/partner/handoff", json=payload, headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert data["status"] == "QUEUED_FOR_WHATSAPP"
+    assert "command_key" in data
+    assert data["session_handoff_context"] == payload["session_handoff_context"]
+    assert "Carlos VIP" in data["confirmation_text"]
+
+
+def test_genui_cards_in_baseline_and_briefing(client):
+    headers = {"X-Partner-Key": DEFAULT_PARTNER_API_KEY}
+    # 1. Baseline GenUI Cards
+    resp_base = client.get("/api/v1/partner/segments/postos_redes/baseline", headers=headers)
+    assert resp_base.status_code == 200
+    data_base = resp_base.json()
+    assert "genUiCards" in data_base
+    cards = data_base["genUiCards"]
+    assert "runOutGenUiCard" in cards
+    assert "leakageGenUiCard" in cards
+    assert "rfmGenUiCard" in cards
+    assert cards["runOutGenUiCard"]["component_name"] == "render_PredictiveRunOutUI"
+
+    # 2. Morning Briefing GenUI Card
+    payload = {
+        "segment": "postos_redes",
+        "manager_name": "Marlon Henrique",
+        "business_name": "Posto Central",
+        "station_id": "posto_01",
+    }
+    resp_briefing = client.post("/api/v1/partner/morning-briefing", json=payload, headers=headers)
+    assert resp_briefing.status_code == 200
+    data_briefing = resp_briefing.json()
+    assert "genUiCard" in data_briefing
+    assert data_briefing["genUiCard"]["component_name"] == "render_MorningBriefingUI"
+
+

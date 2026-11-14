@@ -2227,6 +2227,11 @@ async def partner_quick_action_endpoint(
                 f"Ciencia de sangria registrada com sucesso no posto {clean_station.upper()}. "
                 f"O caixa continuara monitorado no proximo ciclo."
             )
+        elif "FISCAL" in action_type or "SEFAZ" in action_type or "PENDENCIA" in action_type:
+            confirmation_text = (
+                f"Pendencia fiscal/SEFAZ auditada e registrada no Command Journal do posto {clean_station.upper()}. "
+                f"Trilha de liberacao no ERP gravada sob o recibo {voucher_ref}."
+            )
 
         if claim.acquired:
             journal.complete_command(
@@ -2868,6 +2873,245 @@ async def partner_predictive_rfm_endpoint(
     }
 
 
+def _build_predictive_genui_cards(
+    seg_key: str,
+    cfg: dict[str, Any],
+    runout_res: dict[str, Any],
+    leakage_res: dict[str, Any],
+    rfm_res: dict[str, Any],
+) -> dict[str, Any]:
+    """Monta envelopes GenUiCard nativos compativeis com o GenUiParser do Android."""
+    unit_label = runout_res.get("unitLabel") or cfg.get("unit_label", "un")
+    curr_cap = runout_res.get("currentStockOrCapacity", 0.0)
+    burn_rate = runout_res.get("burnRatePerHour", 0.0)
+    hours_rem = runout_res.get("hoursRemaining", 0.0)
+    savings_val = runout_res.get("anticipationSavingsBrl", 0.0)
+    is_crit = runout_res.get("status") in ("critical", "depleted")
+
+    runout_card = {
+        "component_name": "render_PredictiveRunOutUI",
+        "client_component": "PredictiveRunOutUI",
+        "props": {
+            "title": f"Previsao de Ruptura & Autonomia ({cfg['label']})",
+            "subtitle": f"{runout_res.get('resourceName')} - {hours_rem}h restantes",
+            "diagnosis": runout_res.get("consultativeRecommendation"),
+            "severity": "critical" if is_crit else "info",
+            "blocks": [
+                {
+                    "block_type": "kpi_grid",
+                    "title": "Autonomia e Capacidade",
+                    "kpis": [
+                        {
+                            "label": "Capacidade Atual",
+                            "value": f"{curr_cap:,.1f} {unit_label}",
+                            "trend": "neutral",
+                            "status": "neutral",
+                        },
+                        {
+                            "label": "Consumo Medio",
+                            "value": f"{burn_rate:,.1f} {unit_label}/h",
+                            "trend": "neutral",
+                            "status": "neutral",
+                        },
+                        {
+                            "label": "Horas Restantes",
+                            "value": f"{hours_rem}h",
+                            "trend": "down" if is_crit else "neutral",
+                            "status": "danger" if is_crit else "success",
+                        },
+                        {
+                            "label": "Economia de Antecipacao",
+                            "value": f"R$ {savings_val:,.2f}",
+                            "trend": "up",
+                            "status": "success",
+                        },
+                    ],
+                },
+                {
+                    "block_type": "alert_callout",
+                    "alert": {
+                        "title": runout_res.get("headline", "Autonomia Operacional"),
+                        "message": runout_res.get("consultativeRecommendation", ""),
+                        "severity": "warning" if is_crit else "info",
+                        "action_label": cfg.get("primary_quick_action_text", "Aprovar Reposicao"),
+                    },
+                },
+            ],
+        },
+        "actions": [
+            {
+                "action_id": "act_quick_order_resource",
+                "label": cfg.get("primary_quick_action_text", "Aprovar Reposicao"),
+                "action_type": "mutation",
+                "variant": "primary",
+                "requires_confirmation": True,
+                "is_destructive": False,
+            },
+            {
+                "action_id": "handoff_supplier_quote",
+                "label": "Cotar com Fornecedor no WhatsApp",
+                "action_type": "handoff",
+                "variant": "secondary",
+                "requires_confirmation": False,
+                "is_destructive": False,
+            },
+        ],
+    }
+
+    breakdown_rows = leakage_res.get("leakageBreakdown", [])
+    rank_items = [
+        {
+            "rank": idx + 1,
+            "title": item.get("category", "Vazamento"),
+            "subtitle": item.get("description", ""),
+            "value": f"R$ {item.get('monthlyBrl', 0.0):,.2f}/mes",
+            "tag": str(item.get("severity", "medium")).upper(),
+            "status": "danger" if item.get("severity") == "critical" else "warning",
+        }
+        for idx, item in enumerate(breakdown_rows[:5])
+    ]
+
+    tot_leak = leakage_res.get("totalMonthlyLeakageBrl", 0.0)
+    ann_leak = leakage_res.get("annualizedLeakageBrl", 0.0)
+    proj_rec = leakage_res.get("stoppagePlan", {}).get("projectedRecoveryBrl", 0.0)
+
+    leakage_card = {
+        "component_name": "render_FinancialLeakAuditUI",
+        "client_component": "FinancialLeakAuditUI",
+        "props": {
+            "title": f"Detector de Fuga Invisivel ({cfg['label']})",
+            "subtitle": f"Perda de R$ {tot_leak:,.2f}/mes",
+            "diagnosis": leakage_res.get("consultativeDiagnosis"),
+            "severity": "critical" if tot_leak > 3000 else "warning",
+            "blocks": [
+                {
+                    "block_type": "kpi_grid",
+                    "title": "Impacto Financeiro Oculto",
+                    "kpis": [
+                        {
+                            "label": "Fuga Mensal",
+                            "value": f"R$ {tot_leak:,.2f}",
+                            "trend": "down",
+                            "status": "danger",
+                        },
+                        {
+                            "label": "Impacto Anualizado",
+                            "value": f"R$ {ann_leak:,.2f}",
+                            "trend": "neutral",
+                            "status": "warning",
+                        },
+                        {
+                            "label": "Recuperacao Projetada",
+                            "value": f"R$ {proj_rec:,.2f}",
+                            "trend": "up",
+                            "status": "success",
+                        },
+                    ],
+                },
+                {
+                    "block_type": "ranking_list",
+                    "title": "Fontes de Vazamento Identificadas",
+                    "subtitle": "Ordenadas por impacto financeiro mensal",
+                    "ranking_items": rank_items,
+                },
+            ],
+        },
+        "actions": [
+            {
+                "action_id": "act_stop_leakage_protocol",
+                "label": "Ativar Protocolo Anti-Vazamento",
+                "action_type": "mutation",
+                "variant": "primary",
+                "requires_confirmation": True,
+                "is_destructive": False,
+            },
+            {
+                "action_id": "handoff_align_team",
+                "label": "Alinhar Meta com Equipe no WhatsApp",
+                "action_type": "handoff",
+                "variant": "secondary",
+                "requires_confirmation": False,
+                "is_destructive": False,
+            },
+        ],
+    }
+
+    rfm_batch = rfm_res.get("readyToSendBatch", [])
+    rfm_rank_items = [
+        {
+            "rank": idx + 1,
+            "title": c.get("customerName", "Cliente"),
+            "subtitle": f"Inativo ha {c.get('lastSeenDaysAgo', 0)} dias | {c.get('preferredItemOrService', '')}",
+            "value": f"Risco: R$ {c.get('estimatedLossRiskBrl', 0.0):,.2f}",
+            "tag": "CHURN",
+            "status": "warning",
+        }
+        for idx, c in enumerate(rfm_batch[:5])
+    ]
+
+    tot_rfm_risk = rfm_res.get("totalRevenueAtRiskBrl", 0.0)
+    proj_rfm_rec = rfm_res.get("projectedRecoverableRevenueBrl", 0.0)
+
+    rfm_card = {
+        "component_name": "render_RfmAntiChurnUI",
+        "client_component": "RfmAntiChurnUI",
+        "props": {
+            "title": f"Maquina Anti-Churn RFM ({cfg['label']})",
+            "subtitle": f"{rfm_res.get('atRiskCustomersCount', 0)} clientes VIP em risco de abandono",
+            "diagnosis": f"Auditoria identificou R$ {tot_rfm_risk:,.2f} em receita recorrente sob ameaca de churn.",
+            "severity": "warning",
+            "blocks": [
+                {
+                    "block_type": "kpi_grid",
+                    "title": "Diagnostico da Base de Clientes",
+                    "kpis": [
+                        {
+                            "label": "Clientes em Risco",
+                            "value": f"{rfm_res.get('atRiskCustomersCount', 0)}",
+                            "trend": "down",
+                            "status": "warning",
+                        },
+                        {
+                            "label": "Receita em Risco",
+                            "value": f"R$ {tot_rfm_risk:,.2f}",
+                            "trend": "down",
+                            "status": "danger",
+                        },
+                        {
+                            "label": "Recuperacao Estimada",
+                            "value": f"R$ {proj_rfm_rec:,.2f}",
+                            "trend": "up",
+                            "status": "success",
+                        },
+                    ],
+                },
+                {
+                    "block_type": "ranking_list",
+                    "title": "Lote Prioritario para Reativacao",
+                    "subtitle": "Clientes VIP ordenados por potencial de perda",
+                    "ranking_items": rfm_rank_items,
+                },
+            ],
+        },
+        "actions": [
+            {
+                "action_id": "handoff_rfm_vip_batch",
+                "label": "Acionar Atendimento VIP no WhatsApp",
+                "action_type": "handoff",
+                "variant": "primary",
+                "requires_confirmation": True,
+                "is_destructive": False,
+            },
+        ],
+    }
+
+    return {
+        "runOutGenUiCard": runout_card,
+        "leakageGenUiCard": leakage_card,
+        "rfmGenUiCard": rfm_card,
+    }
+
+
 @partner_router.get(
     "/segments/{segment}/baseline",
     summary="Baseline Demonstrativo Hiper-Realista por Segmento",
@@ -2932,6 +3176,17 @@ async def partner_segment_baseline_endpoint(
     )
     rfm_res = await partner_predictive_rfm_endpoint(payload=rfm_req, auth_info=auth_info)
 
+    genui_cards = _build_predictive_genui_cards(
+        seg_key=seg_key,
+        cfg=cfg,
+        runout_res=runout_res,
+        leakage_res=leakage_res,
+        rfm_res=rfm_res,
+    )
+    runout_res["genUiCard"] = genui_cards["runOutGenUiCard"]
+    leakage_res["genUiCard"] = genui_cards["leakageGenUiCard"]
+    rfm_res["genUiCard"] = genui_cards["rfmGenUiCard"]
+
     return {
         "success": True,
         "segment": seg_key,
@@ -2942,6 +3197,7 @@ async def partner_segment_baseline_endpoint(
         "runOutTelemetry": runout_res,
         "leakageTelemetry": leakage_res,
         "rfmTelemetry": rfm_res,
+        "genUiCards": genui_cards,
     }
 
 
@@ -3080,5 +3336,205 @@ async def partner_morning_briefing_endpoint(
                 "description": "Suspender alertas temporariamente mantendo auditoria em background",
             },
         ],
+        "genUiCard": {
+            "component_name": "render_MorningBriefingUI",
+            "client_component": "MorningBriefingUI",
+            "props": {
+                "title": f"Briefing Matinal Voice-First ({cfg['label']})",
+                "subtitle": f"{business_name} | Gestao de {manager_name}",
+                "diagnosis": oral_script,
+                "severity": "warning" if run_out.get("status") == "critical" else "info",
+                "blocks": [
+                    {
+                        "block_type": "kpi_grid",
+                        "title": "Radar Executivo do Dia",
+                        "kpis": [
+                            {
+                                "label": "Autonomia de Recursos",
+                                "value": f"{run_out.get('hoursRemaining')}h",
+                                "trend": "down" if run_out.get("status") == "critical" else "neutral",
+                                "status": "danger" if run_out.get("status") == "critical" else "success",
+                            },
+                            {
+                                "label": "Fuga Invisivel Mensal",
+                                "value": leakage_txt,
+                                "trend": "down",
+                                "status": "warning",
+                            },
+                            {
+                                "label": "Clientes VIP em Risco",
+                                "value": f"{rfm.get('atRiskCustomersCount', 0)}",
+                                "trend": "neutral",
+                                "status": "warning",
+                            },
+                        ],
+                    },
+                    {
+                        "block_type": "alert_callout",
+                        "alert": {
+                            "title": "Briefing de 45s (Modo Socio)",
+                            "message": oral_script,
+                            "severity": "info",
+                            "action_label": "Ouvir Audio",
+                        },
+                    },
+                ],
+            },
+            "actions": [
+                {
+                    "action_id": "act_briefing_option_1",
+                    "label": "1. " + str(run_out.get("suggestedQuickAction", {}).get("description") or "Aprovar Acao"),
+                    "action_type": "mutation",
+                    "variant": "primary",
+                    "requires_confirmation": True,
+                    "is_destructive": False,
+                },
+                {
+                    "action_id": "act_briefing_option_2",
+                    "label": "2. Delegar para Equipe no WhatsApp",
+                    "action_type": "handoff",
+                    "variant": "secondary",
+                    "requires_confirmation": False,
+                    "is_destructive": False,
+                },
+                {
+                    "action_id": "act_briefing_option_3",
+                    "label": "3. Silenciar por 6 Horas",
+                    "action_type": "mutation",
+                    "variant": "secondary",
+                    "requires_confirmation": False,
+                    "is_destructive": False,
+                },
+            ],
+        },
+    }
+
+
+# =============================================================================
+# ENDPOINTS ADICIONAIS: QUICK-ACTIONS E CONTEXTUAL HANDOFF
+# =============================================================================
+
+@partner_router.post(
+    "/quick-actions",
+    summary="Execucao de Acao Rapida Universal",
+    description="Processa comando 1-toque com persistencia no Command Journal.",
+)
+async def partner_universal_quick_action_endpoint(
+    payload: PartnerQuickActionRequest = Body(...),
+    auth_info: dict[str, str] = Depends(verify_partner_auth),
+    staging_store: PartnerStagingStore = Depends(get_partner_staging_store),
+):
+    """Executa comando rapido roteando para a estacao/posto configurado."""
+    station_id = payload.parameters.get("station_id") or "posto_01"
+    return await partner_quick_action_endpoint(
+        station_id=station_id,
+        payload=payload,
+        auth_info=auth_info,
+        staging_store=staging_store,
+    )
+
+
+class PartnerHandoffRequest(BaseModel):
+    action_id: str = Field(..., description="ID da acao de handoff")
+    segment: str = Field(default="postos_redes", description="Segmento de negocio")
+    phone: str = Field(..., description="Telefone de destino")
+    contact_name: str | None = Field(default=None, description="Nome do contato")
+    initial_message: str = Field(..., description="Mensagem inicial a enviar")
+    session_handoff_context: str = Field(..., description="Contexto silencioso para continuidade")
+    station_id: str = Field(default="posto_01", description="Filial ou estacao")
+    attachment_base64: str | None = Field(default=None, description="Imagem Base64 opcional (copia da DANFE/documento)")
+    attachment_mimetype: str | None = Field(default="image/jpeg", description="MIME type do anexo")
+    attachment_filename: str | None = Field(default="copia_nota_fiscal.jpg", description="Nome do arquivo anexado")
+    attachment_caption: str | None = Field(default=None, description="Legenda da imagem no WhatsApp")
+
+
+@partner_router.post(
+    "/handoff",
+    summary="Disparo de Continuidade de Atendimento com Contexto (App Android -> WhatsApp CRM)",
+    description="Enfileira ordem de atendimento com sessionHandoffContext no Command Journal e despacha via Evolution API.",
+)
+async def partner_handoff_endpoint(
+    payload: PartnerHandoffRequest = Body(...),
+    auth_info: dict[str, str] = Depends(verify_partner_auth),
+):
+    """
+    Grava ordem no Command Journal (SQLite WAL) com recibo de handoff contextualizado
+    e realiza o disparo imediato da mensagem (e copia da nota em anexo, quando enviada)
+    no WhatsApp via Evolution API + Transactional Outbox.
+    """
+    from core.command_journal import get_command_journal
+    from core.webhooks import dispatch_evolution_media, dispatch_evolution_message
+
+    journal = get_command_journal()
+    cmd_key = f"handoff_{payload.action_id}_{int(time.time())}"
+    safe_journal_req = payload.model_dump(exclude={"attachment_base64"})
+    safe_journal_req["has_attachment"] = bool(payload.attachment_base64 and len(payload.attachment_base64) > 50)
+
+    claim = journal.begin_command(
+        command_key=cmd_key,
+        action_id=payload.action_id,
+        action_type="CONTEXTUAL_HANDOFF",
+        actor=auth_info.get("partner_id", "AuraMobileAndroid"),
+        request_payload=safe_journal_req,
+    )
+
+    dispatch_res = await dispatch_evolution_message(
+        phone=payload.phone,
+        message_text=payload.initial_message,
+        idempotency_key=cmd_key,
+        event_type="partner_handoff_whatsapp",
+    )
+
+    media_res = None
+    if payload.attachment_base64 and len(payload.attachment_base64.strip()) > 50:
+        media_caption = payload.attachment_caption or "📎 *Cópia da Nota Fiscal / Documento auditado pela AURA*"
+        media_res = await dispatch_evolution_media(
+            phone=payload.phone,
+            media_base64=payload.attachment_base64,
+            caption=media_caption,
+            mimetype=payload.attachment_mimetype or "image/jpeg",
+            filename=payload.attachment_filename or "copia_nota_fiscal.jpg",
+            idempotency_key=f"{cmd_key}_media",
+            event_type="partner_handoff_whatsapp_media",
+        )
+
+    media_sent = bool(media_res and media_res.success)
+    delivery_status = "SENT_VIA_WHATSAPP" if dispatch_res.success else "QUEUED_FOR_WHATSAPP"
+
+    if claim.acquired:
+        journal.complete_command(
+            command_key=cmd_key,
+            result_payload={
+                "status": delivery_status,
+                "session_handoff_context": payload.session_handoff_context,
+                "target_phone": payload.phone,
+                "whatsapp_sent": dispatch_res.success,
+                "media_sent": media_sent,
+                "outbox_message_id": dispatch_res.outbox_message_id,
+                "whatsapp_error": dispatch_res.error or (media_res.error if media_res else None),
+                "queued_at": datetime.now(UTC).isoformat(),
+            },
+        )
+
+    dest = payload.contact_name or payload.phone
+    anexo_info = " (com cópia da nota em anexo)" if media_sent else ""
+    confirmation = (
+        f"Relatório enviado via WhatsApp{anexo_info} pela instância Evolution para {dest} e gravado no Command Journal ({cmd_key})."
+        if dispatch_res.success
+        else f"Ordem para {dest} gravada no Command Journal ({cmd_key}) e enfileirada na Outbox ({dispatch_res.error or 'Evolution pendente'})."
+    )
+
+    return {
+        "success": True,
+        "status": delivery_status,
+        "whatsapp_sent": dispatch_res.success,
+        "media_sent": media_sent,
+        "whatsapp_error": dispatch_res.error,
+        "media_error": media_res.error if media_res else None,
+        "outbox_message_id": dispatch_res.outbox_message_id,
+        "command_key": cmd_key,
+        "journal_id": claim.entry.journal_id if claim.entry else None,
+        "session_handoff_context": payload.session_handoff_context,
+        "confirmation_text": confirmation,
     }
 

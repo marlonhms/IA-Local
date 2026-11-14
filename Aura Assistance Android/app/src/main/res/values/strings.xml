@@ -1,3 +1,12 @@
 <resources>
     <string name="app_name">Aura Posto Assitance</string>
+    <string name="shortcut_briefing_short">Briefing 45s</string>
+    <string name="shortcut_briefing_long">Ouvir Briefing Matinal (Modo Sócio)</string>
+    <string name="shortcut_assist_short">AURA Assist</string>
+    <string name="shortcut_assist_long">Invocar Assistente Digital AURA</string>
+    <string name="shortcut_ruptura_short">Ruptura &amp; Autonomia</string>
+    <string name="shortcut_ruptura_long">Previsão de Ruptura e Autonomia 24h</string>
+    <string name="shortcut_fuga_short">Fuga Invisível</string>
+    <string name="shortcut_fuga_long">Auditoria de Fugas de Caixa e Margem</string>
+    <string name="widget_name">AURA Sócio • Telemetria</string>
 </resources>

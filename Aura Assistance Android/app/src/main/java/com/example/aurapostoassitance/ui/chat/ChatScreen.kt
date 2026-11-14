@@ -1,10 +1,15 @@
 package com.example.aurapostoassitance.ui.chat
 
 import android.Manifest
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -32,6 +37,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -46,9 +52,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -57,6 +66,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material.icons.rounded.Security
@@ -70,18 +80,35 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import java.io.File
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -91,16 +118,23 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.aurapostoassitance.data.local.HandoffContact
 import com.example.aurapostoassitance.ui.components.AuraAmbientBackground
 import com.example.aurapostoassitance.ui.components.AuraBrandTitle
 import com.example.aurapostoassitance.ui.components.AuraCard
 import com.example.aurapostoassitance.ui.components.AuraChip
 import com.example.aurapostoassitance.ui.components.AuraDeepDiveModal
 import com.example.aurapostoassitance.ui.components.AuraDynamicIsland
+import com.example.aurapostoassitance.ui.vision.AuraVisionBottomSheet
+import com.example.aurapostoassitance.ui.components.AuraGhostButton
+import com.example.aurapostoassitance.ui.components.AuraGradientButton
 import com.example.aurapostoassitance.ui.components.AuraLivingOrb
 import com.example.aurapostoassitance.ui.components.AuraMessageActionType
 import com.example.aurapostoassitance.ui.components.AuraMessageContextMenuSheet
@@ -112,9 +146,12 @@ import com.example.aurapostoassitance.ui.components.SectionLabel
 import com.example.aurapostoassitance.ui.components.SpatialGlassCard
 import com.example.aurapostoassitance.ui.components.StatusDot
 import com.example.aurapostoassitance.ui.components.ThinkingIndicator
+import com.example.aurapostoassitance.ui.components.findFragmentActivity
+import com.example.aurapostoassitance.ui.genui.AuraWhatsAppReportFormatter
 import com.example.aurapostoassitance.ui.genui.GenUiAction
 import com.example.aurapostoassitance.ui.genui.GenUiCardView
 import com.example.aurapostoassitance.ui.genui.GenUiParser
+import com.example.aurapostoassitance.ui.genui.isHandoffAction
 import com.example.aurapostoassitance.ui.theme.AuraCyan
 import com.example.aurapostoassitance.ui.theme.AuraEmerald
 import com.example.aurapostoassitance.ui.theme.AuraPurple
@@ -165,13 +202,30 @@ fun ChatScreen(
     val voiceRms by viewModel.voiceRms.collectAsState()
     val isSpeaking by viewModel.isSpeaking.collectAsState()
     val speakingMessageId by viewModel.speakingMessageId.collectAsState()
+    val voiceError by viewModel.voiceError.collectAsState()
+    val isVoiceConversationActive by viewModel.isVoiceConversationActive.collectAsState()
+    val openVisionScannerRequest by viewModel.openVisionScannerRequest.collectAsState()
+    val handoffContacts by viewModel.handoffContacts.collectAsState()
+    val lastHandoffRole by viewModel.lastHandoffRole.collectAsState()
+    val pendingWhatsAppUrl by viewModel.pendingWhatsAppUrl.collectAsState()
+    val hasScannedDocument by viewModel.hasScannedDocument.collectAsState()
+    val lastScannedDocumentTitle by viewModel.lastScannedDocumentTitle.collectAsState()
 
     val context = LocalContext.current
+
+    LaunchedEffect(pendingWhatsAppUrl) {
+        val url = pendingWhatsAppUrl ?: return@LaunchedEffect
+        runCatching {
+            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+            context.startActivity(intent)
+        }
+        viewModel.consumePendingWhatsAppUrl()
+    }
     val recordAudioLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            viewModel.startVoiceListening()
+            viewModel.startVoiceConversation()
         }
     }
 
@@ -182,7 +236,7 @@ fun ChatScreen(
         ) == PackageManager.PERMISSION_GRANTED
 
         if (hasPermission) {
-            viewModel.startVoiceListening()
+            viewModel.startVoiceConversation()
         } else {
             recordAudioLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
@@ -192,8 +246,24 @@ fun ChatScreen(
     var showMenu by remember { mutableStateOf(false) }
     var showSessionsSheet by remember { mutableStateOf(false) }
     var showCommandHubSheet by remember { mutableStateOf(false) }
+    var showVisionScanner by remember { mutableStateOf(false) }
     var selectedMenuMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    var pendingHandoffAction by remember { mutableStateOf<GenUiAction?>(null) }
     var activeModeTitle by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(openVisionScannerRequest) {
+        if (openVisionScannerRequest) {
+            showVisionScanner = true
+            viewModel.consumeVisionScannerRequest()
+        }
+    }
+
+    LaunchedEffect(voiceError) {
+        if (voiceError != null) {
+            kotlinx.coroutines.delay(4000)
+            viewModel.clearVoiceError()
+        }
+    }
 
     val listState = rememberLazyListState()
     val haptic = LocalHapticFeedback.current
@@ -206,12 +276,31 @@ fun ChatScreen(
     val send: (String) -> Unit = { text ->
         if (text.isNotBlank()) {
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            viewModel.sendMessage(text)
+            viewModel.sendMessage(
+                query = text,
+                speakResponse = isVoiceConversationActive,
+                voiceMode = isVoiceConversationActive
+            )
+        }
+    }
+
+    val activity = remember(context) { context.findFragmentActivity() }
+
+    val executeSignedOrDirect: (GenUiAction) -> Unit = { action ->
+        val act = activity ?: context.findFragmentActivity()
+        if (act != null && (action.requiresConfirmation || action.isDestructive || action.isHandoffAction())) {
+            viewModel.handleSignedGenUiAction(act, action)
+        } else {
+            viewModel.handleGenUiAction(action)
         }
     }
 
     val onAction: (GenUiAction) -> Unit = { action ->
-        send("Confirmo a ação: ${action.label}")
+        if (action.isHandoffAction() && action.targetPhone.isNullOrBlank()) {
+            pendingHandoffAction = action
+        } else {
+            executeSignedOrDirect(action)
+        }
     }
 
     AuraAmbientBackground {
@@ -225,6 +314,14 @@ fun ChatScreen(
                     title = sessionTitle,
                     isTyping = isTyping,
                     activeMode = activeModeTitle,
+                    isVoiceConversationActive = isVoiceConversationActive,
+                    onToggleVoiceConversation = {
+                        if (isVoiceConversationActive) {
+                            viewModel.endVoiceConversation()
+                        } else {
+                            requestVoiceListening()
+                        }
+                    },
                     onBack = onNavigateBack,
                     onHistory = { showSessionsSheet = true },
                     onNewChat = { viewModel.createNewChat("Novo Chat") },
@@ -259,7 +356,7 @@ fun ChatScreen(
             bottomBar = {
                 Column {
                     AnimatedVisibility(
-                        visible = isListening || spokenText.isNotBlank(),
+                        visible = isVoiceConversationActive || isListening || spokenText.isNotBlank(),
                         enter = expandVertically() + fadeIn(),
                         exit = shrinkVertically() + fadeOut()
                     ) {
@@ -267,11 +364,37 @@ fun ChatScreen(
                             isListening = isListening,
                             spokenText = spokenText,
                             voiceRms = voiceRms,
-                            onCancel = { viewModel.cancelVoiceListening() },
+                            onCancel = { viewModel.endVoiceConversation() },
                             onSend = { text ->
                                 viewModel.sendVoiceQuery(text)
-                            }
+                            },
+                            isConversationActive = isVoiceConversationActive,
+                            isThinking = isTyping,
+                            isAuraSpeaking = isSpeaking,
+                            voiceError = voiceError,
+                            onOrbTap = { viewModel.interruptAndListen() }
                         )
+                    }
+
+                    AnimatedVisibility(
+                        visible = !isVoiceConversationActive && voiceError != null && !isListening && spokenText.isBlank(),
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        voiceError?.let { err ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                LiquidGlassPill(
+                                    text = err,
+                                    accentColor = StatusDanger,
+                                    onClick = { viewModel.clearVoiceError() }
+                                )
+                            }
+                        }
                     }
 
                     Composer(
@@ -284,8 +407,9 @@ fun ChatScreen(
                             send(toSend)
                         },
                         onStartVoice = requestVoiceListening,
-                        voiceRms = if (isListening) voiceRms else 0.05f,
+                        voiceRms = if (isListening || (isVoiceConversationActive && isSpeaking)) voiceRms else 0.05f,
                         onOpenCommandHub = { showCommandHubSheet = true },
+                        onOpenVisionScanner = { showVisionScanner = true },
                         onSelectSuggestion = { suggestion ->
                             inputText = suggestion
                         }
@@ -333,6 +457,19 @@ fun ChatScreen(
                     }
                 }
             }
+        }
+
+        if (showVisionScanner) {
+            AuraVisionBottomSheet(
+                onDismiss = { showVisionScanner = false },
+                onAuditWithAura = { telemetry ->
+                    viewModel.sendScannedDocument(telemetry)
+                },
+                scanner = viewModel.visionScanner,
+                onDocumentCaptured = { uri, title ->
+                    viewModel.setLastScannedDocument(uri, title)
+                }
+            )
         }
     }
 
@@ -457,6 +594,256 @@ fun ChatScreen(
             }
         }
     }
+
+    pendingHandoffAction?.let { handoffAction ->
+        AuraHandoffRecipientDialog(
+            action = handoffAction,
+            contacts = handoffContacts,
+            defaultRole = handoffAction.targetRole ?: lastHandoffRole,
+            hasScannedDocument = hasScannedDocument,
+            scannedDocumentTitle = lastScannedDocumentTitle,
+            onDismiss = { pendingHandoffAction = null },
+            onConfirm = { role, contactName, phone, customSummary, attachDoc ->
+                val normalized = viewModel.normalizeWhatsAppPhone(phone)
+                val cleanName = contactName.trim().ifBlank { role }
+                viewModel.saveHandoffContact(
+                    HandoffContact(
+                        role = role,
+                        name = cleanName,
+                        phone = normalized
+                    )
+                )
+                pendingHandoffAction = null
+                executeSignedOrDirect(
+                    handoffAction.copy(
+                        targetRole = role,
+                        targetContactName = cleanName,
+                        targetPhone = normalized,
+                        contextSummary = customSummary.trim().ifBlank { handoffAction.contextSummary },
+                        includeAttachment = attachDoc
+                    )
+                )
+            }
+        )
+    }
+}
+
+@Composable
+private fun AuraHandoffRecipientDialog(
+    action: GenUiAction,
+    contacts: List<HandoffContact>,
+    defaultRole: String,
+    hasScannedDocument: Boolean,
+    scannedDocumentTitle: String?,
+    onDismiss: () -> Unit,
+    onConfirm: (role: String, name: String, phone: String, summary: String, includeAttachment: Boolean) -> Unit
+) {
+    val roles = remember(contacts) {
+        contacts.map { it.role }.ifEmpty { listOf("Contador", "Gerente de Pista", "Fornecedor", "Outro") }
+    }
+    var selectedRole by remember(action.actionId, defaultRole) {
+        mutableStateOf(roles.firstOrNull { it.equals(defaultRole, ignoreCase = true) } ?: roles.first())
+    }
+    val initialContact = remember(selectedRole, contacts) {
+        contacts.firstOrNull { it.role.equals(selectedRole, ignoreCase = true) }
+    }
+    var contactName by remember(action.actionId) {
+        mutableStateOf(initialContact?.name?.ifBlank { selectedRole } ?: selectedRole)
+    }
+    var phoneInput by remember(action.actionId) {
+        mutableStateOf(initialContact?.phone.orEmpty())
+    }
+    var summaryText by remember(action.actionId) {
+        mutableStateOf(action.contextSummary.orEmpty())
+    }
+    var includeAttachment by remember(action.actionId, hasScannedDocument) {
+        mutableStateOf(hasScannedDocument)
+    }
+    val digitsCount = phoneInput.count { it.isDigit() }
+    val isPhoneValid = digitsCount >= 10
+
+    val textFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = AuraCyan,
+        unfocusedBorderColor = GlassBorderSoft,
+        focusedTextColor = TextPrimary,
+        unfocusedTextColor = TextPrimary,
+        focusedLabelColor = AuraCyan,
+        unfocusedLabelColor = TextSecondary,
+        cursorColor = AuraCyan,
+        focusedContainerColor = ObsidianLow,
+        unfocusedContainerColor = ObsidianLow
+    )
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        AuraCard(
+            shape = RoundedCornerShape(26.dp),
+            accent = AuraCyan,
+            glowActive = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp),
+            contentPadding = PaddingValues(20.dp)
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    StatusDot(color = AuraEmerald, pulsing = true, size = 7.dp)
+                    SectionLabel("WHATSAPP HANDOFF • TEE")
+                }
+
+                Text(
+                    text = action.label,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = TextPrimary
+                )
+
+                Text(
+                    text = "Selecione ou salve o destinatário no posto para encaminhar com contexto no Command Journal.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(roles) { role ->
+                        val isSelected = selectedRole.equals(role, ignoreCase = true)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(
+                                    if (isSelected) AuraCyan.copy(alpha = 0.18f) else ObsidianLow
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isSelected) AuraCyan else GlassBorderSoft,
+                                    shape = RoundedCornerShape(50)
+                                )
+                                .clickable {
+                                    selectedRole = role
+                                    val saved = contacts.firstOrNull { it.role.equals(role, ignoreCase = true) }
+                                    contactName = saved?.name?.ifBlank { role } ?: role
+                                    phoneInput = saved?.phone.orEmpty()
+                                }
+                                .padding(horizontal = 14.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = role,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (isSelected) AuraCyan else TextSecondary
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = contactName,
+                    onValueChange = { contactName = it },
+                    label = { Text("Nome / Setor") },
+                    singleLine = true,
+                    colors = textFieldColors,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = phoneInput,
+                    onValueChange = { next ->
+                        phoneInput = next.filter { it.isDigit() || it == '+' || it == ' ' || it == '-' || it == '(' || it == ')' }
+                    },
+                    label = { Text("WhatsApp (DDD + número)") },
+                    placeholder = { Text("Ex.: 5527999999999", color = TextMuted) },
+                    supportingText = {
+                        Text(
+                            text = if (isPhoneValid) "Contato será salvo para '$selectedRole'." else "Informe ao menos 10 dígitos (DDD + número).",
+                            color = if (isPhoneValid) AuraEmerald else TextMuted
+                        )
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    colors = textFieldColors,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = summaryText,
+                    onValueChange = { summaryText = it.take(3000) },
+                    label = { Text("Relatório formatado para WhatsApp") },
+                    minLines = 5,
+                    maxLines = 8,
+                    colors = textFieldColors,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (hasScannedDocument) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(ObsidianLow)
+                            .border(
+                                1.dp,
+                                if (includeAttachment) AuraEmerald.copy(alpha = 0.6f) else GlassBorderSoft,
+                                RoundedCornerShape(14.dp)
+                            )
+                            .clickable { includeAttachment = !includeAttachment }
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = "Anexar cópia da nota escaneada",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = scannedDocumentTitle ?: "Documento / DANFE capturado",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (includeAttachment) AuraEmerald else TextMuted
+                            )
+                        }
+                        Switch(
+                            checked = includeAttachment,
+                            onCheckedChange = { includeAttachment = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = ObsidianBase,
+                                checkedTrackColor = AuraEmerald
+                            )
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    AuraGhostButton(
+                        text = "Cancelar",
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        tint = TextSecondary
+                    )
+                    AuraGradientButton(
+                        text = "Assinar e Enviar",
+                        enabled = isPhoneValid,
+                        onClick = {
+                            onConfirm(selectedRole, contactName, phoneInput, summaryText, includeAttachment)
+                        },
+                        modifier = Modifier.weight(1.3f)
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -464,6 +851,8 @@ private fun ChatHeader(
     title: String,
     isTyping: Boolean,
     activeMode: String? = null,
+    isVoiceConversationActive: Boolean = false,
+    onToggleVoiceConversation: () -> Unit = {},
     onBack: () -> Unit,
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
@@ -549,6 +938,13 @@ private fun ChatHeader(
                     }
                 }
 
+                IconButton(onClick = onToggleVoiceConversation) {
+                    Icon(
+                        imageVector = if (isVoiceConversationActive) Icons.Rounded.Stop else Icons.Rounded.Mic,
+                        contentDescription = if (isVoiceConversationActive) "Encerrar Voz" else "Conversa por Voz",
+                        tint = if (isVoiceConversationActive) StatusDanger else AuraCyan
+                    )
+                }
                 IconButton(onClick = onOpenCommandHub) {
                     Icon(Icons.Rounded.Tune, "Aura Hub", tint = AuraCyan)
                 }
@@ -713,6 +1109,7 @@ private fun MessageItem(
     if (message.isFromUser) {
         UserBubble(
             text = message.text,
+            envelopeJson = message.envelopeJson,
             onLongClick = { onMessageLongClick(message) },
             modifier = modifier
         )
@@ -732,15 +1129,56 @@ private fun MessageItem(
     }
 }
 
+private data class UserVisionAttachmentCard(
+    val title: String,
+    val sourceFormat: String,
+    val accessKey: String?,
+    val accessKeyVerified: Boolean,
+    val highlights: String,
+    val previewPath: String?
+)
+
+private fun parseUserVisionCard(envelopeJson: String?): UserVisionAttachmentCard? {
+    if (envelopeJson.isNullOrBlank()) return null
+    return runCatching {
+        val obj = Json.parseToJsonElement(envelopeJson).jsonObject
+        if (obj["type"]?.jsonPrimitive?.contentOrNull != "user_vision_card") return null
+        UserVisionAttachmentCard(
+            title = obj["title"]?.jsonPrimitive?.contentOrNull ?: "Documento Auditado",
+            sourceFormat = obj["sourceFormat"]?.jsonPrimitive?.contentOrNull ?: "NPU",
+            accessKey = obj["accessKey"]?.jsonPrimitive?.contentOrNull,
+            accessKeyVerified = obj["accessKeyVerified"]?.jsonPrimitive?.booleanOrNull ?: false,
+            highlights = obj["highlights"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            previewPath = obj["previewPath"]?.jsonPrimitive?.contentOrNull
+        )
+    }.getOrNull()
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun UserBubble(
     text: String,
+    envelopeJson: String? = null,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
     val shape = RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp)
+    val visionCard = remember(envelopeJson) { parseUserVisionCard(envelopeJson) }
+    val previewBitmap by produceState<ImageBitmap?>(initialValue = null, key1 = visionCard?.previewPath) {
+        val path = visionCard?.previewPath
+        value = if (path != null) {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    val file = File(path)
+                    if (file.exists()) {
+                        val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
+                        BitmapFactory.decodeFile(file.absolutePath, opts)?.asImageBitmap()
+                    } else null
+                }.getOrNull()
+            }
+        } else null
+    }
 
     Box(
         modifier = modifier.fillMaxWidth(),
@@ -769,13 +1207,70 @@ private fun UserBubble(
                         onLongClick()
                     }
                 )
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyLarge,
-                color = TextPrimary
-            )
+            if (visionCard != null) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    previewBitmap?.let { img ->
+                        Image(
+                            bitmap = img,
+                            contentDescription = visionCard.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 140.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, GlassBorderSoft, RoundedCornerShape(12.dp))
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.DocumentScanner,
+                            contentDescription = null,
+                            tint = AuraCyan,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = visionCard.title,
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = TextPrimary,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    if (!visionCard.accessKey.isNullOrBlank()) {
+                        Text(
+                            text = "Chave: ${visionCard.accessKey.chunked(4).joinToString(" ")}" +
+                                if (visionCard.accessKeyVerified) " ✓" else "",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp
+                            ),
+                            color = if (visionCard.accessKeyVerified) AuraEmerald else AuraCyan
+                        )
+                    }
+                    if (visionCard.highlights.isNotBlank()) {
+                        Text(
+                            text = visionCard.highlights,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                        color = TextPrimary
+                    )
+                }
+            } else {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = TextPrimary
+                )
+            }
         }
     }
 }
@@ -799,75 +1294,119 @@ private fun AuraMessage(
         message.text.startsWith("O sinal de rede") ||
         message.text.startsWith("Erro de conexão")
     val haptic = LocalHapticFeedback.current
+    val contextUpper = remember(message.text, card?.title) {
+        "${card?.title.orEmpty()} ${message.text}".uppercase()
+    }
+    val isFiscalContext = remember(contextUpper) {
+        listOf("SEFAZ", "DANFE", "NF-E", "NFE", "NFC-E", "ICMS", "CFOP", "NOTA FISCAL", "VPROD", "REJEI").any {
+            contextUpper.contains(it)
+        }
+    }
+    val isTankContext = remember(contextUpper) {
+        listOf("TANQUE", "LMC", "BOMBA", "BICO", "LITROS", "ESTOQUE").any {
+            contextUpper.contains(it)
+        }
+    }
+    val domainBadgeLabel = when {
+        message.isStreaming -> "Analisando..."
+        isFiscalContext -> "Fiscal • SEFAZ"
+        isTankContext -> "Pista • ANP"
+        else -> "Consultor"
+    }
+    val domainBadgeAccent = when {
+        message.isStreaming -> AuraCyan
+        isFiscalContext -> AuraCyan
+        isTankContext -> AuraEmerald
+        else -> AuraPurple
+    }
 
-    Row(
+    Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        AuraAvatar()
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            // Acordeão de Raciocínio Transparente (visível tanto durante streaming quanto após concluído)
-            if (message.reasoningSteps.isNotEmpty()) {
-                AuraReasoningAccordion(
-                    reasoningSteps = message.reasoningSteps,
-                    isStreaming = message.isStreaming
+        // Cabeçalho compacto libera toda a largura horizontal para o texto e cards GenUI
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            AuraAvatar(size = 22.dp)
+            Text(
+                text = "AURA",
+                style = MaterialTheme.typography.labelMedium,
+                color = TextPrimary
+            )
+            LiquidGlassPill(
+                text = domainBadgeLabel,
+                accentColor = domainBadgeAccent
+            )
+        }
+
+        // Acordeão de Raciocínio Transparente (visível tanto durante streaming quanto após concluído)
+        if (message.reasoningSteps.isNotEmpty()) {
+            AuraReasoningAccordion(
+                reasoningSteps = message.reasoningSteps,
+                isStreaming = message.isStreaming
+            )
+        }
+
+        if (message.isStreaming && message.text.isBlank()) {
+            val thinkingLabel = auraStatusMessage ?: "AURA sintetizando resposta..."
+            ThinkingIndicator(label = thinkingLabel)
+        } else if (message.text.isNotBlank()) {
+            if (isError) {
+                Text(message.text, style = MaterialTheme.typography.bodyMedium, color = StatusDanger)
+            } else {
+                val formattedText = AuraMarkupFormatter.format(
+                    if (message.isStreaming) message.text + " \u258A" else message.text
                 )
-            }
 
-            if (message.isStreaming && message.text.isBlank()) {
-                val thinkingLabel = auraStatusMessage ?: "AURA sintetizando resposta..."
-                ThinkingIndicator(label = thinkingLabel)
-            } else if (message.text.isNotBlank()) {
-                if (isError) {
-                    Text(message.text, style = MaterialTheme.typography.bodyMedium, color = StatusDanger)
-                } else {
-                    val formattedText = AuraMarkupFormatter.format(
-                        if (message.isStreaming) message.text + " \u258A" else message.text
+                // Card de vidro espacial envolvendo a resposta da IA
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp, 20.dp, 20.dp, 20.dp))
+                        .background(LiquidGlassSurfaceBrush)
+                        .drawBehind {
+                            drawLine(
+                                brush = Brush.horizontalGradient(
+                                    listOf(Color.Transparent, LiquidSpecularHighlight, Color.Transparent)
+                                ),
+                                start = Offset(0f, 1f),
+                                end = Offset(size.width, 1f),
+                                strokeWidth = 1.dp.toPx()
+                            )
+                        }
+                        .border(1.dp, LiquidIridescentSubtleBrush, RoundedCornerShape(6.dp, 20.dp, 20.dp, 20.dp))
+                        .combinedClickable(
+                            onClick = {},
+                            onLongClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onLongClick()
+                            }
+                        )
+                        .padding(14.dp)
+                ) {
+                    MarkdownText(
+                        markdown = formattedText,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            color = TextPrimary,
+                            lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.25f
+                        ),
+                        linkColor = AuraCyan
                     )
+                }
 
-                    // Card de vidro espacial envolvendo a resposta da IA
-                    Box(
+                // Barra de Micro-Ações de Contexto da Aura (rolável horizontalmente e sensível ao domínio)
+                if (!message.isStreaming) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(4.dp, 20.dp, 20.dp, 20.dp))
-                            .background(LiquidGlassSurfaceBrush)
-                            .drawBehind {
-                                drawLine(
-                                    brush = Brush.horizontalGradient(
-                                        listOf(Color.Transparent, LiquidSpecularHighlight, Color.Transparent)
-                                    ),
-                                    start = Offset(0f, 1f),
-                                    end = Offset(size.width, 1f),
-                                    strokeWidth = 1.dp.toPx()
-                                )
-                            }
-                            .border(1.dp, LiquidIridescentSubtleBrush, RoundedCornerShape(4.dp, 20.dp, 20.dp, 20.dp))
-                            .combinedClickable(
-                                onClick = {},
-                                onLongClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onLongClick()
-                                }
-                            )
-                            .padding(14.dp)
+                            .padding(top = 2.dp)
                     ) {
-                        MarkdownText(
-                            markdown = formattedText,
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                color = TextPrimary,
-                                lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.25f
-                            ),
-                            linkColor = AuraCyan
-                        )
-                    }
-
-                    // Barra de Micro-Ações de Contexto da Aura (visível quando resposta concluída)
-                    if (!message.isStreaming) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(top = 2.dp)
-                        ) {
+                        item {
                             val isSpeakingThis = speakingMessageId == message.id
                             LiquidGlassPill(
                                 text = if (isSpeakingThis) "Parar" else "Ouvir",
@@ -875,21 +1414,38 @@ private fun AuraMessage(
                                 accentColor = if (isSpeakingThis) StatusDanger else AuraCyan,
                                 onClick = { onToggleSpeech(message.id, message.text) }
                             )
+                        }
 
+                        item {
                             LiquidGlassPill(
                                 text = "Raciocínio",
                                 icon = Icons.Rounded.Psychology,
                                 accentColor = AuraEmerald,
                                 onClick = onDeepDive
                             )
+                        }
 
-                            LiquidGlassPill(
-                                text = "ANP",
-                                icon = Icons.Rounded.Security,
-                                accentColor = AuraPurple,
-                                onClick = onAuditAnp
-                            )
+                        item {
+                            if (isFiscalContext) {
+                                LiquidGlassPill(
+                                    text = "Validar SEFAZ",
+                                    icon = Icons.Rounded.Security,
+                                    accentColor = AuraCyan,
+                                    onClick = {
+                                        onDrillDown("Me dê o passo a passo exato para corrigir ou validar essa divergência fiscal na nota / SEFAZ sem travar a operação.")
+                                    }
+                                )
+                            } else {
+                                LiquidGlassPill(
+                                    text = "ANP",
+                                    icon = Icons.Rounded.Security,
+                                    accentColor = AuraPurple,
+                                    onClick = onAuditAnp
+                                )
+                            }
+                        }
 
+                        item {
                             LiquidGlassPill(
                                 text = "Mais...",
                                 icon = Icons.Rounded.AutoAwesome,
@@ -900,7 +1456,24 @@ private fun AuraMessage(
                     }
                 }
             }
-            card?.let { GenUiCardView(card = it, onAction = onAction, onDrillDown = onDrillDown) }
+        }
+        card?.let { parsedCard ->
+            GenUiCardView(
+                card = parsedCard,
+                onAction = { action ->
+                    if (action.isHandoffAction()) {
+                        val richReport = AuraWhatsAppReportFormatter.buildReport(
+                            card = parsedCard,
+                            narrativeText = message.text,
+                            actionLabel = action.label
+                        )
+                        onAction(action.copy(contextSummary = richReport))
+                    } else {
+                        onAction(action)
+                    }
+                },
+                onDrillDown = onDrillDown
+            )
         }
     }
 }
@@ -915,6 +1488,7 @@ private fun Composer(
     onStartVoice: () -> Unit = {},
     voiceRms: Float = 0.05f,
     onOpenCommandHub: () -> Unit,
+    onOpenVisionScanner: () -> Unit = {},
     onSelectSuggestion: (String) -> Unit
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -1019,6 +1593,37 @@ private fun Composer(
                     contentDescription = "Aura Command Hub",
                     tint = AuraCyan,
                     modifier = Modifier.size(22.dp)
+                )
+            }
+
+            // Botão Olhos da AURA (Scanner Neural NPU)
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(ObsidianMid)
+                    .drawBehind {
+                        drawLine(
+                            brush = Brush.horizontalGradient(
+                                listOf(Color.Transparent, LiquidSpecularHighlight.copy(alpha = 0.5f), Color.Transparent)
+                            ),
+                            start = Offset(0f, 1f),
+                            end = Offset(size.width, 1f),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                    }
+                    .border(1.dp, LiquidIridescentSubtleBrush, CircleShape)
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onOpenVisionScanner()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.DocumentScanner,
+                    contentDescription = "Olhos da AURA (Scanner NPU)",
+                    tint = AuraCyan,
+                    modifier = Modifier.size(20.dp)
                 )
             }
 

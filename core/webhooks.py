@@ -267,45 +267,19 @@ async def dispatch_n8n_webhook(
         )
 
 
-async def dispatch_evolution_message(
+async def _dispatch_evolution_outbox(
+    *,
+    endpoint: str,
+    headers: dict[str, str],
+    body: dict[str, Any],
     phone: str,
-    message_text: str,
-    api_url: str | None = None,
-    api_key: str | None = None,
-    instance: str | None = None,
-    timeout_seconds: float = 8.0,
-    outbox: AuraTransactionalOutbox | None = None,
-    idempotency_key: str | None = None,
-    event_type: str = "whatsapp_evolution",
-    max_attempts: int = 5,
+    timeout_seconds: float,
+    outbox: AuraTransactionalOutbox | None,
+    idempotency_key: str | None,
+    event_type: str,
+    max_attempts: int,
 ) -> WebhookDispatchResult:
-    """
-    Persiste primeiramente na Transactional Outbox (SQLite WAL) e envia mensagem
-    de texto via Evolution API para WhatsApp corporativo.
-    """
-    base_url = (api_url or EVOLUTION_API_URL or "").rstrip("/")
-    token = api_key or EVOLUTION_API_KEY
-    inst = instance or EVOLUTION_INSTANCE
-
-    if not base_url or not token:
-        logger.warning("Evolution API nao configurada. Disparo cancelado.")
-        return WebhookDispatchResult(
-            success=False,
-            service="evolution_api",
-            target_url="",
-            error="EVOLUTION_API_URL ou EVOLUTION_API_KEY nao definida no ambiente",
-        )
-
-    endpoint = f"{base_url}/message/sendText/{inst}"
-    headers = {
-        "apikey": token,
-        "Content-Type": "application/json",
-    }
-    body = {
-        "number": phone.replace("+", "").replace("-", "").replace(" ", "").strip(),
-        "text": message_text,
-    }
-
+    """Executa enqueue + claim + post na Evolution API de forma idempotente via Outbox."""
     active_outbox = outbox if outbox is not None else get_transactional_outbox()
     msg = active_outbox.enqueue(
         event_type=event_type,
@@ -405,6 +379,127 @@ async def dispatch_evolution_message(
             outbox_message_id=msg.message_id,
             outbox_status=updated.status if updated else OutboxStatus.FAILED_RETRY.value,
         )
+
+
+async def dispatch_evolution_message(
+    phone: str,
+    message_text: str,
+    api_url: str | None = None,
+    api_key: str | None = None,
+    instance: str | None = None,
+    timeout_seconds: float = 8.0,
+    outbox: AuraTransactionalOutbox | None = None,
+    idempotency_key: str | None = None,
+    event_type: str = "whatsapp_evolution",
+    max_attempts: int = 5,
+) -> WebhookDispatchResult:
+    """
+    Persiste primeiramente na Transactional Outbox (SQLite WAL) e envia mensagem
+    de texto via Evolution API para WhatsApp corporativo.
+    """
+    base_url = (api_url or EVOLUTION_API_URL or "").rstrip("/")
+    token = api_key or EVOLUTION_API_KEY
+    inst = instance or EVOLUTION_INSTANCE
+
+    if not base_url or not token:
+        logger.warning("Evolution API nao configurada. Disparo cancelado.")
+        return WebhookDispatchResult(
+            success=False,
+            service="evolution_api",
+            target_url="",
+            error="EVOLUTION_API_URL ou EVOLUTION_API_KEY nao definida no ambiente",
+        )
+
+    endpoint = f"{base_url}/message/sendText/{inst}"
+    headers = {
+        "apikey": token,
+        "Content-Type": "application/json",
+    }
+    body = {
+        "number": phone.replace("+", "").replace("-", "").replace(" ", "").strip(),
+        "text": message_text,
+    }
+
+    return await _dispatch_evolution_outbox(
+        endpoint=endpoint,
+        headers=headers,
+        body=body,
+        phone=phone,
+        timeout_seconds=timeout_seconds,
+        outbox=outbox,
+        idempotency_key=idempotency_key,
+        event_type=event_type,
+        max_attempts=max_attempts,
+    )
+
+
+async def dispatch_evolution_media(
+    phone: str,
+    media_base64: str,
+    caption: str = "",
+    mimetype: str = "image/jpeg",
+    filename: str = "documento_aura.jpg",
+    mediatype: str = "image",
+    api_url: str | None = None,
+    api_key: str | None = None,
+    instance: str | None = None,
+    timeout_seconds: float = 15.0,
+    outbox: AuraTransactionalOutbox | None = None,
+    idempotency_key: str | None = None,
+    event_type: str = "whatsapp_evolution_media",
+    max_attempts: int = 5,
+) -> WebhookDispatchResult:
+    """
+    Envia imagem/documento em Base64 via Evolution API (/message/sendMedia/{instance})
+    com garantia Persist-Before-Send na Transactional Outbox.
+    """
+    base_url = (api_url or EVOLUTION_API_URL or "").rstrip("/")
+    token = api_key or EVOLUTION_API_KEY
+    inst = instance or EVOLUTION_INSTANCE
+
+    if not base_url or not token:
+        logger.warning("Evolution API nao configurada. Disparo de midia cancelado.")
+        return WebhookDispatchResult(
+            success=False,
+            service="evolution_api",
+            target_url="",
+            error="EVOLUTION_API_URL ou EVOLUTION_API_KEY nao definida no ambiente",
+        )
+
+    clean_b64 = media_base64.split(",", 1)[-1].strip() if "," in media_base64[:80] else media_base64.strip()
+    if not clean_b64:
+        return WebhookDispatchResult(
+            success=False,
+            service="evolution_api",
+            target_url="",
+            error="Midia Base64 vazia",
+        )
+
+    endpoint = f"{base_url}/message/sendMedia/{inst}"
+    headers = {
+        "apikey": token,
+        "Content-Type": "application/json",
+    }
+    body = {
+        "number": phone.replace("+", "").replace("-", "").replace(" ", "").strip(),
+        "mediatype": mediatype,
+        "mimetype": mimetype,
+        "caption": caption,
+        "media": clean_b64,
+        "fileName": filename,
+    }
+
+    return await _dispatch_evolution_outbox(
+        endpoint=endpoint,
+        headers=headers,
+        body=body,
+        phone=phone,
+        timeout_seconds=timeout_seconds,
+        outbox=outbox,
+        idempotency_key=idempotency_key,
+        event_type=event_type,
+        max_attempts=max_attempts,
+    )
 
 
 # =============================================================================

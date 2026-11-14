@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path
+        name="vision_cache"
+        path="vision_scans/" />
+    <files-path
+        name="vision_files"
+        path="." />
+</paths>

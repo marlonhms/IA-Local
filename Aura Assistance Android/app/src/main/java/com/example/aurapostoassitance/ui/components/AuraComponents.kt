@@ -1,5 +1,8 @@
 package com.example.aurapostoassitance.ui.components
 
+import android.content.Context
+import android.content.ContextWrapper
+import androidx.fragment.app.FragmentActivity
 import android.view.SoundEffectConstants
 import android.view.View
 import androidx.compose.animation.AnimatedVisibility
@@ -1155,7 +1158,7 @@ fun AuraLivingOrb(
                     val current = points[i]
                     val next = points[(i + 1) % steps]
                     val mid = Offset((current.x + next.x) / 2f, (current.y + next.y) / 2f)
-                    path.quadraticBezierTo(current.x, current.y, mid.x, mid.y)
+                    path.quadraticTo(current.x, current.y, mid.x, mid.y)
                 }
                 path.close()
                 return path
@@ -1229,11 +1232,25 @@ fun AuraVoiceOrbSheet(
     voiceRms: Float,
     onCancel: () -> Unit,
     onSend: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isConversationActive: Boolean = false,
+    isThinking: Boolean = false,
+    isAuraSpeaking: Boolean = false,
+    voiceError: String? = null,
+    onOrbTap: () -> Unit = {}
 ) {
-    if (!isListening && spokenText.isBlank()) return
+    if (!isConversationActive && !isListening && spokenText.isBlank()) return
 
     val haptic = LocalHapticFeedback.current
+    val statusText = when {
+        isListening -> "OUVINDO VOCÊ • PODE FALAR"
+        isThinking -> "AURA PENSANDO..."
+        isAuraSpeaking -> "AURA FALANDO • TOQUE NO ORBE"
+        voiceError != null -> "PAUSADA • TOQUE PARA FALAR"
+        isConversationActive -> "MODO CONVERSA ATIVO"
+        else -> "TRANSCRIÇÃO CONCLUÍDA"
+    }
+    val dotColor = if (voiceError != null && !isListening && !isAuraSpeaking) StatusDanger else AuraCyan
 
     Column(
         modifier = modifier
@@ -1255,25 +1272,34 @@ fun AuraVoiceOrbSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                StatusDot(color = AuraCyan, size = 8.dp, pulsing = true)
-                SectionLabel(if (isListening) "AURA SINTONIZADA • OUVINDO" else "TRANSCRIÇÃO CONCLUÍDA")
+                StatusDot(color = dotColor, size = 8.dp, pulsing = isListening || isAuraSpeaking || isThinking)
+                SectionLabel(statusText)
             }
 
             AuraGhostButton(
-                text = "Cancelar",
+                text = if (isConversationActive) "Encerrar" else "Cancelar",
                 onClick = onCancel,
                 tint = TextMuted
             )
         }
 
-        // Orbe Vivo da AURA (Consciência visual orgânica líquida)
-        AuraLivingOrb(
-            sizeDp = 140.dp,
-            voiceRms = voiceRms,
-            pulsing = true
-        )
+        // Orbe Vivo e Fluido da AURA (Toque para interromper ou falar novamente)
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .clickable {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onOrbTap()
+                }
+        ) {
+            AuraLivingOrb(
+                sizeDp = 120.dp,
+                voiceRms = voiceRms,
+                pulsing = isListening || isAuraSpeaking || isThinking
+            )
+        }
 
-        // Pré-visualização do texto falado
+        // Pré-visualização do texto falado / estado da conversa
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1283,22 +1309,53 @@ fun AuraVoiceOrbSheet(
                 .padding(14.dp),
             contentAlignment = Alignment.Center
         ) {
-            if (spokenText.isBlank()) {
-                Text(
-                    text = "AURA está ouvindo... Fale sobre bombas, tanques ou fechamento",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextMuted,
-                    textAlign = TextAlign.Center
-                )
-            } else {
-                Text(
-                    text = "\"$spokenText\"",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Medium,
-                        color = TextPrimary
-                    ),
-                    textAlign = TextAlign.Center
-                )
+            when {
+                spokenText.isNotBlank() -> {
+                    Text(
+                        text = "\"$spokenText\"",
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = TextPrimary
+                        ),
+                        textAlign = TextAlign.Center
+                    )
+                }
+                voiceError != null && !isListening && !isAuraSpeaking -> {
+                    Text(
+                        text = voiceError,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = StatusDanger,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                isThinking -> {
+                    Text(
+                        text = "Formulando resposta rápida para você...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextMuted,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                isAuraSpeaking -> {
+                    Text(
+                        text = "AURA está falando... Toque no orbe se quiser interromper",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextMuted,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                else -> {
+                    Text(
+                        text = if (isConversationActive) {
+                            "Pode falar naturalmente... envio automático ao pausar"
+                        } else {
+                            "AURA está ouvindo... Fale sobre bombas, tanques ou fechamento"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextMuted,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
 
@@ -1308,23 +1365,40 @@ fun AuraVoiceOrbSheet(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             AuraGhostButton(
-                text = "Descartar",
+                text = if (isConversationActive) "Encerrar" else "Descartar",
                 onClick = onCancel,
                 modifier = Modifier.weight(1f)
             )
 
-            val canSend = spokenText.isNotBlank()
-            AuraGradientButton(
-                text = "Enviar Pergunta",
-                onClick = {
-                    if (canSend) {
+            if (spokenText.isNotBlank()) {
+                AuraGradientButton(
+                    text = "Enviar Agora",
+                    onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onSend(spokenText)
-                    }
-                },
-                modifier = Modifier.weight(1.5f),
-                enabled = canSend
-            )
+                    },
+                    modifier = Modifier.weight(1.5f),
+                    enabled = true
+                )
+            } else if (isConversationActive) {
+                val actionLabel = if (isAuraSpeaking) "Interromper e Falar" else "Falar Agora"
+                AuraGradientButton(
+                    text = actionLabel,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onOrbTap()
+                    },
+                    modifier = Modifier.weight(1.5f),
+                    enabled = !isThinking
+                )
+            } else {
+                AuraGradientButton(
+                    text = "Enviar Pergunta",
+                    onClick = {},
+                    modifier = Modifier.weight(1.5f),
+                    enabled = false
+                )
+            }
         }
     }
 }
@@ -1734,6 +1808,9 @@ fun AuraBottomGlassDock(
     }
 }
 
-
-
+tailrec fun Context.findFragmentActivity(): FragmentActivity? = when (this) {
+    is FragmentActivity -> this
+    is ContextWrapper -> baseContext.findFragmentActivity()
+    else -> null
+}
 

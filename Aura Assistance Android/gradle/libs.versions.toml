@@ -16,6 +16,10 @@ hiltNavigationCompose = "1.2.0"
 navigationCompose = "2.8.5"
 ksp = "2.3.12"
 composeMarkdown = "0.5.4"
+biometric = "1.2.0-alpha05"
+mlkitTextRecognition = "16.0.1"
+mlkitBarcodeScanning = "17.3.0"
+kotlinxCoroutinesPlayServices = "1.8.1"
 
 room = "2.8.5"
 
@@ -55,6 +59,14 @@ androidx-navigation-compose = { group = "androidx.navigation", name = "navigatio
 
 # Compose Markdown
 compose-markdown = { group = "com.github.jeziellago", name = "compose-markdown", version.ref = "composeMarkdown" }
+
+# Biometric & Hardware TEE
+androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
+
+# ML Kit & Vision NPU
+mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
+mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcodeScanning" }
+kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "kotlinxCoroutinesPlayServices" }
 
 # Room
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }

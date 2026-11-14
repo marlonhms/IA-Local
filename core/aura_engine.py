@@ -3145,12 +3145,13 @@ def build_canonical_genui_envelope(
             blocks = props.get("blocks") or []
 
         if not actions:
+            codigo_fiscal = locals().get("cod_ref") or resultado_bruto.get("chave_acesso") or "SEFAZ"
             actions.append(
                 GenUIActionOption(
                     action_id=generate_action_id(),
                     label="📋 Copiar Diagnostico para o Contador",
                     action_type="inspection",
-                    variant="primary",
+                    variant="secondary",
                     is_destructive=False,
                     requires_confirmation=False,
                     payload={"intent": "copiar_diagnostico_contador", "origem": "auditoria_fiscal_sefaz"},
@@ -3165,6 +3166,28 @@ def build_canonical_genui_envelope(
                     is_destructive=False,
                     requires_confirmation=False,
                     payload={"intent": "ajuda_sistema", "modulo": "faturamento"},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="Enviar resumo p/ Contador (WhatsApp)",
+                    action_type="mutation",
+                    variant="primary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": "handoff_fiscal_contador", "codigo": str(codigo_fiscal), "origem": "auditoria_fiscal_sefaz"},
+                )
+            )
+            actions.append(
+                GenUIActionOption(
+                    action_id=generate_action_id(),
+                    label="Registrar pendência fiscal no Journal",
+                    action_type="mutation",
+                    variant="secondary",
+                    is_destructive=False,
+                    requires_confirmation=True,
+                    payload={"intent": "registrar_pendencia_fiscal", "codigo": str(codigo_fiscal), "modulo": "faturamento"},
                 )
             )
 

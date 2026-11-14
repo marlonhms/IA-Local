@@ -120,5 +120,14 @@ flowchart TB
 ## 4. Ordem de Implementação Sugerida
 
 1. **Sprint A (Imediata):** Executar a **Fase 1** no Painel WhatsApp (limpar fatos poluídos do seu número, blindar o timeout/retry da sua voz clonada na Fish.Audio e deixar o WhatsApp 100% focado em atendimento puro).
-2. **Sprint B:** Executar a **Fase 2** na AURA Local + App Android (`Aura Assistance Android`), conectando os cards `GenUiCard` preditivos, o Briefing de Voz e os novos atalhos na `DashboardScreen.kt` e `ChatViewModel.kt`.
-3. **Sprint C:** Executar as **Fases 3 e 4**, ativando o *Contextual Handoff* para que os botões clicados no App Android disparem atendimentos inteligentes e contextualizados no Painel WhatsApp.
+2. **Sprint B (Concluída):** Executar a **Fase 2** na AURA Local + App Android (`Aura Assistance Android`), conectando os cards `GenUiCard` preditivos, o Briefing de Voz e os novos atalhos na `DashboardScreen.kt` e `ChatViewModel.kt`.
+3. **Sprint C (Concluída no App Android):** Executar as **Fases 3 e 4**, ativando o *Contextual Handoff* para que os botões clicados no App Android disparem atendimentos inteligentes e contextualizados no Painel WhatsApp.
+4. **Sprint D (Concluída e Validada no Hardware Físico):** Executar os **3 Pacotes de Fusão ao Dispositivo (`garnet` / `SM7435` + Android 16)** detalhados no apêndice técnico:
+   - 👉 **[APENDICE_NPU_GARNET_OS_INTEGRATION.md](./APENDICE_NPU_GARNET_OS_INTEGRATION.md)** (Quick Settings Tile, Assistente Digital Overlay `ACTION_ASSIST`, Home Widget, `AuraNpuEngine` para Snapdragon 7s Gen 2, `AuraOfflineVault` e `AuraVoicePlaybackService` com `MediaSession` para Tela Bloqueada/Modo Carro). Validado via ADB Wi-Fi no dispositivo físico `garnet`.
+5. **Sprint E (Segunda Onda de Inovação NPU, Segurança TEE, Visão, Voz & Shaders Adreno 710 — Pacotes 4 a 9):** Especificada na **Seção 5** do **[APENDICE_NPU_GARNET_OS_INTEGRATION.md](./APENDICE_NPU_GARNET_OS_INTEGRATION.md#5-fase-2-segunda-onda-de-inovacao-npu-seguranca-tee-visao-voz--shaders-adreno-710-pacotes-4-a-9)**:
+   - **Pacote 4:** Alçada Executiva com Biometria de Hardware (`AndroidKeyStore` ECDSA no Qualcomm TEE + `BiometricPrompt` Class 3).
+   - **Pacote 5:** "Olhos da AURA" — Scanner Neural de Notas Fiscais (DANFE), Tanques e Documentos na NPU (`ML Kit / LiteRT Vision`).
+   - **Pacote 6:** Memória Vetorial Embarcada On-Device (`AuraSemanticMemoryVault` com embeddings de 128d e busca de cosseno `< 3ms`).
+   - **Pacote 7:** Voz Executiva Neural Otimizada, Amplitude em Tempo Real & Roteador de Comandos Hands-Free (`AuraVoiceCommandRouter`).
+   - **Pacote 8:** Sensor Fusion Automático & Modo Cockpit Automotivo (`AuraContextSensorManager` — Bluetooth Car Audio + Acelerômetro).
+   - **Pacote 9:** Shaders Gráficos AGSL na GPU Adreno 710 (`AuraAdrenoShaderOrb` em 120Hz reativo à frequência da voz).

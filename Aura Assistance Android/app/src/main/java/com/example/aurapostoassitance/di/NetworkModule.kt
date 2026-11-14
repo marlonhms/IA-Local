@@ -20,6 +20,9 @@ import javax.inject.Singleton
 object NetworkModule {
 
     private const val DEFAULT_BASE_URL = "http://127.0.0.1:8000/"
+    private const val TAILSCALE_HOST = "100.77.164.17"
+    private const val OFFICE_LAN_HOST = "192.168.11.247"
+    private const val DEFAULT_PORT = 8000
 
     @Provides
     @Singleton
@@ -34,30 +37,50 @@ object NetworkModule {
     @Singleton
     fun provideOkHttpClient(serverConfig: ServerConfig): OkHttpClient {
         return OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(6, TimeUnit.SECONDS)
+            .readTimeout(45, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .addInterceptor { chain ->
                 val originalRequest = chain.request()
                 val targetBaseUrl = serverConfig.getBaseUrl().toHttpUrlOrNull()
-                
-                val newRequest = if (targetBaseUrl != null) {
-                    val newUrl = originalRequest.url.newBuilder()
-                        .scheme(targetBaseUrl.scheme)
-                        .host(targetBaseUrl.host)
-                        .port(targetBaseUrl.port)
-                        .build()
+
+                fun buildRequestFor(scheme: String, host: String, port: Int) =
                     originalRequest.newBuilder()
-                        .url(newUrl)
+                        .url(
+                            originalRequest.url.newBuilder()
+                                .scheme(scheme)
+                                .host(host)
+                                .port(port)
+                                .build()
+                        )
                         .header("Connection", "close")
+                        .header("X-Partner-Key", "aura-partner-default-key")
+                        .header("X-Aura-Key", "aura-partner-default-key")
                         .build()
-                } else {
-                    originalRequest.newBuilder()
-                        .header("Connection", "close")
-                        .build()
+
+                val primaryScheme = targetBaseUrl?.scheme ?: "http"
+                val primaryHost = targetBaseUrl?.host ?: OFFICE_LAN_HOST
+                val primaryPort = targetBaseUrl?.port ?: DEFAULT_PORT
+                val primaryRequest = buildRequestFor(primaryScheme, primaryHost, primaryPort)
+
+                try {
+                    chain.proceed(primaryRequest)
+                } catch (primaryError: java.io.IOException) {
+                    val fallbackHost = when (primaryHost) {
+                        OFFICE_LAN_HOST -> TAILSCALE_HOST
+                        TAILSCALE_HOST -> OFFICE_LAN_HOST
+                        else -> TAILSCALE_HOST
+                    }
+                    try {
+                        val fallbackRequest = buildRequestFor("http", fallbackHost, DEFAULT_PORT)
+                        val response = chain.proceed(fallbackRequest)
+                        serverConfig.serverIp = "$fallbackHost:$DEFAULT_PORT"
+                        response
+                    } catch (_: java.io.IOException) {
+                        throw primaryError
+                    }
                 }
-                chain.proceed(newRequest)
             }
             .build()
     }

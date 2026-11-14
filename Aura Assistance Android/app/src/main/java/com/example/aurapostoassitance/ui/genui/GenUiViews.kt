@@ -65,10 +65,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.example.aurapostoassitance.ui.components.AuraCard
 import com.example.aurapostoassitance.ui.components.AuraGhostButton
 import com.example.aurapostoassitance.ui.components.AuraGradientButton
@@ -106,6 +107,29 @@ fun GenUiCardView(
     var pending by remember { mutableStateOf<GenUiAction?>(null) }
     val isCritical = card.severity.equals("critical", true) || card.severity.equals("danger", true)
     val accent = if (isCritical) StatusDanger else AuraCyan
+    val cardContextSummary = remember(card) {
+        buildList {
+            add(card.title)
+            (card.diagnosis ?: card.subtitle)?.takeIf { it.isNotBlank() }?.let { add(it) }
+            card.blocks.forEach { block ->
+                when (block) {
+                    is GenUiBlock.AlertCallout -> {
+                        val msg = listOf(block.alert.title, block.alert.message).filter { it.isNotBlank() }.joinToString(" — ")
+                        if (msg.isNotBlank()) add(msg)
+                    }
+                    is GenUiBlock.KpiGrid -> {
+                        val kpiLine = block.kpis.take(4).joinToString(" | ") { "${it.label}: ${it.value}" }
+                        if (kpiLine.isNotBlank()) add(kpiLine)
+                    }
+                    is GenUiBlock.Note -> {
+                        val noteLine = block.text.replace("\n", " ").trim().take(180)
+                        if (noteLine.isNotBlank()) add(noteLine)
+                    }
+                    else -> Unit
+                }
+            }
+        }.joinToString("\n").take(550)
+    }
 
     AuraCard(
         modifier = modifier.fillMaxWidth(),
@@ -114,10 +138,17 @@ fun GenUiCardView(
         contentPadding = PaddingValues(0.dp)
     ) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.padding(18.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.padding(16.dp)
         ) {
             CardHeader(card)
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(GlassBorderSoft)
+            )
 
             card.blocks.forEachIndexed { index, block ->
                 Staggered(index) { BlockView(block, onDrillDown) }
@@ -136,7 +167,16 @@ fun GenUiCardView(
                     card.actions.forEach { action ->
                         val primary = action.variant == "primary"
                         val click = {
-                            if (action.requiresConfirmation) pending = action else onAction(action)
+                            val enriched = action.copy(
+                                contextSummary = action.contextSummary ?: cardContextSummary
+                            )
+                            if (enriched.isHandoffAction()) {
+                                onAction(enriched)
+                            } else if (enriched.requiresConfirmation) {
+                                pending = enriched
+                            } else {
+                                onAction(enriched)
+                            }
                         }
                         val formattedLabel = action.label.replace(" L)", "\u00A0L)")
                         if (primary) {
@@ -206,15 +246,32 @@ fun GenUiCardView(
 
 @Composable
 private fun CardHeader(card: GenUiCard) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    val isCritical = card.severity.equals("critical", true) || card.severity.equals("danger", true)
+    val isWarning = card.severity.equals("warning", true)
+    val titleUpper = card.title.uppercase()
+    val contextBadgeText = when {
+        isCritical -> "ALERTA CRÍTICO"
+        titleUpper.contains("SEFAZ") || titleUpper.contains("DANFE") || titleUpper.contains("FISCAL") -> "AUDITORIA FISCAL"
+        titleUpper.contains("TANQUE") || titleUpper.contains("LMC") -> "TELEMETRIA DE PISTA"
+        isWarning -> "ATENÇÃO OPERACIONAL"
+        else -> "AURA INTELIGÊNCIA"
+    }
+    val contextBadgeColor = when {
+        isCritical -> StatusDanger
+        isWarning -> StatusWarning
+        else -> AuraCyan
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            StatusDot(color = AuraEmerald, pulsing = true, size = 7.dp)
-            SectionLabel("AURA")
+            StatusDot(color = contextBadgeColor, pulsing = isCritical, size = 7.dp)
+            AuraPill(text = contextBadgeText, color = contextBadgeColor)
+            Spacer(Modifier.weight(1f))
             card.confidence?.let {
-                Spacer(Modifier.weight(1f))
                 AuraPill(
                     text = "${(it * 100).toInt()}% confiança",
                     color = AuraEmerald
@@ -223,13 +280,13 @@ private fun CardHeader(card: GenUiCard) {
         }
         Text(
             text = card.title,
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.headlineSmall.copy(lineHeight = 28.sp),
             color = TextPrimary
         )
         (card.diagnosis ?: card.subtitle)?.let {
             Text(
                 text = it,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
                 color = TextSecondary
             )
         }
@@ -277,24 +334,57 @@ private fun BlockTitle(title: String?, subtitle: String?) {
 private fun KpiGridBlock(block: GenUiBlock.KpiGrid, onDrillDown: (String) -> Unit) {
     Column {
         BlockTitle(block.title, block.subtitle)
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            block.kpis.chunked(2).forEach { pair ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(IntrinsicSize.Max),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    pair.forEach { kpi ->
-                        KpiTile(
-                            kpi = kpi,
-                            onClick = {
-                                onDrillDown("Explique em detalhes o indicador '${kpi.label}' (${kpi.value}${kpi.delta?.let { " com variação $it" } ?: ""}) e sugira ações operacionais.")
-                            },
-                            modifier = Modifier.weight(1f).fillMaxHeight()
-                        )
+        val rows = remember(block.kpis) {
+            val result = mutableListOf<List<GenUiKpi>>()
+            var pair = mutableListOf<GenUiKpi>()
+            for (kpi in block.kpis) {
+                val isWide = kpi.value.trim().length > 16 || (kpi.subtext?.length ?: 0) > 28
+                if (isWide) {
+                    if (pair.isNotEmpty()) {
+                        result.add(pair)
+                        pair = mutableListOf()
                     }
-                    if (pair.size == 1) Spacer(Modifier.weight(1f))
+                    result.add(listOf(kpi))
+                } else {
+                    pair.add(kpi)
+                    if (pair.size == 2) {
+                        result.add(pair)
+                        pair = mutableListOf()
+                    }
+                }
+            }
+            if (pair.isNotEmpty()) result.add(pair)
+            result
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            rows.forEach { rowItems ->
+                if (rowItems.size == 1) {
+                    val kpi = rowItems.first()
+                    KpiTile(
+                        kpi = kpi,
+                        onClick = {
+                            onDrillDown("Explique em detalhes o indicador '${kpi.label}' (${kpi.value}${kpi.delta?.let { " com variação $it" } ?: ""}) e sugira ações operacionais.")
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Max),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        rowItems.forEach { kpi ->
+                            KpiTile(
+                                kpi = kpi,
+                                onClick = {
+                                    onDrillDown("Explique em detalhes o indicador '${kpi.label}' (${kpi.value}${kpi.delta?.let { " com variação $it" } ?: ""}) e sugira ações operacionais.")
+                                },
+                                modifier = Modifier.weight(1f).fillMaxHeight()
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -305,6 +395,24 @@ private fun KpiGridBlock(block: GenUiBlock.KpiGrid, onDrillDown: (String) -> Uni
 private fun KpiTile(kpi: GenUiKpi, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val haptic = LocalHapticFeedback.current
     val color = statusColor(kpi.status)
+    val formattedValue = kpi.value.replace(" L", "\u00A0L").replace(" h", "\u00A0h").trim()
+    val valueLen = formattedValue.length
+    val valueSize = when {
+        valueLen <= 7 -> 22.sp
+        valueLen <= 14 -> 17.sp
+        else -> 15.sp
+    }
+    val valueLineHeight = when {
+        valueLen <= 7 -> 26.sp
+        valueLen <= 14 -> 21.sp
+        else -> 20.sp
+    }
+    val valueMaxLines = when {
+        valueLen <= 7 -> 1
+        valueLen <= 14 -> 2
+        else -> 4
+    }
+
     Column(
         modifier
             .clip(RoundedCornerShape(16.dp))
@@ -314,22 +422,32 @@ private fun KpiTile(kpi: GenUiKpi, onClick: () -> Unit, modifier: Modifier = Mod
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
             }
-            .padding(14.dp),
+            .padding(13.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            if (kpi.status != null) {
+                StatusDot(color = color, size = 6.dp)
+            }
+            Text(
+                text = kpi.label,
+                style = MaterialTheme.typography.labelSmall.copy(lineHeight = 14.sp),
+                color = TextSecondary,
+                maxLines = 2
+            )
+        }
         Text(
-            text = kpi.label,
-            style = MaterialTheme.typography.labelSmall,
-            color = TextSecondary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            text = kpi.value.replace(" L", "\u00A0L").replace(" h", "\u00A0h"),
-            style = MaterialTheme.typography.headlineSmall.copy(fontSize = 24.sp),
+            text = formattedValue,
+            style = MaterialTheme.typography.headlineSmall.copy(
+                fontSize = valueSize,
+                lineHeight = valueLineHeight,
+                fontWeight = FontWeight.SemiBold
+            ),
             color = TextPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            maxLines = valueMaxLines
         )
         kpi.delta?.let { d ->
             val icon: ImageVector? = when (kpi.trend) {
@@ -355,7 +473,7 @@ private fun KpiTile(kpi: GenUiKpi, onClick: () -> Unit, modifier: Modifier = Mod
                 text = it.replace(" L", "\u00A0L").replace(" h", "\u00A0h"),
                 style = MaterialTheme.typography.bodySmall,
                 color = TextMuted,
-                maxLines = 2
+                maxLines = 3
             )
         }
     }
@@ -393,8 +511,9 @@ private fun ComparisonBlock(block: GenUiBlock.Comparison, onDrillDown: (String) 
                             color = TextMuted
                         )
                     }
+                    Spacer(Modifier.width(12.dp))
                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(row.primary, style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                        Text(row.primary, style = MaterialTheme.typography.titleMedium, color = TextPrimary, textAlign = TextAlign.End)
                         row.gap?.let { AuraPill(it, statusColor(row.status)) }
                     }
                 }
@@ -445,12 +564,13 @@ private fun RankingBlock(block: GenUiBlock.Ranking, onDrillDown: (String) -> Uni
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    Column(Modifier.weight(1f)) {
-                        Text(item.title, style = MaterialTheme.typography.titleSmall, color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        item.subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = TextMuted, maxLines = 1) }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(item.title, style = MaterialTheme.typography.titleSmall, color = TextPrimary, maxLines = 2)
+                        item.subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = TextMuted, maxLines = 2) }
                     }
+                    Spacer(Modifier.width(4.dp))
                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(item.value, style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                        Text(item.value, style = MaterialTheme.typography.titleMedium, color = TextPrimary, textAlign = TextAlign.End)
                         item.tag?.let { AuraPill(it, statusColor(item.status)) }
                     }
                 }
@@ -518,13 +638,14 @@ private fun AlertBlock(alert: GenUiAlert) {
             .background(color.copy(alpha = 0.10f))
             .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
             .padding(14.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
     ) {
-        Icon(icon, null, tint = color, modifier = Modifier.size(22.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(alert.title, style = MaterialTheme.typography.titleSmall, color = color)
+        Icon(icon, null, tint = color, modifier = Modifier.padding(top = 2.dp).size(20.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(alert.title, style = MaterialTheme.typography.titleSmall.copy(lineHeight = 19.sp), color = color)
             if (alert.message.isNotBlank()) {
-                Text(alert.message, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                Text(alert.message, style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp), color = TextSecondary)
             }
         }
     }
@@ -534,7 +655,57 @@ private fun AlertBlock(alert: GenUiAlert) {
 private fun NoteBlock(block: GenUiBlock.Note) {
     Column {
         BlockTitle(block.title, null)
-        Text(block.text, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+        val paragraphs = remember(block.text) {
+            block.text.split("\n").map { it.trim() }.filter { it.isNotBlank() }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+                .clip(RoundedCornerShape(16.dp))
+                .background(ObsidianLow)
+                .border(1.dp, GlassBorderSoft, RoundedCornerShape(16.dp))
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .fillMaxHeight()
+                    .background(AuraCyan.copy(alpha = 0.8f))
+            )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(14.dp)
+            ) {
+                paragraphs.forEach { paragraph ->
+                    val colonIndex = paragraph.indexOf(':')
+                    val hasShortPrefix = colonIndex in 3..32
+                    if (hasShortPrefix) {
+                        val prefix = paragraph.substring(0, colonIndex + 1)
+                        val body = paragraph.substring(colonIndex + 1).trimStart()
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = prefix,
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = AuraCyan
+                            )
+                            Text(
+                                text = body,
+                                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
+                                color = TextSecondary
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = paragraph,
+                            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
+                            color = TextSecondary
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

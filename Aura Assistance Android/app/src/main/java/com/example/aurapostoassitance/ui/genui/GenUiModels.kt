@@ -67,8 +67,131 @@ data class GenUiAction(
     val type: String,
     val variant: String,
     val requiresConfirmation: Boolean,
-    val isDestructive: Boolean
+    val isDestructive: Boolean,
+    val targetRole: String? = null,
+    val contextSummary: String? = null,
+    val targetPhone: String? = null,
+    val targetContactName: String? = null,
+    val includeAttachment: Boolean = true
 )
+
+fun GenUiAction.isHandoffAction(): Boolean =
+    type.equals("handoff", ignoreCase = true) || actionId.startsWith("handoff_", ignoreCase = true)
+
+object AuraWhatsAppReportFormatter {
+
+    fun markdownToWhatsApp(raw: String): String {
+        if (raw.isBlank()) return ""
+        val lines = raw.replace("\r\n", "\n").lines()
+        val formatted = lines.map { line ->
+            val trimmed = line.trim()
+            when {
+                trimmed.startsWith("### ") -> "*${trimmed.removePrefix("### ").trim()}*"
+                trimmed.startsWith("## ") -> "*${trimmed.removePrefix("## ").trim()}*"
+                trimmed.startsWith("# ") -> "*${trimmed.removePrefix("# ").trim()}*"
+                trimmed.startsWith("- ") -> "• ${convertInlineMarkdown(trimmed.removePrefix("- ").trim())}"
+                trimmed.startsWith("* ") -> "• ${convertInlineMarkdown(trimmed.removePrefix("* ").trim())}"
+                else -> convertInlineMarkdown(trimmed)
+            }
+        }
+        return formatted.joinToString("\n").replace(Regex("\n{3,}"), "\n\n").trim()
+    }
+
+    private fun convertInlineMarkdown(text: String): String {
+        return text
+            .replace(Regex("\\*\\*(.+?)\\*\\*"), "*$1*")
+            .replace(Regex("__(.+?)__"), "_$1_")
+    }
+
+    fun buildReport(
+        card: GenUiCard?,
+        narrativeText: String?,
+        actionLabel: String,
+        unitLabel: String = "Posto 01"
+    ): String {
+        val nowStr = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale("pt", "BR"))
+            .format(java.util.Date())
+
+        return buildString {
+            appendLine("*AURA | RELATÓRIO DE AUDITORIA EXECUTIVA*")
+            appendLine("*Unidade:* $unitLabel  •  *Emissão:* $nowStr")
+            appendLine("━━━━━━━━━━━━━━━━━━━━━━")
+
+            if (card != null) {
+                appendLine()
+                appendLine("*📌 ${card.title}*")
+                (card.diagnosis ?: card.subtitle)?.takeIf { it.isNotBlank() }?.let { diag ->
+                    appendLine(diag.trim())
+                }
+
+                card.blocks.filterIsInstance<GenUiBlock.AlertCallout>().forEach { blk ->
+                    appendLine()
+                    appendLine("*🚨 Alerta Identificado*")
+                    appendLine("• *${blk.alert.title}*")
+                    if (blk.alert.message.isNotBlank()) {
+                        appendLine("  _${blk.alert.message}_")
+                    }
+                }
+
+                val kpiBlocks = card.blocks.filterIsInstance<GenUiBlock.KpiGrid>()
+                if (kpiBlocks.isNotEmpty()) {
+                    appendLine()
+                    appendLine("*📊 Parâmetros & Indicadores*")
+                    kpiBlocks.forEach { grid ->
+                        grid.kpis.forEach { kpi ->
+                            val extra = kpi.delta?.let { " ($it)" } ?: ""
+                            appendLine("• *${kpi.label}:* ${kpi.value}$extra")
+                        }
+                    }
+                }
+
+                val compBlocks = card.blocks.filterIsInstance<GenUiBlock.Comparison>()
+                if (compBlocks.isNotEmpty()) {
+                    appendLine()
+                    appendLine("*⚖️ Comparativo*")
+                    compBlocks.forEach { comp ->
+                        comp.rows.take(5).forEach { row ->
+                            val gapTxt = row.gap?.let { " | Dif: $it" } ?: ""
+                            appendLine("• *${row.name}:* ${row.primary} (Ref: ${row.secondary})$gapTxt")
+                        }
+                    }
+                }
+            }
+
+            val cleanNarrative = markdownToWhatsApp(narrativeText.orEmpty())
+            if (cleanNarrative.isNotBlank()) {
+                appendLine()
+                appendLine("*🧾 Parecer Técnico Completo*")
+                appendLine(cleanNarrative.take(1500))
+            }
+
+            val notes = card?.blocks?.filterIsInstance<GenUiBlock.Note>().orEmpty()
+            if (notes.isNotEmpty()) {
+                appendLine()
+                appendLine("*🛠️ Procedimento Recomendado no ERP*")
+                notes.forEach { note ->
+                    note.title?.takeIf { it.isNotBlank() }?.let { t ->
+                        appendLine("*${t.trim()}*")
+                    }
+                    note.text.split("\n").map { it.trim() }.filter { it.isNotBlank() }.forEach { p ->
+                        val colon = p.indexOf(':')
+                        if (colon in 3..32) {
+                            val prefix = p.substring(0, colon + 1)
+                            val body = p.substring(colon + 1).trimStart()
+                            appendLine("• *$prefix* $body")
+                        } else {
+                            appendLine("• $p")
+                        }
+                    }
+                }
+            }
+
+            appendLine()
+            appendLine("━━━━━━━━━━━━━━━━━━━━━━")
+            append("_Solicitação: ${actionLabel}_")
+        }.trim()
+    }
+}
 
 /** Blocos nativos renderizaveis pelo app (equivalentes aos "blocos Lego" do painel web). */
 sealed class GenUiBlock {
@@ -153,26 +276,70 @@ object GenUiParser {
             }
         }
 
-        val actions = (root["actions"] as? JsonArray).orEmpty().mapNotNull { el ->
+        val parsedActions = (root["actions"] as? JsonArray).orEmpty().mapNotNull { el ->
             val o = el as? JsonObject ?: return@mapNotNull null
-            val type = o.str("action_type") ?: "mutation"
+            val rawType = o.str("action_type") ?: "mutation"
             // "inspection" abre o Companion Canvas do painel web: sem equivalente no app
-            if (type == "inspection") return@mapNotNull null
+            if (rawType == "inspection") return@mapNotNull null
+            val id = o.str("action_id") ?: return@mapNotNull null
+            val label = o.str("label") ?: return@mapNotNull null
+            val payloadObj = o["payload"] as? JsonObject
+            val payloadIntent = payloadObj?.str("intent").orEmpty()
+            val resolvedType = if (
+                rawType.equals("handoff", ignoreCase = true) ||
+                payloadIntent.startsWith("handoff_", ignoreCase = true) ||
+                label.contains("WhatsApp", ignoreCase = true)
+            ) {
+                "handoff"
+            } else {
+                rawType
+            }
+            val inferredRole = inferTargetRole("$id $payloadIntent $label", label)
             GenUiAction(
-                actionId = o.str("action_id") ?: return@mapNotNull null,
-                label = o.str("label") ?: return@mapNotNull null,
-                type = type,
+                actionId = id,
+                label = label,
+                type = resolvedType,
                 variant = o.str("variant") ?: "primary",
                 requiresConfirmation = o.bool("requires_confirmation") ?: true,
-                isDestructive = o.bool("is_destructive") ?: false
+                isDestructive = o.bool("is_destructive") ?: false,
+                targetRole = inferredRole
             )
+        }
+
+        val diagnosisText = props.str("diagnosis")
+        val fiscalFingerprint = listOfNotNull(title, intent, component, diagnosisText).joinToString(" ").uppercase()
+        val isFiscalCard = listOf("SEFAZ", "DANFE", "FISCAL", "REJEI", "NF-E", "NFE", "ICMS", "CFOP", "W07-10").any {
+            fiscalFingerprint.contains(it)
+        }
+        val actions = if (parsedActions.isEmpty() && isFiscalCard) {
+            listOf(
+                GenUiAction(
+                    actionId = "handoff_fiscal_contador",
+                    label = "Enviar resumo p/ Contador (WhatsApp)",
+                    type = "handoff",
+                    variant = "primary",
+                    requiresConfirmation = true,
+                    isDestructive = false,
+                    targetRole = "Contador"
+                ),
+                GenUiAction(
+                    actionId = "fiscal_register_pendencia",
+                    label = "Registrar pendência fiscal no Journal",
+                    type = "mutation",
+                    variant = "secondary",
+                    requiresConfirmation = true,
+                    isDestructive = false
+                )
+            )
+        } else {
+            parsedActions
         }
 
         GenUiCard(
             componentName = component,
             title = title,
             subtitle = props.str("subtitle"),
-            diagnosis = props.str("diagnosis"),
+            diagnosis = diagnosisText,
             confidence = props.dbl("confidence_score")?.toFloat(),
             severity = severity,
             blocks = blocks,
@@ -180,6 +347,16 @@ object GenUiParser {
             limitations = (props["limitations"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content }
         )
     }.getOrNull()
+
+    private fun inferTargetRole(actionId: String, label: String): String? {
+        val text = "$actionId $label".lowercase()
+        return when {
+            text.contains("contador") || text.contains("fiscal") || text.contains("sefaz") -> "Contador"
+            text.contains("supplier") || text.contains("fornec") || text.contains("cotac") -> "Fornecedor"
+            text.contains("team") || text.contains("equipe") || text.contains("gerente") || text.contains("pista") -> "Gerente de Pista"
+            else -> null
+        }
+    }
 
     private fun parseBlock(o: JsonObject): GenUiBlock? {
         val title = o.str("title")

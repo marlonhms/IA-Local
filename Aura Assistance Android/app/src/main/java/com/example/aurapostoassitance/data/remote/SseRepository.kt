@@ -25,14 +25,37 @@ class SseRepository @Inject constructor(
     private val json: Json,
     private val serverConfig: ServerConfig
 ) {
-    fun streamChat(query: String, sessionId: String = "android_session"): Flow<SseEvent> = callbackFlow {
-        
+    fun streamChat(
+        query: String,
+        sessionId: String = "android_session",
+        voiceMode: Boolean = false
+    ): Flow<SseEvent> = callbackFlow {
+
+        val wireQuery = if (voiceMode) {
+            "[CONVERSA POR VOZ NO CARRO - fale de forma leve e informal como sócia próxima em 2 a 3 frases curtas, ZERO listas, ZERO tópicos e ZERO markdown] $query"
+        } else {
+            query
+        }
+
         val jsonBody = buildJsonObject {
-            put("query", query)
+            put("query", wireQuery)
             put("session_id", sessionId)
             put("stream", true)
             put("tenant_id", "posto_01")
             put("filial_id", "59050")
+            if (voiceMode) {
+                put("genui", false)
+                put(
+                    "context",
+                    buildJsonObject {
+                        put("channel", "voice_hands_free_driving")
+                        put(
+                            "estilo_resposta",
+                            "MODO CONVERSA FLUIDA POR VOZ (DIRIGINDO). O Marlon esta conversando com voce por audio, possivelmente no carro. NAO gere relatorio formal, NAO use topicos, listas, tabelas, emojis ou markdown pesado. Fale como uma socia inteligente e parceira de confianca batendo um papo leve e natural no carro: tom coloquial na medida certa, direto, humano e fluido em portugues do Brasil, em 2 a 4 frases curtas fáceis de ouvir."
+                        )
+                    }
+                )
+            }
         }.toString()
         
         val chatUrl = "${serverConfig.getBaseUrl()}api/v1/aura/chat"
@@ -126,8 +149,12 @@ class SseRepository @Inject constructor(
                     else -> "Falha na conexão SSE"
                 }
                 Log.e("SSE", "Error: $errorMsg")
-                trySend(SseEvent.Error(errorMsg ?: "Falha na conexão"))
-                close(t ?: Exception(errorMsg))
+                if (t is java.io.IOException) {
+                    close(t)
+                } else {
+                    trySend(SseEvent.Error(errorMsg ?: "Falha na conexão"))
+                    close(t ?: Exception(errorMsg))
+                }
             }
         }
 
