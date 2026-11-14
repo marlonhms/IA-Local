@@ -2227,23 +2227,32 @@ async def partner_quick_action_endpoint(
                 f"Ciencia de sangria registrada com sucesso no posto {clean_station.upper()}. "
                 f"O caixa continuara monitorado no proximo ciclo."
             )
-        elif "FISCAL" in action_type or "SEFAZ" in action_type or "PENDENCIA" in action_type:
+        fiscal_audit: dict[str, Any] | None = None
+        if "FISCAL" in action_type or "SEFAZ" in action_type or "PENDENCIA" in action_type:
+            fiscal_audit = {
+                key: payload.parameters.get(key)
+                for key in ("chave_acesso", "numero_nf", "resumo_divergencia", "fornecedor")
+                if payload.parameters.get(key) is not None
+            }
             confirmation_text = (
                 f"Pendencia fiscal/SEFAZ auditada e registrada no Command Journal do posto {clean_station.upper()}. "
                 f"Trilha de liberacao no ERP gravada sob o recibo {voucher_ref}."
             )
 
         if claim.acquired:
+            res_payload: dict[str, Any] = {
+                "status": "COMPLETED",
+                "executed_at": now_iso,
+                "confirmation": confirmation_text,
+            }
+            if fiscal_audit is not None:
+                res_payload["fiscal_audit"] = fiscal_audit
             journal.complete_command(
                 command_key=command_key,
-                result_payload={
-                    "status": "COMPLETED",
-                    "executed_at": now_iso,
-                    "confirmation": confirmation_text,
-                },
+                result_payload=res_payload,
             )
 
-        return {
+        response_body: dict[str, Any] = {
             "success": True,
             "action_executed": action_type,
             "option_key": payload.option_key,
@@ -2255,6 +2264,9 @@ async def partner_quick_action_endpoint(
             "replayed": claim.replayed,
             "timestamp": now_iso,
         }
+        if fiscal_audit is not None:
+            response_body["fiscal_audit"] = fiscal_audit
+        return response_body
 
     # Opcao 2: Delegar para a equipe / cobrar responsavel
     if opt in ("delegar", "cobrar", "equipe", "vendedor", "gerente") or action_type == "DELEGAR_EQUIPE":
@@ -3439,6 +3451,7 @@ class PartnerHandoffRequest(BaseModel):
     segment: str = Field(default="postos_redes", description="Segmento de negocio")
     phone: str = Field(..., description="Telefone de destino")
     contact_name: str | None = Field(default=None, description="Nome do contato")
+    role_label: str | None = Field(default=None, description="Papel do contato (ex: Contador, Gerente, Fornecedor)")
     initial_message: str = Field(..., description="Mensagem inicial a enviar")
     session_handoff_context: str = Field(..., description="Contexto silencioso para continuidade")
     station_id: str = Field(default="posto_01", description="Filial ou estacao")
@@ -3458,17 +3471,21 @@ async def partner_handoff_endpoint(
     auth_info: dict[str, str] = Depends(verify_partner_auth),
 ):
     """
-    Grava ordem no Command Journal (SQLite WAL) com recibo de handoff contextualizado
+    Grava ordem no Command Journal (SQLite WAL) com recibo de handoff contextualizado,
+    registra a mensagem OUTBOUND na conversa dedicada de retorno (wa_handoff_<phone>)
     e realiza o disparo imediato da mensagem (e copia da nota em anexo, quando enviada)
     no WhatsApp via Evolution API + Transactional Outbox.
     """
-    from core.command_journal import get_command_journal
+    from core.command_journal import get_command_journal, normalize_whatsapp_phone
     from core.webhooks import dispatch_evolution_media, dispatch_evolution_message
 
     journal = get_command_journal()
+    norm_phone = normalize_whatsapp_phone(payload.phone) or payload.phone
     cmd_key = f"handoff_{payload.action_id}_{int(time.time())}"
+    has_attachment = bool(payload.attachment_base64 and len(payload.attachment_base64.strip()) > 50)
     safe_journal_req = payload.model_dump(exclude={"attachment_base64"})
-    safe_journal_req["has_attachment"] = bool(payload.attachment_base64 and len(payload.attachment_base64) > 50)
+    safe_journal_req["has_attachment"] = has_attachment
+    safe_journal_req["normalized_phone"] = norm_phone
 
     claim = journal.begin_command(
         command_key=cmd_key,
@@ -3486,11 +3503,11 @@ async def partner_handoff_endpoint(
     )
 
     media_res = None
-    if payload.attachment_base64 and len(payload.attachment_base64.strip()) > 50:
+    if has_attachment:
         media_caption = payload.attachment_caption or "📎 *Cópia da Nota Fiscal / Documento auditado pela AURA*"
         media_res = await dispatch_evolution_media(
             phone=payload.phone,
-            media_base64=payload.attachment_base64,
+            media_base64=payload.attachment_base64 or "",
             caption=media_caption,
             mimetype=payload.attachment_mimetype or "image/jpeg",
             filename=payload.attachment_filename or "copia_nota_fiscal.jpg",
@@ -3507,7 +3524,7 @@ async def partner_handoff_endpoint(
             result_payload={
                 "status": delivery_status,
                 "session_handoff_context": payload.session_handoff_context,
-                "target_phone": payload.phone,
+                "target_phone": norm_phone,
                 "whatsapp_sent": dispatch_res.success,
                 "media_sent": media_sent,
                 "outbox_message_id": dispatch_res.outbox_message_id,
@@ -3516,7 +3533,22 @@ async def partner_handoff_endpoint(
             },
         )
 
-    dest = payload.contact_name or payload.phone
+    thread_rec = journal.record_handoff_message(
+        thread_phone=norm_phone,
+        direction="OUTBOUND",
+        sender_label="Gestor AURA",
+        message_text=payload.initial_message,
+        contact_name=payload.contact_name,
+        role_label=payload.role_label,
+        station_id=payload.station_id,
+        command_key=cmd_key,
+        has_media=bool(media_sent or has_attachment),
+        media_caption=payload.attachment_caption,
+        source="android_handoff",
+        is_read=True,
+    )
+
+    dest = payload.contact_name or norm_phone
     anexo_info = " (com cópia da nota em anexo)" if media_sent else ""
     confirmation = (
         f"Relatório enviado via WhatsApp{anexo_info} pela instância Evolution para {dest} e gravado no Command Journal ({cmd_key})."
@@ -3534,7 +3566,164 @@ async def partner_handoff_endpoint(
         "outbox_message_id": dispatch_res.outbox_message_id,
         "command_key": cmd_key,
         "journal_id": claim.entry.journal_id if claim.entry else None,
+        "session_id": thread_rec["session_id"],
+        "thread_phone": thread_rec["thread_phone"],
+        "message_id": thread_rec["message_id"],
         "session_handoff_context": payload.session_handoff_context,
         "confirmation_text": confirmation,
+    }
+
+
+class PartnerHandoffReplyRequest(BaseModel):
+    """Aceita retorno direto do Painel CRM ou payload bruto MESSAGES_UPSERT da Evolution API."""
+    model_config = ConfigDict(extra="allow")
+
+    phone: str | None = Field(default=None, description="Telefone ou JID do remetente")
+    message_text: str | None = Field(default=None, description="Texto da resposta recebida")
+    sender_name: str | None = Field(default=None, description="Nome do remetente")
+    contact_name: str | None = Field(default=None, description="Alias para nome do contato")
+    external_msg_id: str | None = Field(default=None, description="ID externo da mensagem para deduplicacao")
+    epoch_ts: int | None = Field(default=None, description="Timestamp epoch em segundos")
+    has_media: bool = Field(default=False, description="Indica se a resposta contem midia")
+    source: str | None = Field(default=None, description="Origem do evento")
+    event: str | None = Field(default=None, description="Evento Evolution API (ex: MESSAGES_UPSERT)")
+    data: dict[str, Any] | None = Field(default=None, description="Bloco data do webhook Evolution API")
+
+
+@partner_router.post(
+    "/handoff-reply",
+    summary="Ingestao Passiva de Retorno WhatsApp (Painel CRM ou Webhook Evolution API)",
+    description="Correlaciona respostas recebidas no WhatsApp com handoffs ativos das ultimas 72h.",
+)
+async def partner_handoff_reply_endpoint(
+    payload: PartnerHandoffReplyRequest = Body(...),
+    auth_info: dict[str, str] = Depends(verify_partner_auth),
+):
+    """
+    Recebe resposta de contato via Painel WhatsApp CRM ou webhook Evolution MESSAGES_UPSERT,
+    correlaciona pelo match_key (com/sem 9o digito BR) e grava na sessao dedicada do contato.
+    """
+    from core.command_journal import get_command_journal, normalize_whatsapp_phone
+    from core.webhooks import extract_evolution_message_content
+
+    journal = get_command_journal()
+
+    raw_phone = payload.phone
+    msg_text = payload.message_text
+    sender_name = payload.sender_name or payload.contact_name
+    ext_id = payload.external_msg_id
+    epoch_ts = payload.epoch_ts
+    has_media = bool(payload.has_media)
+    source = payload.source or "crm_webhook"
+
+    if isinstance(payload.data, dict):
+        evo_data = payload.data
+        key = evo_data.get("key") or {}
+        if key.get("fromMe") is True:
+            return {"success": True, "accepted": False, "ingested": False, "reason": "from_me_ignored"}
+        raw_phone = raw_phone or key.get("remoteJid")
+        ext_id = ext_id or key.get("id")
+        sender_name = sender_name or evo_data.get("pushName")
+        if evo_data.get("messageTimestamp"):
+            try:
+                epoch_ts = int(evo_data["messageTimestamp"])
+            except (TypeError, ValueError):
+                pass
+        if not msg_text and isinstance(evo_data.get("message"), dict):
+            extracted_txt, extracted_media = extract_evolution_message_content(evo_data.get("message"))
+            msg_text = extracted_txt
+            has_media = has_media or extracted_media
+        if not payload.source:
+            source = "evolution_webhook"
+
+    norm_phone = normalize_whatsapp_phone(raw_phone)
+    if not norm_phone:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Telefone ou remoteJid ausente/invalido no payload de handoff-reply.",
+        )
+
+    active_thread = journal.find_active_handoff_contact(norm_phone, lookback_hours=72)
+    if active_thread is None:
+        return {
+            "success": True,
+            "accepted": False,
+            "ingested": False,
+            "reason": "no_active_handoff",
+            "thread_phone": norm_phone,
+        }
+
+    saved = journal.record_handoff_message(
+        thread_phone=active_thread["thread_phone"],
+        direction="INBOUND",
+        sender_label=str(sender_name or active_thread.get("contact_name") or active_thread["thread_phone"]),
+        message_text=str(msg_text or "[Mensagem recebida no WhatsApp]"),
+        contact_name=active_thread.get("contact_name"),
+        role_label=active_thread.get("role_label"),
+        station_id=str(active_thread.get("station_id") or "posto_01"),
+        command_key=active_thread.get("last_command_key"),
+        has_media=has_media,
+        source=source,
+        external_msg_id=ext_id,
+        epoch_ts=epoch_ts,
+        is_read=False,
+    )
+
+    return {
+        "success": True,
+        "accepted": True,
+        "ingested": not bool(saved.get("already_exists")),
+        "session_id": active_thread["session_id"],
+        "thread_phone": active_thread["thread_phone"],
+        "message": saved,
+    }
+
+
+@partner_router.get(
+    "/handoffs",
+    summary="Lista Conversas Dedicadas de Retorno WhatsApp",
+    description="Sincroniza mensagens novas na Evolution API (Dual-Sync) e lista threads com unread_count.",
+)
+async def partner_list_handoffs_endpoint(
+    sync_evolution: bool = Query(default=True, description="Executa pull ativo na Evolution API antes de listar"),
+    limit: int = Query(default=30, ge=1, le=100, description="Maximo de threads"),
+    auth_info: dict[str, str] = Depends(verify_partner_auth),
+):
+    from core.command_journal import get_command_journal
+    from core.webhooks import sync_inbound_messages_from_evolution
+
+    journal = get_command_journal()
+    sync_result: dict[str, Any] = {"synced": False, "skipped_cooldown": False, "ingested": 0}
+    if sync_evolution:
+        sync_result = await sync_inbound_messages_from_evolution(journal)
+
+    threads = journal.list_handoff_threads(limit=limit)
+    total_unread = sum(int(t.get("unread_count") or 0) for t in threads)
+    return {
+        "success": True,
+        "threads": threads,
+        "total_unread": total_unread,
+        "sync_result": sync_result,
+    }
+
+
+@partner_router.post(
+    "/handoffs/{phone}/read",
+    summary="Marca Thread de Retorno WhatsApp como Lida",
+    description="Zera o contador de mensagens INBOUND nao lidas para o contato informado.",
+)
+async def partner_mark_handoff_read_endpoint(
+    phone: str = FPath(..., description="Telefone ou session_id wa_handoff_<phone>"),
+    auth_info: dict[str, str] = Depends(verify_partner_auth),
+):
+    from core.command_journal import get_command_journal, normalize_whatsapp_phone
+
+    clean_phone = phone.removeprefix("wa_handoff_")
+    journal = get_command_journal()
+    updated = journal.mark_handoff_thread_read(clean_phone)
+    return {
+        "success": True,
+        "thread_phone": normalize_whatsapp_phone(clean_phone) or clean_phone,
+        "marked_read": updated,
     }
 

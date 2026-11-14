@@ -34,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Crop
 import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Refresh
@@ -63,6 +64,7 @@ import androidx.core.content.ContextCompat
 import com.example.aurapostoassitance.data.vision.AuraVisionNpuScanner
 import com.example.aurapostoassitance.data.vision.ScannedDocumentTelemetry
 import com.example.aurapostoassitance.ui.components.AuraBrandTitle
+import com.example.aurapostoassitance.ui.components.AuraGhostButton
 import com.example.aurapostoassitance.ui.components.AuraGradientButton
 import com.example.aurapostoassitance.ui.components.LiquidGlassPill
 import com.example.aurapostoassitance.ui.components.SpatialGlassCard
@@ -94,6 +96,8 @@ fun AuraVisionBottomSheet(
     var isScanning by remember { mutableStateOf(false) }
     var scannedResult by remember { mutableStateOf<ScannedDocumentTelemetry?>(null) }
     var lastScannedUri by remember { mutableStateOf<Uri?>(null) }
+    var lastOriginalImageUri by remember { mutableStateOf<Uri?>(null) }
+    var cropCandidateUri by remember { mutableStateOf<Uri?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
 
@@ -125,7 +129,9 @@ fun AuraVisionBottomSheet(
     ) { success: Boolean ->
         val uri = pendingCameraUri
         if (success && uri != null) {
-            processScannedUri(uri)
+            errorMessage = null
+            lastOriginalImageUri = uri
+            cropCandidateUri = uri
         } else if (success) {
             errorMessage = "Não foi possível recuperar a foto capturada."
         }
@@ -174,7 +180,17 @@ fun AuraVisionBottomSheet(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            processScannedUri(uri)
+            val mime = context.contentResolver.getType(uri)?.lowercase().orEmpty()
+            val looksLikeImage = mime.startsWith("image/") ||
+                (mime.isBlank() && !uri.toString().lowercase().let { it.endsWith(".pdf") || it.endsWith(".xml") })
+            if (looksLikeImage) {
+                errorMessage = null
+                lastOriginalImageUri = uri
+                cropCandidateUri = uri
+            } else {
+                lastOriginalImageUri = null
+                processScannedUri(uri)
+            }
         }
     }
 
@@ -220,9 +236,13 @@ fun AuraVisionBottomSheet(
                 contentPadding = PaddingValues(20.dp)
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
+                    modifier = if (cropCandidateUri == null) {
+                        Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                    } else {
+                        Modifier.fillMaxWidth()
+                    }
                 ) {
                     // Header com Identificação Neural
                     Row(
@@ -276,7 +296,16 @@ fun AuraVisionBottomSheet(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    if (isScanning) {
+                    if (cropCandidateUri != null) {
+                        AuraImageCropEditor(
+                            sourceUri = cropCandidateUri!!,
+                            onCancel = { cropCandidateUri = null },
+                            onCroppedReady = { croppedUri ->
+                                cropCandidateUri = null
+                                processScannedUri(croppedUri)
+                            }
+                        )
+                    } else if (isScanning) {
                         // Estado de Processamento na NPU
                         Row(
                             modifier = Modifier
@@ -369,6 +398,18 @@ fun AuraVisionBottomSheet(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
+                        val recropTarget = lastOriginalImageUri ?: result.previewImagePath?.let { Uri.fromFile(File(it)) }
+                        if (recropTarget != null) {
+                            AuraGhostButton(
+                                text = "Recortar / Ajustar Área",
+                                icon = Icons.Rounded.Crop,
+                                onClick = { cropCandidateUri = recropTarget },
+                                modifier = Modifier.fillMaxWidth(),
+                                tint = AuraCyan
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                        }
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -380,7 +421,7 @@ fun AuraVisionBottomSheet(
                                 modifier = Modifier.weight(1f)
                             )
                             AuraGradientButton(
-                                text = "Galeria",
+                                text = "Foto / PDF / XML",
                                 icon = Icons.Rounded.PhotoLibrary,
                                 onClick = { launchGallery() },
                                 modifier = Modifier.weight(1f)

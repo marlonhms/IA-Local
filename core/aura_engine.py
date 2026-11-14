@@ -4083,6 +4083,10 @@ class AuraEngine:
                 bloco_fichas = formatar_fichas_para_prompt(pergunta)
                 contexto_extra = (
                     f"{bloco_fichas}\n\n"
+                    "[FRONTEIRA DE DADOS ERP]: Notas fiscais de entrada (compra de mercadorias/combustiveis, Modelo 55) "
+                    "ficam exclusivamente no banco Web; nunca tente buscar notas de entrada no banco PostgreSQL local (:5433). "
+                    "Audite 100% com base nos dados extraidos do documento/XML/chave e nas regras da SEFAZ. "
+                    "Apenas cupons de saida emitidos no PDV (NFC-e Modelo 65) residem no banco local.\n\n"
                     f"Auditoria Fiscal e Diagnostico Especialista SEFAZ (Agent Sefaz + ERP RAG):{directive}\n"
                     f"{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
                 )

@@ -380,9 +380,14 @@ class AuraVisionNpuScanner @Inject constructor(
             add("${items.size} item(ns) no XML")
         }.joinToString(" • ")
 
+        val cleanXmlForAudit = extractCleanXmlForAudit(xmlText)
         val promptForAura = buildString {
             append("Audite este arquivo XML oficial de NF-e/NFC-e (valide totais W07-10/vProd vs soma dos itens, NCM/CFOP, alíquotas ICMS/ST e divergências fiscais):\n\n")
-            append(rawText.take(2600))
+            append(rawText.take(2200))
+            if (cleanXmlForAudit.isNotBlank()) {
+                append("\n\n")
+                append(cleanXmlForAudit)
+            }
         }
 
         val allUpper = rawText.uppercase(Locale.getDefault())
@@ -412,6 +417,18 @@ class AuraVisionNpuScanner @Inject constructor(
             previewImagePath = null,
             compactHighlights = highlights
         )
+    }
+
+    private fun extractCleanXmlForAudit(rawXml: String): String {
+        val noSig = rawXml.replace(Regex("<Signature[\\s\\S]*?</Signature>", RegexOption.IGNORE_CASE), "").trim()
+        val infStart = noSig.indexOf("<infNFe")
+        val infEnd = noSig.lastIndexOf("</infNFe>")
+        if (infStart >= 0 && infEnd > infStart) {
+            val infSlice = noSig.substring(infStart, infEnd + "</infNFe>".length)
+            val wrapped = "<NFe>$infSlice</NFe>"
+            if (wrapped.length <= 6000) return wrapped
+        }
+        return if (noSig.length <= 6000) noSig else ""
     }
 
     private suspend fun runOcrAndBarcodes(image: InputImage): Pair<String, BarcodeExtraction> = coroutineScope {

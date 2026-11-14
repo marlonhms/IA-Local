@@ -398,7 +398,27 @@ class PostoTools:
                 auditar_documento_xml,
             )
             clean_input = (chave_ou_xml or "").strip()
-            digits = re.sub(r"[^0-9]", "", clean_input)
+            xml_match = re.search(
+                r"(<(?:nfeProc|NFe|infNFe)\b[\s\S]*</(?:nfeProc|NFe|infNFe)>)",
+                clean_input,
+                flags=re.IGNORECASE,
+            )
+            if xml_match:
+                resultado = auditar_documento_xml(xml_match.group(1).strip())
+                return {
+                    "tipo": "xml_documento",
+                    "resultado": resultado,
+                    "status": "sucesso",
+                }
+            if "<" in clean_input and ("infNFe" in clean_input or "NFe" in clean_input or "nfeProc" in clean_input):
+                resultado = auditar_documento_xml(clean_input)
+                return {
+                    "tipo": "xml_documento",
+                    "resultado": resultado,
+                    "status": "sucesso",
+                }
+            key_match = re.search(r"(?<!\d)(\d{44})(?!\d)", re.sub(r"[\s.\-/]", "", clean_input))
+            digits = key_match.group(1) if key_match else re.sub(r"[^0-9]", "", clean_input)
             if len(digits) == 44 and "<" not in clean_input:
                 decomp = decompor_chave_acesso(digits)
                 findings = validar_chave_acesso(digits)
@@ -406,13 +426,6 @@ class PostoTools:
                     "tipo": "chave_acesso",
                     "decomposicao": decomp,
                     "apontamentos": [f.model_dump(mode="json") for f in findings],
-                    "status": "sucesso",
-                }
-            elif "<" in clean_input and ("infNFe" in clean_input or "NFe" in clean_input or "nfeProc" in clean_input):
-                resultado = auditar_documento_xml(clean_input)
-                return {
-                    "tipo": "xml_documento",
-                    "resultado": resultado,
                     "status": "sucesso",
                 }
             else:

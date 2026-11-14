@@ -6,6 +6,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 @Serializable
 data class HealthResponse(
@@ -83,6 +84,7 @@ data class HandoffRequest(
     val segment: String = "postos_redes",
     val phone: String,
     val contact_name: String? = null,
+    val role_label: String? = null,
     val initial_message: String,
     val session_handoff_context: String,
     val station_id: String = "posto_01",
@@ -100,8 +102,63 @@ data class HandoffResponse(
     val media_sent: Boolean? = null,
     val command_key: String? = null,
     val journal_id: String? = null,
+    val session_id: String? = null,
+    val thread_phone: String? = null,
+    val message_id: String? = null,
     val session_handoff_context: String? = null,
     val confirmation_text: String? = null
+)
+
+@Serializable
+data class HandoffThreadMessageDto(
+    val message_id: String,
+    val thread_phone: String,
+    val match_key: String? = null,
+    val contact_name: String? = null,
+    val role_label: String? = null,
+    val station_id: String? = null,
+    val command_key: String? = null,
+    val direction: String,
+    val sender_label: String,
+    val message_text: String,
+    val has_media: Int = 0,
+    val media_caption: String? = null,
+    val source: String? = null,
+    val external_msg_id: String? = null,
+    val epoch_ts: Long = 0L,
+    val is_read: Int = 0,
+    val created_at: String? = null
+)
+
+@Serializable
+data class HandoffThreadDto(
+    val thread_phone: String,
+    val match_key: String? = null,
+    val session_id: String,
+    val contact_name: String? = null,
+    val role_label: String? = null,
+    val station_id: String? = null,
+    val last_epoch_ts: Long = 0L,
+    val last_message_text: String = "",
+    val last_direction: String = "OUTBOUND",
+    val last_created_at: String? = null,
+    val unread_count: Int = 0,
+    val total_messages: Int = 0,
+    val messages: List<HandoffThreadMessageDto> = emptyList()
+)
+
+@Serializable
+data class HandoffThreadsResponse(
+    val success: Boolean = true,
+    val threads: List<HandoffThreadDto> = emptyList(),
+    val total_unread: Int = 0
+)
+
+@Serializable
+data class HandoffMarkReadResponse(
+    val success: Boolean = true,
+    val thread_phone: String? = null,
+    val marked_read: Int = 0
 )
 
 @Serializable
@@ -146,4 +203,15 @@ interface AuraApiService {
 
     @POST("api/v1/partner/handoff")
     suspend fun triggerHandoff(@Body request: HandoffRequest): HandoffResponse
+
+    @GET("api/v1/partner/handoffs")
+    suspend fun getHandoffThreads(
+        @Query("sync_evolution") syncEvolution: Boolean = true,
+        @Query("limit") limit: Int = 30
+    ): HandoffThreadsResponse
+
+    @POST("api/v1/partner/handoffs/{phone}/read")
+    suspend fun markHandoffThreadRead(
+        @Path("phone") phone: String
+    ): HandoffMarkReadResponse
 }

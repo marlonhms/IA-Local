@@ -86,6 +86,51 @@ def _parse_iso_to_epoch(ts_str: str | None) -> float | None:
             return None
 
 
+def normalize_whatsapp_phone(raw_phone: str | None) -> str:
+    """Normaliza telefone/JID do WhatsApp para somente digitos com DDI 55 quando aplicavel."""
+    raw = str(raw_phone or "").strip()
+    if not raw:
+        return ""
+    head = raw.split("@", 1)[0].split(":", 1)[0]
+    digits = "".join(ch for ch in head if ch.isdigit())
+    if len(digits) in (10, 11):
+        digits = f"55{digits}"
+    return digits
+
+
+def phone_match_key(raw_phone: str | None) -> str:
+    """
+    Retorna chave canonica (DDD + ultimos 8 digitos) para correlacionar telefones
+    brasileiros com ou sem o nono digito nos JIDs do WhatsApp.
+    """
+    norm = normalize_whatsapp_phone(raw_phone)
+    if not norm:
+        return ""
+    if norm.startswith("55") and len(norm) in (12, 13):
+        return f"{norm[2:4]}{norm[-8:]}"
+    if len(norm) >= 10:
+        return norm[-10:]
+    return norm
+
+
+def whatsapp_jid_candidates(raw_phone: str | None) -> list[str]:
+    """
+    Retorna JIDs candidatos do WhatsApp (com e sem o nono digito para Brasil)
+    para consultas ativas na Evolution API.
+    """
+    norm = normalize_whatsapp_phone(raw_phone)
+    if not norm:
+        return []
+    candidates: list[str] = [f"{norm}@s.whatsapp.net"]
+    if norm.startswith("55") and len(norm) == 13 and norm[4] == "9":
+        alt = f"{norm[:4]}{norm[5:]}"
+        candidates.append(f"{alt}@s.whatsapp.net")
+    elif norm.startswith("55") and len(norm) == 12:
+        alt = f"{norm[:4]}9{norm[4:]}"
+        candidates.append(f"{alt}@s.whatsapp.net")
+    return list(dict.fromkeys(candidates))
+
+
 @dataclass
 class CommandJournalEntry:
     """Representa um registro persistido na tabela aura_command_journal."""
@@ -398,6 +443,48 @@ class AuraCommandJournal:
                 """
                 CREATE INDEX IF NOT EXISTS idx_cmd_journal_started_at
                 ON aura_command_journal(started_at);
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS aura_handoff_messages (
+                    message_id TEXT PRIMARY KEY,
+                    thread_phone TEXT NOT NULL,
+                    match_key TEXT NOT NULL,
+                    contact_name TEXT,
+                    role_label TEXT,
+                    station_id TEXT NOT NULL DEFAULT 'posto_01',
+                    command_key TEXT,
+                    direction TEXT NOT NULL,
+                    sender_label TEXT NOT NULL,
+                    message_text TEXT NOT NULL,
+                    has_media INTEGER NOT NULL DEFAULT 0,
+                    media_caption TEXT,
+                    source TEXT NOT NULL DEFAULT 'android_handoff',
+                    external_msg_id TEXT,
+                    epoch_ts INTEGER NOT NULL,
+                    is_read INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL
+                );
+                """
+            )
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_handoff_thread_epoch
+                ON aura_handoff_messages(thread_phone, epoch_ts ASC);
+                """
+            )
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_handoff_match_key
+                ON aura_handoff_messages(match_key, epoch_ts DESC);
+                """
+            )
+            conn.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_handoff_external_msg_id
+                ON aura_handoff_messages(external_msg_id)
+                WHERE external_msg_id IS NOT NULL;
                 """
             )
 
@@ -1094,6 +1181,300 @@ class AuraCommandJournal:
                 stats["total"] += cnt
         return stats
 
+    # =========================================================================
+    # 6. CONVERSAS DEDICADAS DE RETORNO WHATSAPP (HANDOFF THREADS)
+    # =========================================================================
+
+    def record_handoff_message(
+        self,
+        thread_phone: str,
+        direction: str,
+        sender_label: str,
+        message_text: str,
+        contact_name: str | None = None,
+        role_label: str | None = None,
+        station_id: str = "posto_01",
+        command_key: str | None = None,
+        has_media: bool = False,
+        media_caption: str | None = None,
+        source: str = "android_handoff",
+        external_msg_id: str | None = None,
+        epoch_ts: int | None = None,
+        is_read: bool | None = None,
+    ) -> dict[str, Any]:
+        """
+        Registra uma mensagem OUTBOUND ou INBOUND em aura_handoff_messages.
+        Correlaciona por match_key (com/sem nono digito BR) e deduplica por external_msg_id.
+        """
+        norm_phone = normalize_whatsapp_phone(thread_phone)
+        mkey = phone_match_key(norm_phone)
+        if not norm_phone or not mkey:
+            raise ValueError("thread_phone invalido para registro de handoff.")
+
+        norm_dir = str(direction or "OUTBOUND").strip().upper()
+        if norm_dir not in ("OUTBOUND", "INBOUND"):
+            norm_dir = "OUTBOUND"
+
+        clean_ext = str(external_msg_id).strip() if external_msg_id and str(external_msg_id).strip() else None
+        eff_epoch = int(epoch_ts) if epoch_ts is not None and int(epoch_ts) > 0 else int(time.time())
+        eff_is_read = (1 if is_read else 0) if is_read is not None else (1 if norm_dir == "OUTBOUND" else 0)
+        created_iso = datetime.now(UTC).isoformat()
+        clean_text = str(message_text or "").strip() or "[Mensagem sem texto]"
+        clean_sender = str(sender_label or ("Gestor AURA" if norm_dir == "OUTBOUND" else "Contato")).strip()
+        clean_contact = str(contact_name).strip() if contact_name and str(contact_name).strip() else None
+        clean_role = str(role_label).strip() if role_label and str(role_label).strip() else None
+        clean_caption = str(media_caption).strip() if media_caption and str(media_caption).strip() else None
+        clean_station = str(station_id or "posto_01").strip() or "posto_01"
+        clean_cmd_key = str(command_key).strip() if command_key and str(command_key).strip() else None
+        clean_source = str(source or "android_handoff").strip() or "android_handoff"
+
+        with self._connection(immediate=True) as conn:
+            if clean_ext is not None:
+                existing = conn.execute(
+                    "SELECT * FROM aura_handoff_messages WHERE external_msg_id = ? LIMIT 1",
+                    (clean_ext,),
+                ).fetchone()
+                if existing is not None:
+                    res = dict(existing)
+                    res["already_exists"] = True
+                    res["session_id"] = f"wa_handoff_{res['thread_phone']}"
+                    return res
+
+            thread_row = conn.execute(
+                """
+                SELECT thread_phone, contact_name, role_label
+                FROM aura_handoff_messages
+                WHERE match_key = ?
+                ORDER BY epoch_ts ASC, rowid ASC
+                LIMIT 1
+                """,
+                (mkey,),
+            ).fetchone()
+            canonical_phone = str(thread_row["thread_phone"]) if thread_row is not None else norm_phone
+            if clean_contact is None and thread_row is not None and thread_row["contact_name"]:
+                clean_contact = str(thread_row["contact_name"])
+            if clean_role is None and thread_row is not None and thread_row["role_label"]:
+                clean_role = str(thread_row["role_label"])
+
+            message_id = f"hm_{uuid.uuid4().hex[:16]}"
+            conn.execute(
+                """
+                INSERT INTO aura_handoff_messages (
+                    message_id, thread_phone, match_key, contact_name, role_label,
+                    station_id, command_key, direction, sender_label, message_text,
+                    has_media, media_caption, source, external_msg_id, epoch_ts,
+                    is_read, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    message_id,
+                    canonical_phone,
+                    mkey,
+                    clean_contact,
+                    clean_role,
+                    clean_station,
+                    clean_cmd_key,
+                    norm_dir,
+                    clean_sender,
+                    clean_text,
+                    1 if has_media else 0,
+                    clean_caption,
+                    clean_source,
+                    clean_ext,
+                    eff_epoch,
+                    eff_is_read,
+                    created_iso,
+                ),
+            )
+            inserted = conn.execute(
+                "SELECT * FROM aura_handoff_messages WHERE message_id = ?",
+                (message_id,),
+            ).fetchone()
+            res = dict(inserted)
+            res["already_exists"] = False
+            res["session_id"] = f"wa_handoff_{canonical_phone}"
+            return res
+
+    def find_active_handoff_contact(
+        self,
+        raw_phone: str,
+        lookback_hours: int = 72,
+    ) -> dict[str, Any] | None:
+        """
+        Verifica se existe envio OUTBOUND recente para este telefone (ou variante BR 9o digito)
+        nas ultimas lookback_hours horas.
+        """
+        mkey = phone_match_key(raw_phone)
+        if not mkey:
+            return None
+        min_epoch = int(time.time()) - max(1, int(lookback_hours)) * 3600
+        with self._connection(immediate=False) as conn:
+            agg = conn.execute(
+                """
+                SELECT MIN(epoch_ts) AS first_outbound_epoch,
+                       MAX(epoch_ts) AS last_outbound_epoch
+                FROM aura_handoff_messages
+                WHERE match_key = ? AND direction = 'OUTBOUND' AND epoch_ts >= ?
+                """,
+                (mkey, min_epoch),
+            ).fetchone()
+            if agg is None or agg["first_outbound_epoch"] is None:
+                return None
+
+            latest = conn.execute(
+                """
+                SELECT thread_phone, match_key, contact_name, role_label, station_id, command_key
+                FROM aura_handoff_messages
+                WHERE match_key = ? AND direction = 'OUTBOUND'
+                ORDER BY epoch_ts DESC, rowid DESC
+                LIMIT 1
+                """,
+                (mkey,),
+            ).fetchone()
+            if latest is None:
+                return None
+
+            return {
+                "thread_phone": str(latest["thread_phone"]),
+                "match_key": str(latest["match_key"]),
+                "contact_name": latest["contact_name"],
+                "role_label": latest["role_label"],
+                "station_id": str(latest["station_id"] or "posto_01"),
+                "first_outbound_epoch": int(agg["first_outbound_epoch"]),
+                "last_outbound_epoch": int(agg["last_outbound_epoch"]),
+                "last_command_key": latest["command_key"],
+                "session_id": f"wa_handoff_{latest['thread_phone']}",
+            }
+
+    def list_active_outbound_threads(self, lookback_hours: int = 72) -> list[dict[str, Any]]:
+        """
+        Lista threads com pelo menos uma mensagem OUTBOUND dentro de lookback_hours
+        para alimentar a sincronizacao ativa com a Evolution API.
+        """
+        min_epoch = int(time.time()) - max(1, int(lookback_hours)) * 3600
+        with self._connection(immediate=False) as conn:
+            rows = conn.execute(
+                """
+                SELECT thread_phone,
+                       match_key,
+                       MIN(epoch_ts) AS first_outbound_epoch,
+                       MAX(epoch_ts) AS last_outbound_epoch
+                FROM aura_handoff_messages
+                WHERE direction = 'OUTBOUND' AND epoch_ts >= ?
+                GROUP BY match_key
+                ORDER BY last_outbound_epoch DESC
+                """,
+                (min_epoch,),
+            ).fetchall()
+            result: list[dict[str, Any]] = []
+            for row in rows:
+                meta = conn.execute(
+                    """
+                    SELECT thread_phone, contact_name, role_label, station_id, command_key
+                    FROM aura_handoff_messages
+                    WHERE match_key = ?
+                    ORDER BY epoch_ts DESC, rowid DESC
+                    LIMIT 1
+                    """,
+                    (row["match_key"],),
+                ).fetchone()
+                t_phone = str(meta["thread_phone"] if meta else row["thread_phone"])
+                result.append(
+                    {
+                        "thread_phone": t_phone,
+                        "match_key": str(row["match_key"]),
+                        "contact_name": meta["contact_name"] if meta else None,
+                        "role_label": meta["role_label"] if meta else None,
+                        "station_id": str(meta["station_id"] or "posto_01") if meta else "posto_01",
+                        "last_command_key": meta["command_key"] if meta else None,
+                        "first_outbound_epoch": int(row["first_outbound_epoch"]),
+                        "last_outbound_epoch": int(row["last_outbound_epoch"]),
+                        "session_id": f"wa_handoff_{t_phone}",
+                    }
+                )
+            return result
+
+    def list_handoff_threads(self, limit: int = 30) -> list[dict[str, Any]]:
+        """
+        Lista as threads de handoff ordenadas por atividade mais recente, com unread_count
+        e o historico completo de mensagens de cada contato.
+        """
+        safe_limit = max(1, min(int(limit), 100))
+        with self._connection(immediate=False) as conn:
+            thread_rows = conn.execute(
+                """
+                SELECT thread_phone,
+                       match_key,
+                       MAX(epoch_ts) AS last_epoch_ts,
+                       COUNT(*) AS total_messages,
+                       SUM(CASE WHEN direction = 'INBOUND' AND is_read = 0 THEN 1 ELSE 0 END) AS unread_count
+                FROM aura_handoff_messages
+                GROUP BY thread_phone
+                ORDER BY last_epoch_ts DESC
+                LIMIT ?
+                """,
+                (safe_limit,),
+            ).fetchall()
+
+            threads: list[dict[str, Any]] = []
+            for tr in thread_rows:
+                t_phone = str(tr["thread_phone"])
+                msg_rows = conn.execute(
+                    """
+                    SELECT *
+                    FROM aura_handoff_messages
+                    WHERE thread_phone = ?
+                    ORDER BY epoch_ts ASC, rowid ASC
+                    """,
+                    (t_phone,),
+                ).fetchall()
+                messages = [dict(m) for m in msg_rows]
+                last_msg = messages[-1] if messages else {}
+                contact_name = None
+                role_label = None
+                station_id = "posto_01"
+                for m in reversed(messages):
+                    if not contact_name and m.get("contact_name"):
+                        contact_name = str(m["contact_name"])
+                    if not role_label and m.get("role_label"):
+                        role_label = str(m["role_label"])
+                    if m.get("station_id"):
+                        station_id = str(m["station_id"])
+                threads.append(
+                    {
+                        "thread_phone": t_phone,
+                        "match_key": str(tr["match_key"]),
+                        "session_id": f"wa_handoff_{t_phone}",
+                        "contact_name": contact_name or t_phone,
+                        "role_label": role_label or "WhatsApp",
+                        "station_id": station_id,
+                        "last_epoch_ts": int(tr["last_epoch_ts"] or 0),
+                        "last_message_text": str(last_msg.get("message_text") or ""),
+                        "last_direction": str(last_msg.get("direction") or "OUTBOUND"),
+                        "last_created_at": str(last_msg.get("created_at") or ""),
+                        "unread_count": int(tr["unread_count"] or 0),
+                        "total_messages": int(tr["total_messages"] or 0),
+                        "messages": messages,
+                    }
+                )
+            return threads
+
+    def mark_handoff_thread_read(self, raw_phone: str) -> int:
+        """Marca todas as mensagens INBOUND de um contato (por match_key) como lidas."""
+        mkey = phone_match_key(raw_phone)
+        if not mkey:
+            return 0
+        with self._connection(immediate=True) as conn:
+            cur = conn.execute(
+                """
+                UPDATE aura_handoff_messages
+                SET is_read = 1
+                WHERE match_key = ? AND direction = 'INBOUND' AND is_read = 0
+                """,
+                (mkey,),
+            )
+            return int(cur.rowcount or 0)
+
     def close(self) -> None:
         """Fecha conexoes persistentes em memoria."""
         with self._lock:
@@ -1160,6 +1541,9 @@ __all__ = [
     "CommandJournalError",
     "CommandJournalStatus",
     "get_command_journal",
+    "normalize_whatsapp_phone",
+    "phone_match_key",
     "reset_command_journal",
     "set_command_journal",
+    "whatsapp_jid_candidates",
 ]

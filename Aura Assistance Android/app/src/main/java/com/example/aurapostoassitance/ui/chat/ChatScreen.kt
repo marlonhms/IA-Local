@@ -62,10 +62,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Psychology
@@ -119,6 +121,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -193,8 +196,18 @@ fun ChatScreen(
     val messages by viewModel.messages.collectAsState()
     val isTyping by viewModel.isAuraTyping.collectAsState()
     val auraStatusMessage by viewModel.auraStatusMessage.collectAsState()
+    val currentSessionId by viewModel.currentSessionId.collectAsState()
     val sessionTitle by viewModel.currentSessionTitle.collectAsState()
     val sessions by viewModel.sessions.collectAsState()
+    val handoffThreads by viewModel.handoffThreads.collectAsState()
+    val totalUnreadHandoffs by viewModel.totalUnreadHandoffs.collectAsState()
+    val incomingHandoffAlert by viewModel.incomingHandoffAlert.collectAsState()
+    val isDirectWhatsAppSession = currentSessionId.startsWith("wa_handoff_")
+    val activeHandoffThread = remember(currentSessionId, handoffThreads) {
+        handoffThreads.firstOrNull {
+            it.session_id == currentSessionId || "wa_handoff_${it.thread_phone}" == currentSessionId
+        }
+    }
 
     // Fluxos de Voz e Fala Hands-Free
     val isListening by viewModel.isListening.collectAsState()
@@ -310,48 +323,79 @@ fun ChatScreen(
                 .imePadding(),
             containerColor = Color.Transparent,
             topBar = {
-                ChatHeader(
-                    title = sessionTitle,
-                    isTyping = isTyping,
-                    activeMode = activeModeTitle,
-                    isVoiceConversationActive = isVoiceConversationActive,
-                    onToggleVoiceConversation = {
-                        if (isVoiceConversationActive) {
-                            viewModel.endVoiceConversation()
-                        } else {
-                            requestVoiceListening()
+                Column {
+                    ChatHeader(
+                        title = sessionTitle,
+                        isTyping = isTyping,
+                        activeMode = activeModeTitle,
+                        isVoiceConversationActive = isVoiceConversationActive,
+                        totalUnreadHandoffs = totalUnreadHandoffs,
+                        onToggleVoiceConversation = {
+                            if (isVoiceConversationActive) {
+                                viewModel.endVoiceConversation()
+                            } else {
+                                requestVoiceListening()
+                            }
+                        },
+                        onBack = onNavigateBack,
+                        onHistory = { showSessionsSheet = true },
+                        onNewChat = { viewModel.createNewChat("Novo Chat") },
+                        onOpenCommandHub = { showCommandHubSheet = true },
+                        onQueryAction = { query -> send(query) },
+                        menuContent = {
+                            IconButton(onClick = { showMenu = true }) {
+                                Icon(Icons.Default.MoreVert, "Opções", tint = TextSecondary)
+                            }
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false },
+                                containerColor = ObsidianMid
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Aura Command Hub", color = TextPrimary) },
+                                    onClick = { showCommandHubSheet = true; showMenu = false },
+                                    leadingIcon = { Icon(Icons.Rounded.Tune, null, tint = AuraCyan) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Limpar esta conversa", color = TextPrimary) },
+                                    onClick = { viewModel.clearCurrentChat(); showMenu = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Nova conversa", color = TextPrimary) },
+                                    onClick = { viewModel.createNewChat("Novo Chat"); showMenu = false }
+                                )
+                            }
                         }
-                    },
-                    onBack = onNavigateBack,
-                    onHistory = { showSessionsSheet = true },
-                    onNewChat = { viewModel.createNewChat("Novo Chat") },
-                    onOpenCommandHub = { showCommandHubSheet = true },
-                    onQueryAction = { query -> send(query) },
-                    menuContent = {
-                        IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Default.MoreVert, "Opções", tint = TextSecondary)
-                        }
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false },
-                            containerColor = ObsidianMid
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Aura Command Hub", color = TextPrimary) },
-                                onClick = { showCommandHubSheet = true; showMenu = false },
-                                leadingIcon = { Icon(Icons.Rounded.Tune, null, tint = AuraCyan) }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Limpar esta conversa", color = TextPrimary) },
-                                onClick = { viewModel.clearCurrentChat(); showMenu = false }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Nova conversa", color = TextPrimary) },
-                                onClick = { viewModel.createNewChat("Novo Chat"); showMenu = false }
+                    )
+
+                    AnimatedVisibility(
+                        visible = incomingHandoffAlert != null,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        incomingHandoffAlert?.let { alert ->
+                            HandoffReplyTopBanner(
+                                alert = alert,
+                                onOpen = { viewModel.openHandoffThread(alert.sessionId, alert.phone) },
+                                onDismiss = { viewModel.dismissIncomingHandoffAlert() }
                             )
                         }
                     }
-                )
+
+                    AnimatedVisibility(
+                        visible = isDirectWhatsAppSession,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        val phone = currentSessionId.removePrefix("wa_handoff_")
+                        val name = activeHandoffThread?.contact_name?.takeIf { it.isNotBlank() } ?: sessionTitle
+                        ActiveWhatsAppSessionBar(
+                            contactName = name,
+                            phone = phone,
+                            onBackToAura = { viewModel.loadSession("default", "AURA") }
+                        )
+                    }
+                }
             },
             bottomBar = {
                 Column {
@@ -401,6 +445,11 @@ fun ChatScreen(
                         text = inputText,
                         onTextChange = { inputText = it },
                         enabled = !isTyping,
+                        placeholderText = if (isDirectWhatsAppSession) {
+                            "Responder no WhatsApp (ou @aura p/ perguntar à IA)..."
+                        } else {
+                            "Pergunte à AURA sobre o posto..."
+                        },
                         onSend = {
                             val toSend = inputText
                             inputText = ""
@@ -514,6 +563,17 @@ fun ChatScreen(
     }
 
     if (showSessionsSheet) {
+        LaunchedEffect(showSessionsSheet) {
+            viewModel.refreshHandoffThreads(syncEvolution = true)
+        }
+        var selectedHistoryTab by remember { mutableStateOf(if (totalUnreadHandoffs > 0) 1 else 0) }
+        val analysisSessions = remember(sessions) {
+            sessions.filter { !it.sessionId.startsWith("wa_handoff_") }
+        }
+        val localHandoffSessions = remember(sessions) {
+            sessions.filter { it.sessionId.startsWith("wa_handoff_") }
+        }
+
         ModalBottomSheet(
             onDismissRequest = { showSessionsSheet = false },
             containerColor = ObsidianLow,
@@ -533,60 +593,248 @@ fun ChatScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Retome uma análise ou diagnóstico anterior",
+                    "Alternar entre análises com a AURA e retornos no WhatsApp",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary
                 )
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(14.dp))
 
-                AuraCard(
-                    onClick = {
-                        viewModel.createNewChat("Novo Chat")
-                        showSessionsSheet = false
-                    },
-                    accent = AuraCyan,
-                    modifier = Modifier.fillMaxWidth()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    val isAuraTab = selectedHistoryTab == 0
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (isAuraTab) AuraCyan.copy(alpha = 0.16f) else ObsidianMid)
+                            .border(
+                                1.dp,
+                                if (isAuraTab) AuraCyan else GlassBorderSoft,
+                                RoundedCornerShape(14.dp)
+                            )
+                            .clickable { selectedHistoryTab = 0 }
+                            .padding(vertical = 10.dp, horizontal = 12.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Add, null, tint = AuraCyan)
                         Text(
-                            "Nova conversa",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = TextPrimary,
-                            fontWeight = FontWeight.SemiBold
+                            text = "Análises AURA",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (isAuraTab) AuraCyan else TextSecondary,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
                         )
+                    }
+
+                    val isWaTab = selectedHistoryTab == 1
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (isWaTab) AuraEmerald.copy(alpha = 0.16f) else ObsidianMid)
+                            .border(
+                                1.dp,
+                                if (isWaTab) AuraEmerald else GlassBorderSoft,
+                                RoundedCornerShape(14.dp)
+                            )
+                            .clickable { selectedHistoryTab = 1 }
+                            .padding(vertical = 10.dp, horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Retornos WhatsApp",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (isWaTab) AuraEmerald else TextSecondary,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
+                        )
+                        if (totalUnreadHandoffs > 0) {
+                            Spacer(Modifier.width(6.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(AuraEmerald)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = totalUnreadHandoffs.toString(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = ObsidianBase,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                 }
 
                 Spacer(Modifier.height(14.dp))
 
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(sessions, key = { it.sessionId }) { session ->
+                if (selectedHistoryTab == 0) {
+                    AuraCard(
+                        onClick = {
+                            viewModel.createNewChat("Novo Chat")
+                            showSessionsSheet = false
+                        },
+                        accent = AuraCyan,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(ObsidianMid)
-                                .border(1.dp, GlassBorderSoft, RoundedCornerShape(16.dp))
-                                .clickable {
-                                    viewModel.loadSession(session.sessionId, session.title)
-                                    showSessionsSheet = false
-                                }
-                                .padding(start = 16.dp, top = 6.dp, bottom = 6.dp, end = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
+                            Icon(Icons.Default.Add, null, tint = AuraCyan)
                             Text(
-                                text = session.title,
-                                style = MaterialTheme.typography.bodyLarge,
+                                "Nova conversa",
+                                style = MaterialTheme.typography.titleSmall,
                                 color = TextPrimary,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1
+                                fontWeight = FontWeight.SemiBold
                             )
-                            IconButton(onClick = { viewModel.deleteSession(session.sessionId) }) {
-                                Icon(Icons.Default.Delete, "Excluir conversa", tint = TextMuted)
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(analysisSessions, key = { it.sessionId }) { session ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(ObsidianMid)
+                                    .border(1.dp, GlassBorderSoft, RoundedCornerShape(16.dp))
+                                    .clickable {
+                                        viewModel.loadSession(session.sessionId, session.title)
+                                        showSessionsSheet = false
+                                    }
+                                    .padding(start = 16.dp, top = 6.dp, bottom = 6.dp, end = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = session.title,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = TextPrimary,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1
+                                )
+                                IconButton(onClick = { viewModel.deleteSession(session.sessionId) }) {
+                                    Icon(Icons.Default.Delete, "Excluir conversa", tint = TextMuted)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    if (handoffThreads.isEmpty() && localHandoffSessions.isEmpty()) {
+                        Text(
+                            text = "Nenhum contato acionado via WhatsApp ainda. Envie um relatório pela AURA para abrir uma conversa dedicada aqui.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextMuted,
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        )
+                    } else if (handoffThreads.isNotEmpty()) {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(handoffThreads, key = { it.session_id }) { thread ->
+                                val hasUnread = thread.unread_count > 0
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(ObsidianMid)
+                                        .border(
+                                            1.dp,
+                                            if (hasUnread) AuraEmerald.copy(alpha = 0.65f) else GlassBorderSoft,
+                                            RoundedCornerShape(16.dp)
+                                        )
+                                        .clickable {
+                                            viewModel.openHandoffThread(thread.session_id, thread.thread_phone)
+                                            showSessionsSheet = false
+                                        }
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Chat,
+                                        contentDescription = null,
+                                        tint = if (hasUnread) AuraEmerald else AuraCyan,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Column(Modifier.weight(1f)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = "${thread.role_label ?: "WhatsApp"} • ${thread.contact_name ?: thread.thread_phone}",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                color = TextPrimary,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f, fill = false)
+                                            )
+                                            Text(
+                                                text = thread.thread_phone,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = TextMuted,
+                                                maxLines = 1
+                                            )
+                                        }
+                                        Spacer(Modifier.height(2.dp))
+                                        Text(
+                                            text = thread.last_message_text.ifBlank { "Sem prévia" },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = if (hasUnread) AuraEmerald else TextSecondary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    if (hasUnread) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(CircleShape)
+                                                .background(AuraEmerald)
+                                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = thread.unread_count.toString(),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = ObsidianBase,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(localHandoffSessions, key = { it.sessionId }) { session ->
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(ObsidianMid)
+                                        .border(1.dp, GlassBorderSoft, RoundedCornerShape(16.dp))
+                                        .clickable {
+                                            viewModel.openHandoffThread(session.sessionId)
+                                            showSessionsSheet = false
+                                        }
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = session.title,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = TextPrimary,
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }
@@ -847,11 +1095,123 @@ private fun AuraHandoffRecipientDialog(
 }
 
 @Composable
+private fun HandoffReplyTopBanner(
+    alert: IncomingHandoffAlert,
+    onOpen: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(ObsidianLow.copy(alpha = 0.96f))
+            .border(1.dp, AuraEmerald.copy(alpha = 0.75f), RoundedCornerShape(18.dp))
+            .clickable { onOpen() }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        StatusDot(color = AuraEmerald, size = 8.dp, pulsing = true)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "💬 ${alert.roleLabel}: ${alert.contactName} respondeu",
+                style = MaterialTheme.typography.labelLarge,
+                color = AuraEmerald,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = alert.previewText,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(AuraEmerald)
+                .clickable { onOpen() }
+                .padding(horizontal = 10.dp, vertical = 5.dp)
+        ) {
+            Text(
+                text = "Abrir",
+                style = MaterialTheme.typography.labelMedium,
+                color = ObsidianBase,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        IconButton(
+            onClick = onDismiss,
+            modifier = Modifier.size(28.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Fechar alerta",
+                tint = TextMuted,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActiveWhatsAppSessionBar(
+    contactName: String,
+    phone: String,
+    onBackToAura: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AuraEmerald.copy(alpha = 0.12f))
+            .border(0.5.dp, AuraEmerald.copy(alpha = 0.4f))
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Chat,
+            contentDescription = null,
+            tint = AuraEmerald,
+            modifier = Modifier.size(16.dp)
+        )
+        Text(
+            text = "Canal Direto WhatsApp • $contactName ($phone)",
+            style = MaterialTheme.typography.labelMedium,
+            color = TextPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(ObsidianMid)
+                .border(1.dp, AuraCyan.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                .clickable { onBackToAura() }
+                .padding(horizontal = 10.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = "Voltar p/ AURA",
+                style = MaterialTheme.typography.labelSmall,
+                color = AuraCyan,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
 private fun ChatHeader(
     title: String,
     isTyping: Boolean,
     activeMode: String? = null,
     isVoiceConversationActive: Boolean = false,
+    totalUnreadHandoffs: Int = 0,
     onToggleVoiceConversation: () -> Unit = {},
     onBack: () -> Unit,
     onHistory: () -> Unit,
@@ -949,7 +1309,18 @@ private fun ChatHeader(
                     Icon(Icons.Rounded.Tune, "Aura Hub", tint = AuraCyan)
                 }
                 IconButton(onClick = onHistory) {
-                    Icon(Icons.Default.History, "Histórico", tint = TextSecondary)
+                    Box {
+                        Icon(Icons.Default.History, "Histórico", tint = TextSecondary)
+                        if (totalUnreadHandoffs > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .size(9.dp)
+                                    .clip(CircleShape)
+                                    .background(AuraEmerald)
+                            )
+                        }
+                    }
                 }
                 IconButton(onClick = onNewChat) {
                     Icon(Icons.Default.Add, "Novo Chat", tint = AuraCyan)
@@ -1484,6 +1855,7 @@ private fun Composer(
     text: String,
     onTextChange: (String) -> Unit,
     enabled: Boolean,
+    placeholderText: String = "Pergunte à AURA sobre o posto...",
     onSend: () -> Unit,
     onStartVoice: () -> Unit = {},
     voiceRms: Float = 0.05f,
@@ -1656,9 +2028,11 @@ private fun Composer(
                         Box(Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
                             if (text.isEmpty()) {
                                 Text(
-                                    "Pergunte à AURA sobre o posto...",
+                                    placeholderText,
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = TextMuted
+                                    color = TextMuted,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                             inner()

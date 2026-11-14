@@ -25,6 +25,7 @@ import com.example.aurapostoassitance.data.local.memory.AuraSemanticMemoryVault
 import com.example.aurapostoassitance.data.npu.AuraNpuEngine
 import com.example.aurapostoassitance.data.remote.AuraApiService
 import com.example.aurapostoassitance.data.remote.HandoffRequest
+import com.example.aurapostoassitance.data.remote.HandoffThreadDto
 import com.example.aurapostoassitance.data.remote.QuickActionRequest
 import com.example.aurapostoassitance.data.remote.SseEvent
 import com.example.aurapostoassitance.data.remote.SseRepository
@@ -61,6 +62,15 @@ data class ChatMessage(
     val envelopeJson: String? = null,
     /** Trilha cronológica das etapas e ferramentas consultadas pela IA. */
     val reasoningSteps: List<String> = emptyList()
+)
+
+data class IncomingHandoffAlert(
+    val sessionId: String,
+    val phone: String,
+    val contactName: String,
+    val roleLabel: String,
+    val previewText: String,
+    val unreadCount: Int
 )
 
 @HiltViewModel
@@ -126,6 +136,17 @@ class ChatViewModel @Inject constructor(
     private val _lastScannedDocumentTitle = MutableStateFlow<String?>(null)
     val lastScannedDocumentTitle: StateFlow<String?> = _lastScannedDocumentTitle.asStateFlow()
 
+    private val _handoffThreads = MutableStateFlow<List<HandoffThreadDto>>(emptyList())
+    val handoffThreads: StateFlow<List<HandoffThreadDto>> = _handoffThreads.asStateFlow()
+
+    private val _totalUnreadHandoffs = MutableStateFlow(0)
+    val totalUnreadHandoffs: StateFlow<Int> = _totalUnreadHandoffs.asStateFlow()
+
+    private val _incomingHandoffAlert = MutableStateFlow<IncomingHandoffAlert?>(null)
+    val incomingHandoffAlert: StateFlow<IncomingHandoffAlert?> = _incomingHandoffAlert.asStateFlow()
+
+    private val notifiedInboundMessageIds = mutableSetOf<String>()
+
     private val cachedHandoffDocFile: File
         get() = File(File(appContext.cacheDir, "vision_scans").apply { mkdirs() }, "last_handoff_doc.jpg")
 
@@ -167,6 +188,27 @@ class ChatViewModel @Inject constructor(
     private suspend fun readCachedAttachmentBase64(): String? = withContext(Dispatchers.IO) {
         runCatching {
             val f = cachedHandoffDocFile
+            if (!f.exists() || f.length() == 0L) return@runCatching null
+            Base64.encodeToString(f.readBytes(), Base64.NO_WRAP)
+        }.getOrNull()
+    }
+
+    private suspend fun createPerHandoffSnapshot(normPhone: String, sourcePath: String? = null): String? =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val srcFile = sourcePath?.let { File(it) }?.takeIf { it.exists() && it.length() > 0L }
+                    ?: cachedHandoffDocFile.takeIf { it.exists() && it.length() > 0L }
+                    ?: return@runCatching null
+                val dir = File(appContext.cacheDir, "vision_scans").apply { mkdirs() }
+                val destFile = File(dir, "handoff_${normPhone}_${System.currentTimeMillis()}.jpg")
+                srcFile.copyTo(destFile, overwrite = true)
+                destFile.absolutePath
+            }.getOrNull()
+        }
+
+    private suspend fun readPathAsBase64(path: String): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val f = File(path)
             if (!f.exists() || f.length() == 0L) return@runCatching null
             Base64.encodeToString(f.readBytes(), Base64.NO_WRAP)
         }.getOrNull()
@@ -235,6 +277,122 @@ class ChatViewModel @Inject constructor(
             }
         }
         loadSession("default", "AURA")
+        startHandoffPolling()
+    }
+
+    private fun startHandoffPolling() {
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(1500L)
+            while (true) {
+                refreshHandoffThreads(syncEvolution = true)
+                kotlinx.coroutines.delay(8000L)
+            }
+        }
+    }
+
+    fun refreshHandoffThreads(syncEvolution: Boolean = true) {
+        viewModelScope.launch {
+            runCatching {
+                apiService.getHandoffThreads(syncEvolution = syncEvolution, limit = 30)
+            }.onSuccess { response ->
+                _handoffThreads.value = response.threads
+                _totalUnreadHandoffs.value = response.total_unread
+
+                var newestAlert: IncomingHandoffAlert? = null
+                val activeSid = _currentSessionId.value
+
+                for (thread in response.threads) {
+                    val cleanTitle = formatHandoffSessionTitle(
+                        roleLabel = thread.role_label,
+                        contactName = thread.contact_name,
+                        phone = thread.thread_phone
+                    )
+                    val sessionTs = if (thread.last_epoch_ts > 0L) thread.last_epoch_ts * 1000L else System.currentTimeMillis()
+                    chatDao.insertSession(ChatSessionEntity(thread.session_id, cleanTitle, sessionTs))
+
+                    for (msg in thread.messages) {
+                        val isOutbound = msg.direction.equals("OUTBOUND", ignoreCase = true)
+                        val msgTs = if (msg.epoch_ts > 0L) msg.epoch_ts * 1000L else System.currentTimeMillis()
+                        val displayText = if (isOutbound) {
+                            msg.message_text
+                        } else {
+                            "💬 **${msg.sender_label}:** ${msg.message_text}"
+                        }
+                        chatDao.insertMessageIfAbsent(
+                            ChatMessageEntity(
+                                id = "wa_msg_${msg.message_id}",
+                                sessionId = thread.session_id,
+                                text = displayText,
+                                isFromUser = isOutbound,
+                                timestamp = msgTs
+                            )
+                        )
+                        if (!isOutbound && msg.is_read == 0) {
+                            val isNewForAlert = notifiedInboundMessageIds.add(msg.message_id)
+                            if (isNewForAlert && activeSid != thread.session_id) {
+                                newestAlert = IncomingHandoffAlert(
+                                    sessionId = thread.session_id,
+                                    phone = thread.thread_phone,
+                                    contactName = thread.contact_name?.takeIf { it.isNotBlank() } ?: thread.thread_phone,
+                                    roleLabel = thread.role_label?.takeIf { it.isNotBlank() } ?: "WhatsApp",
+                                    previewText = msg.message_text,
+                                    unreadCount = thread.unread_count.coerceAtLeast(1)
+                                )
+                            }
+                        }
+                    }
+
+                    if (activeSid == thread.session_id && thread.unread_count > 0) {
+                        markThreadRead(thread.thread_phone)
+                    }
+                }
+
+                if (newestAlert != null) {
+                    _incomingHandoffAlert.value = newestAlert
+                }
+            }
+        }
+    }
+
+    private fun formatHandoffSessionTitle(roleLabel: String?, contactName: String?, phone: String): String {
+        val role = roleLabel?.takeIf { it.isNotBlank() } ?: "WhatsApp"
+        val name = contactName?.takeIf { it.isNotBlank() } ?: phone
+        return "📲 $role • $name"
+    }
+
+    fun openHandoffThread(sessionId: String, phone: String? = null) {
+        _incomingHandoffAlert.value = null
+        val targetPhone = phone?.takeIf { it.isNotBlank() } ?: sessionId.removePrefix("wa_handoff_")
+        val thread = _handoffThreads.value.firstOrNull {
+            it.session_id == sessionId || it.thread_phone == targetPhone
+        }
+        val existingTitle = _sessions.value.firstOrNull { it.sessionId == sessionId }?.title
+        val title = existingTitle ?: formatHandoffSessionTitle(
+            roleLabel = thread?.role_label,
+            contactName = thread?.contact_name,
+            phone = targetPhone
+        )
+        loadSession(sessionId, title)
+        markThreadRead(targetPhone)
+    }
+
+    fun dismissIncomingHandoffAlert() {
+        _incomingHandoffAlert.value = null
+    }
+
+    fun markThreadRead(phone: String) {
+        val cleanPhone = phone.removePrefix("wa_handoff_")
+        if (cleanPhone.isBlank()) return
+        viewModelScope.launch {
+            runCatching { apiService.markHandoffThreadRead(cleanPhone) }
+            val updated = _handoffThreads.value.map { t ->
+                if (t.thread_phone == cleanPhone || t.session_id == "wa_handoff_$cleanPhone") {
+                    t.copy(unread_count = 0)
+                } else t
+            }
+            _handoffThreads.value = updated
+            _totalUnreadHandoffs.value = updated.sumOf { it.unread_count }
+        }
     }
 
     fun loadSession(sessionId: String, title: String) {
@@ -297,6 +455,12 @@ class ChatViewModel @Inject constructor(
                 setLastScannedDocument(Uri.fromFile(f), telemetry.title)
             }
         }
+
+        if (_currentSessionId.value.startsWith("wa_handoff_")) {
+            sendScannedDocumentToActiveHandoff(telemetry)
+            return
+        }
+
         val cleanText = "Auditar ${telemetry.title}"
         val cardJson = buildJsonObject {
             put("type", "user_vision_card")
@@ -319,6 +483,135 @@ class ChatViewModel @Inject constructor(
         )
     }
 
+    private fun sendScannedDocumentToActiveHandoff(telemetry: ScannedDocumentTelemetry) {
+        val activeSessionId = _currentSessionId.value
+        val targetPhone = activeSessionId.removePrefix("wa_handoff_")
+        if (targetPhone.isBlank()) return
+
+        val thread = _handoffThreads.value.firstOrNull {
+            it.session_id == activeSessionId || it.thread_phone == targetPhone
+        }
+        val contactName = thread?.contact_name?.takeIf { it.isNotBlank() } ?: targetPhone
+        val roleLabel = thread?.role_label?.takeIf { it.isNotBlank() }
+
+        viewModelScope.launch {
+            val snapshotPath = createPerHandoffSnapshot(targetPhone, telemetry.previewImagePath)
+            val attachmentB64 = snapshotPath?.let { readPathAsBase64(it) } ?: readCachedAttachmentBase64()
+            val messageBody = buildString {
+                append("📄 *${telemetry.title}*\n")
+                if (telemetry.compactHighlights.isNotBlank()) {
+                    append("${telemetry.compactHighlights}\n")
+                }
+                if (telemetry.executiveSummary.isNotBlank()) {
+                    append("\n${telemetry.executiveSummary.take(650)}")
+                }
+            }.trim()
+
+            val cardJson = buildJsonObject {
+                put("type", "user_vision_card")
+                put("title", telemetry.title)
+                put("docType", telemetry.docType.label)
+                put("sourceFormat", telemetry.sourceFormat)
+                telemetry.accessKey?.let { put("accessKey", it) }
+                put("accessKeyVerified", telemetry.accessKeyVerified)
+                telemetry.nfeNumber?.let { put("nfeNumber", it) }
+                put("highlights", telemetry.compactHighlights)
+                (snapshotPath ?: telemetry.previewImagePath)?.let { put("previewPath", it) }
+            }.toString()
+
+            _auraStatusMessage.value = "Enviando documento recortado para $contactName no WhatsApp..."
+            runCatching {
+                apiService.triggerHandoff(
+                    HandoffRequest(
+                        action_id = "wa_doc_${System.currentTimeMillis()}",
+                        phone = targetPhone,
+                        contact_name = contactName,
+                        role_label = roleLabel,
+                        initial_message = messageBody,
+                        session_handoff_context = "Envio direto dos Olhos da AURA na sessao $activeSessionId",
+                        attachment_base64 = attachmentB64,
+                        attachment_mimetype = if (attachmentB64 != null) "image/jpeg" else null,
+                        attachment_filename = if (attachmentB64 != null) "documento_recortado_aura.jpg" else null,
+                        attachment_caption = if (attachmentB64 != null) "📎 *${telemetry.title}* - Olhos da AURA" else null
+                    )
+                )
+            }.onSuccess { res ->
+                val msgId = res.message_id?.let { "wa_msg_$it" } ?: "wa_local_${System.currentTimeMillis()}"
+                val entity = ChatMessageEntity(
+                    id = msgId,
+                    sessionId = activeSessionId,
+                    text = messageBody,
+                    isFromUser = true,
+                    envelopeJson = cardJson,
+                    timestamp = System.currentTimeMillis()
+                )
+                chatDao.insertMessage(entity)
+                _auraStatusMessage.value = null
+                refreshHandoffThreads(syncEvolution = false)
+            }.onFailure { err ->
+                _auraStatusMessage.value = null
+                val errEntity = ChatMessageEntity(
+                    id = "wa_err_${System.currentTimeMillis()}",
+                    sessionId = activeSessionId,
+                    text = "⚠️ Falha ao enviar documento no WhatsApp (${err.localizedMessage ?: "erro de rede"}).",
+                    isFromUser = false,
+                    timestamp = System.currentTimeMillis()
+                )
+                chatDao.insertMessage(errEntity)
+            }
+        }
+    }
+
+    private fun sendDirectWhatsAppReply(text: String) {
+        val activeSessionId = _currentSessionId.value
+        val targetPhone = activeSessionId.removePrefix("wa_handoff_")
+        if (targetPhone.isBlank() || text.isBlank()) return
+
+        val thread = _handoffThreads.value.firstOrNull {
+            it.session_id == activeSessionId || it.thread_phone == targetPhone
+        }
+        val contactName = thread?.contact_name?.takeIf { it.isNotBlank() } ?: targetPhone
+        val roleLabel = thread?.role_label?.takeIf { it.isNotBlank() }
+
+        viewModelScope.launch {
+            _auraStatusMessage.value = "Enviando para $contactName no WhatsApp..."
+            runCatching {
+                apiService.triggerHandoff(
+                    HandoffRequest(
+                        action_id = "wa_reply_${System.currentTimeMillis()}",
+                        phone = targetPhone,
+                        contact_name = contactName,
+                        role_label = roleLabel,
+                        initial_message = text,
+                        session_handoff_context = "Resposta direta do gestor via App Android ($activeSessionId)"
+                    )
+                )
+            }.onSuccess { res ->
+                val msgId = res.message_id?.let { "wa_msg_$it" } ?: "wa_local_${System.currentTimeMillis()}"
+                val entity = ChatMessageEntity(
+                    id = msgId,
+                    sessionId = activeSessionId,
+                    text = text,
+                    isFromUser = true,
+                    timestamp = System.currentTimeMillis()
+                )
+                chatDao.insertMessage(entity)
+                _auraStatusMessage.value = null
+                refreshHandoffThreads(syncEvolution = false)
+            }.onFailure { err ->
+                _auraStatusMessage.value = null
+                val errEntity = ChatMessageEntity(
+                    id = "wa_err_${System.currentTimeMillis()}",
+                    sessionId = activeSessionId,
+                    text = "⚠️ Falha ao enviar mensagem para $contactName (${err.localizedMessage ?: "erro de rede"}).",
+                    isFromUser = false,
+                    timestamp = System.currentTimeMillis()
+                )
+                chatDao.insertMessage(errEntity)
+            }
+        }
+    }
+
     fun sendMessage(
         query: String,
         speakResponse: Boolean = false,
@@ -329,10 +622,23 @@ class ChatViewModel @Inject constructor(
         if (query.isBlank()) return
 
         val activeSessionId = _currentSessionId.value
+        val trimmed = query.trim()
+        val effectiveQuery = if (activeSessionId.startsWith("wa_handoff_") && userEnvelopeJson == null) {
+            if (trimmed.startsWith("@aura", ignoreCase = true)) {
+                val stripped = trimmed.removePrefix("@aura").removePrefix("@AURA").trim()
+                if (stripped.isBlank()) return
+                stripped
+            } else {
+                sendDirectWhatsAppReply(trimmed)
+                return
+            }
+        } else {
+            query
+        }
 
         val userMessage = ChatMessage(
             id = System.currentTimeMillis().toString(),
-            text = userDisplayText ?: query,
+            text = userDisplayText ?: effectiveQuery,
             isFromUser = true,
             envelopeJson = userEnvelopeJson
         )
@@ -352,11 +658,11 @@ class ChatViewModel @Inject constructor(
         streamJob?.cancel()
 
         // 1. Roteamento semântico instantâneo na NPU Hexagon (< 2ms)
-        val npuResult = npuEngine.classifyIntent(query)
+        val npuResult = npuEngine.classifyIntent(effectiveQuery)
         val npuStep = "⚡ Qualcomm Hexagon NPU (${"%.1f".format(npuResult.latencyMs)}ms): ${npuResult.intent.friendlyName}"
 
         // 2. Busca vetorial na Memória Semântica On-Device (< 2ms)
-        val memoryMatches = memoryVault.searchMemories(query, topK = 2, minSimilarity = 0.28f)
+        val memoryMatches = memoryVault.searchMemories(effectiveQuery, topK = 2, minSimilarity = 0.28f)
         val memoryStep = if (memoryMatches.isNotEmpty()) {
             val best = memoryMatches.first()
             "🧠 RAG Vetorial NPU: '${best.item.title}' (${"%.1f".format(best.latencyMs)}ms, sim: ${"%.2f".format(best.similarity)})"
@@ -400,7 +706,7 @@ class ChatViewModel @Inject constructor(
             }
 
             var hasSpokenReply = false
-            sseRepository.streamChat(query, sessionId = activeSessionId, voiceMode = voiceMode)
+            sseRepository.streamChat(effectiveQuery, sessionId = activeSessionId, voiceMode = voiceMode)
                 .catch { e ->
                     val isNetworkFailure = e is ConnectException ||
                         e is SocketTimeoutException ||
@@ -695,14 +1001,17 @@ class ChatViewModel @Inject constructor(
                 val targetName = action.targetContactName?.takeIf { it.isNotBlank() }
                     ?: action.targetRole?.takeIf { it.isNotBlank() }
                     ?: "Responsável"
+                val roleLabel = action.targetRole?.takeIf { it.isNotBlank() }
                 val contextBody = action.contextSummary?.takeIf { it.isNotBlank() }
                 val initialMsg = contextBody ?: "AURA: ${action.label}"
-                val attachmentB64 = if (action.includeAttachment && _hasScannedDocument.value) {
-                    readCachedAttachmentBase64()
+                val docTitle = _lastScannedDocumentTitle.value ?: "Nota Fiscal / DANFE"
+                val snapshotPath = if (action.includeAttachment && _hasScannedDocument.value) {
+                    createPerHandoffSnapshot(targetPhone)
                 } else {
                     null
                 }
-                val docTitle = _lastScannedDocumentTitle.value ?: "Nota Fiscal / DANFE"
+                val attachmentB64 = snapshotPath?.let { readPathAsBase64(it) }
+                    ?: if (action.includeAttachment && _hasScannedDocument.value) readCachedAttachmentBase64() else null
 
                 _auraStatusMessage.value = if (attachmentB64 != null) {
                     "Enviando relatório + cópia da nota via WhatsApp..."
@@ -715,6 +1024,7 @@ class ChatViewModel @Inject constructor(
                             action_id = action.actionId,
                             phone = targetPhone,
                             contact_name = targetName,
+                            role_label = roleLabel,
                             initial_message = initialMsg,
                             session_handoff_context = buildString {
                                 append("Gatilho App Android: ${action.label} (ID: ${action.actionId})")
@@ -730,7 +1040,7 @@ class ChatViewModel @Inject constructor(
                             attachment_base64 = attachmentB64,
                             attachment_mimetype = if (attachmentB64 != null) "image/jpeg" else null,
                             attachment_filename = if (attachmentB64 != null) "copia_nota_fiscal_aura.jpg" else null,
-                            attachment_caption = if (attachmentB64 != null) "📎 *Cópia do documento ($docTitle)* — Auditoria AURA" else null
+                            attachment_caption = if (attachmentB64 != null) "📎 *Cópia do documento ($docTitle)* - Auditoria AURA" else null
                         )
                     )
                     val receipt = handoffRes.command_key ?: handoffRes.journal_id ?: "CMD-HANDOFF-OK"
@@ -739,9 +1049,35 @@ class ChatViewModel @Inject constructor(
                         attachmentB64 != null -> "\n• *Anexo:* Cópia da nota enfileirada"
                         else -> ""
                     }
+                    val dedicatedSessionId = handoffRes.session_id ?: "wa_handoff_$targetPhone"
+                    val dedicatedTitle = formatHandoffSessionTitle(roleLabel, targetName, targetPhone)
+                    val threadMsgId = handoffRes.message_id?.let { "wa_msg_$it" } ?: "wa_local_${System.currentTimeMillis()}"
+                    val dedicatedEnvelope = snapshotPath?.let { path ->
+                        buildJsonObject {
+                            put("type", "user_vision_card")
+                            put("title", docTitle)
+                            put("docType", "Anexo Enviado no WhatsApp")
+                            put("sourceFormat", "Imagem Recortada AURA")
+                            put("highlights", "Enviado para $targetName ($targetPhone)")
+                            put("previewPath", path)
+                        }.toString()
+                    }
+                    chatDao.insertSession(ChatSessionEntity(dedicatedSessionId, dedicatedTitle, System.currentTimeMillis()))
+                    chatDao.insertMessage(
+                        ChatMessageEntity(
+                            id = threadMsgId,
+                            sessionId = dedicatedSessionId,
+                            text = initialMsg,
+                            isFromUser = true,
+                            envelopeJson = dedicatedEnvelope,
+                            timestamp = System.currentTimeMillis()
+                        )
+                    )
+
                     val feedbackText = "💬 **Relatório Enviado no WhatsApp$secBadge**\n\n" +
                         "• *Destinatário:* **$targetName** (`$targetPhone`)\n" +
                         "• *Protocolo Command Journal:* `${receipt}`$mediaNote\n" +
+                        "• *Canal de Retorno:* Aba **Retornos WhatsApp** no Histórico\n" +
                         "• *Status:* ${handoffRes.confirmation_text ?: "Ordem contextualizada enviada com sucesso."}"
 
                     val feedbackMsg = ChatMessage(
@@ -760,6 +1096,7 @@ class ChatViewModel @Inject constructor(
                     )
                     _messages.value = _messages.value + feedbackMsg
                     _auraStatusMessage.value = null
+                    refreshHandoffThreads(syncEvolution = false)
 
                     // Indexa no Cofre Semântico RAG Local
                     memoryVault.indexMemory(

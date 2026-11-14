@@ -9,6 +9,7 @@ Zero travessoes em todo o arquivo.
 
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -25,6 +26,7 @@ from config.settings import (
     PAINEL_WHATSAPP_TENANT_SLUG,
     WHATSAPP_MANAGER_PHONE,
 )
+from core.command_journal import AuraCommandJournal, whatsapp_jid_candidates
 from core.logger import logger
 from core.outbox import (
     AuraTransactionalOutbox,
@@ -1023,3 +1025,190 @@ async def notify_alerta_lmc(
         results["painel_whatsapp"] = crm_res.model_dump()
 
     return results
+
+
+# =============================================================================
+# SINCRONIZACAO ATIVA DE RETORNOS WHATSAPP (EVOLUTION API DUAL-SYNC)
+# =============================================================================
+
+_EVOLUTION_SYNC_COOLDOWN_SEC: float = 6.0
+_last_evolution_sync_ts: float = 0.0
+
+
+def extract_evolution_message_content(msg_obj: dict[str, Any] | None) -> tuple[str, bool]:
+    """
+    Extrai texto legivel e indicador de midia a partir do objeto 'message'
+    retornado pela Evolution API (/chat/findMessages ou MESSAGES_UPSERT).
+    """
+    if not isinstance(msg_obj, dict) or not msg_obj:
+        return "[Mensagem recebida no WhatsApp]", False
+
+    conv = msg_obj.get("conversation")
+    if isinstance(conv, str) and conv.strip():
+        return conv.strip(), False
+
+    ext = msg_obj.get("extendedTextMessage")
+    if isinstance(ext, dict):
+        ext_txt = str(ext.get("text") or "").strip()
+        if ext_txt:
+            return ext_txt, False
+
+    img = msg_obj.get("imageMessage")
+    if isinstance(img, dict):
+        cap = str(img.get("caption") or "").strip()
+        return (cap if cap else "[Imagem recebida no WhatsApp]"), True
+
+    doc = msg_obj.get("documentMessage")
+    if isinstance(doc, dict):
+        cap = str(doc.get("caption") or doc.get("fileName") or doc.get("title") or "").strip()
+        return (cap if cap else "[Documento recebido no WhatsApp]"), True
+
+    if isinstance(msg_obj.get("audioMessage"), dict):
+        return "[Audio recebido no WhatsApp]", True
+
+    vid = msg_obj.get("videoMessage")
+    if isinstance(vid, dict):
+        cap = str(vid.get("caption") or "").strip()
+        return (cap if cap else "[Video recebido no WhatsApp]"), True
+
+    btn = msg_obj.get("buttonsResponseMessage")
+    if isinstance(btn, dict):
+        sel = str(btn.get("selectedDisplayText") or "").strip()
+        if sel:
+            return sel, False
+
+    lst = msg_obj.get("listResponseMessage")
+    if isinstance(lst, dict):
+        title = str(lst.get("title") or "").strip()
+        if title:
+            return title, False
+
+    return "[Mensagem recebida no WhatsApp]", False
+
+
+async def sync_inbound_messages_from_evolution(
+    journal: AuraCommandJournal,
+    force: bool = False,
+    lookback_hours: int = 72,
+    http_client: httpx.AsyncClient | None = None,
+) -> dict[str, Any]:
+    """
+    Consulta ativamente POST {EVOLUTION_API_URL}/chat/findMessages/{EVOLUTION_INSTANCE}
+    apenas para contatos com envio OUTBOUND recente, aplicando filtro temporal estrito
+    (messageTimestamp >= first_outbound_epoch - 5) e fromMe == False.
+    Nao altera a configuracao de webhook do Painel WhatsApp CRM.
+    """
+    global _last_evolution_sync_ts
+
+    now_mono = time.monotonic()
+    if (
+        not force
+        and _last_evolution_sync_ts > 0.0
+        and (now_mono - _last_evolution_sync_ts) < _EVOLUTION_SYNC_COOLDOWN_SEC
+    ):
+        return {"synced": False, "skipped_cooldown": True, "ingested": 0, "threads_checked": 0}
+
+    threads = journal.list_active_outbound_threads(lookback_hours=lookback_hours)
+    if not threads:
+        _last_evolution_sync_ts = now_mono
+        return {"synced": True, "skipped_cooldown": False, "ingested": 0, "threads_checked": 0}
+
+    evo_url = (EVOLUTION_API_URL or "").strip().rstrip("/")
+    evo_instance = (EVOLUTION_INSTANCE or "").strip()
+    if not evo_url or not evo_instance:
+        return {
+            "synced": False,
+            "skipped_cooldown": False,
+            "ingested": 0,
+            "threads_checked": 0,
+            "error": "Evolution API nao configurada",
+        }
+
+    _last_evolution_sync_ts = now_mono
+    endpoint = f"{evo_url}/chat/findMessages/{evo_instance}"
+    headers: dict[str, str] = {"Content-Type": "application/json"}
+    if EVOLUTION_API_KEY:
+        headers["apikey"] = EVOLUTION_API_KEY
+
+    ingested_count = 0
+    threads_checked = 0
+    errors: list[str] = []
+
+    async def _poll_threads(client: httpx.AsyncClient) -> None:
+        nonlocal ingested_count, threads_checked
+        for thread in threads[:5]:
+            threads_checked += 1
+            first_epoch = int(thread.get("first_outbound_epoch") or 0)
+            thread_phone = str(thread["thread_phone"])
+            candidates = whatsapp_jid_candidates(thread_phone)
+            for jid in candidates:
+                try:
+                    resp = await client.post(
+                        endpoint,
+                        headers=headers,
+                        json={"where": {"key": {"remoteJid": jid}}, "limit": 15},
+                    )
+                    if resp.status_code >= 400:
+                        errors.append(f"{jid}: HTTP {resp.status_code}")
+                        continue
+                    payload = resp.json()
+                    msgs_block = payload.get("messages") if isinstance(payload, dict) else None
+                    if isinstance(msgs_block, dict):
+                        records = msgs_block.get("records") or []
+                    elif isinstance(msgs_block, list):
+                        records = msgs_block
+                    elif isinstance(payload, list):
+                        records = payload
+                    else:
+                        records = []
+
+                    for rec in records:
+                        if not isinstance(rec, dict):
+                            continue
+                        key = rec.get("key") or {}
+                        if key.get("fromMe") is not False:
+                            continue
+                        raw_ts = rec.get("messageTimestamp") or 0
+                        try:
+                            msg_ts = int(raw_ts)
+                        except (TypeError, ValueError):
+                            msg_ts = 0
+                        if msg_ts <= 0 or msg_ts < (first_epoch - 5):
+                            continue
+
+                        ext_id = key.get("id") or rec.get("id")
+                        msg_text, has_media = extract_evolution_message_content(rec.get("message"))
+                        push_name = str(rec.get("pushName") or thread.get("contact_name") or thread_phone).strip()
+                        saved = journal.record_handoff_message(
+                            thread_phone=thread_phone,
+                            direction="INBOUND",
+                            sender_label=push_name,
+                            message_text=msg_text,
+                            contact_name=thread.get("contact_name"),
+                            role_label=thread.get("role_label"),
+                            station_id=str(thread.get("station_id") or "posto_01"),
+                            command_key=thread.get("last_command_key"),
+                            has_media=has_media,
+                            source="evolution_find_messages",
+                            external_msg_id=str(ext_id) if ext_id else None,
+                            epoch_ts=msg_ts,
+                            is_read=False,
+                        )
+                        if not saved.get("already_exists"):
+                            ingested_count += 1
+                except Exception as exc:
+                    errors.append(f"{jid}: {exc}")
+
+    if http_client is not None:
+        await _poll_threads(http_client)
+    else:
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            await _poll_threads(client)
+
+    return {
+        "synced": True,
+        "skipped_cooldown": False,
+        "ingested": ingested_count,
+        "threads_checked": threads_checked,
+        "errors": errors,
+    }
