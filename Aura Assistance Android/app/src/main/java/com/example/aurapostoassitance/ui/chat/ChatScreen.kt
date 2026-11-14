@@ -94,6 +94,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -101,6 +102,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -293,12 +295,15 @@ fun ChatScreen(
         }
     }
 
-    val listState = rememberLazyListState()
+    val listState = remember(currentSessionId) { androidx.compose.foundation.lazy.LazyListState() }
     val haptic = LocalHapticFeedback.current
 
     val keyboardBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-    LaunchedEffect(messages.size, messages.lastOrNull()?.text, messages.lastOrNull()?.envelopeJson, keyboardBottomPadding) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+    LaunchedEffect(currentSessionId, messages.lastOrNull()?.id, keyboardBottomPadding) {
+        if (messages.isNotEmpty() && listState.firstVisibleItemIndex <= 1) {
+            // reverseLayout = true: indice 0 ja eh a mensagem mais nova (instantaneo, 0ms, sem rolar tudo do inicio)
+            listState.scrollToItem(0)
+        }
     }
 
     val send: (String) -> Unit = { text ->
@@ -390,7 +395,7 @@ fun ChatScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(ObsidianLow.copy(alpha = 0.85f))
+                            .background(ObsidianBase)
                             .padding(horizontal = 12.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -580,6 +585,7 @@ fun ChatScreen(
                             } else {
                                 "Pergunte à AURA sobre o posto..."
                             },
+                            showSuggestions = !isDirectWhatsAppSession,
                             onSend = {
                                 val toSend = inputText
                                 inputText = ""
@@ -601,6 +607,7 @@ fun ChatScreen(
                 Modifier
                     .fillMaxSize()
                     .padding(padding)
+                    .clipToBounds()
             ) {
                 if (isWhatsAppReturnsMode && isViewingWhatsAppContactHub) {
                     WhatsAppContactsHubView(
@@ -618,31 +625,37 @@ fun ChatScreen(
                         onOpenCommandHub = { showCommandHubSheet = true }
                     )
                 } else {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp)
-                    ) {
-                        items(messages, key = { it.id }) { message ->
-                            MessageItem(
-                                message = message,
-                                onAction = onAction,
-                                onDrillDown = { send(it) },
-                                speakingMessageId = speakingMessageId,
-                                onToggleSpeech = { id, text -> viewModel.toggleSpeech(id, text) },
-                                auraStatusMessage = auraStatusMessage,
-                                onMessageLongClick = { selectedMenuMessage = it },
-                                onDeepDive = {
-                                    val clean = message.text.replace("\n", " ").replace("\"", "'").trim().take(110)
-                                    send("Aprofunde o raciocínio detalhado, cálculos e fontes desta resposta: '$clean'")
-                                },
-                                onAuditAnp = {
-                                    val clean = message.text.replace("\n", " ").replace("\"", "'").trim().take(110)
-                                    send("Audite a conformidade deste dado segundo as normas da ANP, LMC (±0.60%) e critérios fiscais: '$clean'")
-                                },
-                                modifier = Modifier.animateItem()
-                            )
+                    val reversedMessages = remember(messages) { messages.asReversed() }
+                    key(currentSessionId) {
+                        LazyColumn(
+                            state = listState,
+                            reverseLayout = true,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clipToBounds(),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(18.dp)
+                        ) {
+                            items(reversedMessages, key = { "${currentSessionId}:${it.id}" }) { message ->
+                                MessageItem(
+                                    message = message,
+                                    isWhatsAppSession = isDirectWhatsAppSession,
+                                    onAction = onAction,
+                                    onDrillDown = { send(it) },
+                                    speakingMessageId = speakingMessageId,
+                                    onToggleSpeech = { id, text -> viewModel.toggleSpeech(id, text) },
+                                    auraStatusMessage = auraStatusMessage,
+                                    onMessageLongClick = { selectedMenuMessage = it },
+                                    onDeepDive = {
+                                        val clean = message.text.replace("\n", " ").replace("\"", "'").trim().take(110)
+                                        send("Aprofunde o raciocínio detalhado, cálculos e fontes desta resposta: '$clean'")
+                                    },
+                                    onAuditAnp = {
+                                        val clean = message.text.replace("\n", " ").replace("\"", "'").trim().take(110)
+                                        send("Audite a conformidade deste dado segundo as normas da ANP, LMC (±0.60%) e critérios fiscais: '$clean'")
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -1326,8 +1339,9 @@ private fun ActiveWhatsAppSessionBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AuraEmerald.copy(alpha = 0.12f))
-            .border(0.5.dp, AuraEmerald.copy(alpha = 0.4f))
+            .background(ObsidianLow)
+            .background(AuraEmerald.copy(alpha = 0.14f))
+            .border(0.5.dp, AuraEmerald.copy(alpha = 0.45f))
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1417,7 +1431,7 @@ private fun QuickContactSwitcherRow(
     LazyRow(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ObsidianLow.copy(alpha = 0.90f))
+            .background(ObsidianBase)
             .padding(horizontal = 12.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -2138,6 +2152,7 @@ private fun EmptyState(
 @Composable
 private fun MessageItem(
     message: ChatMessage,
+    isWhatsAppSession: Boolean = false,
     onAction: (GenUiAction) -> Unit,
     onDrillDown: (String) -> Unit = {},
     speakingMessageId: String? = null,
@@ -2155,6 +2170,12 @@ private fun MessageItem(
             onLongClick = { onMessageLongClick(message) },
             modifier = modifier
         )
+    } else if (isWhatsAppSession && (message.id.startsWith("wa_msg_") || message.text.startsWith("💬 "))) {
+        WhatsAppInboundBubble(
+            text = message.text,
+            onLongClick = { onMessageLongClick(message) },
+            modifier = modifier
+        )
     } else {
         AuraMessage(
             message = message,
@@ -2168,6 +2189,84 @@ private fun MessageItem(
             onAuditAnp = onAuditAnp,
             modifier = modifier
         )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun WhatsAppInboundBubble(
+    text: String,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+    val cleaned = text.removePrefix("💬 ").trim()
+    val colonIdx = cleaned.indexOf(':')
+    val senderName = if (colonIdx in 1..48) {
+        cleaned.substring(0, colonIdx).replace("*", "").trim()
+    } else {
+        "Contato WhatsApp"
+    }
+    val bodyText = if (colonIdx in 1..48) {
+        cleaned.substring(colonIdx + 1).removePrefix("**").trim()
+    } else {
+        cleaned
+    }
+    val shape = RoundedCornerShape(6.dp, 20.dp, 20.dp, 20.dp)
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            ContactInitialsAvatar(
+                name = senderName,
+                hasAlert = false,
+                size = 22.dp
+            )
+            Text(
+                text = senderName,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                color = AuraEmerald
+            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(AuraEmerald.copy(alpha = 0.16f))
+                    .padding(horizontal = 6.dp, vertical = 1.dp)
+            ) {
+                Text(
+                    text = "WhatsApp",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AuraEmerald,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .widthIn(max = 320.dp)
+                .clip(shape)
+                .background(ObsidianMid)
+                .border(1.dp, AuraEmerald.copy(alpha = 0.45f), shape)
+                .combinedClickable(
+                    onClick = {},
+                    onLongClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onLongClick()
+                    }
+                )
+                .padding(horizontal = 14.dp, vertical = 11.dp)
+        ) {
+            Text(
+                text = bodyText.ifBlank { text },
+                style = MaterialTheme.typography.bodyLarge,
+                color = TextPrimary
+            )
+        }
     }
 }
 
@@ -2527,6 +2626,7 @@ private fun Composer(
     onTextChange: (String) -> Unit,
     enabled: Boolean,
     placeholderText: String = "Pergunte à AURA sobre o posto...",
+    showSuggestions: Boolean = true,
     onSend: () -> Unit,
     onStartVoice: () -> Unit = {},
     voiceRms: Float = 0.05f,
@@ -2558,6 +2658,7 @@ private fun Composer(
 
     Column(
         Modifier
+            .background(ObsidianLow)
             .background(LiquidGlassElevatedBrush)
             .drawBehind {
                 drawLine(
@@ -2570,9 +2671,9 @@ private fun Composer(
                 )
             }
     ) {
-        // Chips deslizantes de sugestão rápida
+        // Chips deslizantes de sugestão rápida (ocultos na conversa WhatsApp para manter a tela limpa)
         AnimatedVisibility(
-            visible = !focused,
+            visible = showSuggestions && !focused,
             enter = expandVertically() + fadeIn(),
             exit = shrinkVertically() + fadeOut()
         ) {

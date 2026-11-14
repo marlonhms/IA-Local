@@ -463,11 +463,16 @@ class ChatViewModel @Inject constructor(
     }
 
     fun loadSession(sessionId: String, title: String) {
+        val isSwitchingSession = _currentSessionId.value != sessionId
         _currentSessionId.value = sessionId
         _currentSessionTitle.value = title
         if (!sessionId.startsWith("wa_handoff_")) {
             _isWhatsAppReturnsMode.value = false
             _isViewingWhatsAppContactHub.value = false
+        }
+        if (isSwitchingSession) {
+            // Limpa imediatamente a sessao anterior para evitar sobreposicao visual durante a leitura assincrona do Room
+            _messages.value = emptyList()
         }
 
         viewModelScope.launch {
@@ -485,7 +490,9 @@ class ChatViewModel @Inject constructor(
                     } ?: emptyList()
                     ChatMessage(it.id, it.text, it.isFromUser, false, it.envelopeJson, steps)
                 }
-                val activeStreaming = _messages.value.firstOrNull { it.isStreaming }
+                val activeStreaming = if (!isSwitchingSession) {
+                    _messages.value.firstOrNull { it.isStreaming }
+                } else null
                 _messages.value = if (activeStreaming != null && roomList.none { it.id == activeStreaming.id }) {
                     roomList + activeStreaming
                 } else {
