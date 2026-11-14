@@ -46,6 +46,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Chat
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -1697,19 +1698,23 @@ enum class AuraNavTab(
 ) {
     PULSO("Pulso", Icons.Rounded.Assessment),
     COCKPIT("Cockpit", Icons.Rounded.AutoAwesome),
+    RETORNOS("Retornos", Icons.AutoMirrored.Rounded.Chat),
     TANQUES("Tanques", Icons.Rounded.LocalGasStation),
     CONEXAO("Servidor", Icons.Rounded.Tune)
 }
 
 /**
  * Aura Bottom Glass Dock: Barra de navegação espacial translúcida com Liquid Glassmorphism,
- * borda iridescente especular e micro-interações táteis para alternar entre Pulso, Cockpit, Tanques e Servidor.
+ * borda iridescente especular e micro-interações táteis para alternar entre Pulso, Cockpit,
+ * Retornos WhatsApp, Tanques e Servidor.
  */
 @Composable
 fun AuraBottomGlassDock(
     selectedTab: AuraNavTab,
     onTabSelected: (AuraNavTab) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    handoffUnreadCount: Int = 0,
+    handoffThreadCount: Int = 0
 ) {
     val haptic = LocalHapticFeedback.current
 
@@ -1717,7 +1722,7 @@ fun AuraBottomGlassDock(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
         Surface(
@@ -1730,11 +1735,14 @@ fun AuraBottomGlassDock(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .padding(horizontal = 6.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AuraNavTab.values().forEach { tab ->
+                    val isReturnsTab = tab == AuraNavTab.RETORNOS
+                    val hasUnreadReturns = isReturnsTab && handoffUnreadCount > 0
+                    val hasAnyReturns = isReturnsTab && handoffThreadCount > 0
                     val isSelected = tab == selectedTab
                     val interactionSource = remember { MutableInteractionSource() }
                     val isPressed by interactionSource.collectIsPressedAsState()
@@ -1753,8 +1761,8 @@ fun AuraBottomGlassDock(
                             }
                             .clip(RoundedCornerShape(20.dp))
                             .then(
-                                if (isSelected) {
-                                    Modifier
+                                when {
+                                    isSelected -> Modifier
                                         .background(
                                             Brush.horizontalGradient(
                                                 listOf(
@@ -1768,8 +1776,14 @@ fun AuraBottomGlassDock(
                                             AuraCyan.copy(alpha = 0.40f),
                                             RoundedCornerShape(20.dp)
                                         )
-                                } else {
-                                    Modifier
+                                    hasUnreadReturns -> Modifier
+                                        .background(AuraEmerald.copy(alpha = 0.16f))
+                                        .border(
+                                            1.dp,
+                                            AuraEmerald.copy(alpha = 0.55f),
+                                            RoundedCornerShape(20.dp)
+                                        )
+                                    else -> Modifier
                                 }
                             )
                             .clickable(
@@ -1779,26 +1793,65 @@ fun AuraBottomGlassDock(
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onTabSelected(tab)
                             }
-                            .padding(vertical = 8.dp),
+                            .padding(vertical = 8.dp, horizontal = 2.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
-                            Icon(
-                                imageVector = tab.icon,
-                                contentDescription = tab.label,
-                                tint = if (isSelected) AuraCyan else TextMuted,
-                                modifier = Modifier.size(20.dp)
-                            )
+                            Box(contentAlignment = Alignment.TopEnd) {
+                                Icon(
+                                    imageVector = tab.icon,
+                                    contentDescription = tab.label,
+                                    tint = when {
+                                        isSelected -> AuraCyan
+                                        hasUnreadReturns -> AuraEmerald
+                                        hasAnyReturns -> AuraEmerald.copy(alpha = 0.85f)
+                                        else -> TextMuted
+                                    },
+                                    modifier = Modifier
+                                        .padding(horizontal = 6.dp)
+                                        .size(20.dp)
+                                )
+                                if (hasUnreadReturns) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(AuraEmerald)
+                                            .padding(horizontal = 4.dp, vertical = 1.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = if (handoffUnreadCount > 99) "99+" else handoffUnreadCount.toString(),
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontSize = 8.5.sp,
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            color = ObsidianBase
+                                        )
+                                    }
+                                } else if (hasAnyReturns) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .clip(CircleShape)
+                                            .background(AuraEmerald)
+                                    )
+                                }
+                            }
                             Text(
                                 text = tab.label,
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    fontSize = 10.5.sp
+                                    fontWeight = if (isSelected || hasUnreadReturns) FontWeight.Bold else FontWeight.Normal,
+                                    fontSize = 9.5.sp
                                 ),
-                                color = if (isSelected) TextPrimary else TextMuted
+                                color = when {
+                                    isSelected -> TextPrimary
+                                    hasUnreadReturns -> AuraEmerald
+                                    else -> TextMuted
+                                },
+                                maxLines = 1
                             )
                         }
                     }

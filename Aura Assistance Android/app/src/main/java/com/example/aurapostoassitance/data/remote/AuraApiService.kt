@@ -133,10 +133,12 @@ data class HandoffThreadMessageDto(
 @Serializable
 data class HandoffThreadDto(
     val thread_phone: String,
+    val formatted_phone: String? = null,
     val match_key: String? = null,
     val session_id: String,
     val contact_name: String? = null,
     val role_label: String? = null,
+    val profile_pic_url: String? = null,
     val station_id: String? = null,
     val last_epoch_ts: Long = 0L,
     val last_message_text: String = "",

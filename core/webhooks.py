@@ -26,7 +26,12 @@ from config.settings import (
     PAINEL_WHATSAPP_TENANT_SLUG,
     WHATSAPP_MANAGER_PHONE,
 )
-from core.command_journal import AuraCommandJournal, phone_match_key, whatsapp_jid_candidates
+from core.command_journal import (
+    AuraCommandJournal,
+    is_generic_or_numeric_name,
+    phone_match_key,
+    whatsapp_jid_candidates,
+)
 from core.logger import logger
 from core.outbox import (
     AuraTransactionalOutbox,
@@ -1033,6 +1038,124 @@ async def notify_alerta_lmc(
 
 _EVOLUTION_SYNC_COOLDOWN_SEC: float = 6.0
 _last_evolution_sync_ts: float = 0.0
+_EVOLUTION_CONTACT_CACHE_TTL_SEC: float = 300.0
+_evolution_contact_cache: dict[str, tuple[float, dict[str, str | None]]] = {}
+
+
+def get_cached_evolution_contact_profile(phone: str | None) -> dict[str, str | None]:
+    """Retorna o perfil em cache (push_name, profile_pic_url) para um telefone."""
+    mkey = phone_match_key(phone)
+    if not mkey:
+        return {"push_name": None, "profile_pic_url": None}
+    cached = _evolution_contact_cache.get(mkey)
+    if cached and (time.monotonic() - cached[0]) < _EVOLUTION_CONTACT_CACHE_TTL_SEC:
+        return dict(cached[1])
+    return {"push_name": None, "profile_pic_url": None}
+
+
+def _extract_profile_from_contact_records(
+    records: list[Any],
+    target_phone: str,
+    target_mkey: str,
+) -> dict[str, str | None]:
+    best_name: str | None = None
+    best_pic: str | None = None
+    for item in records:
+        if not isinstance(item, dict):
+            continue
+        rjid = str(item.get("remoteJid") or item.get("id") or "")
+        if target_mkey and "@" in rjid and not rjid.endswith("@lid"):
+            if phone_match_key(rjid) != target_mkey:
+                continue
+        elif target_mkey and rjid.endswith("@lid") and len(records) > 1:
+            # Ignora entradas @lid sem identificacao em varreduras gerais
+            pass
+        for cand_field in ("pushName", "name", "verifiedName", "notify"):
+            val = str(item.get(cand_field) or "").strip()
+            if val and not is_generic_or_numeric_name(val, target_phone):
+                best_name = best_name or val
+                break
+        pic = str(item.get("profilePicUrl") or "").strip()
+        if pic and not best_pic:
+            best_pic = pic
+        if best_name and best_pic:
+            break
+    return {"push_name": best_name, "profile_pic_url": best_pic}
+
+
+async def fetch_evolution_contact_profile(
+    phone: str,
+    http_client: httpx.AsyncClient | None = None,
+    force: bool = False,
+) -> dict[str, str | None]:
+    """
+    Consulta POST {EVOLUTION_API_URL}/chat/findContacts/{EVOLUTION_INSTANCE}
+    para obter pushName e profilePicUrl reais do contato no WhatsApp.
+    """
+    mkey = phone_match_key(phone)
+    if not mkey:
+        return {"push_name": None, "profile_pic_url": None}
+
+    now_mono = time.monotonic()
+    if not force:
+        cached = _evolution_contact_cache.get(mkey)
+        if cached and (now_mono - cached[0]) < _EVOLUTION_CONTACT_CACHE_TTL_SEC:
+            return dict(cached[1])
+
+    evo_url = (EVOLUTION_API_URL or "").strip().rstrip("/")
+    evo_instance = (EVOLUTION_INSTANCE or "").strip()
+    if not evo_url or not evo_instance:
+        return {"push_name": None, "profile_pic_url": None}
+
+    endpoint = f"{evo_url}/chat/findContacts/{evo_instance}"
+    headers: dict[str, str] = {"Content-Type": "application/json"}
+    if EVOLUTION_API_KEY:
+        headers["apikey"] = EVOLUTION_API_KEY
+
+    async def _query(client: httpx.AsyncClient) -> dict[str, str | None]:
+        merged: dict[str, str | None] = {"push_name": None, "profile_pic_url": None}
+        for jid in whatsapp_jid_candidates(phone):
+            try:
+                resp = await client.post(endpoint, headers=headers, json={"where": {"remoteJid": jid}})
+                if resp.status_code < 400:
+                    data = resp.json()
+                    recs = data if isinstance(data, list) else (data.get("contacts") or data.get("records") or [])
+                    if isinstance(recs, list) and recs:
+                        prof = _extract_profile_from_contact_records(recs, phone, mkey)
+                        merged["push_name"] = merged["push_name"] or prof["push_name"]
+                        merged["profile_pic_url"] = merged["profile_pic_url"] or prof["profile_pic_url"]
+                        if merged["push_name"]:
+                            return merged
+            except Exception:
+                continue
+
+        try:
+            resp_all = await client.post(endpoint, headers=headers, json={})
+            if resp_all.status_code < 400:
+                data = resp_all.json()
+                recs = data if isinstance(data, list) else (data.get("contacts") or data.get("records") or [])
+                if isinstance(recs, list):
+                    matching = [
+                        r
+                        for r in recs
+                        if isinstance(r, dict) and phone_match_key(r.get("remoteJid")) == mkey
+                    ]
+                    if matching:
+                        prof = _extract_profile_from_contact_records(matching, phone, mkey)
+                        merged["push_name"] = merged["push_name"] or prof["push_name"]
+                        merged["profile_pic_url"] = merged["profile_pic_url"] or prof["profile_pic_url"]
+        except Exception:
+            pass
+        return merged
+
+    if http_client is not None:
+        profile = await _query(http_client)
+    else:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            profile = await _query(client)
+
+    _evolution_contact_cache[mkey] = (now_mono, dict(profile))
+    return profile
 
 
 def extract_evolution_message_content(msg_obj: dict[str, Any] | None) -> tuple[str, bool]:
@@ -1186,14 +1309,34 @@ async def sync_inbound_messages_from_evolution(
 
                             ext_id = key.get("id") or rec.get("id")
                             msg_text, has_media = extract_evolution_message_content(rec.get("message"))
-                            push_name = str(rec.get("pushName") or thread.get("contact_name") or thread_phone).strip()
+                            raw_push_name = str(rec.get("pushName") or "").strip()
+                            role_label = thread.get("role_label")
+                            resolved_contact = thread.get("contact_name")
+                            if raw_push_name and not is_generic_or_numeric_name(raw_push_name, thread_phone, role_label):
+                                journal.update_thread_contact_identity(
+                                    thread_phone,
+                                    contact_name=raw_push_name,
+                                    role_label=role_label,
+                                )
+                                resolved_contact = raw_push_name
+                                thread["contact_name"] = raw_push_name
+                                _evolution_contact_cache[thread_match_key] = (
+                                    time.monotonic(),
+                                    {
+                                        "push_name": raw_push_name,
+                                        "profile_pic_url": get_cached_evolution_contact_profile(thread_phone).get("profile_pic_url"),
+                                    },
+                                )
+                            push_name = str(
+                                raw_push_name or resolved_contact or thread_phone
+                            ).strip()
                             saved = journal.record_handoff_message(
                                 thread_phone=thread_phone,
                                 direction="INBOUND",
                                 sender_label=push_name,
                                 message_text=msg_text,
-                                contact_name=thread.get("contact_name"),
-                                role_label=thread.get("role_label"),
+                                contact_name=resolved_contact,
+                                role_label=role_label,
                                 station_id=str(thread.get("station_id") or "posto_01"),
                                 command_key=thread.get("last_command_key"),
                                 has_media=has_media,
@@ -1206,6 +1349,15 @@ async def sync_inbound_messages_from_evolution(
                                 ingested_count += 1
                     except Exception as exc:
                         errors.append(f"{jid} ({key_field}): {exc}")
+
+            if is_generic_or_numeric_name(thread.get("contact_name"), thread_phone, thread.get("role_label")):
+                profile = await fetch_evolution_contact_profile(thread_phone, http_client=client)
+                if profile.get("push_name"):
+                    journal.update_thread_contact_identity(
+                        thread_phone,
+                        contact_name=profile["push_name"],
+                        role_label=thread.get("role_label"),
+                    )
 
     if http_client is not None:
         await _poll_threads(http_client)

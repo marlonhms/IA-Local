@@ -3476,11 +3476,24 @@ async def partner_handoff_endpoint(
     e realiza o disparo imediato da mensagem (e copia da nota em anexo, quando enviada)
     no WhatsApp via Evolution API + Transactional Outbox.
     """
-    from core.command_journal import get_command_journal, normalize_whatsapp_phone
-    from core.webhooks import dispatch_evolution_media, dispatch_evolution_message
+    from core.command_journal import (
+        get_command_journal,
+        is_generic_or_numeric_name,
+        normalize_whatsapp_phone,
+    )
+    from core.webhooks import (
+        dispatch_evolution_media,
+        dispatch_evolution_message,
+        fetch_evolution_contact_profile,
+    )
 
     journal = get_command_journal()
     norm_phone = normalize_whatsapp_phone(payload.phone) or payload.phone
+    resolved_contact_name = payload.contact_name
+    if is_generic_or_numeric_name(resolved_contact_name, norm_phone, payload.role_label):
+        evo_prof = await fetch_evolution_contact_profile(norm_phone)
+        if evo_prof.get("push_name"):
+            resolved_contact_name = evo_prof["push_name"]
     cmd_key = f"handoff_{payload.action_id}_{int(time.time())}"
     has_attachment = bool(payload.attachment_base64 and len(payload.attachment_base64.strip()) > 50)
     safe_journal_req = payload.model_dump(exclude={"attachment_base64"})
@@ -3538,7 +3551,7 @@ async def partner_handoff_endpoint(
         direction="OUTBOUND",
         sender_label="Gestor AURA",
         message_text=payload.initial_message,
-        contact_name=payload.contact_name,
+        contact_name=resolved_contact_name,
         role_label=payload.role_label,
         station_id=payload.station_id,
         command_key=cmd_key,
@@ -3603,7 +3616,11 @@ async def partner_handoff_reply_endpoint(
     Recebe resposta de contato via Painel WhatsApp CRM ou webhook Evolution MESSAGES_UPSERT,
     correlaciona pelo match_key (com/sem 9o digito BR) e grava na sessao dedicada do contato.
     """
-    from core.command_journal import get_command_journal, normalize_whatsapp_phone
+    from core.command_journal import (
+        get_command_journal,
+        is_generic_or_numeric_name,
+        normalize_whatsapp_phone,
+    )
     from core.webhooks import extract_evolution_message_content
 
     journal = get_command_journal()
@@ -3656,12 +3673,23 @@ async def partner_handoff_reply_endpoint(
             "thread_phone": norm_phone,
         }
 
+    resolved_contact = active_thread.get("contact_name")
+    if sender_name and not is_generic_or_numeric_name(
+        str(sender_name), active_thread["thread_phone"], active_thread.get("role_label")
+    ):
+        journal.update_thread_contact_identity(
+            active_thread["thread_phone"],
+            contact_name=str(sender_name).strip(),
+            role_label=active_thread.get("role_label"),
+        )
+        resolved_contact = str(sender_name).strip()
+
     saved = journal.record_handoff_message(
         thread_phone=active_thread["thread_phone"],
         direction="INBOUND",
-        sender_label=str(sender_name or active_thread.get("contact_name") or active_thread["thread_phone"]),
+        sender_label=str(sender_name or resolved_contact or active_thread["thread_phone"]),
         message_text=str(msg_text or "[Mensagem recebida no WhatsApp]"),
-        contact_name=active_thread.get("contact_name"),
+        contact_name=resolved_contact,
         role_label=active_thread.get("role_label"),
         station_id=str(active_thread.get("station_id") or "posto_01"),
         command_key=active_thread.get("last_command_key"),
@@ -3692,8 +3720,12 @@ async def partner_list_handoffs_endpoint(
     limit: int = Query(default=30, ge=1, le=100, description="Maximo de threads"),
     auth_info: dict[str, str] = Depends(verify_partner_auth),
 ):
-    from core.command_journal import get_command_journal
-    from core.webhooks import sync_inbound_messages_from_evolution
+    from core.command_journal import get_command_journal, is_generic_or_numeric_name
+    from core.webhooks import (
+        fetch_evolution_contact_profile,
+        get_cached_evolution_contact_profile,
+        sync_inbound_messages_from_evolution,
+    )
 
     journal = get_command_journal()
     sync_result: dict[str, Any] = {"synced": False, "skipped_cooldown": False, "ingested": 0}
@@ -3701,6 +3733,27 @@ async def partner_list_handoffs_endpoint(
         sync_result = await sync_inbound_messages_from_evolution(journal)
 
     threads = journal.list_handoff_threads(limit=limit)
+    identity_updated = False
+    for th in threads:
+        t_phone = str(th.get("thread_phone") or "")
+        cached_prof = get_cached_evolution_contact_profile(t_phone)
+        if sync_evolution and is_generic_or_numeric_name(th.get("contact_name"), t_phone, th.get("role_label")):
+            prof = await fetch_evolution_contact_profile(t_phone)
+            if prof.get("push_name"):
+                journal.update_thread_contact_identity(
+                    t_phone,
+                    contact_name=prof["push_name"],
+                    role_label=th.get("role_label"),
+                )
+                identity_updated = True
+            cached_prof = prof
+        th["profile_pic_url"] = cached_prof.get("profile_pic_url")
+
+    if identity_updated:
+        threads = journal.list_handoff_threads(limit=limit)
+        for th in threads:
+            th["profile_pic_url"] = get_cached_evolution_contact_profile(th.get("thread_phone")).get("profile_pic_url")
+
     total_unread = sum(int(t.get("unread_count") or 0) for t in threads)
     return {
         "success": True,

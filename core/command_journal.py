@@ -131,6 +131,62 @@ def whatsapp_jid_candidates(raw_phone: str | None) -> list[str]:
     return list(dict.fromkeys(candidates))
 
 
+_GENERIC_HANDOFF_NAMES: frozenset[str] = frozenset(
+    {
+        "whatsapp",
+        "contato",
+        "contador",
+        "gerente",
+        "fornecedor",
+        "financeiro",
+        "juridico",
+        "socio",
+        "diretoria",
+        "gestor",
+        "gestor aura",
+        "cliente",
+        "desconhecido",
+        "outro",
+    }
+)
+
+
+def format_brazil_phone_display(raw_phone: str | None) -> str:
+    """Formata numero de WhatsApp em padrão legivel humano (ex: +55 (27) 99227-7217)."""
+    norm = normalize_whatsapp_phone(raw_phone)
+    if not norm:
+        return str(raw_phone or "").strip()
+    if norm.startswith("55") and len(norm) == 13:
+        return f"+55 ({norm[2:4]}) {norm[4:9]}-{norm[9:]}"
+    if norm.startswith("55") and len(norm) == 12:
+        return f"+55 ({norm[2:4]}) {norm[4:8]}-{norm[8:]}"
+    if len(norm) >= 10:
+        return f"+{norm}"
+    return norm
+
+
+def is_generic_or_numeric_name(
+    name: str | None,
+    phone: str | None = None,
+    role: str | None = None,
+) -> bool:
+    """Indica se o nome do contato ainda esta vazio, numerico ou apenas com rotulo de cargo."""
+    clean = str(name or "").strip()
+    if not clean:
+        return True
+    lower = clean.lower()
+    if lower in _GENERIC_HANDOFF_NAMES:
+        return True
+    if role and lower == str(role).strip().lower():
+        return True
+    digits_only = "".join(ch for ch in clean if ch.isdigit())
+    if len(digits_only) >= 8 and all(ch.isdigit() or ch in "+()- .@swhanetlid:" for ch in lower):
+        return True
+    if phone and phone_match_key(clean) and phone_match_key(clean) == phone_match_key(phone):
+        return True
+    return False
+
+
 @dataclass
 class CommandJournalEntry:
     """Representa um registro persistido na tabela aura_command_journal."""
@@ -1251,10 +1307,22 @@ class AuraCommandJournal:
                 (mkey,),
             ).fetchone()
             canonical_phone = str(thread_row["thread_phone"]) if thread_row is not None else norm_phone
-            if clean_contact is None and thread_row is not None and thread_row["contact_name"]:
-                clean_contact = str(thread_row["contact_name"])
-            if clean_role is None and thread_row is not None and thread_row["role_label"]:
-                clean_role = str(thread_row["role_label"])
+            existing_contact = str(thread_row["contact_name"]) if (thread_row is not None and thread_row["contact_name"]) else None
+            existing_role = str(thread_row["role_label"]) if (thread_row is not None and thread_row["role_label"]) else None
+            if clean_role is None:
+                clean_role = existing_role
+
+            effective_role = clean_role or existing_role
+            incoming_is_generic = is_generic_or_numeric_name(clean_contact, canonical_phone, effective_role)
+            existing_is_generic = is_generic_or_numeric_name(existing_contact, canonical_phone, effective_role)
+
+            if clean_contact is None or (incoming_is_generic and not existing_is_generic):
+                clean_contact = existing_contact or clean_contact
+            elif not incoming_is_generic and existing_is_generic:
+                conn.execute(
+                    "UPDATE aura_handoff_messages SET contact_name = ? WHERE match_key = ?",
+                    (clean_contact, mkey),
+                )
 
             message_id = f"hm_{uuid.uuid4().hex[:16]}"
             conn.execute(
@@ -1431,21 +1499,40 @@ class AuraCommandJournal:
                 messages = [dict(m) for m in msg_rows]
                 last_msg = messages[-1] if messages else {}
                 contact_name = None
+                inbound_sender = None
                 role_label = None
                 station_id = "posto_01"
                 for m in reversed(messages):
-                    if not contact_name and m.get("contact_name"):
-                        contact_name = str(m["contact_name"])
                     if not role_label and m.get("role_label"):
                         role_label = str(m["role_label"])
-                    if m.get("station_id"):
+                    if m.get("station_id") and station_id == "posto_01":
                         station_id = str(m["station_id"])
+                for m in reversed(messages):
+                    cand_contact = str(m.get("contact_name") or "").strip()
+                    if not contact_name and cand_contact and not is_generic_or_numeric_name(cand_contact, t_phone, role_label):
+                        contact_name = cand_contact
+                    if not inbound_sender and str(m.get("direction") or "").upper() == "INBOUND":
+                        cand_sender = str(m.get("sender_label") or "").strip()
+                        if cand_sender and not is_generic_or_numeric_name(cand_sender, t_phone, role_label):
+                            inbound_sender = cand_sender
+                resolved_name = contact_name or inbound_sender or (
+                    next(
+                        (
+                            str(m.get("contact_name")).strip()
+                            for m in reversed(messages)
+                            if m.get("contact_name") and not is_generic_or_numeric_name(m.get("contact_name"), t_phone, None)
+                        ),
+                        None,
+                    )
+                )
+                formatted_phone = format_brazil_phone_display(t_phone)
                 threads.append(
                     {
                         "thread_phone": t_phone,
+                        "formatted_phone": formatted_phone,
                         "match_key": str(tr["match_key"]),
                         "session_id": f"wa_handoff_{t_phone}",
-                        "contact_name": contact_name or t_phone,
+                        "contact_name": resolved_name or role_label or formatted_phone,
                         "role_label": role_label or "WhatsApp",
                         "station_id": station_id,
                         "last_epoch_ts": int(tr["last_epoch_ts"] or 0),
@@ -1458,6 +1545,54 @@ class AuraCommandJournal:
                     }
                 )
             return threads
+
+    def update_thread_contact_identity(
+        self,
+        raw_phone: str,
+        contact_name: str | None = None,
+        role_label: str | None = None,
+    ) -> int:
+        """
+        Atualiza retroativamente o nome real (pushName do Evolution) na thread do contato
+        quando os registros existentes estiverem vazios, numericos ou genericos.
+        """
+        mkey = phone_match_key(raw_phone)
+        clean_name = str(contact_name or "").strip()
+        if not mkey or not clean_name or is_generic_or_numeric_name(clean_name, raw_phone, role_label):
+            return 0
+        with self._connection(immediate=True) as conn:
+            rows = conn.execute(
+                "SELECT message_id, thread_phone, contact_name, role_label, direction, sender_label "
+                "FROM aura_handoff_messages WHERE match_key = ?",
+                (mkey,),
+            ).fetchall()
+            updated = 0
+            for row in rows:
+                r_role = role_label or row["role_label"]
+                need_contact_update = is_generic_or_numeric_name(row["contact_name"], row["thread_phone"], r_role)
+                need_sender_update = (
+                    str(row["direction"] or "").upper() == "INBOUND"
+                    and is_generic_or_numeric_name(row["sender_label"], row["thread_phone"], r_role)
+                )
+                if need_contact_update and need_sender_update:
+                    conn.execute(
+                        "UPDATE aura_handoff_messages SET contact_name = ?, sender_label = ? WHERE message_id = ?",
+                        (clean_name, clean_name, row["message_id"]),
+                    )
+                    updated += 1
+                elif need_contact_update:
+                    conn.execute(
+                        "UPDATE aura_handoff_messages SET contact_name = ? WHERE message_id = ?",
+                        (clean_name, row["message_id"]),
+                    )
+                    updated += 1
+                elif need_sender_update:
+                    conn.execute(
+                        "UPDATE aura_handoff_messages SET sender_label = ? WHERE message_id = ?",
+                        (clean_name, row["message_id"]),
+                    )
+                    updated += 1
+            return updated
 
     def mark_handoff_thread_read(self, raw_phone: str) -> int:
         """Marca todas as mensagens INBOUND de um contato (por match_key) como lidas."""
@@ -1540,7 +1675,9 @@ __all__ = [
     "CommandJournalEntry",
     "CommandJournalError",
     "CommandJournalStatus",
+    "format_brazil_phone_display",
     "get_command_journal",
+    "is_generic_or_numeric_name",
     "normalize_whatsapp_phone",
     "phone_match_key",
     "reset_command_journal",

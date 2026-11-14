@@ -145,6 +145,15 @@ class ChatViewModel @Inject constructor(
     private val _incomingHandoffAlert = MutableStateFlow<IncomingHandoffAlert?>(null)
     val incomingHandoffAlert: StateFlow<IncomingHandoffAlert?> = _incomingHandoffAlert.asStateFlow()
 
+    private val _isWhatsAppReturnsMode = MutableStateFlow(false)
+    val isWhatsAppReturnsMode: StateFlow<Boolean> = _isWhatsAppReturnsMode.asStateFlow()
+
+    private val _isViewingWhatsAppContactHub = MutableStateFlow(false)
+    val isViewingWhatsAppContactHub: StateFlow<Boolean> = _isViewingWhatsAppContactHub.asStateFlow()
+
+    private val _isSyncingHandoffs = MutableStateFlow(false)
+    val isSyncingHandoffs: StateFlow<Boolean> = _isSyncingHandoffs.asStateFlow()
+
     private val notifiedInboundMessageIds = mutableSetOf<String>()
 
     private val cachedHandoffDocFile: File
@@ -292,84 +301,142 @@ class ChatViewModel @Inject constructor(
 
     fun refreshHandoffThreads(syncEvolution: Boolean = true) {
         viewModelScope.launch {
-            runCatching {
-                apiService.getHandoffThreads(syncEvolution = syncEvolution, limit = 30)
-            }.onSuccess { response ->
-                _handoffThreads.value = response.threads
-                _totalUnreadHandoffs.value = response.total_unread
+            if (syncEvolution) _isSyncingHandoffs.value = true
+            try {
+                runCatching {
+                    apiService.getHandoffThreads(syncEvolution = syncEvolution, limit = 30)
+                }.onSuccess { response ->
+                    _handoffThreads.value = response.threads
+                    _totalUnreadHandoffs.value = response.total_unread
 
-                var newestAlert: IncomingHandoffAlert? = null
-                val activeSid = _currentSessionId.value
+                    var newestAlert: IncomingHandoffAlert? = null
+                    val activeSid = _currentSessionId.value
+                    val isInsideConversation = !_isViewingWhatsAppContactHub.value
 
-                for (thread in response.threads) {
-                    val cleanTitle = formatHandoffSessionTitle(
-                        roleLabel = thread.role_label,
-                        contactName = thread.contact_name,
-                        phone = thread.thread_phone
-                    )
-                    val sessionTs = if (thread.last_epoch_ts > 0L) thread.last_epoch_ts * 1000L else System.currentTimeMillis()
-                    chatDao.insertSession(ChatSessionEntity(thread.session_id, cleanTitle, sessionTs))
-
-                    for (msg in thread.messages) {
-                        val isOutbound = msg.direction.equals("OUTBOUND", ignoreCase = true)
-                        val msgTs = if (msg.epoch_ts > 0L) msg.epoch_ts * 1000L else System.currentTimeMillis()
-                        val displayText = if (isOutbound) {
-                            msg.message_text
-                        } else {
-                            "💬 **${msg.sender_label}:** ${msg.message_text}"
-                        }
-                        chatDao.insertMessageIfAbsent(
-                            ChatMessageEntity(
-                                id = "wa_msg_${msg.message_id}",
-                                sessionId = thread.session_id,
-                                text = displayText,
-                                isFromUser = isOutbound,
-                                timestamp = msgTs
-                            )
+                    for (thread in response.threads) {
+                        val displayName = resolveContactDisplayName(thread)
+                        val cleanTitle = formatHandoffSessionTitle(
+                            roleLabel = thread.role_label,
+                            contactName = displayName,
+                            phone = thread.thread_phone
                         )
-                        if (!isOutbound && msg.is_read == 0) {
-                            val isNewForAlert = notifiedInboundMessageIds.add(msg.message_id)
-                            if (isNewForAlert && activeSid != thread.session_id) {
-                                newestAlert = IncomingHandoffAlert(
+                        val sessionTs = if (thread.last_epoch_ts > 0L) thread.last_epoch_ts * 1000L else System.currentTimeMillis()
+                        chatDao.insertSession(ChatSessionEntity(thread.session_id, cleanTitle, sessionTs))
+
+                        for (msg in thread.messages) {
+                            val isOutbound = msg.direction.equals("OUTBOUND", ignoreCase = true)
+                            val msgTs = if (msg.epoch_ts > 0L) msg.epoch_ts * 1000L else System.currentTimeMillis()
+                            val senderTitle = msg.sender_label.takeIf { it.isNotBlank() && !isPhoneDigitsOnly(it) } ?: displayName
+                            val displayText = if (isOutbound) {
+                                msg.message_text
+                            } else {
+                                "💬 **$senderTitle:** ${msg.message_text}"
+                            }
+                            chatDao.insertMessageIfAbsent(
+                                ChatMessageEntity(
+                                    id = "wa_msg_${msg.message_id}",
                                     sessionId = thread.session_id,
-                                    phone = thread.thread_phone,
-                                    contactName = thread.contact_name?.takeIf { it.isNotBlank() } ?: thread.thread_phone,
-                                    roleLabel = thread.role_label?.takeIf { it.isNotBlank() } ?: "WhatsApp",
-                                    previewText = msg.message_text,
-                                    unreadCount = thread.unread_count.coerceAtLeast(1)
+                                    text = displayText,
+                                    isFromUser = isOutbound,
+                                    timestamp = msgTs
                                 )
+                            )
+                            if (!isOutbound && msg.is_read == 0) {
+                                val isNewForAlert = notifiedInboundMessageIds.add(msg.message_id)
+                                if (isNewForAlert && (!isInsideConversation || activeSid != thread.session_id)) {
+                                    newestAlert = IncomingHandoffAlert(
+                                        sessionId = thread.session_id,
+                                        phone = thread.thread_phone,
+                                        contactName = displayName,
+                                        roleLabel = thread.role_label?.takeIf { it.isNotBlank() } ?: "WhatsApp",
+                                        previewText = msg.message_text,
+                                        unreadCount = thread.unread_count.coerceAtLeast(1)
+                                    )
+                                }
                             }
                         }
+
+                        if (isInsideConversation && activeSid == thread.session_id && thread.unread_count > 0) {
+                            markThreadRead(thread.thread_phone)
+                        }
                     }
 
-                    if (activeSid == thread.session_id && thread.unread_count > 0) {
-                        markThreadRead(thread.thread_phone)
+                    if (newestAlert != null) {
+                        _incomingHandoffAlert.value = newestAlert
                     }
                 }
-
-                if (newestAlert != null) {
-                    _incomingHandoffAlert.value = newestAlert
-                }
+            } finally {
+                if (syncEvolution) _isSyncingHandoffs.value = false
             }
         }
     }
 
+    private fun isPhoneDigitsOnly(value: String?): Boolean {
+        val clean = value?.trim().orEmpty()
+        if (clean.isEmpty()) return true
+        val digits = clean.filter { it.isDigit() }
+        return digits.length >= 8 && clean.all { it.isDigit() || it in "+()- .@swhanetlid:" }
+    }
+
+    fun formatPhoneDisplay(rawPhone: String): String {
+        val norm = normalizeWhatsAppPhone(rawPhone)
+        return when {
+            norm.startsWith("55") && norm.length == 13 -> "+55 (${norm.substring(2, 4)}) ${norm.substring(4, 9)}-${norm.substring(9)}"
+            norm.startsWith("55") && norm.length == 12 -> "+55 (${norm.substring(2, 4)}) ${norm.substring(4, 8)}-${norm.substring(8)}"
+            norm.length >= 10 -> "+$norm"
+            else -> rawPhone
+        }
+    }
+
+    fun resolveContactDisplayName(thread: HandoffThreadDto): String {
+        val role = thread.role_label?.trim().orEmpty()
+        val candidate = thread.contact_name?.trim().orEmpty()
+        if (candidate.isNotBlank() && !isPhoneDigitsOnly(candidate) && !candidate.equals(role, ignoreCase = true)) {
+            return candidate
+        }
+        val inboundPush = thread.messages.lastOrNull {
+            it.direction.equals("INBOUND", ignoreCase = true) &&
+                it.sender_label.isNotBlank() &&
+                !isPhoneDigitsOnly(it.sender_label) &&
+                !it.sender_label.equals(role, ignoreCase = true)
+        }?.sender_label?.trim()
+        if (!inboundPush.isNullOrBlank()) return inboundPush
+        if (candidate.isNotBlank() && !isPhoneDigitsOnly(candidate)) return candidate
+        if (role.isNotBlank() && !role.equals("WhatsApp", ignoreCase = true)) return role
+        return thread.formatted_phone?.takeIf { it.isNotBlank() } ?: formatPhoneDisplay(thread.thread_phone)
+    }
+
     private fun formatHandoffSessionTitle(roleLabel: String?, contactName: String?, phone: String): String {
         val role = roleLabel?.takeIf { it.isNotBlank() } ?: "WhatsApp"
-        val name = contactName?.takeIf { it.isNotBlank() } ?: phone
-        return "📲 $role • $name"
+        val name = contactName?.takeIf { it.isNotBlank() } ?: formatPhoneDisplay(phone)
+        return "📲 $name • $role"
+    }
+
+    fun openWhatsAppContactsHub() {
+        _isWhatsAppReturnsMode.value = true
+        _isViewingWhatsAppContactHub.value = true
+        _incomingHandoffAlert.value = null
+        refreshHandoffThreads(syncEvolution = true)
+    }
+
+    fun switchToAuraMode(sessionId: String = "default", title: String = "AURA") {
+        _isWhatsAppReturnsMode.value = false
+        _isViewingWhatsAppContactHub.value = false
+        loadSession(sessionId, title)
     }
 
     fun openHandoffThread(sessionId: String, phone: String? = null) {
         _incomingHandoffAlert.value = null
+        _isWhatsAppReturnsMode.value = true
+        _isViewingWhatsAppContactHub.value = false
         val targetPhone = phone?.takeIf { it.isNotBlank() } ?: sessionId.removePrefix("wa_handoff_")
         val thread = _handoffThreads.value.firstOrNull {
             it.session_id == sessionId || it.thread_phone == targetPhone
         }
-        val existingTitle = _sessions.value.firstOrNull { it.sessionId == sessionId }?.title
-        val title = existingTitle ?: formatHandoffSessionTitle(
+        val resolvedName = thread?.let { resolveContactDisplayName(it) }
+        val title = formatHandoffSessionTitle(
             roleLabel = thread?.role_label,
-            contactName = thread?.contact_name,
+            contactName = resolvedName,
             phone = targetPhone
         )
         loadSession(sessionId, title)
@@ -398,6 +465,10 @@ class ChatViewModel @Inject constructor(
     fun loadSession(sessionId: String, title: String) {
         _currentSessionId.value = sessionId
         _currentSessionTitle.value = title
+        if (!sessionId.startsWith("wa_handoff_")) {
+            _isWhatsAppReturnsMode.value = false
+            _isViewingWhatsAppContactHub.value = false
+        }
 
         viewModelScope.launch {
             chatDao.insertSession(ChatSessionEntity(sessionId, title))

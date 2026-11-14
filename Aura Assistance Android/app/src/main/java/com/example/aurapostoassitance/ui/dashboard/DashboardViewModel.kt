@@ -19,6 +19,7 @@ import com.example.aurapostoassitance.data.vision.AuraSharedIntakeRelay
 import com.example.aurapostoassitance.data.vision.AuraVisionNpuScanner
 import com.example.aurapostoassitance.data.vision.ScannedDocumentTelemetry
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -91,10 +92,37 @@ class DashboardViewModel @Inject constructor(
     private val _isExecutingAction = MutableStateFlow(false)
     val isExecutingAction: StateFlow<Boolean> = _isExecutingAction.asStateFlow()
 
+    private val _handoffUnreadCount = MutableStateFlow(0)
+    val handoffUnreadCount: StateFlow<Int> = _handoffUnreadCount.asStateFlow()
+
+    private val _handoffThreadCount = MutableStateFlow(0)
+    val handoffThreadCount: StateFlow<Int> = _handoffThreadCount.asStateFlow()
+
     fun toggleCarMode() = contextSensorManager.toggleManualCarMode()
 
     init {
         loadBriefing(_selectedSegment.value)
+        startHandoffSummaryPolling()
+    }
+
+    private fun startHandoffSummaryPolling() {
+        viewModelScope.launch {
+            while (true) {
+                refreshHandoffSummary()
+                delay(15000L)
+            }
+        }
+    }
+
+    fun refreshHandoffSummary() {
+        viewModelScope.launch {
+            runCatching {
+                apiService.getHandoffThreads(syncEvolution = true, limit = 30)
+            }.onSuccess { res ->
+                _handoffUnreadCount.value = res.total_unread
+                _handoffThreadCount.value = res.threads.size
+            }
+        }
     }
 
     fun selectSegment(segmentKey: String) {

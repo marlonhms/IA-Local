@@ -71,10 +71,12 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Psychology
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -129,6 +131,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.aurapostoassitance.data.local.HandoffContact
+import com.example.aurapostoassitance.data.remote.HandoffThreadDto
 import com.example.aurapostoassitance.ui.components.AuraAmbientBackground
 import com.example.aurapostoassitance.ui.components.AuraBrandTitle
 import com.example.aurapostoassitance.ui.components.AuraCard
@@ -202,10 +205,19 @@ fun ChatScreen(
     val handoffThreads by viewModel.handoffThreads.collectAsState()
     val totalUnreadHandoffs by viewModel.totalUnreadHandoffs.collectAsState()
     val incomingHandoffAlert by viewModel.incomingHandoffAlert.collectAsState()
+    val isWhatsAppReturnsMode by viewModel.isWhatsAppReturnsMode.collectAsState()
+    val isViewingWhatsAppContactHub by viewModel.isViewingWhatsAppContactHub.collectAsState()
+    val isSyncingHandoffs by viewModel.isSyncingHandoffs.collectAsState()
     val isDirectWhatsAppSession = currentSessionId.startsWith("wa_handoff_")
     val activeHandoffThread = remember(currentSessionId, handoffThreads) {
         handoffThreads.firstOrNull {
             it.session_id == currentSessionId || "wa_handoff_${it.thread_phone}" == currentSessionId
+        }
+    }
+
+    LaunchedEffect(initialQuery) {
+        if (initialQuery == "OPEN_WHATSAPP_RETURNS") {
+            viewModel.openWhatsAppContactsHub()
         }
     }
 
@@ -259,7 +271,7 @@ fun ChatScreen(
         mutableStateOf(if (initialQuery == "OPEN_WHATSAPP_RETURNS") "" else (initialQuery ?: ""))
     }
     var showMenu by remember { mutableStateOf(false) }
-    var showSessionsSheet by remember { mutableStateOf(initialQuery == "OPEN_WHATSAPP_RETURNS") }
+    var showSessionsSheet by remember { mutableStateOf(false) }
     var selectedHistoryTab by remember { mutableStateOf(if (initialQuery == "OPEN_WHATSAPP_RETURNS") 1 else 0) }
     var showCommandHubSheet by remember { mutableStateOf(false) }
     var showVisionScanner by remember { mutableStateOf(false) }
@@ -382,7 +394,8 @@ fun ChatScreen(
                             .padding(horizontal = 12.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        val onAuraMode = !isDirectWhatsAppSession
+                        val onAuraMode = !isWhatsAppReturnsMode && !isDirectWhatsAppSession
+                        val onWhatsAppMode = isWhatsAppReturnsMode || isDirectWhatsAppSession
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -394,12 +407,7 @@ fun ChatScreen(
                                     RoundedCornerShape(14.dp)
                                 )
                                 .clickable {
-                                    if (isDirectWhatsAppSession) {
-                                        viewModel.loadSession("default", "AURA")
-                                    } else {
-                                        selectedHistoryTab = 0
-                                        showSessionsSheet = true
-                                    }
+                                    viewModel.switchToAuraMode("default", "AURA")
                                 }
                                 .padding(vertical = 7.dp, horizontal = 10.dp),
                             contentAlignment = Alignment.Center
@@ -418,11 +426,11 @@ fun ChatScreen(
                                 .weight(1f)
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(
-                                    if (isDirectWhatsAppSession) AuraEmerald.copy(alpha = 0.18f) else ObsidianMid
+                                    if (onWhatsAppMode) AuraEmerald.copy(alpha = 0.18f) else ObsidianMid
                                 )
                                 .border(
                                     1.dp,
-                                    if (isDirectWhatsAppSession || totalUnreadHandoffs > 0) {
+                                    if (onWhatsAppMode || totalUnreadHandoffs > 0) {
                                         AuraEmerald.copy(alpha = 0.75f)
                                     } else {
                                         GlassBorderSoft
@@ -431,7 +439,7 @@ fun ChatScreen(
                                 )
                                 .clickable {
                                     selectedHistoryTab = 1
-                                    showSessionsSheet = true
+                                    viewModel.openWhatsAppContactsHub()
                                 }
                                 .padding(vertical = 7.dp, horizontal = 10.dp),
                             horizontalArrangement = Arrangement.Center,
@@ -440,14 +448,14 @@ fun ChatScreen(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.Chat,
                                 contentDescription = null,
-                                tint = if (isDirectWhatsAppSession || totalUnreadHandoffs > 0) AuraEmerald else TextSecondary,
+                                tint = if (onWhatsAppMode || totalUnreadHandoffs > 0) AuraEmerald else TextSecondary,
                                 modifier = Modifier.size(15.dp)
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 text = "Retornos WhatsApp",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = if (isDirectWhatsAppSession || totalUnreadHandoffs > 0) AuraEmerald else TextSecondary,
+                                color = if (onWhatsAppMode || totalUnreadHandoffs > 0) AuraEmerald else TextSecondary,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -487,17 +495,34 @@ fun ChatScreen(
                     }
 
                     AnimatedVisibility(
-                        visible = isDirectWhatsAppSession,
+                        visible = isDirectWhatsAppSession && !isViewingWhatsAppContactHub,
                         enter = expandVertically() + fadeIn(),
                         exit = shrinkVertically() + fadeOut()
                     ) {
-                        val phone = currentSessionId.removePrefix("wa_handoff_")
-                        val name = activeHandoffThread?.contact_name?.takeIf { it.isNotBlank() } ?: sessionTitle
-                        ActiveWhatsAppSessionBar(
-                            contactName = name,
-                            phone = phone,
-                            onBackToAura = { viewModel.loadSession("default", "AURA") }
-                        )
+                        Column {
+                            val rawPhone = currentSessionId.removePrefix("wa_handoff_")
+                            val displayName = activeHandoffThread?.let { viewModel.resolveContactDisplayName(it) }
+                                ?: sessionTitle.removePrefix("📲 ").substringBefore(" • ").ifBlank { rawPhone }
+                            val roleLabel = activeHandoffThread?.role_label?.takeIf { it.isNotBlank() } ?: "WhatsApp"
+                            val formattedPhone = activeHandoffThread?.formatted_phone?.takeIf { it.isNotBlank() }
+                                ?: viewModel.formatPhoneDisplay(rawPhone)
+                            if (handoffThreads.size > 1) {
+                                QuickContactSwitcherRow(
+                                    threads = handoffThreads,
+                                    activeSessionId = currentSessionId,
+                                    resolveName = { viewModel.resolveContactDisplayName(it) },
+                                    onBackToHub = { viewModel.openWhatsAppContactsHub() },
+                                    onSelectThread = { th -> viewModel.openHandoffThread(th.session_id, th.thread_phone) }
+                                )
+                            }
+                            ActiveWhatsAppSessionBar(
+                                contactName = displayName,
+                                roleLabel = roleLabel,
+                                formattedPhone = formattedPhone,
+                                onBackToContacts = { viewModel.openWhatsAppContactsHub() },
+                                onBackToAura = { viewModel.switchToAuraMode("default", "AURA") }
+                            )
+                        }
                     }
                 }
             },
@@ -545,28 +570,30 @@ fun ChatScreen(
                         }
                     }
 
-                    Composer(
-                        text = inputText,
-                        onTextChange = { inputText = it },
-                        enabled = !isTyping,
-                        placeholderText = if (isDirectWhatsAppSession) {
-                            "Responder no WhatsApp (ou @aura p/ perguntar à IA)..."
-                        } else {
-                            "Pergunte à AURA sobre o posto..."
-                        },
-                        onSend = {
-                            val toSend = inputText
-                            inputText = ""
-                            send(toSend)
-                        },
-                        onStartVoice = requestVoiceListening,
-                        voiceRms = if (isListening || (isVoiceConversationActive && isSpeaking)) voiceRms else 0.05f,
-                        onOpenCommandHub = { showCommandHubSheet = true },
-                        onOpenVisionScanner = { showVisionScanner = true },
-                        onSelectSuggestion = { suggestion ->
-                            inputText = suggestion
-                        }
-                    )
+                    if (!(isWhatsAppReturnsMode && isViewingWhatsAppContactHub)) {
+                        Composer(
+                            text = inputText,
+                            onTextChange = { inputText = it },
+                            enabled = !isTyping,
+                            placeholderText = if (isDirectWhatsAppSession) {
+                                "Responder no WhatsApp (ou @aura p/ perguntar à IA)..."
+                            } else {
+                                "Pergunte à AURA sobre o posto..."
+                            },
+                            onSend = {
+                                val toSend = inputText
+                                inputText = ""
+                                send(toSend)
+                            },
+                            onStartVoice = requestVoiceListening,
+                            voiceRms = if (isListening || (isVoiceConversationActive && isSpeaking)) voiceRms else 0.05f,
+                            onOpenCommandHub = { showCommandHubSheet = true },
+                            onOpenVisionScanner = { showVisionScanner = true },
+                            onSelectSuggestion = { suggestion ->
+                                inputText = suggestion
+                            }
+                        )
+                    }
                 }
             }
         ) { padding ->
@@ -575,7 +602,17 @@ fun ChatScreen(
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                if (messages.isEmpty() && !isTyping) {
+                if (isWhatsAppReturnsMode && isViewingWhatsAppContactHub) {
+                    WhatsAppContactsHubView(
+                        threads = handoffThreads,
+                        isSyncing = isSyncingHandoffs,
+                        resolveContactName = { viewModel.resolveContactDisplayName(it) },
+                        formatPhone = { it.formatted_phone?.takeIf { f -> f.isNotBlank() } ?: viewModel.formatPhoneDisplay(it.thread_phone) },
+                        onRefresh = { viewModel.refreshHandoffThreads(syncEvolution = true) },
+                        onOpenThread = { th -> viewModel.openHandoffThread(th.session_id, th.thread_phone) },
+                        onBackToAura = { viewModel.switchToAuraMode("default", "AURA") }
+                    )
+                } else if (messages.isEmpty() && !isTyping) {
                     EmptyState(
                         onSuggestion = { inputText = it },
                         onOpenCommandHub = { showCommandHubSheet = true }
@@ -865,12 +902,15 @@ fun ChatScreen(
                                         modifier = Modifier.size(20.dp)
                                     )
                                     Column(Modifier.weight(1f)) {
+                                        val resolvedName = viewModel.resolveContactDisplayName(thread)
+                                        val formattedPhone = thread.formatted_phone?.takeIf { it.isNotBlank() }
+                                            ?: viewModel.formatPhoneDisplay(thread.thread_phone)
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
                                             Text(
-                                                text = "${thread.role_label ?: "WhatsApp"} • ${thread.contact_name ?: thread.thread_phone}",
+                                                text = resolvedName,
                                                 style = MaterialTheme.typography.titleSmall,
                                                 color = TextPrimary,
                                                 fontWeight = FontWeight.SemiBold,
@@ -878,13 +918,27 @@ fun ChatScreen(
                                                 overflow = TextOverflow.Ellipsis,
                                                 modifier = Modifier.weight(1f, fill = false)
                                             )
-                                            Text(
-                                                text = thread.thread_phone,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = TextMuted,
-                                                maxLines = 1
-                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(AuraCyan.copy(alpha = 0.16f))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = thread.role_label ?: "WhatsApp",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = AuraCyan,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    maxLines = 1
+                                                )
+                                            }
                                         }
+                                        Text(
+                                            text = formattedPhone,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = TextMuted,
+                                            maxLines = 1
+                                        )
                                         Spacer(Modifier.height(2.dp))
                                         Text(
                                             text = thread.last_message_text.ifBlank { "Sem prévia" },
@@ -1264,7 +1318,9 @@ private fun HandoffReplyTopBanner(
 @Composable
 private fun ActiveWhatsAppSessionBar(
     contactName: String,
-    phone: String,
+    roleLabel: String,
+    formattedPhone: String,
+    onBackToContacts: () -> Unit,
     onBackToAura: () -> Unit
 ) {
     Row(
@@ -1272,38 +1328,550 @@ private fun ActiveWhatsAppSessionBar(
             .fillMaxWidth()
             .background(AuraEmerald.copy(alpha = 0.12f))
             .border(0.5.dp, AuraEmerald.copy(alpha = 0.4f))
-            .padding(horizontal = 14.dp, vertical = 7.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Rounded.Chat,
-            contentDescription = null,
-            tint = AuraEmerald,
-            modifier = Modifier.size(16.dp)
+        ContactInitialsAvatar(
+            name = contactName,
+            hasAlert = false,
+            size = 30.dp
         )
-        Text(
-            text = "Canal Direto WhatsApp • $contactName ($phone)",
-            style = MaterialTheme.typography.labelMedium,
-            color = TextPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = contactName,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(AuraEmerald.copy(alpha = 0.22f))
+                        .padding(horizontal = 6.dp, vertical = 1.dp)
+                ) {
+                    Text(
+                        text = roleLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AuraEmerald,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
+                    )
+                }
+            }
+            Text(
+                text = formattedPhone,
+                style = MaterialTheme.typography.labelSmall,
+                color = TextMuted,
+                maxLines = 1
+            )
+        }
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(12.dp))
                 .background(ObsidianMid)
-                .border(1.dp, AuraCyan.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                .clickable { onBackToAura() }
-                .padding(horizontal = 10.dp, vertical = 4.dp)
+                .border(1.dp, AuraEmerald.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                .clickable { onBackToContacts() }
+                .padding(horizontal = 9.dp, vertical = 5.dp)
         ) {
             Text(
-                text = "Voltar p/ AURA",
+                text = "Contatos",
+                style = MaterialTheme.typography.labelSmall,
+                color = AuraEmerald,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(ObsidianMid)
+                .border(1.dp, AuraCyan.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
+                .clickable { onBackToAura() }
+                .padding(horizontal = 9.dp, vertical = 5.dp)
+        ) {
+            Text(
+                text = "AURA",
                 style = MaterialTheme.typography.labelSmall,
                 color = AuraCyan,
                 fontWeight = FontWeight.SemiBold
             )
+        }
+    }
+}
+
+@Composable
+private fun QuickContactSwitcherRow(
+    threads: List<HandoffThreadDto>,
+    activeSessionId: String,
+    resolveName: (HandoffThreadDto) -> String,
+    onBackToHub: () -> Unit,
+    onSelectThread: (HandoffThreadDto) -> Unit
+) {
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(ObsidianLow.copy(alpha = 0.90f))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        item {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(ObsidianMid)
+                    .border(1.dp, GlassBorderSoft, RoundedCornerShape(12.dp))
+                    .clickable { onBackToHub() }
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "Todos (${threads.size})",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextSecondary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+        items(threads, key = { it.session_id }) { thread ->
+            val isActive = thread.session_id == activeSessionId
+            val name = resolveName(thread)
+            val hasUnread = thread.unread_count > 0
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        when {
+                            isActive -> AuraEmerald.copy(alpha = 0.22f)
+                            hasUnread -> AuraEmerald.copy(alpha = 0.10f)
+                            else -> ObsidianMid
+                        }
+                    )
+                    .border(
+                        1.dp,
+                        when {
+                            isActive -> AuraEmerald
+                            hasUnread -> AuraEmerald.copy(alpha = 0.5f)
+                            else -> GlassBorderSoft
+                        },
+                        RoundedCornerShape(14.dp)
+                    )
+                    .clickable { onSelectThread(thread) }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (hasUnread || thread.last_direction.equals("INBOUND", ignoreCase = true)) {
+                    StatusDot(color = AuraEmerald, size = 6.dp, pulsing = hasUnread)
+                }
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isActive) AuraEmerald else TextPrimary,
+                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                    maxLines = 1
+                )
+                if (hasUnread) {
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(AuraEmerald)
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            text = thread.unread_count.toString(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = ObsidianBase,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContactInitialsAvatar(
+    name: String,
+    hasAlert: Boolean,
+    size: Dp = 44.dp
+) {
+    val words = name.trim().split(" ", "-", "•").filter { it.isNotBlank() && it.any { c -> c.isLetter() } }
+    val initials = when {
+        words.size >= 2 -> "${words[0].first { it.isLetter() }.uppercaseChar()}${words[1].first { it.isLetter() }.uppercaseChar()}"
+        words.size == 1 -> words[0].filter { it.isLetter() }.take(2).uppercase()
+        else -> "WA"
+    }
+    Box(
+        modifier = Modifier.size(size),
+        contentAlignment = Alignment.BottomEnd
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(CircleShape)
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            AuraEmerald.copy(alpha = 0.30f),
+                            AuraCyan.copy(alpha = 0.25f)
+                        )
+                    )
+                )
+                .border(1.dp, AuraEmerald.copy(alpha = 0.55f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = initials,
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = (size.value * 0.36f).sp
+                ),
+                color = TextPrimary
+            )
+        }
+        if (hasAlert) {
+            Box(
+                modifier = Modifier
+                    .size(11.dp)
+                    .clip(CircleShape)
+                    .background(ObsidianBase)
+                    .padding(1.5.dp)
+            ) {
+                StatusDot(color = AuraEmerald, size = 8.dp, pulsing = true)
+            }
+        }
+    }
+}
+
+private fun formatRelativeEpoch(epochSec: Long): String {
+    if (epochSec <= 0L) return ""
+    val diffSec = ((System.currentTimeMillis() / 1000L) - epochSec).coerceAtLeast(0L)
+    return when {
+        diffSec < 60L -> "agora"
+        diffSec < 3600L -> "há ${diffSec / 60L}m"
+        diffSec < 86400L -> "há ${diffSec / 3600L}h"
+        else -> "há ${diffSec / 86400L}d"
+    }
+}
+
+@Composable
+private fun WhatsAppContactsHubView(
+    threads: List<HandoffThreadDto>,
+    isSyncing: Boolean,
+    resolveContactName: (HandoffThreadDto) -> String,
+    formatPhone: (HandoffThreadDto) -> String,
+    onRefresh: () -> Unit,
+    onOpenThread: (HandoffThreadDto) -> Unit,
+    onBackToAura: () -> Unit
+) {
+    var selectedFilter by remember { mutableStateOf(0) } // 0 = Todos, 1 = Nao Lidos, 2 = Respondidos
+    val unreadThreads = remember(threads) { threads.filter { it.unread_count > 0 } }
+    val repliedThreads = remember(threads) {
+        threads.filter { th ->
+            th.last_direction.equals("INBOUND", ignoreCase = true) ||
+                th.messages.any { it.direction.equals("INBOUND", ignoreCase = true) }
+        }
+    }
+    val visibleThreads = remember(threads, selectedFilter, unreadThreads, repliedThreads) {
+        when (selectedFilter) {
+            1 -> unreadThreads
+            2 -> repliedThreads
+            else -> threads
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            SpatialGlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                accent = AuraEmerald,
+                iridescentBorder = true,
+                contentPadding = PaddingValues(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(
+                            text = "Retornos por Contato",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = if (threads.isEmpty()) {
+                                "Nenhum contato acionado nas últimas 72h"
+                            } else {
+                                "${threads.size} contato(s) • ${unreadThreads.sumOf { it.unread_count }} retorno(s) não lido(s)"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(ObsidianMid)
+                            .border(1.dp, AuraEmerald.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
+                            .clickable(enabled = !isSyncing) { onRefresh() }
+                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        if (isSyncing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                color = AuraEmerald,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Rounded.Refresh,
+                                contentDescription = "Sincronizar Evolution",
+                                tint = AuraEmerald,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                        Text(
+                            text = "Sincronizar",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = AuraEmerald,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        }
+
+        if (threads.isNotEmpty()) {
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val filters = listOf(
+                        Triple(0, "Todos (${threads.size})", AuraCyan),
+                        Triple(1, "Não Lidos (${unreadThreads.size})", AuraEmerald),
+                        Triple(2, "Respondidos (${repliedThreads.size})", AuraPurple)
+                    )
+                    items(filters) { (idx, label, accent) ->
+                        val active = selectedFilter == idx
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (active) accent.copy(alpha = 0.18f) else ObsidianMid)
+                                .border(
+                                    1.dp,
+                                    if (active) accent else GlassBorderSoft,
+                                    RoundedCornerShape(16.dp)
+                                )
+                                .clickable { selectedFilter = idx }
+                                .padding(horizontal = 12.dp, vertical = 7.dp)
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (active) accent else TextSecondary,
+                                fontWeight = if (active) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (visibleThreads.isEmpty()) {
+            item {
+                SpatialGlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    accent = AuraCyan,
+                    iridescentBorder = false,
+                    contentPadding = PaddingValues(20.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.Chat,
+                            contentDescription = null,
+                            tint = AuraEmerald,
+                            modifier = Modifier.size(34.dp)
+                        )
+                        Text(
+                            text = if (threads.isEmpty()) {
+                                "Nenhum retorno WhatsApp ainda"
+                            } else {
+                                "Nenhum contato neste filtro"
+                            },
+                            style = MaterialTheme.typography.titleSmall,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Envie um diagnóstico ou XML pela AURA para acompanhar aqui cada contato e suas respostas em tempo real.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                        AuraChip(
+                            label = "Ir para Análises AURA",
+                            icon = Icons.Rounded.AutoAwesome,
+                            onClick = onBackToAura
+                        )
+                    }
+                }
+            }
+        } else {
+            items(visibleThreads, key = { it.session_id }) { thread ->
+                val contactName = resolveContactName(thread)
+                val formattedPhone = formatPhone(thread)
+                val roleLabel = thread.role_label?.takeIf { it.isNotBlank() } ?: "WhatsApp"
+                val hasUnread = thread.unread_count > 0
+                val isInboundLast = thread.last_direction.equals("INBOUND", ignoreCase = true)
+                val timeLabel = formatRelativeEpoch(thread.last_epoch_ts)
+                val inboundCount = thread.messages.count { it.direction.equals("INBOUND", ignoreCase = true) }
+
+                SpatialGlassCard(
+                    onClick = { onOpenThread(thread) },
+                    modifier = Modifier.fillMaxWidth(),
+                    accent = if (hasUnread || isInboundLast) AuraEmerald else AuraCyan,
+                    glowActive = hasUnread,
+                    iridescentBorder = true,
+                    contentPadding = PaddingValues(14.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            ContactInitialsAvatar(
+                                name = contactName,
+                                hasAlert = hasUnread || isInboundLast,
+                                size = 46.dp
+                            )
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = contactName,
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = TextPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(AuraCyan.copy(alpha = 0.16f))
+                                            .border(0.5.dp, AuraCyan.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = roleLabel,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = AuraCyan,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = formattedPhone,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextMuted,
+                                        maxLines = 1
+                                    )
+                                    if (timeLabel.isNotBlank()) {
+                                        Text(
+                                            text = "• $timeLabel",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (hasUnread) AuraEmerald else TextMuted,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                            if (hasUnread) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(AuraEmerald)
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = thread.unread_count.toString(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = ObsidianBase,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            } else if (inboundCount > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(AuraEmerald.copy(alpha = 0.14f))
+                                        .padding(horizontal = 7.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = "$inboundCount resp.",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = AuraEmerald,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(ObsidianBase.copy(alpha = 0.55f))
+                                .border(
+                                    0.5.dp,
+                                    if (isInboundLast) AuraEmerald.copy(alpha = 0.45f) else GlassBorderSoft,
+                                    RoundedCornerShape(12.dp)
+                                )
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    text = if (isInboundLast) "↩ Resposta recebida" else "↗ Enviado pela AURA",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = if (isInboundLast) AuraEmerald else TextMuted
+                                )
+                                Text(
+                                    text = thread.last_message_text.ifBlank { "Sem mensagens registradas" },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextPrimary,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

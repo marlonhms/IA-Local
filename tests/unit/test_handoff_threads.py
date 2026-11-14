@@ -18,6 +18,8 @@ import core.webhooks as webhooks_mod
 from core.aura_api import create_aura_app
 from core.command_journal import (
     AuraCommandJournal,
+    format_brazil_phone_display,
+    is_generic_or_numeric_name,
     normalize_whatsapp_phone,
     phone_match_key,
     reset_command_journal,
@@ -25,7 +27,11 @@ from core.command_journal import (
     whatsapp_jid_candidates,
 )
 from core.tools import PostoTools
-from core.webhooks import WebhookDispatchResult, sync_inbound_messages_from_evolution
+from core.webhooks import (
+    WebhookDispatchResult,
+    fetch_evolution_contact_profile,
+    sync_inbound_messages_from_evolution,
+)
 
 
 @pytest.fixture
@@ -475,4 +481,63 @@ async def test_evolution_find_messages_sync_queries_remote_jid_alt_for_lid_repli
     assert "ok" in texts
     assert "obrigado" in texts
     assert "nao deve entrar" not in texts
+
+
+@pytest.mark.asyncio
+async def test_evolution_contact_identity_enrichment_and_phone_formatting(
+    isolated_journal: AuraCommandJournal,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    assert format_brazil_phone_display("5527992277217") == "+55 (27) 99227-7217"
+    assert format_brazil_phone_display("552732277217") == "+55 (27) 3227-7217"
+    assert is_generic_or_numeric_name("Contador", "5527992277217", "Contador") is True
+    assert is_generic_or_numeric_name("5527992277217", "5527992277217", "WhatsApp") is True
+    assert is_generic_or_numeric_name("Marlon Henrique", "5527992277217", "Contador") is False
+
+    now_epoch = int(time.time())
+    isolated_journal.record_handoff_message(
+        thread_phone="5527992277217",
+        direction="OUTBOUND",
+        sender_label="Gestor AURA",
+        message_text="Envio relatorio SEFAZ.",
+        contact_name="Contador",
+        role_label="Contador",
+        epoch_ts=now_epoch,
+    )
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/chat/findContacts/webposto-n3"):
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "remoteJid": "5527992277217@s.whatsapp.net",
+                        "pushName": "Marlon Henrique",
+                        "profilePicUrl": "https://cdn.example.com/marlon.jpg",
+                    }
+                ],
+            )
+        if request.url.path.endswith("/chat/findMessages/webposto-n3"):
+            return httpx.Response(200, json={"messages": {"total": 0, "records": []}})
+        return httpx.Response(404)
+
+    monkeypatch.setattr(webhooks_mod, "EVOLUTION_API_URL", "http://mock-evo:8080")
+    monkeypatch.setattr(webhooks_mod, "EVOLUTION_INSTANCE", "webposto-n3")
+    monkeypatch.setattr(webhooks_mod, "_last_evolution_sync_ts", 0.0)
+    webhooks_mod._evolution_contact_cache.clear()
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        prof = await fetch_evolution_contact_profile("5527992277217", http_client=client, force=True)
+        assert prof["push_name"] == "Marlon Henrique"
+        assert prof["profile_pic_url"] == "https://cdn.example.com/marlon.jpg"
+
+        await sync_inbound_messages_from_evolution(isolated_journal, force=True, http_client=client)
+
+    threads = isolated_journal.list_handoff_threads()
+    assert len(threads) == 1
+    assert threads[0]["contact_name"] == "Marlon Henrique"
+    assert threads[0]["role_label"] == "Contador"
+    assert threads[0]["formatted_phone"] == "+55 (27) 99227-7217"
+
 

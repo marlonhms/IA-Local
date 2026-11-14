@@ -189,6 +189,13 @@ fun DashboardScreen(
     val actionFeedback by viewModel.actionFeedback.collectAsState()
     val signedActions by viewModel.signedActions.collectAsState()
     val isExecutingAction by viewModel.isExecutingAction.collectAsState()
+    val handoffUnreadCount by viewModel.handoffUnreadCount.collectAsState()
+    val handoffThreadCount by viewModel.handoffThreadCount.collectAsState()
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        selectedTab = AuraNavTab.PULSO
+        viewModel.refreshHandoffSummary()
+    }
 
     val isPlayingBriefing = isSpeaking && speakingMessageId == "briefing_$selectedSegment"
 
@@ -219,11 +226,14 @@ fun DashboardScreen(
             bottomBar = {
                 AuraBottomGlassDock(
                     selectedTab = selectedTab,
+                    handoffUnreadCount = handoffUnreadCount,
+                    handoffThreadCount = handoffThreadCount,
                     onTabSelected = { tab ->
                         selectedTab = tab
                         when (tab) {
                             AuraNavTab.PULSO -> { /* Já no Pulso */ }
                             AuraNavTab.COCKPIT -> onNavigateToChat(null)
+                            AuraNavTab.RETORNOS -> onNavigateToChat("OPEN_WHATSAPP_RETURNS")
                             AuraNavTab.TANQUES -> onNavigateToChat("Faça a previsão de esgotamento (Run-Out) dos recursos e mostre a situação de todos os compartimentos.")
                             AuraNavTab.CONEXAO -> onNavigateToSetup()
                         }

@@ -237,3 +237,137 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_handoff_external_msg_id
      - Contagem de nao lidas (`unread_count`) e limpeza via `POST /api/v1/partner/handoffs/{phone}/read`.
    - Executar `pytest -q tests/unit/test_handoff_threads.py tests/unit/test_partner_api.py tests/unit/test_fiscal_engine.py`.
    - Compilar `.\gradlew assembleDebug` e instalar via `adb install -r` no dispositivo.
+
+---
+
+## 7. Fase 2: Evolucao UI/UX, Identidade Evolution API e Hub de Retornos por Contato
+
+### 7.1. Diagnostico e Objetivos da Fase 2
+Apos a validacao em producao do fluxo de handoff e captura de retornos (`@lid` / `remoteJidAlt`), tres pontos de experiencia do usuario (UI/UX) e enriquecimento de dados foram definidos para tornar a operacao mais intuitiva, moderna e executiva:
+
+1. **Acesso Direto no Rodape da Pagina Principal (`DashboardScreen.kt`):**
+   - O gestor precisa de um **icone dedicado de Retornos WhatsApp fixo no rodape (Bottom Dock)** da tela principal (`DashboardScreen`), ao lado do botao principal de abertura do AURA Chat.
+   - Esse icone deve exibir em tempo real um **badge pulsante de mensagens nao lidas** e levar com 1 toque diretamente para a sessao de **Retornos WhatsApp** (`onNavigateToChat("OPEN_WHATSAPP_HANDOFFS_TAB")`).
+
+2. **Enriquecimento Automatico de Identidade via Evolution API (`pushName` e Perfil do Contato):**
+   - Nenhum contato na sessao de retornos deve aparecer como um "numero flutuante" (ex: `5527992277217`) ou apenas com o rotulo generico do cargo (`Contador`) quando a Evolution API possui o nome real do contato no WhatsApp (ex: `Marlon Henrique`).
+   - O backend deve resolver e persistir o nome real do contato a partir de duas fontes da Evolution API v2:
+     - **Busca Ativa de Contatos (`POST {EVOLUTION_API_URL}/chat/findContacts/{EVOLUTION_INSTANCE}`):** consulta por `remoteJid` nos candidatos do telefone (`whatsapp_jid_candidates(phone)`), extraindo `pushName`, `name`, `verifiedName` e `profilePicUrl`.
+     - **Captura Passiva/Ativa em Mensagens (`findMessages` e Webhook `MESSAGES_UPSERT`):** extrai o `pushName` de todas as mensagens recebidas (`fromMe == False`) e atualiza retroativamente (`backfill`) os registros daquela thread em `aura_handoff_messages` cujo `contact_name` esteja vazio, seja igual ao numero do telefone ou seja identico ao `role_label` (`Contador`, `Gerente`, etc.).
+   - O payload de `GET /api/v1/partner/handoffs` passa a expor claramente:
+     - `contact_name`: Nome real da pessoa obtido no Evolution/WhatsApp (ex: `"Marlon Henrique"`).
+     - `role_label`: Cargo ou funcao operacional (ex: `"Contador"`, `"Gerente"`, `"Fornecedor"`).
+     - `formatted_phone`: Numero formatado para leitura humana (ex: `"+55 (27) 99227-7217"`), exibido apenas como metadado secundario.
+     - `profile_pic_url`: URL opcional da foto de perfil retornada pela Evolution API.
+
+3. **Separacao Visual dos Retornos por Contato (`ChatScreen.kt` - Hub Master-Detail):**
+   - Na aba **Retornos WhatsApp**, os retornos devem ser **separados e organizados por contato** de forma visualmente imediata, evitando misturar fluxos ou jogar o usuario em um numero solto.
+   - A aba **Retornos WhatsApp** passa a operar com uma arquitetura **Hub de Contatos + Conversa Isolada (Master-Detail Fluido)**:
+     - **Nivel 1 - Hub de Contatos (`WhatsAppContactsHubView`):** grade/lista executiva de cards separados por contato, com filtros rapidos (`Todos`, `Nao Lidos`, `Respondidos`), avatar com iniciais/foto e indicador de presenca, **Nome do Evolution em destaque**, **Badge colorido do Cargo** (`Contador`, `Gerente`), telefone formatado discreto, previa da ultima mensagem (`INBOUND` ou `OUTBOUND`), horario relativo e contador de nao lidas.
+     - **Nivel 2 - Conversa Exclusiva do Contato (`WhatsAppContactConversationView`):** ao tocar em um contato no Hub, abre o historico exclusivo daquele contato com:
+       - **Header de Identidade do Contato:** Nome real (`Marlon Henrique`), badge do cargo (`Contador`), telefone formatado (`+55 (27) 99227-7217`) e botao **`<- Contatos`** para voltar ao Hub de Contatos.
+       - **Faixa Rapida de Alternancia entre Contatos (`QuickContactSwitcherRow`):** chips horizontais no topo da conversa permitindo alternar de um contato para outro (ex: de `Marlon Henrique (Contador)` para `Marcos (Gerente)`) com 1 toque e badge individual de nao lidas por contato.
+
+---
+
+### 7.2. Fluxo Arquitetural da Fase 2 (Mermaid)
+
+```mermaid
+flowchart TD
+    subgraph Dashboard["Dashboard Principal (Rodape Fixo)"]
+        Dock["Spatial Bottom Dock\n[Abrir AURA Chat] + [Icone Retornos WhatsApp c/ Badge]"]
+    end
+
+    subgraph Backend["Backend FastAPI + Evolution API v2"]
+        FindContacts["POST /chat/findContacts/{instance}\n(pushName + profilePicUrl)"]
+        FindMessages["POST /chat/findMessages/{instance}\n(remoteJid + remoteJidAlt + pushName)"]
+        Backfill["AuraCommandJournal.update_thread_contact_identity()\nSubstitui numero cru/cargo pelo pushName real"]
+    end
+
+    subgraph WhatsAppHub["Sessao Retornos WhatsApp (UI Separada por Contatos)"]
+        HubList["Nivel 1: Hub de Contatos\nCards separados por Contato (Nome Evolution + Cargo + Previa + Badge)"]
+        ConvView["Nivel 2: Conversa Isolada do Contato\nChips Rapidos de Contatos no Topo + Historico + Resposta Direta"]
+    end
+
+    Dock -->|"1 Toque no Icone do Rodape"| HubList
+    FindContacts --> Backfill
+    FindMessages --> Backfill
+    Backfill -->|"GET /api/v1/partner/handoffs"| HubList
+    HubList -->|"Seleciona Contato"| ConvView
+    ConvView -->|"Botao Contatos ou Chip Superior"| HubList
+```
+
+---
+
+### 7.3. Especificacao Tecnica do Backend (Fase 2)
+
+#### 7.3.1. Formatacao Humana e Backfill de Identidade (`core/command_journal.py`)
+1. **Funcao `format_brazil_phone_display(raw_phone: str | None) -> str`:**
+   - Converte `"5527992277217"` em `"+55 (27) 99227-7217"` e `"552792277217"` em `"+55 (27) 9227-7217"`.
+2. **Funcao `is_generic_or_numeric_name(name: str | None, phone: str | None = None, role: str | None = None) -> bool`:**
+   - Retorna `True` quando `name` e vazio, contem apenas digitos/simbolos de telefone, coincide com `phone_match_key(phone)` ou coincide com rotulos genericos (`"whatsapp"`, `"contador"`, `"gerente"`, `"fornecedor"`, `"financeiro"`, `"contato"`).
+3. **Metodo `update_thread_contact_identity(self, raw_phone: str, contact_name: str, role_label: str | None = None) -> int`:**
+   - Atualiza todos os registros daquele `match_key` em `aura_handoff_messages` onde `contact_name` seja nulo ou generico/numerico, gravando o nome real vindo da Evolution API (`pushName`).
+4. **Enriquecimento em `list_handoff_threads()`:**
+   - Ao consolidar as mensagens de uma thread:
+     - Prioriza o primeiro `contact_name` nao-generico; se todos os `contact_name` salvos forem genericos/numericos, inspeciona o `sender_label` das mensagens `INBOUND` (que guarda o `pushName` da Evolution) e promove-o automaticamente para `contact_name`!
+     - Inclui no dicionario de cada thread o campo `"formatted_phone": format_brazil_phone_display(t_phone)`.
+
+#### 7.3.2. Lookup de Contato na Evolution API (`core/webhooks.py`)
+1. **Funcao Assincrona `fetch_evolution_contact_profile(phone: str, http_client: httpx.AsyncClient | None = None) -> dict[str, str | None]`:**
+   - Consulta `POST {EVOLUTION_API_URL}/chat/findContacts/{EVOLUTION_INSTANCE}` para os candidatos JID de `phone`.
+   - Caso a busca filtrada retorne vazio, faz fallback seguro filtrando por `phone_match_key` sobre os contatos retornados.
+   - Extrai:
+     - `push_name`: primeiro valor util entre `pushName`, `name`, `verifiedName`, `notify`.
+     - `profile_pic_url`: `profilePicUrl` quando presente.
+   - Mantem cache em memoria (`_evolution_contact_cache: dict[str, tuple[float, dict]]`, TTL de `300s`) para zero latencia adicional no polling.
+2. **Integracao em `sync_inbound_messages_from_evolution` (`core/webhooks.py`):**
+   - Sempre que uma mensagem `INBOUND` trouxer `rec.get("pushName")` valido (ex: `"Marlon Henrique"`), passa esse nome tambem para `journal.update_thread_contact_identity(thread_phone, push_name)` e salva no `record_handoff_message(..., contact_name=resolved_contact_name)`.
+   - Se a thread ainda estiver com `contact_name` generico/numerico mesmo sem novas mensagens, consulta `fetch_evolution_contact_profile(thread_phone)` e atualiza `journal.update_thread_contact_identity(...)` imediatamente.
+
+---
+
+### 7.4. Especificacao Tecnica do App Android (Fase 2)
+
+#### 7.4.1. Rodape Fixo na Pagina Principal com Icone de Retornos (`DashboardScreen.kt` e `DashboardViewModel.kt`)
+1. **Contador de Retornos no Dashboard (`DashboardViewModel.kt`):**
+   - Adiciona `handoffUnreadCount: StateFlow<Int>` e `handoffTotalThreads: StateFlow<Int>` alimentados por `apiService.getHandoffThreads(syncEvolution = true)` na inicializacao e em polling leve (`15.000ms`), permitindo exibir o badge no rodape mesmo antes de abrir o Chat.
+2. **Barra de Rodape Espacial (`DashboardBottomDock` em `DashboardScreen.kt`):**
+   - Posicionada no `bottomBar` do `Scaffold` (ou fixada na base da tela com glassmorphism `ObsidianSurface` + borda luminescente):
+     - **Botao Principal (Esquerda/Centro - `weight(1f)`):** `"Abrir AURA Chat"` (`AuraGradientButton`).
+     - **Botao de Retornos WhatsApp (Direita - Icone Dedicado 56x56dp):** container circular/arredondado em vidro esmeralda (`StatusSuccess.copy(alpha = 0.16f)` com borda `StatusSuccess.copy(alpha = 0.45f)`), icone `Icons.Rounded.Forum` / `Icons.AutoMirrored.Rounded.ReplyAll`, rotulo compacto `"Retornos"` e **Badge pulsante** no canto superior direito exibindo `handoffUnreadCount` (ou ponto indicador ativo quando houver conversas abertas).
+     - Ao clicar no icone do rodape, navega direto para `onNavigateToChat("OPEN_WHATSAPP_HANDOFFS_TAB")`.
+
+#### 7.4.2. Separacao por Contatos na Sessao de Retornos (`ChatViewModel.kt` e `ChatScreen.kt`)
+1. **Estado de Navegacao Interna do Hub (`ChatViewModel.kt`):**
+   - Quando o usuario entra na aba **`Retornos WhatsApp`** (seja pelo icone do rodape da pagina principal, pelo card do Dashboard ou pela aba superior do Chat):
+     - Introduz `_isViewingWhatsAppContactList: MutableStateFlow<Boolean>`:
+       - Por padrao, ao tocar na aba **`Retornos WhatsApp`** ou no icone do rodape, abre o **Hub de Contatos (`_isViewingWhatsAppContactList = true`)** separando claramente cada contato que possui handoff/retorno ativo.
+       - Ao tocar em um contato especifico (ou no botao `Abrir` do banner de alerta no topo), define `_isViewingWhatsAppContactList = false` e carrega a sessao `wa_handoff_<phone>` daquele contato.
+       - O botao **`<- Contatos`** na barra superior da conversa volta imediatamente para `_isViewingWhatsAppContactList = true`.
+2. **Design do Hub de Contatos (`WhatsAppContactsHubView` em `ChatScreen.kt`):**
+   - **Header Resumo do Hub:** exibe total de contatos em acompanhamento, total de retornos nao lidos e botao de sincronizacao imediata (`Sincronizar agora`).
+   - **Filtros Rapidos (Chips):** `Todos ({N})`, `Nao Lidos ({Unread})`, `Respondidos ({Inbound})`.
+   - **Cards Executivos por Contato (`WhatsAppContactThreadCard`):**
+     - **Avatar Identitario:** circulo com iniciais do nome real (ex: `MH` para `Marlon Henrique`) + ponto de status verde quando houve resposta (`last_direction == "INBOUND"`).
+     - **Linha Principal:** Nome real do Evolution em destaque (`Marlon Henrique`) + **Pill Badge do Cargo** ao lado (`Contador` em ciano/esmeralda).
+     - **Subtitulo Discreto:** Telefone formatado (`+55 (27) 99227-7217`) - nunca solto sem nome!
+     - **Box de Ultima Mensagem:** indica claramente se foi `↩ Resposta recebida:` (destaque esmeralda) ou `↗ Enviado pelo AURA:`, com previa de ate 2 linhas, horario e **Badge de Nao Lidas** (`unread_count`).
+3. **Faixa Superior de Contatos Dentro da Conversa (`QuickContactSwitcherRow` em `ChatScreen.kt`):**
+   - Mesmo dentro da conversa de um contato (`_isViewingWhatsAppContactList == false`), exibe uma barra horizontal deslizante de chips compactos com todos os contatos ativos (ex: `[← Todos os Contatos]  [🟢 Marlon Henrique • Contador]  [⚪ Marcos • Gerente]`).
+   - Permite alternar entre os retornos de diferentes contatos com 1 unico toque e ver o nome real + cargo no cabecalho da conversa.
+
+---
+
+### 7.5. Roteiro de Implementacao da Fase 2 (Etapas 6 a 8)
+
+1. **Etapa 6 (Backend - Identidade Evolution API e Backfill):**
+   - Atualizar `core/command_journal.py` (`format_brazil_phone_display`, `is_generic_or_numeric_name`, `update_thread_contact_identity` e fallback automatico para `sender_label` de mensagens `INBOUND` em `list_handoff_threads`).
+   - Atualizar `core/webhooks.py` (`fetch_evolution_contact_profile` via `/chat/findContacts/{instance}` + backfill imediato em `sync_inbound_messages_from_evolution`) e `core/partner_api.py` (enriquecer `contact_name` no `POST /api/v1/partner/handoff` e `POST /api/v1/partner/handoff-reply`).
+   - Adicionar testes unitarios em `tests/unit/test_handoff_threads.py` cobrindo o enriquecimento de nome via `pushName` / `findContacts` e substituicao de numeros flutuantes.
+2. **Etapa 7 (Android - Icone de Retornos no Rodape Principal):**
+   - Atualizar `DashboardViewModel.kt` e `DashboardScreen.kt` adicionando o `DashboardBottomDock` fixo no rodape da pagina principal com o botao `"Abrir AURA Chat"` e o icone dedicado de **`Retornos WhatsApp`** com badge ao vivo.
+3. **Etapa 8 (Android - Hub de Retornos Separado por Contato e Header Rico):**
+   - Atualizar `AuraApiService.kt` (`formatted_phone`, `profile_pic_url`), `ChatViewModel.kt` (`isViewingWhatsAppContactList`, `showWhatsAppContactsHub()`, formatacao de nome/telefone) e `ChatScreen.kt` (`WhatsAppContactsHubView`, `WhatsAppContactThreadCard`, `QuickContactSwitcherRow` e `ActiveWhatsAppSessionBar` com Nome Evolution + Cargo + Telefone formatado).
+   - Compilar APK (`.\gradlew assembleDebug`), instalar via ADB (`adb install -r`) e validar em producao.
+
