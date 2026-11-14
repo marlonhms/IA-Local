@@ -49,6 +49,7 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Storefront
+import androidx.compose.material.icons.automirrored.rounded.Chat
 import androidx.compose.material.icons.automirrored.rounded.TrendingDown
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
@@ -147,6 +148,13 @@ private val universalTriggers = listOf(
         icon = Icons.Rounded.DocumentScanner,
         accentColor = AuraPurple,
         query = "VISION_SCANNER_TRIGGER"
+    ),
+    QuickTrigger(
+        title = "Retornos WhatsApp",
+        description = "Acompanhe respostas do Contador, Gerente ou equipe em sessões dedicadas.",
+        icon = Icons.AutoMirrored.Rounded.Chat,
+        accentColor = AuraEmerald,
+        query = "OPEN_WHATSAPP_RETURNS"
     )
 )
 

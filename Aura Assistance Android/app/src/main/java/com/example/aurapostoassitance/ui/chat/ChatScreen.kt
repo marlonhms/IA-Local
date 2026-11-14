@@ -60,6 +60,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.Chat
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
@@ -67,7 +68,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Psychology
@@ -255,9 +255,12 @@ fun ChatScreen(
         }
     }
 
-    var inputText by remember { mutableStateOf(initialQuery ?: "") }
+    var inputText by remember {
+        mutableStateOf(if (initialQuery == "OPEN_WHATSAPP_RETURNS") "" else (initialQuery ?: ""))
+    }
     var showMenu by remember { mutableStateOf(false) }
-    var showSessionsSheet by remember { mutableStateOf(false) }
+    var showSessionsSheet by remember { mutableStateOf(initialQuery == "OPEN_WHATSAPP_RETURNS") }
+    var selectedHistoryTab by remember { mutableStateOf(if (initialQuery == "OPEN_WHATSAPP_RETURNS") 1 else 0) }
     var showCommandHubSheet by remember { mutableStateOf(false) }
     var showVisionScanner by remember { mutableStateOf(false) }
     var selectedMenuMessage by remember { mutableStateOf<ChatMessage?>(null) }
@@ -338,7 +341,10 @@ fun ChatScreen(
                             }
                         },
                         onBack = onNavigateBack,
-                        onHistory = { showSessionsSheet = true },
+                        onHistory = {
+                            selectedHistoryTab = if (totalUnreadHandoffs > 0 || isDirectWhatsAppSession) 1 else 0
+                            showSessionsSheet = true
+                        },
                         onNewChat = { viewModel.createNewChat("Novo Chat") },
                         onOpenCommandHub = { showCommandHubSheet = true },
                         onQueryAction = { query -> send(query) },
@@ -367,6 +373,104 @@ fun ChatScreen(
                             }
                         }
                     )
+
+                    // Abas sempre visíveis no topo: Análises AURA | Retornos WhatsApp
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(ObsidianLow.copy(alpha = 0.85f))
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val onAuraMode = !isDirectWhatsAppSession
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (onAuraMode) AuraCyan.copy(alpha = 0.16f) else ObsidianMid)
+                                .border(
+                                    1.dp,
+                                    if (onAuraMode) AuraCyan.copy(alpha = 0.7f) else GlassBorderSoft,
+                                    RoundedCornerShape(14.dp)
+                                )
+                                .clickable {
+                                    if (isDirectWhatsAppSession) {
+                                        viewModel.loadSession("default", "AURA")
+                                    } else {
+                                        selectedHistoryTab = 0
+                                        showSessionsSheet = true
+                                    }
+                                }
+                                .padding(vertical = 7.dp, horizontal = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Análises AURA",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (onAuraMode) AuraCyan else TextSecondary,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(
+                                    if (isDirectWhatsAppSession) AuraEmerald.copy(alpha = 0.18f) else ObsidianMid
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isDirectWhatsAppSession || totalUnreadHandoffs > 0) {
+                                        AuraEmerald.copy(alpha = 0.75f)
+                                    } else {
+                                        GlassBorderSoft
+                                    },
+                                    RoundedCornerShape(14.dp)
+                                )
+                                .clickable {
+                                    selectedHistoryTab = 1
+                                    showSessionsSheet = true
+                                }
+                                .padding(vertical = 7.dp, horizontal = 10.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.Chat,
+                                contentDescription = null,
+                                tint = if (isDirectWhatsAppSession || totalUnreadHandoffs > 0) AuraEmerald else TextSecondary,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "Retornos WhatsApp",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (isDirectWhatsAppSession || totalUnreadHandoffs > 0) AuraEmerald else TextSecondary,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (totalUnreadHandoffs > 0) {
+                                Spacer(Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(AuraEmerald)
+                                        .padding(horizontal = 6.dp, vertical = 1.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = totalUnreadHandoffs.toString(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = ObsidianBase,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     AnimatedVisibility(
                         visible = incomingHandoffAlert != null,
@@ -566,7 +670,6 @@ fun ChatScreen(
         LaunchedEffect(showSessionsSheet) {
             viewModel.refreshHandoffThreads(syncEvolution = true)
         }
-        var selectedHistoryTab by remember { mutableStateOf(if (totalUnreadHandoffs > 0) 1 else 0) }
         val analysisSessions = remember(sessions) {
             sessions.filter { !it.sessionId.startsWith("wa_handoff_") }
         }
@@ -756,7 +859,7 @@ fun ChatScreen(
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Rounded.Chat,
+                                        imageVector = Icons.AutoMirrored.Rounded.Chat,
                                         contentDescription = null,
                                         tint = if (hasUnread) AuraEmerald else AuraCyan,
                                         modifier = Modifier.size(20.dp)
@@ -1174,7 +1277,7 @@ private fun ActiveWhatsAppSessionBar(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Icon(
-            imageVector = Icons.Rounded.Chat,
+            imageVector = Icons.AutoMirrored.Rounded.Chat,
             contentDescription = null,
             tint = AuraEmerald,
             modifier = Modifier.size(16.dp)
