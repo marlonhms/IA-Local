@@ -364,6 +364,12 @@ class TestAuraProactiveDaemonCircuitBreakerIntegration:
     ) -> None:
         """Se o watchdog estiver CLOSED, o daemon opera normalmente."""
         test_watchdog.reset()
+        test_watchdog._simulated_metrics = {
+            "cpu_percent": 15.0,
+            "ram_percent": 35.0,
+            "ram_available_mb": 4096.0,
+            "ram_total_mb": 8192.0,
+        }
         daemon = AuraProactiveDaemon(
             db_path=":memory:",
             dispatch_enabled=False,
