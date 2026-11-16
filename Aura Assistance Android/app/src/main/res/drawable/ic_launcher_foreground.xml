@@ -1,30 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:pathData="M31,63.928c0,0 6.4,-11 12.1,-13.1c7.2,-2.6 26,-1.4 26,-1.4l38.1,38.1L107,108.928l-32,-1L31,63.928z">
+    <!-- Halo difuso organico -->
+    <path android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0">
         <aapt:attr name="android:fillColor">
             <gradient
-                android:endX="85.84757"
-                android:endY="92.4963"
-                android:startX="42.9492"
-                android:startY="49.59793"
-                android:type="linear">
-                <item
-                    android:color="#44000000"
-                    android:offset="0.0" />
-                <item
-                    android:color="#00000000"
-                    android:offset="1.0" />
+                android:centerX="54"
+                android:centerY="54"
+                android:gradientRadius="40"
+                android:type="radial">
+                <item android:color="#6622D3EE" android:offset="0.0" />
+                <item android:color="#388B5CF6" android:offset="0.55" />
+                <item android:color="#0022D3EE" android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillType="nonZero"
-        android:pathData="M65.3,45.828l3.8,-6.6c0.2,-0.4 0.1,-0.9 -0.3,-1.1c-0.4,-0.2 -0.9,-0.1 -1.1,0.3l-3.9,6.7c-6.3,-2.8 -13.4,-2.8 -19.7,0l-3.9,-6.7c-0.2,-0.4 -0.7,-0.5 -1.1,-0.3C38.8,38.328 38.7,38.828 38.9,39.228l3.8,6.6C36.2,49.428 31.7,56.028 31,63.928h46C76.3,56.028 71.8,49.428 65.3,45.828zM43.4,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2c-0.3,-0.7 -0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C45.3,56.528 44.5,57.328 43.4,57.328L43.4,57.328zM64.6,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2s-0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C66.5,56.528 65.6,57.328 64.6,57.328L64.6,57.328z"
-        android:strokeWidth="1"
-        android:strokeColor="#00000000" />
+
+    <!-- Camada 1: Manto Liquido Externo (Ciano -> Esmeralda -> Roxo) -->
+    <path android:pathData="M83.86,51.56 Q86.09,54.00 87.06,57.00 Q88.04,60.00 87.37,62.95 Q86.69,65.90 84.57,68.16 Q82.44,70.42 79.51,71.69 Q76.59,72.95 73.62,73.39 Q70.65,73.84 68.12,73.96 Q65.60,74.09 63.57,74.40 Q61.54,74.71 59.72,75.42 Q57.90,76.13 55.95,77.03 Q54.00,77.93 51.78,78.57 Q49.55,79.22 47.20,79.20 Q44.84,79.17 42.64,78.32 Q40.45,77.47 38.66,75.95 Q36.86,74.42 35.52,72.53 Q34.18,70.63 33.15,68.63 Q32.12,66.63 31.24,64.62 Q30.36,62.60 29.58,60.52 Q28.80,58.44 28.24,56.22 Q27.69,54.00 27.53,51.65 Q27.38,49.31 27.76,46.95 Q28.15,44.59 29.05,42.35 Q29.95,40.12 31.26,38.07 Q32.57,36.02 34.17,34.15 Q35.77,32.28 37.64,30.59 Q39.52,28.91 41.70,27.56 Q43.88,26.21 46.36,25.46 Q48.83,24.71 51.42,24.85 Q54.00,25.00 56.35,26.15 Q58.71,27.30 60.51,29.22 Q62.32,31.14 63.49,33.33 Q64.67,35.53 65.48,37.44 Q66.29,39.35 67.27,40.70 Q68.25,42.04 69.87,42.97 Q71.49,43.90 73.86,44.91 Q76.23,45.91 78.92,47.52 Q81.62,49.13 83.86,51.56 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="24"
+                android:startY="24"
+                android:endX="84"
+                android:endY="84"
+                android:type="linear">
+                <item android:color="#E622D3EE" android:offset="0.0" />
+                <item android:color="#D910B981" android:offset="0.48" />
+                <item android:color="#E68B5CF6" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Camada 2: Nucleo Secundario Contra-Rotativo -->
+    <path android:pathData="M76.83,51.97 Q76.60,54.00 75.67,55.83 Q74.74,57.66 73.30,59.08 Q71.87,60.50 70.27,61.49 Q68.67,62.47 67.25,63.20 Q65.82,63.92 64.74,64.71 Q63.66,65.51 62.81,66.64 Q61.96,67.78 61.03,69.29 Q60.11,70.80 58.82,72.40 Q57.53,74.00 55.76,75.20 Q54.00,76.41 51.96,76.78 Q49.92,77.15 47.97,76.53 Q46.03,75.91 44.51,74.48 Q43.00,73.06 42.01,71.26 Q41.02,69.47 40.36,67.73 Q39.71,65.99 39.05,64.50 Q38.39,63.01 37.49,61.67 Q36.60,60.33 35.49,58.90 Q34.39,57.46 33.41,55.73 Q32.43,54.00 31.98,52.02 Q31.54,50.04 31.94,48.08 Q32.33,46.11 33.55,44.51 Q34.77,42.90 36.53,41.86 Q38.29,40.82 40.19,40.31 Q42.08,39.80 43.81,39.57 Q45.53,39.34 47.01,39.09 Q48.48,38.85 49.83,38.42 Q51.18,37.99 52.59,37.42 Q54.00,36.85 55.60,36.35 Q57.20,35.84 58.99,35.62 Q60.77,35.40 62.63,35.61 Q64.49,35.83 66.30,36.51 Q68.10,37.19 69.75,38.30 Q71.39,39.40 72.78,40.88 Q74.17,42.36 75.17,44.14 Q76.17,45.93 76.62,47.93 Q77.07,49.93 76.83,51.97 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="54"
+                android:centerY="54"
+                android:gradientRadius="24"
+                android:type="radial">
+                <item android:color="#CC8B5CF6" android:offset="0.0" />
+                <item android:color="#D922D3EE" android:offset="0.65" />
+                <item android:color="#0022D3EE" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Camada 3: Nucleo Incandescente Branco/Ciano -->
+    <path android:pathData="M54,54m-13.5,0a13.5,13.5 0,1 1,27 0a13.5,13.5 0,1 1,-27 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="54"
+                android:centerY="54"
+                android:gradientRadius="13.5"
+                android:type="radial">
+                <item android:color="#FFFFFFFF" android:offset="0.0" />
+                <item android:color="#F0FFFFFF" android:offset="0.32" />
+                <item android:color="#D922D3EE" android:offset="0.68" />
+                <item android:color="#0022D3EE" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 </vector>
