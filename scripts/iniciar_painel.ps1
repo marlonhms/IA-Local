@@ -1,4 +1,4 @@
-# Launcher PowerShell para o Painel Web da AURA
+﻿# Launcher PowerShell para o Painel Web da AURA
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $Host.UI.RawUI.WindowTitle = "AURA // Painel Operacional"
 
@@ -24,4 +24,6 @@ try {
 
 Write-Host ""
 Write-Host "  Iniciando Painel Web da AURA (o navegador abrirá automaticamente)..." -ForegroundColor Cyan
-python server.py
+$projectRoot = Split-Path -Parent $PSScriptRoot
+Set-Location -Path $projectRoot
+python "$projectRoot\server.py"

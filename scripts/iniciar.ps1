@@ -21,5 +21,6 @@ if ($pgService -and $pgService.Status -ne "Running") {
 
 # 3. Rodar o Agente
 Write-Host "`n[*] Iniciando o agente inteligente...`n" -ForegroundColor Cyan
-Set-Location -Path $PSScriptRoot
-python "$PSScriptRoot\main.py"
+$projectRoot = Split-Path -Parent $PSScriptRoot
+Set-Location -Path $projectRoot
+python "$projectRoot\main.py"

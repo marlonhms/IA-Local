@@ -19,7 +19,11 @@ echo ======================================================================
 echo.
 
 :: 3. Executar script PowerShell com bypass de politica
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\configurar_ponte_tailscale.ps1"
+if exist "%~dp0configurar_ponte_tailscale.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0configurar_ponte_tailscale.ps1"
+) else (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\configurar_ponte_tailscale.ps1"
+)
 
 echo.
 pause

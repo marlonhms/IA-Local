@@ -11,6 +11,10 @@ if %errorlevel% neq 0 (
 )
 
 title Reparar Autenticacao PostgreSQL - PDV e AURA
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\reparar_banco.ps1"
+if exist "%~dp0reparar_banco.ps1" (
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0reparar_banco.ps1"
+) else (
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\reparar_banco.ps1"
+)
 pause
 
