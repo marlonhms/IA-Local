@@ -108,6 +108,7 @@ class TestCircuitBreakerStateTransitions:
 
     def test_initial_state_is_closed(self, test_watchdog: HardwareCircuitBreaker) -> None:
         """O circuito recem-criado deve iniciar em CLOSED e permitir operacoes pesadas."""
+        test_watchdog.set_simulated_metrics(cpu_percent=15.0, ram_percent=35.0)
         assert test_watchdog.get_system_metrics()["circuit_state"] == CircuitState.CLOSED.value
         assert test_watchdog.is_heavy_operation_allowed() is True
 
@@ -173,6 +174,7 @@ class TestCircuitBreakerStateTransitions:
 
     def test_manual_trip_and_reset(self, test_watchdog: HardwareCircuitBreaker) -> None:
         """Verifica metodos operacionais manuais de trip e reset."""
+        test_watchdog.set_simulated_metrics(cpu_percent=15.0, ram_percent=35.0)
         test_watchdog.trip("teste de seguranca")
         assert test_watchdog.is_heavy_operation_allowed() is False
         m_trip = test_watchdog.get_system_metrics()

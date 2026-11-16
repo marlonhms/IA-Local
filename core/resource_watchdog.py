@@ -208,24 +208,32 @@ class HardwareCircuitBreaker:
         except (OSError, ValueError, KeyError):
             pass
 
-        cpu_pct = 10.0
+        cpu_pct = self._last_cpu_percent if self._last_sys_idle_time > 0 else 10.0
+        now = time.time()
+        dt = now - self._last_cpu_check
         try:
             if os.path.exists("/proc/stat"):
                 with open("/proc/stat", "r", encoding="utf-8") as f:
                     cpu_line = f.readline()
                     fields = [float(x) for x in cpu_line.strip().split()[1:]]
-                    idle_t = fields[3]
-                    total_t = sum(fields)
-                    if self._last_sys_idle_time > 0:
+                    idle_t = int(fields[3])
+                    total_t = int(sum(fields))
+                    if self._last_sys_idle_time > 0 and dt >= 0.1:
                         d_total = total_t - self._last_sys_user_time
                         d_idle = idle_t - self._last_sys_idle_time
-                        if d_total > 0:
+                        if d_total >= 10:
                             cpu_pct = max(
                                 0.0,
                                 min(100.0, round(((d_total - d_idle) / d_total) * 100.0, 1)),
                             )
-                    self._last_sys_user_time = int(total_t)
-                    self._last_sys_idle_time = int(idle_t)
+                            self._last_cpu_percent = cpu_pct
+                            self._last_sys_user_time = total_t
+                            self._last_sys_idle_time = idle_t
+                            self._last_cpu_check = now
+                    elif self._last_sys_idle_time == 0:
+                        self._last_sys_user_time = total_t
+                        self._last_sys_idle_time = idle_t
+                        self._last_cpu_check = now
             elif hasattr(os, "getloadavg"):
                 load1 = os.getloadavg()[0]
                 cores = os.cpu_count() or 1
