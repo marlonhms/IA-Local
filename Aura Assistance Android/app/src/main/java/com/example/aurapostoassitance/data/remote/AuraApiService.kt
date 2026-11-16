@@ -127,6 +127,7 @@ data class HandoffThreadMessageDto(
     val external_msg_id: String? = null,
     val epoch_ts: Long = 0L,
     val is_read: Int = 0,
+    val ack_status: String? = null,
     val created_at: String? = null
 )
 
@@ -140,6 +141,8 @@ data class HandoffThreadDto(
     val role_label: String? = null,
     val profile_pic_url: String? = null,
     val station_id: String? = null,
+    val delivery_status: String = "SENT",
+    val delivery_status_label: String = "Disparado pela AURA",
     val last_epoch_ts: Long = 0L,
     val last_message_text: String = "",
     val last_direction: String = "OUTBOUND",

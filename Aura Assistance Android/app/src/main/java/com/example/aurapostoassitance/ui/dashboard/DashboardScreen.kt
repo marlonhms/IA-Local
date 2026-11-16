@@ -150,8 +150,8 @@ private val universalTriggers = listOf(
         query = "VISION_SCANNER_TRIGGER"
     ),
     QuickTrigger(
-        title = "Retornos WhatsApp",
-        description = "Acompanhe respostas do Contador, Gerente ou equipe em sessões dedicadas.",
+        title = "Monitor de Gatilhos",
+        description = "Acompanhe entrega, visualização e recebimento dos alertas enviados pela AURA.",
         icon = Icons.AutoMirrored.Rounded.Chat,
         accentColor = AuraEmerald,
         query = "OPEN_WHATSAPP_RETURNS"

@@ -541,3 +541,76 @@ async def test_evolution_contact_identity_enrichment_and_phone_formatting(
     assert threads[0]["formatted_phone"] == "+55 (27) 99227-7217"
 
 
+@pytest.mark.asyncio
+async def test_evolution_ack_progression_sent_delivered_read_and_replied(
+    isolated_journal: AuraCommandJournal,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    now_epoch = int(time.time())
+    isolated_journal.record_handoff_message(
+        thread_phone="5527992277217",
+        direction="OUTBOUND",
+        sender_label="Gestor AURA",
+        message_text="Gatilho SEFAZ enviado.",
+        contact_name="Marlon Henrique",
+        role_label="Contador",
+        epoch_ts=now_epoch,
+    )
+
+    assert isolated_journal.list_handoff_threads()[0]["delivery_status"] == "SENT"
+
+    stage = {"records": []}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/chat/findMessages/webposto-n3"):
+            return httpx.Response(200, json={"messages": {"total": len(stage["records"]), "records": stage["records"]}})
+        if request.url.path.endswith("/chat/findContacts/webposto-n3"):
+            return httpx.Response(200, json=[])
+        return httpx.Response(404)
+
+    monkeypatch.setattr(webhooks_mod, "EVOLUTION_API_URL", "http://mock-evo:8080")
+    monkeypatch.setattr(webhooks_mod, "EVOLUTION_INSTANCE", "webposto-n3")
+    webhooks_mod._evolution_contact_cache.clear()
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        # 1. Entregue no aparelho
+        stage["records"] = [
+            {
+                "key": {"id": "OUT_1", "fromMe": True, "remoteJid": "5527992277217@s.whatsapp.net"},
+                "messageTimestamp": now_epoch + 1,
+                "MessageUpdate": [{"status": "SERVER_ACK"}, {"status": "DELIVERY_ACK"}],
+            }
+        ]
+        await sync_inbound_messages_from_evolution(isolated_journal, force=True, http_client=client)
+        assert isolated_journal.list_handoff_threads()[0]["delivery_status"] == "DELIVERED"
+
+        # 2. Visualizado pelo destinatario no WhatsApp
+        stage["records"] = [
+            {
+                "key": {"id": "OUT_1", "fromMe": True, "remoteJid": "5527992277217@s.whatsapp.net"},
+                "messageTimestamp": now_epoch + 1,
+                "MessageUpdate": [{"status": "DELIVERY_ACK"}, {"status": "READ"}],
+            }
+        ]
+        await sync_inbound_messages_from_evolution(isolated_journal, force=True, http_client=client)
+        th_read = isolated_journal.list_handoff_threads()[0]
+        assert th_read["delivery_status"] == "READ"
+        assert "Visualizado" in th_read["delivery_status_label"]
+
+        # 3. Retorno recebido -> promove para REPLIED
+        stage["records"].append(
+            {
+                "key": {"id": "IN_1", "fromMe": False, "remoteJid": "5527992277217@s.whatsapp.net"},
+                "pushName": "Marlon Henrique",
+                "message": {"conversation": "Recebido e ajustado"},
+                "messageTimestamp": now_epoch + 10,
+            }
+        )
+        await sync_inbound_messages_from_evolution(isolated_journal, force=True, http_client=client)
+        th_replied = isolated_journal.list_handoff_threads()[0]
+        assert th_replied["delivery_status"] == "REPLIED"
+        assert th_replied["unread_count"] == 1
+
+
+

@@ -520,10 +520,17 @@ class AuraCommandJournal:
                     external_msg_id TEXT,
                     epoch_ts INTEGER NOT NULL,
                     is_read INTEGER NOT NULL DEFAULT 0,
+                    ack_status TEXT NOT NULL DEFAULT 'SENT',
                     created_at TEXT NOT NULL
                 );
                 """
             )
+            try:
+                conn.execute(
+                    "ALTER TABLE aura_handoff_messages ADD COLUMN ack_status TEXT NOT NULL DEFAULT 'SENT';"
+                )
+            except sqlite3.OperationalError:
+                pass
             conn.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_handoff_thread_epoch
@@ -1257,6 +1264,7 @@ class AuraCommandJournal:
         external_msg_id: str | None = None,
         epoch_ts: int | None = None,
         is_read: bool | None = None,
+        ack_status: str | None = None,
     ) -> dict[str, Any]:
         """
         Registra uma mensagem OUTBOUND ou INBOUND em aura_handoff_messages.
@@ -1283,6 +1291,7 @@ class AuraCommandJournal:
         clean_station = str(station_id or "posto_01").strip() or "posto_01"
         clean_cmd_key = str(command_key).strip() if command_key and str(command_key).strip() else None
         clean_source = str(source or "android_handoff").strip() or "android_handoff"
+        clean_ack = str(ack_status or ("REPLIED" if norm_dir == "INBOUND" else "SENT")).strip().upper()
 
         with self._connection(immediate=True) as conn:
             if clean_ext is not None:
@@ -1331,8 +1340,8 @@ class AuraCommandJournal:
                     message_id, thread_phone, match_key, contact_name, role_label,
                     station_id, command_key, direction, sender_label, message_text,
                     has_media, media_caption, source, external_msg_id, epoch_ts,
-                    is_read, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    is_read, ack_status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     message_id,
@@ -1351,9 +1360,16 @@ class AuraCommandJournal:
                     clean_ext,
                     eff_epoch,
                     eff_is_read,
+                    clean_ack,
                     created_iso,
                 ),
             )
+            if norm_dir == "INBOUND":
+                conn.execute(
+                    "UPDATE aura_handoff_messages SET ack_status = 'REPLIED' "
+                    "WHERE match_key = ? AND direction = 'OUTBOUND'",
+                    (mkey,),
+                )
             inserted = conn.execute(
                 "SELECT * FROM aura_handoff_messages WHERE message_id = ?",
                 (message_id,),
@@ -1525,6 +1541,22 @@ class AuraCommandJournal:
                         None,
                     )
                 )
+                rank_map = {"PENDING": 0, "SENT": 1, "DELIVERED": 2, "READ": 3, "REPLIED": 4}
+                label_map = {
+                    "PENDING": "Enfileirado",
+                    "SENT": "Disparado pela AURA",
+                    "DELIVERED": "Entregue no Aparelho",
+                    "READ": "Visualizado no WhatsApp",
+                    "REPLIED": "Visualizado e Respondido",
+                }
+                has_inbound = any(str(m.get("direction") or "").upper() == "INBOUND" for m in messages)
+                best_ack = "REPLIED" if has_inbound else "SENT"
+                if not has_inbound:
+                    for m in messages:
+                        if str(m.get("direction") or "").upper() == "OUTBOUND":
+                            cand_ack = str(m.get("ack_status") or "SENT").upper()
+                            if rank_map.get(cand_ack, 1) > rank_map.get(best_ack, 1):
+                                best_ack = cand_ack
                 formatted_phone = format_brazil_phone_display(t_phone)
                 threads.append(
                     {
@@ -1535,6 +1567,8 @@ class AuraCommandJournal:
                         "contact_name": resolved_name or role_label or formatted_phone,
                         "role_label": role_label or "WhatsApp",
                         "station_id": station_id,
+                        "delivery_status": best_ack,
+                        "delivery_status_label": label_map.get(best_ack, "Disparado pela AURA"),
                         "last_epoch_ts": int(tr["last_epoch_ts"] or 0),
                         "last_message_text": str(last_msg.get("message_text") or ""),
                         "last_direction": str(last_msg.get("direction") or "OUTBOUND"),
@@ -1545,6 +1579,34 @@ class AuraCommandJournal:
                     }
                 )
             return threads
+
+    def update_outbound_ack_status(self, raw_phone: str, ack_status: str) -> int:
+        """
+        Promove o ack_status (SENT -> DELIVERED -> READ -> REPLIED) dos gatilhos OUTBOUND
+        do contato sem jamais rebaixar um status ja alcancado.
+        """
+        mkey = phone_match_key(raw_phone)
+        target = str(ack_status or "SENT").strip().upper()
+        rank_map = {"PENDING": 0, "SENT": 1, "DELIVERED": 2, "READ": 3, "REPLIED": 4}
+        target_rank = rank_map.get(target, 1)
+        if not mkey:
+            return 0
+        with self._connection(immediate=True) as conn:
+            rows = conn.execute(
+                "SELECT message_id, ack_status FROM aura_handoff_messages "
+                "WHERE match_key = ? AND direction = 'OUTBOUND'",
+                (mkey,),
+            ).fetchall()
+            updated = 0
+            for row in rows:
+                curr = str(row["ack_status"] or "SENT").strip().upper()
+                if target_rank > rank_map.get(curr, 1):
+                    conn.execute(
+                        "UPDATE aura_handoff_messages SET ack_status = ? WHERE message_id = ?",
+                        (target, row["message_id"]),
+                    )
+                    updated += 1
+            return updated
 
     def update_thread_contact_identity(
         self,

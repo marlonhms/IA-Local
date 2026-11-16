@@ -54,6 +54,7 @@ import androidx.compose.material.icons.rounded.Assessment
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.LocalGasStation
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.PointOfSale
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
@@ -1698,7 +1699,7 @@ enum class AuraNavTab(
 ) {
     PULSO("Pulso", Icons.Rounded.Assessment),
     COCKPIT("Cockpit", Icons.Rounded.AutoAwesome),
-    RETORNOS("Retornos", Icons.AutoMirrored.Rounded.Chat),
+    RETORNOS("Gatilhos", Icons.Rounded.NotificationsActive),
     TANQUES("Tanques", Icons.Rounded.LocalGasStation),
     CONEXAO("Servidor", Icons.Rounded.Tune)
 }

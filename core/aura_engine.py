@@ -4348,6 +4348,42 @@ class AuraEngine:
             contexto_extra = f"Aviso de execução da ferramenta ({intencao}): Indisponibilidade técnica ao consultar dados ({str(e)}).\n"
 
         tool_lat_ms = (time.perf_counter() - t0) * 1000
+        q_lower_handoff = pergunta.lower()
+        if any(
+            kw in q_lower_handoff
+            for kw in (
+                "whatsapp",
+                "gatilho",
+                "retorno",
+                "retornos",
+                "visualiz",
+                "entregue",
+                "respondeu",
+                "contador",
+                "gerente",
+                "enviado",
+            )
+        ):
+            try:
+                from core.command_journal import get_command_journal
+
+                handoff_threads = get_command_journal().list_handoff_threads(limit=5)
+                if handoff_threads:
+                    lines = ["\n[MONITOR DE GATILHOS WHATSAPP - VISUALIZACAO E RETORNOS RECIBOS]:"]
+                    for th in handoff_threads:
+                        replies = [
+                            str(m.get("message_text") or "").strip()
+                            for m in (th.get("messages") or [])
+                            if str(m.get("direction") or "").upper() == "INBOUND"
+                        ]
+                        replies_summary = " | ".join(replies[-3:]) if replies else "Sem retorno textual ainda"
+                        lines.append(
+                            f"- Destinatario: {th.get('contact_name')} ({th.get('role_label')}, {th.get('formatted_phone')}) | "
+                            f"Status: {th.get('delivery_status_label')} | Retornos: {replies_summary}"
+                        )
+                    contexto_extra += "\n".join(lines) + "\n"
+            except Exception:
+                pass
         if self._is_heavy_tool(intencao):
             self.watchdog.record_execution_impact(tool_lat_ms / 1000.0)
         return contexto_extra, resultado_bruto, telemetria_retrieval, cache_hit, tool_lat_ms

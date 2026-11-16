@@ -208,14 +208,7 @@ fun ChatScreen(
     val totalUnreadHandoffs by viewModel.totalUnreadHandoffs.collectAsState()
     val incomingHandoffAlert by viewModel.incomingHandoffAlert.collectAsState()
     val isWhatsAppReturnsMode by viewModel.isWhatsAppReturnsMode.collectAsState()
-    val isViewingWhatsAppContactHub by viewModel.isViewingWhatsAppContactHub.collectAsState()
     val isSyncingHandoffs by viewModel.isSyncingHandoffs.collectAsState()
-    val isDirectWhatsAppSession = currentSessionId.startsWith("wa_handoff_")
-    val activeHandoffThread = remember(currentSessionId, handoffThreads) {
-        handoffThreads.firstOrNull {
-            it.session_id == currentSessionId || "wa_handoff_${it.thread_phone}" == currentSessionId
-        }
-    }
 
     LaunchedEffect(initialQuery) {
         if (initialQuery == "OPEN_WHATSAPP_RETURNS") {
@@ -274,7 +267,6 @@ fun ChatScreen(
     }
     var showMenu by remember { mutableStateOf(false) }
     var showSessionsSheet by remember { mutableStateOf(false) }
-    var selectedHistoryTab by remember { mutableStateOf(if (initialQuery == "OPEN_WHATSAPP_RETURNS") 1 else 0) }
     var showCommandHubSheet by remember { mutableStateOf(false) }
     var showVisionScanner by remember { mutableStateOf(false) }
     var selectedMenuMessage by remember { mutableStateOf<ChatMessage?>(null) }
@@ -359,7 +351,6 @@ fun ChatScreen(
                         },
                         onBack = onNavigateBack,
                         onHistory = {
-                            selectedHistoryTab = if (totalUnreadHandoffs > 0 || isDirectWhatsAppSession) 1 else 0
                             showSessionsSheet = true
                         },
                         onNewChat = { viewModel.createNewChat("Novo Chat") },
@@ -391,7 +382,7 @@ fun ChatScreen(
                         }
                     )
 
-                    // Abas sempre visíveis no topo: Análises AURA | Retornos WhatsApp
+                    // Abas sempre visíveis no topo: Análises AURA | Gatilhos WhatsApp
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -399,8 +390,8 @@ fun ChatScreen(
                             .padding(horizontal = 12.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        val onAuraMode = !isWhatsAppReturnsMode && !isDirectWhatsAppSession
-                        val onWhatsAppMode = isWhatsAppReturnsMode || isDirectWhatsAppSession
+                        val onAuraMode = !isWhatsAppReturnsMode
+                        val onMonitorMode = isWhatsAppReturnsMode
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -431,11 +422,11 @@ fun ChatScreen(
                                 .weight(1f)
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(
-                                    if (onWhatsAppMode) AuraEmerald.copy(alpha = 0.18f) else ObsidianMid
+                                    if (onMonitorMode) AuraEmerald.copy(alpha = 0.18f) else ObsidianMid
                                 )
                                 .border(
                                     1.dp,
-                                    if (onWhatsAppMode || totalUnreadHandoffs > 0) {
+                                    if (onMonitorMode || totalUnreadHandoffs > 0) {
                                         AuraEmerald.copy(alpha = 0.75f)
                                     } else {
                                         GlassBorderSoft
@@ -443,7 +434,6 @@ fun ChatScreen(
                                     RoundedCornerShape(14.dp)
                                 )
                                 .clickable {
-                                    selectedHistoryTab = 1
                                     viewModel.openWhatsAppContactsHub()
                                 }
                                 .padding(vertical = 7.dp, horizontal = 10.dp),
@@ -453,14 +443,14 @@ fun ChatScreen(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.Chat,
                                 contentDescription = null,
-                                tint = if (onWhatsAppMode || totalUnreadHandoffs > 0) AuraEmerald else TextSecondary,
+                                tint = if (onMonitorMode || totalUnreadHandoffs > 0) AuraEmerald else TextSecondary,
                                 modifier = Modifier.size(15.dp)
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                text = "Retornos WhatsApp",
+                                text = "Gatilhos WhatsApp",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = if (onWhatsAppMode || totalUnreadHandoffs > 0) AuraEmerald else TextSecondary,
+                                color = if (onMonitorMode || totalUnreadHandoffs > 0) AuraEmerald else TextSecondary,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -495,37 +485,6 @@ fun ChatScreen(
                                 alert = alert,
                                 onOpen = { viewModel.openHandoffThread(alert.sessionId, alert.phone) },
                                 onDismiss = { viewModel.dismissIncomingHandoffAlert() }
-                            )
-                        }
-                    }
-
-                    AnimatedVisibility(
-                        visible = isDirectWhatsAppSession && !isViewingWhatsAppContactHub,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
-                    ) {
-                        Column {
-                            val rawPhone = currentSessionId.removePrefix("wa_handoff_")
-                            val displayName = activeHandoffThread?.let { viewModel.resolveContactDisplayName(it) }
-                                ?: sessionTitle.removePrefix("📲 ").substringBefore(" • ").ifBlank { rawPhone }
-                            val roleLabel = activeHandoffThread?.role_label?.takeIf { it.isNotBlank() } ?: "WhatsApp"
-                            val formattedPhone = activeHandoffThread?.formatted_phone?.takeIf { it.isNotBlank() }
-                                ?: viewModel.formatPhoneDisplay(rawPhone)
-                            if (handoffThreads.size > 1) {
-                                QuickContactSwitcherRow(
-                                    threads = handoffThreads,
-                                    activeSessionId = currentSessionId,
-                                    resolveName = { viewModel.resolveContactDisplayName(it) },
-                                    onBackToHub = { viewModel.openWhatsAppContactsHub() },
-                                    onSelectThread = { th -> viewModel.openHandoffThread(th.session_id, th.thread_phone) }
-                                )
-                            }
-                            ActiveWhatsAppSessionBar(
-                                contactName = displayName,
-                                roleLabel = roleLabel,
-                                formattedPhone = formattedPhone,
-                                onBackToContacts = { viewModel.openWhatsAppContactsHub() },
-                                onBackToAura = { viewModel.switchToAuraMode("default", "AURA") }
                             )
                         }
                     }
@@ -575,17 +534,13 @@ fun ChatScreen(
                         }
                     }
 
-                    if (!(isWhatsAppReturnsMode && isViewingWhatsAppContactHub)) {
+                    if (!isWhatsAppReturnsMode) {
                         Composer(
                             text = inputText,
                             onTextChange = { inputText = it },
                             enabled = !isTyping,
-                            placeholderText = if (isDirectWhatsAppSession) {
-                                "Responder no WhatsApp (ou @aura p/ perguntar à IA)..."
-                            } else {
-                                "Pergunte à AURA sobre o posto..."
-                            },
-                            showSuggestions = !isDirectWhatsAppSession,
+                            placeholderText = "Pergunte à AURA sobre o posto...",
+                            showSuggestions = true,
                             onSend = {
                                 val toSend = inputText
                                 inputText = ""
@@ -609,14 +564,15 @@ fun ChatScreen(
                     .padding(padding)
                     .clipToBounds()
             ) {
-                if (isWhatsAppReturnsMode && isViewingWhatsAppContactHub) {
+                if (isWhatsAppReturnsMode) {
                     WhatsAppContactsHubView(
                         threads = handoffThreads,
                         isSyncing = isSyncingHandoffs,
                         resolveContactName = { viewModel.resolveContactDisplayName(it) },
                         formatPhone = { it.formatted_phone?.takeIf { f -> f.isNotBlank() } ?: viewModel.formatPhoneDisplay(it.thread_phone) },
                         onRefresh = { viewModel.refreshHandoffThreads(syncEvolution = true) },
-                        onOpenThread = { th -> viewModel.openHandoffThread(th.session_id, th.thread_phone) },
+                        onMarkThreadRead = { phone -> viewModel.markThreadRead(phone) },
+                        onAskAura = { th -> viewModel.askAuraAboutHandoff(th) },
                         onBackToAura = { viewModel.switchToAuraMode("default", "AURA") }
                     )
                 } else if (messages.isEmpty() && !isTyping) {
@@ -639,7 +595,6 @@ fun ChatScreen(
                             items(reversedMessages, key = { "${currentSessionId}:${it.id}" }) { message ->
                                 MessageItem(
                                     message = message,
-                                    isWhatsAppSession = isDirectWhatsAppSession,
                                     onAction = onAction,
                                     onDrillDown = { send(it) },
                                     speakingMessageId = speakingMessageId,
@@ -717,14 +672,8 @@ fun ChatScreen(
     }
 
     if (showSessionsSheet) {
-        LaunchedEffect(showSessionsSheet) {
-            viewModel.refreshHandoffThreads(syncEvolution = true)
-        }
         val analysisSessions = remember(sessions) {
             sessions.filter { !it.sessionId.startsWith("wa_handoff_") }
-        }
-        val localHandoffSessions = remember(sessions) {
-            sessions.filter { it.sessionId.startsWith("wa_handoff_") }
         }
 
         ModalBottomSheet(
@@ -740,271 +689,66 @@ fun ChatScreen(
                     .padding(bottom = 28.dp)
             ) {
                 Text(
-                    "Histórico de Conversas",
+                    "Histórico da AURA",
                     style = MaterialTheme.typography.headlineSmall,
                     color = TextPrimary
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Alternar entre análises com a AURA e retornos no WhatsApp",
+                    "Suas consultas e análises executivas com a Assessora AURA",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary
                 )
                 Spacer(Modifier.height(14.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                AuraCard(
+                    onClick = {
+                        viewModel.createNewChat("Novo Chat")
+                        showSessionsSheet = false
+                    },
+                    accent = AuraCyan,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    val isAuraTab = selectedHistoryTab == 0
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(if (isAuraTab) AuraCyan.copy(alpha = 0.16f) else ObsidianMid)
-                            .border(
-                                1.dp,
-                                if (isAuraTab) AuraCyan else GlassBorderSoft,
-                                RoundedCornerShape(14.dp)
-                            )
-                            .clickable { selectedHistoryTab = 0 }
-                            .padding(vertical = 10.dp, horizontal = 12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Análises AURA",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (isAuraTab) AuraCyan else TextSecondary,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1
-                        )
-                    }
-
-                    val isWaTab = selectedHistoryTab == 1
                     Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(if (isWaTab) AuraEmerald.copy(alpha = 0.16f) else ObsidianMid)
-                            .border(
-                                1.dp,
-                                if (isWaTab) AuraEmerald else GlassBorderSoft,
-                                RoundedCornerShape(14.dp)
-                            )
-                            .clickable { selectedHistoryTab = 1 }
-                            .padding(vertical = 10.dp, horizontal = 12.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        Icon(Icons.Default.Add, null, tint = AuraCyan)
                         Text(
-                            text = "Retornos WhatsApp",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (isWaTab) AuraEmerald else TextSecondary,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1
+                            "Nova conversa com a AURA",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold
                         )
-                        if (totalUnreadHandoffs > 0) {
-                            Spacer(Modifier.width(6.dp))
-                            Box(
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(AuraEmerald)
-                                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = totalUnreadHandoffs.toString(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = ObsidianBase,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
                     }
                 }
 
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(12.dp))
 
-                if (selectedHistoryTab == 0) {
-                    AuraCard(
-                        onClick = {
-                            viewModel.createNewChat("Novo Chat")
-                            showSessionsSheet = false
-                        },
-                        accent = AuraCyan,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(analysisSessions, key = { it.sessionId }) { session ->
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(ObsidianMid)
+                                .border(1.dp, GlassBorderSoft, RoundedCornerShape(16.dp))
+                                .clickable {
+                                    viewModel.loadSession(session.sessionId, session.title)
+                                    showSessionsSheet = false
+                                }
+                                .padding(start = 16.dp, top = 6.dp, bottom = 6.dp, end = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Add, null, tint = AuraCyan)
                             Text(
-                                "Nova conversa",
-                                style = MaterialTheme.typography.titleSmall,
+                                text = session.title,
+                                style = MaterialTheme.typography.bodyLarge,
                                 color = TextPrimary,
-                                fontWeight = FontWeight.SemiBold
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1
                             )
-                        }
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(analysisSessions, key = { it.sessionId }) { session ->
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(ObsidianMid)
-                                    .border(1.dp, GlassBorderSoft, RoundedCornerShape(16.dp))
-                                    .clickable {
-                                        viewModel.loadSession(session.sessionId, session.title)
-                                        showSessionsSheet = false
-                                    }
-                                    .padding(start = 16.dp, top = 6.dp, bottom = 6.dp, end = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = session.title,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = TextPrimary,
-                                    modifier = Modifier.weight(1f),
-                                    maxLines = 1
-                                )
-                                IconButton(onClick = { viewModel.deleteSession(session.sessionId) }) {
-                                    Icon(Icons.Default.Delete, "Excluir conversa", tint = TextMuted)
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    if (handoffThreads.isEmpty() && localHandoffSessions.isEmpty()) {
-                        Text(
-                            text = "Nenhum contato acionado via WhatsApp ainda. Envie um relatório pela AURA para abrir uma conversa dedicada aqui.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextMuted,
-                            modifier = Modifier.padding(vertical = 12.dp)
-                        )
-                    } else if (handoffThreads.isNotEmpty()) {
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(handoffThreads, key = { it.session_id }) { thread ->
-                                val hasUnread = thread.unread_count > 0
-                                Row(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .background(ObsidianMid)
-                                        .border(
-                                            1.dp,
-                                            if (hasUnread) AuraEmerald.copy(alpha = 0.65f) else GlassBorderSoft,
-                                            RoundedCornerShape(16.dp)
-                                        )
-                                        .clickable {
-                                            viewModel.openHandoffThread(thread.session_id, thread.thread_phone)
-                                            showSessionsSheet = false
-                                        }
-                                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Rounded.Chat,
-                                        contentDescription = null,
-                                        tint = if (hasUnread) AuraEmerald else AuraCyan,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Column(Modifier.weight(1f)) {
-                                        val resolvedName = viewModel.resolveContactDisplayName(thread)
-                                        val formattedPhone = thread.formatted_phone?.takeIf { it.isNotBlank() }
-                                            ?: viewModel.formatPhoneDisplay(thread.thread_phone)
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Text(
-                                                text = resolvedName,
-                                                style = MaterialTheme.typography.titleSmall,
-                                                color = TextPrimary,
-                                                fontWeight = FontWeight.SemiBold,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.weight(1f, fill = false)
-                                            )
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(AuraCyan.copy(alpha = 0.16f))
-                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                                            ) {
-                                                Text(
-                                                    text = thread.role_label ?: "WhatsApp",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = AuraCyan,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    maxLines = 1
-                                                )
-                                            }
-                                        }
-                                        Text(
-                                            text = formattedPhone,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = TextMuted,
-                                            maxLines = 1
-                                        )
-                                        Spacer(Modifier.height(2.dp))
-                                        Text(
-                                            text = thread.last_message_text.ifBlank { "Sem prévia" },
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = if (hasUnread) AuraEmerald else TextSecondary,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                    if (hasUnread) {
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(CircleShape)
-                                                .background(AuraEmerald)
-                                                .padding(horizontal = 8.dp, vertical = 3.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = thread.unread_count.toString(),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = ObsidianBase,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(localHandoffSessions, key = { it.sessionId }) { session ->
-                                Row(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .background(ObsidianMid)
-                                        .border(1.dp, GlassBorderSoft, RoundedCornerShape(16.dp))
-                                        .clickable {
-                                            viewModel.openHandoffThread(session.sessionId)
-                                            showSessionsSheet = false
-                                        }
-                                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = session.title,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = TextPrimary,
-                                        modifier = Modifier.weight(1f),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
+                            IconButton(onClick = { viewModel.deleteSession(session.sessionId) }) {
+                                Icon(Icons.Default.Delete, "Excluir conversa", tint = TextMuted)
                             }
                         }
                     }
@@ -1329,189 +1073,6 @@ private fun HandoffReplyTopBanner(
 }
 
 @Composable
-private fun ActiveWhatsAppSessionBar(
-    contactName: String,
-    roleLabel: String,
-    formattedPhone: String,
-    onBackToContacts: () -> Unit,
-    onBackToAura: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(ObsidianLow)
-            .background(AuraEmerald.copy(alpha = 0.14f))
-            .border(0.5.dp, AuraEmerald.copy(alpha = 0.45f))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        ContactInitialsAvatar(
-            name = contactName,
-            hasAlert = false,
-            size = 30.dp
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = contactName,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = TextPrimary,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(AuraEmerald.copy(alpha = 0.22f))
-                        .padding(horizontal = 6.dp, vertical = 1.dp)
-                ) {
-                    Text(
-                        text = roleLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AuraEmerald,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1
-                    )
-                }
-            }
-            Text(
-                text = formattedPhone,
-                style = MaterialTheme.typography.labelSmall,
-                color = TextMuted,
-                maxLines = 1
-            )
-        }
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(ObsidianMid)
-                .border(1.dp, AuraEmerald.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                .clickable { onBackToContacts() }
-                .padding(horizontal = 9.dp, vertical = 5.dp)
-        ) {
-            Text(
-                text = "Contatos",
-                style = MaterialTheme.typography.labelSmall,
-                color = AuraEmerald,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(ObsidianMid)
-                .border(1.dp, AuraCyan.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
-                .clickable { onBackToAura() }
-                .padding(horizontal = 9.dp, vertical = 5.dp)
-        ) {
-            Text(
-                text = "AURA",
-                style = MaterialTheme.typography.labelSmall,
-                color = AuraCyan,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-    }
-}
-
-@Composable
-private fun QuickContactSwitcherRow(
-    threads: List<HandoffThreadDto>,
-    activeSessionId: String,
-    resolveName: (HandoffThreadDto) -> String,
-    onBackToHub: () -> Unit,
-    onSelectThread: (HandoffThreadDto) -> Unit
-) {
-    LazyRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(ObsidianBase)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        item {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(ObsidianMid)
-                    .border(1.dp, GlassBorderSoft, RoundedCornerShape(12.dp))
-                    .clickable { onBackToHub() }
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = "Todos (${threads.size})",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = TextSecondary,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-        items(threads, key = { it.session_id }) { thread ->
-            val isActive = thread.session_id == activeSessionId
-            val name = resolveName(thread)
-            val hasUnread = thread.unread_count > 0
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(
-                        when {
-                            isActive -> AuraEmerald.copy(alpha = 0.22f)
-                            hasUnread -> AuraEmerald.copy(alpha = 0.10f)
-                            else -> ObsidianMid
-                        }
-                    )
-                    .border(
-                        1.dp,
-                        when {
-                            isActive -> AuraEmerald
-                            hasUnread -> AuraEmerald.copy(alpha = 0.5f)
-                            else -> GlassBorderSoft
-                        },
-                        RoundedCornerShape(14.dp)
-                    )
-                    .clickable { onSelectThread(thread) }
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                if (hasUnread || thread.last_direction.equals("INBOUND", ignoreCase = true)) {
-                    StatusDot(color = AuraEmerald, size = 6.dp, pulsing = hasUnread)
-                }
-                Text(
-                    text = name,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (isActive) AuraEmerald else TextPrimary,
-                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                    maxLines = 1
-                )
-                if (hasUnread) {
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(AuraEmerald)
-                            .padding(horizontal = 5.dp, vertical = 1.dp)
-                    ) {
-                        Text(
-                            text = thread.unread_count.toString(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = ObsidianBase,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun ContactInitialsAvatar(
     name: String,
     hasAlert: Boolean,
@@ -1583,14 +1144,18 @@ private fun WhatsAppContactsHubView(
     resolveContactName: (HandoffThreadDto) -> String,
     formatPhone: (HandoffThreadDto) -> String,
     onRefresh: () -> Unit,
-    onOpenThread: (HandoffThreadDto) -> Unit,
+    onMarkThreadRead: (String) -> Unit,
+    onAskAura: (HandoffThreadDto) -> Unit,
     onBackToAura: () -> Unit
 ) {
-    var selectedFilter by remember { mutableStateOf(0) } // 0 = Todos, 1 = Nao Lidos, 2 = Respondidos
+    var selectedFilter by remember { mutableStateOf(0) } // 0 = Todos, 1 = Novos Retornos, 2 = Visualizados/Respondidos
+    var expandedThreadIds by remember { mutableStateOf(setOf<String>()) }
     val unreadThreads = remember(threads) { threads.filter { it.unread_count > 0 } }
     val repliedThreads = remember(threads) {
         threads.filter { th ->
-            th.last_direction.equals("INBOUND", ignoreCase = true) ||
+            th.delivery_status.equals("REPLIED", ignoreCase = true) ||
+                th.delivery_status.equals("READ", ignoreCase = true) ||
+                th.last_direction.equals("INBOUND", ignoreCase = true) ||
                 th.messages.any { it.direction.equals("INBOUND", ignoreCase = true) }
         }
     }
@@ -1621,15 +1186,15 @@ private fun WhatsAppContactsHubView(
                 ) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(
-                            text = "Retornos por Contato",
+                            text = "Monitor de Gatilhos WhatsApp",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = TextPrimary
                         )
                         Text(
                             text = if (threads.isEmpty()) {
-                                "Nenhum contato acionado nas últimas 72h"
+                                "Nenhum gatilho disparado nas últimas 72h"
                             } else {
-                                "${threads.size} contato(s) • ${unreadThreads.sumOf { it.unread_count }} retorno(s) não lido(s)"
+                                "Visualização e recebimento • ${threads.size} destinatário(s)"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary
@@ -1654,13 +1219,13 @@ private fun WhatsAppContactsHubView(
                         } else {
                             Icon(
                                 imageVector = Icons.Rounded.Refresh,
-                                contentDescription = "Sincronizar Evolution",
+                                contentDescription = "Atualizar status",
                                 tint = AuraEmerald,
                                 modifier = Modifier.size(15.dp)
                             )
                         }
                         Text(
-                            text = "Sincronizar",
+                            text = "Atualizar",
                             style = MaterialTheme.typography.labelMedium,
                             color = AuraEmerald,
                             fontWeight = FontWeight.SemiBold
@@ -1675,8 +1240,8 @@ private fun WhatsAppContactsHubView(
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val filters = listOf(
                         Triple(0, "Todos (${threads.size})", AuraCyan),
-                        Triple(1, "Não Lidos (${unreadThreads.size})", AuraEmerald),
-                        Triple(2, "Respondidos (${repliedThreads.size})", AuraPurple)
+                        Triple(1, "Novos Retornos (${unreadThreads.size})", AuraEmerald),
+                        Triple(2, "Visualizados (${repliedThreads.size})", AuraPurple)
                     )
                     items(filters) { (idx, label, accent) ->
                         val active = selectedFilter == idx
@@ -1725,21 +1290,21 @@ private fun WhatsAppContactsHubView(
                         )
                         Text(
                             text = if (threads.isEmpty()) {
-                                "Nenhum retorno WhatsApp ainda"
+                                "Nenhum gatilho enviado ainda"
                             } else {
-                                "Nenhum contato neste filtro"
+                                "Nenhum gatilho neste filtro"
                             },
                             style = MaterialTheme.typography.titleSmall,
                             color = TextPrimary,
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = "Envie um diagnóstico ou XML pela AURA para acompanhar aqui cada contato e suas respostas em tempo real.",
+                            text = "Quando a AURA disparar um alerta ou relatório fiscal no WhatsApp, acompanhe aqui se foi entregue, visualizado e qual foi a confirmação recebida.",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary
                         )
                         AuraChip(
-                            label = "Ir para Análises AURA",
+                            label = "Voltar para Assessora AURA",
                             icon = Icons.Rounded.AutoAwesome,
                             onClick = onBackToAura
                         )
@@ -1752,19 +1317,54 @@ private fun WhatsAppContactsHubView(
                 val formattedPhone = formatPhone(thread)
                 val roleLabel = thread.role_label?.takeIf { it.isNotBlank() } ?: "WhatsApp"
                 val hasUnread = thread.unread_count > 0
-                val isInboundLast = thread.last_direction.equals("INBOUND", ignoreCase = true)
+                val inboundMessages = remember(thread.messages) {
+                    thread.messages.filter { it.direction.equals("INBOUND", ignoreCase = true) }
+                }
+                val outboundMessages = remember(thread.messages) {
+                    thread.messages.filter { it.direction.equals("OUTBOUND", ignoreCase = true) }
+                }
+                val lastOutbound = outboundMessages.lastOrNull()
+                val isReplied = inboundMessages.isNotEmpty() || thread.delivery_status.equals("REPLIED", ignoreCase = true)
+                val stageRank = when {
+                    isReplied -> 4
+                    thread.delivery_status.equals("READ", ignoreCase = true) -> 3
+                    thread.delivery_status.equals("DELIVERED", ignoreCase = true) -> 2
+                    else -> 1
+                }
+                val statusBadgeLabel = when (stageRank) {
+                    4 -> "✓✓ Visualizado e Respondido"
+                    3 -> "✓✓ Visualizado no WhatsApp"
+                    2 -> "✓✓ Entregue no Aparelho"
+                    else -> "✓ Disparado pela AURA"
+                }
+                val statusAccent = when (stageRank) {
+                    4 -> AuraEmerald
+                    3 -> AuraCyan
+                    2 -> AuraCyan.copy(alpha = 0.85f)
+                    else -> TextSecondary
+                }
                 val timeLabel = formatRelativeEpoch(thread.last_epoch_ts)
-                val inboundCount = thread.messages.count { it.direction.equals("INBOUND", ignoreCase = true) }
+                val isExpanded = expandedThreadIds.contains(thread.session_id)
 
                 SpatialGlassCard(
-                    onClick = { onOpenThread(thread) },
+                    onClick = {
+                        expandedThreadIds = if (isExpanded) {
+                            expandedThreadIds - thread.session_id
+                        } else {
+                            expandedThreadIds + thread.session_id
+                        }
+                        if (hasUnread) {
+                            onMarkThreadRead(thread.thread_phone)
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
-                    accent = if (hasUnread || isInboundLast) AuraEmerald else AuraCyan,
+                    accent = if (hasUnread || isReplied) AuraEmerald else AuraCyan,
                     glowActive = hasUnread,
                     iridescentBorder = true,
                     contentPadding = PaddingValues(14.dp)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        // 1. Destinatário + Função + Badge de Novo Retorno
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -1772,8 +1372,8 @@ private fun WhatsAppContactsHubView(
                         ) {
                             ContactInitialsAvatar(
                                 name = contactName,
-                                hasAlert = hasUnread || isInboundLast,
-                                size = 46.dp
+                                hasAlert = hasUnread || isReplied,
+                                size = 44.dp
                             )
                             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Row(
@@ -1827,61 +1427,185 @@ private fun WhatsAppContactsHubView(
                             if (hasUnread) {
                                 Box(
                                     modifier = Modifier
-                                        .clip(CircleShape)
+                                        .clip(RoundedCornerShape(12.dp))
                                         .background(AuraEmerald)
+                                        .clickable { onMarkThreadRead(thread.thread_phone) }
                                         .padding(horizontal = 8.dp, vertical = 4.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = thread.unread_count.toString(),
+                                        text = "Marcar visto (${thread.unread_count})",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = ObsidianBase,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
-                            } else if (inboundCount > 0) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(AuraEmerald.copy(alpha = 0.14f))
-                                        .padding(horizontal = 7.dp, vertical = 3.dp)
-                                ) {
+                            }
+                        }
+
+                        // 2. Stepper Visual de 4 Estágios (Disparado -> Entregue -> Visualizado -> Respondido)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(ObsidianBase.copy(alpha = 0.65f))
+                                .border(0.5.dp, statusAccent.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = statusBadgeLabel,
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = statusAccent
+                                )
+                                Text(
+                                    text = "${outboundMessages.size} envio(s) • ${inboundMessages.size} retorno(s)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextMuted
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                val steps = listOf(
+                                    1 to "Disparado",
+                                    2 to "Entregue",
+                                    3 to "Visualizado",
+                                    4 to "Respondido"
+                                )
+                                steps.forEach { (rank, label) ->
+                                    val reached = stageRank >= rank
+                                    val stepColor = when {
+                                        !reached -> ObsidianBright
+                                        rank == 4 -> AuraEmerald
+                                        else -> AuraCyan
+                                    }
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(4.dp)
+                                                .clip(RoundedCornerShape(2.dp))
+                                                .background(stepColor)
+                                        )
+                                        Text(
+                                            text = label,
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp),
+                                            color = if (reached) stepColor else TextMuted,
+                                            fontWeight = if (reached) FontWeight.SemiBold else FontWeight.Normal,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // 3. Gatilho Enviado pela AURA (Resumo expansível inline)
+                        lastOutbound?.let { triggerMsg ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(ObsidianLow)
+                                    .border(0.5.dp, GlassBorderSoft, RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 12.dp, vertical = 9.dp)
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "↗ GATILHO ENVIADO PELA AURA",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = AuraCyan
+                                        )
+                                        Text(
+                                            text = if (isExpanded) "Recolher ▲" else "Expandir ▼",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = AuraCyan
+                                        )
+                                    }
                                     Text(
-                                        text = "$inboundCount resp.",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = AuraEmerald,
-                                        fontWeight = FontWeight.SemiBold
+                                        text = triggerMsg.message_text.replace("*", "").trim(),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = TextSecondary,
+                                        maxLines = if (isExpanded) 18 else 2,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
                         }
 
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(ObsidianBase.copy(alpha = 0.55f))
-                                .border(
-                                    0.5.dp,
-                                    if (isInboundLast) AuraEmerald.copy(alpha = 0.45f) else GlassBorderSoft,
-                                    RoundedCornerShape(12.dp)
-                                )
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        // 4. Confirmações Recebidas (Somente-Leitura) + Ação com a Assessora AURA
+                        if (inboundMessages.isNotEmpty()) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(AuraEmerald.copy(alpha = 0.08f))
+                                    .border(0.5.dp, AuraEmerald.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
                                 Text(
-                                    text = if (isInboundLast) "↩ Resposta recebida" else "↗ Enviado pela AURA",
+                                    text = "↩ CONFIRMAÇÃO RECEBIDA DE ${contactName.uppercase()}",
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = if (isInboundLast) AuraEmerald else TextMuted
+                                    color = AuraEmerald
                                 )
-                                Text(
-                                    text = thread.last_message_text.ifBlank { "Sem mensagens registradas" },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = TextPrimary,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                val visibleReplies = if (isExpanded) inboundMessages.takeLast(6) else inboundMessages.takeLast(2)
+                                visibleReplies.forEach { reply ->
+                                    val replyTime = formatRelativeEpoch(reply.epoch_ts)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "• \"${reply.message_text}\"",
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                            color = TextPrimary,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        if (replyTime.isNotBlank()) {
+                                            Text(
+                                                text = replyTime,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = if (reply.is_read == 0) AuraEmerald else TextMuted
+                                            )
+                                        }
+                                    }
+                                }
                             }
+                        } else {
+                            Text(
+                                text = "Aguardando visualização ou confirmação do destinatário no WhatsApp.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextMuted
+                            )
+                        }
+
+                        // Ação de assessoria exclusiva com a AURA (sem abrir chat com o parceiro)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            AuraChip(
+                                label = "Avaliar com a AURA",
+                                icon = Icons.Rounded.AutoAwesome,
+                                onClick = { onAskAura(thread) }
+                            )
                         }
                     }
                 }
@@ -2152,7 +1876,6 @@ private fun EmptyState(
 @Composable
 private fun MessageItem(
     message: ChatMessage,
-    isWhatsAppSession: Boolean = false,
     onAction: (GenUiAction) -> Unit,
     onDrillDown: (String) -> Unit = {},
     speakingMessageId: String? = null,
@@ -2170,12 +1893,6 @@ private fun MessageItem(
             onLongClick = { onMessageLongClick(message) },
             modifier = modifier
         )
-    } else if (isWhatsAppSession && (message.id.startsWith("wa_msg_") || message.text.startsWith("💬 "))) {
-        WhatsAppInboundBubble(
-            text = message.text,
-            onLongClick = { onMessageLongClick(message) },
-            modifier = modifier
-        )
     } else {
         AuraMessage(
             message = message,
@@ -2189,84 +1906,6 @@ private fun MessageItem(
             onAuditAnp = onAuditAnp,
             modifier = modifier
         )
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun WhatsAppInboundBubble(
-    text: String,
-    onLongClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val haptic = LocalHapticFeedback.current
-    val cleaned = text.removePrefix("💬 ").trim()
-    val colonIdx = cleaned.indexOf(':')
-    val senderName = if (colonIdx in 1..48) {
-        cleaned.substring(0, colonIdx).replace("*", "").trim()
-    } else {
-        "Contato WhatsApp"
-    }
-    val bodyText = if (colonIdx in 1..48) {
-        cleaned.substring(colonIdx + 1).removePrefix("**").trim()
-    } else {
-        cleaned
-    }
-    val shape = RoundedCornerShape(6.dp, 20.dp, 20.dp, 20.dp)
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(5.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp)
-        ) {
-            ContactInitialsAvatar(
-                name = senderName,
-                hasAlert = false,
-                size = 22.dp
-            )
-            Text(
-                text = senderName,
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                color = AuraEmerald
-            )
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(AuraEmerald.copy(alpha = 0.16f))
-                    .padding(horizontal = 6.dp, vertical = 1.dp)
-            ) {
-                Text(
-                    text = "WhatsApp",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AuraEmerald,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-        Box(
-            modifier = Modifier
-                .widthIn(max = 320.dp)
-                .clip(shape)
-                .background(ObsidianMid)
-                .border(1.dp, AuraEmerald.copy(alpha = 0.45f), shape)
-                .combinedClickable(
-                    onClick = {},
-                    onLongClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onLongClick()
-                    }
-                )
-                .padding(horizontal = 14.dp, vertical = 11.dp)
-        ) {
-            Text(
-                text = bodyText.ifBlank { text },
-                style = MaterialTheme.typography.bodyLarge,
-                color = TextPrimary
-            )
-        }
     }
 }
 

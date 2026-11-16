@@ -1158,6 +1158,26 @@ async def fetch_evolution_contact_profile(
     return profile
 
 
+def _extract_evolution_ack_status(rec: dict[str, Any]) -> str:
+    """
+    Extrai o status de entrega/visualizacao (SENT, DELIVERED, READ) de um registro
+    do /chat/findMessages da Evolution API v2 (campo status e array MessageUpdate).
+    """
+    tokens: list[str] = []
+    if rec.get("status") is not None:
+        tokens.append(str(rec.get("status")).strip().upper())
+    updates = rec.get("MessageUpdate")
+    if isinstance(updates, list):
+        for u in updates:
+            if isinstance(u, dict) and u.get("status") is not None:
+                tokens.append(str(u.get("status")).strip().upper())
+    if any(t in ("READ", "PLAYED", "4", "3") for t in tokens):
+        return "READ"
+    if any(t in ("DELIVERY_ACK", "DELIVERED", "2") for t in tokens):
+        return "DELIVERED"
+    return "SENT"
+
+
 def extract_evolution_message_content(msg_obj: dict[str, Any] | None) -> tuple[str, bool]:
     """
     Extrai texto legivel e indicador de midia a partir do objeto 'message'
@@ -1291,8 +1311,6 @@ async def sync_inbound_messages_from_evolution(
                             if not isinstance(rec, dict):
                                 continue
                             key = rec.get("key") or {}
-                            if key.get("fromMe") is not False:
-                                continue
                             rec_match_keys = {
                                 phone_match_key(key.get("remoteJid")),
                                 phone_match_key(key.get("remoteJidAlt")),
@@ -1304,8 +1322,19 @@ async def sync_inbound_messages_from_evolution(
                                 msg_ts = int(raw_ts)
                             except (TypeError, ValueError):
                                 msg_ts = 0
-                            if msg_ts <= 0 or msg_ts < (first_epoch - 5):
+                            if msg_ts <= 0 or msg_ts < (first_epoch - 10):
                                 continue
+
+                            if key.get("fromMe") is True:
+                                ack = _extract_evolution_ack_status(rec)
+                                journal.update_outbound_ack_status(thread_phone, ack)
+                                continue
+                            if key.get("fromMe") is not False:
+                                continue
+                            if msg_ts < (first_epoch - 5):
+                                continue
+
+                            journal.update_outbound_ack_status(thread_phone, "REPLIED")
 
                             ext_id = key.get("id") or rec.get("id")
                             msg_text, has_media = extract_evolution_message_content(rec.get("message"))
