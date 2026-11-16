@@ -25,13 +25,13 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
 # Importa os executores diretos das suites da Fase 8
-from scripts.test_genui_contracts import run_all_contract_tests
-from scripts.test_genui_streaming import run_all_streaming_tests
-from scripts.test_genui_frontend_lifecycle import run_nodejs_frontend_lifecycle_tests
+from tests.integration.test_genui_contracts import run_all_contract_tests
+from tests.integration.test_genui_streaming import run_all_streaming_tests
+from tests.integration.test_genui_frontend_lifecycle import run_nodejs_frontend_lifecycle_tests
 
 
 def run_consolidated_e2e_quality_suite() -> bool:

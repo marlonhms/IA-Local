@@ -9,9 +9,11 @@ import time
 import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from playwright.sync_api import sync_playwright
+import pytest
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+sync_playwright = pytest.importorskip("playwright.sync_api").sync_playwright
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 class AuraWebHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):

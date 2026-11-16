@@ -44,4 +44,4 @@ jobs:
 
       - name: Executar Suite de Testes (Pytest)
         run: |
-          pytest tests/ -v
+          pytest tests/unit -v

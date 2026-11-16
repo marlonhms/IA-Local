@@ -28,8 +28,8 @@ def test_docker_compose_structure():
 @pytest.mark.unit
 def test_deploy_posto_powershell_script():
     """Valida o script PowerShell de onboarding em 1-clique."""
-    ps_file = PROJECT_ROOT / "scripts" / "deploy_posto.ps1"
-    assert ps_file.exists(), "scripts/deploy_posto.ps1 nao encontrado"
+    ps_file = PROJECT_ROOT / "automacoes" / "deploy_posto.ps1"
+    assert ps_file.exists(), "automacoes/deploy_posto.ps1 nao encontrado"
 
     content = ps_file.read_text(encoding="utf-8")
     # Regra do powershell-windows: ASCII puro sem emojis ou caracteres corrompidos

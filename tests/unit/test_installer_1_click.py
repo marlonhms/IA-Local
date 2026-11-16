@@ -159,9 +159,9 @@ def test_cli_main_json_output(
 
 
 def test_powershell_script_pure_ascii_and_stages() -> None:
-    """Garante que `scripts/instalar_posto.ps1` e 100% ASCII puro e contem os 8 estagios."""
-    ps1_path = PROJECT_ROOT / "scripts" / "instalar_posto.ps1"
-    assert ps1_path.is_file(), "Script scripts/instalar_posto.ps1 nao encontrado"
+    """Garante que `automacoes/instalar_posto.ps1` e 100% ASCII puro e contem os 8 estagios."""
+    ps1_path = PROJECT_ROOT / "automacoes" / "instalar_posto.ps1"
+    assert ps1_path.is_file(), "Script automacoes/instalar_posto.ps1 nao encontrado"
 
     content = ps1_path.read_text(encoding="utf-8")
     non_ascii = [
@@ -185,7 +185,7 @@ def test_powershell_script_dry_run_execution() -> None:
     if sys.platform != "win32" or not ps_bin:
         pytest.skip("powershell.exe nao disponivel neste ambiente de execucao (requer Windows)")
 
-    ps1_path = PROJECT_ROOT / "scripts" / "instalar_posto.ps1"
+    ps1_path = PROJECT_ROOT / "automacoes" / "instalar_posto.ps1"
     proc = subprocess.run(
         [
             ps_bin,
@@ -209,21 +209,21 @@ def test_powershell_script_dry_run_execution() -> None:
 
 
 def test_batch_launcher_structure_and_ascii() -> None:
-    """Valida o atalho `INSTALAR_POSTO_1_CLIQUE.bat` na raiz do projeto."""
-    bat_path = PROJECT_ROOT / "INSTALAR_POSTO_1_CLIQUE.bat"
-    assert bat_path.is_file(), "Atalho INSTALAR_POSTO_1_CLIQUE.bat nao encontrado"
+    """Valida o atalho `automacoes/INSTALAR_POSTO_1_CLIQUE.bat`."""
+    bat_path = PROJECT_ROOT / "automacoes" / "INSTALAR_POSTO_1_CLIQUE.bat"
+    assert bat_path.is_file(), "Atalho automacoes/INSTALAR_POSTO_1_CLIQUE.bat nao encontrado"
 
     content = bat_path.read_text(encoding="utf-8")
     assert all(ord(c) < 128 for c in content), "INSTALAR_POSTO_1_CLIQUE.bat deve ser ASCII puro"
-    assert "scripts\\instalar_posto.ps1" in content
+    assert "instalar_posto.ps1" in content
 
 
 def test_zero_em_dashes_in_installer_files() -> None:
     """Garante ausencia absoluta de travessoes nos arquivos do instalador 1-clique."""
     target_files = [
         PROJECT_ROOT / "core" / "installer_wizard.py",
-        PROJECT_ROOT / "scripts" / "instalar_posto.ps1",
-        PROJECT_ROOT / "INSTALAR_POSTO_1_CLIQUE.bat",
+        PROJECT_ROOT / "automacoes" / "instalar_posto.ps1",
+        PROJECT_ROOT / "automacoes" / "INSTALAR_POSTO_1_CLIQUE.bat",
         Path(__file__),
     ]
     for path in target_files:

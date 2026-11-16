@@ -338,9 +338,9 @@ def test_server_handle_service_cli_args(
 
 
 def test_gerenciar_servico_aura_bat_and_ps1_compliance() -> None:
-    """Valida scripts/gerenciar_servico_aura.bat e scripts/instalar_posto.ps1 (ASCII puro e sem NSSM)."""
-    bat_path = PROJECT_ROOT / "scripts" / "gerenciar_servico_aura.bat"
-    assert bat_path.is_file(), "Script scripts/gerenciar_servico_aura.bat nao encontrado"
+    """Valida automacoes/gerenciar_servico_aura.bat e automacoes/instalar_posto.ps1 (ASCII puro e sem NSSM)."""
+    bat_path = PROJECT_ROOT / "automacoes" / "gerenciar_servico_aura.bat"
+    assert bat_path.is_file(), "Script automacoes/gerenciar_servico_aura.bat nao encontrado"
 
     bat_content = bat_path.read_text(encoding="utf-8")
     assert all(ord(c) < 128 for c in bat_content), "gerenciar_servico_aura.bat deve ser 100% ASCII puro"
@@ -354,7 +354,7 @@ def test_gerenciar_servico_aura_bat_and_ps1_compliance() -> None:
     ):
         assert flag in bat_content, f"Flag {flag} ausente em gerenciar_servico_aura.bat"
 
-    ps1_path = PROJECT_ROOT / "scripts" / "instalar_posto.ps1"
+    ps1_path = PROJECT_ROOT / "automacoes" / "instalar_posto.ps1"
     ps1_content = ps1_path.read_text(encoding="utf-8")
     assert "--install-service" in ps1_content
     assert "restart/5000/restart/10000/restart/30000" in ps1_content
@@ -365,8 +365,8 @@ def test_zero_em_dashes_in_phase1_files() -> None:
     files = [
         PROJECT_ROOT / "core" / "service.py",
         PROJECT_ROOT / "server.py",
-        PROJECT_ROOT / "scripts" / "gerenciar_servico_aura.bat",
-        PROJECT_ROOT / "scripts" / "instalar_posto.ps1",
+        PROJECT_ROOT / "automacoes" / "gerenciar_servico_aura.bat",
+        PROJECT_ROOT / "automacoes" / "instalar_posto.ps1",
         Path(__file__),
     ]
     for path in files:

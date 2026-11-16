@@ -99,10 +99,10 @@ def test_aurabackend_spec_v2_pro_modules_and_memory_trimmer():
 def test_edge_recovery_scripts_exist_and_zero_dashes():
     """Valida presenca e conformidade dos scripts de recuperacao de borda."""
     recovery_scripts = [
-        PROJECT_ROOT / "reiniciar_servico_aura.bat",
-        PROJECT_ROOT / "reiniciar_servico_aura.ps1",
-        PROJECT_ROOT / "reparar_banco_posto.bat",
-        PROJECT_ROOT / "scripts" / "reparar_banco.ps1",
+        PROJECT_ROOT / "automacoes" / "reiniciar_servico_aura.bat",
+        PROJECT_ROOT / "automacoes" / "reiniciar_servico_aura.ps1",
+        PROJECT_ROOT / "automacoes" / "reparar_banco_posto.bat",
+        PROJECT_ROOT / "automacoes" / "reparar_banco.ps1",
     ]
     for script_path in recovery_scripts:
         assert script_path.is_file(), f"Script de recuperacao ausente: {script_path}"
@@ -113,8 +113,8 @@ def test_edge_recovery_scripts_exist_and_zero_dashes():
 
 def test_build_aura_standalone_script_structure():
     """Valida presenca e integridade do script de compilacao PowerShell."""
-    build_script = PROJECT_ROOT / "scripts" / "build_aura_standalone.ps1"
-    assert build_script.is_file(), "scripts/build_aura_standalone.ps1 nao encontrado"
+    build_script = PROJECT_ROOT / "automacoes" / "build_aura_standalone.ps1"
+    assert build_script.is_file(), "automacoes/build_aura_standalone.ps1 nao encontrado"
 
     content = build_script.read_text(encoding="utf-8")
     assert "PyInstaller" in content
@@ -125,8 +125,8 @@ def test_build_aura_standalone_script_structure():
 
 def test_installer_bat_structure():
     """Valida presenca e comandos do instalador autonomo Instalar-Aura.bat."""
-    installer_path = PROJECT_ROOT / "scripts" / "installer" / "Instalar-Aura.bat"
-    assert installer_path.is_file(), "scripts/installer/Instalar-Aura.bat nao encontrado"
+    installer_path = PROJECT_ROOT / "automacoes" / "installer" / "Instalar-Aura.bat"
+    assert installer_path.is_file(), "automacoes/installer/Instalar-Aura.bat nao encontrado"
 
     bat_text = installer_path.read_text(encoding="utf-8", errors="ignore")
     assert "net session" in bat_text, "Verificacao de UAC ausente no instalador"
@@ -142,8 +142,8 @@ def test_zero_dashes_enforcement_fase8():
     """Garante ausencia inegociavel de travessoes nos arquivos da Fase 8."""
     files_to_check = [
         PROJECT_ROOT / "AuraBackend.spec",
-        PROJECT_ROOT / "scripts" / "build_aura_standalone.ps1",
-        PROJECT_ROOT / "scripts" / "installer" / "Instalar-Aura.bat",
+        PROJECT_ROOT / "automacoes" / "build_aura_standalone.ps1",
+        PROJECT_ROOT / "automacoes" / "installer" / "Instalar-Aura.bat",
         Path(__file__),
     ]
 
