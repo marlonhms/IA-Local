@@ -1169,101 +1169,70 @@ private fun WhatsAppContactsHubView(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
-            SpatialGlassCard(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                accent = AuraEmerald,
-                iridescentBorder = true,
-                contentPadding = PaddingValues(16.dp)
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                LazyRow(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text(
-                            text = "Monitor de Gatilhos WhatsApp",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = TextPrimary
-                        )
-                        Text(
-                            text = if (threads.isEmpty()) {
-                                "Nenhum gatilho disparado nas últimas 72h"
-                            } else {
-                                "Visualização e recebimento • ${threads.size} destinatário(s)"
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
-                        )
-                    }
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(ObsidianMid)
-                            .border(1.dp, AuraEmerald.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
-                            .clickable(enabled = !isSyncing) { onRefresh() }
-                            .padding(horizontal = 10.dp, vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        if (isSyncing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
-                                color = AuraEmerald,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Rounded.Refresh,
-                                contentDescription = "Atualizar status",
-                                tint = AuraEmerald,
-                                modifier = Modifier.size(15.dp)
-                            )
-                        }
-                        Text(
-                            text = "Atualizar",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = AuraEmerald,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-            }
-        }
-
-        if (threads.isNotEmpty()) {
-            item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val filters = listOf(
                         Triple(0, "Todos (${threads.size})", AuraCyan),
-                        Triple(1, "Novos Retornos (${unreadThreads.size})", AuraEmerald),
+                        Triple(1, "Novos (${unreadThreads.size})", AuraEmerald),
                         Triple(2, "Visualizados (${repliedThreads.size})", AuraPurple)
                     )
                     items(filters) { (idx, label, accent) ->
                         val active = selectedFilter == idx
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
+                                .clip(RoundedCornerShape(14.dp))
                                 .background(if (active) accent.copy(alpha = 0.18f) else ObsidianMid)
                                 .border(
                                     1.dp,
                                     if (active) accent else GlassBorderSoft,
-                                    RoundedCornerShape(16.dp)
+                                    RoundedCornerShape(14.dp)
                                 )
                                 .clickable { selectedFilter = idx }
-                                .padding(horizontal = 12.dp, vertical = 7.dp)
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
                             Text(
                                 text = label,
-                                style = MaterialTheme.typography.labelMedium,
+                                style = MaterialTheme.typography.labelSmall,
                                 color = if (active) accent else TextSecondary,
-                                fontWeight = if (active) FontWeight.Bold else FontWeight.Medium
+                                fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1
                             )
                         }
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ObsidianMid)
+                        .border(1.dp, AuraEmerald.copy(alpha = 0.50f), RoundedCornerShape(12.dp))
+                        .clickable(enabled = !isSyncing) { onRefresh() }
+                        .padding(horizontal = 9.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSyncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            color = AuraEmerald,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = "Atualizar status",
+                            tint = AuraEmerald,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
             }
@@ -1275,18 +1244,18 @@ private fun WhatsAppContactsHubView(
                     modifier = Modifier.fillMaxWidth(),
                     accent = AuraCyan,
                     iridescentBorder = false,
-                    contentPadding = PaddingValues(20.dp)
+                    contentPadding = PaddingValues(18.dp)
                 ) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.Chat,
                             contentDescription = null,
                             tint = AuraEmerald,
-                            modifier = Modifier.size(34.dp)
+                            modifier = Modifier.size(30.dp)
                         )
                         Text(
                             text = if (threads.isEmpty()) {
@@ -1299,7 +1268,7 @@ private fun WhatsAppContactsHubView(
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = "Quando a AURA disparar um alerta ou relatório fiscal no WhatsApp, acompanhe aqui se foi entregue, visualizado e qual foi a confirmação recebida.",
+                            text = "Quando a AURA disparar um alerta no WhatsApp, acompanhe aqui a entrega, visualização e confirmação.",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary
                         )
@@ -1345,37 +1314,38 @@ private fun WhatsAppContactsHubView(
                 }
                 val timeLabel = formatRelativeEpoch(thread.last_epoch_ts)
                 val isExpanded = expandedThreadIds.contains(thread.session_id)
+                val toggleExpand = {
+                    expandedThreadIds = if (isExpanded) {
+                        expandedThreadIds - thread.session_id
+                    } else {
+                        expandedThreadIds + thread.session_id
+                    }
+                    if (hasUnread) {
+                        onMarkThreadRead(thread.thread_phone)
+                    }
+                }
 
                 SpatialGlassCard(
-                    onClick = {
-                        expandedThreadIds = if (isExpanded) {
-                            expandedThreadIds - thread.session_id
-                        } else {
-                            expandedThreadIds + thread.session_id
-                        }
-                        if (hasUnread) {
-                            onMarkThreadRead(thread.thread_phone)
-                        }
-                    },
+                    onClick = toggleExpand,
                     modifier = Modifier.fillMaxWidth(),
                     accent = if (hasUnread || isReplied) AuraEmerald else AuraCyan,
                     glowActive = hasUnread,
                     iridescentBorder = true,
-                    contentPadding = PaddingValues(14.dp)
+                    contentPadding = PaddingValues(12.dp)
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        // 1. Destinatário + Função + Badge de Novo Retorno
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // 1. Linha compacta do Contato (Nome Evolution + Cargo + Telefone + Badge/Expandir)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             ContactInitialsAvatar(
                                 name = contactName,
                                 hasAlert = hasUnread || isReplied,
-                                size = 44.dp
+                                size = 38.dp
                             )
-                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1390,14 +1360,14 @@ private fun WhatsAppContactsHubView(
                                     )
                                     Box(
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
+                                            .clip(RoundedCornerShape(6.dp))
                                             .background(AuraCyan.copy(alpha = 0.16f))
-                                            .border(0.5.dp, AuraCyan.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            .border(0.5.dp, AuraCyan.copy(alpha = 0.45f), RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 5.dp, vertical = 1.dp)
                                     ) {
                                         Text(
                                             text = roleLabel,
-                                            style = MaterialTheme.typography.labelSmall,
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                                             color = AuraCyan,
                                             fontWeight = FontWeight.SemiBold,
                                             maxLines = 1
@@ -1406,7 +1376,7 @@ private fun WhatsAppContactsHubView(
                                 }
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Text(
                                         text = formattedPhone,
@@ -1427,31 +1397,45 @@ private fun WhatsAppContactsHubView(
                             if (hasUnread) {
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(CircleShape)
                                         .background(AuraEmerald)
-                                        .clickable { onMarkThreadRead(thread.thread_phone) }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                        .padding(horizontal = 7.dp, vertical = 2.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = "Marcar visto (${thread.unread_count})",
+                                        text = thread.unread_count.toString(),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = ObsidianBase,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(ObsidianBase.copy(alpha = 0.85f))
+                                    .border(0.5.dp, GlassBorderSoft, RoundedCornerShape(10.dp))
+                                    .clickable { toggleExpand() }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = if (isExpanded) "Recolher ▲" else "Expandir ▼",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                    color = AuraCyan,
+                                    maxLines = 1
+                                )
+                            }
                         }
 
-                        // 2. Stepper Visual de 4 Estágios (Disparado -> Entregue -> Visualizado -> Respondido)
+                        // 2. Trajeto compacto: Disparado -> Entregue -> Visualizado -> Respondido
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(ObsidianBase.copy(alpha = 0.65f))
-                                .border(0.5.dp, statusAccent.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(ObsidianBase.copy(alpha = 0.60f))
+                                .border(0.5.dp, statusAccent.copy(alpha = 0.38f), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 10.dp, vertical = 7.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1460,18 +1444,18 @@ private fun WhatsAppContactsHubView(
                             ) {
                                 Text(
                                     text = statusBadgeLabel,
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                     color = statusAccent
                                 )
                                 Text(
-                                    text = "${outboundMessages.size} envio(s) • ${inboundMessages.size} retorno(s)",
+                                    text = "${outboundMessages.size} env. • ${inboundMessages.size} ret.",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = TextMuted
                                 )
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
                             ) {
                                 val steps = listOf(
                                     1 to "Disparado",
@@ -1489,18 +1473,18 @@ private fun WhatsAppContactsHubView(
                                     Column(
                                         modifier = Modifier.weight(1f),
                                         horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
                                     ) {
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(4.dp)
+                                                .height(3.5.dp)
                                                 .clip(RoundedCornerShape(2.dp))
                                                 .background(stepColor)
                                         )
                                         Text(
                                             text = label,
-                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp),
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
                                             color = if (reached) stepColor else TextMuted,
                                             fontWeight = if (reached) FontWeight.SemiBold else FontWeight.Normal,
                                             maxLines = 1
@@ -1510,102 +1494,113 @@ private fun WhatsAppContactsHubView(
                             }
                         }
 
-                        // 3. Gatilho Enviado pela AURA (Resumo expansível inline)
-                        lastOutbound?.let { triggerMsg ->
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(ObsidianLow)
-                                    .border(0.5.dp, GlassBorderSoft, RoundedCornerShape(12.dp))
-                                    .padding(horizontal = 12.dp, vertical = 9.dp)
-                            ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                        // 3. Detalhes completos (visíveis somente ao tocar em Expandir)
+                        AnimatedVisibility(
+                            visible = isExpanded,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                lastOutbound?.let { triggerMsg ->
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(ObsidianLow)
+                                            .border(0.5.dp, GlassBorderSoft, RoundedCornerShape(10.dp))
+                                            .padding(horizontal = 11.dp, vertical = 8.dp)
                                     ) {
-                                        Text(
-                                            text = "↗ GATILHO ENVIADO PELA AURA",
-                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                            color = AuraCyan
-                                        )
-                                        Text(
-                                            text = if (isExpanded) "Recolher ▲" else "Expandir ▼",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = AuraCyan
-                                        )
-                                    }
-                                    Text(
-                                        text = triggerMsg.message_text.replace("*", "").trim(),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = TextSecondary,
-                                        maxLines = if (isExpanded) 18 else 2,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-
-                        // 4. Confirmações Recebidas (Somente-Leitura) + Ação com a Assessora AURA
-                        if (inboundMessages.isNotEmpty()) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(AuraEmerald.copy(alpha = 0.08f))
-                                    .border(0.5.dp, AuraEmerald.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
-                                    .padding(horizontal = 12.dp, vertical = 9.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    text = "↩ CONFIRMAÇÃO RECEBIDA DE ${contactName.uppercase()}",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = AuraEmerald
-                                )
-                                val visibleReplies = if (isExpanded) inboundMessages.takeLast(6) else inboundMessages.takeLast(2)
-                                visibleReplies.forEach { reply ->
-                                    val replyTime = formatRelativeEpoch(reply.epoch_ts)
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "• \"${reply.message_text}\"",
-                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                            color = TextPrimary,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        if (replyTime.isNotBlank()) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                             Text(
-                                                text = replyTime,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = if (reply.is_read == 0) AuraEmerald else TextMuted
+                                                text = "↗ GATILHO ENVIADO PELA AURA",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                color = AuraCyan
+                                            )
+                                            Text(
+                                                text = triggerMsg.message_text.replace("*", "").trim(),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = TextSecondary,
+                                                maxLines = 18,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                         }
                                     }
                                 }
-                            }
-                        } else {
-                            Text(
-                                text = "Aguardando visualização ou confirmação do destinatário no WhatsApp.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = TextMuted
-                            )
-                        }
 
-                        // Ação de assessoria exclusiva com a AURA (sem abrir chat com o parceiro)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            AuraChip(
-                                label = "Avaliar com a AURA",
-                                icon = Icons.Rounded.AutoAwesome,
-                                onClick = { onAskAura(thread) }
-                            )
+                                if (inboundMessages.isNotEmpty()) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(AuraEmerald.copy(alpha = 0.08f))
+                                            .border(0.5.dp, AuraEmerald.copy(alpha = 0.45f), RoundedCornerShape(10.dp))
+                                            .padding(horizontal = 11.dp, vertical = 8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        Text(
+                                            text = "↩ CONFIRMAÇÃO RECEBIDA DE ${contactName.uppercase()}",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = AuraEmerald
+                                        )
+                                        inboundMessages.takeLast(6).forEach { reply ->
+                                            val replyTime = formatRelativeEpoch(reply.epoch_ts)
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "• \"${reply.message_text}\"",
+                                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                                    color = TextPrimary,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                if (replyTime.isNotBlank()) {
+                                                    Text(
+                                                        text = replyTime,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = if (reply.is_read == 0) AuraEmerald else TextMuted
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    Text(
+                                        text = "Aguardando visualização ou confirmação do destinatário no WhatsApp.",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextMuted
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (hasUnread) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(14.dp))
+                                                .background(AuraEmerald)
+                                                .clickable { onMarkThreadRead(thread.thread_phone) }
+                                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                        ) {
+                                            Text(
+                                                text = "Marcar visto",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = ObsidianBase,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                    AuraChip(
+                                        label = "Avaliar com a AURA",
+                                        icon = Icons.Rounded.AutoAwesome,
+                                        onClick = { onAskAura(thread) }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
