@@ -1212,3 +1212,30 @@ class HybridRAGEngine:
                 metrics["extensions"] = cur.fetchall()
 
         return metrics
+
+    def search_causal_rca_context(
+        self,
+        tenant_id: str,
+        anomaly_node_id: str,
+        max_hops: int = 4,
+        time_window_hours: int = 72,
+        top_k_paths: int = 3,
+    ) -> Dict[str, Any]:
+        """
+        Consulta o grafo causal leve (GraphRAG Fase 4) para retornar cadeias de
+        causa-raiz multi-salto e bloco textual auditavel para injecao no prompt.
+        """
+        from core.causal_graph import get_causal_graph
+
+        graph = get_causal_graph()
+        trace = graph.trace_root_cause(
+            tenant_id=tenant_id,
+            anomaly_node_id=anomaly_node_id,
+            max_hops=max_hops,
+            time_window_hours=time_window_hours,
+            top_k_paths=top_k_paths,
+        )
+        return {
+            "trace": trace,
+            "causal_context_text": graph.format_for_rag_context(trace),
+        }

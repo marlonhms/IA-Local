@@ -93,6 +93,7 @@ router = APIRouter(prefix="/api/v1/aura", tags=["AURA Core Engine"])
 cockpit_router = APIRouter(prefix="/api/v1/cockpit", tags=["AURA Cockpit Zero-Click"])
 from core.partner_api import partner_router
 from core.voice_api import voice_router
+from core.voice_live_bridge import voice_live_router
 
 # Instância Singleton do Motor (pode ser injetada externamente)
 _engine_instance: AuraEngine | None = None
@@ -1716,6 +1717,96 @@ async def health_endpoint():
     }
 
 
+@router.get("/self-healing/status", summary="Status e Historico do Self-Healing Local (Fase 1A)")
+async def self_healing_status_endpoint(
+    limit: int = Query(default=20, ge=1, le=100, description="Limite de eventos recentes"),
+):
+    """Retorna historico de incidentes e guardrails de auto-cura de infraestrutura."""
+    from core.self_healing import get_self_healer
+
+    healer = get_self_healer()
+    return await asyncio.to_thread(healer.get_status, limit=limit)
+
+
+@router.get("/roi-realized", summary="Scorecard de ROI Realmente Salvo pela AURA (Fase 2)")
+async def get_roi_realized_endpoint(
+    period_days: int = Query(default=30, ge=1, le=365, description="Janela em dias"),
+    tenant_id: str | None = Query(default=None, description="Filtro opcional de tenant"),
+):
+    """Retorna total previsto vs. realizado, hit-rate e top acoes auditadas no ERP."""
+    from core.outcome_tracker import get_outcome_tracker
+
+    tracker = get_outcome_tracker()
+    scorecard = await asyncio.to_thread(
+        tracker.get_realized_roi_scorecard, period_days=period_days, tenant_id=tenant_id
+    )
+    return scorecard.model_dump()
+
+
+@router.post("/outcomes/{outcome_id}/feedback", summary="Feedback do Gestor sobre Outcome Auditado (Fase 2)")
+async def post_outcome_feedback_endpoint(
+    outcome_id: str,
+    payload: dict[str, Any] = Body(...),
+):
+    """Permite ao gestor confirmar (CONFIRMED) ou contestar (DISPUTED) um resultado."""
+    from core.outcome_tracker import OutcomeFeedbackRequest, get_outcome_tracker
+
+    try:
+        req = OutcomeFeedbackRequest(**payload)
+        tracker = get_outcome_tracker()
+        updated = await asyncio.to_thread(
+            tracker.record_feedback, outcome_id=outcome_id, feedback=req.feedback, note=req.note
+        )
+        return {"status": "success", "outcome": updated}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/what-if/simulate", summary="Simulador Contrafactual What-If Deterministico (Fase 3)")
+async def post_whatif_simulate_endpoint(payload: dict[str, Any] = Body(...)):
+    """
+    Executa simulacao matematica What-If em < 50ms sem consumir tokens de LLM
+    (ideal para sliders interativos de preco, PIX vs. cartao e compra em lote).
+    """
+    from core.whatif_simulator import run_whatif_simulation
+
+    try:
+        return await asyncio.to_thread(run_whatif_simulation, payload)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/causal-graph/trace", summary="Travessia Causal Multi-Salto GraphRAG (Fase 4)")
+async def post_causal_graph_trace_endpoint(payload: dict[str, Any] = Body(...)):
+    """Executa travessia BFS ponderada de causa-raiz em grafo SQLite WAL sem Neo4j."""
+    from core.causal_graph import get_causal_graph
+
+    tenant_id = str(payload.get("tenant_id") or "posto_local")
+    anomaly_node_id = str(payload.get("anomaly_node_id") or "").strip()
+    if not anomaly_node_id:
+        raise HTTPException(status_code=422, detail="anomaly_node_id e obrigatorio.")
+
+    max_hops = int(payload.get("max_hops", 4))
+    time_window_hours = int(payload.get("time_window_hours", 72))
+    top_k_paths = int(payload.get("top_k_paths", 3))
+
+    graph = get_causal_graph()
+    trace = await asyncio.to_thread(
+        graph.trace_root_cause,
+        tenant_id=tenant_id,
+        anomaly_node_id=anomaly_node_id,
+        max_hops=max_hops,
+        time_window_hours=time_window_hours,
+        top_k_paths=top_k_paths,
+    )
+    return {
+        **trace,
+        "causal_context_text": graph.format_for_rag_context(trace),
+    }
+
+
 # =============================================================================
 # CONFORMIDADE JURIDICA E OPT-IN DO LOJISTA (LGPD & CLEAN ROOM - BLOCO 6)
 # =============================================================================
@@ -2715,6 +2806,23 @@ def create_aura_app(
     app.include_router(cockpit_router)
     app.include_router(partner_router)
     app.include_router(voice_router)
+    app.include_router(voice_live_router)
+
+    from core.partner_api import verify_partner_auth
+
+    @app.post(
+        "/mcp",
+        tags=["AURA MCP Gateway"],
+        summary="Gateway HTTP JSON-RPC do Servidor MCP da AURA (Fase 5A)",
+    )
+    async def mcp_http_jsonrpc_endpoint(
+        payload: dict[str, Any] = Body(...),
+        _partner: dict[str, str] = Depends(verify_partner_auth),
+    ) -> dict[str, Any]:
+        """Recebe chamadas MCP autenticadas por X-Partner-Key ou Authorization: Bearer."""
+        from core.mcp_server import handle_mcp_jsonrpc
+
+        return await handle_mcp_jsonrpc(payload)
 
     @app.get(
         "/metrics",

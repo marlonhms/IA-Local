@@ -29,6 +29,7 @@ VALID_CATEGORIES = {
     "rotina_operacional",
     "preferencia_gestor",
     "regra_posto",
+    "estrategia_validada",
     "geral",
 }
 VALID_ORIGINS = {"chat", "gestor", "api", "documento"}

@@ -856,7 +856,23 @@ class AuraCommandJournal:
                 "SELECT * FROM aura_command_journal WHERE command_key = ?",
                 (norm_key,),
             ).fetchone()
-            return CommandJournalEntry.from_row(updated)
+            entry = CommandJournalEntry.from_row(updated)
+
+        try:
+            from core.outcome_tracker import (
+                get_outcome_tracker,
+                get_registered_outcome_tracker,
+            )
+
+            tracker = get_registered_outcome_tracker()
+            if tracker is None and self.db_path != ":memory:":
+                tracker = get_outcome_tracker()
+            if tracker is not None:
+                tracker.register_from_command(entry)
+        except (ImportError, ValueError, OSError, sqlite3.Error) as exc:
+            logger.debug("OutcomeTracker hook ignorado no command_journal: %s", exc)
+
+        return entry
 
     def fail_command(
         self,

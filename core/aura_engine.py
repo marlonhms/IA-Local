@@ -3664,6 +3664,9 @@ class AuraEngine:
             ):
                 return self.tools.consultar_clientes_erp(termo=p.get("termo", ""))
 
+            elif norm_name == "simular_cenario_what_if":
+                return self.tools.simular_cenario_what_if(**p)
+
             elif norm_name in (
                 "cenario_preditivo", "simulacao_preditiva", "simular_cenario_precificacao",
                 "simular_cenario", "simular_preco", "what_if", "what-if", "precificacao_dinamica"

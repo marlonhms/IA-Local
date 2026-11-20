@@ -1509,4 +1509,53 @@ class PaymentMethodsBreakdownProps(BaseModel):
     suggested_actions: List[GenUIActionOption] = Field(default_factory=list, description="Acoes transacionais HITL")
 
 
+class RealizedRoiItem(BaseModel):
+    """Item individual de auditoria de retorno realizado vs. previsto (Fase 2)."""
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
+
+    outcome_id: str = Field(..., description="Identificador unico do outcome auditado")
+    action_type: str = Field(..., description="Tipo da acao executada")
+    target_entity: str = Field(..., description="Entidade alvo (produto, tanque, turno)")
+    predicted_impact_brl: float = Field(..., description="Impacto financeiro inicialmente estimado em R$")
+    realized_impact_brl: float = Field(..., description="Impacto financeiro real medido no ERP em R$")
+    accuracy_pct: float = Field(default=0.0, description="Aderencia percentual entre realizado e previsto")
+    status: str = Field(..., description="Estado atual da auditoria (PENDING_24H, PENDING_7D, COMPLETED, etc.)")
+    manager_feedback: Optional[str] = Field(default=None, description="Confirmacao ou contestacao do gestor")
+
+
+class RealizedRoiScorecardProps(BaseModel):
+    """Propriedades do Card GenUI RealizedRoiScorecard (Closed-Loop ROI Tracking - Fase 2)."""
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
+
+    title: str = Field(default="Lucro Realmente Salvo pela AURA", description="Titulo executivo do scorecard")
+    period_days: int = Field(default=30, ge=1, description="Janela analisada em dias")
+    total_predicted_brl: float = Field(default=0.0, description="Total previsto em R$")
+    total_realized_brl: float = Field(default=0.0, description="Total efetivamente realizado em R$")
+    hit_rate_pct: float = Field(default=0.0, description="Taxa percentual de acoes com retorno positivo")
+    items: List[RealizedRoiItem] = Field(default_factory=list, description="Top acoes auditadas no periodo")
+
+
+class WhatIfScenarioOutcome(BaseModel):
+    """Cenario contrafactual individual do simulador What-If (Fase 3)."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    name: str = Field(..., description="conservador | base | otimista")
+    elasticity: float = Field(..., description="Elasticidade-preco aplicada no cenario")
+    projected_daily_volume: float = Field(..., ge=0.0, description="Volume diario projetado")
+    projected_daily_profit_brl: float = Field(..., description="Lucro diario projetado em R$")
+    horizon_net_delta_brl: float = Field(..., description="Variacao liquida no horizonte simulado em R$")
+
+
+class WhatIfSimulationProps(BaseModel):
+    """Propriedades do Card GenUI WhatIfSimulation (Gemeo Digital Financeiro - Fase 3)."""
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
+
+    simulation_type: str = Field(..., description="price_change | payment_mix_shift | inventory_purchase")
+    title: str = Field(..., description="Titulo executivo da simulacao")
+    recommendation: str = Field(..., description="Parecer deterministico baseado nos numeros")
+    horizon_days: int = Field(default=30, ge=1)
+    metrics: Dict[str, Any] = Field(default_factory=dict, description="Metricas calculadas")
+    scenarios: List[WhatIfScenarioOutcome] = Field(default_factory=list)
+
+
 

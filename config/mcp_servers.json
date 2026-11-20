@@ -1,0 +1,13 @@
+{
+  "servers": [
+    {
+      "name": "contabilidade_exports",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "./exports"],
+      "read_only": true,
+      "require_hitl_for_writes": true,
+      "enabled": false
+    }
+  ]
+}

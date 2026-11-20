@@ -9560,3 +9560,14 @@ class PostoTools:
                 "intent": "formas_pagamento",
                 "message": f"Erro ao consultar formas de pagamento: {e}",
             }
+
+    def simular_cenario_what_if(
+        self,
+        simulation_type: str = "price_change",
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Executa simulacao contrafactual deterministica What-If (Fase 3 - CPU-only)."""
+        from core.whatif_simulator import run_whatif_simulation
+
+        payload = {"simulation_type": simulation_type, **kwargs}
+        return run_whatif_simulation(payload)

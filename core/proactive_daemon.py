@@ -173,6 +173,8 @@ class AuraProactiveDaemon:
         self._rules_evaluated_count: int = 0
         self._last_evaluation_timestamp: str | None = None
         self._active_alerts_count: int = 0
+        self._last_outcomes_audit_monotonic: float = 0.0
+        self._outcomes_audit_interval_seconds: float = 21600.0
         self._last_error: str | None = None
 
         # Fila de eventos e alertas in-app da AURA
@@ -1499,6 +1501,7 @@ class AuraProactiveDaemon:
         while self._running:
             try:
                 await self.evaluate_rules()
+                await self.run_outcome_audits_if_due()
             except asyncio.CancelledError:
                 break
             except Exception as exc:
@@ -1510,6 +1513,26 @@ class AuraProactiveDaemon:
                 await asyncio.sleep(self.evaluation_interval_seconds)
             except asyncio.CancelledError:
                 break
+
+    async def run_outcome_audits_if_due(self, force: bool = False) -> list[dict[str, Any]]:
+        """Executa varredura de outcomes T+24h/7d/30d a cada 6h sem bloquear o event loop."""
+        now_mono = time.monotonic()
+        if not force and (now_mono - self._last_outcomes_audit_monotonic) < self._outcomes_audit_interval_seconds:
+            return []
+
+        self._last_outcomes_audit_monotonic = now_mono
+        from core.outcome_tracker import (
+            get_outcome_tracker,
+            get_registered_outcome_tracker,
+        )
+
+        tracker = get_registered_outcome_tracker()
+        if tracker is None:
+            if self.db_path == ":memory:":
+                return []
+            tracker = get_outcome_tracker()
+
+        return await asyncio.to_thread(tracker.audit_pending_outcomes)
 
     def get_status(self) -> dict[str, Any]:
         """Retorna o estado operacional corrente do daemon proativo."""
