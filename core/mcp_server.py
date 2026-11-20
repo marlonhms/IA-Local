@@ -174,15 +174,33 @@ def get_compliance_status() -> str:
 
 
 def _serialize_call_result(raw_result: Any) -> dict[str, Any]:
-    """Normaliza CallToolResult do SDK mcp (v1/v2) e garante sanitizacao final."""
+    """Normaliza retorno de call_tool do SDK mcp (v1 tuple/list e v2 CallToolResult) e sanitiza."""
+    is_error = bool(getattr(raw_result, "is_error", getattr(raw_result, "isError", False)))
     items = getattr(raw_result, "content", None)
-    if items is None and isinstance(raw_result, (list, tuple)):
-        items = list(raw_result)
+
+    if items is None:
+        if isinstance(raw_result, tuple) and raw_result and isinstance(raw_result[0], (list, tuple)):
+            # SDK mcp 1.x retorna (list[ContentBlock], structured_dict)
+            items = list(raw_result[0])
+        elif isinstance(raw_result, (list, tuple)):
+            items = list(raw_result)
+        elif isinstance(raw_result, dict):
+            return {
+                "content": [{"type": "text", "text": json.dumps(_sanitize_payload(raw_result), ensure_ascii=False)}],
+                "isError": is_error,
+            }
+
     serialized_content: list[dict[str, Any]] = []
     for item in items or []:
         text = getattr(item, "text", None)
         if text is None and isinstance(item, dict):
-            text = item.get("text")
+            if "text" in item:
+                text = item["text"]
+            else:
+                serialized_content.append(
+                    {"type": "text", "text": json.dumps(_sanitize_payload(item), ensure_ascii=False)}
+                )
+                continue
         if text is not None:
             clean_text = _sanitize_payload(str(text))
             serialized_content.append({"type": "text", "text": clean_text})
@@ -190,7 +208,7 @@ def _serialize_call_result(raw_result: Any) -> dict[str, Any]:
             serialized_content.append({"type": "text", "text": _sanitize_payload(str(item))})
     return {
         "content": serialized_content,
-        "isError": bool(getattr(raw_result, "is_error", False)),
+        "isError": is_error,
     }
 
 

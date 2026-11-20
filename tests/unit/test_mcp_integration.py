@@ -12,7 +12,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from core.mcp_client import AuraMcpClient, is_write_tool
-from core.mcp_server import _sanitize_payload, handle_mcp_jsonrpc
+from core.mcp_server import (
+    _sanitize_payload,
+    _serialize_call_result,
+    handle_mcp_jsonrpc,
+)
 from core.schemas.genui import GenUIEnvelope
 
 
@@ -179,6 +183,20 @@ async def test_mcp_client_hitl_governance_on_writes(tmp_path: Path) -> None:
     )
     assert wr_ok["executed"] is True
     assert called == ["list_sheets", "create_invoice"]
+
+
+def test_serialize_call_result_supports_mcp_v1_and_v2_shapes() -> None:
+    """Garante compatibilidade com tuple (mcp 1.x) e CallToolResult.content (mcp 2.x)."""
+    from types import SimpleNamespace
+
+    v1_tuple = ([SimpleNamespace(text='{"break_even_daily_volume": 22550.0}')], {"break_even_daily_volume": 22550.0})
+    out_v1 = _serialize_call_result(v1_tuple)
+    assert out_v1["isError"] is False
+    assert json.loads(out_v1["content"][0]["text"])["break_even_daily_volume"] == 22550.0
+
+    v2_obj = SimpleNamespace(content=[SimpleNamespace(text='{"ok": true}')], is_error=False)
+    out_v2 = _serialize_call_result(v2_obj)
+    assert json.loads(out_v2["content"][0]["text"])["ok"] is True
 
 
 def test_zero_unicode_dashes_in_phase5_files() -> None:
