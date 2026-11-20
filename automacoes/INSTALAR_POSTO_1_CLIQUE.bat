@@ -6,14 +6,14 @@ setlocal EnableExtensions
 :: Duplo-clique neste arquivo para provisionar o posto automaticamente.
 :: ============================================================================
 
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 echo ============================================================================
 echo    AURA - INICIANDO INSTALADOR AUTOMATIZADO 1-CLIQUE
 echo    Diretorio: %CD%
 echo ============================================================================
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\instalar_posto.ps1" %*
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0instalar_posto.ps1" %*
 set EXIT_CODE=%ERRORLEVEL%
 
 :: Se nao estiver em modo automatizado/DryRun, aguarda tecla para fechar a janela

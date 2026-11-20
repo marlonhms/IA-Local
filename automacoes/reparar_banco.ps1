@@ -15,7 +15,7 @@ $pgCtl = "C:\Program Files\PostgreSQL\16\bin\pg_ctl.exe"
 $pgHba = "C:\Program Files\PostgreSQL\16\data\pg_hba.conf"
 $pgHbaBak = "C:\Program Files\PostgreSQL\16\data\pg_hba.conf.bak"
 $psql = "C:\Program Files\PostgreSQL\16\bin\psql.exe"
-$sqlScript = Join-Path $PSScriptRoot "desbloquear_usuarios.sql"
+$sqlScript = Join-Path (Split-Path -Parent $PSScriptRoot) "scripts\desbloquear_usuarios.sql"
 
 function Reload-Or-Start-PostgreSql {
     param([int]$waitPort = 5433)

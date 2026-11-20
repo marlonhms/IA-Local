@@ -8,7 +8,7 @@ echo   Iniciando IA do Posto (pgvector + Gemini 3.1 Flash)
 echo ========================================================
 echo.
 
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 REM 1. Banco Vetorial e ERP 100% Nativo no Windows (PostgreSQL 16 porta 5433)
 echo [*] Modo 100%% Nativo Windows: PostgreSQL 16 com pgvector (sem Docker/WSL).
