@@ -57,6 +57,8 @@ REDACTED_CERTIFICATE = "[REDACTED:CERTIFICATE]"
 REDACTED_BASE64 = "[REDACTED:BASE64]"
 REDACTED_CREDENTIAL = "[REDACTED:CREDENTIAL]"
 REDACTED_FISCAL_ACCESS_KEY = "[REDACTED:FISCAL_ACCESS_KEY]"
+REDACTED_PERSON = "[REDACTED:PERSON]"
+REDACTED_ADDRESS = "[REDACTED:ADDRESS]"
 NEUTRALIZED_PROMPT_INJECTION = "[NEUTRALIZED_PROMPT_INJECTION_OWASP_ACS]"
 
 
@@ -191,11 +193,212 @@ _FISCAL_ACCESS_KEY_PATTERN = re.compile(r"(?<!\d)(\d{44})(?!\d)")
 _PROMPT_INJECTION_PATTERN = re.compile(
     r"\b(?:ignore|disregard|forget)\s+(?:all\s+)?(?:previous|prior|above)\s+(?:instructions|prompts|rules|commands)\b|"
     r"\b(?:you are now|assume the role of|act as|behave as)\s+(?:a|an|the)?\s*(?:unrestricted|system|root|admin|god)\b|"
+    r"\b(?:ignore|desconsidere|esque[cç]a|descarte|anule)\s+(?:todas\s+as\s+|todos\s+os\s+|as\s+|os\s+)?(?:instru[cç][oõ]es|regras|diretrizes|comandos|restri[cç][oõ]es)\s+(?:anteriores|acima|prvias|pr[eé]vias)\b|"
+    r"\b(?:atue\s+como|aja\s+como|assuma\s+o\s+papel\s+de|voc[eê]\s+agora\s+[eé]|a\s+partir\s+de\s+agora\s+voc[eê]\s+[eé])\s+(?:um\s+|uma\s+|o\s+|a\s+)?(?:administrador|admin|sistema|root|sem\s+restri[cç][oõ]es|desenvolvedor|modo\s+livre|deus)\b|"
+    r"\b(?:modo\s+desenvolvedor|modo\s+sem\s+restri[cç][oõ]es|ativar\s+jailbreak|jailbreak)\b|"
+    r"\b(?:revele|mostre|exiba|imprima)\s+(?:o\s+seu\s+|seu\s+|o\s+|as\s+)?(?:system\s+prompt|prompt\s+de\s+sistema|instru[cç][oõ]es\s+(?:internas|ocultas|de\s+sistema))\b|"
     r"\[(?:system|instruction|override|developer|jailbreak)\]|"
     r"<\/?(?:system|instruction|prompt|command|rules)>|"
     r"\b(?:execute\s+(?:drop|delete|truncate|grant|alter)\s+table)\b",
     re.IGNORECASE,
 )
+
+# Allowlist deterministica de termos empresariais (ANP / PJ), marcas e termos tecnicos
+# para evitar falsos positivos na redacao de nomes proprios (Carbon Core P0.3)
+_PII_ENTITY_ALLOWLIST_PREFIXES: Tuple[str, ...] = (
+    "posto",
+    "auto posto",
+    "autoposto",
+    "revenda",
+    "rede ",
+    "distribuidora",
+    "comercio",
+    "comercial",
+    "supermercado",
+    "mercado",
+    "farmacia",
+    "drogaria",
+    "loja ",
+    "centro automotivo",
+    "oficina",
+)
+_PII_ENTITY_ALLOWLIST_TOKENS: Set[str] = {
+    "posto",
+    "autoposto",
+    "revenda",
+    "ltda",
+    "s/a",
+    "s.a.",
+    "eireli",
+    "epp",
+    "shell",
+    "ipiranga",
+    "vibra",
+    "petrobras",
+    "raizen",
+    "ale",
+    "rodoil",
+    "atem",
+    "br",
+    "gasolina",
+    "etanol",
+    "diesel",
+    "gnv",
+    "arla",
+    "aditivada",
+    "comum",
+    "s10",
+    "s500",
+    "lubrificante",
+    "conveniencia",
+    "pista",
+    "retaguarda",
+    "caixa",
+    "turno",
+    "tanque",
+    "bomba",
+    "bico",
+    "pdv",
+    "erp",
+    "webposto",
+    "aura",
+    "companytec",
+    "sitef",
+    "tef",
+    "sefaz",
+    "anp",
+    "anvisa",
+    "sngpc",
+    "sped",
+    "nfce",
+    "nfe",
+    "lmc",
+    "pix",
+    "modelo",
+    "piloto",
+    "central",
+    "geral",
+    "padrao",
+    "cafe",
+    "expresso",
+    "pao",
+    "queijo",
+    "agua",
+    "mineral",
+    "cerveja",
+    "refrigerante",
+    "redacted",
+    "neutralized",
+}
+
+# Heuristica deterministica contextual PT-BR para nomes proprios (Carbon Core P0.3)
+# Nota: case-insensitivity (?i:...) restrito estritamente ao papel para exigir
+# capitalizacao propria no nome e evitar falsos positivos em prosa comum.
+_CONTEXTUAL_PERSON_PATTERN = re.compile(
+    r"\b(?P<role>(?i:cliente|operador(?:a)?|frentista|motorista|paciente|m[eé]dic[oa]|farmac[eê]utic[oa]|vendedor(?:a)?|funcion[aá]ri[oa]|comprador(?:a)?|portador(?:a)?|titular|dr\.?|dra\.?|sr\.?|sra\.?))"
+    r"(?P<sep>\s*[:=]?\s+)"
+    r"(?P<name>[A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]{1,30}(?:\s+(?:da|de|do|dos|das|e|[A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]{1,30})){1,4})\b"
+)
+
+# Heuristica contextualizada de endereco fisico (logradouro + nome + numero)
+_CONTEXTUAL_ADDRESS_PATTERN = re.compile(
+    r"\b(?P<prefix>(?i:endere[cç]o\s*[:=]?\s*))?"
+    r"(?P<street>(?i:rua|r\.|avenida|av\.|travessa|tv\.|alameda|al\.|estrada|rodovia|pra[cç]a|quadra)\s+"
+    r"[A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9][A-Za-zÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç0-9\.\-\s]{2,55}?"
+    r"(?:,\s*|\s+n[°ºo.]?\s*)\d{1,5}(?:\s*[-,]\s*(?:apto\.?|apt\.?|bloco|casa|sala|lj|loja)?\s*[A-Za-z0-9]{1,12})?)\b"
+)
+
+# Verificacao de contexto de logradouro para entidades LOC do spaCy NER
+_ADDRESS_CONTEXT_RE = re.compile(
+    r"(?i)\b(?:rua|r\.|avenida|av\.|travessa|tv\.|alameda|al\.|estrada|rodovia|pra[cç]a|quadra|endere[cç]o|resid[eê]ncia|domic[ií]lio)\b"
+)
+_STREET_NUMBER_RE = re.compile(r"(?:,\s*|\bn[°ºo.]?\s*)\d{1,5}\b", re.IGNORECASE)
+
+
+def _normalize_ascii_lower(value: str) -> str:
+    """Normaliza acentos basicos PT-BR para checagem rapida em allowlist."""
+    repl = str.maketrans(
+        "áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ",
+        "aaaaaeeeeiiiiooooouuuucaaaaaeeeeiiiiooooouuuuc",
+    )
+    return value.translate(repl).lower().strip()
+
+
+def _is_allowlisted_entity(candidate: str) -> bool:
+    """Retorna True se o termo pertence a razoes sociais ANP, marcas, combustiveis ou termos tecnicos."""
+    if not candidate or "[REDACTED:" in candidate or "[NEUTRALIZED_" in candidate:
+        return True
+    norm = _normalize_ascii_lower(candidate)
+    for pref in _PII_ENTITY_ALLOWLIST_PREFIXES:
+        if norm.startswith(pref):
+            return True
+    tokens = [t for t in re.split(r"[\s,;/\-]+", norm) if t]
+    if not tokens:
+        return True
+    if any(t in _PII_ENTITY_ALLOWLIST_TOKENS for t in tokens):
+        return True
+    return False
+
+
+_spacy_ner_lock = threading.Lock()
+_spacy_ner_initialized = False
+_spacy_ner_nlp: Any = None
+_spacy_ner_available = False
+_spacy_ner_warned = False
+
+
+def _get_spacy_ner_pipeline() -> Tuple[Any, bool]:
+    """
+    Carrega de forma lazy e thread-safe o modelo spaCy pt_core_news_sm para NER LGPD.
+    Registra alerta de telemetria caso pt_core_news_sm nao esteja instalado no ambiente.
+    """
+    global _spacy_ner_initialized, _spacy_ner_nlp, _spacy_ner_available, _spacy_ner_warned
+    if _spacy_ner_initialized:
+        return _spacy_ner_nlp, _spacy_ner_available
+
+    with _spacy_ner_lock:
+        if _spacy_ner_initialized:
+            return _spacy_ner_nlp, _spacy_ner_available
+        if spacy is None:
+            _spacy_ner_nlp = None
+            _spacy_ner_available = False
+            if not _spacy_ner_warned:
+                logger.warning(
+                    "[LGPD/NER] Biblioteca spaCy indisponivel; operando com heuristica deterministica PT-BR."
+                )
+                _spacy_ner_warned = True
+        else:
+            try:
+                nlp = spacy.load("pt_core_news_sm")
+                has_ner = "ner" in getattr(nlp, "pipe_names", [])
+                _spacy_ner_nlp = nlp if has_ner else None
+                _spacy_ner_available = has_ner
+                if not has_ner and not _spacy_ner_warned:
+                    logger.warning(
+                        "[LGPD/NER] Modelo pt_core_news_sm carregado sem pipe 'ner'; acionando heuristica deterministica PT-BR."
+                    )
+                    _spacy_ner_warned = True
+            except Exception:
+                _spacy_ner_nlp = None
+                _spacy_ner_available = False
+                if not _spacy_ner_warned:
+                    logger.warning(
+                        "[LGPD/NER] Modelo spaCy 'pt_core_news_sm' nao instalado; operando com fallback deterministico PT-BR para PER/LOC."
+                    )
+                    _spacy_ner_warned = True
+        _spacy_ner_initialized = True
+    return _spacy_ner_nlp, _spacy_ner_available
+
+
+def get_ner_telemetry_status() -> Dict[str, Any]:
+    """Retorna status operacional do pipeline NER spaCy para observabilidade LGPD."""
+    nlp, available = _get_spacy_ner_pipeline()
+    return {
+        "spacy_installed": spacy is not None,
+        "pt_core_news_sm_ner_active": available,
+        "fallback_heuristic_active": True,
+        "pipe_names": list(getattr(nlp, "pipe_names", [])) if nlp is not None else [],
+    }
 _MULTILINE_BASE64_PATTERN = re.compile(
     r"(?:^[A-Za-z0-9+/]{40,}\r?\n)+^[A-Za-z0-9+/]{4,}={0,2}$", re.MULTILINE
 )
@@ -496,6 +699,9 @@ class CentralLogSanitizer:
 
         result = _BASE64_PATTERN.sub(_sub_b64, result)
 
+        # 25. Redacao LGPD de Nomes Proprios (PER) e Enderecos Contextualizados (LOC) (Carbon Core P0.3)
+        result = self._redact_person_and_address_pii(result, counts)
+
         total_found = sum(counts.values())
         if total_found > 0:
             with self._lock:
@@ -504,6 +710,72 @@ class CentralLogSanitizer:
                     self._category_counts[cat] = self._category_counts.get(cat, 0) + count
 
         return result, counts
+
+    def _redact_person_and_address_pii(self, text: str, counts: Dict[str, int]) -> str:
+        """
+        Aplica redacao deterministica contextual PT-BR e NER spaCy (pt_core_news_sm quando
+        disponivel) para nomes proprios (PER -> [REDACTED:PERSON]) e enderecos fisicos
+        contextualizados com logradouro/numero (LOC -> [REDACTED:ADDRESS]), preservando
+        razoes sociais ANP, marcas comerciais e nomes de produtos via allowlist.
+        """
+        if not text:
+            return text
+
+        result = text
+
+        # 25.1 Enderecos contextualizados (logradouro + numero)
+        def _sub_ctx_address(m):
+            prefix = m.group("prefix") or ""
+            street = m.group("street") or ""
+            if _is_allowlisted_entity(street):
+                return m.group(0)
+            counts["address"] = counts.get("address", 0) + 1
+            return f"{prefix}{REDACTED_ADDRESS}"
+
+        result = _CONTEXTUAL_ADDRESS_PATTERN.sub(_sub_ctx_address, result)
+
+        # 25.2 Nomes proprios contextualizados em PT-BR (cliente/operador/frentista/medico/paciente/Dr./Sr.)
+        def _sub_ctx_person(m):
+            role = m.group("role")
+            sep = m.group("sep")
+            name = m.group("name").strip()
+            if _is_allowlisted_entity(name):
+                return m.group(0)
+            counts["person"] = counts.get("person", 0) + 1
+            return f"{role}{sep}{REDACTED_PERSON}"
+
+        result = _CONTEXTUAL_PERSON_PATTERN.sub(_sub_ctx_person, result)
+
+        # 25.3 Extracao NER real via spaCy pt_core_news_sm quando disponivel no ambiente
+        nlp, ner_active = _get_spacy_ner_pipeline()
+        if ner_active and nlp is not None and len(result) <= 20000:
+            try:
+                doc = nlp(result)
+                spans_to_replace: List[Tuple[int, int, str, str]] = []
+                for ent in getattr(doc, "ents", ()):
+                    ent_text = ent.text.strip()
+                    if not ent_text or _is_allowlisted_entity(ent_text):
+                        continue
+                    if ent.label_ in ("PER", "PERSON"):
+                        # Exige nome composto (minimo 2 palavras) para evitar falsos positivos em siglas/marcas
+                        words = [w for w in ent_text.split() if len(w) >= 2]
+                        if len(words) >= 2:
+                            spans_to_replace.append((ent.start_char, ent.end_char, REDACTED_PERSON, "person"))
+                    elif ent.label_ in ("LOC", "GPE"):
+                        ctx_start = max(0, ent.start_char - 24)
+                        ctx_end = min(len(result), ent.end_char + 24)
+                        local_ctx = result[ctx_start:ctx_end]
+                        if _ADDRESS_CONTEXT_RE.search(local_ctx) and _STREET_NUMBER_RE.search(local_ctx):
+                            spans_to_replace.append((ent.start_char, ent.end_char, REDACTED_ADDRESS, "address"))
+
+                # Substitui de tras para frente preservando indices
+                for start_c, end_c, marker, cat in sorted(spans_to_replace, key=lambda x: x[0], reverse=True):
+                    result = result[:start_c] + marker + result[end_c:]
+                    counts[cat] = counts.get(cat, 0) + 1
+            except Exception as exc:
+                logger.debug("Falha nao-bloqueante no NER spaCy durante sanitizacao: %s", exc)
+
+        return result
 
     def sanitize_lines(self, lines: List[str]) -> Tuple[List[str], Dict[str, int]]:
         """Higieniza uma lista de linhas de texto, agregando os contadores."""
@@ -631,19 +903,27 @@ class SpacyLogNLPProcessor:
     """
 
     def __init__(self):
+        self.ner_enabled: bool = False
+        self.ner_fallback_warning: bool = False
         if spacy is None:
             self.nlp = None
             self.matcher = None
             self.phrase_matcher = None
-            logger.info("spaCy não instalado. SpacyLogNLPProcessor em modo pass-through.")
+            self.ner_fallback_warning = True
+            logger.warning("[LGPD/NER] spaCy nao instalado. SpacyLogNLPProcessor em modo pass-through.")
             return
 
         try:
             self.nlp = spacy.load("pt_core_news_sm")
-            logger.info("Modelo pt_core_news_sm carregado para o Ai.la NLP Processor.")
+            self.ner_enabled = "ner" in getattr(self.nlp, "pipe_names", [])
+            logger.info("Modelo pt_core_news_sm carregado para o Ai.la NLP Processor (ner=%s).", self.ner_enabled)
         except Exception:
             self.nlp = spacy.blank("pt")
-            logger.info("Pipeline blank('pt') inicializado para o Ai.la NLP Processor.")
+            self.ner_enabled = False
+            self.ner_fallback_warning = True
+            logger.warning(
+                "[LGPD/NER] Modelo pt_core_news_sm ausente; SpacyLogNLPProcessor em blank('pt') com heuristica deterministica PT-BR."
+            )
 
         self.matcher = Matcher(self.nlp.vocab)
         self.phrase_matcher = PhraseMatcher(self.nlp.vocab, attr="LOWER")
@@ -943,3 +1223,75 @@ def sanitize_erp_brand_data(obj: Any) -> Any:
     if isinstance(obj, list):
         return [sanitize_erp_brand_data(item) for item in obj]
     return obj
+
+
+class StreamingOutputSanitizerGuard:
+    """
+    Guard de saida com sliding-window buffer leve para streaming SSE (Carbon Core P0.3).
+    Retem uma janela deslizante na fronteira entre tokens para mascarar PII acidental
+    (CPF, CNPJ, email, telefone, nomes proprios) e nomes comerciais de ERP antes de
+    emitir chunks DELTA ao cliente.
+    """
+
+    def __init__(
+        self,
+        window_size: int = 48,
+        sanitizer: Optional[CentralLogSanitizer] = None,
+    ) -> None:
+        self.window_size = max(16, int(window_size))
+        self._sanitizer = sanitizer or central_log_sanitizer
+        self._buffer: str = ""
+        self.redacted_counts: Dict[str, int] = {}
+
+    def _clean(self, text: str) -> str:
+        if not text:
+            return ""
+        brand_clean = sanitize_erp_brand_names(text)
+        pii_clean, counts = self._sanitizer.sanitize_text(brand_clean)
+        for cat, cnt in counts.items():
+            self.redacted_counts[cat] = self.redacted_counts.get(cat, 0) + cnt
+        return pii_clean
+
+    def push(self, chunk_text: str) -> str:
+        """Adiciona token ao buffer e libera prefixo seguro mantendo janela deslizante."""
+        if not chunk_text:
+            return ""
+        self._buffer += chunk_text
+        if len(self._buffer) <= self.window_size:
+            return ""
+
+        cleaned = self._clean(self._buffer)
+        if len(cleaned) <= self.window_size:
+            self._buffer = cleaned
+            return ""
+
+        cut = len(cleaned) - self.window_size
+        # Evita fatiar no meio de um marcador [REDACTED:...] ou palavra curta
+        last_open_bracket = cleaned.rfind("[", 0, cut)
+        last_close_bracket = cleaned.rfind("]", 0, cut)
+        if last_open_bracket > last_close_bracket and (cut - last_open_bracket) <= 24:
+            cut = last_open_bracket
+        else:
+            ws_pos = cleaned.rfind(" ", max(0, cut - 16), cut + 1)
+            if ws_pos > 0:
+                cut = ws_pos + 1
+
+        if cut <= 0:
+            self._buffer = cleaned
+            return ""
+
+        emit = cleaned[:cut]
+        self._buffer = cleaned[cut:]
+        return emit
+
+    def flush(self) -> str:
+        """Higieniza e libera todo o conteudo remanescente do buffer ao encerrar o stream."""
+        if not self._buffer:
+            return ""
+        remaining = self._clean(self._buffer)
+        self._buffer = ""
+        return remaining
+
+    def reset(self) -> None:
+        """Descarta buffer pendente em caso de STREAM_RESET."""
+        self._buffer = ""

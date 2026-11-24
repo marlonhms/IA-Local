@@ -123,8 +123,10 @@ PGVECTOR_LOCAL_PASS: str = os.getenv("VECTOR_DB_PASSWORD", "")
 # =============================================================================
 # CONFIGURACOES DO BANCO ERP & ROLE TECNICA DEDICADA (P1-1, P1-4)
 # =============================================================================
+from config.settings import AURA_API_KEY as _SETTINGS_AURA_API_KEY
+
 ERP_SERVICE_USER: str = os.getenv("ERP_SERVICE_USER") or os.getenv("ERP_DB_USER", "aura_service_ro")
 ERP_SERVICE_PASS: str = os.getenv("ERP_SERVICE_PASS") or os.getenv("ERP_DB_PASSWORD", "")
-AURA_API_KEY: str = os.getenv("AURA_API_KEY", "aura_secret_admin_key_2026")
+AURA_API_KEY: str = os.getenv("AURA_API_KEY") or _SETTINGS_AURA_API_KEY
 
 

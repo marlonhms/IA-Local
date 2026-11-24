@@ -419,27 +419,22 @@ class VoiceLiveSessionStats:
 
 def _authorize_websocket(websocket: WebSocket) -> bool:
     """
-    Replica a semantica de autenticacao administrativa da API (core/aura_api.py)
-    para conexoes WebSocket via header X-API-Key, Authorization Bearer ou query api_key.
+    Aplica a politica dual de autenticacao (Carbon Core P0.1) para conexoes WebSocket:
+    - Valida X-API-Key, Authorization Bearer ou query api_key via hmac.compare_digest;
+    - Exige API Key obrigatoria para IPs externos (LAN/WAN);
+    - Valida Origin anti-CSRF e cookie HttpOnly 'aura_local_session' para localhost.
     """
-    configured_key = os.getenv("AURA_API_KEY") or AURA_API_KEY
-    enforce_auth = os.getenv("AURA_ENFORCE_ADMIN_AUTH", "0").lower() in ("1", "true", "yes")
+    from core.aura_api import authorize_admin_request
 
-    provided_key: str | None = None
-    header_key = websocket.headers.get("x-api-key")
-    if header_key:
-        provided_key = header_key.strip()
-    else:
-        auth_header = websocket.headers.get("authorization", "")
-        if auth_header.lower().startswith("bearer "):
-            provided_key = auth_header[7:].strip()
-        elif websocket.query_params.get("api_key"):
-            provided_key = str(websocket.query_params.get("api_key")).strip()
-
-    if provided_key is not None:
-        return provided_key == configured_key
-
-    return not (enforce_auth and configured_key)
+    client_host = websocket.client.host if websocket.client else None
+    query_key = websocket.query_params.get("api_key")
+    allowed, _, _ = authorize_admin_request(
+        headers=websocket.headers,
+        cookies=websocket.cookies,
+        client_host=client_host,
+        query_api_key=str(query_key) if query_key else None,
+    )
+    return allowed
 
 
 class VoiceLiveBridgeSession:

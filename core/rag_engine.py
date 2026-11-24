@@ -10,16 +10,19 @@ Tecnologias:
 - Google Gemini Embedding API (gemini-embedding-001)
 """
 
+import math
 import os
 import re
 import sys
 import time
 import json
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import google.generativeai as genai
+from core.llm_client import CompatGenAIShim, embed_content as llm_embed_content
+
+genai = CompatGenAIShim()
 
 from config.settings import (
     DB_VECTOR_CONFIG,
@@ -31,8 +34,42 @@ from core.db_pool import (
     get_vector_connection,
     get_vector_db_connection,
 )
+from core.migrations import ensure_semantic_cache_partition_schema
+from core.tenancy import (
+    TenantContext,
+    inject_rls_filial_context,
+    inject_rls_tenant_context,
+    validate_filial_id,
+    validate_tenant_id,
+)
 
 logger = logging.getLogger("HybridRAG")
+
+# TTLs padrao para particionamento do cache semantico (Carbon Core P0.2)
+DEFAULT_CACHE_TTL_CATALOG_SECONDS = 900
+DEFAULT_CACHE_TTL_STATIC_SECONDS = 86400
+DEFAULT_MIN_COSINE_EVIDENCE = 0.62
+DEFAULT_MIN_FTS_EVIDENCE = 0.05
+
+
+def _validate_positive_int(value: Any, name: str, min_val: int = 1, max_val: int = 10000) -> int:
+    """Valida estritamente inteiro numerico para parametros de consulta SQL/HNSW."""
+    if isinstance(value, bool):
+        raise ValueError(f"Parametro '{name}' nao pode ser booleano.")
+    iv = int(value)
+    if iv < min_val or iv > max_val:
+        raise ValueError(f"Parametro '{name}' fora dos limites [{min_val}, {max_val}]: {iv}")
+    return iv
+
+
+def _validate_finite_float(value: Any, name: str, min_val: float = 0.0, max_val: float = 10.0) -> float:
+    """Valida estritamente numero real finito para pesos RRF e limiares de corte."""
+    if isinstance(value, bool):
+        raise ValueError(f"Parametro '{name}' nao pode ser booleano.")
+    fv = float(value)
+    if not math.isfinite(fv) or fv < min_val or fv > max_val:
+        raise ValueError(f"Parametro '{name}' invalido ou fora dos limites [{min_val}, {max_val}]: {fv}")
+    return fv
 
 # Regex para detecção de viscosidades de óleos lubrificantes (com suporte a hífen, espaço ou colado)
 VISCOSITY_REGEX = re.compile(
@@ -80,88 +117,212 @@ class HybridRAGEngine:
         self.api_key = gemini_api_key or GEMINI_API_KEY
         self.embedding_model = embedding_model
         self.llm_model = llm_model
-        self.ef_search = ef_search
-        self.rrf_k = rrf_k
+        self.ef_search = _validate_positive_int(ef_search, "ef_search", min_val=1, max_val=2000)
+        self.rrf_k = _validate_positive_int(rrf_k, "rrf_k", min_val=1, max_val=1000)
+        self._cache_schema_ready = False
 
-        if self.api_key:
+    def _resolve_cache_partition(
+        self,
+        tenant_id: Optional[str] = None,
+        filial_id: Optional[Union[str, int]] = None,
+        pack_id: Optional[str] = None,
+    ) -> tuple[str, str, str]:
+        """Resolve a tupla (tenant_id, filial_id, pack_id) ativa para particionamento do cache."""
+        eff_tenant = (tenant_id or "").strip()
+        if not eff_tenant:
+            eff_tenant = TenantContext.get_tenant_id() if TenantContext.get_current() is not None else "default"
+        eff_tenant = validate_tenant_id(eff_tenant)
+
+        if filial_id is not None and str(filial_id).strip():
+            eff_filial = str(filial_id).strip()
+        else:
+            ctx_filial = TenantContext.get_filial_id()
+            eff_filial = str(ctx_filial) if ctx_filial is not None else "1"
+
+        eff_pack = (pack_id or "").strip()
+        if not eff_pack:
             try:
-                genai.configure(api_key=self.api_key, transport="rest")
+                from core.domain.domain_pack_loader import get_active_domain_pack
+
+                eff_pack = get_active_domain_pack().pack_id
             except Exception:
-                genai.configure(api_key=self.api_key)
+                eff_pack = "fuel_convenience"
+
+        return eff_tenant, eff_filial, eff_pack
 
     def _get_connection(self, tenant_id: str | None = None, filial_id: int | None = None):
-        """Abre conexao com o PostgreSQL do pgvector a partir do pool gerenciado com escopo RLS (Fase 8)."""
+        """
+        Abre conexao com o PostgreSQL do pgvector com isolamento RLS obrigatorio (Carbon Core P0.2).
+        Para DB_VECTOR_CONFIG padrao, usa estritamente o pool gerenciado (sem bypass RLS).
+        Para db_config customizado, injeta explicitamente o contexto RLS na conexao.
+        """
         if self.db_config == DB_VECTOR_CONFIG:
-            try:
-                return get_vector_connection(filial_id=filial_id, tenant_id=tenant_id)
-            except Exception:
-                pass
+            return get_vector_connection(filial_id=filial_id, tenant_id=tenant_id)
+
+        eff_filial = filial_id if filial_id is not None else TenantContext.get_filial_id()
+        if eff_filial is not None:
+            eff_filial = validate_filial_id(eff_filial)
+        eff_tenant = (
+            tenant_id
+            if tenant_id is not None
+            else (TenantContext.get_tenant_id() if TenantContext.get_current() is not None else None)
+        )
+        if eff_tenant is not None:
+            eff_tenant = validate_tenant_id(eff_tenant)
+
         conn = psycopg2.connect(**self.db_config)
         try:
-            conn.set_client_encoding('UTF8')
+            conn.set_client_encoding("UTF8")
         except Exception:
             pass
+        if eff_filial is not None:
+            inject_rls_filial_context(conn, eff_filial, session_scope=True)
+        if eff_tenant is not None:
+            inject_rls_tenant_context(conn, eff_tenant, session_scope=True)
         return conn
 
+    def ensure_semantic_cache_schema(self, conn: Any = None) -> None:
+        """Executa migracao idempotente de particionamento/TTL em perguntas_cache."""
+        if conn is not None:
+            ensure_semantic_cache_partition_schema(conn)
+            self._cache_schema_ready = True
+            return
+        if self._cache_schema_ready:
+            return
+        with self._get_connection() as managed_conn:
+            ensure_semantic_cache_partition_schema(managed_conn)
+            self._cache_schema_ready = True
+
     def gerar_embedding(self, texto: str, task_type: str = "retrieval_query", timeout_sec: float = 2.5) -> List[float]:
-        """Gera embedding de 768 dimensoes com o Gemini com timeout agil para operacao de borda."""
-        res = genai.embed_content(
+        """Gera embedding de 768 dimensoes com o cliente unificado google-genai Keep-Alive."""
+        vec = llm_embed_content(
             model=self.embedding_model,
             content=texto,
             output_dimensionality=768,
             task_type=task_type,
-            request_options={"timeout": timeout_sec},
+            timeout_sec=timeout_sec,
+            api_key=self.api_key,
         )
-        return res["embedding"]
+        return list(vec) if isinstance(vec, list) else []
 
     def check_semantic_cache(
         self,
         query_text: str,
         similarity_threshold: float = 0.96,
         query_vector: Optional[List[float]] = None,
+        tenant_id: Optional[str] = None,
+        filial_id: Optional[Union[str, int]] = None,
+        pack_id: Optional[str] = None,
+        ttl_seconds: int = DEFAULT_CACHE_TTL_CATALOG_SECONDS,
     ) -> Optional[Dict[str, Any]]:
-        """Verifica se há resposta idêntica ou equivalente já armazenada em cache."""
+        """
+        Verifica se ha resposta identica ou equivalente valida no cache semantico,
+        particionada estritamente por (tenant_id, filial_id, pack_id) e TTL (Carbon Core P0.2).
+        """
         if not query_vector:
             query_vector = self.gerar_embedding(query_text, task_type="retrieval_query")
+
+        eff_tenant, eff_filial, eff_pack = self._resolve_cache_partition(
+            tenant_id=tenant_id,
+            filial_id=filial_id,
+            pack_id=pack_id,
+        )
+        eff_ttl = _validate_positive_int(ttl_seconds, "ttl_seconds", min_val=1, max_val=86400 * 30)
+        eff_threshold = _validate_finite_float(similarity_threshold, "similarity_threshold", min_val=0.0, max_val=1.0)
+
         sql = """
-        SELECT resposta_llm, json_produtos, 
-               1 - (pergunta_vetor <=> %s::halfvec) AS cosine_similarity
+        SELECT resposta_llm, json_produtos,
+               1 - (pergunta_vetor <=> %s::halfvec) AS cosine_similarity,
+               tenant_id, filial_id, pack_id, created_at
         FROM perguntas_cache
+        WHERE tenant_id = %s
+          AND filial_id = %s
+          AND pack_id = %s
+          AND created_at >= NOW() - (%s * INTERVAL '1 second')
         ORDER BY pergunta_vetor <=> %s::halfvec
         LIMIT 1;
         """
         try:
-            with self._get_connection() as conn:
+            rls_filial_int = int(re.sub(r"\D", "", eff_filial) or 1)
+            with self._get_connection(tenant_id=eff_tenant, filial_id=rls_filial_int) as conn:
+                if not self._cache_schema_ready:
+                    try:
+                        ensure_semantic_cache_partition_schema(conn)
+                    except Exception:
+                        pass
+                    self._cache_schema_ready = True
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     vec_str = str(query_vector)
-                    cur.execute(sql, (vec_str, vec_str))
+                    cur.execute(sql, (vec_str, eff_tenant, eff_filial, eff_pack, eff_ttl, vec_str))
                     row = cur.fetchone()
 
-            if row and row['cosine_similarity'] >= similarity_threshold:
+            if row and float(row["cosine_similarity"]) >= eff_threshold:
                 return {
                     "resposta_llm": row["resposta_llm"],
                     "json_produtos": row["json_produtos"],
-                    "cosine_similarity": row["cosine_similarity"],
-                    "query_vector": query_vector
+                    "cosine_similarity": float(row["cosine_similarity"]),
+                    "tenant_id": eff_tenant,
+                    "filial_id": eff_filial,
+                    "pack_id": eff_pack,
+                    "query_vector": query_vector,
                 }
         except Exception as e:
             logger.error(f"Erro no cache semântico: {e}")
         return {"query_vector": query_vector}
 
-    def save_semantic_cache(self, query_text: str, query_vector: List[float], resposta_llm: str, json_produtos: Any):
-        """Salva a resposta do catálogo no cache semântico evitando erros ou respostas vazias."""
+    def save_semantic_cache(
+        self,
+        query_text: str,
+        query_vector: List[float],
+        resposta_llm: str,
+        json_produtos: Any,
+        tenant_id: Optional[str] = None,
+        filial_id: Optional[Union[str, int]] = None,
+        pack_id: Optional[str] = None,
+    ):
+        """
+        Salva a resposta no cache semantico particionado por (tenant_id, filial_id, pack_id)
+        com timestamp created_at para expiracao deterministica por TTL.
+        """
         frases_bloqueio = ["não há registros", "erro", "indisponível", "não foi possível", "não encontrei"]
         if any(fb in resposta_llm.lower() for fb in frases_bloqueio):
             return
 
+        eff_tenant, eff_filial, eff_pack = self._resolve_cache_partition(
+            tenant_id=tenant_id,
+            filial_id=filial_id,
+            pack_id=pack_id,
+        )
+
         sql = """
-        INSERT INTO perguntas_cache (pergunta, pergunta_vetor, resposta_llm, json_produtos)
-        VALUES (%s, %s::halfvec, %s, %s);
+        INSERT INTO perguntas_cache (
+            pergunta, pergunta_vetor, resposta_llm, json_produtos,
+            tenant_id, filial_id, pack_id, created_at
+        )
+        VALUES (%s, %s::halfvec, %s, %s, %s, %s, %s, NOW());
         """
         try:
-            with self._get_connection() as conn:
+            rls_filial_int = int(re.sub(r"\D", "", eff_filial) or 1)
+            with self._get_connection(tenant_id=eff_tenant, filial_id=rls_filial_int) as conn:
+                if not self._cache_schema_ready:
+                    try:
+                        ensure_semantic_cache_partition_schema(conn)
+                    except Exception:
+                        pass
+                    self._cache_schema_ready = True
                 with conn.cursor() as cur:
-                    cur.execute(sql, (query_text, str(query_vector), resposta_llm, json.dumps(json_produtos, default=str)))
+                    cur.execute(
+                        sql,
+                        (
+                            query_text,
+                            str(query_vector),
+                            resposta_llm,
+                            json.dumps(json_produtos, default=str),
+                            eff_tenant,
+                            eff_filial,
+                            eff_pack,
+                        ),
+                    )
                 conn.commit()
         except Exception as e:
             logger.error(f"Erro ao salvar no cache semântico: {e}")
@@ -182,7 +343,10 @@ class HybridRAGEngine:
         - Priorização léxica de viscosidades de lubrificantes (+0.08 de boost no RRF)
         - Tuning dinâmico de HNSW ef_search = 128
         """
-        ef = ef_search or self.ef_search
+        ef = _validate_positive_int(ef_search or self.ef_search, "ef_search", min_val=1, max_val=2000)
+        eff_dense_weight = _validate_finite_float(dense_weight, "dense_weight", min_val=0.0, max_val=10.0)
+        eff_sparse_weight = _validate_finite_float(sparse_weight, "sparse_weight", min_val=0.0, max_val=10.0)
+        eff_rrf_k = _validate_positive_int(self.rrf_k, "rrf_k", min_val=1, max_val=1000)
         t0 = time.perf_counter()
 
         clean_query = (query_text or "").strip()
@@ -234,9 +398,6 @@ class HybridRAGEngine:
 
         if query_vector is not None:
             sql_rrf = f"""
-            SET LOCAL hnsw.ef_search = {ef};
-            {iterative_scan_sql}
-
             WITH dense_search AS (
                 SELECT 
                     codpro, nompro, grupo, codbar, unidade, preco, texto_busca,
@@ -289,8 +450,8 @@ class HybridRAGEngine:
                 d.dense_rank,
                 s.sparse_rank,
                 (
-                    {dense_weight} * COALESCE(1.0 / ({self.rrf_k} + d.dense_rank), 0.0) +
-                    {sparse_weight} * COALESCE(1.0 / ({self.rrf_k} + s.sparse_rank), 0.0) +
+                    %s * COALESCE(1.0 / (%s + d.dense_rank), 0.0) +
+                    %s * COALESCE(1.0 / (%s + s.sparse_rank), 0.0) +
                     -- Boost normalizado de Código de Barras / Código de Produto (+0.050)
                     (CASE WHEN %s <> '' AND (TRIM(COALESCE(d.codbar, s.codbar)) = %s OR TRIM(COALESCE(d.codpro, s.codpro)) = %s OR (LTRIM(TRIM(COALESCE(d.codpro, s.codpro)), '0') <> '' AND LTRIM(TRIM(COALESCE(d.codpro, s.codpro)), '0') = LTRIM(%s, '0'))) THEN 0.050 ELSE 0.0 END) +
                     -- Boost normalizado de Viscosidade de Lubrificante (+0.015)
@@ -327,8 +488,10 @@ class HybridRAGEngine:
                 params.append(grupo_filter)
             params.append(fetch_limit)
 
-            # Parâmetros para SELECT final (boosts RRF)
+            # Parâmetros para SELECT final (pesos e boosts RRF parametrizados)
             params.extend([
+                eff_dense_weight, eff_rrf_k,
+                eff_sparse_weight, eff_rrf_k,
                 exact_code, exact_code, exact_code, exact_code,                                    # Boost exato codbar/codpro
                 viscosity_sql_regex, viscosity_sql_regex,                                          # Boost viscosidade
                 top_k                                                                              # LIMIT final
@@ -336,8 +499,6 @@ class HybridRAGEngine:
         else:
             # Fallback gracioso para recuperação esparsa (GIN FTS + Boosts + RRF) quando embedding não disponível
             sql_rrf = f"""
-            SET LOCAL hnsw.ef_search = {ef};
-
             WITH sparse_search AS (
                 SELECT 
                     codpro, nompro, grupo, codbar, unidade, preco, texto_busca,
@@ -371,7 +532,7 @@ class HybridRAGEngine:
                 NULL::bigint AS dense_rank,
                 s.sparse_rank,
                 (
-                    {sparse_weight} * (1.0 / ({self.rrf_k} + s.sparse_rank)) +
+                    %s * (1.0 / (%s + s.sparse_rank)) +
                     (CASE WHEN %s <> '' AND (TRIM(s.codbar) = %s OR TRIM(s.codpro) = %s OR (LTRIM(TRIM(s.codpro), '0') <> '' AND LTRIM(TRIM(s.codpro), '0') = LTRIM(%s, '0'))) THEN 0.050 ELSE 0.0 END) +
                     (CASE WHEN %s <> '' AND s.nompro ~* %s THEN 0.015 ELSE 0.0 END)
                 ) AS rrf_score
@@ -394,6 +555,7 @@ class HybridRAGEngine:
                 params.append(grupo_filter)
             params.extend([
                 fetch_limit,
+                eff_sparse_weight, eff_rrf_k,
                 exact_code, exact_code, exact_code, exact_code,
                 viscosity_sql_regex, viscosity_sql_regex,
                 top_k
@@ -402,6 +564,10 @@ class HybridRAGEngine:
         t_db_start = time.perf_counter()
         with self._get_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT set_config('hnsw.ef_search', %s, true);", (str(ef),))
+                if grupo_filter and query_vector is not None:
+                    cur.execute("SELECT set_config('hnsw.iterative_scan', 'relaxed_order', true);")
+                    cur.execute("SELECT set_config('hnsw.max_scan_tuples', '20000', true);")
                 cur.execute(sql_rrf, tuple(params))
                 results = cur.fetchall()
 
@@ -449,7 +615,10 @@ class HybridRAGEngine:
         + Reciprocal Rank Fusion (RRF) em SQL nativo.
         Latência de busca em banco sub-5ms (< 5ms).
         """
-        ef = ef_search or self.ef_search
+        ef = _validate_positive_int(ef_search or self.ef_search, "ef_search", min_val=1, max_val=2000)
+        eff_dense_weight = _validate_finite_float(dense_weight, "dense_weight", min_val=0.0, max_val=10.0)
+        eff_sparse_weight = _validate_finite_float(sparse_weight, "sparse_weight", min_val=0.0, max_val=10.0)
+        eff_rrf_k = _validate_positive_int(self.rrf_k, "rrf_k", min_val=1, max_val=1000)
         t0 = time.perf_counter()
 
         q_clean = (query_text or "").strip()
@@ -719,17 +888,24 @@ class HybridRAGEngine:
         sparse_weight: float = 0.5,
         ef_search: int = 100,
         query_vector: list = None,
+        vertical_pack: Optional[str] = None,
+        min_cosine_threshold: float = DEFAULT_MIN_COSINE_EVIDENCE,
+        min_fts_threshold: float = DEFAULT_MIN_FTS_EVIDENCE,
     ) -> dict:
         """
-        Busca hibrida multicamada de procedimentos operacionais e manuais do ERP (Secao 8 do Roadmap).
+        Busca hibrida multicamada de procedimentos operacionais e manuais do ERP (Carbon Core P0.2).
         Executa busca em aura_core.aura_conhecimento_chunks:
-        - Ramo denso: HNSW halfvec(768) com varredura iterativa e ef_search calibrado
+        - Ramo denso: HNSW puro (ORDER BY embedding <=> %s::halfvec ASC LIMIT 50) + corte cosine >= 0.62
         - Ramo esparso: GIN tsvector em portugues com ts_rank_cd e fallback relaxado
-        - Fusao: Reciprocal Rank Fusion (RRF, k=60)
-        - Deduplicacao: maximo 2 chunks por pagina (doc_id)
-        - Indicador de relevancia minima (evidencia_insuficiente)
+        - Fusao: Reciprocal Rank Fusion (RRF, k=60) com boost de breadcrumb apenas no score externo
+        - Trava matematica real de evidencia_insuficiente: max_cosine < 0.62 AND max_fts_score < 0.05
         """
-        ef = ef_search or 100
+        ef = _validate_positive_int(ef_search or 100, "ef_search", min_val=1, max_val=2000)
+        eff_dense_weight = _validate_finite_float(dense_weight, "dense_weight", min_val=0.0, max_val=10.0)
+        eff_sparse_weight = _validate_finite_float(sparse_weight, "sparse_weight", min_val=0.0, max_val=10.0)
+        eff_min_cosine = _validate_finite_float(min_cosine_threshold, "min_cosine_threshold", min_val=0.0, max_val=1.0)
+        eff_min_fts = _validate_finite_float(min_fts_threshold, "min_fts_threshold", min_val=0.0, max_val=10.0)
+        eff_vertical = (vertical_pack or "").strip()
         t0 = time.perf_counter()
 
         q_clean = (query_text or "").strip()
@@ -787,31 +963,31 @@ class HybridRAGEngine:
         try:
             with self._get_connection(tenant_id=tenant_id) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
                 if query_vector is not None:
-                    sql_rrf = f"""
-                    SET LOCAL hnsw.ef_search = {ef};
-                    SET LOCAL hnsw.iterative_scan = 'relaxed_order';
+                    cur.execute("SELECT set_config('hnsw.ef_search', %s, true);", (str(ef),))
+                    cur.execute("SELECT set_config('hnsw.iterative_scan', 'relaxed_order', true);")
 
-                    WITH dense_search AS (
-                        SELECT 
+                    sql_rrf = """
+                    WITH dense_candidates AS (
+                        SELECT
                             id, doc_id, doc_titulo, doc_url, doc_versao, breadcrumb, secao,
                             chunk_idx, chunk_total, conteudo, n_tokens,
-                            1 - (embedding <=> %s::halfvec) AS cosine_similarity,
-                            ROW_NUMBER() OVER (
-                                ORDER BY 
-                                    (CASE 
-                                        WHEN %s AND (breadcrumb ILIKE '%%pdv%%' OR doc_titulo ILIKE '%%pdv%%') THEN 0
-                                        WHEN %s AND (breadcrumb ILIKE '%%retaguarda%%' OR doc_titulo ILIKE '%%retaguarda%%') THEN 0
-                                        WHEN %s AND breadcrumb ILIKE '%%retaguarda%%' THEN 1
-                                        WHEN %s AND breadcrumb ILIKE '%%pdv%%' THEN 1
-                                        ELSE 0
-                                    END) ASC,
-                                    embedding <=> %s::halfvec ASC
-                            ) AS dense_rank
+                            1 - (embedding <=> %s::halfvec) AS cosine_similarity
                         FROM aura_core.aura_conhecimento_chunks
                         WHERE embedding IS NOT NULL
                           AND status = 'ativo'
                           AND (camada IN ('core', 'vertical', 'erp') OR (camada = 'tenant' AND tenant_id = %s))
-                        LIMIT 30
+                          AND (%s = '' OR vertical IS NULL OR vertical = '' OR vertical = %s)
+                        ORDER BY embedding <=> %s::halfvec ASC
+                        LIMIT 50
+                    ),
+                    dense_search AS (
+                        SELECT
+                            id, doc_id, doc_titulo, doc_url, doc_versao, breadcrumb, secao,
+                            chunk_idx, chunk_total, conteudo, n_tokens,
+                            cosine_similarity,
+                            ROW_NUMBER() OVER (ORDER BY cosine_similarity DESC, id ASC) AS dense_rank
+                        FROM dense_candidates
+                        WHERE cosine_similarity >= %s
                     ),
                     sparse_search AS (
                         SELECT 
@@ -820,13 +996,6 @@ class HybridRAGEngine:
                             ts_rank_cd(tsv, to_tsquery('portuguese', %s)) AS fts_score,
                             ROW_NUMBER() OVER (
                                 ORDER BY 
-                                    (CASE 
-                                        WHEN %s AND (breadcrumb ILIKE '%%pdv%%' OR doc_titulo ILIKE '%%pdv%%') THEN 10
-                                        WHEN %s AND (breadcrumb ILIKE '%%retaguarda%%' OR doc_titulo ILIKE '%%retaguarda%%') THEN 10
-                                        WHEN %s AND breadcrumb ILIKE '%%retaguarda%%' THEN -5
-                                        WHEN %s AND breadcrumb ILIKE '%%pdv%%' THEN -5
-                                        ELSE 0
-                                    END) DESC,
                                     (CASE WHEN tsv @@ to_tsquery('portuguese', %s) THEN 1 ELSE 0 END) DESC,
                                     (CASE WHEN doc_titulo ILIKE %s THEN 1 ELSE 0 END) DESC,
                                     ts_rank_cd(tsv, to_tsquery('portuguese', %s)) DESC,
@@ -839,6 +1008,7 @@ class HybridRAGEngine:
                                OR breadcrumb ILIKE %s)
                           AND status = 'ativo'
                           AND (camada IN ('core', 'vertical', 'erp') OR (camada = 'tenant' AND tenant_id = %s))
+                          AND (%s = '' OR vertical IS NULL OR vertical = '' OR vertical = %s)
                         ORDER BY sparse_rank ASC
                         LIMIT 30
                     )
@@ -859,8 +1029,15 @@ class HybridRAGEngine:
                         d.dense_rank,
                         s.sparse_rank,
                         (
-                            {dense_weight} * COALESCE(1.0 / (60 + d.dense_rank), 0.0) +
-                            {sparse_weight} * COALESCE(1.0 / (60 + s.sparse_rank), 0.0)
+                            %s * COALESCE(1.0 / (60 + d.dense_rank), 0.0) +
+                            %s * COALESCE(1.0 / (60 + s.sparse_rank), 0.0) +
+                            (CASE
+                                WHEN %s AND (COALESCE(d.breadcrumb, s.breadcrumb) ILIKE '%%pdv%%' OR COALESCE(d.doc_titulo, s.doc_titulo) ILIKE '%%pdv%%') THEN 0.005
+                                WHEN %s AND (COALESCE(d.breadcrumb, s.breadcrumb) ILIKE '%%retaguarda%%' OR COALESCE(d.doc_titulo, s.doc_titulo) ILIKE '%%retaguarda%%') THEN 0.005
+                                WHEN %s AND COALESCE(d.breadcrumb, s.breadcrumb) ILIKE '%%retaguarda%%' THEN -0.003
+                                WHEN %s AND COALESCE(d.breadcrumb, s.breadcrumb) ILIKE '%%pdv%%' THEN -0.003
+                                ELSE 0.0
+                            END)
                         ) AS rrf_score
                     FROM dense_search d
                     FULL OUTER JOIN sparse_search s ON d.id = s.id
@@ -870,12 +1047,18 @@ class HybridRAGEngine:
                     vec_str = str(query_vector)
                     params = (
                         vec_str,
-                        is_pdv, is_retaguarda, is_pdv, is_retaguarda,
-                        vec_str, tenant_id,
+                        tenant_id,
+                        eff_vertical, eff_vertical,
+                        vec_str,
+                        eff_min_cosine,
                         tsquery_and,
-                        is_pdv, is_retaguarda, is_pdv, is_retaguarda,
                         tsquery_and, like_main, tsquery_and,
-                        tsquery_and, tsquery_or, like_main, like_main, tenant_id
+                        tsquery_and, tsquery_or, like_main, like_main,
+                        tenant_id,
+                        eff_vertical, eff_vertical,
+                        eff_dense_weight,
+                        eff_sparse_weight,
+                        is_pdv, is_retaguarda, is_pdv, is_retaguarda,
                     )
                     cur.execute(sql_rrf, params)
                     raw_rows = cur.fetchall()
@@ -952,7 +1135,7 @@ class HybridRAGEngine:
             retrieval_mode = "error_fallback"
 
         # Fallback de contingencia local FTS5 SQLite sobre os 2.343 chunks estruturais se pgvector estiver offline
-        if not results:
+        if not results and retrieval_mode == "error_fallback":
             try:
                 from core.webposto_rag import get_webposto_rag
                 rag_local = get_webposto_rag()
@@ -962,6 +1145,9 @@ class HybridRAGEngine:
                     limit=top_k,
                 )
                 if chunk_hits:
+                    for hit in chunk_hits:
+                        hit.setdefault("cosine_similarity", 0.0)
+                        hit.setdefault("fts_score", float(hit.get("rrf_score", 0.0)))
                     results.extend(chunk_hits)
                     retrieval_mode = "local_chunks_fts5"
             except Exception as e_ch:
@@ -970,9 +1156,14 @@ class HybridRAGEngine:
         db_latency_ms = (time.perf_counter() - t_db_start) * 1000
         total_latency_ms = (time.perf_counter() - t0) * 1000
 
-        # Calibracao de limiar minimo de evidencia
-        max_score = max((r.get("rrf_score", 0.0) for r in results), default=0.0)
-        evidencia_insuficiente = bool(not results or max_score < 0.008)
+        # Trava matematica real de evidencia minima (Carbon Core P0.2):
+        # Evita o limiar RRF morto (< 0.008) que jamais disparava quando dense_weight=0.5 e k=60
+        max_score = max((float(r.get("rrf_score") or 0.0) for r in results), default=0.0)
+        max_cosine = max((float(r.get("cosine_similarity") or 0.0) for r in results), default=0.0)
+        max_fts_score = max((float(r.get("fts_score") or 0.0) for r in results), default=0.0)
+        evidencia_insuficiente = bool(
+            not results or (max_cosine < eff_min_cosine and max_fts_score < eff_min_fts)
+        )
 
         telemetry = {
             "query": query_text,
@@ -984,6 +1175,8 @@ class HybridRAGEngine:
             "top_k": top_k,
             "results_count": len(results),
             "max_rrf_score": round(max_score, 5),
+            "max_cosine_similarity": round(max_cosine, 5),
+            "max_fts_score": round(max_fts_score, 5),
             "evidencia_insuficiente": evidencia_insuficiente,
             "retrieval_mode": retrieval_mode,
         }
@@ -1003,7 +1196,7 @@ class HybridRAGEngine:
         query_vector: Optional[List[float]] = None
     ) -> Dict[str, Any]:
         """Busca puramente semântica (HNSW) com suporte a filtro relacional e iterative scan."""
-        ef = ef_search or self.ef_search
+        ef = _validate_positive_int(ef_search or self.ef_search, "ef_search", min_val=1, max_val=2000)
         t0 = time.perf_counter()
 
         clean_query = (query_text or "").strip()

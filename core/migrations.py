@@ -461,6 +461,102 @@ class AuraMigrationManager:
             self._shared_memory_conn = None
 
 
+def ensure_semantic_cache_partition_schema(
+    conn: Any,
+    dialect: str | None = None,
+) -> dict[str, Any]:
+    """
+    Migracao idempotente (Carbon Core P0.2) para garantir particionamento multi-tenant
+    e TTL na tabela perguntas_cache (tenant_id, filial_id, pack_id, created_at).
+    Suporta PostgreSQL (pgvector) e SQLite (testes locais).
+    """
+    resolved_dialect = dialect
+    if resolved_dialect is None:
+        mod_name = type(conn).__module__.lower()
+        resolved_dialect = "sqlite" if "sqlite" in mod_name else "postgresql"
+
+    cur = conn.cursor()
+    try:
+        if resolved_dialect == "postgresql":
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS perguntas_cache (
+                    id SERIAL PRIMARY KEY,
+                    pergunta TEXT NOT NULL,
+                    pergunta_vetor halfvec(768),
+                    resposta_llm TEXT NOT NULL,
+                    json_produtos JSONB,
+                    tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
+                    filial_id VARCHAR(32) NOT NULL DEFAULT '1',
+                    pack_id VARCHAR(64) NOT NULL DEFAULT 'fuel_convenience',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """
+            )
+            cur.execute(
+                "ALTER TABLE perguntas_cache ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(64) NOT NULL DEFAULT 'default';"
+            )
+            cur.execute(
+                "ALTER TABLE perguntas_cache ADD COLUMN IF NOT EXISTS filial_id VARCHAR(32) NOT NULL DEFAULT '1';"
+            )
+            cur.execute(
+                "ALTER TABLE perguntas_cache ADD COLUMN IF NOT EXISTS pack_id VARCHAR(64) NOT NULL DEFAULT 'fuel_convenience';"
+            )
+            cur.execute(
+                "ALTER TABLE perguntas_cache ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();"
+            )
+            cur.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_perguntas_cache_partition_ttl
+                ON perguntas_cache (tenant_id, filial_id, pack_id, created_at DESC);
+                """
+            )
+        else:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS perguntas_cache (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    pergunta TEXT NOT NULL,
+                    pergunta_vetor TEXT,
+                    resposta_llm TEXT NOT NULL,
+                    json_produtos TEXT,
+                    tenant_id TEXT NOT NULL DEFAULT 'default',
+                    filial_id TEXT NOT NULL DEFAULT '1',
+                    pack_id TEXT NOT NULL DEFAULT 'fuel_convenience',
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                """
+            )
+            cur.execute("PRAGMA table_info(perguntas_cache);")
+            existing_cols = {str(r[1]).lower() for r in cur.fetchall()}
+            alter_specs = [
+                ("tenant_id", "TEXT NOT NULL DEFAULT 'default'"),
+                ("filial_id", "TEXT NOT NULL DEFAULT '1'"),
+                ("pack_id", "TEXT NOT NULL DEFAULT 'fuel_convenience'"),
+                ("created_at", "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"),
+            ]
+            for col_name, col_def in alter_specs:
+                if col_name not in existing_cols:
+                    cur.execute(f"ALTER TABLE perguntas_cache ADD COLUMN {col_name} {col_def};")
+            cur.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_perguntas_cache_partition_ttl
+                ON perguntas_cache (tenant_id, filial_id, pack_id, created_at);
+                """
+            )
+        if hasattr(conn, "commit"):
+            conn.commit()
+    finally:
+        cur.close()
+
+    return {
+        "status": "ok",
+        "table": "perguntas_cache",
+        "dialect": resolved_dialect,
+        "columns": ["tenant_id", "filial_id", "pack_id", "created_at"],
+    }
+
+
 def run_startup_migrations(db_path: str | Path | None = None) -> dict[str, Any]:
     """
     Rotina utilitaria de inicializacao para aplicar migracoes pendentes ate 'head'

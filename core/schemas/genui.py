@@ -449,7 +449,9 @@ class ActionAuditLogRecord(BaseModel):
     client_ip: Optional[str] = Field(default=None, description="Endereco IP do cliente")
 
 
-AURA_VOUCHER_SECRET = os.getenv("AURA_VOUCHER_SECRET", "aura_voucher_hmac_secret_v1")
+from config.settings import AURA_VOUCHER_SECRET as _SETTINGS_AURA_VOUCHER_SECRET
+
+AURA_VOUCHER_SECRET = os.getenv("AURA_VOUCHER_SECRET") or _SETTINGS_AURA_VOUCHER_SECRET
 
 
 def generate_action_voucher_signature(

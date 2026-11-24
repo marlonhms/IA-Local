@@ -7,6 +7,7 @@ Zero travessoes em todo o modulo.
 """
 
 import logging
+import os
 import threading
 import time
 from contextlib import contextmanager, suppress
@@ -120,35 +121,48 @@ def _format_pg_exc(exc: Exception) -> str:
         return repr(exc)
 
 
-def _build_role_candidates(primary_user: str, primary_password: str) -> list[tuple[str, str]]:
+def _build_role_candidates(
+    primary_user: str,
+    primary_password: str,
+    allow_suporte_fallback: bool | None = None,
+) -> list[tuple[str, str]]:
     """
-    Constroi a lista ordenada de credenciais para Dual-Role Fallback:
-    Prioriza a ultima credencial validada, seguida da configurada, da role
-    permanente somente-leitura 'aura_service_ro' e da role 'suporte'.
+    Constroi a lista ordenada de credenciais somente-leitura para o pool PostgreSQL.
+    Prioriza estritamente a role permanente somente-leitura 'aura_service_ro'.
+    Fallback para 'suporte' permanece desabilitado por padrao (ERP_ALLOW_SUPORTE_FALLBACK=0).
     Em ambiente mockado de testes unitarios, retorna apenas a credencial primaria.
     """
     if _is_pool_mocked(pool.ThreadedConnectionPool):
         return [(primary_user, primary_password)]
 
-    service_ro_pass = "364768"
-    with suppress(Exception):
-        from core.identity_vault import get_vault_secret
+    allow_suporte = (
+        os.getenv("ERP_ALLOW_SUPORTE_FALLBACK", "0").strip().lower() in ("1", "true", "yes")
+        if allow_suporte_fallback is None
+        else bool(allow_suporte_fallback)
+    )
 
-        vault_ro = get_vault_secret("aura_service_ro_password")
-        if vault_ro:
-            service_ro_pass = vault_ro
+    service_ro_pass = (os.getenv("ERP_SERVICE_RO_PASSWORD") or "").strip() or None
+    if not service_ro_pass:
+        with suppress(Exception):
+            from core.identity_vault import get_vault_secret
+
+            vault_ro = get_vault_secret("aura_service_ro_password")
+            if vault_ro:
+                service_ro_pass = vault_ro
 
     raw_candidates: list[tuple[str, str]] = []
     if _last_working_erp_cred is not None:
-        raw_candidates.append(_last_working_erp_cred)
-    raw_candidates.extend(
-        [
-            ("aura_service_ro", service_ro_pass),
-            ("aura_service_ro", primary_password),
-            (primary_user, primary_password),
-            ("suporte", primary_password),
-        ]
-    )
+        if allow_suporte or _last_working_erp_cred[0].lower() != "suporte":
+            raw_candidates.append(_last_working_erp_cred)
+
+    if service_ro_pass:
+        raw_candidates.append(("aura_service_ro", service_ro_pass))
+    if primary_password is not None:
+        raw_candidates.append(("aura_service_ro", primary_password))
+    if primary_user and (allow_suporte or primary_user.lower() != "suporte"):
+        raw_candidates.append((primary_user, primary_password))
+    if allow_suporte:
+        raw_candidates.append(("suporte", primary_password))
 
     seen: set[tuple[str, str]] = set()
     ordered: list[tuple[str, str]] = []
@@ -156,7 +170,10 @@ def _build_role_candidates(primary_user: str, primary_password: str) -> list[tup
         if cand[0] and cand[1] is not None and cand not in seen:
             seen.add(cand)
             ordered.append(cand)
-    return ordered or [(primary_user, primary_password)]
+    if ordered:
+        return ordered
+    fallback_user = primary_user if (allow_suporte or primary_user.lower() != "suporte") else "aura_service_ro"
+    return [(fallback_user, primary_password)]
 
 
 def _create_erp_pool(
@@ -166,13 +183,18 @@ def _create_erp_pool(
 ) -> pool.ThreadedConnectionPool:
     """
     Cria pool gerenciado para o banco ERP com deteccao automatica da porta funcional
-    e Dual-Role Fallback entre 'aura_service_ro' e 'suporte'.
+    e blindagem estrita somente-leitura via 'aura_service_ro' + default_transaction_read_only=on.
     """
     global _last_working_erp_port, _last_working_erp_cred
     config = dict(DB_ERP_CONFIG)
     primary_pass = get_erp_password()
-    primary_user = str(config.get("user", "suporte"))
+    primary_user = str(config.get("user", "aura_service_ro"))
     configured_port = int(config.get("port", 5433))
+
+    # Garante default_transaction_read_only=on em nivel de driver no ERP
+    existing_opts = str(config.get("options") or "").strip()
+    if "default_transaction_read_only=on" not in existing_opts:
+        config["options"] = f"{existing_opts} -c default_transaction_read_only=on".strip()
 
     ports_to_try = [configured_port]
     if _last_working_erp_port and _last_working_erp_port not in ports_to_try:
@@ -219,11 +241,12 @@ def _create_vector_pool(
     """
     global _last_working_erp_cred
     config = dict(DB_VECTOR_CONFIG)
-    primary_pass = get_erp_password()
+    primary_pass = str(config.get("password") or get_erp_password())
     primary_user = str(config.get("user", "suporte"))
     port = config.get("port", 5433)
 
-    candidates = _build_role_candidates(primary_user, primary_pass)
+    # Banco vetorial proprio da AURA (posto_ai) usa a credencial configurada em DB_VECTOR_CONFIG
+    candidates = [(primary_user, primary_pass)]
     last_exc = None
     for cand_user, cand_pass in candidates:
         try_config = dict(config)
@@ -236,7 +259,6 @@ def _create_vector_pool(
                 maxconn=maxconn,
                 **try_config,
             )
-            _last_working_erp_cred = (cand_user, cand_pass)
             logger.info(
                 f"Vector ThreadedConnectionPool inicializado no posto_ai:{port} com role '{cand_user}' e schema aura_core (min={minconn}, max={maxconn})."
             )

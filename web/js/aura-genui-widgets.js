@@ -716,29 +716,22 @@
           }
           return false;
         }
-      } else if (typeof fetch === 'function' && typeof window !== 'undefined' && window.location) {
+      } else if (typeof window !== 'undefined' && typeof window.AuraApiClient === 'function') {
         rpcExecuted = true;
         try {
+          const fallbackClient = new window.AuraApiClient();
           const operatorRole = this.operatorRole || (window.currentUser && window.currentUser.role) || 'gerente';
           const operatorId = this.operatorId || (window.currentUser && window.currentUser.id) || 'operador_01';
-          const fetchResp = await fetch('/api/v1/aura/actions/execute', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              session_id: this.sessionId || (window.auraChat && window.auraChat.sessionId) || '',
-              tool_call_id: this.toolCallId,
-              action_id: actionId,
-              action_name: actionDef.label || 'acao_executiva',
-              action_type: actionDef.action_type || actionType || 'mutation',
-              payload: actionDef.payload || {},
-              operator_id: operatorId,
-              operator_role: operatorRole
-            })
+          res = await fallbackClient.executeAction({
+            session_id: this.sessionId || (window.auraChat && window.auraChat.sessionId) || '',
+            tool_call_id: this.toolCallId,
+            action_id: actionId,
+            action_name: actionDef.label || 'acao_executiva',
+            action_type: actionDef.action_type || actionType || 'mutation',
+            payload: actionDef.payload || {},
+            operator_id: operatorId,
+            operator_role: operatorRole
           });
-          if (!fetchResp.ok) {
-            throw new Error(`HTTP ${fetchResp.status}`);
-          }
-          res = await fetchResp.json();
         } catch (err) {
           if (stateMgr) {
             stateMgr.rollbackOptimisticState(this.toolCallId);
@@ -1618,7 +1611,7 @@
                 <span class="text-[10px] text-emerald-300/80 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/20">Oficial ANP</span>
               </div>
               <div class="space-y-1.5 pt-1">
-                ${rankingList.slice(0, 5).map((st, idx) => {
+                ${rankingList.slice(0, 10).map((st, idx) => {
                   const rankNum = idx + 1;
                   const postoNome = escapeHtml(st.posto || st.revenda || 'Posto Concorrente');
                   const bandeira = escapeHtml(st.bandeira || 'Branca');
@@ -4454,6 +4447,117 @@
   // 10. REGISTRO NO SecureComponentRegistry & EXPORTACOES ZERO-BUNDLER
   // =========================================================================
 
+  class WhatIfSimulatorUI extends BaseGenUIWidget {
+    constructor(payload = {}) {
+      super(payload, 'simular_cenario_what_if', 'WhatIfSimulatorUI');
+      this.cardClass = 'genui-whatif-simulator-card';
+      this.ariaLabel = 'Simulador What-If e Ponto de Equilibrio';
+    }
+
+    renderLayer1() {
+      const title = escapeHtml(this.props.title || 'Simulador What-If');
+      const rec = escapeHtml(this.props.recommendation || this.summary || 'Simulacao deterministica de impacto financeiro.');
+      const horizon = coerceNumber(this.props.horizon_days, 30);
+      return `
+        <div class="genui-layer genui-layer-1 mb-3">
+          <div class="flex items-center justify-between gap-2 mb-1">
+            <span class="text-xs font-semibold uppercase tracking-wider text-cyan-300">What-If Simulator</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-200 border border-cyan-500/30">${horizon} dias</span>
+          </div>
+          <h4 class="text-base font-bold text-white">${title}</h4>
+          <p class="text-sm text-slate-300 mt-1">${rec}</p>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const scenarios = Array.isArray(this.props.scenarios) ? this.props.scenarios : [];
+      if (!scenarios.length) return '<div class="genui-layer genui-layer-2"></div>';
+      const rows = scenarios.map(sc => {
+        const name = escapeHtml(sc.name || sc.label || 'Cenario');
+        const delta = coerceNumber(sc.horizon_net_delta_brl, 0);
+        const cls = delta >= 0 ? 'text-emerald-400' : 'text-rose-400';
+        return `<div class="flex items-center justify-between py-1.5 border-b border-slate-700/50 text-xs">
+          <span class="text-slate-200 font-medium">${name}</span>
+          <span class="font-bold ${cls}">R$ ${formatNumber(delta, 2)}</span>
+        </div>`;
+      }).join('');
+      return `<div class="genui-layer genui-layer-2 rounded-xl bg-slate-800/60 p-3 border border-slate-700/60">${rows}</div>`;
+    }
+  }
+
+  class RealizedRoiScorecardUI extends BaseGenUIWidget {
+    constructor(payload = {}) {
+      super(payload, 'realized_roi_scorecard', 'RealizedRoiScorecardUI');
+      this.cardClass = 'genui-realized-roi-card';
+      this.ariaLabel = 'Scorecard de ROI Realizado';
+    }
+
+    renderLayer1() {
+      const title = escapeHtml(this.props.title || 'Scorecard de ROI Realizado');
+      const totalBrl = coerceNumber(this.props.total_realized_brl, 0);
+      const summary = escapeHtml(this.summary || `Retorno financeiro auditado no ERP: R$ ${formatNumber(totalBrl, 2)}.`);
+      return `
+        <div class="genui-layer genui-layer-1 mb-3">
+          <div class="flex items-center justify-between gap-2 mb-1">
+            <span class="text-xs font-semibold uppercase tracking-wider text-emerald-300">Closed-Loop ROI</span>
+            <span class="text-xs font-bold text-emerald-400">R$ ${formatNumber(totalBrl, 2)}</span>
+          </div>
+          <h4 class="text-base font-bold text-white">${title}</h4>
+          <p class="text-sm text-slate-300 mt-1">${summary}</p>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const items = Array.isArray(this.props.items) ? this.props.items : [];
+      if (!items.length) return '<div class="genui-layer genui-layer-2"></div>';
+      const rows = items.slice(0, 6).map(it => {
+        const label = escapeHtml(it.action_label || it.action_type || 'Acao Auditada');
+        const val = coerceNumber(it.realized_brl, 0);
+        const cls = val >= 0 ? 'text-emerald-400' : 'text-rose-400';
+        return `<div class="flex items-center justify-between py-1.5 border-b border-slate-700/50 text-xs">
+          <span class="text-slate-200">${label}</span>
+          <span class="font-bold ${cls}">R$ ${formatNumber(val, 2)}</span>
+        </div>`;
+      }).join('');
+      return `<div class="genui-layer genui-layer-2 rounded-xl bg-slate-800/60 p-3 border border-slate-700/60">${rows}</div>`;
+    }
+  }
+
+  class McpActionConfirmationUI extends BaseGenUIWidget {
+    constructor(payload = {}) {
+      super(payload, 'mcp_external_write_confirmation', 'McpActionConfirmationUI');
+      this.cardClass = 'genui-mcp-confirmation-card';
+      this.ariaLabel = 'Confirmacao HITL de Acao Externa MCP';
+    }
+
+    renderLayer1() {
+      const serverName = escapeHtml(this.props.server_name || 'MCP Server');
+      const toolName = escapeHtml(this.props.tool_name || 'acao_externa');
+      const summary = escapeHtml(this.summary || `Confirmacao obrigatoria antes de executar ${toolName} em ${serverName}.`);
+      return `
+        <div class="genui-layer genui-layer-1 mb-3">
+          <div class="flex items-center justify-between gap-2 mb-1">
+            <span class="text-xs font-semibold uppercase tracking-wider text-amber-300">MCP HITL Guard</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-200 border border-amber-500/30">${serverName}</span>
+          </div>
+          <h4 class="text-base font-bold text-white">Autorizar ferramenta: ${toolName}</h4>
+          <p class="text-sm text-slate-300 mt-1">${summary}</p>
+        </div>
+      `;
+    }
+
+    renderLayer2() {
+      const argsJson = escapeHtml(JSON.stringify(this.props.arguments || {}, null, 2));
+      return `
+        <div class="genui-layer genui-layer-2 rounded-xl bg-slate-950/70 p-3 border border-amber-500/25">
+          <pre class="text-xs text-slate-300 overflow-x-auto">${argsJson}</pre>
+        </div>
+      `;
+    }
+  }
+
   function registerWidgets(reg) {
     if (!reg || typeof reg.registerComponent !== 'function') return;
 
@@ -4588,6 +4692,44 @@
           'analisar_custo_estoque_macroeconomico'
         ],
         intent: 'custo_estoque_macro'
+      },
+      {
+        name: 'WhatIfSimulatorUI',
+        cls: WhatIfSimulatorUI,
+        aliases: [
+          'render_WhatIfSimulatorUI',
+          'WhatIfSimulatorWidget',
+          'render_WhatIfSimulatorWidget',
+          'simular_cenario_what_if',
+          'what_if',
+          'whatif'
+        ],
+        intent: 'simular_cenario_what_if'
+      },
+      {
+        name: 'RealizedRoiScorecardUI',
+        cls: RealizedRoiScorecardUI,
+        aliases: [
+          'render_RealizedRoiScorecardUI',
+          'RealizedRoiScorecardWidget',
+          'render_RealizedRoiScorecardWidget',
+          'realized_roi_scorecard',
+          'roi_realizado',
+          'outcome_scorecard'
+        ],
+        intent: 'realized_roi_scorecard'
+      },
+      {
+        name: 'McpActionConfirmationUI',
+        cls: McpActionConfirmationUI,
+        aliases: [
+          'render_McpActionConfirmationUI',
+          'McpActionConfirmationWidget',
+          'render_McpActionConfirmationWidget',
+          'mcp_external_write_confirmation',
+          'confirm_mcp_write'
+        ],
+        intent: 'mcp_external_write_confirmation'
       }
     ];
 
@@ -4733,6 +4875,9 @@
     window.AuraGenUI.LMCComplianceReportWidget = LMCComplianceReportWidget;
     window.AuraGenUI.MacroeconomicInventoryCostUI = MacroeconomicInventoryCostUI;
     window.AuraGenUI.MacroeconomicInventoryCostWidget = MacroeconomicInventoryCostWidget;
+    window.AuraGenUI.WhatIfSimulatorUI = WhatIfSimulatorUI;
+    window.AuraGenUI.RealizedRoiScorecardUI = RealizedRoiScorecardUI;
+    window.AuraGenUI.McpActionConfirmationUI = McpActionConfirmationUI;
     window.AuraGenUI.ComplianceStatusWidget = ComplianceStatusWidget;
     window.AuraGenUI.PaymentMethodsBreakdownUI = PaymentMethodsBreakdownUI;
     window.AuraGenUI.PaymentMethodsBreakdownWidget = PaymentMethodsBreakdownWidget;
@@ -4779,6 +4924,9 @@
       LMCComplianceReportWidget,
       MacroeconomicInventoryCostUI,
       MacroeconomicInventoryCostWidget,
+      WhatIfSimulatorUI,
+      RealizedRoiScorecardUI,
+      McpActionConfirmationUI,
       registerWidgets,
       initGlobalGenUIActionDelegation,
       escapeHtml,

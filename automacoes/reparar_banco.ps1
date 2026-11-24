@@ -88,7 +88,13 @@ Reload-Or-Start-PostgreSql -waitPort 5433 | Out-Null
 
 # 4. Teste de validacao final da role aura_service_ro
 Write-Host "[4/4] Validando autenticacao permanente da role 'aura_service_ro'..." -ForegroundColor Yellow
-$env:PGPASSWORD = "364768"
+if (-not $env:PGPASSWORD) {
+    if ($env:ERP_SERVICE_RO_PASSWORD) {
+        $env:PGPASSWORD = $env:ERP_SERVICE_RO_PASSWORD
+    } elseif ($env:ERP_SERVICE_PASS) {
+        $env:PGPASSWORD = $env:ERP_SERVICE_PASS
+    }
+}
 $testAura = & $psql -h 127.0.0.1 -p 5433 -U aura_service_ro -d posto -w -c "SELECT 'AURA_OK' as status;" 2>&1
 
 Write-Host ""

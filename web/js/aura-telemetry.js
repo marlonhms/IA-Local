@@ -161,12 +161,13 @@ class AuraTelemetryCoordinator {
    */
   async fetchSilentBadge() {
     try {
+      if (!window.auraApi) return;
       const [metricsRes, budgetRes] = await Promise.allSettled([
-        fetch('/api/v1/aura/telemetry/metrics'),
-        fetch('/api/v1/aura/telemetry/token-budget'),
+        window.auraApi.getTelemetryMetrics(),
+        window.auraApi.getTokenBudget(),
       ]);
-      const metrics = metricsRes.status === 'fulfilled' && metricsRes.value.ok ? await metricsRes.value.json() : null;
-      const budget = budgetRes.status === 'fulfilled' && budgetRes.value.ok ? await budgetRes.value.json() : null;
+      const metrics = metricsRes.status === 'fulfilled' ? metricsRes.value : null;
+      const budget = budgetRes.status === 'fulfilled' ? budgetRes.value : null;
 
       if (metrics) {
         this.updateHeaderBadge(metrics);
@@ -262,19 +263,22 @@ class AuraTelemetryCoordinator {
     }
 
     try {
+      if (!window.auraApi) {
+        throw new Error('AuraApiClient indisponivel para telemetria.');
+      }
       const [metricsRes, stationsRes, complianceRes, budgetRes, memoryRes] = await Promise.allSettled([
-        fetch('/api/v1/aura/telemetry/metrics'),
-        fetch('/api/v1/aura/stations'),
-        fetch('/api/v1/aura/compliance/status'),
-        fetch('/api/v1/aura/telemetry/token-budget'),
-        fetch('/api/v1/aura/memory/tenant'),
+        window.auraApi.getTelemetryMetrics(),
+        window.auraApi.getStations(),
+        window.auraApi.getComplianceStatus(),
+        window.auraApi.getTokenBudget(),
+        window.auraApi.listTenantMemories(),
       ]);
 
-      const metrics = metricsRes.status === 'fulfilled' && metricsRes.value.ok ? await metricsRes.value.json() : null;
-      const stations = stationsRes.status === 'fulfilled' && stationsRes.value.ok ? await stationsRes.value.json() : null;
-      const compliance = complianceRes.status === 'fulfilled' && complianceRes.value.ok ? await complianceRes.value.json() : null;
-      const budget = budgetRes.status === 'fulfilled' && budgetRes.value.ok ? await budgetRes.value.json() : null;
-      const memories = memoryRes.status === 'fulfilled' && memoryRes.value.ok ? await memoryRes.value.json() : null;
+      const metrics = metricsRes.status === 'fulfilled' ? metricsRes.value : null;
+      const stations = stationsRes.status === 'fulfilled' ? stationsRes.value : null;
+      const compliance = complianceRes.status === 'fulfilled' ? complianceRes.value : null;
+      const budget = budgetRes.status === 'fulfilled' ? budgetRes.value : null;
+      const memories = memoryRes.status === 'fulfilled' ? memoryRes.value : null;
 
       this.lastMetrics = metrics;
       this.lastBudget = budget;
@@ -570,23 +574,17 @@ class AuraTelemetryCoordinator {
     }
 
     try {
-      const res = await fetch('/api/v1/aura/telemetry/token-budget/policy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          monthly_budget_brl: monthlyVal,
-          alert_threshold_pct: alertVal,
-          enforcement_mode: modeVal,
-        }),
+      await window.auraApi.updateTokenBudgetPolicy({
+        monthly_budget_brl: monthlyVal,
+        alert_threshold_pct: alertVal,
+        enforcement_mode: modeVal,
       });
 
-      if (res.ok) {
-        if (feedback) {
-          feedback.classList.remove('hidden');
-          setTimeout(() => feedback.classList.add('hidden'), 4000);
-        }
-        await this.fetchCockpitData();
+      if (feedback) {
+        feedback.classList.remove('hidden');
+        setTimeout(() => feedback.classList.add('hidden'), 4000);
       }
+      await this.fetchCockpitData();
     } catch (e) {
       console.warn('Falha ao salvar politica de orcamento:', e);
     } finally {
@@ -799,13 +797,7 @@ class AuraTelemetryCoordinator {
         origem: 'gestor',
       };
 
-      const res = await fetch('/api/v1/aura/memory/tenant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await window.auraApi.createTenantMemory(payload);
 
       if (elKey) elKey.value = '';
       if (elContent) elContent.value = '';
@@ -819,12 +811,7 @@ class AuraTelemetryCoordinator {
 
   async handleApproveTenantMemory(factId) {
     try {
-      const res = await fetch(`/api/v1/aura/memory/tenant/${factId}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ approved_by: 'gestor_painel' }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await window.auraApi.approveTenantMemory(factId, 'gestor_painel');
       await this.fetchCockpitData(true);
     } catch (err) {
       alert(`Falha ao aprovar regra: ${err.message}`);
@@ -833,12 +820,7 @@ class AuraTelemetryCoordinator {
 
   async handleRejectTenantMemory(factId) {
     try {
-      const res = await fetch(`/api/v1/aura/memory/tenant/${factId}/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: 'Rejeitado pelo gestor no painel' }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await window.auraApi.rejectTenantMemory(factId, 'Rejeitado pelo gestor no painel');
       await this.fetchCockpitData(true);
     } catch (err) {
       alert(`Falha ao rejeitar regra: ${err.message}`);
@@ -848,10 +830,7 @@ class AuraTelemetryCoordinator {
   async handleDeleteTenantMemory(factId) {
     if (!confirm('Deseja realmente inativar esta regra do posto?')) return;
     try {
-      const res = await fetch(`/api/v1/aura/memory/tenant/${factId}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await window.auraApi.deleteTenantMemory(factId);
       await this.fetchCockpitData(true);
     } catch (err) {
       alert(`Falha ao excluir regra: ${err.message}`);

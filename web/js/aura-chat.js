@@ -137,25 +137,22 @@ class AuraChatController {
     try {
       let msgs = await window.AuraStorage.getMessages(this.sessionId);
 
-      // Fallback: se local estiver vazio, busca historico no backend duravel SQLite
-      if ((!msgs || msgs.length === 0) && typeof fetch !== 'undefined') {
+      // Fallback: se local estiver vazio, busca historico no backend duravel SQLite via AuraApiClient
+      if ((!msgs || msgs.length === 0) && typeof window !== 'undefined' && window.auraApi && typeof window.auraApi.getSessionHistory === 'function') {
         try {
-          const resp = await fetch(`/api/v1/aura/sessions/${this.sessionId}`);
-          if (resp.ok) {
-            const data = await resp.json();
-            if (data.status === 'success' && Array.isArray(data.messages) && data.messages.length > 0) {
-              msgs = [];
-              for (const m of data.messages) {
-                const item = {
-                  role: m.role === 'user' ? 'user' : 'assistant',
-                  text: m.content || '',
-                  intent: m.intent ? { intent: m.intent } : null,
-                  genuiEnvelope: (m.metadata && m.metadata.envelope) ? m.metadata.envelope : null,
-                  timestamp: m.created_at ? new Date(m.created_at).getTime() : Date.now()
-                };
-                msgs.push(item);
-                await window.AuraStorage.saveMessage(this.sessionId, item);
-              }
+          const data = await window.auraApi.getSessionHistory(this.sessionId);
+          if (data && data.status === 'success' && Array.isArray(data.messages) && data.messages.length > 0) {
+            msgs = [];
+            for (const m of data.messages) {
+              const item = {
+                role: m.role === 'user' ? 'user' : 'assistant',
+                text: m.content || '',
+                intent: m.intent ? { intent: m.intent } : null,
+                genuiEnvelope: (m.metadata && m.metadata.envelope) ? m.metadata.envelope : null,
+                timestamp: m.created_at ? new Date(m.created_at).getTime() : Date.now()
+              };
+              msgs.push(item);
+              await window.AuraStorage.saveMessage(this.sessionId, item);
             }
           }
         } catch (_) {}
@@ -267,10 +264,10 @@ class AuraChatController {
   }
 
   initProactiveStream() {
-    if (typeof window === 'undefined' || typeof EventSource === 'undefined') return;
+    if (typeof window === 'undefined') return;
     try {
       if (window.auraApi && typeof window.auraApi.subscribeProactiveStream === 'function') {
-        window.auraApi.subscribeProactiveStream((alertData) => {
+        this._proactiveStreamHandle = window.auraApi.subscribeProactiveStream((alertData) => {
           this.handleProactiveAlert(alertData);
         });
       }
@@ -768,6 +765,31 @@ class AuraChatController {
           fullResponseText += token;
           this.updateAuraText(messageContainerId, fullResponseText, true);
         },
+        onStreamReset: (resetPayload) => {
+          // Limpeza transacional em caso de fallback de modelo no meio do stream (P0-UI3)
+          fullResponseText = '';
+          pendingGenUIEnvelope = null;
+          pendingFallbackTool = null;
+          uiCompleteReceived = false;
+          lastGenUIEnvelope = null;
+
+          const reasonMsg = (resetPayload && (resetPayload.text || (resetPayload.data && resetPayload.data.reason)))
+            ? String(resetPayload.text || resetPayload.data.reason)
+            : 'Recalibrando sintese com modelo de contingencia...';
+
+          this.updateCognitiveStep(messageContainerId, reasonMsg, 'cyan');
+
+          if (typeof document !== 'undefined') {
+            const textEl = document.getElementById(`${messageContainerId}-text`);
+            if (textEl) {
+              textEl.innerHTML = '<span class="text-slate-400 text-xs font-sans">Recalibrando sintese executiva...</span><span class="typing-cursor"></span>';
+            }
+            const splitTextEl = document.getElementById(`${messageContainerId}-split-text`);
+            if (splitTextEl) {
+              splitTextEl.innerHTML = '<span class="text-slate-400 text-xs font-sans">Recalibrando sintese executiva...</span>';
+            }
+          }
+        },
         onSkeleton: (skeletonData) => {
           this.handleUISkeleton(messageContainerId, skeletonData);
         },
@@ -844,9 +866,10 @@ class AuraChatController {
             type === 'ui_delta' ||
             type === 'ui_complete' ||
             type === 'ui_action_feedback' ||
-            type === 'ui_action_result'
+            type === 'ui_action_result' ||
+            type === 'stream_reset'
           ) {
-            // Já despachados pelos callbacks dedicados de ciclo de vida (onSkeleton, onUIDelta, onUIComplete, onActionFeedback)
+            // Já despachados pelos callbacks dedicados de ciclo de vida (onSkeleton, onUIDelta, onUIComplete, onActionFeedback, onStreamReset)
             // Não reprocessa para evitar chamadas duplicadas, jank de layout e duplo registro no Companion Canvas.
             return;
           }

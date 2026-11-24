@@ -435,18 +435,17 @@ class AuraVoiceController {
         return;
       }
 
-      const response = await fetch('/api/v1/aura/voice/transcribe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': mime
-        },
-        body: audioBlob
-      });
+      if (!window.auraApi || typeof window.auraApi.transcribeVoice !== 'function') {
+        throw new Error('AuraApiClient indisponivel para transcricao de voz.');
+      }
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        const detail = data && data.detail ? data.detail : 'Falha na transcricao do audio.';
+      let data;
+      try {
+        data = await window.auraApi.transcribeVoice(audioBlob, mime);
+      } catch (voiceErr) {
+        const detail = (voiceErr && voiceErr.data && voiceErr.data.detail)
+          ? voiceErr.data.detail
+          : (voiceErr && voiceErr.message ? voiceErr.message : 'Falha na transcricao do audio.');
         if (this.statusLabel) {
           this.statusLabel.textContent = 'AVISO OPERACIONAL';
           this.statusLabel.className = 'text-xs font-sans font-bold uppercase tracking-widest text-amber-400';

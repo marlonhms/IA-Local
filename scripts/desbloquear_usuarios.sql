@@ -15,12 +15,18 @@ GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO suporte;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO suporte;
 
 -- 3. Provisiona e desbloqueia a role de servico dedicada da AURA (somente-leitura permanente)
+-- Defina a senha via variavel psql: psql -v aura_service_ro_password="'SENHA_FORTE'" -f desbloquear_usuarios.sql
 DO $$
+DECLARE
+    v_ro_pass TEXT := current_setting('aura.service_ro_password', true);
 BEGIN
+    IF v_ro_pass IS NULL OR length(trim(v_ro_pass)) = 0 THEN
+        RAISE EXCEPTION 'Defina aura.service_ro_password via SET antes de provisionar aura_service_ro.';
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'aura_service_ro') THEN
-        CREATE ROLE aura_service_ro WITH LOGIN PASSWORD '364768' CONNECTION LIMIT -1 VALID UNTIL 'infinity';
+        EXECUTE format('CREATE ROLE aura_service_ro WITH LOGIN PASSWORD %L CONNECTION LIMIT -1 VALID UNTIL %L', v_ro_pass, 'infinity');
     ELSE
-        ALTER ROLE aura_service_ro WITH LOGIN PASSWORD '364768' CONNECTION LIMIT -1 VALID UNTIL 'infinity';
+        EXECUTE format('ALTER ROLE aura_service_ro WITH LOGIN PASSWORD %L CONNECTION LIMIT -1 VALID UNTIL %L', v_ro_pass, 'infinity');
     END IF;
 END
 $$;

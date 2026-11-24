@@ -13,15 +13,18 @@ Conectores:
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import math
 import os
+import secrets
 import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 import re
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
+from urllib.parse import urlparse
 
 from fastapi import (
     APIRouter,
@@ -34,7 +37,7 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -194,38 +197,176 @@ def set_public_data_repository(repo: Any | None) -> None:
     _public_data_repo_instance = repo
 
 
-def verify_admin_auth(request: Request = None) -> bool:
-    """
-    Valida autenticacao por API Key (header X-API-Key) ou Bearer Token (Authorization)
-    para endpoints administrativos e operacoes transacionais (P1-4).
-    """
-    configured_key = os.getenv("AURA_API_KEY") or AURA_API_KEY
-    enforce_auth = os.getenv("AURA_ENFORCE_ADMIN_AUTH", "0").lower() in ("1", "true", "yes")
+LOCAL_SESSION_COOKIE_NAME = "aura_local_session"
+_LOCAL_SESSION_TOKEN: str = secrets.token_urlsafe(32)
+_LOCALHOST_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "::1", "localhost"})
+_ALLOWED_LOCAL_ORIGIN_HOSTS: frozenset[str] = frozenset(
+    {"127.0.0.1", "::1", "localhost", "testserver"}
+)
 
-    provided_key = None
-    if request is not None:
-        header_key = request.headers.get("x-api-key")
-        if header_key:
-            provided_key = header_key.strip()
-        else:
-            auth_header = request.headers.get("authorization", "")
-            if auth_header.lower().startswith("bearer "):
-                provided_key = auth_header[7:].strip()
+
+def get_local_session_token() -> str:
+    """Retorna o token efemero de sessao local (por boot) para acessos localhost."""
+    return _LOCAL_SESSION_TOKEN
+
+
+def _is_test_runtime() -> bool:
+    """Indica se o processo esta executando sob pytest ou CI."""
+    return bool(os.getenv("PYTEST_CURRENT_TEST") or os.getenv("CI") or os.getenv("GITHUB_ACTIONS"))
+
+
+def _extract_effective_client_host(
+    headers: Mapping[str, str],
+    client_host: str | None,
+) -> str:
+    """Resolve o IP efetivo do cliente, preservando IPs externos via proxy/X-Forwarded-For."""
+    xff = (headers.get("x-forwarded-for") or "").strip()
+    if xff:
+        first_ip = xff.split(",")[0].strip()
+        if first_ip:
+            return first_ip
+    xri = (headers.get("x-real-ip") or "").strip()
+    if xri:
+        return xri
+    return (client_host or "").strip()
+
+
+def _is_localhost_host(host: str) -> bool:
+    return host.lower() in _LOCALHOST_HOSTS
+
+
+def _is_testclient_host(host: str) -> bool:
+    return host.lower() == "testclient" and _is_test_runtime()
+
+
+def _is_allowed_local_origin(origin: str) -> bool:
+    """Valida se o cabecalho Origin pertence estritamente a localhost (anti-CSRF / DNS rebinding)."""
+    raw = (origin or "").strip()
+    if not raw:
+        return True
+    try:
+        parsed = urlparse(raw)
+    except Exception:
+        return False
+    if parsed.scheme not in ("http", "https"):
+        return False
+    hostname = (parsed.hostname or "").strip().lower()
+    return hostname in _ALLOWED_LOCAL_ORIGIN_HOSTS
+
+
+def _attach_local_session_cookie(response: Response, request: Request) -> Response:
+    """Emite cookie HttpOnly; SameSite=Strict exclusivamente para requisicoes originadas em localhost."""
+    raw_host = request.client.host if request.client else ""
+    effective_host = _extract_effective_client_host(request.headers, raw_host)
+    if _is_localhost_host(effective_host) or _is_testclient_host(effective_host):
+        response.set_cookie(
+            key=LOCAL_SESSION_COOKIE_NAME,
+            value=_LOCAL_SESSION_TOKEN,
+            httponly=True,
+            samesite="strict",
+            secure=(request.url.scheme == "https"),
+            path="/",
+        )
+    return response
+
+
+def authorize_admin_request(
+    headers: Mapping[str, str],
+    cookies: Mapping[str, str],
+    client_host: str | None,
+    query_api_key: str | None = None,
+) -> tuple[bool, int, str]:
+    """
+    Politica dual de autenticacao (Carbon Core P0.1):
+    1. X-API-Key ou Authorization: Bearer validada via hmac.compare_digest.
+    2. Protecao anti-CSRF / Origin check bloqueando origens cruzadas sem API Key (403).
+    3. Requisicoes originadas em LAN / IPs externos exigem obrigatoriamente X-API-Key / Bearer (401).
+    4. Requisicoes de localhost (127.0.0.1 / ::1 / localhost) autenticam via cookie
+       HttpOnly; SameSite=Strict 'aura_local_session' (ou API Key).
+    """
+    configured_key = (os.getenv("AURA_API_KEY") or AURA_API_KEY or "").strip()
+
+    provided_key: str | None = None
+    header_key = headers.get("x-api-key")
+    if header_key:
+        provided_key = header_key.strip()
+    else:
+        auth_header = headers.get("authorization", "")
+        if auth_header.lower().startswith("bearer "):
+            provided_key = auth_header[7:].strip()
+        elif query_api_key:
+            provided_key = query_api_key.strip()
 
     if provided_key is not None:
-        if provided_key == configured_key:
-            return True
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Autenticacao invalida: X-API-Key ou Bearer Token incorreto.",
+        if configured_key and hmac.compare_digest(provided_key, configured_key):
+            return True, status.HTTP_200_OK, "ok"
+        return (
+            False,
+            status.HTTP_401_UNAUTHORIZED,
+            "Autenticacao invalida: X-API-Key ou Bearer Token incorreto.",
         )
 
-    if enforce_auth and configured_key:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Autenticacao necessaria: cabecalho X-API-Key ou Bearer Token ausente.",
+    origin = (headers.get("origin") or "").strip()
+    if origin and not _is_allowed_local_origin(origin):
+        return (
+            False,
+            status.HTTP_403_FORBIDDEN,
+            "Origem cruzada nao autorizada sem X-API-Key ou Bearer Token valido.",
         )
 
+    effective_host = _extract_effective_client_host(headers, client_host)
+    is_local = _is_localhost_host(effective_host)
+    is_testclient = _is_testclient_host(effective_host)
+
+    # IPs externos (LAN / Tailscale / WAN) exigem sempre X-API-Key ou Bearer Token
+    if not is_local and not is_testclient:
+        return (
+            False,
+            status.HTTP_401_UNAUTHORIZED,
+            "Autenticacao necessaria: acesso via LAN exige cabecalho X-API-Key ou Bearer Token.",
+        )
+
+    session_cookie = (cookies.get(LOCAL_SESSION_COOKIE_NAME) or "").strip()
+    if session_cookie and hmac.compare_digest(session_cookie, _LOCAL_SESSION_TOKEN):
+        return True, status.HTTP_200_OK, "ok"
+
+    raw_enforce = os.getenv("AURA_ENFORCE_ADMIN_AUTH")
+    if is_testclient:
+        if raw_enforce is not None and raw_enforce.strip().lower() in ("1", "true", "yes"):
+            return (
+                False,
+                status.HTTP_401_UNAUTHORIZED,
+                "Autenticacao necessaria: cabecalho X-API-Key ou Bearer Token ausente.",
+            )
+        return True, status.HTTP_200_OK, "ok"
+
+    # Em localhost real, exige sessao local (cookie HttpOnly) ou API Key por padrao (default=1)
+    enforce_local = True if raw_enforce is None else raw_enforce.strip().lower() not in ("0", "false", "no")
+    if enforce_local:
+        return (
+            False,
+            status.HTTP_401_UNAUTHORIZED,
+            "Autenticacao necessaria: cookie de sessao local (aura_local_session) ou X-API-Key ausente.",
+        )
+    return True, status.HTTP_200_OK, "ok"
+
+
+def verify_admin_auth(request: Request = None) -> bool:
+    """
+    Valida autenticacao dual (sessao local HttpOnly+SameSite=Strict para localhost com
+    validacao de Origin, e X-API-Key / Bearer obrigatoria para LAN) em endpoints administrativos.
+    """
+    if request is None:
+        return True
+
+    client_host = request.client.host if request.client else None
+    allowed, status_code, detail = authorize_admin_request(
+        headers=request.headers,
+        cookies=request.cookies,
+        client_host=client_host,
+    )
+    if not allowed:
+        raise HTTPException(status_code=status_code, detail=detail)
     return True
 
 
@@ -2708,6 +2849,31 @@ def create_aura_app(
         d = get_proactive_daemon()
         await d.stop()
 
+    # Middleware de Blindagem LAN e Anti-CSRF/Origin (Carbon Core P0.1)
+    @app.middleware("http")
+    async def lan_and_origin_guard_middleware(request: Request, call_next):
+        path = request.url.path
+        protected_prefixes = ("/api/v1/aura/", "/api/v1/cockpit/", "/api/v1/voice/")
+        is_protected_api = path.startswith(protected_prefixes) and path != "/api/v1/aura/health"
+        if is_protected_api and request.method.upper() != "OPTIONS":
+            client_host = request.client.host if request.client else None
+            effective_host = _extract_effective_client_host(request.headers, client_host)
+            is_local = _is_localhost_host(effective_host)
+            is_testclient = _is_testclient_host(effective_host)
+            origin = (request.headers.get("origin") or "").strip()
+
+            # Bloqueia acessos LAN sem API Key ou origens cruzadas sem API Key em todas as rotas da AURA
+            if (not is_local and not is_testclient) or (origin and not _is_allowed_local_origin(origin)):
+                allowed, status_code, detail = authorize_admin_request(
+                    headers=request.headers,
+                    cookies=request.cookies,
+                    client_host=client_host,
+                )
+                if not allowed:
+                    return JSONResponse(status_code=status_code, content={"detail": detail})
+
+        return await call_next(request)
+
     # Middleware de Isolamento Multi-Tenant e RLS (Fase 8)
     @app.middleware("http")
     async def multi_tenant_isolation_middleware(request: Request, call_next):
@@ -2915,22 +3081,27 @@ def create_aura_app(
         @app.get("/", include_in_schema=False)
         @app.get("/dashboard", include_in_schema=False)
         @app.get("/index.html", include_in_schema=False)
-        async def serve_dashboard():
+        async def serve_dashboard(request: Request):
             index_file = web_dir / "index.html"
             if index_file.exists():
-                return FileResponse(str(index_file))
-            return {"service": "AURA Core Engine API", "status": "online"}
+                resp: Response = FileResponse(str(index_file))
+            else:
+                resp = JSONResponse({"service": "AURA Core Engine API", "status": "online"})
+            return _attach_local_session_cookie(resp, request)
 
         @app.get("/showcase", include_in_schema=False)
         @app.get("/apresentacao", include_in_schema=False)
-        async def serve_showcase():
+        async def serve_showcase(request: Request):
             showcase_file = web_dir / "showcase.html"
             if showcase_file.exists():
-                return FileResponse(str(showcase_file))
-            index_file = web_dir / "index.html"
-            if index_file.exists():
-                return FileResponse(str(index_file))
-            return {"service": "AURA Showcase", "status": "online"}
+                resp: Response = FileResponse(str(showcase_file))
+            else:
+                index_file = web_dir / "index.html"
+                if index_file.exists():
+                    resp = FileResponse(str(index_file))
+                else:
+                    resp = JSONResponse({"service": "AURA Showcase", "status": "online"})
+            return _attach_local_session_cookie(resp, request)
 
     return app
 

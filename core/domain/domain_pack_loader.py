@@ -7,9 +7,11 @@ Zero travessoes em todo o modulo.
 
 from __future__ import annotations
 
+import contextvars
 import logging
+import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -177,50 +179,125 @@ def load_all_domain_packs(
     return loaded
 
 
-_ACTIVE_PACK: DomainPackConfig | None = None
+_PACK_CACHE_LOCK = threading.Lock()
+_PACK_CACHE: dict[tuple[str, str], DomainPackConfig] = {}
+
+_ACTIVE_PACK_VAR: contextvars.ContextVar[DomainPackConfig | None] = contextvars.ContextVar(
+    "aura_active_domain_pack",
+    default=None,
+)
+
+
+def _load_domain_pack_cached(
+    pack_id: str,
+    packs_dir: str | Path | None = None,
+) -> DomainPackConfig:
+    """Carrega Domain Pack imutavel com cache thread-safe por (packs_dir, pack_id)."""
+    base_dir = Path(packs_dir).resolve() if packs_dir else DEFAULT_DOMAIN_PACKS_DIR.resolve()
+    cache_key = (str(base_dir), str(pack_id).strip())
+    with _PACK_CACHE_LOCK:
+        cached = _PACK_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    loaded = load_domain_pack(pack_id, packs_dir=base_dir)
+    with _PACK_CACHE_LOCK:
+        _PACK_CACHE[cache_key] = loaded
+    return loaded
 
 
 def get_active_domain_pack(
     pack_id: str | None = None,
     packs_dir: str | Path | None = None,
 ) -> DomainPackConfig:
-    """Retorna o Domain Pack atualmente ativo (padrao: fuel_convenience)."""
-    global _ACTIVE_PACK
-
+    """
+    Retorna o Domain Pack ativo isolado por requisicao via ContextVar (Carbon Core P0.4).
+    Padrao retrocompativel: fuel_convenience.
+    """
+    current = _ACTIVE_PACK_VAR.get()
     if pack_id is None:
-        if _ACTIVE_PACK is not None:
-            return _ACTIVE_PACK
+        if current is not None:
+            return current
         target_id = "fuel_convenience"
     else:
         target_id = pack_id
 
-    if _ACTIVE_PACK is not None and _ACTIVE_PACK.pack_id == target_id:
-        return _ACTIVE_PACK
+    if current is not None and current.pack_id == target_id and packs_dir is None:
+        return current
 
-    _ACTIVE_PACK = load_domain_pack(target_id, packs_dir=packs_dir)
-    return _ACTIVE_PACK
-
-
-def set_active_domain_pack(pack: DomainPackConfig) -> None:
-    """Define explicitamente o Domain Pack ativo na sessao."""
-    global _ACTIVE_PACK
-    _ACTIVE_PACK = pack
+    loaded = _load_domain_pack_cached(target_id, packs_dir=packs_dir)
+    _ACTIVE_PACK_VAR.set(loaded)
+    return loaded
 
 
-def reset_active_domain_pack() -> None:
-    """Reseta o Domain Pack ativo para o estado inicial nao carregado."""
-    global _ACTIVE_PACK
-    _ACTIVE_PACK = None
+def peek_active_domain_pack() -> DomainPackConfig | None:
+    """Retorna o Domain Pack definido explicitamente no ContextVar atual, ou None."""
+    return _ACTIVE_PACK_VAR.get()
+
+
+def set_active_domain_pack(
+    pack: DomainPackConfig | str,
+    packs_dir: str | Path | None = None,
+) -> contextvars.Token[DomainPackConfig | None]:
+    """Define o Domain Pack ativo no ContextVar da coroutine/thread atual e retorna o Token."""
+    resolved = pack if isinstance(pack, DomainPackConfig) else _load_domain_pack_cached(pack, packs_dir=packs_dir)
+    return _ACTIVE_PACK_VAR.set(resolved)
+
+
+def reset_active_domain_pack(
+    token: contextvars.Token[DomainPackConfig | None] | None = None,
+) -> None:
+    """Reseta o Domain Pack ativo no ContextVar atual (via Token ou limpando para None)."""
+    if token is not None:
+        _ACTIVE_PACK_VAR.reset(token)
+    else:
+        _ACTIVE_PACK_VAR.set(None)
+
+
+class DomainPackContext:
+    """
+    Gerenciador de contexto sync/async baseado em ContextVar para isolamento multi-tenant
+    de Domain Packs sem race conditions entre requisicoes concorrentes (Carbon Core P0.4).
+    """
+
+    def __init__(
+        self,
+        pack: DomainPackConfig | str | None = None,
+        packs_dir: str | Path | None = None,
+    ) -> None:
+        if pack is None:
+            self.pack = get_active_domain_pack(packs_dir=packs_dir)
+        elif isinstance(pack, DomainPackConfig):
+            self.pack = pack
+        else:
+            self.pack = _load_domain_pack_cached(pack, packs_dir=packs_dir)
+        self._token: contextvars.Token[DomainPackConfig | None] | None = None
+
+    def __enter__(self) -> DomainPackConfig:
+        self._token = _ACTIVE_PACK_VAR.set(self.pack)
+        return self.pack
+
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
+        if self._token is not None:
+            _ACTIVE_PACK_VAR.reset(self._token)
+            self._token = None
+
+    async def __aenter__(self) -> DomainPackConfig:
+        return self.__enter__()
+
+    async def __aexit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
+        self.__exit__(exc_type, exc_val, exc_tb)
 
 
 __all__ = [
     "DEFAULT_DOMAIN_PACKS_DIR",
     "DomainPackConfig",
+    "DomainPackContext",
     "SpecificIntentItem",
     "get_active_domain_pack",
     "list_available_packs",
     "load_all_domain_packs",
     "load_domain_pack",
+    "peek_active_domain_pack",
     "reset_active_domain_pack",
     "set_active_domain_pack",
 ]

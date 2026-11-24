@@ -27,6 +27,7 @@ from core.adapters.erp.base import (
 )
 from core.adapters.erp.mock_adapter import MockERPAdapter
 from core.db_pool import get_erp_connection
+from core.tenancy import ReadOnlySQLViolationError, assert_readonly_safe_sql
 from core.domain.cashier import UniversalCashierShift
 from core.domain.pumps import UniversalDispenserLog, UniversalPump
 from core.domain.sales import (
@@ -147,12 +148,15 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
         query: str,
         params: tuple[Any, ...] | list[Any] | None = None,
     ) -> list[dict[str, Any]]:
-        """Executa consulta SQL estritamente somente-leitura com RealDictCursor."""
+        """Executa consulta SQL estritamente somente-leitura com RealDictCursor e guarda lexical."""
+        assert_readonly_safe_sql(query)
         try:
             with get_erp_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(query, params or ())
                 rows = cur.fetchall()
                 return [dict(r) for r in rows]
+        except ReadOnlySQLViolationError:
+            raise
         except Exception:
             self._last_offline_incident = time.monotonic()
             raise
@@ -226,10 +230,10 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                 ROUND(COALESCE(i.valitem, (COALESCE(i.valunit, pr.valvenda, 0) * COALESCE(i.quant, 1)), 0)::numeric, 2) AS item_total
             FROM sub_pedidos sp
             JOIN pedido p ON p.codi = sp.codi
-            LEFT JOIN itemped i ON TRIM(i.pedido) = TRIM(p.codi)
-            LEFT JOIN produtos pr ON TRIM(pr.codpro) = TRIM(i.codpec)
-            LEFT JOIN grupos g ON TRIM(g.codi) = TRIM(pr.codgru)
-            LEFT JOIN prazos prz ON TRIM(prz.codpra) = TRIM(p.formapg)
+            LEFT JOIN itemped i ON i.pedido = p.codi
+            LEFT JOIN produtos pr ON pr.codpro = i.codpec
+            LEFT JOIN grupos g ON g.codi = pr.codgru
+            LEFT JOIN prazos prz ON prz.codpra = p.formapg
             ORDER BY COALESCE(p.ven_ts_venda, (p.dtem + p.hsmov)::timestamp, p.dtem::timestamp) DESC NULLS LAST, p.codi DESC, i.controle ASC NULLS LAST;
         """
 
@@ -531,9 +535,9 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                     ROUND(COALESCE(a.litros, 0)::numeric, 3) AS volume_automacao_litros,
                     ROUND(COALESCE(a.total, 0)::numeric, 2) AS total_automacao_reais
                 FROM abastecimentos a
-                LEFT JOIN bombas b ON TRIM(b.codbom) = TRIM(a.bomba)
+                LEFT JOIN bombas b ON b.codbom = a.bomba
                 LEFT JOIN produtos pr ON pr.codpro = a.codpro
-                LEFT JOIN funcionarios f ON (TRIM(f.matr) = TRIM(a.idfrentista) OR TRIM(f.cartaoidentfid) = TRIM(a.idfrentista))
+                LEFT JOIN funcionarios f ON (f.matr = a.idfrentista OR f.cartaoidentfid = a.idfrentista)
                 {where_ab_sql}
                 ORDER BY a.data DESC, a.hora DESC
                 LIMIT %s;
@@ -669,7 +673,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                     ROUND(COALESCE(SUM(a.litros), 0)::numeric, 3) AS volume_automacao_litros,
                     ROUND(COALESCE(SUM(a.total), 0)::numeric, 2) AS total_automacao_reais
                 FROM abastecimentos a
-                LEFT JOIN bombas b ON TRIM(b.codbom) = TRIM(a.bomba)
+                LEFT JOIN bombas b ON b.codbom = a.bomba
                 LEFT JOIN produtos pr ON pr.codpro = a.codpro
                 {where_ab_sql}
                 GROUP BY b.ilha, a.bomba, COALESCE(NULLIF(TRIM(a.tanque), ''), TRIM(b.codtan), ''), a.codpro, pr.nompro, a.turno, a.abt_ts_abastecimento, a.data, a.hora
@@ -759,7 +763,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                 ROUND(COALESCE(fc.valtot, (COALESCE(fc.valdinh, 0) + COALESCE(fc.valcart, 0) + COALESCE(fc.valnotpra, 0) + COALESCE(fc.valcheconv, 0) + COALESCE(fc.valchevis, 0) + COALESCE(fc.valchepre, 0)))::numeric, 2) AS total_declarado_reais,
                 ROUND((COALESCE(fc.venda_combustivel, 0) + COALESCE(fc.venda_produtos, 0))::numeric, 2) AS total_sistema_reais
             FROM fechacaixa fc
-            LEFT JOIN funcionarios f ON TRIM(f.matr) = TRIM(fc.matricula)
+            LEFT JOIN funcionarios f ON f.matr = fc.matricula
             {where_sql}
             ORDER BY fc.dtmov DESC, fc.cai_cd_caixa DESC
             LIMIT %s;
@@ -844,7 +848,7 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
                 1.0 AS quantidade,
                 ROUND(COALESCE(p.valvenda, 0)::numeric, 2) AS total_item_reais
             FROM produtos p
-            LEFT JOIN grupos g ON TRIM(g.codi) = TRIM(p.codgru)
+            LEFT JOIN grupos g ON g.codi = p.codgru
             {where_sql}
             ORDER BY p.codpro ASC
             LIMIT %s;

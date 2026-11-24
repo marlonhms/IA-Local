@@ -56,7 +56,12 @@ from core.logger import logger
 # CONSTANTES E CONFIGURACOES DE AMBIENTE
 # =============================================================================
 
+from config.settings import AURA_PARTNER_API_KEY, PAINEL_WHATSAPP_AURA_KEY
+
 DEFAULT_PARTNER_API_KEY = "aura-partner-default-key"
+MAX_RAW_SYNC_TABLES = 32
+MAX_RAW_SYNC_RECORDS = 10_000
+MAX_RAW_SYNC_PAYLOAD_BYTES = 10 * 1024 * 1024
 DEFAULT_STAGING_DIR = Path("data") / "staging" / "partner"
 
 # Tabelas padrao esperadas do WebPosto / generic_postgres
@@ -1002,6 +1007,44 @@ def get_partner_erp_adapter(
 # AUTENTICACAO DE PARCEIROS E ISOLAMENTO MULTI-TENANT
 # =============================================================================
 
+def _parse_partner_station_acl(raw_acl: str) -> dict[str, set[str]]:
+    """
+    Interpreta PARTNER_STATION_ACL no formato JSON ({"key": ["station_a"]})
+    ou textual ("key1=station_a,station_b;key2=*").
+    """
+    clean = (raw_acl or "").strip()
+    if not clean:
+        return {}
+    if clean.startswith("{"):
+        try:
+            parsed = json.loads(clean)
+            if isinstance(parsed, dict):
+                acl: dict[str, set[str]] = {}
+                for k, vals in parsed.items():
+                    key_s = str(k).strip()
+                    if not key_s:
+                        continue
+                    if isinstance(vals, (list, tuple, set)):
+                        acl[key_s] = {str(v).strip() for v in vals if str(v).strip()}
+                    elif isinstance(vals, str) and vals.strip():
+                        acl[key_s] = {v.strip() for v in vals.split(",") if v.strip()}
+                return acl
+        except Exception:
+            return {}
+
+    acl = {}
+    for entry in clean.split(";"):
+        entry = entry.strip()
+        if "=" not in entry:
+            continue
+        k_part, stations_part = entry.split("=", 1)
+        key_s = k_part.strip()
+        if not key_s:
+            continue
+        acl[key_s] = {s.strip() for s in stations_part.split(",") if s.strip()}
+    return acl
+
+
 def verify_partner_auth(
     request: Request,
     x_partner_key: str | None = Header(None, alias="X-Partner-Key"),
@@ -1011,8 +1054,9 @@ def verify_partner_auth(
     x_station_id: str | None = Header(None, alias="X-Station-ID"),
 ) -> dict[str, str]:
     """
-    Valida autenticacao do parceiro via Header X-Partner-Key ou Authorization: Bearer,
-    e valida a correspondencia da estacao via Header X-Station-ID.
+    Valida autenticacao do parceiro via Header X-Partner-Key ou Authorization: Bearer
+    com comparacao em tempo constante (hmac.compare_digest), separacao estrita entre
+    chaves de Admin vs Partner e validacao opcional de PARTNER_STATION_ACL (Carbon Core P0.1).
     """
     # 1. Extracao da chave de parceiro (aceita X-Partner-Key, X-Tenant-Key, X-Aura-Key ou Bearer)
     provided_key: str | None = None
@@ -1031,23 +1075,36 @@ def verify_partner_auth(
             detail="Autenticacao de parceiro necessaria: informe o cabecalho X-Partner-Key ou Authorization: Bearer.",
         )
 
-    # 2. Validacao da chave de parceiro (aceita chave AURA ou chave do webhook do parceiro)
+    # 2. Chaves de parceiro estritamente separadas da chave administrativa (AURA_API_KEY)
+    is_test_env = bool(os.getenv("PYTEST_CURRENT_TEST") or os.getenv("CI") or os.getenv("GITHUB_ACTIONS"))
     expected_keys = {
-        DEFAULT_PARTNER_API_KEY,
         (os.getenv("AURA_PARTNER_API_KEY") or "").strip(),
         (os.getenv("PARTNER_API_KEY") or "").strip(),
-        (os.getenv("AURA_API_KEY") or "").strip(),
-        (os.getenv("PAINEL_WHATSAPP_AURA_KEY") or "whsec_partner_fuel_bi_2026").strip(),
-        (os.getenv("PARTNER_BI_WEBHOOK_SECRET") or "whsec_partner_fuel_bi_2026").strip(),
+        (os.getenv("PAINEL_WHATSAPP_AURA_KEY") or "").strip(),
+        (os.getenv("PARTNER_BI_WEBHOOK_SECRET") or "").strip(),
+        (AURA_PARTNER_API_KEY or "").strip(),
+        (PAINEL_WHATSAPP_AURA_KEY or "").strip(),
     }
+    if is_test_env:
+        expected_keys.add(DEFAULT_PARTNER_API_KEY)
     expected_keys.discard("")
-    if provided_key not in expected_keys:
+
+    acl_map = _parse_partner_station_acl(os.getenv("PARTNER_STATION_ACL", ""))
+    expected_keys.update(acl_map.keys())
+
+    # Comparacao em tempo constante contra timing attacks
+    key_matched = False
+    for candidate_key in expected_keys:
+        if hmac.compare_digest(provided_key, candidate_key):
+            key_matched = True
+
+    if not key_matched:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Autenticacao de parceiro invalida: chave incorreta.",
         )
 
-    # 3. Validacao do station_id
+    # 3. Validacao do station_id e ACL por estacao (PARTNER_STATION_ACL)
     station_id = x_station_id.strip() if x_station_id else None
     path_station_id = request.path_params.get("station_id") or request.path_params.get("store_id")
 
@@ -1058,6 +1115,17 @@ def verify_partner_auth(
         )
 
     effective_station = station_id or path_station_id or ""
+    if acl_map and effective_station:
+        allowed_stations: set[str] | None = None
+        for acl_key, stations in acl_map.items():
+            if hmac.compare_digest(provided_key, acl_key):
+                allowed_stations = stations
+        if allowed_stations is None or ("*" not in allowed_stations and effective_station not in allowed_stations):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acesso negado: chave de parceiro nao autorizada para a estacao solicitada.",
+            )
+
     return {
         "partner_key": provided_key,
         "station_id": effective_station,
@@ -1069,10 +1137,10 @@ def verify_partner_auth(
 # =============================================================================
 
 class RawSyncPayload(BaseModel):
-    """Payload de ingestao de tabelas brutas para staging isolado."""
+    """Payload de ingestao de tabelas brutas para staging isolado com limites anti-DoS."""
     model_config = ConfigDict(extra="allow")
 
-    station_id: str | None = Field(default=None, description="Identificador da filial/estacao")
+    station_id: str | None = Field(default=None, max_length=128, description="Identificador da filial/estacao")
     sync_timestamp: datetime | None = Field(default=None, description="Timestamp da sincronizacao no parceiro")
     tables: dict[str, list[dict[str, Any]]] | None = Field(
         default=None,
@@ -1097,6 +1165,25 @@ class RawSyncPayload(BaseModel):
             if extracted:
                 data["tables"] = extracted
         return data
+
+    @model_validator(mode="after")
+    def enforce_payload_bounds(self) -> "RawSyncPayload":
+        """Impõe limites de tabelas e registros por requisicao contra exaustao de memoria/disco."""
+        tables = self.tables or {}
+        if len(tables) > MAX_RAW_SYNC_TABLES:
+            raise ValueError(
+                f"Limite maximo de {MAX_RAW_SYNC_TABLES} tabelas por requisicao excedido ({len(tables)})."
+            )
+        total_records = 0
+        for table_name, rows in tables.items():
+            if len(str(table_name)) > 64:
+                raise ValueError(f"Nome de tabela excede limite de 64 caracteres: '{str(table_name)[:32]}'.")
+            total_records += len(rows)
+            if total_records > MAX_RAW_SYNC_RECORDS:
+                raise ValueError(
+                    f"Limite maximo de {MAX_RAW_SYNC_RECORDS} registros por requisicao excedido."
+                )
+        return self
 
 
 
@@ -1584,6 +1671,7 @@ async def partner_health_endpoint():
     description="Recebe tabelas cruas do backend do parceiro (ex: WebPosto) e armazena em staging isolado.",
 )
 async def partner_raw_sync_endpoint(
+    request: Request,
     station_id: str = FPath(..., description="Identificador da estacao/posto fisico"),
     strict_physics: bool = Query(default=False, description="Se True, rejeita lote com 422 ao violar leis fisicas"),
     payload: RawSyncPayload = Body(...),
@@ -1594,6 +1682,17 @@ async def partner_raw_sync_endpoint(
     Ingere tabelas cruas do ERP (tanques, fechabomba, fechacaixa, pedido, etc.)
     e armazena em staging isolado com validacao de invariantes fisicas e pseudonimizacao LGPD.
     """
+    raw_content_length = request.headers.get("content-length")
+    if raw_content_length:
+        try:
+            if int(raw_content_length) > MAX_RAW_SYNC_PAYLOAD_BYTES:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"Payload excede limite maximo de {MAX_RAW_SYNC_PAYLOAD_BYTES} bytes.",
+                )
+        except ValueError:
+            pass
+
     clean_station = staging_store.sanitize_station_id(station_id)
 
     raw_tables = payload.tables or {}

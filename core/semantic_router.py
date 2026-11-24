@@ -1221,7 +1221,7 @@ class SemanticRouter:
         self,
         db_config: Optional[Dict[str, Any]] = None,
         rag_engine: Optional[Any] = None,
-        confidence_threshold: float = 0.58,
+        confidence_threshold: float = 0.72,
         cache_max_size: int = 500,
     ):
         self.db_config = db_config or DB_VECTOR_CONFIG
@@ -1235,13 +1235,6 @@ class SemanticRouter:
 
         # Conexao reutilizavel com PostgreSQL protegida por _db_lock
         self._conn = None
-
-        if GEMINI_API_KEY:
-            try:
-                import google.generativeai as genai
-                genai.configure(api_key=GEMINI_API_KEY)
-            except Exception:
-                pass
 
         # Cache em memoria para consultas identicas ou normalizadas (latencia < 0.1ms)
         self._memory_cache: Dict[str, Tuple[str, float, Dict[str, Any]]] = {}
@@ -1277,49 +1270,38 @@ class SemanticRouter:
         return UNIVERSAL_TO_LEGACY_INTENTS.get(intent, intent)
 
     def resolve_active_pack_intent(self, intent: str) -> str:
-        """Resolve a intencao de acordo com o Domain Pack ativo, se houver."""
-        if self.active_domain_pack:
+        """Resolve a intencao de acordo com o Domain Pack ativo (instancia ou ContextVar)."""
+        if self.active_domain_pack is not None:
             return self.active_domain_pack.resolve_intent(intent)
+        try:
+            from core.domain.domain_pack_loader import peek_active_domain_pack
+
+            ctx_pack = peek_active_domain_pack()
+            if ctx_pack is not None:
+                return ctx_pack.resolve_intent(intent)
+        except Exception:
+            pass
         return intent
 
     def _get_connection(self):
         """
-        Retorna conexao ativa com o PostgreSQL do pgvector de forma thread-safe.
-        Aplica reconexao resiliente com retry caso o servico PostgreSQL seja reiniciado.
+        Obtem conexao concorrente a partir do pool gerenciado (get_vector_connection)
+        eliminando o gargalo de conexao unica serializada por RLock (Carbon Core P0.4).
         """
-        with self._db_lock:
-            if self._conn is not None and not self._conn.closed:
-                try:
-                    with self._conn.cursor() as cur:
-                        cur.execute("SELECT 1;")
-                    return self._conn
-                except Exception:
-                    try:
-                        self._conn.close()
-                    except Exception:
-                        pass
-                    self._conn = None
+        if self.db_config == DB_VECTOR_CONFIG:
+            from core.db_pool import get_vector_connection
 
-            max_retries = 3
-            last_err = None
-            for attempt in range(1, max_retries + 1):
-                try:
-                    self._conn = psycopg2.connect(**self.db_config)
-                    try:
-                        self._conn.set_client_encoding('UTF8')
-                    except Exception:
-                        pass
-                    return self._conn
-                except Exception as exc:
-                    last_err = exc
-                    if attempt < max_retries:
-                        time.sleep(0.15 * attempt)
-            raise psycopg2.OperationalError(
-                f"Falha de conexao com PostgreSQL pgvector apos {max_retries} tentativas: {last_err}"
-            )
+            return get_vector_connection()
+
+        conn = psycopg2.connect(**self.db_config)
+        try:
+            conn.set_client_encoding("UTF8")
+        except Exception:
+            pass
+        return conn
 
     def close(self):
-        """Fecha conexao com o banco de dados de forma thread-safe."""
+        """Fecha conexao legada se houver; conexoes do pool retornam automaticamente via context manager."""
         with self._db_lock:
             if self._conn and not self._conn.closed:
                 try:
@@ -1328,80 +1310,124 @@ class SemanticRouter:
                     pass
                 self._conn = None
 
+    def _get_effective_domain_pack(self) -> Any | None:
+        """Retorna o Domain Pack ativo (instancia explicita ou ContextVar da requisicao)."""
+        if self.active_domain_pack is not None:
+            return self.active_domain_pack
+        try:
+            from core.domain.domain_pack_loader import peek_active_domain_pack
+
+            return peek_active_domain_pack()
+        except Exception:
+            return None
+
+    def _match_active_pack_intent(self, query_norm: str, active_pack: Any | None) -> tuple[str, str] | None:
+        """Detecta intencoes especificas ou mapeadas do Domain Pack ativo de forma deterministica."""
+        if active_pack is None or not query_norm:
+            return None
+
+        # 1. Verifica specific_intents declaradas no YAML do pack ativo
+        for spec in getattr(active_pack, "specific_intents", []) or []:
+            spec_id = str(getattr(spec, "id", "") or "").strip()
+            if not spec_id:
+                continue
+            if spec_id.lower() in query_norm or spec_id.lower().replace("_", " ") in query_norm:
+                return spec_id, f"specific_intent:{spec_id}"
+            for kw in getattr(spec, "keywords", []) or []:
+                kw_norm = str(kw or "").strip().lower()
+                if kw_norm and kw_norm in query_norm:
+                    return spec_id, f"keyword:{kw_norm}"
+
+        # 2. Para packs nao-posto, verifica nomes de intencoes mapeadas (ex: fechamento_caixa_pbm)
+        if getattr(active_pack, "pack_id", "") != "fuel_convenience":
+            intent_mappings = getattr(active_pack, "intent_mappings", {}) or {}
+            for univ_id, mapped_id in intent_mappings.items():
+                m_norm = str(mapped_id or "").strip().lower()
+                if not m_norm:
+                    continue
+                m_words = m_norm.replace("_", " ")
+                if m_norm in query_norm or m_words in query_norm:
+                    return str(mapped_id), f"mapped_intent:{univ_id}->{mapped_id}"
+                # Match por combinacao de termos relevantes do nome mapeado (ex: 'fechamento' + 'pbm')
+                tokens = [t for t in m_norm.split("_") if len(t) >= 3]
+                if len(tokens) >= 2 and sum(1 for t in tokens if t in query_norm) >= 2:
+                    return str(mapped_id), f"mapped_tokens:{univ_id}->{mapped_id}"
+
+        return None
+
     def init_table(self):
-        """Garante a existencia da tabela intencoes_vetores e indice HNSW otimizado no posto_ai."""
-        with self._db_lock:
-            conn = self._get_connection()
-            with conn.cursor() as cur:
-                cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS intencoes_vetores (
-                        id SERIAL PRIMARY KEY,
-                        intencao VARCHAR(50) NOT NULL,
-                        descricao TEXT NOT NULL,
-                        exemplo_frase TEXT NOT NULL,
-                        embedding halfvec(768),
-                        criado_em TIMESTAMP DEFAULT NOW()
-                    );
-                """)
+        """Garante a existencia da tabela intencoes_vetores (com pack_id) e indice HNSW otimizado."""
+        with self._get_connection() as conn, conn.cursor() as cur:
+            cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS intencoes_vetores (
+                    id SERIAL PRIMARY KEY,
+                    intencao VARCHAR(80) NOT NULL,
+                    pack_id VARCHAR(64) NOT NULL DEFAULT 'global',
+                    descricao TEXT NOT NULL,
+                    exemplo_frase TEXT NOT NULL,
+                    embedding halfvec(768),
+                    criado_em TIMESTAMP DEFAULT NOW()
+                );
+            """)
+            cur.execute(
+                "ALTER TABLE intencoes_vetores ADD COLUMN IF NOT EXISTS pack_id VARCHAR(64) NOT NULL DEFAULT 'global';"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_intencoes_vetores_pack_id ON intencoes_vetores (pack_id);"
+            )
 
-                # Verifica se o indice ja existe com m=32 e ef_construction=256; caso contrario, recompila
-                cur.execute("SELECT indexdef FROM pg_indexes WHERE indexname = 'idx_intencoes_vetores_hnsw';")
-                idx_row = cur.fetchone()
-                idx_def = idx_row[0] if idx_row else ""
-                m_ok = bool(re.search(r"\bm\s*=\s*'?32'?", idx_def))
-                ef_ok = bool(re.search(r"\bef_construction\s*=\s*'?256'?", idx_def))
-                if not idx_row or not m_ok or not ef_ok:
-                    cur.execute("DROP INDEX IF EXISTS idx_intencoes_vetores_hnsw;")
-                    cur.execute("""
-                        CREATE INDEX idx_intencoes_vetores_hnsw 
-                        ON intencoes_vetores USING hnsw (embedding halfvec_cosine_ops)
-                        WITH (m = 32, ef_construction = 256);
-                    """)
-                conn.commit()
-
-    def recompile_hnsw_index(self):
-        """Recompila explicitamente o indice HNSW de intencoes com m=32 e ef_construction=256."""
-        with self._db_lock:
-            conn = self._get_connection()
-            with conn.cursor() as cur:
+            # Verifica se o indice ja existe com m=32 e ef_construction=256; caso contrario, recompila
+            cur.execute("SELECT indexdef FROM pg_indexes WHERE indexname = 'idx_intencoes_vetores_hnsw';")
+            idx_row = cur.fetchone()
+            idx_def = idx_row[0] if idx_row else ""
+            m_ok = bool(re.search(r"\bm\s*=\s*'?32'?", idx_def))
+            ef_ok = bool(re.search(r"\bef_construction\s*=\s*'?256'?", idx_def))
+            if not idx_row or not m_ok or not ef_ok:
                 cur.execute("DROP INDEX IF EXISTS idx_intencoes_vetores_hnsw;")
                 cur.execute("""
                     CREATE INDEX idx_intencoes_vetores_hnsw 
                     ON intencoes_vetores USING hnsw (embedding halfvec_cosine_ops)
                     WITH (m = 32, ef_construction = 256);
                 """)
-                conn.commit()
-            logger.info("Indice 'idx_intencoes_vetores_hnsw' recompilado com m=32, ef_construction=256.")
+            conn.commit()
+
+    def recompile_hnsw_index(self):
+        """Recompila explicitamente o indice HNSW de intencoes com m=32 e ef_construction=256."""
+        with self._get_connection() as conn, conn.cursor() as cur:
+            cur.execute("DROP INDEX IF EXISTS idx_intencoes_vetores_hnsw;")
+            cur.execute("""
+                CREATE INDEX idx_intencoes_vetores_hnsw 
+                ON intencoes_vetores USING hnsw (embedding halfvec_cosine_ops)
+                WITH (m = 32, ef_construction = 256);
+            """)
+            conn.commit()
+        logger.info("Indice 'idx_intencoes_vetores_hnsw' recompilado com m=32, ef_construction=256.")
 
     def count_intents(self) -> int:
-        """Retorna o numero de exemplos de intencoes indexados de forma thread-safe."""
-        with self._db_lock:
-            try:
-                conn = self._get_connection()
-                with conn.cursor() as cur:
-                    cur.execute("SELECT count(*) FROM intencoes_vetores WHERE embedding IS NOT NULL;")
-                    row = cur.fetchone()
-                    return row[0] if row else 0
-            except Exception:
-                return 0
+        """Retorna o numero de exemplos de intencoes indexados usando conexao do pool."""
+        try:
+            with self._get_connection() as conn, conn.cursor() as cur:
+                cur.execute("SELECT count(*) FROM intencoes_vetores WHERE embedding IS NOT NULL;")
+                row = cur.fetchone()
+                return row[0] if row else 0
+        except Exception:
+            return 0
 
     def count_distinct_intents(self) -> int:
-        """Retorna o numero de intencoes canonicas distintas indexadas de forma thread-safe."""
-        with self._db_lock:
-            try:
-                conn = self._get_connection()
-                with conn.cursor() as cur:
-                    cur.execute("SELECT count(DISTINCT intencao) FROM intencoes_vetores WHERE embedding IS NOT NULL;")
-                    row = cur.fetchone()
-                    return row[0] if row else 0
-            except Exception:
-                return 0
+        """Retorna o numero de intencoes canonicas distintas indexadas usando conexao do pool."""
+        try:
+            with self._get_connection() as conn, conn.cursor() as cur:
+                cur.execute("SELECT count(DISTINCT intencao) FROM intencoes_vetores WHERE embedding IS NOT NULL;")
+                row = cur.fetchone()
+                return row[0] if row else 0
+        except Exception:
+            return 0
 
-    def seed_intents(self, force: bool = False) -> int:
+    def seed_intents(self, force: bool = False, include_domain_packs: bool = True) -> int:
         """
-        Popula a tabela intencoes_vetores com os exemplares canônicos das 9 intenções.
-        Gera embeddings via Gemini e indexa no pgvector com halfvec(768).
+        Popula a tabela intencoes_vetores com os exemplares canonicos e specific_intents dos Domain Packs.
+        Embebeda apenas a frase limpa (sem prefixo textual de classe) via google-genai (Carbon Core P1.1/P1.3).
         """
         self.init_table()
         current_count = self.count_intents()
@@ -1415,7 +1441,7 @@ class SemanticRouter:
             self.rag_engine = HybridRAGEngine(db_config=self.db_config)
 
         total_inseridos = 0
-        exemplos_lote = []
+        exemplos_lote: list[tuple[str, str, str, str]] = []
 
         with self._db_lock, self._get_connection() as conn, conn.cursor() as cur:
             if force:
@@ -1427,38 +1453,53 @@ class SemanticRouter:
                 existing_intents = {r[0] for r in cur.fetchall()}
                 intents_to_seed = {k: v for k, v in INTENT_EXEMPLARS.items() if k not in existing_intents}
 
-        if not intents_to_seed:
-            return current_count
-
         for intencao, dados in intents_to_seed.items():
             desc = dados["descricao"]
             for frase in dados["exemplos"]:
-                exemplos_lote.append((intencao, desc, frase))
+                exemplos_lote.append((intencao, "global", desc, frase))
 
-        logger.info(f"Gerando embeddings para {len(exemplos_lote)} frases de intenções ({list(intents_to_seed.keys())})...")
+        if include_domain_packs:
+            try:
+                from core.domain.domain_pack_loader import load_all_domain_packs
 
-        # Gera embeddings em lotes para respeitar limites da API
+                all_packs = load_all_domain_packs()
+                for pack_id, pack in all_packs.items():
+                    for spec in pack.specific_intents:
+                        desc = spec.descricao or spec.id
+                        for kw in spec.keywords:
+                            clean_kw = str(kw or "").strip()
+                            if clean_kw:
+                                exemplos_lote.append((spec.id, pack_id, desc, clean_kw))
+            except Exception as exc:
+                logger.warning("Falha ao coletar specific_intents dos Domain Packs para seeding: %s", exc)
+
+        if not exemplos_lote:
+            return current_count
+
+        logger.info(f"Gerando embeddings limpos para {len(exemplos_lote)} frases de intenções...")
+
+        from core.llm_client import embed_content as llm_embed_content
+
         batch_size = 20
         with self._db_lock, self._get_connection() as conn, conn.cursor() as cur:
             for i in range(0, len(exemplos_lote), batch_size):
                 chunk = exemplos_lote[i:i + batch_size]
-                textos = [f"Intenção: {item[0]} | Pergunta Típica: {item[2]}" for item in chunk]
+                # Carbon Core P1.1: embebeda estritamente a frase limpa, sem prefixo 'Intencao: ...'
+                textos = [item[3] for item in chunk]
 
                 try:
-                    import google.generativeai as genai
-                    res = genai.embed_content(
+                    embeddings = llm_embed_content(
                         model=DEFAULT_EMBEDDING_MODEL,
                         content=textos,
                         output_dimensionality=768,
-                        task_type="retrieval_document"
+                        task_type="retrieval_document",
                     )
-                    embeddings = res["embedding"]
 
-                    for (intencao, desc, frase), emb in zip(chunk, embeddings):
+                    for (intencao, pack_id, desc, frase), emb in zip(chunk, embeddings):
                         cur.execute("""
-                            INSERT INTO intencoes_vetores (intencao, descricao, exemplo_frase, embedding)
-                            VALUES (%s, %s, %s, %s::halfvec);
-                        """, (intencao, desc, frase, str(emb)))
+                            INSERT INTO intencoes_vetores (intencao, pack_id, descricao, exemplo_frase, embedding)
+                            VALUES (%s, %s, %s, %s, %s::halfvec);
+                        """, (intencao, pack_id, desc, frase, str(emb)))
                         total_inseridos += 1
 
                     conn.commit()
@@ -1467,6 +1508,45 @@ class SemanticRouter:
                     logger.error(f"Erro ao gerar embeddings do lote {i}: {e}")
 
         logger.info(f"Seeding concluído: {total_inseridos} intenções indexadas em intencoes_vetores.")
+        return total_inseridos
+
+    def seed_domain_pack_intents(self, packs: Optional[List[Any]] = None) -> int:
+        """Indexa especificamente DomainPackConfig.specific_intents com coluna pack_id e frase limpa."""
+        from core.domain.domain_pack_loader import load_all_domain_packs
+        from core.llm_client import embed_content as llm_embed_content
+
+        self.init_table()
+        target_packs = list(packs) if packs is not None else list(load_all_domain_packs().values())
+        lote: list[tuple[str, str, str, str]] = []
+        for pack in target_packs:
+            for spec in getattr(pack, "specific_intents", []) or []:
+                desc = spec.descricao or spec.id
+                for kw in spec.keywords:
+                    clean_kw = str(kw or "").strip()
+                    if clean_kw:
+                        lote.append((spec.id, pack.pack_id, desc, clean_kw))
+        if not lote:
+            return 0
+
+        total_inseridos = 0
+        with self._db_lock, self._get_connection() as conn, conn.cursor() as cur:
+            textos = [item[3] for item in lote]
+            embeddings = llm_embed_content(
+                model=DEFAULT_EMBEDDING_MODEL,
+                content=textos,
+                output_dimensionality=768,
+                task_type="retrieval_document",
+            )
+            for (intencao, pack_id, desc, frase), emb in zip(lote, embeddings):
+                cur.execute(
+                    """
+                    INSERT INTO intencoes_vetores (intencao, pack_id, descricao, exemplo_frase, embedding)
+                    VALUES (%s, %s, %s, %s, %s::halfvec);
+                    """,
+                    (intencao, pack_id, desc, frase, str(emb)),
+                )
+                total_inseridos += 1
+            conn.commit()
         return total_inseridos
 
     def route(
@@ -1522,6 +1602,32 @@ class SemanticRouter:
                 with self._cache_lock:
                     self._memory_cache[query_norm] = ("ajuda_sistema", 1.0, telemetry)
             return "ajuda_sistema", 1.0, telemetry
+
+        active_pack = self._get_effective_domain_pack()
+        active_pack_id = active_pack.pack_id if active_pack is not None else "fuel_convenience"
+        cache_key = f"{active_pack_id}::{query_norm}"
+
+        # 0.055 Deteccao deterministica de specific_intents e mapeamentos do Domain Pack ativo (P1.1)
+        pack_match = self._match_active_pack_intent(query_norm, active_pack)
+        if pack_match is not None and active_pack_id != "fuel_convenience":
+            matched_intent, matched_reason = pack_match
+            total_ms = (time.perf_counter() - t0) * 1000
+            telemetry = {
+                "intent": matched_intent,
+                "confidence": 0.96,
+                "method": "domain_pack_intent",
+                "matched_phrase": matched_reason,
+                "pack_id": active_pack_id,
+                "pgvector_latency_ms": 0.0,
+                "embedding_latency_ms": 0.0,
+                "total_routing_latency_ms": round(total_ms, 3),
+                "confidence_threshold": self.confidence_threshold,
+                "query_vector": None,
+            }
+            if use_cache:
+                with self._cache_lock:
+                    self._memory_cache[cache_key] = (matched_intent, 0.96, telemetry)
+            return matched_intent, 0.96, telemetry
 
         # 0.06 Deteccao deterministica de procedimentos operacionais e manuais do ERP
         is_procedural = bool(
@@ -1592,19 +1698,20 @@ class SemanticRouter:
             }
             return "catalogo_produtos", 0.50, telemetry
 
-        # 1. Checa cache em memoria
+        # 1. Checa cache em memoria (particionado por pack_id)
         if use_cache:
             with self._cache_lock:
-                if query_norm in self._memory_cache:
+                cached_entry = self._memory_cache.get(cache_key)
+                if cached_entry is not None:
                     self._metrics["cache_hits"] += 1
-                    intencao, conf, cached_telemetry = self._memory_cache[query_norm]
+                    intencao, conf, cached_telemetry = cached_entry
                     latency_ms = (time.perf_counter() - t0) * 1000
                     telemetry = dict(cached_telemetry)
                     telemetry["method"] = "memory_cache"
                     telemetry["total_routing_latency_ms"] = round(latency_ms, 3)
                     return intencao, conf, telemetry
 
-        # 2. Roteamento Vetorial via pgvector
+        # 2. Roteamento Vetorial via pgvector (filtrado por pack_id = 'global' ou pack ativo)
         pg_latency_ms = 0.0
         emb_latency_ms = 0.0
         emb_gerado = query_vector
@@ -1628,15 +1735,14 @@ class SemanticRouter:
                     1 - (embedding <=> %s::halfvec) AS similarity
                 FROM intencoes_vetores
                 WHERE embedding IS NOT NULL
+                  AND (pack_id = 'global' OR pack_id = %s)
                 ORDER BY embedding <=> %s::halfvec
                 LIMIT 1;
             """
             vec_str = str(emb_gerado)
-            with self._db_lock:
-                conn = self._get_connection()
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute(sql, (vec_str, vec_str))
-                    melhor_match = cur.fetchone()
+            with self._get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(sql, (vec_str, active_pack_id, vec_str))
+                melhor_match = cur.fetchone()
 
             pg_latency_ms = (time.perf_counter() - t_pg) * 1000
 
@@ -1699,7 +1805,7 @@ class SemanticRouter:
                     if use_cache:
                         with self._cache_lock:
                             if len(self._memory_cache) < self.cache_max_size:
-                                self._memory_cache[query_norm] = (intencao_detectada, similarity, telemetry)
+                                self._memory_cache[cache_key] = (intencao_detectada, similarity, telemetry)
 
                     return intencao_detectada, similarity, telemetry
 
@@ -1730,7 +1836,7 @@ class SemanticRouter:
         if use_cache:
             with self._cache_lock:
                 if len(self._memory_cache) < self.cache_max_size:
-                    self._memory_cache[query_norm] = (intencao_heuristica, 0.50, telemetry)
+                    self._memory_cache[cache_key] = (intencao_heuristica, 0.50, telemetry)
 
         return intencao_heuristica, 0.50, telemetry
 

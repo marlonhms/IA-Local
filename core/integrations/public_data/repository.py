@@ -166,15 +166,45 @@ class PublicDataRepository:
                     """
                 )
         else:
-            sql_path = Path(__file__).resolve().parent.parent.parent.parent / "scripts" / "init_public_data_cache.sql"
-            if not sql_path.exists():
-                sql_path = Path("scripts/init_public_data_cache.sql")
-            ddl_sql = sql_path.read_text(encoding="utf-8")
+            required_tables = (
+                "aura_core.anp_precos_semanais",
+                "aura_core.confaz_pmpf",
+                "aura_core.bacen_series_historicas",
+                "aura_core.public_sync_telemetry",
+            )
             with self._get_connection() as conn:
                 cur = conn.cursor()
                 try:
-                    cur.execute(ddl_sql)
-                    conn.commit()
+                    all_ready = True
+                    for tbl in required_tables:
+                        try:
+                            cur.execute(f"SELECT 1 FROM {tbl} LIMIT 1;")
+                        except Exception:  # noqa: BLE001
+                            conn.rollback()
+                            all_ready = False
+                            break
+                    if all_ready:
+                        return
+
+                    sql_path = Path(__file__).resolve().parent.parent.parent.parent / "scripts" / "init_public_data_cache.sql"
+                    if not sql_path.exists():
+                        sql_path = Path("scripts/init_public_data_cache.sql")
+                    ddl_sql = sql_path.read_text(encoding="utf-8")
+                    try:
+                        cur.execute(ddl_sql)
+                        conn.commit()
+                    except Exception as ddl_exc:  # noqa: BLE001
+                        conn.rollback()
+                        try:
+                            cur.execute("SELECT 1 FROM aura_core.anp_precos_semanais LIMIT 1;")
+                            logger.warning(
+                                "DDL de public_data ignorado (privilegio read-only); "
+                                "usando tabelas aura_core existentes (%s).",
+                                ddl_exc,
+                            )
+                        except Exception:  # noqa: BLE001
+                            conn.rollback()
+                            raise ddl_exc from None
                 finally:
                     cur.close()
 

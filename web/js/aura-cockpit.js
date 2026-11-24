@@ -42,21 +42,12 @@ class AuraCockpitController {
     }
 
     try {
-      const url = `/api/v1/cockpit/zero-click-feed?force_refresh=${forceRefresh ? 'true' : 'false'}`;
-      let res = await fetch(url);
-      if (!res.ok) {
-        res = await fetch(`/api/v1/aura/cockpit/zero-click-feed?force_refresh=${forceRefresh ? 'true' : 'false'}`);
+      if (!window.auraApi || typeof window.auraApi.getZeroClickFeed !== 'function') {
+        throw new Error('AuraApiClient indisponivel para Feed Zero-Click.');
       }
-      if (res.ok) {
-        const data = await res.json();
-        this.zeroClickCards = data.cards || [];
-        this.renderZeroClickFeed();
-      } else {
-        console.warn('[AURA Zero-Click] Resposta HTTP nao-200:', res.status);
-        if (container && (!this.zeroClickCards || this.zeroClickCards.length === 0)) {
-          this.renderErrorState(container, 'Falha ao carregar o Feed Zero-Click.');
-        }
-      }
+      const data = await window.auraApi.getZeroClickFeed(forceRefresh);
+      this.zeroClickCards = (data && data.cards) ? data.cards : [];
+      this.renderZeroClickFeed();
     } catch (err) {
       console.warn('[AURA Zero-Click] Erro ao carregar feed zero-click:', err);
       if (container && (!this.zeroClickCards || this.zeroClickCards.length === 0)) {
@@ -148,36 +139,27 @@ class AuraCockpitController {
     };
 
     try {
-      const res = await fetch('/api/v1/aura/directives/dispatch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          directive_id: directive.directive_id,
-          card_id: cardId,
-          title: directive.title,
-          category: directive.category,
-          financial_impact_brl: directive.financial_impact_brl,
-          roteiro_voz_consultor: directive.roteiro_voz_consultor,
-          treinamento_equipe_15s: directive.treinamento_equipe_15s,
-          campanha_clientes_whatsapp: directive.campanha_clientes_whatsapp,
-          canal_despacho: directive.canal_despacho || 'outbox_webhook',
-          operator_id: 'gerente_01'
-        })
+      if (!window.auraApi || typeof window.auraApi.dispatchDirective !== 'function') {
+        throw new Error('AuraApiClient indisponivel para despacho de diretiva.');
+      }
+      const data = await window.auraApi.dispatchDirective({
+        directive_id: directive.directive_id,
+        card_id: cardId,
+        title: directive.title,
+        category: directive.category,
+        financial_impact_brl: directive.financial_impact_brl,
+        roteiro_voz_consultor: directive.roteiro_voz_consultor,
+        treinamento_equipe_15s: directive.treinamento_equipe_15s,
+        campanha_clientes_whatsapp: directive.campanha_clientes_whatsapp,
+        canal_despacho: directive.canal_despacho || 'outbox_webhook',
+        operator_id: 'gerente_01'
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (btn) {
-          btn.className = 'w-full py-2.5 px-3 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm';
-          btn.innerHTML = `
-            <svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span>Gravado na Outbox (Msg #${(data.outbox_message_id || '').slice(0, 8)})</span>`;
-        }
-      } else {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = `<span>Erro ao gravar na Outbox. Tentar Novamente</span>`;
-        }
+      if (btn) {
+        btn.className = 'w-full py-2.5 px-3 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm';
+        btn.innerHTML = `
+          <svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Gravado na Outbox (Msg #${((data && data.outbox_message_id) || '').slice(0, 8)})</span>`;
       }
     } catch (err) {
       console.warn('[AURA Actionable BI] Erro ao despachar diretiva:', err);

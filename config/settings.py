@@ -4,9 +4,9 @@ Carrega variáveis de ambiente (.env) e estabelece parâmetros padrão de conex�
 """
 
 import os
+import secrets
 from pathlib import Path
 
-import google.generativeai as genai
 from dotenv import load_dotenv
 
 # Diretório raiz do projeto
@@ -26,8 +26,6 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 GROQ_AUDIO_URL = os.getenv("GROQ_AUDIO_URL", "https://api.groq.com/openai/v1/audio/transcriptions").strip()
 GROQ_WHISPER_MODEL = os.getenv("GROQ_WHISPER_MODEL", "whisper-large-v3-turbo").strip()
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY, transport="rest")
 
 
 def get_erp_password() -> str:
@@ -91,11 +89,35 @@ def get_erp_password() -> str:
     )
 
 
-# Parametrizacao da Chave Secreta HMAC para Action Vouchers (P0-2)
-AURA_VOUCHER_SECRET = os.getenv("AURA_VOUCHER_SECRET", "aura_voucher_hmac_secret_v1")
+def _is_test_or_ci_env() -> bool:
+    """Identifica se o processo esta rodando em suite de testes unitarios ou CI."""
+    return bool(os.getenv("CI") or os.getenv("GITHUB_ACTIONS") or os.getenv("PYTEST_CURRENT_TEST"))
 
-# Seguranca da API Administrativa e Endpoints Criticos (P1-4)
-AURA_API_KEY = os.getenv("AURA_API_KEY", "aura_secret_admin_key_2026")
+
+def resolve_runtime_secret(
+    env_var: str,
+    test_default: str,
+    fallback_env_vars: tuple[str, ...] = (),
+) -> str:
+    """
+    Resolve segredo de runtime priorizando variaveis de ambiente explicitas.
+    Fora de ambiente CI/PYTEST, gera segredo criptografico efemero por boot
+    para impedir uso de chaves default previsiveis em producao (Carbon Core P0.1).
+    """
+    for var_name in (env_var, *fallback_env_vars):
+        val = (os.getenv(var_name) or "").strip()
+        if val:
+            return val
+    if _is_test_or_ci_env():
+        return test_default
+    return secrets.token_urlsafe(32)
+
+
+# Parametrizacao da Chave Secreta HMAC para Action Vouchers (P0-2 / Carbon Core P0.1)
+AURA_VOUCHER_SECRET = resolve_runtime_secret("AURA_VOUCHER_SECRET", "aura_voucher_hmac_secret_v1")
+
+# Seguranca da API Administrativa e Endpoints Criticos (P1-4 / Carbon Core P0.1)
+AURA_API_KEY = resolve_runtime_secret("AURA_API_KEY", "aura_secret_admin_key_2026")
 
 
 def get_cors_origins() -> list[str]:
@@ -126,12 +148,13 @@ WHATSAPP_MANAGER_PHONE = os.getenv("WHATSAPP_MANAGER_PHONE", "")
 
 # Integracao com Painel WhatsApp CRM (Hub Omnichannel e Campanhas)
 PAINEL_WHATSAPP_EVENTS_URL = os.getenv("PAINEL_WHATSAPP_EVENTS_URL", "http://localhost:3000/api/aura/events")
-PAINEL_WHATSAPP_AURA_KEY = os.getenv(
+PAINEL_WHATSAPP_AURA_KEY = resolve_runtime_secret(
     "PAINEL_WHATSAPP_AURA_KEY",
-    os.getenv("PARTNER_BI_WEBHOOK_SECRET", "whsec_partner_fuel_bi_2026"),
+    "whsec_partner_fuel_bi_2026",
+    fallback_env_vars=("PARTNER_BI_WEBHOOK_SECRET",),
 )
 PAINEL_WHATSAPP_TENANT_SLUG = os.getenv("PAINEL_WHATSAPP_TENANT_SLUG", "partner-fuel-bi")
-AURA_PARTNER_API_KEY = os.getenv("AURA_PARTNER_API_KEY", "aura-partner-default-key")
+AURA_PARTNER_API_KEY = resolve_runtime_secret("AURA_PARTNER_API_KEY", "aura-partner-default-key")
 
 # Configuracao do Banco ERP (PostgreSQL 16 Windows Service - Porta 5433)
 # Prioriza a role tecnica dedicada aura_service_ro (P1-1)
@@ -159,7 +182,7 @@ AURA_CORE_SCHEMA = os.getenv("AURA_CORE_SCHEMA", "aura_core")
 N3_SRE_SCHEMA = os.getenv("N3_SRE_SCHEMA", "n3_sre")
 VECTOR_DB_DRIVER_OPTIONS = os.getenv(
     "VECTOR_DB_OPTIONS",
-    f"-c search_path={AURA_CORE_SCHEMA},public",
+    f"-c search_path={AURA_CORE_SCHEMA},public -c statement_timeout=5000 -c lock_timeout=1500",
 )
 
 DB_VECTOR_CONFIG = {

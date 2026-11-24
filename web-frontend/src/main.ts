@@ -7,7 +7,11 @@
 
 import {
   AuraApiClient,
+  AuraHttpTransport,
   type AuraClientConfig,
+  type AuraStreamChatOptions,
+  type AuraStreamHandle,
+  type AuraTransportConfig,
   isValidActionVoucher,
   isValidGenUIEnvelope,
 } from "./api/aura-client";
@@ -15,7 +19,11 @@ import {
 export * from "./types/aura-contracts";
 export {
   AuraApiClient,
+  AuraHttpTransport,
   type AuraClientConfig,
+  type AuraStreamChatOptions,
+  type AuraStreamHandle,
+  type AuraTransportConfig,
   isValidActionVoucher,
   isValidGenUIEnvelope,
 };

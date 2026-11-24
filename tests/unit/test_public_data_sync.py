@@ -550,3 +550,57 @@ def test_ausencia_travessoes_fase3():
         conteudo = arq.read_text(encoding="utf-8")
         assert "\u2014" not in conteudo, f"Travessao em-dash (\\u2014) encontrado no arquivo {arq.name}"
         assert "\u2013" not in conteudo, f"Travessao en-dash (\\u2013) encontrado no arquivo {arq.name}"
+
+
+def test_init_schema_readonly_postgres_graceful():
+    """
+    Garante que roles somente-leitura (ex: aura_service_ro) nao quebrem
+    PublicDataRepository.__init__ quando as tabelas em aura_core ja existem.
+    """
+
+    class _FakeReadOnlyCursor:
+        def __init__(self, fail_one_table: bool = False):
+            self.fail_one_table = fail_one_table
+            self.ddl_called = False
+
+        def execute(self, sql: str):
+            sql_u = sql.strip().upper()
+            if sql_u.startswith("SELECT 1 FROM"):
+                if self.fail_one_table and "PUBLIC_SYNC_TELEMETRY" in sql_u:
+                    raise RuntimeError("tabela ausente")
+                return
+            self.ddl_called = True
+            raise PermissionError("permissao negada para banco de dados posto_ai")
+
+        def close(self):
+            return None
+
+    class _FakeReadOnlyConn:
+        def __init__(self, fail_one_table: bool = False):
+            self.cur = _FakeReadOnlyCursor(fail_one_table=fail_one_table)
+            self.rollbacks = 0
+
+        def cursor(self):
+            return self.cur
+
+        def rollback(self):
+            self.rollbacks += 1
+
+        def commit(self):
+            return None
+
+        def close(self):
+            return None
+
+    # Caso 1: todas as tabelas ja existem -> nao tenta executar DDL
+    conn_ready = _FakeReadOnlyConn(fail_one_table=False)
+    repo1 = PublicDataRepository(connection_provider=lambda: conn_ready, use_sqlite_fallback=False, auto_init=True)
+    assert repo1.use_sqlite is False
+    assert conn_ready.cur.ddl_called is False
+
+    # Caso 2: falta tabela secundaria e DDL falha por privilegio, mas anp_precos_semanais e legivel
+    conn_ro = _FakeReadOnlyConn(fail_one_table=True)
+    repo2 = PublicDataRepository(connection_provider=lambda: conn_ro, use_sqlite_fallback=False, auto_init=True)
+    assert repo2.use_sqlite is False
+    assert conn_ro.cur.ddl_called is True
+    assert conn_ro.rollbacks >= 2

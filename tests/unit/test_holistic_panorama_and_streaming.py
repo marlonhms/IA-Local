@@ -113,7 +113,7 @@ async def test_aura_engine_streaming_resilience_on_truncation() -> None:
                 return mock_chunk1
             raise RuntimeError("503 This model is currently experiencing high demand.")
 
-    with patch("google.generativeai.GenerativeModel") as mock_model_cls:
+    with patch("core.aura_engine.genai.GenerativeModel") as mock_model_cls:
         mock_instance = MagicMock()
         mock_instance.generate_content_async = AsyncMock(return_value=MockAsyncStream())
         mock_model_cls.return_value = mock_instance

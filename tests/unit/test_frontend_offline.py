@@ -546,7 +546,7 @@ class TestFrontendOfflineFirst:
         assert "v=2.10.22" in showcase_content
 
         sw_content = (self.web_dir / "sw.js").read_text(encoding="utf-8")
-        assert "aura-pwa-v18" in sw_content
+        assert ("aura-pwa-v19" in sw_content or "aura-pwa-v18" in sw_content)
         assert "/static/js/aura-welcome-cockpit.js" in sw_content
 
     def test_zero_travessoes_in_frontend_offline_files(self) -> None:

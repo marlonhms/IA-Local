@@ -51,18 +51,12 @@ class AuraSecurityArchitectureCoordinator {
     this.isLoading = true;
 
     try {
-      let res = await fetch('/api/v1/aura/security/telemetry');
-      if (!res.ok) {
-        res = await fetch('/api/v1/aura/compliance/security/telemetry');
+      if (!window.auraApi || typeof window.auraApi.getSecurityTelemetry !== 'function') {
+        throw new Error('AuraApiClient indisponivel para telemetria de seguranca.');
       }
-
-      if (res.ok) {
-        const data = await res.json();
-        this.telemetryData = data;
-        this.renderTelemetry(data);
-      } else {
-        this.renderFallbackTelemetry();
-      }
+      const data = await window.auraApi.getSecurityTelemetry();
+      this.telemetryData = data;
+      this.renderTelemetry(data);
     } catch (err) {
       console.warn('[AURA Security] Conexao direta offline, exibindo padrao de auditoria:', err);
       this.renderFallbackTelemetry();

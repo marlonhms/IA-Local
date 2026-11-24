@@ -9,23 +9,76 @@ Regra inegociavel: ZERO travessoes em todo o modulo.
 from typing import Any
 
 
+def _resolve_pack_metadata(domain_pack: Any | None = None) -> dict[str, Any]:
+    """Resolve metadados do Domain Pack ativo via ContextVar para parametrizacao agnostica (Carbon Core P0.4)."""
+    pack = domain_pack
+    if pack is None:
+        try:
+            from core.domain.domain_pack_loader import get_active_domain_pack
+
+            pack = get_active_domain_pack()
+        except Exception:
+            pack = None
+
+    if pack is None:
+        return {
+            "pack_id": "fuel_convenience",
+            "pack_name": "Posto de Combustiveis e Loja de Conveniencia",
+            "vertical": "fuel_retail",
+            "vocabulary": {},
+            "is_fuel": True,
+        }
+
+    pack_id = str(getattr(pack, "pack_id", "fuel_convenience") or "fuel_convenience")
+    pack_name = str(getattr(pack, "pack_name", "Posto de Combustiveis e Loja de Conveniencia") or "Unidade Operacional")
+    vertical = str(getattr(pack, "vertical", "fuel_retail") or "fuel_retail")
+    vocab = dict(getattr(pack, "vocabulary", {}) or {})
+    return {
+        "pack_id": pack_id,
+        "pack_name": pack_name,
+        "vertical": vertical,
+        "vocabulary": vocab,
+        "is_fuel": pack_id == "fuel_convenience",
+    }
+
+
+def _format_domain_pack_block(pack_meta: dict[str, Any]) -> str:
+    """Formata bloco declarativo do Domain Pack ativo para injecao no prompt sistemico."""
+    vocab = pack_meta.get("vocabulary") or {}
+    vocab_pairs = ", ".join(f"{k}={v}" for k, v in list(vocab.items())[:8])
+    vocab_line = f"\n- Vocabulario da Vertical: {vocab_pairs}" if vocab_pairs else ""
+    return (
+        f"Domain Pack Ativo (AUDS):\n"
+        f"- Pack: {pack_meta['pack_name']} ({pack_meta['pack_id']} | vertical={pack_meta['vertical']})"
+        f"{vocab_line}"
+    )
+
+
 def build_help_prompt(
     pergunta_sanitizada: str,
     contexto_sanitizado: str,
     historico_formatado: str,
     dados_filial: dict[str, Any] | None = None,
+    domain_pack: Any | None = None,
 ) -> str:
     """Constroi o prompt especializado para a intencao de ajuda do sistema e navegacao guiada.
 
     Focado em auto-conhecimento dos modulos, telas, atalhos de teclado e micro-widgets da AURA.
     """
+    pack_meta = _resolve_pack_metadata(domain_pack)
+    domain_label = (
+        "do Posto e Loja de Conveniencia"
+        if pack_meta["is_fuel"]
+        else f"da Operacao ({pack_meta['pack_name']})"
+    )
     filial = dados_filial or {}
     empresa_id = filial.get("idempresa") or "00001"
-    nome_fantasia = filial.get("nome") or "POSTO PILOTO MODELO"
-    razao_social = filial.get("razao_social") or "POSTO PILOTO MODELO LTDA"
+    nome_fantasia = filial.get("nome") or ("POSTO PILOTO MODELO" if pack_meta["is_fuel"] else pack_meta["pack_name"])
+    razao_social = filial.get("razao_social") or ("POSTO PILOTO MODELO LTDA" if pack_meta["is_fuel"] else f"{pack_meta['pack_name']} LTDA")
     cnpj = filial.get("cnpj") or "00.000.000/0001-00"
 
-    return f"""Voce e a AURA (Autonomous Unified Retail Assistant), a Assistente de Prontidao e Especialista Guia da Plataforma de Gestao do Posto e Loja de Conveniencia.
+    return f"""Voce e a AURA (Autonomous Unified Retail Assistant), a Assistente de Prontidao e Especialista Guia da Plataforma de Gestao {domain_label}.
+{_format_domain_pack_block(pack_meta)}
 Seu papel neste atendimento e fornecer AUTO-CONHECIMENTO e EXPLICACAO EXECUTIVA sobre as telas, modulos operacionais, metricas analiticas e atalhos de navegacao da aplicacao.
 
 Diretrizes de Tom e Persona para Ajuda do Sistema:
@@ -167,17 +220,21 @@ def build_system_prompt(
     dados_filial: dict[str, Any] | None = None,
     intencao: str | None = None,
     genui_active: bool = False,
+    domain_pack: Any | None = None,
 ) -> str:
     """Constroi o prompt sistemico principal da AURA para analises executivas e tomada de decisao.
 
     Rigorosamente higienizado: nenhuma informacao proprietaria de schemas relacionais e vazada.
     """
+    pack_meta = _resolve_pack_metadata(domain_pack)
+
     if intencao == "ajuda_sistema":
         return build_help_prompt(
             pergunta_sanitizada=pergunta_sanitizada,
             contexto_sanitizado=contexto_sanitizado,
             historico_formatado=historico_formatado,
             dados_filial=dados_filial,
+            domain_pack=domain_pack,
         )
 
     if intencao in ("auditoria_fiscal_sefaz", "conhecimento_fiscal", "fiscal_sefaz"):
@@ -200,11 +257,18 @@ def build_system_prompt(
 
     filial = dados_filial or {}
     empresa_id = filial.get("idempresa") or "00001"
-    nome_fantasia = filial.get("nome") or "POSTO PILOTO MODELO"
-    razao_social = filial.get("razao_social") or "POSTO PILOTO MODELO LTDA"
+    nome_fantasia = filial.get("nome") or ("POSTO PILOTO MODELO" if pack_meta["is_fuel"] else pack_meta["pack_name"])
+    razao_social = filial.get("razao_social") or ("POSTO PILOTO MODELO LTDA" if pack_meta["is_fuel"] else f"{pack_meta['pack_name']} LTDA")
     cnpj = filial.get("cnpj") or "00.000.000/0001-00"
     endereco = filial.get("endereco") or "Avenida Central, 1000 - Centro"
     pdv = filial.get("pdv") or "001"
+
+    persona_header = (
+        "Voce e a AURA (Autonomous Unified Retail Assistant), a Assistente de Prontidao e Gerente Supervisora do Posto de Combustiveis e Loja de Conveniencia."
+        if pack_meta["is_fuel"]
+        else f"Voce e a AURA (Autonomous Unified Retail Assistant), a Assistente de Prontidao e Gerente Supervisora de {pack_meta['pack_name']}."
+    )
+    pack_block = _format_domain_pack_block(pack_meta)
 
     if genui_active:
         intelligent_ui_block = """
@@ -223,7 +287,8 @@ Modo Texto Direto (Sem Interface Grafica):
 - Como o canal atual nao possui painel grafico interativo, liste as informacoes de postos e indicadores em topicos claros e objetivos a partir dos dados recuperados.
 """
 
-    return f"""Voce e a AURA (Autonomous Unified Retail Assistant), a Assistente de Prontidao e Gerente Supervisora do Posto de Combustiveis e Loja de Conveniencia.
+    return f"""{persona_header}
+{pack_block}
 Seu papel fundamental e o suporte a tomada de decisao rapida e cirurgica do gestor: o usuario tirou o celular do bolso na correria da pista ou da retaguarda, precisou tomar uma decisao imediata, perguntou para voce, voce ilumina com diagnosticos diretos, calculos matematicos exatos e a melhor acao para ele bater o martelo.
 
 Posicionamento e Demarcacao:

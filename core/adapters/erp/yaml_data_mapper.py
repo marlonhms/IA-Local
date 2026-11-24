@@ -45,6 +45,7 @@ from core.domain.sales import (
     UniversalSaleReceipt,
 )
 from core.domain.tanks import UniversalTankReading
+from core.tenancy import ReadOnlySQLViolationError, assert_readonly_safe_sql
 
 logger = logging.getLogger("YAMLDataMapperERPAdapter")
 
@@ -586,7 +587,8 @@ class YAMLDataMapperERPAdapter(BaseERPAdapter):
         query: str,
         params: list[Any] | tuple[Any, ...] | None = None,
     ) -> list[dict[str, Any]]:
-        """Executa consulta SQL com RealDictCursor ou conversao de tuplas."""
+        """Executa consulta SQL estritamente read-only com RealDictCursor ou conversao de tuplas."""
+        assert_readonly_safe_sql(query)
         conn_obj = self._get_connection()
         try:
             if hasattr(conn_obj, "__enter__") and hasattr(conn_obj, "__exit__"):

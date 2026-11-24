@@ -75,3 +75,6 @@ screen_*.png
 
 # Scratch scripts
 scratch/
+
+# Node / Frontend dependencies
+node_modules/

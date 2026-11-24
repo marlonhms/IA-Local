@@ -21,11 +21,13 @@ from core.domain.cashier import (
 )
 from core.domain.domain_pack_loader import (
     DomainPackConfig,
+    DomainPackContext,
     SpecificIntentItem,
     get_active_domain_pack,
     list_available_packs,
     load_all_domain_packs,
     load_domain_pack,
+    peek_active_domain_pack,
     reset_active_domain_pack,
     set_active_domain_pack,
 )
@@ -57,6 +59,7 @@ __all__ = [
     "AUPSBaseModel",
     "CashMovementType",
     "DomainPackConfig",
+    "DomainPackContext",
     "PaymentType",
     "SpecificIntentItem",
     "UniversalCashMovement",

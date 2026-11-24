@@ -16,6 +16,8 @@ export type AuraChunkType =
   | "ui_action_feedback"
   | "cache_hit"
   | "telemetry"
+  | "stream_reset"
+  | "proactive_alert"
   | "error"
   | "done";
 

@@ -31,7 +31,9 @@ from enum import Enum
 from typing import AsyncIterator, Optional, Dict, Any, List, Tuple, Union
 
 from pydantic import BaseModel, Field, ConfigDict, model_validator
-import google.generativeai as genai
+from core.llm_client import CompatGenAIShim
+
+genai = CompatGenAIShim()
 
 # Diretório raiz
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -48,7 +50,18 @@ from core.rag_engine import HybridRAGEngine
 from core.tools import PostoTools, get_erp_connection
 from core.prompts import build_help_prompt, build_system_prompt
 from core.adapters.erp.base import BaseERPAdapter
-from core.sanitizer import central_log_sanitizer, sanitize_erp_brand_names, sanitize_erp_brand_data
+from core.domain.domain_pack_loader import (
+    DomainPackConfig,
+    DomainPackContext,
+    get_active_domain_pack,
+    peek_active_domain_pack,
+)
+from core.sanitizer import (
+    StreamingOutputSanitizerGuard,
+    central_log_sanitizer,
+    sanitize_erp_brand_data,
+    sanitize_erp_brand_names,
+)
 from core.semantic_router import SemanticRouter, classificar_intencao_heuristica, RETRY_REGEX
 from core.schemas.idempotency import generate_tool_call_id, generate_action_id
 from core.schemas.genui import (
@@ -164,6 +177,7 @@ class AuraChunkType(str, Enum):
     UI_ACTION_RESULT = "ui_action_result"# Confirmação de ação transacional executada (F1-01)
     UI_ACTION_FEEDBACK = "ui_action_feedback"# Feedback assíncrono com Action Voucher (Protocolo SSE v1.0)
     CACHE_HIT = "cache_hit"              # Resposta recuperada instantaneamente do cache semântico
+    STREAM_RESET = "stream_reset"        # Sinal transacional para limpar texto parcial antes de fallback
     TELEMETRY = "telemetry"              # Métricas de observabilidade e latência SRE
     ERROR = "error"                      # Notificação de erro no processamento
     DONE = "done"                        # Finalização da requisição
@@ -1529,6 +1543,20 @@ CANONICAL_EXECUTIVE_TITLES: Dict[str, str] = {
     "auditoria_fiscal_sefaz": "Auditoria Fiscal & Regras SEFAZ",
     "conhecimento_fiscal": "Auditoria Fiscal & Regras SEFAZ",
     "fiscal_sefaz": "Auditoria Fiscal & Regras SEFAZ",
+    "simular_cenario_what_if": "Simulador What-If & Elasticidade",
+    "what_if": "Simulador What-If & Elasticidade",
+    "whatif": "Simulador What-If & Elasticidade",
+    "WhatIfSimulatorUI": "Simulador What-If & Elasticidade",
+    "render_WhatIfSimulatorUI": "Simulador What-If & Elasticidade",
+    "realized_roi_scorecard": "Scorecard de ROI Realizado",
+    "roi_realizado": "Scorecard de ROI Realizado",
+    "outcome_scorecard": "Scorecard de ROI Realizado",
+    "RealizedRoiScorecardUI": "Scorecard de ROI Realizado",
+    "render_RealizedRoiScorecardUI": "Scorecard de ROI Realizado",
+    "mcp_external_write_confirmation": "Confirmacao de Acao MCP (HITL)",
+    "confirm_mcp_write": "Confirmacao de Acao MCP (HITL)",
+    "McpActionConfirmationUI": "Confirmacao de Acao MCP (HITL)",
+    "render_McpActionConfirmationUI": "Confirmacao de Acao MCP (HITL)",
 }
 
 GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
@@ -1851,6 +1879,61 @@ GENUI_COMPONENT_REGISTRY_MAP: Dict[str, Dict[str, str]] = {
         "component_name": "render_FiscalShieldInspectorUI",
         "client_component": "FiscalShieldInspectorUI",
         "title": "Auditando regras fiscais, tributacao e rejeicoes SEFAZ...",
+    },
+    "simular_cenario_what_if": {
+        "component_name": "WhatIfSimulatorUI",
+        "client_component": "WhatIfSimulatorUI",
+        "title": "Simulando cenarios What-If e ponto de equilibrio...",
+    },
+    "what_if": {
+        "component_name": "WhatIfSimulatorUI",
+        "client_component": "WhatIfSimulatorUI",
+        "title": "Simulando cenarios What-If e ponto de equilibrio...",
+    },
+    "whatif": {
+        "component_name": "WhatIfSimulatorUI",
+        "client_component": "WhatIfSimulatorUI",
+        "title": "Simulando cenarios What-If e ponto de equilibrio...",
+    },
+    "WhatIfSimulatorUI": {
+        "component_name": "WhatIfSimulatorUI",
+        "client_component": "WhatIfSimulatorUI",
+        "title": "Simulando cenarios What-If e ponto de equilibrio...",
+    },
+    "realized_roi_scorecard": {
+        "component_name": "RealizedRoiScorecardUI",
+        "client_component": "RealizedRoiScorecardUI",
+        "title": "Consolidando Scorecard de ROI Realizado (Closed-Loop)...",
+    },
+    "roi_realizado": {
+        "component_name": "RealizedRoiScorecardUI",
+        "client_component": "RealizedRoiScorecardUI",
+        "title": "Consolidando Scorecard de ROI Realizado (Closed-Loop)...",
+    },
+    "outcome_scorecard": {
+        "component_name": "RealizedRoiScorecardUI",
+        "client_component": "RealizedRoiScorecardUI",
+        "title": "Consolidando Scorecard de ROI Realizado (Closed-Loop)...",
+    },
+    "RealizedRoiScorecardUI": {
+        "component_name": "RealizedRoiScorecardUI",
+        "client_component": "RealizedRoiScorecardUI",
+        "title": "Consolidando Scorecard de ROI Realizado (Closed-Loop)...",
+    },
+    "mcp_external_write_confirmation": {
+        "component_name": "McpActionConfirmationUI",
+        "client_component": "McpActionConfirmationUI",
+        "title": "Preparando confirmacao HITL para acao externa MCP...",
+    },
+    "confirm_mcp_write": {
+        "component_name": "McpActionConfirmationUI",
+        "client_component": "McpActionConfirmationUI",
+        "title": "Preparando confirmacao HITL para acao externa MCP...",
+    },
+    "McpActionConfirmationUI": {
+        "component_name": "McpActionConfirmationUI",
+        "client_component": "McpActionConfirmationUI",
+        "title": "Preparando confirmacao HITL para acao externa MCP...",
     },
 }
 
@@ -3303,9 +3386,12 @@ class AuraEngine:
         compliance_manager: Optional[Any] = None,
         proactive_daemon: Optional[Any] = None,
         watchdog: Optional[Any] = None,
+        pack_id: Optional[str] = None,
+        tool_registry: Optional[Any] = None,
     ):
         self.tenant_id = tenant_id or "default_tenant"
         self.filial_id = filial_id or "posto_01"
+        self.pack_id = pack_id
 
         # Lazy / Dependency Injection de componentes essenciais
         self._rag_engine = rag_engine
@@ -3317,6 +3403,7 @@ class AuraEngine:
         self._compliance_manager = compliance_manager
         self._proactive_daemon = proactive_daemon
         self._watchdog = watchdog
+        self._tool_registry = tool_registry
         self._dados_filial: Optional[Dict[str, Any]] = None
         self._token_budget = None
 
@@ -3351,6 +3438,15 @@ class AuraEngine:
         if self._watchdog is None:
             self._watchdog = get_resource_watchdog()
         return self._watchdog
+
+    @property
+    def tool_registry(self):
+        """Registro agnostico de tools universais AUDS e cartuchos verticais (Carbon Core P1.1)."""
+        if self._tool_registry is None:
+            from core.packs.registry import create_default_tool_registry
+
+            self._tool_registry = create_default_tool_registry()
+        return self._tool_registry
 
     def _is_heavy_tool(self, tool_name: str) -> bool:
         """Determina se a ferramenta ou intencao e analitica pesada para protecao do PDV."""
@@ -3424,6 +3520,25 @@ class AuraEngine:
     def get_dados_filial(self, force_reload: bool = False) -> Dict[str, Any]:
         """Obtém dados cadastrais da filial conectada com cache em memória."""
         if self._dados_filial is None or force_reload:
+            active_pack = peek_active_domain_pack()
+            if active_pack is None and self.pack_id:
+                try:
+                    active_pack = get_active_domain_pack(self.pack_id)
+                except Exception:
+                    active_pack = None
+
+            if active_pack is not None and active_pack.pack_id != "fuel_convenience":
+                self._dados_filial = {
+                    "idempresa": self.filial_id,
+                    "nome": f"{active_pack.pack_name} ({self.filial_id})",
+                    "razao_social": active_pack.pack_name,
+                    "cnpj": "00.000.000/0001-00",
+                    "endereco": "Unidade Operacional",
+                    "pdv": "01",
+                    "pack_id": active_pack.pack_id,
+                }
+                return self._dados_filial
+
             try:
                 self._dados_filial = self.tools.dados_cadastrais_filial()
             except Exception as e:
@@ -3690,6 +3805,8 @@ class AuraEngine:
                     turno=p.get("turno"),
                     custom_benchmarks=p.get("custom_benchmarks"),
                     filial_nome=p.get("filial_nome"),
+                    municipio=p.get("municipio"),
+                    produto=p.get("produto"),
                 )
 
             elif norm_name in (
@@ -3897,6 +4014,7 @@ class AuraEngine:
         historico_formatado: str,
         intencao: Optional[str] = None,
         genui_active: bool = False,
+        domain_pack: Optional[DomainPackConfig] = None,
     ) -> str:
         dados_filial = self.get_dados_filial()
         f_id = 1
@@ -3913,6 +4031,8 @@ class AuraEngine:
         if memoria_bloco:
             contexto_sanitizado = f"{memoria_bloco}\n\n{contexto_sanitizado}".strip()
 
+        active_pack = domain_pack or peek_active_domain_pack() or get_active_domain_pack(self.pack_id)
+
         return build_system_prompt(
             pergunta_sanitizada=pergunta_sanitizada,
             contexto_sanitizado=contexto_sanitizado,
@@ -3920,6 +4040,7 @@ class AuraEngine:
             dados_filial=dados_filial,
             intencao=intencao,
             genui_active=genui_active,
+            domain_pack=active_pack,
         )
 
     # -------------------------------------------------------------------------
@@ -3979,6 +4100,54 @@ class AuraEngine:
             return msg_protecao, resultado_bruto, None, False, (time.perf_counter() - t0) * 1000
 
         try:
+            # Despacho agnostico via DomainToolRegistry (Carbon Core P1.1):
+            # - Intencoes universais AUDS (auditoria_turno_caixa, previsao_runout_estoque,
+            #   market_basket_cross_sell, simular_cenario_what_if) sobre BaseERPAdapter;
+            # - Cartuchos verticais isolados (fuel_convenience: lmc_anp, vazao_bicos, benchmark_anp);
+            # - Qualquer intencao especifica/mapeada de packs nao-posto (ex: pharmacy_health).
+            active_pack = peek_active_domain_pack() or get_active_domain_pack(self.pack_id)
+            _universal_dispatch_intents = {
+                "auditoria_turno_caixa",
+                "previsao_runout_estoque",
+                "market_basket_cross_sell",
+                "simular_cenario_what_if",
+                "what_if",
+                "whatif",
+            }
+            _fuel_cartridge_intents = {
+                "lmc_anp",
+                "lmc_compliance",
+                "lmc",
+                "auditar_conformidade_lmc_anp",
+                "vazao_bicos",
+                "benchmark_anp",
+                "benchmark_comparativo",
+                "comparativo_turnos",
+                "custo_estoque_macro",
+                "analisar_custo_estoque_macroeconomico",
+            }
+            norm_intent = (intencao or "").strip().lower()
+            should_use_registry = (
+                (active_pack.pack_id != "fuel_convenience" and self.tool_registry.can_handle(norm_intent, active_pack))
+                or norm_intent in _universal_dispatch_intents
+                or (active_pack.pack_id == "fuel_convenience" and norm_intent in _fuel_cartridge_intents)
+            )
+            if should_use_registry:
+                exec_res = self.tool_registry.dispatch(
+                    intent=norm_intent,
+                    query=pergunta,
+                    erp_adapter=self.tools.erp_adapter,
+                    domain_pack=active_pack,
+                    tools_facade=self.tools,
+                )
+                if exec_res is not None:
+                    resultado_bruto = exec_res.raw_result
+                    contexto_extra = (
+                        f"{exec_res.context_header}\n"
+                        f"{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+                    )
+                    return contexto_extra, resultado_bruto, None, False, (time.perf_counter() - t0) * 1000
+
             if intencao == "ajuda_sistema":
                 busca = self.tools.consultar_conhecimento_aura(
                     termo=pergunta,
@@ -4322,8 +4491,15 @@ class AuraEngine:
                 )
 
             else:
-                # Catálogo de produtos (RAG Híbrido HNSW + GIN FTS) com Cache Semântico
-                cache_data = self.tools.rag.check_semantic_cache(pergunta, query_vector=query_vector)
+                # Catálogo de produtos (RAG Híbrido HNSW + GIN FTS) com Cache Semântico Particionado (Carbon Core P0.2)
+                active_pack_id = (peek_active_domain_pack() or get_active_domain_pack(self.pack_id)).pack_id
+                cache_data = self.tools.rag.check_semantic_cache(
+                    pergunta,
+                    query_vector=query_vector,
+                    tenant_id=self.tenant_id,
+                    filial_id=self.filial_id,
+                    pack_id=active_pack_id,
+                )
                 if cache_data.get("resposta_llm"):
                     cache_hit = True
                     resultado_bruto = cache_data
@@ -4870,18 +5046,29 @@ class AuraEngine:
                 score_cor_f = "[/verde]" if comp_score >= 80 else ("[/amarelo]" if comp_score >= 60 else "[/vermelho]")
 
                 destaque_lider = ""
+                top_nomes_md = ""
                 if postos_lista:
                     lider = postos_lista[0]
                     l_nome = lider.get("posto") or "Revenda líder"
                     l_preco = float(lider.get("preco", 0.0))
                     l_band = lider.get("bandeira") or "Branca"
                     destaque_lider = f" O concorrente mais agressivo da cidade é **{l_nome}** ({l_band}) a [verde]R$ {l_preco:.2f}[/verde]."
+                    nome_comb = f_alvo.replace("_", " ").title()
+                    top_itens = []
+                    for idx, pst in enumerate(postos_lista[:5], 1):
+                        p_nome = pst.get("posto") or "Revenda"
+                        p_band = pst.get("bandeira") or "Branca"
+                        p_val = float(pst.get("preco", 0.0))
+                        p_dt = pst.get("data_coleta") or ""
+                        dt_txt = f" ({p_dt})" if p_dt else ""
+                        top_itens.append(f"  {idx}. **{p_nome}** ({p_band}): [verde]R$ {p_val:.2f}[/verde]{dt_txt}")
+                    top_nomes_md = f"\n- **Postos ANP ({nome_comb}):**\n" + "\n".join(top_itens)
 
                 return (
                     f"### 📊 Benchmark de Mercado & Concorrência\n\n"
                     f"**Diagnóstico:** {diag}\n\n"
                     f"- **Score Competitivo:** {score_cor}{comp_score:.0f}/100{score_cor_f} ({market_pos})\n"
-                    f"- **Confronto:** **{entity}** vs **{group}**.{destaque_lider}\n\n"
+                    f"- **Confronto:** **{entity}** vs **{group}**.{destaque_lider}{top_nomes_md}\n\n"
                     f"👉 *O ranking nominal dos postos, os indicadores confrontados e os botões de ação imediata estão disponíveis no **painel interativo ao lado**.*"
                 )
 
@@ -5695,6 +5882,7 @@ class AuraEngine:
         tenant_id: Optional[str] = None,
         filial_id: Optional[str] = None,
         enable_genui: Optional[bool] = None,
+        pack_id: Optional[str] = None,
     ) -> AsyncIterator[AuraChunk]:
         """
         Gera resposta em streaming assíncrono token a token via Server-Sent Events (SSE).
@@ -5708,572 +5896,699 @@ class AuraEngine:
         t_skeleton_emitted: Optional[float] = None
         q_limpa = (query or "").strip()
 
-        if not q_limpa:
-            msg_vazia = "Olá! Como posso ajudar você hoje no posto ou na loja de conveniência?"
-            yield AuraChunk(chunk_type=AuraChunkType.DELTA, text=msg_vazia, session_id=sess_id)
-            yield AuraChunk(chunk_type=AuraChunkType.DONE, text=msg_vazia, session_id=sess_id)
-            return
+        requested_pack_id = (
+            pack_id
+            or (context.get("pack_id") if isinstance(context, dict) else None)
+            or self.pack_id
+        )
+        pack_ctx_arg: Any = requested_pack_id if requested_pack_id else peek_active_domain_pack()
 
-        # 1. Tratamento de Comandos de Repetição/Retry (Multi-turn Context)
-        is_retry = bool(RETRY_REGEX.match(q_limpa))
-        pergunta_efetiva = q_limpa
-        retry_pergunta_anterior: Optional[str] = None
+        with DomainPackContext(pack_ctx_arg) as active_pack:
+            domain_greeting_label = (
+                "no posto ou na loja de conveniência"
+                if active_pack.pack_id == "fuel_convenience"
+                else f"na operação de {active_pack.pack_name}"
+            )
 
-        if is_retry:
-            historico_prev = self.session_memory.get_history(sess_id, limit=10)
-            for msg in reversed(historico_prev):
-                if msg.get("role") == "user":
-                    content_ant = (msg.get("content") or "").strip()
-                    if content_ant and not RETRY_REGEX.match(content_ant):
-                        retry_pergunta_anterior = content_ant
-                        pergunta_efetiva = content_ant
-                        break
-
-            if not retry_pergunta_anterior:
-                msg_aviso = "Não identifiquei uma consulta anterior nesta sessão para tentar novamente. Como posso ajudar você no posto ou na conveniência?"
-                yield AuraChunk(chunk_type=AuraChunkType.DELTA, text=msg_aviso, session_id=sess_id)
-                yield AuraChunk(chunk_type=AuraChunkType.DONE, text=msg_aviso, session_id=sess_id)
+            if not q_limpa:
+                msg_vazia = f"Olá! Como posso ajudar você hoje {domain_greeting_label}?"
+                yield AuraChunk(chunk_type=AuraChunkType.DELTA, text=msg_vazia, session_id=sess_id)
+                yield AuraChunk(chunk_type=AuraChunkType.DONE, text=msg_vazia, session_id=sess_id)
                 return
 
-        # 2. Roteamento Semântico Vetorial / Heurístico (sobre a pergunta efetiva)
-        intencao, confianca, telemetria_rota = self.router.route(pergunta_efetiva)
-        # Scoped Tooling Guard: previne que falsos positivos operacionais sobreponham termos fiscais
-        from core.semantic_router import PADRAO_FISCAL_DETERMINISTICO
-        if PADRAO_FISCAL_DETERMINISTICO.search(pergunta_efetiva) and intencao in (
-            "mentoria_decisao",
-            "previsao_tanques",
-            "previsao_runout_estoque",
-            "estoque_posicao",
-            "desempenho_pista_frentistas",
-            "desempenho_equipe_conversao",
-            "vendas_analitico",
-            "vendas_consolidado",
-        ):
-            logger.warning(
-                "AuraEngine [SCOPED TOOLING]: Redirecionando intencao preliminar '%s' para 'auditoria_fiscal_sefaz'.",
-                intencao,
+            # 1. Tratamento de Comandos de Repetição/Retry (Multi-turn Context)
+            is_retry = bool(RETRY_REGEX.match(q_limpa))
+            pergunta_efetiva = q_limpa
+            retry_pergunta_anterior: Optional[str] = None
+
+            if is_retry:
+                historico_prev = await asyncio.to_thread(self.session_memory.get_history, sess_id, 10)
+                for msg in reversed(historico_prev):
+                    if msg.get("role") == "user":
+                        content_ant = (msg.get("content") or "").strip()
+                        if content_ant and not RETRY_REGEX.match(content_ant):
+                            retry_pergunta_anterior = content_ant
+                            pergunta_efetiva = content_ant
+                            break
+
+                if not retry_pergunta_anterior:
+                    msg_aviso = (
+                        f"Não identifiquei uma consulta anterior nesta sessão para tentar novamente. "
+                        f"Como posso ajudar você {domain_greeting_label}?"
+                    )
+                    yield AuraChunk(chunk_type=AuraChunkType.DELTA, text=msg_aviso, session_id=sess_id)
+                    yield AuraChunk(chunk_type=AuraChunkType.DONE, text=msg_aviso, session_id=sess_id)
+                    return
+
+            # 2. Roteamento Semântico Vetorial / Heurístico em paralelo com leitura de historico e dados da filial (Carbon Core P0.4/P1.3)
+            # Evita bloqueio do event loop durante embedding HTTP ou query pgvector e pre-aquece cache da filial
+            (intencao, confianca, telemetria_rota), historico_formatado, _ = await asyncio.gather(
+                asyncio.to_thread(self.router.route, pergunta_efetiva),
+                asyncio.to_thread(self.session_memory.format_history_for_prompt, sess_id, 6),
+                asyncio.to_thread(self.get_dados_filial),
             )
-            intencao = "auditoria_fiscal_sefaz"
-            confianca = max(confianca, 0.99)
+            # Scoped Tooling Guard: previne que falsos positivos operacionais sobreponham termos fiscais
+            from core.semantic_router import PADRAO_FISCAL_DETERMINISTICO
+            if PADRAO_FISCAL_DETERMINISTICO.search(pergunta_efetiva) and intencao in (
+                "mentoria_decisao",
+                "previsao_tanques",
+                "previsao_runout_estoque",
+                "estoque_posicao",
+                "desempenho_pista_frentistas",
+                "desempenho_equipe_conversao",
+                "vendas_analitico",
+                "vendas_consolidado",
+            ):
+                logger.warning(
+                    "AuraEngine [SCOPED TOOLING]: Redirecionando intencao preliminar '%s' para 'auditoria_fiscal_sefaz'.",
+                    intencao,
+                )
+                intencao = "auditoria_fiscal_sefaz"
+                confianca = max(confianca, 0.99)
 
-        query_vector = telemetria_rota.get("query_vector")
-        tool_call_id = generate_tool_call_id()
+            query_vector = telemetria_rota.get("query_vector")
+            tool_call_id = generate_tool_call_id()
 
-        tool_start_msg = (
-            f"Repetindo consulta anterior: '{retry_pergunta_anterior}'..."
-            if is_retry
-            else f"Executando ferramenta para intenção '{intencao}'..."
-        )
+            tool_start_msg = (
+                f"Repetindo consulta anterior: '{retry_pergunta_anterior}'..."
+                if is_retry
+                else f"Executando ferramenta para intenção '{intencao}'..."
+            )
 
-        yield AuraChunk(
-            chunk_type=AuraChunkType.INTENT,
-            text=intencao,
-            data={
-                "intent": intencao,
-                "confidence": confianca,
-                "routing_telemetry": telemetria_rota,
-                "is_retry": is_retry,
-                "retry_target": retry_pergunta_anterior,
-                "tool_call_id": tool_call_id,
-            },
-            session_id=sess_id,
-        )
-
-        yield AuraChunk(
-            chunk_type=AuraChunkType.TOOL_START,
-            text=tool_start_msg,
-            data={"intent": intencao, "tool_name": intencao, "tool_call_id": tool_call_id},
-            session_id=sess_id,
-        )
-
-        # Se intencao mapeada no catalogo GenUI e GenUI estiver ativo, emite ui_skeleton precursor (<100ms)
-        # exceto se o Circuit Breaker de Hardware estiver OPEN (evita skeleton loader travado no frontend)
-        genui_meta = GENUI_COMPONENT_REGISTRY_MAP.get(intencao)
-        circuit_blocked_early = self._is_heavy_tool(intencao) and not self.watchdog.is_heavy_operation_allowed()
-        if genui_meta and genui_active and not circuit_blocked_early:
-            t_skeleton_emitted = time.perf_counter()
             yield AuraChunk(
-                chunk_type=AuraChunkType.UI_SKELETON,
-                tool_call_id=tool_call_id,
-                component_name=genui_meta["component_name"],
-                title=genui_meta["title"],
-                session_id=sess_id,
+                chunk_type=AuraChunkType.INTENT,
+                text=intencao,
                 data={
-                    "chunk_type": "ui_skeleton",
+                    "intent": intencao,
+                    "confidence": confianca,
+                    "routing_telemetry": telemetria_rota,
+                    "is_retry": is_retry,
+                    "retry_target": retry_pergunta_anterior,
                     "tool_call_id": tool_call_id,
-                    "component_name": genui_meta["component_name"],
-                    "client_component": genui_meta.get("client_component"),
-                    "title": genui_meta["title"],
-                    "session_id": sess_id,
+                    "pack_id": active_pack.pack_id,
                 },
+                session_id=sess_id,
             )
 
-        # 3. Execução da Ferramenta correspondente
-        (
-            contexto_extra,
-            resultado_bruto,
-            telemetria_retrieval,
-            cache_hit,
-            tool_latency_ms,
-        ) = await asyncio.to_thread(
-            self._resolver_contexto_ferramenta,
-            pergunta_efetiva,
-            intencao,
-            query_vector,
-            (genui_meta is not None and genui_active),
-        )
+            yield AuraChunk(
+                chunk_type=AuraChunkType.TOOL_START,
+                text=tool_start_msg,
+                data={"intent": intencao, "tool_name": intencao, "tool_call_id": tool_call_id},
+                session_id=sess_id,
+            )
 
-        # 3. Tratamento de Cache Hit Semântico
-        if cache_hit:
-            resposta_cache = contexto_extra
-            total_e2e_ms = (time.perf_counter() - t_global_start) * 1000
-            cache_ttft_ms = total_e2e_ms
-            self.telemetry.record_ttft(cache_ttft_ms, session_id=sess_id)
+            # Se intencao mapeada no catalogo GenUI e GenUI estiver ativo, emite ui_skeleton precursor (<100ms)
+            # exceto se o Circuit Breaker de Hardware estiver OPEN (evita skeleton loader travado no frontend)
+            genui_meta = GENUI_COMPONENT_REGISTRY_MAP.get(intencao)
+            circuit_blocked_early = self._is_heavy_tool(intencao) and not self.watchdog.is_heavy_operation_allowed()
+            if genui_meta and genui_active and not circuit_blocked_early:
+                t_skeleton_emitted = time.perf_counter()
+                yield AuraChunk(
+                    chunk_type=AuraChunkType.UI_SKELETON,
+                    tool_call_id=tool_call_id,
+                    component_name=genui_meta["component_name"],
+                    title=genui_meta["title"],
+                    session_id=sess_id,
+                    data={
+                        "chunk_type": "ui_skeleton",
+                        "tool_call_id": tool_call_id,
+                        "component_name": genui_meta["component_name"],
+                        "client_component": genui_meta.get("client_component"),
+                        "title": genui_meta["title"],
+                        "session_id": sess_id,
+                    },
+                )
+
+            # 3. Execução da Ferramenta correspondente
+            (
+                contexto_extra,
+                resultado_bruto,
+                telemetria_retrieval,
+                cache_hit,
+                tool_latency_ms,
+            ) = await asyncio.to_thread(
+                self._resolver_contexto_ferramenta,
+                pergunta_efetiva,
+                intencao,
+                query_vector,
+                (genui_meta is not None and genui_active),
+            )
+
+            # 3. Tratamento de Cache Hit Semântico
+            if cache_hit:
+                resposta_cache = contexto_extra
+                total_e2e_ms = (time.perf_counter() - t_global_start) * 1000
+                cache_ttft_ms = total_e2e_ms
+                self.telemetry.record_ttft(cache_ttft_ms, session_id=sess_id)
+
+                yield AuraChunk(
+                    chunk_type=AuraChunkType.CACHE_HIT,
+                    text=resposta_cache,
+                    data={
+                        "similarity": resultado_bruto.get("cosine_similarity", 1.0) if isinstance(resultado_bruto, dict) else 1.0,
+                        "cache_cost": "zero",
+                        "pack_id": active_pack.pack_id,
+                    },
+                    session_id=sess_id,
+                )
+                yield AuraChunk(
+                    chunk_type=AuraChunkType.DELTA,
+                    text=resposta_cache,
+                    session_id=sess_id,
+                )
+
+                # Persiste mensagem na sessão
+                self.session_memory.save_message(
+                    session_id=sess_id,
+                    role="user",
+                    content=q_limpa,
+                    intent=intencao,
+                    tenant_id=t_id,
+                    filial_id=f_id,
+                    metadata={"is_retry": is_retry, "target_query": retry_pergunta_anterior} if is_retry else None,
+                )
+                self.session_memory.save_message(
+                    session_id=sess_id,
+                    role="assistant",
+                    content=resposta_cache,
+                    intent=intencao,
+                    tenant_id=t_id,
+                    filial_id=f_id,
+                    metadata={"cache_hit": True},
+                )
+
+                token_record = self.token_budget.record_usage(
+                    session_id=sess_id,
+                    filial_id=f_id,
+                    prompt_tokens=max(10, len(pergunta_efetiva) // 4),
+                    completion_tokens=max(10, len(resposta_cache) // 4),
+                    model_name="local-semantic-cache",
+                    cached=True,
+                )
+                self.telemetry.record_token_usage(
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    model_name="local-semantic-cache",
+                    cost_brl=0.0,
+                    avoided_cost_brl=token_record.get("avoided_cost_brl", 0.0),
+                    session_id=sess_id,
+                )
+
+                yield AuraChunk(
+                    chunk_type=AuraChunkType.TELEMETRY,
+                    data={
+                        "intent": intencao,
+                        "pack_id": active_pack.pack_id,
+                        "cache_hit": True,
+                        "ttft_ms": round(cache_ttft_ms, 2),
+                        "tool_latency_ms": round(tool_latency_ms, 2),
+                        "total_e2e_ms": round(total_e2e_ms, 2),
+                        "tokens": token_record,
+                    },
+                    session_id=sess_id,
+                )
+                yield AuraChunk(
+                    chunk_type=AuraChunkType.DONE,
+                    text=resposta_cache,
+                    data={"session_id": sess_id, "intent": intencao, "cache_hit": True, "pack_id": active_pack.pack_id},
+                    session_id=sess_id,
+                )
+                return
 
             yield AuraChunk(
-                chunk_type=AuraChunkType.CACHE_HIT,
-                text=resposta_cache,
+                chunk_type=AuraChunkType.TOOL_RESULT,
                 data={
-                    "similarity": resultado_bruto.get("cosine_similarity", 1.0) if isinstance(resultado_bruto, dict) else 1.0,
-                    "cache_cost": "zero",
+                    "intent": intencao,
+                    "tool_name": intencao,
+                    "latency_ms": round(tool_latency_ms, 2),
+                    "has_structured_data": resultado_bruto is not None,
+                    "result": resultado_bruto,
                 },
                 session_id=sess_id,
             )
-            yield AuraChunk(
-                chunk_type=AuraChunkType.DELTA,
-                text=resposta_cache,
-                session_id=sess_id,
+
+            # Se o Circuit Breaker estiver OPEN, retorna sintese leve imediata sem sobrecarregar a LLM
+            if isinstance(resultado_bruto, dict) and resultado_bruto.get("circuit_open"):
+                msg_protecao = resultado_bruto.get("message") or CIRCUIT_BREAKER_PROTECTION_MESSAGE
+                yield AuraChunk(
+                    chunk_type=AuraChunkType.DELTA,
+                    text=msg_protecao,
+                    session_id=sess_id,
+                )
+                self.session_memory.save_message(
+                    session_id=sess_id,
+                    role="user",
+                    content=q_limpa,
+                    intent=intencao,
+                    tenant_id=t_id,
+                    filial_id=f_id,
+                    metadata={"circuit_open": True},
+                )
+                self.session_memory.save_message(
+                    session_id=sess_id,
+                    role="assistant",
+                    content=msg_protecao,
+                    intent=intencao,
+                    tenant_id=t_id,
+                    filial_id=f_id,
+                    metadata={"circuit_open": True},
+                )
+                yield AuraChunk(
+                    chunk_type=AuraChunkType.DONE,
+                    text=msg_protecao,
+                    data={
+                        "session_id": sess_id,
+                        "intent": intencao,
+                        "circuit_open": True,
+                        "circuit_state": "OPEN",
+                    },
+                    session_id=sess_id,
+                )
+                return
+
+            # 3.5. Emissao Imediata do Envelope Canonico GenUI (ui_complete) para Hidratacao Sub-segundo (<1s)
+            ui_complete_emitted = False
+            if genui_meta and genui_active:
+                diag_summary = ""
+                if isinstance(resultado_bruto, dict):
+                    diag_summary = (
+                        resultado_bruto.get("props", {}).get("diagnosis")
+                        or resultado_bruto.get("diagnosis")
+                        or ""
+                    )
+                envelope = build_canonical_genui_envelope(
+                    intencao=intencao,
+                    tool_call_id=tool_call_id,
+                    resultado_bruto=resultado_bruto,
+                    executive_summary=diag_summary,
+                    telemetry=self.telemetry,
+                )
+                if envelope:
+                    envelope_payload = sanitize_erp_brand_data(envelope.to_sse_payload())
+                    if t_skeleton_emitted is not None:
+                        backend_hydration_ms = (time.perf_counter() - t_skeleton_emitted) * 1000
+                        self.telemetry.record_hydration(
+                            ms=backend_hydration_ms,
+                            session_id=sess_id,
+                            tool_call_id=tool_call_id,
+                            details={"source": "backend"},
+                        )
+                    canonical_ui_title = CANONICAL_EXECUTIVE_TITLES.get(intencao) or CANONICAL_EXECUTIVE_TITLES.get(genui_meta.get("component_name")) or genui_meta.get("title")
+                    yield AuraChunk(
+                        chunk_type=AuraChunkType.UI_COMPLETE,
+                        tool_call_id=tool_call_id,
+                        component_name=genui_meta["component_name"],
+                        title=canonical_ui_title,
+                        envelope=envelope_payload,
+                        data=envelope_payload,
+                        session_id=sess_id,
+                    )
+                    ui_complete_emitted = True
+
+            # 4. Blindagem LGPD e Sanitização de Contexto e Pergunta
+            if context:
+                try:
+                    ctx_extra_str = json.dumps(context, ensure_ascii=False, indent=2, default=str)
+                    contexto_extra = f"Contexto Operacional do Chamador:\n{ctx_extra_str}\n\n" + contexto_extra
+                except Exception:
+                    contexto_extra = f"Contexto Operacional do Chamador:\n{str(context)}\n\n" + contexto_extra
+
+            if is_retry and retry_pergunta_anterior:
+                pergunta_para_prompt = (
+                    f"O usuário solicitou tentar novamente a consulta anterior: '{retry_pergunta_anterior}' "
+                    f"(comando digitado agora: '{q_limpa}'). Responda diretamente à consulta original com os dados recuperados da ferramenta."
+                )
+            else:
+                pergunta_para_prompt = q_limpa
+
+            (contexto_sanitizado, counts_ctx), (pergunta_sanitizada, counts_perg) = await asyncio.gather(
+                asyncio.to_thread(central_log_sanitizer.sanitize_text, contexto_extra),
+                asyncio.to_thread(central_log_sanitizer.sanitize_text, pergunta_para_prompt),
+            )
+            total_redacted = sum(counts_ctx.values()) + sum(counts_perg.values())
+
+            # 6. Montagem do Prompt Sistêmico fora do event loop (evita bloqueio em get_dados_filial/SQLite)
+            prompt_sistema = await asyncio.to_thread(
+                self._build_prompt_sistema,
+                pergunta_sanitizada=pergunta_sanitizada,
+                contexto_sanitizado=contexto_sanitizado,
+                historico_formatado=historico_formatado,
+                intencao=intencao,
+                genui_active=(genui_meta is not None and genui_active),
+                domain_pack=active_pack,
             )
 
-            # Persiste mensagem na sessão
-            self.session_memory.save_message(
-                session_id=sess_id,
-                role="user",
-                content=q_limpa,
-                intent=intencao,
-                tenant_id=t_id,
-                filial_id=f_id,
-                metadata={"is_retry": is_retry, "target_query": retry_pergunta_anterior} if is_retry else None,
+            # 7. Streaming com Google Gemini, Sliding-Window Output Guard (P0.3) e STREAM_RESET Transacional (P0.4)
+            t_llm_start = time.perf_counter()
+            ttft_ms = None
+            texto_completo: List[str] = []
+            sucesso_llm = False
+            stream_interrompida = False
+            emitted_any_delta = False
+            last_chunk_obj = None
+            stream_reset_count = 0
+
+            for m_name in FALLBACK_MODELS[:2]:
+                output_guard = StreamingOutputSanitizerGuard(window_size=48)
+                try:
+                    model = genai.GenerativeModel(m_name)
+                    last_chunk_obj = None
+                    texto_modelo: List[str] = []
+                    stream_interrompida = False
+
+                    # Invoca streaming assincrono com timeout resiliente de 25 segundos
+                    response_stream = await asyncio.wait_for(
+                        model.generate_content_async(
+                            prompt_sistema,
+                            stream=True,
+                            request_options={"timeout": 25.0},
+                        ),
+                        timeout=25.0,
+                    )
+
+                    async def _get_next_chunk(aiter_obj):
+                        return await aiter_obj.__anext__()
+
+                    stream_aiter = response_stream.__aiter__()
+                    while True:
+                        try:
+                            chunk = await asyncio.wait_for(_get_next_chunk(stream_aiter), timeout=20.0)
+                            last_chunk_obj = chunk
+                        except StopAsyncIteration:
+                            # Streaming concluiu naturalmente com sucesso
+                            break
+                        except (asyncio.TimeoutError, Exception) as stream_step_err:
+                            logger.warning(
+                                "AuraEngine: Timeout ou interrupcao no streaming da LLM (%s): %s",
+                                m_name,
+                                stream_step_err,
+                            )
+                            stream_interrompida = True
+                            break
+
+                        try:
+                            chunk_text = chunk.text
+                        except Exception:
+                            continue
+
+                        if not chunk_text:
+                            continue
+
+                        safe_delta = output_guard.push(chunk_text)
+                        if safe_delta:
+                            if ttft_ms is None:
+                                ttft_ms = (time.perf_counter() - t_global_start) * 1000
+                                self.telemetry.record_ttft(ttft_ms, session_id=sess_id)
+                            texto_modelo.append(safe_delta)
+                            texto_completo.append(safe_delta)
+                            emitted_any_delta = True
+                            yield AuraChunk(
+                                chunk_type=AuraChunkType.DELTA,
+                                text=safe_delta,
+                                session_id=sess_id,
+                            )
+
+                    if not stream_interrompida:
+                        flushed_tail = output_guard.flush()
+                        if flushed_tail:
+                            if ttft_ms is None:
+                                ttft_ms = (time.perf_counter() - t_global_start) * 1000
+                                self.telemetry.record_ttft(ttft_ms, session_id=sess_id)
+                            texto_modelo.append(flushed_tail)
+                            texto_completo.append(flushed_tail)
+                            emitted_any_delta = True
+                            yield AuraChunk(
+                                chunk_type=AuraChunkType.DELTA,
+                                text=flushed_tail,
+                                session_id=sess_id,
+                            )
+                    else:
+                        output_guard.reset()
+
+                    total_redacted += sum(output_guard.redacted_counts.values())
+                    texto_parcial = "".join(texto_modelo).strip()
+                    pontuacao_valida = ('.', '!', '?', ')', '"', "'", ':', ']')
+                    frase_truncada = stream_interrompida or (
+                        len(texto_parcial) < 180 and not texto_parcial.endswith(pontuacao_valida)
+                    )
+
+                    if texto_modelo and not frase_truncada:
+                        sucesso_llm = True
+                        break
+
+                    # Aborta transacionalmente qualquer texto parcial antes de tentar proximo fallback
+                    if emitted_any_delta or texto_completo:
+                        stream_reset_count += 1
+                        yield AuraChunk(
+                            chunk_type=AuraChunkType.STREAM_RESET,
+                            text="",
+                            data={
+                                "reason": "stream_interrupted" if stream_interrompida else "truncated_response",
+                                "failed_model": m_name,
+                                "discarded_chars": len(texto_parcial),
+                            },
+                            session_id=sess_id,
+                        )
+                        texto_completo.clear()
+                        emitted_any_delta = False
+
+                    if stream_interrompida:
+                        logger.warning(
+                            "AuraEngine: Stream do modelo %s interrompida prematuramente (%d chars: '%s...'). Emitido STREAM_RESET e acionando contingencia.",
+                            m_name,
+                            len(texto_parcial),
+                            texto_parcial[:50],
+                        )
+
+                except Exception as llm_init_err:
+                    output_guard.reset()
+                    if emitted_any_delta or texto_completo:
+                        stream_reset_count += 1
+                        yield AuraChunk(
+                            chunk_type=AuraChunkType.STREAM_RESET,
+                            text="",
+                            data={
+                                "reason": "model_exception",
+                                "failed_model": m_name,
+                            },
+                            session_id=sess_id,
+                        )
+                        texto_completo.clear()
+                        emitted_any_delta = False
+                    logger.info(
+                        "AuraEngine: Modelo %s indisponivel ou timeout (%s). Acionando contingencia deterministica.",
+                        m_name,
+                        llm_init_err,
+                    )
+                    continue
+
+            total_llm_ms = (time.perf_counter() - t_llm_start) * 1000
+            texto_acumulado_str = "".join(texto_completo).strip()
+            resposta_final = normalize_aura_color_markup(texto_acumulado_str)
+            pontuacao_valida = ('.', '!', '?', ')', '"', "'", ':', ']')
+            precisa_contingencia = (
+                not sucesso_llm
+                or not resposta_final
+                or stream_interrompida
+                or (len(resposta_final) < 180 and not resposta_final.endswith(pontuacao_valida))
             )
-            self.session_memory.save_message(
-                session_id=sess_id,
-                role="assistant",
-                content=resposta_cache,
-                intent=intencao,
-                tenant_id=t_id,
-                filial_id=f_id,
-                metadata={"cache_hit": True},
-            )
+
+            if precisa_contingencia:
+                # Contingência determinística de alta fidelidade a partir dos dados apurados no ERP
+                sintese_contingencia = self._gerar_sintese_contingencia_ferramenta(
+                    intencao=intencao,
+                    resultado_bruto=resultado_bruto,
+                    pergunta=pergunta_efetiva,
+                    session_id=sess_id,
+                    genui_active=(genui_meta is not None and genui_active),
+                )
+                if sintese_contingencia:
+                    if emitted_any_delta or texto_completo:
+                        stream_reset_count += 1
+                        yield AuraChunk(
+                            chunk_type=AuraChunkType.STREAM_RESET,
+                            text="",
+                            data={"reason": "deterministic_contingency_fallback"},
+                            session_id=sess_id,
+                        )
+                        texto_completo.clear()
+                        emitted_any_delta = False
+
+                    resposta_final = normalize_aura_color_markup(sintese_contingencia)
+                    sucesso_llm = True
+                    if ttft_ms is None:
+                        ttft_ms = (time.perf_counter() - t_global_start) * 1000
+                        self.telemetry.record_ttft(ttft_ms, session_id=sess_id)
+                    yield AuraChunk(
+                        chunk_type=AuraChunkType.DELTA,
+                        text=resposta_final,
+                        session_id=sess_id,
+                    )
+                elif not resposta_final:
+                    resposta_final = "Não foi possível obter resposta dos modelos da AURA no momento. Por favor, tente novamente em instantes."
+                    yield AuraChunk(
+                        chunk_type=AuraChunkType.ERROR,
+                        text=resposta_final,
+                        session_id=sess_id,
+                    )
+
+            # 7.5. Emissao do Envelope Canonico GenUI se ainda nao emitido na etapa 3.5
+            if genui_meta and genui_active and not ui_complete_emitted:
+                envelope = build_canonical_genui_envelope(
+                    intencao=intencao,
+                    tool_call_id=tool_call_id,
+                    resultado_bruto=resultado_bruto,
+                    executive_summary=resposta_final,
+                    telemetry=self.telemetry,
+                )
+                if envelope:
+                    envelope_payload = sanitize_erp_brand_data(envelope.to_sse_payload())
+                    if t_skeleton_emitted is not None:
+                        backend_hydration_ms = (time.perf_counter() - t_skeleton_emitted) * 1000
+                        self.telemetry.record_hydration(
+                            ms=backend_hydration_ms,
+                            session_id=sess_id,
+                            tool_call_id=tool_call_id,
+                            details={"source": "backend"}
+                        )
+                    canonical_ui_title = CANONICAL_EXECUTIVE_TITLES.get(intencao) or CANONICAL_EXECUTIVE_TITLES.get(genui_meta.get("component_name")) or genui_meta.get("title")
+                    yield AuraChunk(
+                        chunk_type=AuraChunkType.UI_COMPLETE,
+                        tool_call_id=tool_call_id,
+                        component_name=genui_meta["component_name"],
+                        title=canonical_ui_title,
+                        envelope=envelope_payload,
+                        data=envelope_payload,
+                        session_id=sess_id,
+                    )
+
+            # 8. Salvamento no Cache Semântico Particionado (se catálogo)
+            if intencao == "catalogo_produtos" and not cache_hit and query_vector and sucesso_llm:
+                frases_bloqueio = ["não há registros", "erro", "indisponível", "não foi possível", "não encontrei"]
+                if not any(fb in resposta_final.lower() for fb in frases_bloqueio):
+                    try:
+                        produtos_salvar = resultado_bruto.get("results", []) if isinstance(resultado_bruto, dict) else []
+                        await asyncio.to_thread(
+                            self.tools.rag.save_semantic_cache,
+                            q_limpa,
+                            query_vector,
+                            resposta_final,
+                            produtos_salvar,
+                            t_id,
+                            f_id,
+                            active_pack.pack_id,
+                        )
+                    except Exception:
+                        pass
+
+            # 8.5. Auditoria Deterministica Online de Fidelidade Numerica (Carbon Core P0.4)
+            numeric_audit: Optional[Dict[str, Any]] = None
+            if resultado_bruto is not None and resposta_final:
+                try:
+                    from evals.evaluators import evaluate_numeric_fidelity, extract_numbers_from_payload
+
+                    allowed_nums = extract_numbers_from_payload(resultado_bruto)
+                    if allowed_nums:
+                        fidelity = evaluate_numeric_fidelity(
+                            response_text=resposta_final,
+                            allowed_numbers=allowed_nums,
+                        )
+                        numeric_audit = {
+                            "score": fidelity["score"],
+                            "passed": fidelity["passed"],
+                            "hallucinated_count": len(fidelity["hallucinated_numbers"]),
+                        }
+                        if not fidelity["passed"]:
+                            logger.warning(
+                                "AuraEngine [NUMERIC_GUARD]: Divergencia numerica detectada (score=%.3f, extras=%s).",
+                                fidelity["score"],
+                                fidelity["hallucinated_numbers"][:5],
+                            )
+                except Exception:
+                    numeric_audit = None
+
+            # 9. Persistência de Histórico de Conversa fora do event loop
+            def _persist_messages() -> None:
+                self.session_memory.save_message(
+                    session_id=sess_id,
+                    role="user",
+                    content=q_limpa,
+                    intent=intencao,
+                    tenant_id=t_id,
+                    filial_id=f_id,
+                    metadata={"is_retry": is_retry, "target_query": retry_pergunta_anterior} if is_retry else None,
+                )
+                self.session_memory.save_message(
+                    session_id=sess_id,
+                    role="assistant",
+                    content=resposta_final,
+                    intent=intencao,
+                    tenant_id=t_id,
+                    filial_id=f_id,
+                    metadata={"tool": intencao, "ttft_ms": round(ttft_ms or 0, 2)},
+                )
+
+            await asyncio.to_thread(_persist_messages)
+
+            # 10. Emissão de Telemetria e Conclusão
+            total_e2e_ms = (time.perf_counter() - t_global_start) * 1000
+            telemetria_final: Dict[str, Any] = {
+                "intent": intencao,
+                "pack_id": active_pack.pack_id,
+                "confidence": confianca,
+                "routing_method": telemetria_rota.get("method"),
+                "tool_latency_ms": round(tool_latency_ms, 2),
+                "ttft_ms": round(ttft_ms or 0, 2),
+                "llm_total_ms": round(total_llm_ms, 2),
+                "total_e2e_ms": round(total_e2e_ms, 2),
+                "lgpd_redacted_count": total_redacted,
+                "stream_reset_count": stream_reset_count,
+            }
+            if numeric_audit is not None:
+                telemetria_final["numeric_fidelity"] = numeric_audit
+
+            # Registro e medicao precisa de tokens consumidos
+            usage_meta = getattr(last_chunk_obj, "usage_metadata", None) if last_chunk_obj else None
+            p_tokens = getattr(usage_meta, "prompt_token_count", None) if usage_meta else None
+            c_tokens = getattr(usage_meta, "candidates_token_count", None) if usage_meta else None
+            if p_tokens is None or p_tokens <= 0:
+                p_tokens = max(10, len(prompt_sistema) // 4)
+            if c_tokens is None or c_tokens <= 0:
+                c_tokens = max(5, len(resposta_final) // 4)
 
             token_record = self.token_budget.record_usage(
                 session_id=sess_id,
                 filial_id=f_id,
-                prompt_tokens=max(10, len(pergunta_efetiva) // 4),
-                completion_tokens=max(10, len(resposta_cache) // 4),
-                model_name="local-semantic-cache",
-                cached=True,
+                prompt_tokens=p_tokens,
+                completion_tokens=c_tokens,
+                model_name=m_name if "m_name" in locals() else "gemini-flash",
+                cached=False,
             )
             self.telemetry.record_token_usage(
-                prompt_tokens=0,
-                completion_tokens=0,
-                model_name="local-semantic-cache",
-                cost_brl=0.0,
-                avoided_cost_brl=token_record.get("avoided_cost_brl", 0.0),
+                prompt_tokens=p_tokens,
+                completion_tokens=c_tokens,
+                model_name=m_name if "m_name" in locals() else "gemini-flash",
+                cost_brl=token_record.get("cost_brl", 0.0),
+                avoided_cost_brl=0.0,
                 session_id=sess_id,
             )
+            telemetria_final["tokens"] = token_record
+
+            if telemetria_retrieval:
+                telemetria_final["retrieval"] = telemetria_retrieval
 
             yield AuraChunk(
                 chunk_type=AuraChunkType.TELEMETRY,
-                data={
-                    "intent": intencao,
-                    "cache_hit": True,
-                    "ttft_ms": round(cache_ttft_ms, 2),
-                    "tool_latency_ms": round(tool_latency_ms, 2),
-                    "total_e2e_ms": round(total_e2e_ms, 2),
-                    "tokens": token_record,
-                },
+                data=telemetria_final,
                 session_id=sess_id,
             )
+
             yield AuraChunk(
                 chunk_type=AuraChunkType.DONE,
-                text=resposta_cache,
-                data={"session_id": sess_id, "intent": intencao, "cache_hit": True},
+                text=resposta_final,
+                data={"session_id": sess_id, "intent": intencao, "success": sucesso_llm, "pack_id": active_pack.pack_id},
                 session_id=sess_id,
             )
-            return
-
-        yield AuraChunk(
-            chunk_type=AuraChunkType.TOOL_RESULT,
-            data={
-                "intent": intencao,
-                "tool_name": intencao,
-                "latency_ms": round(tool_latency_ms, 2),
-                "has_structured_data": resultado_bruto is not None,
-                "result": resultado_bruto,
-            },
-            session_id=sess_id,
-        )
-
-        # Se o Circuit Breaker estiver OPEN, retorna sintese leve imediata sem sobrecarregar a LLM
-        if isinstance(resultado_bruto, dict) and resultado_bruto.get("circuit_open"):
-            msg_protecao = resultado_bruto.get("message") or CIRCUIT_BREAKER_PROTECTION_MESSAGE
-            yield AuraChunk(
-                chunk_type=AuraChunkType.DELTA,
-                text=msg_protecao,
-                session_id=sess_id,
-            )
-            self.session_memory.save_message(
-                session_id=sess_id,
-                role="user",
-                content=q_limpa,
-                intent=intencao,
-                tenant_id=t_id,
-                filial_id=f_id,
-                metadata={"circuit_open": True},
-            )
-            self.session_memory.save_message(
-                session_id=sess_id,
-                role="assistant",
-                content=msg_protecao,
-                intent=intencao,
-                tenant_id=t_id,
-                filial_id=f_id,
-                metadata={"circuit_open": True},
-            )
-            yield AuraChunk(
-                chunk_type=AuraChunkType.DONE,
-                text=msg_protecao,
-                data={
-                    "session_id": sess_id,
-                    "intent": intencao,
-                    "circuit_open": True,
-                    "circuit_state": "OPEN",
-                },
-                session_id=sess_id,
-            )
-            return
-
-        # 3.5. Emissao Imediata do Envelope Canonico GenUI (ui_complete) para Hidratacao Sub-segundo (<1s)
-        ui_complete_emitted = False
-        if genui_meta and genui_active:
-            diag_summary = ""
-            if isinstance(resultado_bruto, dict):
-                diag_summary = (
-                    resultado_bruto.get("props", {}).get("diagnosis")
-                    or resultado_bruto.get("diagnosis")
-                    or ""
-                )
-            envelope = build_canonical_genui_envelope(
-                intencao=intencao,
-                tool_call_id=tool_call_id,
-                resultado_bruto=resultado_bruto,
-                executive_summary=diag_summary,
-                telemetry=self.telemetry,
-            )
-            if envelope:
-                envelope_payload = sanitize_erp_brand_data(envelope.to_sse_payload())
-                if t_skeleton_emitted is not None:
-                    backend_hydration_ms = (time.perf_counter() - t_skeleton_emitted) * 1000
-                    self.telemetry.record_hydration(
-                        ms=backend_hydration_ms,
-                        session_id=sess_id,
-                        tool_call_id=tool_call_id,
-                        details={"source": "backend"},
-                    )
-                canonical_ui_title = CANONICAL_EXECUTIVE_TITLES.get(intencao) or CANONICAL_EXECUTIVE_TITLES.get(genui_meta.get("component_name")) or genui_meta.get("title")
-                yield AuraChunk(
-                    chunk_type=AuraChunkType.UI_COMPLETE,
-                    tool_call_id=tool_call_id,
-                    component_name=genui_meta["component_name"],
-                    title=canonical_ui_title,
-                    envelope=envelope_payload,
-                    data=envelope_payload,
-                    session_id=sess_id,
-                )
-                ui_complete_emitted = True
-
-        # 4. Blindagem LGPD e Sanitização de Contexto e Pergunta
-        # Se houver contexto extra injetado pelo chamador (perfil, canal, etc), anexa ao contexto
-        if context:
-            try:
-                ctx_extra_str = json.dumps(context, ensure_ascii=False, indent=2, default=str)
-                contexto_extra = f"Contexto Operacional do Chamador:\n{ctx_extra_str}\n\n" + contexto_extra
-            except Exception:
-                contexto_extra = f"Contexto Operacional do Chamador:\n{str(context)}\n\n" + contexto_extra
-
-        if is_retry and retry_pergunta_anterior:
-            pergunta_para_prompt = (
-                f"O usuário solicitou tentar novamente a consulta anterior: '{retry_pergunta_anterior}' "
-                f"(comando digitado agora: '{q_limpa}'). Responda diretamente à consulta original com os dados recuperados da ferramenta."
-            )
-        else:
-            pergunta_para_prompt = q_limpa
-
-        contexto_sanitizado, counts_ctx = central_log_sanitizer.sanitize_text(contexto_extra)
-        pergunta_sanitizada, counts_perg = central_log_sanitizer.sanitize_text(pergunta_para_prompt)
-        total_redacted = sum(counts_ctx.values()) + sum(counts_perg.values())
-
-        # 5. Recuperação de Histórico de Continuidade
-        historico_formatado = self.session_memory.format_history_for_prompt(sess_id, limit=6)
-
-        # 6. Montagem do Prompt Sistêmico
-        prompt_sistema = self._build_prompt_sistema(
-            pergunta_sanitizada=pergunta_sanitizada,
-            contexto_sanitizado=contexto_sanitizado,
-            historico_formatado=historico_formatado,
-            intencao=intencao,
-            genui_active=(genui_meta is not None and genui_active),
-        )
-
-        # 7. Streaming com Google Gemini e Fallback Resiliente
-        t_llm_start = time.perf_counter()
-        ttft_ms = None
-        texto_completo: List[str] = []
-        sucesso_llm = False
-        stream_interrompida = False
-
-        for m_name in FALLBACK_MODELS[:2]:
-            try:
-                model = genai.GenerativeModel(m_name)
-                last_chunk_obj = None
-                texto_modelo: List[str] = []
-                stream_interrompida = False
-
-                # Invoca streaming assincrono com timeout resiliente de 25 segundos
-                response_stream = await asyncio.wait_for(
-                    model.generate_content_async(
-                        prompt_sistema,
-                        stream=True,
-                        request_options={"timeout": 25.0},
-                    ),
-                    timeout=25.0,
-                )
-
-                async def _get_next_chunk(aiter_obj):
-                    return await aiter_obj.__anext__()
-
-                stream_aiter = response_stream.__aiter__()
-                while True:
-                    try:
-                        chunk = await asyncio.wait_for(_get_next_chunk(stream_aiter), timeout=20.0)
-                        last_chunk_obj = chunk
-                    except StopAsyncIteration:
-                        # Streaming concluiu naturalmente com sucesso
-                        break
-                    except (asyncio.TimeoutError, Exception) as stream_step_err:
-                        logger.warning(
-                            "AuraEngine: Timeout ou interrupcao no streaming da LLM (%s): %s",
-                            m_name,
-                            stream_step_err,
-                        )
-                        stream_interrompida = True
-                        break
-
-                    try:
-                        chunk_text = chunk.text
-                    except Exception:
-                        continue
-
-                    if not chunk_text:
-                        continue
-
-                    if ttft_ms is None:
-                        ttft_ms = (time.perf_counter() - t_global_start) * 1000
-                        self.telemetry.record_ttft(ttft_ms, session_id=sess_id)
-
-                    texto_modelo.append(chunk_text)
-                    texto_completo.append(chunk_text)
-                    yield AuraChunk(
-                        chunk_type=AuraChunkType.DELTA,
-                        text=chunk_text,
-                        session_id=sess_id,
-                    )
-
-                texto_parcial = "".join(texto_modelo).strip()
-                pontuacao_valida = ('.', '!', '?', ')', '"', "'", ':', ']')
-                frase_truncada = stream_interrompida or (
-                    len(texto_parcial) < 180 and not texto_parcial.endswith(pontuacao_valida)
-                )
-
-                if texto_modelo and not frase_truncada:
-                    sucesso_llm = True
-                    break
-                elif stream_interrompida:
-                    logger.warning(
-                        "AuraEngine: Stream do modelo %s interrompida prematuramente (%d chars: '%s...'). Testando contingencia.",
-                        m_name,
-                        len(texto_parcial),
-                        texto_parcial[:50],
-                    )
-
-            except Exception as llm_init_err:
-                logger.info(
-                    "AuraEngine: Modelo %s indisponivel ou timeout (%s). Acionando contingencia deterministica.",
-                    m_name,
-                    llm_init_err,
-                )
-                continue
-
-        total_llm_ms = (time.perf_counter() - t_llm_start) * 1000
-        texto_acumulado_str = "".join(texto_completo).strip()
-        resposta_final = normalize_aura_color_markup(texto_acumulado_str)
-        pontuacao_valida = ('.', '!', '?', ')', '"', "'", ':', ']')
-        precisa_contingencia = (
-            not sucesso_llm
-            or not resposta_final
-            or stream_interrompida
-            or (len(resposta_final) < 180 and not resposta_final.endswith(pontuacao_valida))
-        )
-
-        if precisa_contingencia:
-            # Contingência determinística de alta fidelidade a partir dos dados apurados no ERP
-            sintese_contingencia = self._gerar_sintese_contingencia_ferramenta(
-                intencao=intencao,
-                resultado_bruto=resultado_bruto,
-                pergunta=pergunta_efetiva,
-                session_id=sess_id,
-                genui_active=(genui_meta is not None and genui_active),
-            )
-            if sintese_contingencia:
-                resposta_final = normalize_aura_color_markup(sintese_contingencia)
-                sucesso_llm = True
-                if ttft_ms is None:
-                    ttft_ms = (time.perf_counter() - t_global_start) * 1000
-                    self.telemetry.record_ttft(ttft_ms, session_id=sess_id)
-                # Emite o complemento final ou a sintese completa corrigida sem truncamento
-                yield AuraChunk(
-                    chunk_type=AuraChunkType.DELTA,
-                    text=f"\n\n{resposta_final}" if texto_completo else resposta_final,
-                    session_id=sess_id,
-                )
-            elif not resposta_final:
-                resposta_final = "Não foi possível obter resposta dos modelos da AURA no momento. Por favor, tente novamente em instantes."
-                yield AuraChunk(
-                    chunk_type=AuraChunkType.ERROR,
-                    text=resposta_final,
-                    session_id=sess_id,
-                )
-
-        # 7.5. Emissao do Envelope Canonico GenUI se ainda nao emitido na etapa 3.5
-        if genui_meta and genui_active and not ui_complete_emitted:
-            envelope = build_canonical_genui_envelope(
-                intencao=intencao,
-                tool_call_id=tool_call_id,
-                resultado_bruto=resultado_bruto,
-                executive_summary=resposta_final,
-                telemetry=self.telemetry,
-            )
-            if envelope:
-                envelope_payload = sanitize_erp_brand_data(envelope.to_sse_payload())
-                if t_skeleton_emitted is not None:
-                    backend_hydration_ms = (time.perf_counter() - t_skeleton_emitted) * 1000
-                    self.telemetry.record_hydration(
-                        ms=backend_hydration_ms,
-                        session_id=sess_id,
-                        tool_call_id=tool_call_id,
-                        details={"source": "backend"}
-                    )
-                canonical_ui_title = CANONICAL_EXECUTIVE_TITLES.get(intencao) or CANONICAL_EXECUTIVE_TITLES.get(genui_meta.get("component_name")) or genui_meta.get("title")
-                yield AuraChunk(
-                    chunk_type=AuraChunkType.UI_COMPLETE,
-                    tool_call_id=tool_call_id,
-                    component_name=genui_meta["component_name"],
-                    title=canonical_ui_title,
-                    envelope=envelope_payload,
-                    data=envelope_payload,
-                    session_id=sess_id,
-                )
-
-        # 8. Salvamento no Cache Semântico (se catálogo)
-        if intencao == "catalogo_produtos" and not cache_hit and query_vector and sucesso_llm:
-            frases_bloqueio = ["não há registros", "erro", "indisponível", "não foi possível", "não encontrei"]
-            if not any(fb in resposta_final.lower() for fb in frases_bloqueio):
-                try:
-                    produtos_salvar = resultado_bruto.get("results", []) if isinstance(resultado_bruto, dict) else []
-                    await asyncio.to_thread(
-                        self.tools.rag.save_semantic_cache,
-                        q_limpa,
-                        query_vector,
-                        resposta_final,
-                        produtos_salvar,
-                    )
-                except Exception:
-                    pass
-
-        # 9. Persistência de Histórico de Conversa
-        self.session_memory.save_message(
-            session_id=sess_id,
-            role="user",
-            content=q_limpa,
-            intent=intencao,
-            tenant_id=t_id,
-            filial_id=f_id,
-            metadata={"is_retry": is_retry, "target_query": retry_pergunta_anterior} if is_retry else None,
-        )
-        self.session_memory.save_message(
-            session_id=sess_id,
-            role="assistant",
-            content=resposta_final,
-            intent=intencao,
-            tenant_id=t_id,
-            filial_id=f_id,
-            metadata={"tool": intencao, "ttft_ms": round(ttft_ms or 0, 2)},
-        )
-
-        # 10. Emissão de Telemetria e Conclusão
-        total_e2e_ms = (time.perf_counter() - t_global_start) * 1000
-        telemetria_final = {
-            "intent": intencao,
-            "confidence": confianca,
-            "routing_method": telemetria_rota.get("method"),
-            "tool_latency_ms": round(tool_latency_ms, 2),
-            "ttft_ms": round(ttft_ms or 0, 2),
-            "llm_total_ms": round(total_llm_ms, 2),
-            "total_e2e_ms": round(total_e2e_ms, 2),
-            "lgpd_redacted_count": total_redacted,
-        }
-        # Registro e medicao precisa de tokens consumidos
-        usage_meta = getattr(last_chunk_obj, "usage_metadata", None) if "last_chunk_obj" in locals() and last_chunk_obj else None
-        p_tokens = getattr(usage_meta, "prompt_token_count", None) if usage_meta else None
-        c_tokens = getattr(usage_meta, "candidates_token_count", None) if usage_meta else None
-        if p_tokens is None or p_tokens <= 0:
-            p_tokens = max(10, len(prompt_sistema) // 4)
-        if c_tokens is None or c_tokens <= 0:
-            c_tokens = max(5, len(resposta_final) // 4)
-
-        token_record = self.token_budget.record_usage(
-            session_id=sess_id,
-            filial_id=f_id,
-            prompt_tokens=p_tokens,
-            completion_tokens=c_tokens,
-            model_name=m_name if "m_name" in locals() else "gemini-flash",
-            cached=False,
-        )
-        self.telemetry.record_token_usage(
-            prompt_tokens=p_tokens,
-            completion_tokens=c_tokens,
-            model_name=m_name if "m_name" in locals() else "gemini-flash",
-            cost_brl=token_record.get("cost_brl", 0.0),
-            avoided_cost_brl=0.0,
-            session_id=sess_id,
-        )
-        telemetria_final["tokens"] = token_record
-
-        if telemetria_retrieval:
-            telemetria_final["retrieval"] = telemetria_retrieval
-
-        yield AuraChunk(
-            chunk_type=AuraChunkType.TELEMETRY,
-            data=telemetria_final,
-            session_id=sess_id,
-        )
-
-        yield AuraChunk(
-            chunk_type=AuraChunkType.DONE,
-            text=resposta_final,
-            data={"session_id": sess_id, "intent": intencao, "success": sucesso_llm},
-            session_id=sess_id,
-        )
 
     # -------------------------------------------------------------------------
     # RESPOSTA COMPLETA ASSÍNCRONA (ask)
@@ -6287,6 +6602,7 @@ class AuraEngine:
         tenant_id: Optional[str] = None,
         filial_id: Optional[str] = None,
         enable_genui: Optional[bool] = None,
+        pack_id: Optional[str] = None,
     ) -> AuraResponse:
         """
         Executa o pipeline completo da AURA de forma assíncrona,
@@ -6310,6 +6626,7 @@ class AuraEngine:
             tenant_id=tenant_id,
             filial_id=filial_id,
             enable_genui=enable_genui,
+            pack_id=pack_id,
         ):
             if chunk.chunk_type == AuraChunkType.INTENT and chunk.data:
                 intencao_detectada = chunk.data.get("intent", intencao_detectada)
@@ -6331,6 +6648,9 @@ class AuraEngine:
                 envelope_data = chunk.envelope or chunk.data
                 if chunk.tool_call_id:
                     tool_call_id_val = chunk.tool_call_id
+
+            elif chunk.chunk_type == AuraChunkType.STREAM_RESET:
+                texto_chunks.clear()
 
             elif chunk.chunk_type in (AuraChunkType.DELTA, AuraChunkType.ERROR) and chunk.text:
                 texto_chunks.append(chunk.text)

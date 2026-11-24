@@ -165,6 +165,19 @@ class PostoTools:
         self._rag = rag_engine
         self.erp_adapter = erp_adapter or PostgresLocalERPAdapter()
         self._public_data_repo = public_data_repo
+        self._fuel_cartridge: Optional[Any] = None
+
+    @property
+    def fuel_cartridge(self):
+        """Cartucho vertical fuel_convenience extraido (Carbon Core P1.1)."""
+        if self._fuel_cartridge is None:
+            from core.packs.fuel_convenience.tools import FuelConvenienceTools
+
+            self._fuel_cartridge = FuelConvenienceTools(
+                erp_adapter=self.erp_adapter,
+                tools_facade=self,
+            )
+        return self._fuel_cartridge
 
     @property
     def rag(self) -> HybridRAGEngine:
@@ -183,7 +196,8 @@ class PostoTools:
             try:
                 from core.integrations.public_data.repository import get_public_data_repository
                 self._public_data_repo = get_public_data_repository()
-            except Exception:
+            except Exception as exc:
+                logger.warning("PostoTools: falha ao inicializar PublicDataRepository (%s).", exc)
                 self._public_data_repo = None
         return self._public_data_repo
 
@@ -7529,7 +7543,7 @@ class PostoTools:
                             ranking_cand = self.public_data_repo.get_ranking_postos_anp(
                                 municipio=municipio_alvo,
                                 produto=cand,
-                                limit=5,
+                                limit=10,
                                 ordem="asc",
                             )
                             if ranking_cand:
@@ -7964,15 +7978,16 @@ class PostoTools:
             ),
         ]
 
-        limitations = [
-            "Preços de concorrentes coletados via levantamento amostral local no raio de 3km nas últimas 48h",
-        ]
         if anp_stats_by_fuel:
-            limitations.insert(
-                0,
-                f"Preços de referência oficiais da ANP no município de {municipio_alvo} "
-                f"(última coleta em {anp_coleta_data}, {anp_postos_count} postos concorrentes pesquisados)"
-            )
+            limitations = [
+                f"Preços de referência da base ANP no município de {municipio_alvo} "
+                f"(última coleta em {anp_coleta_data}, {anp_postos_count} postos revendedores pesquisados; "
+                "filtro aplicado por município, sem geolocalização por raio em km)"
+            ]
+        else:
+            limitations = [
+                "Preços de concorrentes coletados via levantamento amostral local no raio de 3km nas últimas 48h",
+            ]
         if from_db_abasts:
             limitations.append("Métricas de ticket médio e conversão de aditivada apuradas diretamente no ERP e automação")
         else:
@@ -9239,8 +9254,8 @@ class PostoTools:
                                 COUNT(p.codi) AS total_pedidos,
                                 ROUND(COALESCE(SUM(p.valortotal), 0)::numeric, 2) AS total_valor
                             FROM pedido p
-                            LEFT JOIN prazos prz ON TRIM(prz.codpra) = TRIM(p.formapg)
-                            LEFT JOIN funcionarios f ON TRIM(f.matr) = TRIM(p.vendedor)
+                            LEFT JOIN prazos prz ON prz.codpra = p.formapg
+                            LEFT JOIN funcionarios f ON f.matr = p.vendedor
                             WHERE {where_sql}
                             GROUP BY 
                                 TRIM(COALESCE(p.pdv, '001')),

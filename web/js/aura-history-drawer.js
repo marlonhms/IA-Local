@@ -492,16 +492,13 @@
         }
       }
 
-      // 2. Busca todas as sessoes duraveis do backend SQLite
+      // 2. Busca todas as sessoes duraveis do backend SQLite via AuraApiClient
       let backendSessions = [];
-      if (typeof fetch !== 'undefined') {
+      if (window.auraApi && typeof window.auraApi.listSessions === 'function') {
         try {
-          const resp = await fetch('/api/v1/aura/sessions?limit=100');
-          if (resp.ok) {
-            const data = await resp.json();
-            if (data.status === 'success' && Array.isArray(data.sessions)) {
-              backendSessions = data.sessions;
-            }
+          const data = await window.auraApi.listSessions(100);
+          if (data && data.status === 'success' && Array.isArray(data.sessions)) {
+            backendSessions = data.sessions;
           }
         } catch (_) {}
       }
@@ -717,8 +714,8 @@
           await window.AuraStorage.deleteSession(sessionId);
         }
 
-        if (typeof fetch !== 'undefined') {
-          fetch(`/api/v1/aura/sessions/${sessionId}`, { method: 'DELETE' }).catch(() => {});
+        if (window.auraApi && typeof window.auraApi.deleteSession === 'function') {
+          window.auraApi.deleteSession(sessionId).catch(() => {});
         }
 
         const activeId = window.AuraStorage ? window.AuraStorage.getActiveSessionId() : null;
@@ -740,33 +737,30 @@
       }
 
       try {
-        // 1. Busca todas as sessoes ativas no backend SQLite
+        // 1. Busca todas as sessoes ativas no backend SQLite via AuraApiClient
         let backendSessions = [];
-        if (typeof fetch !== 'undefined') {
+        if (window.auraApi && typeof window.auraApi.listSessions === 'function') {
           try {
-            const resp = await fetch('/api/v1/aura/sessions?limit=100');
-            if (resp.ok) {
-              const data = await resp.json();
-              if (data.status === 'success' && Array.isArray(data.sessions)) {
-                backendSessions = data.sessions;
-              }
+            const data = await window.auraApi.listSessions(100);
+            if (data && data.status === 'success' && Array.isArray(data.sessions)) {
+              backendSessions = data.sessions;
             }
           } catch (_) {}
         }
 
         // 2. Exclui cada sessao no backend SQLite (funciona imediatamente sem depender de restart do servico)
-        if (backendSessions.length > 0 && typeof fetch !== 'undefined') {
+        if (backendSessions.length > 0 && window.auraApi && typeof window.auraApi.deleteSession === 'function') {
           await Promise.all(
             backendSessions.map((s) =>
-              fetch(`/api/v1/aura/sessions/${encodeURIComponent(s.session_id)}`, { method: 'DELETE' }).catch(() => {})
+              window.auraApi.deleteSession(s.session_id).catch(() => {})
             )
           );
         }
 
         // 3. Tenta tambem o endpoint de limpeza em massa
-        if (typeof fetch !== 'undefined') {
+        if (window.auraApi && typeof window.auraApi.clearAllSessions === 'function') {
           try {
-            await fetch('/api/v1/aura/sessions', { method: 'DELETE' });
+            await window.auraApi.clearAllSessions();
           } catch (_) {}
         }
 

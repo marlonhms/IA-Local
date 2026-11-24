@@ -4,7 +4,7 @@
  * Regra inegociavel: ZERO referencias a CDNs externas e ZERO travessoes.
  */
 
-const CACHE_NAME = 'aura-pwa-v18';
+const CACHE_NAME = 'aura-pwa-v19';
 
 const PRECACHE_ASSETS = [
   '/',
@@ -76,6 +76,12 @@ self.addEventListener('fetch', (event) => {
   }
 
   const url = new URL(request.url);
+
+  // Nunca intercepta streams SSE para evitar buffering ou quebra de sessao HttpOnly
+  const acceptHeader = request.headers.get('accept') || '';
+  if (acceptHeader.includes('text/event-stream') || url.pathname.endsWith('/stream')) {
+    return;
+  }
 
   // Ignora requisicoes da API (/api/) e metricas Prometheus (/metrics): rede direta com fallback defensivo
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/metrics')) {
