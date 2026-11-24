@@ -19,7 +19,6 @@ import argparse
 from pathlib import Path
 import psycopg2
 from psycopg2.extras import execute_values
-import google.generativeai as genai
 
 # Garante saída em UTF-8 no terminal Windows
 if sys.stdout.encoding != 'utf-8':
@@ -39,7 +38,10 @@ from config.settings import (
     DEFAULT_EMBEDDING_MODEL,
     BASE_DIR,
 )
+from core.llm_client import CompatGenAIShim
 from core.semantic_router import SemanticRouter
+
+genai = CompatGenAIShim()
 
 
 def gerar_taxonomia_contextual(nompro: str, grupo: str) -> list:

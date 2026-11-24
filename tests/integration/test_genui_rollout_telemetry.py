@@ -31,7 +31,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
 from unittest.mock import MagicMock
-import google.generativeai as genai
+from core.llm_client import CompatGenerativeModel
 from fastapi.testclient import TestClient
 
 from core.config import (
@@ -85,7 +85,7 @@ def run_all_rollout_telemetry_tests():
     from core.semantic_router import SemanticRouter
     SemanticRouter._conectar_pgvector = fast_no_pgvector_conn
     HybridRAGEngine._conectar_pgvector = fast_no_pgvector_conn
-    genai.GenerativeModel.generate_content_async = mock_gemini_generate_content_async
+    CompatGenerativeModel.generate_content_async = mock_gemini_generate_content_async
 
     print("=" * 80)
     print("SUITE DE TESTES: ROLLOUT GRADUAL, FEATURE FLAGS & SRE (FASE 9: F9-04)")

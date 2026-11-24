@@ -349,7 +349,7 @@ def run_all_streaming_tests():
 
     with patch.object(SemanticRouter, "_get_connection", fast_no_pgvector_conn), \
          patch.object(HybridRAGEngine, "_get_connection", fast_no_pgvector_conn), \
-         patch("google.generativeai.GenerativeModel.generate_content_async", side_effect=mock_gemini_generate_content_async):
+         patch("core.llm_client.CompatGenerativeModel.generate_content_async", side_effect=mock_gemini_generate_content_async):
 
         engine = AuraEngine()
 

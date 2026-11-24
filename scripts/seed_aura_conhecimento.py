@@ -21,7 +21,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import google.generativeai as genai
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -42,6 +41,9 @@ from config.settings import (
     DEFAULT_EMBEDDING_MODEL,
     GEMINI_API_KEY,
 )
+from core.llm_client import CompatGenAIShim
+
+genai = CompatGenAIShim()
 
 
 def gerar_embedding_deterministico(texto: str, dim: int = 768) -> list[float]:

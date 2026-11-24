@@ -53,7 +53,9 @@ from core.aura_engine import (
 )
 from core.tools import get_erp_connection
 from core.semantic_router import SemanticRouter, classificar_intencao_heuristica
-import google.generativeai as genai
+from core.llm_client import CompatGenAIShim
+
+genai = CompatGenAIShim()
 
 
 # =============================================================================

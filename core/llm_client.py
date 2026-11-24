@@ -207,6 +207,33 @@ class CompatGenerativeModel:
         self.model_name = model_name
         self._api_key = api_key
 
+    def generate_content(
+        self,
+        contents: Any,
+        stream: bool = False,
+        request_options: dict[str, Any] | None = None,
+        **_kwargs: Any,
+    ) -> Any:
+        timeout_sec = 25.0
+        if isinstance(request_options, dict) and request_options.get("timeout"):
+            timeout_sec = float(request_options["timeout"])
+        client = get_genai_client(api_key=self._api_key)
+        config = genai_types.GenerateContentConfig(
+            http_options=genai_types.HttpOptions(timeout=int(max(1000, timeout_sec * 1000)))
+        )
+        model_name = _normalize_model_name(self.model_name)
+        if stream:
+            return client.models.generate_content_stream(
+                model=model_name,
+                contents=contents,
+                config=config,
+            )
+        return client.models.generate_content(
+            model=model_name,
+            contents=contents,
+            config=config,
+        )
+
     async def generate_content_async(
         self,
         contents: Any,

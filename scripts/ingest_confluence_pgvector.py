@@ -31,10 +31,12 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 import psycopg2
 from psycopg2.extras import execute_batch
-import google.generativeai as genai
 
 from config.settings import GEMINI_API_KEY, DEFAULT_EMBEDDING_MODEL, DB_VECTOR_CONFIG
 from core.confluence_chunker import ConfluenceChunker, ConfluenceChunk
+from core.llm_client import CompatGenAIShim
+
+genai = CompatGenAIShim()
 
 def normalize_l2(vector: List[float]) -> List[float]:
     """Aplica normalizacao Euclidiana L2 no vetor de embedding."""

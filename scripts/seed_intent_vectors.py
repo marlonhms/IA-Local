@@ -12,7 +12,6 @@ import sys
 import time
 from typing import Any, Dict, List, Set, Tuple
 
-import google.generativeai as genai
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -27,7 +26,10 @@ from config.settings import (
     DEFAULT_EMBEDDING_MODEL,
     GEMINI_API_KEY,
 )
+from core.llm_client import CompatGenAIShim
 from core.semantic_router import INTENT_EXEMPLARS
+
+genai = CompatGenAIShim()
 
 logging.basicConfig(
     level=logging.INFO,

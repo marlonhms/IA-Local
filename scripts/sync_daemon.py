@@ -16,7 +16,6 @@ import time
 from contextlib import suppress
 from pathlib import Path
 
-import google.generativeai as genai
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -42,10 +41,13 @@ from core.cdc_listener import (
     FALLBACK_POLLING_INTERVAL_SECONDS,
     AuraCDCListener,
 )
+from core.llm_client import CompatGenAIShim
 from scripts.index_produtos import (
     calcular_hash_produto,
     gerar_texto_busca_produto,
 )
+
+genai = CompatGenAIShim()
 
 
 def sync_cycle(conn_erp, conn_vec) -> int:
