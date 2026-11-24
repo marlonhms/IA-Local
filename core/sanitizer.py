@@ -304,7 +304,7 @@ _CONTEXTUAL_PERSON_PATTERN = re.compile(
 _CONTEXTUAL_ADDRESS_PATTERN = re.compile(
     r"\b(?P<prefix>(?i:endere[cç]o\s*[:=]?\s*))?"
     r"(?P<street>(?i:rua|r\.|avenida|av\.|travessa|tv\.|alameda|al\.|estrada|rodovia|pra[cç]a|quadra)\s+"
-    r"[A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9][A-Za-zÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç0-9\.\-\s]{2,55}?"
+    r"(?:(?:da|de|do|das|dos|e)\s+)*[A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9][A-Za-zÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç0-9\.\-\s]{2,55}?"
     r"(?:,\s*|\s+n[°ºo.]?\s*)\d{1,5}(?:\s*[-,]\s*(?:apto\.?|apt\.?|bloco|casa|sala|lj|loja)?\s*[A-Za-z0-9]{1,12})?)\b"
 )
 

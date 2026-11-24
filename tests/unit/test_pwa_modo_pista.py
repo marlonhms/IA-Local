@@ -48,7 +48,7 @@ class TestPWAModoPista:
         assert data.get("start_url") == "/"
         assert data.get("display") == "standalone"
         assert data.get("background_color") == "#07090e"
-        assert data.get("theme_color") == "#06b6d4"
+        assert data.get("theme_color") == "#07090e"
         assert data.get("orientation") in ["any", "portrait", "landscape"]
 
         # Validacao de icones declarados
@@ -104,7 +104,7 @@ class TestPWAModoPista:
 
         # Links e meta tags PWA
         assert '<link rel="manifest" href="/manifest.json">' in html
-        assert 'name="theme-color" content="#06b6d4"' in html
+        assert 'name="theme-color" content="#07090e"' in html
         assert 'name="mobile-web-app-capable" content="yes"' in html
         assert 'name="apple-mobile-web-app-capable" content="yes"' in html
         assert 'name="apple-mobile-web-app-title" content="AURA Pista"' in html
