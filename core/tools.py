@@ -122,6 +122,16 @@ from core.domain.sales import UniversalSaleReceipt, UniversalSaleItem
 from core.domain.cashier import UniversalCashierShift
 from core.domain.pumps import UniversalDispenserLog, UniversalPump
 from core.domain.tanks import UniversalTankReading
+from core.tenancy import assert_readonly_safe_sql
+
+
+def _execute_readonly_sql(cur: Any, sql: str, params: Any = None) -> None:
+    """Executa consulta SQL no cursor garantindo validacao previa por assert_readonly_safe_sql."""
+    assert_readonly_safe_sql(sql)
+    if params is not None:
+        cur.execute(sql, params)
+    else:
+        cur.execute(sql)
 
 def get_erp_connection(timeout: Optional[int] = None):
     """
@@ -216,7 +226,7 @@ class PostoTools:
         try:
             conn = get_erp_connection()
             with conn.cursor() as cur:
-                cur.execute("""
+                _execute_readonly_sql(cur, """
                     SELECT idempresa, nome, razao_social, cnpj, endereco, numero, bairro, cidade, estado 
                     FROM empresa LIMIT 1;
                 """)
@@ -462,7 +472,7 @@ class PostoTools:
         custos_map: Dict[str, Dict[str, Any]] = {}
         try:
             with get_erp_connection(timeout=3) as conn, conn.cursor() as cur:
-                cur.execute("""
+                _execute_readonly_sql(cur, """
                     SELECT 
                         TRIM(codpro) as codpro,
                         TRIM(nompro) as nompro,
@@ -829,7 +839,7 @@ class PostoTools:
             conn = get_erp_connection()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 1. Top produtos com maior estoque cadastrado
-                cur.execute("""
+                _execute_readonly_sql(cur, """
                     SELECT 
                         TRIM(p.codpro) as codpro,
                         TRIM(p.nompro) as nompro,
@@ -846,7 +856,7 @@ class PostoTools:
                 maiores_estoques = cur.fetchall()
 
                 # 2. Posição dos Tanques de Combustíveis (saldo em litros e ocupação)
-                cur.execute("""
+                _execute_readonly_sql(cur, """
                     SELECT 
                         codtan,
                         COALESCE(prl_ds_produto_lmc, 'COMBUSTÍVEL') as combustivel,
@@ -879,7 +889,7 @@ class PostoTools:
             conn = get_erp_connection()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 1. Ranking de compras por cliente na tabela pedido
-                cur.execute("""
+                _execute_readonly_sql(cur, """
                     SELECT 
                         p.clie AS codigo_cliente,
                         COALESCE(c.cli_nome_a, 'CONSUMIDOR PADRÃO') AS nome_cliente,
@@ -894,7 +904,7 @@ class PostoTools:
                 ranking_compras = cur.fetchall()
 
                 # 2. Total de clientes cadastrados na base
-                cur.execute("SELECT COUNT(*) AS total_cadastrados FROM clientes;")
+                _execute_readonly_sql(cur, "SELECT COUNT(*) AS total_cadastrados FROM clientes;")
                 total_clientes = cur.fetchone()['total_cadastrados']
 
                 # 3. Busca por cliente específico se houver termo
@@ -903,7 +913,7 @@ class PostoTools:
                 palavras = [w for w in re.findall(r"[\w]+", termo.lower()) if w not in stopwords and len(w) > 2]
                 if palavras:
                     termo_busca = "%" + "%".join(palavras) + "%"
-                    cur.execute("""
+                    _execute_readonly_sql(cur, """
                         SELECT 
                             TRIM(cli_cod_a) as cli_cod_a, 
                             TRIM(cli_nome_a) as cli_nome_a, 
@@ -2028,7 +2038,7 @@ class PostoTools:
                 # PADRAO 1: Abastecimento Orfao (Automacao CBC04 vs Cupons PDV)
                 # Bico disparou telemetria, mas nao ha cupom correspondente no PDV
                 # -------------------------------------------------------------
-                cur.execute("""
+                _execute_readonly_sql(cur, """
                     SELECT 
                         TRIM(COALESCE(a.idabast, '')) AS idabast,
                         TRIM(a.bomba) AS bico,
@@ -2062,7 +2072,7 @@ class PostoTools:
                 # PADRAO 2: Estorno Descompassado / Cancelamento Fantasma
                 # Cupons cancelados no PDV enquanto bico rodou fisicamente
                 # -------------------------------------------------------------
-                cur.execute("""
+                _execute_readonly_sql(cur, """
                     SELECT 
                         TRIM(COALESCE(p.codi, '')) AS codi,
                         TRIM(COALESCE(p.cupom, '')) AS cupom,
@@ -2089,7 +2099,7 @@ class PostoTools:
                 # PADRAO 4: Inversao de Forma de Pagamento (Dinheiro vs Cartao/PIX)
                 # Agrupa pagamentos registrados no PDV
                 # -------------------------------------------------------------
-                cur.execute("""
+                _execute_readonly_sql(cur, """
                     SELECT 
                         TRIM(COALESCE(p.pdv, '1')) AS pdv,
                         CASE 
@@ -7012,7 +7022,7 @@ class PostoTools:
         try:
             conn = get_erp_connection()
             with conn.cursor() as cur:
-                cur.execute("""
+                _execute_readonly_sql(cur, """
                     SELECT codpro, nompro, valvenda, custo, preco_compra 
                     FROM produtos 
                     WHERE codpro IN ('00001', '00002', '00003', '00004', '00005')
@@ -7363,7 +7373,7 @@ class PostoTools:
         try:
             conn = get_erp_connection()
             with conn.cursor() as cur:
-                cur.execute("""
+                _execute_readonly_sql(cur, """
                     SELECT codpro, nompro, valvenda 
                     FROM produtos 
                     WHERE codpro IN ('00001', '00002', '00003', '00004', '00005')
@@ -7421,18 +7431,18 @@ class PostoTools:
         try:
             conn = get_erp_connection()
             with conn.cursor() as cur:
-                cur.execute("SELECT CURRENT_DATE;")
+                _execute_readonly_sql(cur, "SELECT CURRENT_DATE;")
                 data_hoje = cur.fetchone()[0]
                 data_filtro_db = None
 
                 if data:
                     d_low = str(data).lower().strip()
                     if d_low == "hoje":
-                        cur.execute("SELECT COUNT(*) FROM abastecimentos WHERE data = %s AND (abt_bl_venda_cancelada IS NOT TRUE);", (data_hoje,))
+                        _execute_readonly_sql(cur, "SELECT COUNT(*) FROM abastecimentos WHERE data = %s AND (abt_bl_venda_cancelada IS NOT TRUE);", (data_hoje,))
                         if (cur.fetchone()[0] or 0) > 0:
                             data_filtro_db = str(data_hoje)
                         else:
-                            cur.execute("SELECT MAX(data) FROM abastecimentos WHERE (abt_bl_venda_cancelada IS NOT TRUE);")
+                            _execute_readonly_sql(cur, "SELECT MAX(data) FROM abastecimentos WHERE (abt_bl_venda_cancelada IS NOT TRUE);")
                             max_d = cur.fetchone()[0]
                             data_filtro_db = str(max_d) if max_d else str(data_hoje)
                     elif d_low == "ontem":
@@ -7469,7 +7479,7 @@ class PostoTools:
                     query_agg += " AND a.data = %s"
                     params_agg.append(data_filtro_db)
                 else:
-                    cur.execute("SELECT MAX(data) FROM abastecimentos WHERE (abt_bl_venda_cancelada IS NOT TRUE);")
+                    _execute_readonly_sql(cur, "SELECT MAX(data) FROM abastecimentos WHERE (abt_bl_venda_cancelada IS NOT TRUE);")
                     max_d_row = cur.fetchone()
                     if max_d_row and max_d_row[0]:
                         max_d = max_d_row[0]
@@ -7483,7 +7493,7 @@ class PostoTools:
                         query_agg += " AND a.turno ILIKE %s"
                         params_agg.append(f"%{t_dig.group(1)}%")
 
-                cur.execute(query_agg, params_agg)
+                _execute_readonly_sql(cur, query_agg, params_agg)
                 agg = cur.fetchone()
                 if agg and agg[0] and int(agg[0]) > 0:
                     from_db_abasts = True
@@ -9199,7 +9209,7 @@ class PostoTools:
                             target_date = hoje_date - timedelta(days=2)
                         else:
                             # Se for 'hoje' ou None, verifica se ha pedidos hoje
-                            cur.execute("""
+                            _execute_readonly_sql(cur, """
                                 SELECT COUNT(*) FROM pedido 
                                 WHERE dtem = %s AND COALESCE(situ, '') != 'C' AND dtcanc IS NULL;
                             """, [hoje_date])
@@ -9208,7 +9218,7 @@ class PostoTools:
                                 target_date = hoje_date
                             else:
                                 # Busca a ultima data com movimento registrada no ERP
-                                cur.execute("""
+                                _execute_readonly_sql(cur, """
                                     SELECT MAX(dtem) FROM pedido 
                                     WHERE dtem IS NOT NULL AND COALESCE(situ, '') != 'C' AND dtcanc IS NULL;
                                 """)
@@ -9266,7 +9276,7 @@ class PostoTools:
                                 COALESCE(TRIM(prz.nompra), 'DINHEIRO')
                             ORDER BY total_valor DESC;
                         """
-                        cur.execute(query, query_params)
+                        _execute_readonly_sql(cur, query, query_params)
                         raw_rows = cur.fetchall()
                 finally:
                     try:

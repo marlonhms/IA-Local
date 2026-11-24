@@ -441,7 +441,16 @@ class AuraVoiceController {
 
       let data;
       try {
-        data = await window.auraApi.transcribeVoice(audioBlob, mime);
+        const res = await window.auraApi.transcribeVoice(audioBlob, mime);
+        if (!res || !res.ok || (typeof res.status === 'number' && res.status >= 400)) {
+          const errPayload = (res && res.data && typeof res.data === 'object') ? res.data : {};
+          const errDetail = errPayload.detail || `Falha na transcricao do audio (HTTP ${res && res.status ? res.status : 'desconhecido'}).`;
+          const voiceError = new Error(errDetail);
+          voiceError.status = res ? res.status : 0;
+          voiceError.data = errPayload;
+          throw voiceError;
+        }
+        data = (res.data && typeof res.data === 'object') ? res.data : {};
       } catch (voiceErr) {
         const detail = (voiceErr && voiceErr.data && voiceErr.data.detail)
           ? voiceErr.data.detail
@@ -459,11 +468,11 @@ class AuraVoiceController {
         return;
       }
 
-      const text = String(data.text || '').trim();
+      const text = String((data && data.text) || '').trim();
       this.isTranscribing = false;
 
       if (text) {
-        this.finalizeAndSend(text, data.duration_ms);
+        this.finalizeAndSend(text, data && data.duration_ms);
       } else {
         if (this.statusLabel) {
           this.statusLabel.textContent = 'NENHUMA FALA DETECTADA';

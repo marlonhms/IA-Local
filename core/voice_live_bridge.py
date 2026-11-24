@@ -421,7 +421,8 @@ def _authorize_websocket(websocket: WebSocket) -> bool:
     """
     Aplica a politica dual de autenticacao (Carbon Core P0.1) para conexoes WebSocket:
     - Valida X-API-Key, Authorization Bearer ou query api_key via hmac.compare_digest;
-    - Exige API Key obrigatoria para IPs externos (LAN/WAN);
+    - Aceita X-Forwarded-For / X-Real-IP exclusivamente de proxies confiaveis (TRUSTED_PROXY_HOSTS);
+    - Exige API Key obrigatoria para IPs externos (LAN/WAN) e origens Tailscale;
     - Valida Origin anti-CSRF e cookie HttpOnly 'aura_local_session' para localhost.
     """
     from core.aura_api import authorize_admin_request

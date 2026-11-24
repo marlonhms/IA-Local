@@ -579,3 +579,42 @@ export interface LiveSecurityTelemetry {
   }>;
 }
 
+
+// ============================================================================
+// Contratos GenUI Next-Gen (Fase P1-UI4 & P1-UI5: What-If, ROI, MCP HITL & DomainPack)
+// ============================================================================
+
+export type AuraDomainPackId =
+  | "fuel_convenience"
+  | "pharmacy_health"
+  | "retail_supermarket"
+  | "autocenter_parts"
+  | "wholesale_distribution";
+
+export interface WhatIfSimulatorProps {
+  title?: string;
+  product_name?: string;
+  baseline_margin_brl?: number;
+  simulated_margin_brl?: number;
+  delta_margin_brl?: number;
+  price_delta_pct?: number;
+  volume_delta_pct?: number;
+  recommendation?: string;
+}
+
+export interface RealizedRoiScorecardProps {
+  period_days?: number;
+  projected_brl?: number;
+  realized_brl?: number;
+  hit_rate_pct?: number;
+  roi_multiple?: number;
+  audited_actions_count?: number;
+}
+
+export interface McpActionConfirmationProps {
+  target_system?: string;
+  operation?: string;
+  reversible?: boolean;
+  ttl_seconds?: number;
+  arguments?: Record<string, unknown>;
+}

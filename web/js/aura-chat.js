@@ -678,7 +678,13 @@ class AuraChatController {
     if (typeof window !== 'undefined' && window.auraOrbManager) {
       window.auraOrbManager.setEmotion('THINKING');
     }
-    this.updateCognitiveStep(messageContainerId, 'Consultando automação da pista...', 'cyan');
+    const initialLabel = (typeof window !== 'undefined' && window.auraDomainAdapter && typeof window.auraDomainAdapter.getInitialReasoningLabel === 'function')
+      ? window.auraDomainAdapter.getInitialReasoningLabel()
+      : 'Consultando telemetria operacional...';
+    this.updateCognitiveStep(messageContainerId, initialLabel, 'cyan');
+    if (typeof window !== 'undefined' && window.auraReasoningRibbon && typeof window.auraReasoningRibbon.start === 'function') {
+      window.auraReasoningRibbon.start(messageContainerId, initialLabel);
+    }
 
     // Força rolagem para o início da nova resposta
     this.scrollToBottom(true);
@@ -702,14 +708,24 @@ class AuraChatController {
       const hasToolPayload = !!(currentToolResult || lastGenUIEnvelope);
       this.updateAuraText(messageContainerId, fullResponseText, false, hasToolPayload);
       this.finalizeCognitiveStep(messageContainerId, true);
+      if (typeof window !== 'undefined' && window.auraReasoningRibbon && typeof window.auraReasoningRibbon.finalize === 'function') {
+        window.auraReasoningRibbon.finalize(messageContainerId, {
+          success: true,
+          telemetry: telemetryData
+        });
+      }
 
+      // Hidratacao in-place Zero-CLS via requestAnimationFrame (sem setTimeout pos-done de 160ms)
       const scheduleMount = (callback) => {
-        // Micro-pausa de 160ms para ritmo de leitura executiva: o texto fixa primeiro, e o card emerge depois com efeito WOW
-        setTimeout(() => {
-          this.cleanupSkeletonSlots(messageContainerId);
+        const run = () => {
           callback();
-          this.scrollToBottom();
-        }, 160);
+          this.scrollToBottom(false);
+        };
+        if (typeof requestAnimationFrame === 'function') {
+          requestAnimationFrame(run);
+        } else {
+          run();
+        }
       };
 
       if (pendingGenUIEnvelope) {
@@ -722,13 +738,14 @@ class AuraChatController {
         const toolInfo = pendingFallbackTool;
         pendingFallbackTool = null;
         scheduleMount(() => {
+          this.cleanupSkeletonSlots(messageContainerId);
           this.updateToolResultCard(messageContainerId, toolInfo.name, toolInfo.result, true, { animated: true });
         });
       } else if (!uiCompleteReceived && currentToolResult) {
-        // Fallback gracioso: o backend executou a ferramenta mas nao emitiu GenUIEnvelope
         const tName = currentToolName || 'ferramenta';
         const tResult = currentToolResult;
         scheduleMount(() => {
+          this.cleanupSkeletonSlots(messageContainerId);
           this.updateToolResultCard(messageContainerId, tName, tResult, true, { animated: true });
         });
       } else {
@@ -761,6 +778,9 @@ class AuraChatController {
         onDelta: (token) => {
           if (!fullResponseText && token.trim()) {
             this.updateCognitiveStep(messageContainerId, 'Gerando diagnóstico executivo...', 'purple');
+            if (typeof window !== 'undefined' && window.auraReasoningRibbon && typeof window.auraReasoningRibbon.markSynthesis === 'function') {
+              window.auraReasoningRibbon.markSynthesis(messageContainerId, { recalibrating: false });
+            }
           }
           fullResponseText += token;
           this.updateAuraText(messageContainerId, fullResponseText, true);
@@ -778,6 +798,9 @@ class AuraChatController {
             : 'Recalibrando sintese com modelo de contingencia...';
 
           this.updateCognitiveStep(messageContainerId, reasonMsg, 'cyan');
+          if (typeof window !== 'undefined' && window.auraReasoningRibbon && typeof window.auraReasoningRibbon.markSynthesis === 'function') {
+            window.auraReasoningRibbon.markSynthesis(messageContainerId, { recalibrating: true, label: reasonMsg });
+          }
 
           if (typeof document !== 'undefined') {
             const textEl = document.getElementById(`${messageContainerId}-text`);
@@ -811,16 +834,15 @@ class AuraChatController {
           }
           uiCompleteReceived = true;
           lastGenUIEnvelope = envelopeData;
-          if (this.isStreaming) {
-            // Em streaming ativo: aguarda conclusao do texto para emergir com efeito WOW
-            pendingGenUIEnvelope = envelopeData;
+          // Hidratacao in-place imediata no slot reservado (Zero-CLS) via requestAnimationFrame
+          const hydrateInPlace = () => {
+            this.handleUIComplete(messageContainerId, envelopeData, { animated: true });
+            this.scrollToBottom(false);
+          };
+          if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(hydrateInPlace);
           } else {
-            // Texto ja concluiu: emerge imediatamente com animacao WOW
-            setTimeout(() => {
-              this.cleanupSkeletonSlots(messageContainerId);
-              this.handleUIComplete(messageContainerId, envelopeData, { animated: true });
-              this.scrollToBottom();
-            }, 120);
+            hydrateInPlace();
           }
         },
         onActionFeedback: (feedbackData) => {
@@ -850,16 +872,29 @@ class AuraChatController {
               this.updateCognitiveStep(messageContainerId, 'Processando raciocínio cognitivo...', 'cyan');
             }
           }
+          else if (type === 'cache_hit') {
+            if (typeof window !== 'undefined' && window.auraReasoningRibbon && typeof window.auraReasoningRibbon.markSource === 'function') {
+              window.auraReasoningRibbon.markSource(messageContainerId, { cacheHit: true });
+            }
+          }
           else if (type === 'tool_start') {
             const toolName = chunk.data?.tool_name || chunk.data?.intent || chunk.tool_name || chunk.intent || 'ferramenta';
             this.updateToolStartStatus(messageContainerId, toolName);
+            if (typeof window !== 'undefined' && window.auraReasoningRibbon && typeof window.auraReasoningRibbon.markSource === 'function') {
+              window.auraReasoningRibbon.markSource(messageContainerId, {
+                cacheHit: false,
+                toolName: this.formatToolDisplayName(toolName)
+              });
+            }
           }
           else if (type === 'tool_result') {
             const toolName = chunk.data?.tool_name || chunk.data?.intent || chunk.tool_name || chunk.intent || 'ferramenta';
             currentToolName = toolName;
             currentToolResult = chunk.data?.result || chunk.data || {};
-            // Registra os dados da ferramenta sem abrir card prematuro antes do texto
             this.updateCognitiveStep(messageContainerId, 'Confrontando dados e regras de negócio...', 'purple');
+            if (typeof window !== 'undefined' && window.auraReasoningRibbon && typeof window.auraReasoningRibbon.markDeterministic === 'function') {
+              window.auraReasoningRibbon.markDeterministic(messageContainerId, 'Calculo Python Auditado');
+            }
           }
           else if (
             type === 'ui_skeleton' ||
@@ -959,8 +994,33 @@ class AuraChatController {
       : Date.now();
 
     const rawTitle = skeletonData.title || 'Analisando indicadores executivos...';
-    // Atualiza chip cognitivo no header da mensagem sem abrir card prematuro antes do texto
     this.updateCognitiveStep(containerId, rawTitle, 'cyan');
+    if (typeof window !== 'undefined' && window.auraReasoningRibbon && typeof window.auraReasoningRibbon.markDeterministic === 'function') {
+      window.auraReasoningRibbon.markDeterministic(containerId, rawTitle);
+    }
+
+    // Reserva imediata do slot geometrico Zero-CLS (grid-template-rows: 0fr -> 1fr)
+    const toolCard = (containerId && typeof document.getElementById === 'function')
+      ? document.getElementById(containerId + '-tool-card')
+      : null;
+    if (toolCard && !document.getElementById('genui-slot-' + toolCallId)) {
+      const slotHtml = `
+        <div id="genui-slot-${this.escapeHtml(toolCallId)}" class="genui-slot-wrapper is-reserved" data-tool-call-id="${this.escapeHtml(toolCallId)}">
+          <div class="genui-slot-inner">
+            <div id="genui-skeleton-${this.escapeHtml(toolCallId)}" class="genui-skeleton-slot glass-panel rounded-2xl p-4 border border-cyan-500/20 space-y-2.5">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-semibold text-cyan-300 font-sans">${this.escapeHtml(rawTitle)}</span>
+                <span class="text-[10px] font-mono text-emerald-400/90">Calculo Auditado</span>
+              </div>
+              <div class="skeleton-shimmer h-5 w-1/3 rounded-md"></div>
+              <div class="skeleton-shimmer h-3 w-2/3 rounded-md"></div>
+            </div>
+          </div>
+        </div>
+      `;
+      toolCard.innerHTML = slotHtml;
+      toolCard.classList.remove('hidden');
+    }
   }
 
   /**
@@ -1135,7 +1195,13 @@ class AuraChatController {
       const isMobile = this.isMobileDevice();
       const startExpanded = isMobile;
 
-      // 1. Projeta no Companion Canvas se habilitado (abre no Desktop, não abre no mobile)
+      // 1. Projeta no Companion Canvas; se ja estiver aberto no Desktop, sincroniza automaticamente
+      const shouldAutoSyncCanvas = Boolean(
+        !isMobile &&
+        typeof window !== 'undefined' &&
+        window.auraAuxPanel &&
+        window.auraAuxPanel.isOpen
+      );
       if (typeof window !== 'undefined' && window.auraAuxPanel && typeof window.auraAuxPanel.projectArtifact === 'function') {
         try {
           const art = window.auraAuxPanel.projectArtifact({
@@ -1145,7 +1211,7 @@ class AuraChatController {
             intent: envelopeData.intent,
             data: envelopeData.props,
             html: widgetContentHtml,
-            autoOpen: false
+            autoOpen: shouldAutoSyncCanvas
           });
           if (art) {
             if (art.title) artifactTitle = this.sanitizeExecutiveTitle(art.title, envelopeData.intent || envelopeData.component_name);
@@ -1168,15 +1234,28 @@ class AuraChatController {
       const toolCard = (containerId && typeof document.getElementById === 'function')
         ? (document.getElementById(containerId + '-tool-card') || document.getElementById(containerId))
         : null;
+      const reservedSlot = (toolCallId && typeof document.getElementById === 'function')
+        ? document.getElementById('genui-slot-' + toolCallId)
+        : null;
 
-      if (toolCard) {
-        toolCard.innerHTML = portalBannerHtml;
+      if (reservedSlot) {
+        const inner = reservedSlot.querySelector('.genui-slot-inner');
+        if (inner) {
+          inner.innerHTML = `<div class="genui-crossfade-in">${portalBannerHtml}</div>`;
+        } else {
+          reservedSlot.innerHTML = `<div class="genui-crossfade-in">${portalBannerHtml}</div>`;
+        }
+        reservedSlot.classList.remove('is-reserved');
+        reservedSlot.classList.add('is-hydrated');
+        if (toolCard) toolCard.classList.remove('hidden');
+      } else if (toolCard) {
+        toolCard.innerHTML = `<div class="genui-slot-wrapper is-hydrated"><div class="genui-slot-inner genui-crossfade-in">${portalBannerHtml}</div></div>`;
         toolCard.classList.remove('hidden');
       } else if (skeletonSlot && skeletonSlot.parentNode) {
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = portalBannerHtml.trim();
         const portalNode = tempDiv.firstElementChild || tempDiv;
-        portalNode.classList.add('genui-fade-in');
+        portalNode.classList.add('genui-crossfade-in');
         skeletonSlot.parentNode.replaceChild(portalNode, skeletonSlot);
       }
 
@@ -1595,14 +1674,7 @@ class AuraChatController {
     const timeStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
     div.innerHTML = `
-      <div class="chat-bubble-user max-w-[85%] md:max-w-[70%] lg:max-w-[65%] ml-auto p-4 text-slate-100 text-sm">
-        <div class="flex items-center justify-between text-[11px] font-sans font-medium text-slate-400 mb-1.5 pb-1 border-b border-white/5">
-          <span class="font-bold text-cyan-400 flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-            <span>OPERADOR</span>
-          </span>
-          <span class="text-slate-400 tabular-nums">${timeStr}</span>
-        </div>
+      <div class="chat-bubble-user chat-bubble-user-pill max-w-[85%] md:max-w-[70%] lg:max-w-[65%] ml-auto text-slate-100 text-sm" title="Enviado as ${timeStr}">
         ${contentHtml}
       </div>
     `;
@@ -1614,23 +1686,27 @@ class AuraChatController {
     const feed = document.getElementById('chat-feed-container');
     if (!feed) return null;
 
+    const initialStep = (typeof window !== 'undefined' && window.auraDomainAdapter && typeof window.auraDomainAdapter.getInitialReasoningLabel === 'function')
+      ? window.auraDomainAdapter.getInitialReasoningLabel()
+      : 'Consultando telemetria operacional...';
+
     const div = document.createElement('div');
     div.id = containerId;
     div.className = 'flex justify-start w-full animate-fade-in';
     div.innerHTML = `
-      <div class="chat-bubble-aura w-full max-w-full p-4 sm:p-5 text-slate-100 text-sm space-y-3">
-        <!-- Header da Resposta com Núcleo e Tags -->
-        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
+      <div class="chat-bubble-aura chat-bubble-aura-editorial w-full max-w-full text-slate-100 text-sm space-y-3">
+        <!-- Header Editorial da Resposta com Nucleo e AuraReasoningRibbon -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-1">
           <div class="flex items-center gap-2">
-            <div id="${containerId}-orb" class="neural-core-orb !w-6 !h-6 reasoning-active flex items-center justify-center shadow-sm"></div>
-            <span class="font-bold font-sans text-xs text-white">AURA</span>
+            <div id="${containerId}-orb" class="neural-core-orb !w-5 !h-5 reasoning-active flex items-center justify-center shadow-sm"></div>
+            <span class="font-bold font-sans text-xs text-white tracking-wide">AURA</span>
             <span class="px-1.5 py-0.5 rounded text-[9px] font-sans font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">AI</span>
           </div>
 
           <div id="${containerId}-meta" class="flex flex-wrap items-center gap-1.5 font-sans text-[10px]">
-            <span id="${containerId}-cognitive-chip" class="chip-cognitive-step px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5 transition-all">
-              <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
-              <span class="cognitive-step-label">Consultando automação da pista...</span>
+            <div id="${containerId}-reasoning-ribbon" class="aura-reasoning-ribbon"></div>
+            <span id="${containerId}-cognitive-chip" class="hidden chip-cognitive-step">
+              <span class="cognitive-step-label">${this.escapeHtml(initialStep)}</span>
             </span>
             <span id="${containerId}-intent-chip" class="hidden chip-intent"></span>
             <span id="${containerId}-tool-chip" class="hidden chip-tool-status"></span>
@@ -1639,13 +1715,13 @@ class AuraChatController {
 
         <!-- Texto em Streaming -->
         <div id="${containerId}-text" class="prose-aura typing-cursor">
-          <span class="text-slate-400 text-xs font-sans">Processando consulta analítica...</span>
+          <span class="text-slate-400 text-xs font-sans">Processando consulta analitica...</span>
         </div>
 
-        <!-- Card de Resultado da Ferramenta Estruturada (emerge com efeito WOW apos o texto) -->
-        <div id="${containerId}-tool-card" class="hidden w-full pt-2"></div>
+        <!-- Slot GenUI Zero-CLS (card protagonista unico) -->
+        <div id="${containerId}-tool-card" class="hidden w-full pt-1"></div>
 
-        <!-- Métricas e Confirmação da Resposta -->
+        <!-- Telemetria consolidada na Trust Pill do AuraReasoningRibbon -->
         <div id="${containerId}-telemetry" class="hidden pt-2 border-t border-slate-800/80 text-[10px] font-sans text-slate-400">
         </div>
       </div>
@@ -6162,44 +6238,9 @@ class AuraChatController {
   }
 
   updateTelemetryBadge(containerId, t) {
-    const ids = [containerId + '-telemetry', containerId + '-split-telemetry'];
-    const e2e = t.total_e2e_ms ? `${t.total_e2e_ms.toFixed(0)}ms` : null;
-    const model = t.llm_model || 'Gemini 3.1 Flash';
-    const lgpd = t.lgpd_sanitized_count || 0;
-
-    const tokens = t.tokens || {};
-    const totalTokens = tokens.total_tokens || t.total_tokens || 0;
-    const costBrl = tokens.cost_brl || t.cost_brl || 0;
-    const avoidedBrl = tokens.avoided_cost_brl || t.avoided_cost_brl || 0;
-    const budgetPct = (tokens.budget_percent_used !== undefined && tokens.budget_percent_used !== null) ? Number(tokens.budget_percent_used) : null;
-
-    let tokenHtml = '';
-    if (totalTokens > 0) {
-      const costFmt = costBrl < 0.01 ? '< R$ 0,01' : `R$ ${costBrl.toFixed(2).replace('.', ',')}`;
-      const budgetBadge = budgetPct !== null ? ` • Meta: ${budgetPct.toFixed(0)}%` : '';
-      tokenHtml = `<span class="text-slate-500">•</span><span class="text-cyan-400 font-medium inline-flex items-center gap-1">⚡ ${totalTokens.toLocaleString('pt-BR')} tokens (~${costFmt}${budgetBadge})</span>`;
-    } else if (avoidedBrl > 0 || tokens.contingency_zero_token) {
-      const avoidedFmt = `R$ ${avoidedBrl.toFixed(2).replace('.', ',')}`;
-      tokenHtml = `<span class="text-slate-500">•</span><span class="text-emerald-400 font-medium inline-flex items-center gap-1">⚡ 0 tokens (Cache Local: Economia ~${avoidedFmt})</span>`;
+    if (typeof window !== 'undefined' && window.auraReasoningRibbon && typeof window.auraReasoningRibbon.updateTelemetry === 'function') {
+      window.auraReasoningRibbon.updateTelemetry(containerId, t);
     }
-
-    const html = `
-      <div class="flex flex-wrap items-center gap-3 opacity-60 hover:opacity-100 transition-opacity font-mono text-[10px]">
-        ${e2e ? `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Resposta em <strong class="text-emerald-300 tabular-nums font-semibold">${e2e}</strong></span>` : ''}
-        <span class="text-slate-500">•</span>
-        <span>Motor: <strong class="text-purple-300 font-semibold">${model}</strong></span>
-        ${tokenHtml}
-        ${lgpd > 0 ? `<span class="text-slate-500">•</span><span class="text-emerald-400/90 font-medium inline-flex items-center gap-1">${CHAT_ICONS.shield} LGPD: ${lgpd} dados protegidos</span>` : ''}
-      </div>
-    `;
-
-    ids.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) {
-        el.innerHTML = html;
-        el.classList.remove('hidden');
-      }
-    });
 
     if (window.auraTelemetry && typeof window.auraTelemetry.fetchSilentBadge === 'function') {
       window.auraTelemetry.fetchSilentBadge();

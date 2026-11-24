@@ -230,3 +230,154 @@ def test_partner_acl_admin_key_isolation_and_raw_sync_limits(tmp_path: Path, mon
         assert resp_oversized.status_code == 422
     finally:
         set_partner_staging_store(None)
+
+
+@pytest.mark.unit
+def test_lan_xff_spoofing_blocked_without_trusted_proxy(monkeypatch) -> None:
+    """
+    Garante que X-Forwarded-For / X-Real-IP vindos da LAN sao ignorados quando
+    client.host nao pertence a TRUSTED_PROXY_HOSTS (vazia por padrao):
+    - GET / nao emite cookie aura_local_session;
+    - Rotas administrativas e operacionais retornam 401;
+    - WebSocket /api/v1/voice/live desconecta com WS 1008;
+    - Somente quando TRUSTED_PROXY_HOSTS inclui explicitamente o proxy, XFF e honrado.
+    """
+    admin_key = "chave-anti-xff-spoof-2026"
+    monkeypatch.setenv("AURA_API_KEY", admin_key)
+    monkeypatch.delenv("AURA_ENFORCE_ADMIN_AUTH", raising=False)
+    monkeypatch.delenv("TRUSTED_PROXY_HOSTS", raising=False)
+    monkeypatch.delenv("AURA_TRUSTED_PROXY_HOSTS", raising=False)
+
+    mem = AuraSessionMemory(db_path=":memory:")
+    engine = AuraEngine(session_memory=mem)
+    app = create_aura_app(engine=engine)
+
+    lan_client = TestClient(app, client=("192.168.1.55", 51111))
+    spoof_headers = {
+        "X-Forwarded-For": "127.0.0.1",
+        "X-Real-IP": "127.0.0.1",
+    }
+
+    # 1. GET / com spoofing de XFF nao emite cookie de sessao local
+    resp_root = lan_client.get("/", headers=spoof_headers)
+    assert resp_root.status_code == 200
+    assert LOCAL_SESSION_COOKIE_NAME not in resp_root.cookies
+
+    # 2. Rotas admin e operacionais rejeitam com 401
+    assert lan_client.get("/api/v1/aura/admin/feature-flags", headers=spoof_headers).status_code == 401
+    assert lan_client.delete("/api/v1/aura/sessions", headers=spoof_headers).status_code == 401
+
+    # 3. WebSocket /api/v1/voice/live tambem rejeita spoofing de XFF (WS 1008)
+    with pytest.raises(WebSocketDisconnect) as exc_info:
+        with lan_client.websocket_connect("/api/v1/voice/live", headers=spoof_headers):
+            pass
+    assert exc_info.value.code == 1008
+
+    # 4. Com proxy explicitamente listado em TRUSTED_PROXY_HOSTS, XFF e respeitado
+    monkeypatch.setenv("TRUSTED_PROXY_HOSTS", "192.168.1.55")
+    resp_trusted_root = lan_client.get("/", headers={"X-Forwarded-For": "127.0.0.1"})
+    assert resp_trusted_root.status_code == 200
+    assert LOCAL_SESSION_COOKIE_NAME in resp_trusted_root.cookies
+
+
+@pytest.mark.unit
+def test_localhost_operational_routes_require_session_cookie_without_origin(monkeypatch) -> None:
+    """
+    Garante que em localhost real (127.0.0.1), mesmo sem cabecalho Origin,
+    rotas operacionais sob /api/v1/aura/ e /api/v1/cockpit/ exigem cookie
+    aura_local_session ou X-API-Key, mantendo livre o bootstrap GET /.
+    """
+    monkeypatch.setenv("AURA_API_KEY", "chave-local-cookie-2026")
+    monkeypatch.delenv("AURA_ENFORCE_ADMIN_AUTH", raising=False)
+
+    mem = AuraSessionMemory(db_path=":memory:")
+    engine = AuraEngine(session_memory=mem)
+    app = create_aura_app(engine=engine)
+
+    local_client = TestClient(app, client=("127.0.0.1", 52222))
+
+    # Sem cookie e sem Origin -> 401 em rotas operacionais/destrutivas
+    assert local_client.get("/api/v1/aura/sessions").status_code == 401
+    assert local_client.delete("/api/v1/aura/sessions").status_code == 401
+    assert local_client.post("/api/v1/aura/execute-intent", json={"tool_name": "dados_filial"}).status_code == 401
+    assert local_client.get("/api/v1/cockpit/zero-click-feed").status_code == 401
+
+    # Bootstrap GET / permanece acessivel e entrega cookie HttpOnly; SameSite=Strict
+    resp_boot = local_client.get("/")
+    assert resp_boot.status_code == 200
+    assert LOCAL_SESSION_COOKIE_NAME in resp_boot.cookies
+
+    # Apos bootstrap, requisicoes localhost autenticam normalmente via cookie
+    assert local_client.get("/api/v1/aura/sessions").status_code == 200
+    assert local_client.delete("/api/v1/aura/sessions").status_code == 200
+
+
+@pytest.mark.unit
+def test_metrics_protected_on_lan_and_localhost_without_cookie(monkeypatch) -> None:
+    """Garante que GET /metrics exige X-API-Key na LAN e cookie/API Key em localhost real."""
+    admin_key = "chave-metrics-lan-2026"
+    monkeypatch.setenv("AURA_API_KEY", admin_key)
+    monkeypatch.delenv("AURA_ENFORCE_ADMIN_AUTH", raising=False)
+
+    mem = AuraSessionMemory(db_path=":memory:")
+    engine = AuraEngine(session_memory=mem)
+    app = create_aura_app(engine=engine)
+
+    # LAN sem X-API-Key -> 401; com X-API-Key -> 200
+    lan_client = TestClient(app, client=("192.168.1.77", 53333))
+    assert lan_client.get("/metrics").status_code == 401
+    resp_lan_ok = lan_client.get("/metrics", headers={"X-API-Key": admin_key})
+    assert resp_lan_ok.status_code == 200
+    assert "aura_ttft_ms" in resp_lan_ok.text
+
+    # Localhost sem cookie -> 401; apos GET / com cookie -> 200
+    local_client = TestClient(app, client=("127.0.0.1", 53334))
+    assert local_client.get("/metrics").status_code == 401
+    local_client.get("/")
+    assert local_client.get("/metrics").status_code == 200
+
+
+@pytest.mark.unit
+def test_tailscale_origin_preflight_and_api_key_alignment(monkeypatch) -> None:
+    """
+    Valida alinhamento entre CORSMiddleware e politica de autenticacao para origens
+    Tailscale (100.x.x.x e *.ts.net): preflight OPTIONS liberado e requisicoes
+    autenticadas exigindo obrigatoriamente X-API-Key (401 sem chave, 200 com chave).
+    """
+    admin_key = "chave-tailscale-2026"
+    monkeypatch.setenv("AURA_API_KEY", admin_key)
+    monkeypatch.delenv("AURA_ENFORCE_ADMIN_AUTH", raising=False)
+
+    mem = AuraSessionMemory(db_path=":memory:")
+    engine = AuraEngine(session_memory=mem)
+    app = create_aura_app(engine=engine)
+
+    for ts_origin in ("http://100.89.108.95:3000", "https://aura-node.tailnet.ts.net"):
+        ts_client = TestClient(app, client=("100.89.108.95", 54444))
+
+        # 1. Preflight OPTIONS permitido pelo CORSMiddleware
+        preflight = ts_client.options(
+            "/api/v1/aura/admin/feature-flags",
+            headers={
+                "Origin": ts_origin,
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-API-Key",
+            },
+        )
+        assert preflight.status_code == 200
+        assert preflight.headers.get("access-control-allow-origin") == ts_origin
+
+        # 2. Requisicao sem X-API-Key retorna 401 (nao 403) exigindo API Key
+        resp_no_key = ts_client.get(
+            "/api/v1/aura/admin/feature-flags",
+            headers={"Origin": ts_origin},
+        )
+        assert resp_no_key.status_code == 401
+
+        # 3. Requisicao com X-API-Key valida retorna 200 com header CORS
+        resp_with_key = ts_client.get(
+            "/api/v1/aura/admin/feature-flags",
+            headers={"Origin": ts_origin, "X-API-Key": admin_key},
+        )
+        assert resp_with_key.status_code == 200
+        assert resp_with_key.headers.get("access-control-allow-origin") == ts_origin

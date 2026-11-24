@@ -203,11 +203,28 @@ _LOCALHOST_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "::1", "localhost"})
 _ALLOWED_LOCAL_ORIGIN_HOSTS: frozenset[str] = frozenset(
     {"127.0.0.1", "::1", "localhost", "testserver"}
 )
+TRUSTED_PROXY_HOSTS: frozenset[str] = frozenset()
+_TAILSCALE_HOST_REGEX = re.compile(
+    r"^(?:100\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)|[a-z0-9-]+(?:\.[a-z0-9-]+)*\.ts\.net|aura-edge-node01)$",
+    re.IGNORECASE,
+)
+ALLOWED_CORS_ORIGIN_REGEX = (
+    r"^https?://(localhost|127\.0\.0\.1|\[::1\]|100\.\d{1,3}\.\d{1,3}\.\d{1,3}|.*\.ts\.net|aura-edge-node01)(:\d+)?$"
+)
 
 
 def get_local_session_token() -> str:
     """Retorna o token efemero de sessao local (por boot) para acessos localhost."""
     return _LOCAL_SESSION_TOKEN
+
+
+def get_trusted_proxy_hosts() -> frozenset[str]:
+    """Retorna o conjunto de IPs/hosts de proxy confiaveis autorizados a encaminhar X-Forwarded-For."""
+    env_raw = (os.getenv("TRUSTED_PROXY_HOSTS") or os.getenv("AURA_TRUSTED_PROXY_HOSTS") or "").strip()
+    if not env_raw:
+        return TRUSTED_PROXY_HOSTS
+    env_hosts = {item.strip().lower() for item in env_raw.split(",") if item.strip()}
+    return frozenset({h.lower() for h in TRUSTED_PROXY_HOSTS} | env_hosts)
 
 
 def _is_test_runtime() -> bool:
@@ -219,16 +236,24 @@ def _extract_effective_client_host(
     headers: Mapping[str, str],
     client_host: str | None,
 ) -> str:
-    """Resolve o IP efetivo do cliente, preservando IPs externos via proxy/X-Forwarded-For."""
-    xff = (headers.get("x-forwarded-for") or "").strip()
-    if xff:
-        first_ip = xff.split(",")[0].strip()
-        if first_ip:
-            return first_ip
-    xri = (headers.get("x-real-ip") or "").strip()
-    if xri:
-        return xri
-    return (client_host or "").strip()
+    """
+    Resolve o IP efetivo do cliente.
+    Aceita X-Forwarded-For / X-Real-IP exclusivamente quando client_host pertence
+    a lista explicita de proxies confiaveis (TRUSTED_PROXY_HOSTS, vazia por padrao),
+    impedindo spoofing de 127.0.0.1 a partir da LAN.
+    """
+    raw_host = (client_host or "").strip()
+    trusted_proxies = get_trusted_proxy_hosts()
+    if raw_host and raw_host.lower() in trusted_proxies:
+        xff = (headers.get("x-forwarded-for") or "").strip()
+        if xff:
+            first_ip = xff.split(",")[0].strip()
+            if first_ip:
+                return first_ip
+        xri = (headers.get("x-real-ip") or "").strip()
+        if xri:
+            return xri
+    return raw_host
 
 
 def _is_localhost_host(host: str) -> bool:
@@ -237,6 +262,21 @@ def _is_localhost_host(host: str) -> bool:
 
 def _is_testclient_host(host: str) -> bool:
     return host.lower() == "testclient" and _is_test_runtime()
+
+
+def _is_tailscale_origin(origin: str) -> bool:
+    """Identifica origens Tailscale autorizadas no CORS (100.x.x.x, *.ts.net e aura-edge-node01)."""
+    raw = (origin or "").strip()
+    if not raw:
+        return False
+    try:
+        parsed = urlparse(raw)
+    except Exception:
+        return False
+    if parsed.scheme not in ("http", "https"):
+        return False
+    hostname = (parsed.hostname or "").strip().lower()
+    return bool(hostname and _TAILSCALE_HOST_REGEX.match(hostname))
 
 
 def _is_allowed_local_origin(origin: str) -> bool:
@@ -279,7 +319,8 @@ def authorize_admin_request(
     """
     Politica dual de autenticacao (Carbon Core P0.1):
     1. X-API-Key ou Authorization: Bearer validada via hmac.compare_digest.
-    2. Protecao anti-CSRF / Origin check bloqueando origens cruzadas sem API Key (403).
+    2. Origens Tailscale (100.x.x.x / *.ts.net) sem API Key exigem X-API-Key / Bearer (401);
+       demais origens cruzadas nao autorizadas sem API Key recebem 403 Forbidden.
     3. Requisicoes originadas em LAN / IPs externos exigem obrigatoriamente X-API-Key / Bearer (401).
     4. Requisicoes de localhost (127.0.0.1 / ::1 / localhost) autenticam via cookie
        HttpOnly; SameSite=Strict 'aura_local_session' (ou API Key).
@@ -307,12 +348,19 @@ def authorize_admin_request(
         )
 
     origin = (headers.get("origin") or "").strip()
-    if origin and not _is_allowed_local_origin(origin):
-        return (
-            False,
-            status.HTTP_403_FORBIDDEN,
-            "Origem cruzada nao autorizada sem X-API-Key ou Bearer Token valido.",
-        )
+    if origin:
+        if _is_tailscale_origin(origin):
+            return (
+                False,
+                status.HTTP_401_UNAUTHORIZED,
+                "Autenticacao necessaria: acesso a partir de origem Tailscale exige cabecalho X-API-Key ou Bearer Token.",
+            )
+        if not _is_allowed_local_origin(origin):
+            return (
+                False,
+                status.HTTP_403_FORBIDDEN,
+                "Origem cruzada nao autorizada sem X-API-Key ou Bearer Token valido.",
+            )
 
     effective_host = _extract_effective_client_host(headers, client_host)
     is_local = _is_localhost_host(effective_host)
@@ -381,6 +429,7 @@ class ChatRequest(BaseModel):
     stream: bool = Field(default=True, description="Se true, retorna Server-Sent Events (SSE)")
     tenant_id: str | None = Field(default=None, description="Identificador do cliente/rede")
     filial_id: str | None = Field(default=None, description="Identificador da filial do posto")
+    pack_id: str | None = Field(default=None, description="Identificador do Domain Pack vertical ativo")
     context: dict[str, Any] | None = Field(default=None, description="Contexto extra opcional injetado pelo chamador")
     genui: bool | None = Field(default=None, description="Feature flag GenUI override (True=ativa, False=desativa)")
     enable_genui: bool | None = Field(default=None, description="Alias para genui")
@@ -414,6 +463,7 @@ class ExecuteIntentRequest(BaseModel):
     params: dict[str, Any] | None = Field(default_factory=dict, description="Parâmetros específicos da ferramenta")
     tenant_id: str | None = Field(default=None, description="Identificador do cliente")
     filial_id: str | None = Field(default=None, description="Identificador da filial")
+    pack_id: str | None = Field(default=None, description="Identificador do Domain Pack vertical ativo")
 
 
 # =============================================================================
@@ -442,6 +492,8 @@ async def chat_endpoint(
         body_val=body_genui,
     )
 
+    header_pack_id = request.headers.get("x-pack-id") if request is not None else None
+    effective_pack_id = req.pack_id or (header_pack_id.strip() if header_pack_id else None)
     should_stream = req.stream or (request is not None and request.url.path.endswith("/stream"))
 
     if should_stream:
@@ -470,6 +522,7 @@ async def chat_endpoint(
                 tenant_id=req.tenant_id,
                 filial_id=req.filial_id,
                 enable_genui=effective_genui,
+                pack_id=effective_pack_id,
             ):
                 yield chunk.to_sse()
 
@@ -491,6 +544,7 @@ async def chat_endpoint(
             tenant_id=req.tenant_id,
             filial_id=req.filial_id,
             enable_genui=effective_genui,
+            pack_id=effective_pack_id,
         )
         return response
 
@@ -502,6 +556,7 @@ async def chat_stream_get_endpoint(
     session_id: str | None = Query(None, description="Identificador da sessao"),
     tenant_id: str | None = Query(None, description="Identificador do cliente"),
     filial_id: str | None = Query(None, description="Identificador da filial"),
+    pack_id: str | None = Query(None, description="Identificador do Domain Pack vertical ativo"),
     genui: str | None = Query(None, description="Feature flag GenUI override (1=ativa, 0=desativa)"),
     engine: AuraEngine = Depends(get_aura_engine),
 ):
@@ -509,6 +564,8 @@ async def chat_stream_get_endpoint(
     Streaming SSE via requisicao GET para total compatibilidade com clientes EventSource padrao do navegador.
     """
     header_genui = request.headers.get("x-genui-enabled") if request is not None else None
+    header_pack_id = request.headers.get("x-pack-id") if request is not None else None
+    effective_pack_id = pack_id or (header_pack_id.strip() if header_pack_id else None)
     effective_genui = resolve_genui_flag(
         query_param=genui,
         header_val=header_genui,
@@ -539,6 +596,7 @@ async def chat_stream_get_endpoint(
             tenant_id=tenant_id,
             filial_id=filial_id,
             enable_genui=effective_genui,
+            pack_id=effective_pack_id,
         ):
             yield chunk.to_sse()
 
@@ -627,16 +685,26 @@ async def delete_session_endpoint(
 @router.post("/execute-intent", summary="Execução Direta de Ferramenta Analítica")
 async def execute_intent_endpoint(
     req: ExecuteIntentRequest,
+    request: Request = None,
     engine: AuraEngine = Depends(get_aura_engine),
 ):
     """
-    Invoca diretamente uma das 12 ferramentas analíticas (ex: Run-Out, LMC, Pista, Conciliação, Causa-Raiz RCA),
+    Invoca diretamente uma ferramenta analítica (universal via DomainToolRegistry ou cartucho vertical),
     sem latência de síntese de LLM. Retorna os dados analíticos estruturados em JSON.
     """
-    result = await engine.execute_tool(
-        tool_name=req.tool_name,
-        params=req.params,
-    )
+    header_pack_id = request.headers.get("x-pack-id") if request is not None else None
+    effective_pack_id = req.pack_id or (header_pack_id.strip() if header_pack_id else None)
+    if effective_pack_id is not None:
+        result = await engine.execute_tool(
+            tool_name=req.tool_name,
+            params=req.params,
+            pack_id=effective_pack_id,
+        )
+    else:
+        result = await engine.execute_tool(
+            tool_name=req.tool_name,
+            params=req.params,
+        )
     if result.get("status") == "error":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -2849,28 +2917,24 @@ def create_aura_app(
         d = get_proactive_daemon()
         await d.stop()
 
-    # Middleware de Blindagem LAN e Anti-CSRF/Origin (Carbon Core P0.1)
+    # Middleware de Blindagem LAN, Sessao Localhost e Anti-CSRF/Origin (Carbon Core P0.1)
     @app.middleware("http")
     async def lan_and_origin_guard_middleware(request: Request, call_next):
         path = request.url.path
         protected_prefixes = ("/api/v1/aura/", "/api/v1/cockpit/", "/api/v1/voice/")
-        is_protected_api = path.startswith(protected_prefixes) and path != "/api/v1/aura/health"
+        is_protected_api = (
+            (path.startswith(protected_prefixes) and path != "/api/v1/aura/health")
+            or path == "/metrics"
+        )
         if is_protected_api and request.method.upper() != "OPTIONS":
             client_host = request.client.host if request.client else None
-            effective_host = _extract_effective_client_host(request.headers, client_host)
-            is_local = _is_localhost_host(effective_host)
-            is_testclient = _is_testclient_host(effective_host)
-            origin = (request.headers.get("origin") or "").strip()
-
-            # Bloqueia acessos LAN sem API Key ou origens cruzadas sem API Key em todas as rotas da AURA
-            if (not is_local and not is_testclient) or (origin and not _is_allowed_local_origin(origin)):
-                allowed, status_code, detail = authorize_admin_request(
-                    headers=request.headers,
-                    cookies=request.cookies,
-                    client_host=client_host,
-                )
-                if not allowed:
-                    return JSONResponse(status_code=status_code, content={"detail": detail})
+            allowed, status_code, detail = authorize_admin_request(
+                headers=request.headers,
+                cookies=request.cookies,
+                client_host=client_host,
+            )
+            if not allowed:
+                return JSONResponse(status_code=status_code, content={"detail": detail})
 
         return await call_next(request)
 
@@ -2908,15 +2972,8 @@ def create_aura_app(
         req_id = request.headers.get("x-request-id") or str(uuid.uuid4())
         token_req = current_request_id.set(req_id)
 
-        client_ip = request.headers.get("x-forwarded-for")
-        if client_ip:
-            client_ip = client_ip.split(",")[0].strip()
-        elif request.headers.get("x-real-ip"):
-            client_ip = request.headers.get("x-real-ip").strip()
-        elif request.client:
-            client_ip = request.client.host
-        else:
-            client_ip = "127.0.0.1"
+        raw_client = request.client.host if request.client else None
+        client_ip = _extract_effective_client_host(request.headers, raw_client) or "127.0.0.1"
         token_ip = current_client_ip.set(client_ip)
 
         t0 = time.perf_counter()
@@ -2961,7 +3018,7 @@ def create_aura_app(
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
-        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|100\.\d{1,3}\.\d{1,3}\.\d{1,3}|.*\.ts\.net|aura-edge-node01)(:\d+)?$",
+        allow_origin_regex=ALLOWED_CORS_ORIGIN_REGEX,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -2994,6 +3051,7 @@ def create_aura_app(
         "/metrics",
         tags=["SRE Observability"],
         summary="Exportador Prometheus OpenMetrics (P2-4)",
+        dependencies=[Depends(verify_admin_auth)],
     )
     async def root_prometheus_metrics_endpoint(
         engine_dep: AuraEngine = Depends(get_aura_engine),

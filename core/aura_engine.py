@@ -241,6 +241,7 @@ class StationStatus(BaseModel):
 
     filial_id: str
     filial_nome: str
+    pack_id: str = "fuel_convenience"
     razao_social: Optional[str] = None
     cnpj: Optional[str] = None
     pdv: Optional[str] = None
@@ -3404,8 +3405,31 @@ class AuraEngine:
         self._proactive_daemon = proactive_daemon
         self._watchdog = watchdog
         self._tool_registry = tool_registry
-        self._dados_filial: Optional[Dict[str, Any]] = None
+        self._dados_filial_cache: Dict[str, Dict[str, Any]] = {}
         self._token_budget = None
+
+    def _resolve_current_pack(self, pack_id: Optional[str] = None) -> DomainPackConfig:
+        """Resolve o Domain Pack efetivo sem mutar o ContextVar global."""
+        if pack_id:
+            return get_active_domain_pack(pack_id)
+        ctx_pack = peek_active_domain_pack()
+        if ctx_pack is not None:
+            return ctx_pack
+        return get_active_domain_pack(self.pack_id)
+
+    @property
+    def _dados_filial(self) -> Optional[Dict[str, Any]]:
+        """Compatibilidade retroativa: acessa o cache de dados da filial chaveado pelo pack_id ativo."""
+        pack_key = self._resolve_current_pack().pack_id
+        return self._dados_filial_cache.get(pack_key)
+
+    @_dados_filial.setter
+    def _dados_filial(self, value: Optional[Dict[str, Any]]) -> None:
+        if value is None:
+            self._dados_filial_cache.clear()
+        else:
+            pack_key = str(value.get("pack_id") or self._resolve_current_pack().pack_id)
+            self._dados_filial_cache[pack_key] = value
 
     @property
     def rag(self) -> HybridRAGEngine:
@@ -3518,40 +3542,40 @@ class AuraEngine:
         )
 
     def get_dados_filial(self, force_reload: bool = False) -> Dict[str, Any]:
-        """Obtém dados cadastrais da filial conectada com cache em memória."""
-        if self._dados_filial is None or force_reload:
-            active_pack = peek_active_domain_pack()
-            if active_pack is None and self.pack_id:
-                try:
-                    active_pack = get_active_domain_pack(self.pack_id)
-                except Exception:
-                    active_pack = None
+        """Obtém dados cadastrais da filial conectada com cache em memória particionado por pack_id."""
+        active_pack = self._resolve_current_pack()
+        pack_key = active_pack.pack_id
 
-            if active_pack is not None and active_pack.pack_id != "fuel_convenience":
-                self._dados_filial = {
+        if force_reload or pack_key not in self._dados_filial_cache:
+            if pack_key != "fuel_convenience":
+                dados_pack = {
                     "idempresa": self.filial_id,
                     "nome": f"{active_pack.pack_name} ({self.filial_id})",
                     "razao_social": active_pack.pack_name,
                     "cnpj": "00.000.000/0001-00",
                     "endereco": "Unidade Operacional",
                     "pdv": "01",
-                    "pack_id": active_pack.pack_id,
+                    "pack_id": pack_key,
                 }
-                return self._dados_filial
+                self._dados_filial_cache[pack_key] = dados_pack
+                return dados_pack
 
             try:
-                self._dados_filial = self.tools.dados_cadastrais_filial()
+                dados_fuel = dict(self.tools.dados_cadastrais_filial())
+                dados_fuel.setdefault("pack_id", pack_key)
+                self._dados_filial_cache[pack_key] = dados_fuel
             except Exception as e:
-                self._dados_filial = {
+                self._dados_filial_cache[pack_key] = {
                     "idempresa": self.filial_id,
                     "nome": f"Posto de Combustíveis ({self.filial_id})",
                     "razao_social": "Auto Posto S/A",
                     "cnpj": "00.000.000/0001-00",
                     "endereco": "Unidade Operacional",
                     "pdv": "01",
+                    "pack_id": pack_key,
                     "status_conexao": f"Indisponível: {e}",
                 }
-        return self._dados_filial
+        return self._dados_filial_cache[pack_key]
 
     def check_compliance_opt_in(self, loja_cnpj: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -3604,11 +3628,13 @@ class AuraEngine:
         except Exception:
             vector_online = False
 
+        active_pack = self._resolve_current_pack()
         filial = self.get_dados_filial()
 
         return StationStatus(
             filial_id=str(filial.get("idempresa") or self.filial_id),
             filial_nome=str(filial.get("nome") or "Posto"),
+            pack_id=str(filial.get("pack_id") or active_pack.pack_id),
             razao_social=filial.get("razao_social"),
             cnpj=filial.get("cnpj"),
             pdv=str(filial.get("pdv") or "01"),
@@ -3632,27 +3658,35 @@ class AuraEngine:
         self,
         tool_name: str,
         params: Optional[Dict[str, Any]] = None,
+        pack_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Executa uma das 11 ferramentas analíticas do posto diretamente,
+        Executa uma ferramenta analítica diretamente via DomainToolRegistry ou cartucho vertical,
         sem passar pela síntese e consumo de tokens do LLM.
         Alias canônico conforme especificado no roadmap e requisitos da Fase 1.
         """
-        return await self.execute_tool_direct(tool_name, params)
+        return await self.execute_tool_direct(tool_name, params, pack_id=pack_id)
 
     async def execute_tool_direct(
         self,
         tool_name: str,
         params: Optional[Dict[str, Any]] = None,
+        pack_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Executa uma das 11 ferramentas analíticas do posto diretamente,
-        sem passar pela síntese e consumo de tokens do LLM.
-        Ideal para endpoints de dashboards, automações e relatórios fixos.
+        Executa uma ferramenta analítica diretamente respeitando o isolamento do Domain Pack ativo.
+        Despacha via DomainToolRegistry e bloqueia fallback para PostoTools quando pack_id != 'fuel_convenience'.
         """
-        p = params or {}
+        p = dict(params or {})
         norm_name = tool_name.strip().lower().replace("-", "_").replace(" ", "_")
         t0 = time.perf_counter()
+
+        requested_pack_id = (
+            pack_id
+            or (p.get("pack_id") if isinstance(p, dict) else None)
+            or self.pack_id
+        )
+        pack_ctx_arg: Any = requested_pack_id if requested_pack_id else peek_active_domain_pack()
 
         # Protecao de Hardware do PDV (Fase 3: Circuit Breaker)
         if self._is_heavy_tool(norm_name) and not self.watchdog.is_heavy_operation_allowed():
@@ -3673,300 +3707,354 @@ class AuraEngine:
             }
 
         def _run_sync():
-            # Mapeamento universal de nomes de intenções e ferramentas
-            if norm_name in (
-                "formas_pagamento", "consultar_formas_pagamento_detalhado",
-                "pagamentos_caixa", "meios_pagamento", "formas_pagamento_detalhado"
-            ):
-                return self.tools.consultar_formas_pagamento_detalhado(
-                    data=p.get("data"),
-                    turno=p.get("turno"),
-                    pdv=p.get("pdv") or p.get("caixa"),
-                )
+            with DomainPackContext(pack_ctx_arg) as active_pack:
+                # 1. Despacho via DomainToolRegistry (Carbon Core P1.1)
+                _universal_direct_intents = {
+                    "auditoria_turno_caixa",
+                    "previsao_runout_estoque",
+                    "market_basket_cross_sell",
+                }
+                _fuel_registry_direct_intents = {
+                    "auditar_conformidade_lmc_anp",
+                    "lmc_compliance",
+                    "vazao_bicos",
+                    "benchmark_anp",
+                    "benchmark_comparativo",
+                    "comparativo_turnos",
+                    "custo_estoque_macro",
+                    "analisar_custo_estoque_macroeconomico",
+                }
 
-            elif norm_name in (
-                "auditoria_turno", "auditar_fechamento_turno", "fechamento_turno",
-                "turno", "conciliacao_turno", "auditoria_de_turno", "fechamento_de_turno",
-                "conferencia_turno", "conferencia_pista"
-            ):
-                data_val = p.get("data")
-                turno_val = p.get("turno")
-                return self.tools.auditar_fechamento_turno(data=data_val, turno=turno_val)
+                if active_pack.pack_id != "fuel_convenience":
+                    if norm_name in (
+                        "dados_filial", "dados_cadastrais_filial", "filial",
+                        "cadastro_filial", "empresa"
+                    ):
+                        return self.get_dados_filial(force_reload=p.get("reload", False))
 
-            elif norm_name in (
-                "investigar_causa_raiz", "investigar_causa", "causa_raiz", "rca",
-                "analisar_causa_quebra", "pericia_forense", "analisar_hipotese_quebra"
-            ):
-                return self.tools.investigar_causa_raiz_turno(
-                    data=p.get("data"),
-                    turno=p.get("turno"),
-                    caixa_id=p.get("caixa_id"),
-                    bico=p.get("bico"),
-                )
+                    if self.tool_registry.can_handle(norm_name, active_pack):
+                        exec_res = self.tool_registry.dispatch(
+                            intent=norm_name,
+                            query=str(p.get("query") or norm_name),
+                            erp_adapter=self.tools.erp_adapter,
+                            domain_pack=active_pack,
+                            tools_facade=self.tools,
+                            extra_params=p,
+                        )
+                        if exec_res is not None:
+                            return exec_res.raw_result
 
-            elif norm_name in (
-                "previsao_tanques", "prever_esgotamento_tanques", "runout", "run_out",
-                "tanques", "esgotamento_tanques", "autonomia_tanques", "autonomia"
-            ):
-                comb_val = p.get("filtro_combustivel") or p.get("combustivel")
-                return self.tools.prever_esgotamento_tanques(filtro_combustivel=comb_val)
+                    raise ValueError(
+                        f"Ferramenta '{tool_name}' nao suportada para o Domain Pack "
+                        f"'{active_pack.pack_id}': fallback legado para PostoTools bloqueado."
+                    )
 
-            elif norm_name in (
-                "desempenho_pista_frentistas", "auditar_desempenho_pista_frentistas",
-                "desempenho_frentistas", "frentistas", "pista", "desempenho_pista",
-                "vazao_bicos", "ranking_frentistas"
-            ):
-                return self.tools.auditar_desempenho_pista_frentistas(
-                    data=p.get("data"),
-                    turno=p.get("turno"),
-                    frentista=p.get("frentista"),
-                    bico=p.get("bico"),
-                )
+                if norm_name in _universal_direct_intents or norm_name in _fuel_registry_direct_intents:
+                    exec_res = self.tool_registry.dispatch(
+                        intent=norm_name,
+                        query=str(p.get("query") or norm_name),
+                        erp_adapter=self.tools.erp_adapter,
+                        domain_pack=active_pack,
+                        tools_facade=self.tools,
+                        extra_params=p,
+                    )
+                    if exec_res is not None:
+                        return exec_res.raw_result
 
-            elif norm_name in (
-                "lmc_anp", "gerar_relatorio_lmc_anp", "lmc", "relatorio_lmc",
-                "lmc_oficial", "livro_lmc"
-            ):
-                return self.tools.gerar_relatorio_lmc_anp(
-                    data=p.get("data"),
-                    combustivel=p.get("combustivel"),
-                    tanque=p.get("tanque"),
-                )
+                # 2. Rotas legadas exclusivas do pack fuel_convenience (PostoTools)
+                if norm_name in (
+                    "formas_pagamento", "consultar_formas_pagamento_detalhado",
+                    "pagamentos_caixa", "meios_pagamento", "formas_pagamento_detalhado"
+                ):
+                    return self.tools.consultar_formas_pagamento_detalhado(
+                        data=p.get("data"),
+                        turno=p.get("turno"),
+                        pdv=p.get("pdv") or p.get("caixa"),
+                    )
 
-            elif norm_name in (
-                "vendas_analitico", "consultar_analise_vendas_erp", "vendas",
-                "analise_vendas", "faturamento"
-            ):
-                tipo_val = p.get("tipo", "mais_vendidos")
-                return self.tools.consultar_analise_vendas_erp(tipo=tipo_val)
+                elif norm_name in (
+                    "auditoria_turno", "auditar_fechamento_turno", "fechamento_turno",
+                    "turno", "conciliacao_turno", "auditoria_de_turno", "fechamento_de_turno",
+                    "conferencia_turno", "conferencia_pista"
+                ):
+                    data_val = p.get("data")
+                    turno_val = p.get("turno")
+                    return self.tools.auditar_fechamento_turno(data=data_val, turno=turno_val)
 
-            elif norm_name in (
-                "conveniencia_vendas_cruzadas", "auditar_cesta_conveniencia_vendas_cruzadas",
-                "cesta", "market_basket", "vendas_cruzadas", "conveniencia", "combos",
-                "cesta_compras", "basket_upsell", "cross_selling", "cross_sell"
-            ):
-                return self.tools.auditar_cesta_conveniencia_vendas_cruzadas(
-                    filtro_produto=p.get("filtro_produto") or p.get("produto"),
-                    min_lift=float(p.get("min_lift", 1.2)),
-                    min_suporte=float(p.get("min_suporte", 0.005)),
-                    min_confianca=float(p.get("min_confianca", 0.05)),
-                    limit=int(p.get("limit", 10)),
-                    data_inicio=p.get("data_inicio") or p.get("data"),
-                    data_fim=p.get("data_fim") or p.get("data"),
-                )
+                elif norm_name in (
+                    "investigar_causa_raiz", "investigar_causa", "causa_raiz", "rca",
+                    "analisar_causa_quebra", "pericia_forense", "analisar_hipotese_quebra"
+                ):
+                    return self.tools.investigar_causa_raiz_turno(
+                        data=p.get("data"),
+                        turno=p.get("turno"),
+                        caixa_id=p.get("caixa_id"),
+                        bico=p.get("bico"),
+                    )
 
-            elif norm_name in (
-                "sre_metricas", "obter_telemetria_sre", "telemetria",
-                "sre", "metricas", "saude_banco"
-            ):
-                res = self.tools.obter_telemetria_sre()
-                res["semantic_router_metrics"] = self.router.get_sre_telemetry()
-                return res
+                elif norm_name in (
+                    "previsao_tanques", "prever_esgotamento_tanques", "runout", "run_out",
+                    "tanques", "esgotamento_tanques", "autonomia_tanques", "autonomia"
+                ):
+                    comb_val = p.get("filtro_combustivel") or p.get("combustivel")
+                    return self.tools.prever_esgotamento_tanques(filtro_combustivel=comb_val)
 
-            elif norm_name in (
-                "dados_filial", "dados_cadastrais_filial", "filial",
-                "cadastro_filial", "empresa"
-            ):
-                return self.get_dados_filial(force_reload=p.get("reload", False))
+                elif norm_name in (
+                    "desempenho_pista_frentistas", "auditar_desempenho_pista_frentistas",
+                    "desempenho_frentistas", "frentistas", "pista", "desempenho_pista",
+                    "vazao_bicos", "ranking_frentistas"
+                ):
+                    return self.tools.auditar_desempenho_pista_frentistas(
+                        data=p.get("data"),
+                        turno=p.get("turno"),
+                        frentista=p.get("frentista"),
+                        bico=p.get("bico"),
+                    )
 
-            elif norm_name in (
-                "estoque_posicao", "consultar_estoque_erp", "estoque", "saldo_estoque"
-            ):
-                return self.tools.consultar_estoque_erp(termo=p.get("termo", ""))
+                elif norm_name in (
+                    "lmc_anp", "gerar_relatorio_lmc_anp", "lmc", "relatorio_lmc",
+                    "lmc_oficial", "livro_lmc"
+                ):
+                    return self.tools.gerar_relatorio_lmc_anp(
+                        data=p.get("data"),
+                        combustivel=p.get("combustivel"),
+                        tanque=p.get("tanque"),
+                    )
 
-            elif norm_name in (
-                "clientes_ranking", "consultar_clientes_erp", "clientes", "ranking_clientes"
-            ):
-                return self.tools.consultar_clientes_erp(termo=p.get("termo", ""))
+                elif norm_name in (
+                    "vendas_analitico", "consultar_analise_vendas_erp", "vendas",
+                    "analise_vendas", "faturamento"
+                ):
+                    tipo_val = p.get("tipo", "mais_vendidos")
+                    return self.tools.consultar_analise_vendas_erp(tipo=tipo_val)
 
-            elif norm_name == "simular_cenario_what_if":
-                return self.tools.simular_cenario_what_if(**p)
+                elif norm_name in (
+                    "conveniencia_vendas_cruzadas", "auditar_cesta_conveniencia_vendas_cruzadas",
+                    "cesta", "market_basket", "vendas_cruzadas", "conveniencia", "combos",
+                    "cesta_compras", "basket_upsell", "cross_selling", "cross_sell"
+                ):
+                    return self.tools.auditar_cesta_conveniencia_vendas_cruzadas(
+                        filtro_produto=p.get("filtro_produto") or p.get("produto"),
+                        min_lift=float(p.get("min_lift", 1.2)),
+                        min_suporte=float(p.get("min_suporte", 0.005)),
+                        min_confianca=float(p.get("min_confianca", 0.05)),
+                        limit=int(p.get("limit", 10)),
+                        data_inicio=p.get("data_inicio") or p.get("data"),
+                        data_fim=p.get("data_fim") or p.get("data"),
+                    )
 
-            elif norm_name in (
-                "cenario_preditivo", "simulacao_preditiva", "simular_cenario_precificacao",
-                "simular_cenario", "simular_preco", "what_if", "what-if", "precificacao_dinamica"
-            ):
-                return self.tools.simular_cenario_precificacao(
-                    produto=p.get("produto") or "GASOLINA COMUM",
-                    delta_preco=float(p.get("delta_preco") if p.get("delta_preco") is not None else 0.10),
-                    periodo_dias=int(p.get("periodo_dias") if p.get("periodo_dias") is not None else 30),
-                    custo_novo=float(p["custo_novo"]) if p.get("custo_novo") is not None else None,
-                    preco_base_override=float(p["preco_base_override"]) if p.get("preco_base_override") is not None else None,
-                )
+                elif norm_name in (
+                    "sre_metricas", "obter_telemetria_sre", "telemetria",
+                    "sre", "metricas", "saude_banco"
+                ):
+                    res = self.tools.obter_telemetria_sre()
+                    res["semantic_router_metrics"] = self.router.get_sre_telemetry()
+                    return res
 
-            elif norm_name in (
-                "benchmark_comparativo", "comparar_benchmark_concorrencia", "benchmark",
-                "comparativo_concorrencia", "comparativo_mercado", "benchmark_postos",
-                "posicionamento_competitivo", "comparativo_turnos"
-            ):
-                return self.tools.comparar_benchmark_concorrencia(
-                    grupo_benchmark=p.get("grupo_benchmark") or p.get("grupo"),
-                    data=p.get("data"),
-                    turno=p.get("turno"),
-                    custom_benchmarks=p.get("custom_benchmarks"),
-                    filial_nome=p.get("filial_nome"),
-                    municipio=p.get("municipio"),
-                    produto=p.get("produto"),
-                )
+                elif norm_name in (
+                    "dados_filial", "dados_cadastrais_filial", "filial",
+                    "cadastro_filial", "empresa"
+                ):
+                    return self.get_dados_filial(force_reload=p.get("reload", False))
 
-            elif norm_name in (
-                "auditoria_fuga_financeira", "fuga_financeira", "fugas", "fugas_financeiras",
-                "auditoria_quebras", "furo_caixa", "furo_gaveta", "auditar_fuga_financeira"
-            ):
-                return self.tools.auditar_fuga_financeira(
-                    data=p.get("data"),
-                    turno=p.get("turno"),
-                    pdv=p.get("pdv"),
-                    cash_tolerance_reais=float(p["cash_tolerance_reais"]) if p.get("cash_tolerance_reais") is not None else 50.0,
-                    max_safe_cash_drawer=float(p["max_safe_cash_drawer"]) if p.get("max_safe_cash_drawer") is not None else 800.0,
-                )
+                elif norm_name in (
+                    "estoque_posicao", "consultar_estoque_erp", "estoque", "saldo_estoque"
+                ):
+                    return self.tools.consultar_estoque_erp(termo=p.get("termo", ""))
 
-            elif norm_name in (
-                "catalogo_produtos", "buscar_produtos_catalogo", "catalogo",
-                "produtos", "busca_produtos"
-            ):
-                query_txt = (p.get("termo") or p.get("query") or "").strip() or "combustivel"
-                return self.tools.buscar_produtos_catalogo(
-                    termo=query_txt,
-                    top_k=int(p.get("top_k", 5)),
-                    grupo_filter=p.get("grupo"),
-                )
+                elif norm_name in (
+                    "clientes_ranking", "consultar_clientes_erp", "clientes", "ranking_clientes"
+                ):
+                    return self.tools.consultar_clientes_erp(termo=p.get("termo", ""))
 
-            elif norm_name in (
-                "ajuda_sistema", "ajuda", "menu", "conhecimento_aura", "conhecimento", "sistema", "guia",
-                "consultar_conhecimento_aura", "auto_conhecimento", "ajuda_telas"
-            ):
-                query_txt = (p.get("query") or p.get("termo") or p.get("pergunta") or "").strip() or "ajuda"
-                return self.tools.consultar_conhecimento_aura(
-                    termo=query_txt,
-                    top_k=int(p.get("top_k", 2)),
-                )
+                elif norm_name == "simular_cenario_what_if":
+                    return self.tools.simular_cenario_what_if(**p)
 
-            elif norm_name in (
-                "compliance_status", "conformidade_legal", "compliance", "termo_interoperabilidade",
-                "blindagem_juridica", "auditar_conformidade", "status_conformidade"
-            ):
-                cnpj_target = p.get("cnpj") or p.get("loja_cnpj")
-                return self.check_compliance_opt_in(cnpj_target)
+                elif norm_name in (
+                    "cenario_preditivo", "simulacao_preditiva", "simular_cenario_precificacao",
+                    "simular_cenario", "simular_preco", "what_if", "what-if", "precificacao_dinamica"
+                ):
+                    return self.tools.simular_cenario_precificacao(
+                        produto=p.get("produto") or "GASOLINA COMUM",
+                        delta_preco=float(p.get("delta_preco") if p.get("delta_preco") is not None else 0.10),
+                        periodo_dias=int(p.get("periodo_dias") if p.get("periodo_dias") is not None else 30),
+                        custo_novo=float(p["custo_novo"]) if p.get("custo_novo") is not None else None,
+                        preco_base_override=float(p["preco_base_override"]) if p.get("preco_base_override") is not None else None,
+                    )
 
-            elif norm_name in (
-                "auditar_conformidade_lmc_anp", "lmc_anp", "lmc_compliance", "lmc", "auditoria_lmc"
-            ):
-                return self.tools.auditar_conformidade_lmc_anp(
-                    data=p.get("data"),
-                    tanque=p.get("tanque"),
-                    combustivel=p.get("combustivel") or p.get("produto"),
-                )
+                elif norm_name in (
+                    "benchmark_comparativo", "comparar_benchmark_concorrencia", "benchmark",
+                    "comparativo_concorrencia", "comparativo_mercado", "benchmark_postos",
+                    "posicionamento_competitivo", "comparativo_turnos"
+                ):
+                    return self.tools.comparar_benchmark_concorrencia(
+                        grupo_benchmark=p.get("grupo_benchmark") or p.get("grupo"),
+                        data=p.get("data"),
+                        turno=p.get("turno"),
+                        custom_benchmarks=p.get("custom_benchmarks"),
+                        filial_nome=p.get("filial_nome"),
+                        municipio=p.get("municipio"),
+                        produto=p.get("produto"),
+                    )
 
-            elif norm_name in (
-                "analisar_custo_estoque_macroeconomico", "custo_estoque_macro", "macro_combustiveis"
-            ):
-                return self.tools.analisar_custo_estoque_macroeconomico(
-                    volume_total_litros=float(p["volume_total_litros"]) if p.get("volume_total_litros") is not None else None,
-                    custo_medio_litro=float(p["custo_medio_litro"]) if p.get("custo_medio_litro") is not None else None,
-                    uf=p.get("uf"),
-                    produto=p.get("produto") or "GASOLINA COMUM",
-                )
+                elif norm_name in (
+                    "auditoria_fuga_financeira", "fuga_financeira", "fugas", "fugas_financeiras",
+                    "auditoria_quebras", "furo_caixa", "furo_gaveta", "auditar_fuga_financeira"
+                ):
+                    return self.tools.auditar_fuga_financeira(
+                        data=p.get("data"),
+                        turno=p.get("turno"),
+                        pdv=p.get("pdv"),
+                        cash_tolerance_reais=float(p["cash_tolerance_reais"]) if p.get("cash_tolerance_reais") is not None else 50.0,
+                        max_safe_cash_drawer=float(p["max_safe_cash_drawer"]) if p.get("max_safe_cash_drawer") is not None else 800.0,
+                    )
 
-            elif norm_name in (
-                "diagnostico_modular", "compor_diagnostico_modular", "generative_modular_card",
-                "modular_lego_card", "blocos_lego", "lego_card"
-            ):
-                return self.tools.compor_diagnostico_modular(
-                    titulo=p.get("titulo") or p.get("title"),
-                    subtitulo=p.get("subtitulo") or p.get("subtitle"),
-                    diagnostico=p.get("diagnostico") or p.get("diagnosis"),
-                    confidence_score=float(p.get("confidence_score", 0.95)),
-                    blocos=p.get("blocos") or p.get("blocks"),
-                    suggested_actions=p.get("suggested_actions") or p.get("acoes"),
-                    limitacoes=p.get("limitacoes") or p.get("limitations"),
-                )
+                elif norm_name in (
+                    "catalogo_produtos", "buscar_produtos_catalogo", "catalogo",
+                    "produtos", "busca_produtos"
+                ):
+                    query_txt = (p.get("termo") or p.get("query") or "").strip() or "combustivel"
+                    return self.tools.buscar_produtos_catalogo(
+                        termo=query_txt,
+                        top_k=int(p.get("top_k", 5)),
+                        grupo_filter=p.get("grupo"),
+                    )
 
-            elif norm_name in (
-                "auditar_erosao_financeira_e_recebiveis", "erosao_financeira",
-                "erosao_financeira_tef_selic", "taxas_tef", "arbitragem_selic"
-            ):
-                return self.tools.auditar_erosao_financeira_e_recebiveis(
-                    data_inicio=p.get("data_inicio") or p.get("data"),
-                    data_fim=p.get("data_fim") or p.get("data"),
-                    taxas_contratadas_custom=p.get("taxas_contratadas_custom") or p.get("taxas_contratadas"),
-                    prazo_liquidacao_dias_custom=p.get("prazo_liquidacao_dias_custom") or p.get("prazos"),
-                    necessidade_caixa_72h=float(p["necessidade_caixa_72h"]) if p.get("necessidade_caixa_72h") is not None else None,
-                    taxa_antecipacao_mensal_custom=float(p["taxa_antecipacao_mensal_custom"]) if p.get("taxa_antecipacao_mensal_custom") is not None else None,
-                )
+                elif norm_name in (
+                    "ajuda_sistema", "ajuda", "menu", "conhecimento_aura", "conhecimento", "sistema", "guia",
+                    "consultar_conhecimento_aura", "auto_conhecimento", "ajuda_telas"
+                ):
+                    query_txt = (p.get("query") or p.get("termo") or p.get("pergunta") or "").strip() or "ajuda"
+                    return self.tools.consultar_conhecimento_aura(
+                        termo=query_txt,
+                        top_k=int(p.get("top_k", 2)),
+                    )
 
-            elif norm_name in (
-                "diagnosticar_capital_morto_e_ruptura_invisivel", "capital_morto",
-                "capital_morto_selic", "ruptura_invisivel", "ruptura_fantasma"
-            ):
-                return self.tools.diagnosticar_capital_morto_e_ruptura_invisivel(
-                    dias_sem_giro_corte=int(p.get("dias_sem_giro_corte", 30)),
-                    taxa_selic_anual_override=float(p["taxa_selic_anual_override"]) if p.get("taxa_selic_anual_override") is not None else None,
-                    itens_custom=p.get("itens_custom"),
-                )
+                elif norm_name in (
+                    "compliance_status", "conformidade_legal", "compliance", "termo_interoperabilidade",
+                    "blindagem_juridica", "auditar_conformidade", "status_conformidade"
+                ):
+                    cnpj_target = p.get("cnpj") or p.get("loja_cnpj")
+                    return self.check_compliance_opt_in(cnpj_target)
 
-            elif norm_name in (
-                "diagnosticar_variacao_margem_causal", "raio_x_causal_margem",
-                "margem_causal_waterfall", "variacao_margem", "waterfall_margem"
-            ):
-                return self.tools.diagnosticar_variacao_margem_causal(
-                    periodo_atual=p.get("periodo_atual"),
-                    periodo_anterior=p.get("periodo_anterior"),
-                    dados_custom=p.get("dados_custom"),
-                )
+                elif norm_name in (
+                    "auditar_conformidade_lmc_anp", "lmc_anp", "lmc_compliance", "lmc", "auditoria_lmc"
+                ):
+                    return self.tools.auditar_conformidade_lmc_anp(
+                        data=p.get("data"),
+                        tanque=p.get("tanque"),
+                        combustivel=p.get("combustivel") or p.get("produto"),
+                    )
 
-            elif norm_name in (
-                "simular_elasticidade_e_lote_compra", "elasticidade_lote_compra",
-                "simulador_elasticidade", "otimizador_lote"
-            ):
-                return self.tools.simular_elasticidade_e_lote_compra(
-                    produto=p.get("produto") or "GASOLINA COMUM",
-                    municipio=p.get("municipio"),
-                    tanque_capacidade_litros=float(p["tanque_capacidade_litros"]) if p.get("tanque_capacidade_litros") is not None else None,
-                    estoque_atual_litros=float(p["estoque_atual_litros"]) if p.get("estoque_atual_litros") is not None else None,
-                    lote_minimo_litros=float(p.get("lote_minimo_litros", 5000.0)),
-                    desconto_lote_reais_litro=float(p.get("desconto_lote_reais_litro", 0.08)),
-                    preco_venda_atual=float(p["preco_venda_atual"]) if p.get("preco_venda_atual") is not None else None,
-                    consumo_diario_litros=float(p["consumo_diario_litros"]) if p.get("consumo_diario_litros") is not None else None,
-                    elasticidade_estimada=float(p.get("elasticidade_estimada", -1.8)),
-                )
+                elif norm_name in (
+                    "analisar_custo_estoque_macroeconomico", "custo_estoque_macro", "macro_combustiveis"
+                ):
+                    return self.tools.analisar_custo_estoque_macroeconomico(
+                        volume_total_litros=float(p["volume_total_litros"]) if p.get("volume_total_litros") is not None else None,
+                        custo_medio_litro=float(p["custo_medio_litro"]) if p.get("custo_medio_litro") is not None else None,
+                        uf=p.get("uf"),
+                        produto=p.get("produto") or "GASOLINA COMUM",
+                    )
 
-            elif norm_name in (
-                "roi_diagnostic", "diagnostico_executivo_roi", "diagnostico_perdas", "roi_perdas"
-            ):
-                from core.partner_api import compute_station_roi_diagnostic, get_partner_staging_store
-                st = get_partner_staging_store()
-                st_id = p.get("station_id") or p.get("filial_id") or self.filial_id or "default"
-                sub_val = float(p.get("monthly_subscription_brl") or 490.0)
-                return compute_station_roi_diagnostic(station_id=st_id, staging_store=st, monthly_subscription_brl=sub_val)
+                elif norm_name in (
+                    "diagnostico_modular", "compor_diagnostico_modular", "generative_modular_card",
+                    "modular_lego_card", "blocos_lego", "lego_card"
+                ):
+                    return self.tools.compor_diagnostico_modular(
+                        titulo=p.get("titulo") or p.get("title"),
+                        subtitulo=p.get("subtitulo") or p.get("subtitle"),
+                        diagnostico=p.get("diagnostico") or p.get("diagnosis"),
+                        confidence_score=float(p.get("confidence_score", 0.95)),
+                        blocos=p.get("blocos") or p.get("blocks"),
+                        suggested_actions=p.get("suggested_actions") or p.get("acoes"),
+                        limitacoes=p.get("limitacoes") or p.get("limitations"),
+                    )
 
-            elif norm_name in (
-                "pos_audit", "radar_anomalias_pdv", "auditoria_pdv_zscore", "auditoria_pos"
-            ):
-                from core.partner_api import audit_pos_and_cashier_anomalies, get_partner_staging_store
-                st = get_partner_staging_store()
-                st_id = p.get("station_id") or p.get("filial_id") or self.filial_id or "default"
-                return audit_pos_and_cashier_anomalies(station_id=st_id, staging_store=st)
+                elif norm_name in (
+                    "auditar_erosao_financeira_e_recebiveis", "erosao_financeira",
+                    "erosao_financeira_tef_selic", "taxas_tef", "arbitragem_selic"
+                ):
+                    return self.tools.auditar_erosao_financeira_e_recebiveis(
+                        data_inicio=p.get("data_inicio") or p.get("data"),
+                        data_fim=p.get("data_fim") or p.get("data"),
+                        taxas_contratadas_custom=p.get("taxas_contratadas_custom") or p.get("taxas_contratadas"),
+                        prazo_liquidacao_dias_custom=p.get("prazo_liquidacao_dias_custom") or p.get("prazos"),
+                        necessidade_caixa_72h=float(p["necessidade_caixa_72h"]) if p.get("necessidade_caixa_72h") is not None else None,
+                        taxa_antecipacao_mensal_custom=float(p["taxa_antecipacao_mensal_custom"]) if p.get("taxa_antecipacao_mensal_custom") is not None else None,
+                    )
 
-            elif norm_name in (
-                "zero_click_briefing", "briefing_matinal", "cafe_com_dono", "morning_briefing"
-            ):
-                from core.partner_api import generate_morning_briefing_payload, get_partner_staging_store
-                st = get_partner_staging_store()
-                st_id = p.get("station_id") or p.get("filial_id") or self.filial_id or "default"
-                return generate_morning_briefing_payload(station_id=st_id, staging_store=st)
+                elif norm_name in (
+                    "diagnosticar_capital_morto_e_ruptura_invisivel", "capital_morto",
+                    "capital_morto_selic", "ruptura_invisivel", "ruptura_fantasma"
+                ):
+                    return self.tools.diagnosticar_capital_morto_e_ruptura_invisivel(
+                        dias_sem_giro_corte=int(p.get("dias_sem_giro_corte", 30)),
+                        taxa_selic_anual_override=float(p["taxa_selic_anual_override"]) if p.get("taxa_selic_anual_override") is not None else None,
+                        itens_custom=p.get("itens_custom"),
+                    )
 
-            elif norm_name in (
-                "auditoria_fiscal_sefaz", "conhecimento_fiscal", "fiscal_sefaz",
-                "auditoria_sefaz", "escudo_fiscal", "auditar_documento_ou_chave_fiscal"
-            ):
-                query_txt = (p.get("chave_ou_xml") or p.get("query") or p.get("termo") or p.get("pergunta") or "").strip()
-                if not query_txt:
-                    query_txt = "Quais as regras de ICMS Monofasico CST 61, PIS/COFINS CST 04 na conveniencia e principais rejeicoes SEFAZ?"
-                return self.tools.auditar_documento_ou_chave_fiscal(query_txt)
+                elif norm_name in (
+                    "diagnosticar_variacao_margem_causal", "raio_x_causal_margem",
+                    "margem_causal_waterfall", "variacao_margem", "waterfall_margem"
+                ):
+                    return self.tools.diagnosticar_variacao_margem_causal(
+                        periodo_atual=p.get("periodo_atual"),
+                        periodo_anterior=p.get("periodo_anterior"),
+                        dados_custom=p.get("dados_custom"),
+                    )
 
-            else:
-                raise ValueError(f"Ferramenta desconhecida ou não suportada: '{tool_name}'")
+                elif norm_name in (
+                    "simular_elasticidade_e_lote_compra", "elasticidade_lote_compra",
+                    "simulador_elasticidade", "otimizador_lote"
+                ):
+                    return self.tools.simular_elasticidade_e_lote_compra(
+                        produto=p.get("produto") or "GASOLINA COMUM",
+                        municipio=p.get("municipio"),
+                        tanque_capacidade_litros=float(p["tanque_capacidade_litros"]) if p.get("tanque_capacidade_litros") is not None else None,
+                        estoque_atual_litros=float(p["estoque_atual_litros"]) if p.get("estoque_atual_litros") is not None else None,
+                        lote_minimo_litros=float(p.get("lote_minimo_litros", 5000.0)),
+                        desconto_lote_reais_litro=float(p.get("desconto_lote_reais_litro", 0.08)),
+                        preco_venda_atual=float(p["preco_venda_atual"]) if p.get("preco_venda_atual") is not None else None,
+                        consumo_diario_litros=float(p["consumo_diario_litros"]) if p.get("consumo_diario_litros") is not None else None,
+                        elasticidade_estimada=float(p.get("elasticidade_estimada", -1.8)),
+                    )
+
+                elif norm_name in (
+                    "roi_diagnostic", "diagnostico_executivo_roi", "diagnostico_perdas", "roi_perdas"
+                ):
+                    from core.partner_api import compute_station_roi_diagnostic, get_partner_staging_store
+                    st = get_partner_staging_store()
+                    st_id = p.get("station_id") or p.get("filial_id") or self.filial_id or "default"
+                    sub_val = float(p.get("monthly_subscription_brl") or 490.0)
+                    return compute_station_roi_diagnostic(station_id=st_id, staging_store=st, monthly_subscription_brl=sub_val)
+
+                elif norm_name in (
+                    "pos_audit", "radar_anomalias_pdv", "auditoria_pdv_zscore", "auditoria_pos"
+                ):
+                    from core.partner_api import audit_pos_and_cashier_anomalies, get_partner_staging_store
+                    st = get_partner_staging_store()
+                    st_id = p.get("station_id") or p.get("filial_id") or self.filial_id or "default"
+                    return audit_pos_and_cashier_anomalies(station_id=st_id, staging_store=st)
+
+                elif norm_name in (
+                    "zero_click_briefing", "briefing_matinal", "cafe_com_dono", "morning_briefing"
+                ):
+                    from core.partner_api import generate_morning_briefing_payload, get_partner_staging_store
+                    st = get_partner_staging_store()
+                    st_id = p.get("station_id") or p.get("filial_id") or self.filial_id or "default"
+                    return generate_morning_briefing_payload(station_id=st_id, staging_store=st)
+
+                elif norm_name in (
+                    "auditoria_fiscal_sefaz", "conhecimento_fiscal", "fiscal_sefaz",
+                    "auditoria_sefaz", "escudo_fiscal", "auditar_documento_ou_chave_fiscal"
+                ):
+                    query_txt = (p.get("chave_ou_xml") or p.get("query") or p.get("termo") or p.get("pergunta") or "").strip()
+                    if not query_txt:
+                        query_txt = "Quais as regras de ICMS Monofasico CST 61, PIS/COFINS CST 04 na conveniencia e principais rejeicoes SEFAZ?"
+                    return self.tools.auditar_documento_ou_chave_fiscal(query_txt)
+
+                else:
+                    raise ValueError(f"Ferramenta desconhecida ou não suportada: '{tool_name}'")
 
         try:
             result_data = await asyncio.to_thread(_run_sync)
@@ -3976,6 +4064,7 @@ class AuraEngine:
             return {
                 "status": "success",
                 "tool_name": norm_name,
+                "pack_id": requested_pack_id or self._resolve_current_pack().pack_id,
                 "latency_ms": round(lat_ms, 2),
                 "data": result_data,
             }
@@ -3984,6 +4073,7 @@ class AuraEngine:
             return {
                 "status": "error",
                 "tool_name": norm_name,
+                "pack_id": requested_pack_id or self._resolve_current_pack().pack_id,
                 "latency_ms": round(lat_ms, 2),
                 "error": str(e),
             }
@@ -4105,7 +4195,7 @@ class AuraEngine:
             #   market_basket_cross_sell, simular_cenario_what_if) sobre BaseERPAdapter;
             # - Cartuchos verticais isolados (fuel_convenience: lmc_anp, vazao_bicos, benchmark_anp);
             # - Qualquer intencao especifica/mapeada de packs nao-posto (ex: pharmacy_health).
-            active_pack = peek_active_domain_pack() or get_active_domain_pack(self.pack_id)
+            active_pack = self._resolve_current_pack()
             _universal_dispatch_intents = {
                 "auditoria_turno_caixa",
                 "previsao_runout_estoque",
@@ -4147,6 +4237,32 @@ class AuraEngine:
                         f"{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
                     )
                     return contexto_extra, resultado_bruto, None, False, (time.perf_counter() - t0) * 1000
+
+            # Isolamento estrito de Domain Pack: bloqueia queda nos blocos elif legados
+            # de PostoTools sempre que o pack ativo for diferente de 'fuel_convenience'.
+            if active_pack.pack_id != "fuel_convenience":
+                if norm_intent == "dados_filial":
+                    resultado_bruto = self.get_dados_filial()
+                    contexto_extra = f"Dados da Unidade ({active_pack.pack_name}):\n{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+                    return contexto_extra, resultado_bruto, None, False, (time.perf_counter() - t0) * 1000
+
+                resultado_bruto = {
+                    "status": "unsupported_for_pack",
+                    "pack_id": active_pack.pack_id,
+                    "pack_name": active_pack.pack_name,
+                    "intent": norm_intent,
+                    "tabelas_legadas_posto_acessadas": False,
+                    "fallback_posto_bloqueado": True,
+                    "message": (
+                        f"A intencao '{norm_intent}' nao possui handler registrado para o Domain Pack "
+                        f"'{active_pack.pack_id}'. Fallback legado para PostoTools bloqueado."
+                    ),
+                }
+                contexto_extra = (
+                    f"Isolamento Domain Pack [{active_pack.pack_id}]:\n"
+                    f"{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+                )
+                return contexto_extra, resultado_bruto, None, False, (time.perf_counter() - t0) * 1000
 
             if intencao == "ajuda_sistema":
                 busca = self.tools.consultar_conhecimento_aura(

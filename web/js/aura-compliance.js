@@ -316,14 +316,26 @@ class AuraComplianceCoordinator {
     const signerName = inputSigner ? inputSigner.value.trim() : '';
 
     if (!signerName) {
-      alert('Por favor, informe o nome e cargo do representante legal que autoriza o opt-in.');
+      if (window.auraFx && typeof window.auraFx.showToast === 'function') {
+        window.auraFx.showToast({
+          title: 'Assinatura Obrigatoria',
+          message: 'Informe o nome e cargo do representante legal que autoriza o opt-in.',
+          type: 'warning'
+        });
+      }
       if (inputSigner) inputSigner.focus();
       return;
     }
 
     const checkConfirm = document.getElementById('compliance-check-confirm');
     if (checkConfirm && !checkConfirm.checked) {
-      alert('Por favor, assinale a confirmacao de ciencia dos termos de interoperabilidade.');
+      if (window.auraFx && typeof window.auraFx.showToast === 'function') {
+        window.auraFx.showToast({
+          title: 'Confirmacao Pendente',
+          message: 'Assinale a confirmacao de ciencia dos termos de interoperabilidade.',
+          type: 'warning'
+        });
+      }
       checkConfirm.focus();
       return;
     }
@@ -364,7 +376,13 @@ class AuraComplianceCoordinator {
       }
     } catch (err) {
       console.error('Falha ao formalizar opt-in:', err);
-      alert(`Falha ao registrar opt-in de conformidade: ${err.message}`);
+      if (window.auraFx && typeof window.auraFx.showToast === 'function') {
+        window.auraFx.showToast({
+          title: 'Falha no Opt-In',
+          message: `Falha ao registrar opt-in de conformidade: ${err.message}`,
+          type: 'error'
+        });
+      }
     } finally {
       this.isSubmitting = false;
       if (btnSubmit) {

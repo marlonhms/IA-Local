@@ -265,9 +265,15 @@ class TestP12SargableSQLAndReadOnlyGuard:
             "SELECT /* comentario */ * FROM pedido",
             "SELECT $$payload$$ FROM pedido",
             "SELECT $tag$DROP TABLE pedido$tag$",
+            "SELECT E'\\''; DROP TABLE pedido; SELECT E'\\''",
+            "SELECT e'escape_literal' FROM pedido",
+            'SELECT "pg_sleep"(10)',
+            'SELECT pg_catalog."pg_sleep"(10)',
+            'SELECT "set_config"(\'search_path\', \'public\', false)',
             "DELETE FROM pedido WHERE codi = '1'",
             "UPDATE produtos SET valvenda = 0",
             "INSERT INTO pedido VALUES (1)",
+            "WITH x AS (DELETE FROM pedido RETURNING *) SELECT * FROM x",
             "COPY pedido TO '/tmp/dump.csv'",
             "SELECT pg_sleep(10)",
             "SELECT dblink('host=evil', 'SELECT 1')",
@@ -275,11 +281,154 @@ class TestP12SargableSQLAndReadOnlyGuard:
             "SELECT lo_import('/etc/passwd')",
             "SELECT * INTO temp_copy FROM pedido",
             "SELECT * FROM pedido FOR UPDATE",
+            "SELECT * FROM pedido FOR KEY SHARE",
+            "SELECT * FROM pedido FOR NO KEY UPDATE",
         ],
     )
     def test_assert_readonly_safe_sql_blocks_unsafe_queries(self, malicious_sql: str) -> None:
         with pytest.raises(ReadOnlySQLViolationError):
             assert_readonly_safe_sql(malicious_sql)
+
+    def test_tools_module_routes_all_direct_sql_through_readonly_guard(self) -> None:
+        import core.tools as tools_mod
+
+        tools_src = (ROOT_DIR / "core" / "tools.py").read_text(encoding="utf-8")
+        # Nenhuma chamada direta cur.execute( fora do wrapper _execute_readonly_sql
+        wrapper_matches = re.findall(r"^\s*cur\.execute\(", tools_src, flags=re.MULTILINE)
+        assert len(wrapper_matches) == 2, (
+            f"Esperadas apenas as 2 chamadas internas de _execute_readonly_sql, encontradas: {len(wrapper_matches)}"
+        )
+
+        fake_cur = MagicMock()
+        with pytest.raises(ReadOnlySQLViolationError):
+            tools_mod._execute_readonly_sql(fake_cur, 'SELECT "pg_sleep"(5);')
+        fake_cur.execute.assert_not_called()
+
+        tools_mod._execute_readonly_sql(fake_cur, "SELECT COUNT(*) FROM pedido WHERE dtem = %s;", ["2026-11-24"])
+        fake_cur.execute.assert_called_once()
+
+
+class TestP1HardeningPackIsolationAndNoSideEffects:
+    """Valida bloqueio de fallback PostoTools, cache por pack_id e get_active_domain_pack puro."""
+
+    def test_get_active_domain_pack_does_not_mutate_contextvar(self) -> None:
+        from core.domain.domain_pack_loader import (
+            get_active_domain_pack,
+            peek_active_domain_pack,
+        )
+
+        reset_active_domain_pack()
+        try:
+            assert peek_active_domain_pack() is None
+            pack = get_active_domain_pack("pharmacy_health")
+            assert pack.pack_id == "pharmacy_health"
+            # Chamada de leitura nao deve mutar _ACTIVE_PACK_VAR fora de DomainPackContext
+            assert peek_active_domain_pack() is None
+
+            default_pack = get_active_domain_pack()
+            assert default_pack.pack_id == "fuel_convenience"
+            assert peek_active_domain_pack() is None
+        finally:
+            reset_active_domain_pack()
+
+    def test_semantic_router_help_and_procedural_cache_keyed_by_pack_id(self) -> None:
+        router = sr_mod.SemanticRouter()
+        with DomainPackContext("pharmacy_health"):
+            intent_help, _, _ = router.route("ajuda", use_cache=True)
+            intent_proc, _, _ = router.route("como dar entrada em nota fiscal", use_cache=True)
+
+        assert intent_help == "ajuda_sistema"
+        assert intent_proc == "procedimento_erp"
+        assert "pharmacy_health::ajuda" in router._memory_cache
+        assert "ajuda" not in router._memory_cache
+        assert "pharmacy_health::como dar entrada em nota fiscal" in router._memory_cache
+        assert "como dar entrada em nota fiscal" not in router._memory_cache
+
+    @pytest.mark.asyncio
+    async def test_execute_intent_and_resolver_block_postotools_fallback_for_non_fuel_pack(
+        self,
+        monkeypatch,
+        tmp_path: Path,
+    ) -> None:
+        from fastapi.testclient import TestClient
+
+        import core.tools as tools_mod
+        from core.aura_api import create_aura_app
+
+        def _forbid_fuel_db(*_args, **_kwargs):
+            raise AssertionError("Pack nao-posto jamais pode abrir get_erp_connection()!")
+
+        monkeypatch.setattr(tools_mod, "get_erp_connection", _forbid_fuel_db)
+        monkeypatch.setattr(ae, "get_erp_connection", _forbid_fuel_db)
+
+        adapter = MockERPAdapter()
+        mem = ae.AuraSessionMemory(db_path=tmp_path / "pack_iso.db")
+        engine = ae.AuraEngine(
+            tenant_id="tenant_farma_iso",
+            filial_id="farma_02",
+            erp_adapter=adapter,
+            session_memory=mem,
+            pack_id="pharmacy_health",
+        )
+
+        # 1. StationStatus e get_dados_filial expoem pack_id e isolam cache por pack
+        st_status = engine.get_stations_status()
+        assert st_status.pack_id == "pharmacy_health"
+        dados_farma = engine.get_dados_filial()
+        assert dados_farma["pack_id"] == "pharmacy_health"
+        with DomainPackContext("retail_supermarket"):
+            dados_retail = engine.get_dados_filial()
+            assert dados_retail["pack_id"] == "retail_supermarket"
+            assert dados_retail["nome"] != dados_farma["nome"]
+        # Cache da farmacia permanece intacto
+        assert engine.get_dados_filial()["pack_id"] == "pharmacy_health"
+
+        # 2. execute_tool_direct despacha via DomainToolRegistry para pharmacy_health
+        res_sngpc = await engine.execute_tool_direct(
+            "conformidade_sngpc_anvisa",
+            params={},
+            pack_id="pharmacy_health",
+        )
+        assert res_sngpc["status"] == "success"
+        assert res_sngpc["data"]["pack_id"] == "pharmacy_health"
+        assert res_sngpc["data"]["tabelas_legadas_posto_acessadas"] is False
+
+        # 3. execute_tool_direct bloqueia fallback legado de posto (ex: lmc_anp / previsao_tanques)
+        res_blocked = await engine.execute_tool_direct(
+            "lmc_anp",
+            params={},
+            pack_id="pharmacy_health",
+        )
+        assert res_blocked["status"] == "error"
+        assert "bloqueado" in res_blocked["error"].lower()
+
+        # 4. Endpoint HTTP POST /api/v1/aura/execute-intent propaga pack_id e bloqueia posto
+        app = create_aura_app(engine=engine)
+        client = TestClient(app)
+        r_ok = client.post(
+            "/api/v1/aura/execute-intent",
+            json={"tool_name": "fechamento_caixa_pbm", "pack_id": "pharmacy_health"},
+        )
+        assert r_ok.status_code == 200
+        assert r_ok.json()["data"]["pack_id"] == "pharmacy_health"
+
+        r_block = client.post(
+            "/api/v1/aura/execute-intent",
+            json={"tool_name": "previsao_tanques", "pack_id": "pharmacy_health"},
+        )
+        assert r_block.status_code == 400
+        assert "bloqueado" in r_block.json()["detail"]["error"].lower()
+
+        # 5. _resolver_contexto_ferramenta bloqueia queda em elifs legados de PostoTools
+        with DomainPackContext("pharmacy_health"):
+            _, raw_res, _, _, _ = engine._resolver_contexto_ferramenta(
+                "Qual o faturamento dos tanques?",
+                "vendas_analitico",
+            )
+            assert raw_res["status"] == "unsupported_for_pack"
+            assert raw_res["pack_id"] == "pharmacy_health"
+            assert raw_res["tabelas_legadas_posto_acessadas"] is False
+            assert raw_res["fallback_posto_bloqueado"] is True
 
     def test_adapters_enforce_readonly_guard_before_db_access(self) -> None:
         pg_adapter = PostgresLocalERPAdapter(fallback_on_error=False, force_offline=False)

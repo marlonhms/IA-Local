@@ -60,7 +60,7 @@ hiddenimports = [
     'yaml',
 
     # LLM & AI
-    'google.generativeai',
+    'google.genai',
 
     # Core Architecture Modules (v2.0.0-PRO)
     'core.service',

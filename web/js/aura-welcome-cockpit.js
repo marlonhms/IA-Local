@@ -367,7 +367,10 @@
       rootEl.setAttribute('aria-busy', 'true');
       rootEl.querySelectorAll('[data-indicator]').forEach((el) => { el.dataset.state = 'loading'; });
       const meta = rootEl.querySelector('[data-role="meta"]');
-      if (meta) meta.textContent = 'Lendo dados do posto...';
+      const loadingText = (root.auraDomainAdapter && root.auraDomainAdapter.activeProfile && root.auraDomainAdapter.activeProfile.cockpitLoadingMeta)
+        ? root.auraDomainAdapter.activeProfile.cockpitLoadingMeta
+        : 'Lendo dados do posto...';
+      if (meta) meta.textContent = loadingText;
     }
 
     finish(rootEl, results, ts) {
@@ -377,7 +380,10 @@
       const anyData = results.some((r) => r && r.state !== 'neutral');
       if (anyData) {
         const hhmm = new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        meta.textContent = 'Atualizado às ' + hhmm + ' (leitura somente leitura do sistema do posto)';
+        const sourceLabel = (root.auraDomainAdapter && root.auraDomainAdapter.activeProfile && root.auraDomainAdapter.activeProfile.cockpitSourceLabel)
+          ? root.auraDomainAdapter.activeProfile.cockpitSourceLabel
+          : 'leitura somente leitura do sistema do posto';
+        meta.textContent = 'Atualizado às ' + hhmm + ' (' + sourceLabel + ')';
       } else {
         meta.textContent = 'Sem dados no momento. Toque em Atualizar para tentar novamente.';
       }

@@ -779,9 +779,9 @@ class AuraApp {
       });
     }
 
-    // Atalho de teclado rapido Alt+P para alternar Modo Pista
+    // Atalho de teclado Alt+Shift+M para alternar Modo Alto Contraste / Pista (Alt+P e exclusivo do Companion Canvas)
     window.addEventListener('keydown', (e) => {
-      if (e.altKey && (e.key === 'p' || e.key === 'P')) {
+      if (e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey && (e.key === 'm' || e.key === 'M')) {
         e.preventDefault();
         const nextState = !this.isModoPistaActive();
         this.applyModoPista(nextState);
@@ -812,15 +812,15 @@ class AuraApp {
 
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
     if (metaThemeColor) {
-      metaThemeColor.setAttribute('content', enabled ? '#000000' : '#06b6d4');
+      metaThemeColor.setAttribute('content', enabled ? '#000000' : '#07090e');
     }
 
     const btnHeader = document.getElementById('btn-toggle-modo-pista');
     if (btnHeader) {
       btnHeader.setAttribute('aria-pressed', enabled ? 'true' : 'false');
       btnHeader.title = enabled
-        ? 'Modo Pista Ativo: clique para desativar'
-        : 'Alternar Modo Pista (Alto Contraste sob Sol Forte)';
+        ? 'Modo Alto Contraste Ativo (Alt+Shift+M): clique para desativar'
+        : 'Alternar Modo Alto Contraste / Pista (Alt+Shift+M)';
     }
 
     const badgeHeader = document.getElementById('modo-pista-badge');

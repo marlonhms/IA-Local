@@ -741,6 +741,133 @@
   }
 
   // ==========================================================================
+  // 6. NOTIFICACOES TOAST & CONFIRMACAO EXECUTIVA (SUBSTITUI alert/confirm)
+  // ==========================================================================
+  AuraDeviceManager.prototype.showToast = function (opts = {}) {
+    if (typeof document === 'undefined') return;
+    const title = opts.title || 'AURA';
+    const message = opts.message || (typeof opts === 'string' ? opts : '');
+    const type = opts.type || 'info';
+    const duration = typeof opts.duration === 'number' ? opts.duration : 4200;
+
+    let container = document.getElementById('aura-fx-toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'aura-fx-toast-container';
+      container.className = 'fixed bottom-5 right-5 z-[120] flex flex-col gap-2 max-w-sm w-[calc(100vw-2.5rem)] pointer-events-none';
+      document.body.appendChild(container);
+    }
+
+    const tone = type === 'success'
+      ? 'border-emerald-500/40 bg-slate-950/95 text-emerald-200'
+      : type === 'error'
+      ? 'border-rose-500/45 bg-slate-950/95 text-rose-200'
+      : type === 'warning'
+      ? 'border-amber-500/45 bg-slate-950/95 text-amber-200'
+      : 'border-cyan-500/35 bg-slate-950/95 text-cyan-200';
+    const dot = type === 'success'
+      ? 'bg-emerald-400'
+      : type === 'error'
+      ? 'bg-rose-400'
+      : type === 'warning'
+      ? 'bg-amber-400'
+      : 'bg-cyan-400';
+
+    const toast = document.createElement('div');
+    toast.className = `pointer-events-auto rounded-xl border px-3.5 py-2.5 shadow-2xl backdrop-blur-md transition-all duration-200 ${tone}`;
+    toast.setAttribute('role', 'status');
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'flex items-center gap-2 text-xs font-semibold text-white';
+    const dotEl = document.createElement('span');
+    dotEl.className = `w-2 h-2 rounded-full flex-shrink-0 ${dot}`;
+    const titleSpan = document.createElement('span');
+    titleSpan.textContent = title;
+    titleEl.appendChild(dotEl);
+    titleEl.appendChild(titleSpan);
+
+    toast.appendChild(titleEl);
+    if (message) {
+      const msgEl = document.createElement('p');
+      msgEl.className = 'mt-1 text-[11px] leading-relaxed text-slate-300 font-sans';
+      msgEl.textContent = message;
+      toast.appendChild(msgEl);
+    }
+
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(6px)';
+      setTimeout(() => {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 220);
+    }, duration);
+  };
+
+  AuraDeviceManager.prototype.confirmAction = function (opts = {}) {
+    if (typeof document === 'undefined') return Promise.resolve(true);
+    const title = opts.title || 'Confirmar Acao';
+    const message = opts.message || 'Deseja prosseguir com esta operacao?';
+    const confirmLabel = opts.confirmLabel || 'Confirmar';
+    const cancelLabel = opts.cancelLabel || 'Cancelar';
+    const variant = opts.variant || 'danger';
+
+    return new Promise((resolve) => {
+      const existing = document.getElementById('aura-fx-confirm-modal');
+      if (existing) existing.remove();
+
+      const backdrop = document.createElement('div');
+      backdrop.id = 'aura-fx-confirm-modal';
+      backdrop.className = 'fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md';
+      backdrop.setAttribute('role', 'dialog');
+      backdrop.setAttribute('aria-modal', 'true');
+
+      const confirmTone = variant === 'danger'
+        ? 'bg-rose-600 hover:bg-rose-500 text-white border border-rose-400/40'
+        : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold border border-emerald-300/40';
+
+      backdrop.innerHTML = `
+        <div class="w-full max-w-md rounded-2xl bg-[#0c111c] border border-white/10 shadow-2xl p-5 space-y-4">
+          <div class="flex items-center gap-2.5">
+            <span class="w-2.5 h-2.5 rounded-full ${variant === 'danger' ? 'bg-rose-400' : 'bg-cyan-400'}"></span>
+            <h3 class="text-sm font-bold text-white font-sans"></h3>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed font-sans"></p>
+          <div class="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+            <button type="button" data-role="cancel" class="px-3.5 py-2 rounded-xl text-xs font-medium bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-colors"></button>
+            <button type="button" data-role="confirm" class="px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors ${confirmTone}"></button>
+          </div>
+        </div>
+      `;
+
+      backdrop.querySelector('h3').textContent = title;
+      backdrop.querySelector('p').textContent = message;
+      const btnCancel = backdrop.querySelector('[data-role="cancel"]');
+      const btnConfirm = backdrop.querySelector('[data-role="confirm"]');
+      btnCancel.textContent = cancelLabel;
+      btnConfirm.textContent = confirmLabel;
+
+      const finish = (result) => {
+        document.removeEventListener('keydown', onKey);
+        backdrop.remove();
+        resolve(result);
+      };
+      const onKey = (ev) => {
+        if (ev.key === 'Escape') finish(false);
+      };
+
+      btnCancel.addEventListener('click', () => finish(false));
+      btnConfirm.addEventListener('click', () => finish(true));
+      backdrop.addEventListener('click', (ev) => {
+        if (ev.target === backdrop) finish(false);
+      });
+      document.addEventListener('keydown', onKey);
+      document.body.appendChild(backdrop);
+      btnConfirm.focus();
+    });
+  };
+
+  // ==========================================================================
   // INICIALIZAÇÃO GLOBAL DOS SUBSISTEMAS FX
   // ==========================================================================
   window.auraDevice = new AuraDeviceManager();

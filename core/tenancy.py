@@ -53,19 +53,51 @@ _READONLY_FORBIDDEN_KEYWORDS = re.compile(
     re.IGNORECASE,
 )
 
+_READONLY_FORBIDDEN_FUNCTION_NAMES: frozenset[str] = frozenset({
+    "pg_sleep",
+    "pg_sleep_for",
+    "pg_sleep_until",
+    "dblink",
+    "dblink_connect",
+    "dblink_connect_u",
+    "dblink_exec",
+    "dblink_send_query",
+    "pg_read_file",
+    "pg_read_binary_file",
+    "pg_write_file",
+    "pg_ls_dir",
+    "pg_stat_file",
+    "lo_import",
+    "lo_export",
+    "lo_unlink",
+    "lo_from_bytea",
+    "lo_put",
+    "pg_terminate_backend",
+    "pg_cancel_backend",
+    "pg_reload_conf",
+    "pg_rotate_logfile",
+    "pg_execute_server_program",
+    "pg_copy_program",
+    "pg_advisory_lock",
+    "pg_advisory_lock_shared",
+    "pg_try_advisory_lock",
+    "pg_try_advisory_lock_shared",
+    "query_to_xml",
+    "database_to_xml",
+    "table_to_xml",
+    "set_config",
+})
+
 _READONLY_FORBIDDEN_FUNCTIONS = re.compile(
-    r"\b("
-    r"pg_sleep|pg_sleep_for|pg_sleep_until|"
-    r"dblink|dblink_connect|dblink_connect_u|dblink_exec|dblink_send_query|"
-    r"pg_read_file|pg_read_binary_file|pg_ls_dir|pg_stat_file|"
-    r"lo_import|lo_export|lo_unlink|lo_from_bytea|lo_put|"
-    r"pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_rotate_logfile|"
-    r"pg_execute_server_program|set_config"
-    r")\s*\(",
+    r'(?:"|\b)('
+    + "|".join(sorted(_READONLY_FORBIDDEN_FUNCTION_NAMES))
+    + r')(?:"|\b)\s*\(',
     re.IGNORECASE,
 )
 
 _DOLLAR_QUOTE_PATTERN = re.compile(r"\$[a-zA-Z0-9_]*\$")
+_PG_ESCAPE_STRING_PATTERN = re.compile(r"(?:^|[^a-zA-Z0-9_])[eE]'")
+_PSYCOPG2_PLACEHOLDER_PATTERN = re.compile(r"%(?:\([a-zA-Z_][a-zA-Z0-9_]*\))?s")
 
 
 def _strip_single_quoted_literals(sql: str) -> str:
@@ -101,18 +133,109 @@ def _strip_single_quoted_literals(sql: str) -> str:
     return "".join(out)
 
 
+def _validate_readonly_ast(stripped_sql: str) -> None:
+    """
+    Valida a arvore sintatica (AST) PostgreSQL via sqlglot garantindo um unico
+    comando SELECT/UNION sem nos de mutacao, locking (FOR UPDATE/SHARE/KEY SHARE),
+    SELECT INTO ou chamadas a funcoes proibidas (inclusive citadas entre aspas duplas).
+    """
+    try:
+        import sqlglot
+        from sqlglot import exp
+        from sqlglot.errors import ParseError
+    except ImportError as exc:
+        raise ReadOnlySQLViolationError(
+            "Dependencia sqlglot indisponivel para validacao AST read-only."
+        ) from exc
+
+    bind_counter = 0
+
+    def _replace_placeholder(_match: re.Match[str]) -> str:
+        nonlocal bind_counter
+        bind_counter += 1
+        return f"${bind_counter}"
+
+    ast_sql = _PSYCOPG2_PLACEHOLDER_PATTERN.sub(_replace_placeholder, stripped_sql)
+
+    try:
+        statements = sqlglot.parse(ast_sql, read="postgres", error_level=sqlglot.ErrorLevel.RAISE)
+    except ParseError as exc:
+        raise ReadOnlySQLViolationError(
+            f"Consulta SQL rejeitada pela validacao AST PostgreSQL: {exc}"
+        ) from exc
+
+    non_empty = [stmt for stmt in statements if stmt is not None]
+    if len(non_empty) != 1:
+        raise ReadOnlySQLViolationError(
+            "Consulta SQL rejeitada pela AST: exatamente um unico statement SELECT e permitido."
+        )
+
+    root_stmt = non_empty[0]
+    if not isinstance(root_stmt, (exp.Select, exp.Union)):
+        raise ReadOnlySQLViolationError(
+            f"Consulta SQL rejeitada pela AST: comando raiz '{type(root_stmt).__name__}' nao e somente-leitura."
+        )
+
+    forbidden_node_names = (
+        "Insert",
+        "Update",
+        "Delete",
+        "Drop",
+        "Alter",
+        "Create",
+        "Command",
+        "Merge",
+        "Copy",
+        "Grant",
+        "Revoke",
+        "Set",
+        "SetItem",
+        "Transaction",
+        "Commit",
+        "Rollback",
+        "TruncateTable",
+        "Into",
+        "Lock",
+        "Analyze",
+        "Refresh",
+        "Pragma",
+        "LoadData",
+    )
+    forbidden_node_types = tuple(
+        cls for name in forbidden_node_names if (cls := getattr(exp, name, None)) is not None
+    )
+
+    for node in root_stmt.walk():
+        if isinstance(node, forbidden_node_types):
+            raise ReadOnlySQLViolationError(
+                f"Consulta SQL rejeitada pela AST: no proibido '{type(node).__name__}' em modo read-only."
+            )
+        if isinstance(node, (exp.Anonymous, exp.Func)):
+            cand_names = {
+                str(getattr(node, "name", "") or "").strip().strip('"').lower(),
+                str(node.sql_name() if hasattr(node, "sql_name") else "").strip().strip('"').lower(),
+            }
+            matched_fn = cand_names & _READONLY_FORBIDDEN_FUNCTION_NAMES
+            if matched_fn:
+                fn_name = sorted(matched_fn)[0]
+                raise ReadOnlySQLViolationError(
+                    f"Consulta SQL rejeitada pela AST: funcao proibida '{fn_name}()' em modo read-only."
+                )
+
+
 def assert_readonly_safe_sql(sql: str) -> str:
     """
-    Validador lexical central para garantir consultas SQL estritamente read-only
-    nos adaptadores de ERP (Carbon Core P1.2).
+    Validador hibrido (lexical + AST sqlglot) para garantir consultas SQL estritamente
+    read-only nos adaptadores de ERP e ferramentas (Carbon Core P1.2).
 
     Bloqueia:
     - Multiplos statements (ponto-e-virgula interno)
-    - Dollar-quoting ($$ ou $tag$)
+    - Dollar-quoting ($$ ou $tag$) e literais com escape PostgreSQL (E'...')
     - Comentarios evasivos (-- ou /* ... */)
-    - Comandos que nao iniciam com SELECT ou WITH
+    - Comandos que nao sejam SELECT/WITH/UNION validos na AST PostgreSQL
+    - Clausulas SELECT INTO e locking de linhas (FOR UPDATE / FOR SHARE / FOR KEY SHARE)
     - Palavras-chave DDL/DML/COPY/SET/EXECUTE
-    - Funcoes perigosas de sistema, rede, arquivo ou DoS (pg_sleep, dblink, lo_import, pg_read_file)
+    - Funcoes perigosas de sistema, rede, arquivo ou DoS (inclusive citadas entre aspas duplas)
     """
     if not isinstance(sql, str) or not sql.strip():
         raise ReadOnlySQLViolationError("Consulta SQL vazia ou invalida.")
@@ -136,6 +259,12 @@ def assert_readonly_safe_sql(sql: str) -> str:
             "Consulta SQL rejeitada: dollar-quoting ($$) nao e permitido em modo read-only."
         )
 
+    # Bloqueia literais de string com escape PostgreSQL (E'...' / e'...')
+    if _PG_ESCAPE_STRING_PATTERN.search(normalized):
+        raise ReadOnlySQLViolationError(
+            "Consulta SQL rejeitada: literais com escape PostgreSQL (E'...') nao sao permitidos em modo read-only."
+        )
+
     # Mascara literais entre aspas simples para inspecionar tokens SQL reais
     stripped = _strip_single_quoted_literals(normalized)
 
@@ -152,15 +281,19 @@ def assert_readonly_safe_sql(sql: str) -> str:
         )
 
     # Bloqueia clausula SELECT ... INTO (criacao de tabela)
-    if re.search(r"\bSELECT\b[\s\S]*?\bINTO\b\s+(?:TEMPORARY\s+|TEMP\s+|UNLOGGED\s+)?(?:TABLE\s+)?[a-zA-Z_]", stripped, re.IGNORECASE):
+    if re.search(
+        r'\bSELECT\b[\s\S]*?\bINTO\b\s+(?:TEMPORARY\s+|TEMP\s+|UNLOGGED\s+)?(?:TABLE\s+)?[a-zA-Z_"]',
+        stripped,
+        re.IGNORECASE,
+    ):
         raise ReadOnlySQLViolationError(
             "Consulta SQL rejeitada: clausula SELECT INTO nao e permitida em modo read-only."
         )
 
-    # Bloqueia FOR UPDATE / FOR SHARE (locking de linhas em ERP de producao)
-    if re.search(r"\bFOR\s+(?:NO\s+KEY\s+)?(?:UPDATE|SHARE)\b", stripped, re.IGNORECASE):
+    # Bloqueia FOR UPDATE / FOR NO KEY UPDATE / FOR SHARE / FOR KEY SHARE
+    if re.search(r"\bFOR\s+(?:(?:NO\s+)?KEY\s+)?(?:UPDATE|SHARE)\b", stripped, re.IGNORECASE):
         raise ReadOnlySQLViolationError(
-            "Consulta SQL rejeitada: clausulas de bloqueio FOR UPDATE/SHARE nao sao permitidas."
+            "Consulta SQL rejeitada: clausulas de bloqueio FOR UPDATE/SHARE/KEY SHARE nao sao permitidas."
         )
 
     kw_match = _READONLY_FORBIDDEN_KEYWORDS.search(stripped)
@@ -174,6 +307,9 @@ def assert_readonly_safe_sql(sql: str) -> str:
         raise ReadOnlySQLViolationError(
             f"Consulta SQL rejeitada: funcao de sistema/rede proibida '{fn_match.group(1).lower()}()' em modo read-only."
         )
+
+    # Validacao estrutural completa via AST PostgreSQL (sqlglot)
+    _validate_readonly_ast(stripped)
 
     return sql
 

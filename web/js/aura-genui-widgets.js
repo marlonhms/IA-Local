@@ -251,60 +251,21 @@
     }
 
     getDefaultActionsHtml() {
-      const shouldDisable = this.state.isLocked || this.isExpired();
-      const stateMgr = (typeof window !== 'undefined' && window.auraStateManager) ||
-                       (typeof globalThis !== 'undefined' && globalThis.auraStateManager) ||
-                       null;
-      const isDone1 = (stateMgr && typeof stateMgr.isActionExecuted === 'function' && stateMgr.isActionExecuted('act_default_apply')) || (this.state.voucher && (this.state.voucher.action_id === 'act_default_apply' || this.state.status === 'committed'));
-      const isDone2 = (stateMgr && typeof stateMgr.isActionExecuted === 'function' && stateMgr.isActionExecuted('act_default_goals')) || (this.state.voucher && (this.state.voucher.action_id === 'act_default_goals'));
-
-      const isCurrentActive1 = this.state.isLocked && this.state.lockedActionId === 'act_default_apply';
-      const isCurrentActive2 = this.state.isLocked && this.state.lockedActionId === 'act_default_goals';
-
-      let displayLabel1 = isDone1 ? '✔ Recomendações Aplicadas' : '⚡ Aplicar Recomendações Prioritárias';
-      if (isCurrentActive1) {
-        displayLabel1 = '<span class="inline-flex items-center gap-1.5"><svg class="animate-spin -ml-0.5 mr-1 h-3.5 w-3.5 text-cyan-400 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg><span class="animate-pulse">Processando...</span></span>';
-      }
-
-      let displayLabel2 = isDone2 ? '✔ Metas Ajustadas' : '🎯 Ajustar Metas do Turno';
-      if (isCurrentActive2) {
-        displayLabel2 = '<span class="inline-flex items-center gap-1.5"><svg class="animate-spin -ml-0.5 mr-1 h-3.5 w-3.5 text-cyan-400 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg><span class="animate-pulse">Processando...</span></span>';
-      }
-
+      // Padrao Carbon UI P1-UI4: sem acoes default fixas de combustivel; apenas inspecao universal no Canvas
       if (!this.actions || this.actions.length === 0) {
         this.actions = [
-          { action_id: 'act_default_apply', label: '⚡ Aplicar Recomendações Prioritárias', action_type: 'mutation', variant: 'primary' },
-          { action_id: 'act_default_goals', label: '🎯 Ajustar Metas do Turno', action_type: 'mutation', variant: 'secondary' },
-          { action_id: 'act_default_canvas', label: '🔍 Projetar Cenário no Canvas', action_type: 'inspection', variant: 'ghost' }
+          { action_id: 'act_default_canvas', label: 'Explorar Detalhes no Canvas', action_type: 'inspection', variant: 'ghost' }
         ];
       }
 
       return `
         <button type="button"
-                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold hover:brightness-110 ${(shouldDisable || isDone1) ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
-                data-action-id="act_default_apply"
-                data-action-type="mutation"
-                data-tool-call-id="${escapeHtml(this.toolCallId)}"
-                title="Gera requisição formal e aciona o fornecedor para reposição de combustível via WhatsApp/ERP"
-                ${(shouldDisable || isDone1) ? 'disabled' : ''}>
-          <span>${displayLabel1}</span>
-        </button>
-        <button type="button"
-                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-cyan-200 border border-cyan-500/30 hover:bg-slate-700 ${(shouldDisable || isDone2) ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}"
-                data-action-id="act_default_goals"
-                data-action-type="mutation"
-                data-tool-call-id="${escapeHtml(this.toolCallId)}"
-                title="Repactua metas de volume e margem no PDV e alerta os líderes de pista via WhatsApp"
-                ${(shouldDisable || isDone2) ? 'disabled' : ''}>
-          <span>${displayLabel2}</span>
-        </button>
-        <button type="button"
-                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 text-slate-300 border border-white/10 hover:bg-slate-800"
+                class="genui-action-btn px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 text-cyan-200 border border-cyan-500/30 hover:bg-slate-800 transition-colors"
                 data-action-id="act_default_canvas"
                 data-action-type="inspection"
                 data-tool-call-id="${escapeHtml(this.toolCallId)}"
-                title="Projeta o diagnóstico e gráficos preditivos no painel lateral de alta fidelidade">
-          <span>🔍 Projetar Cenário no Canvas</span>
+                title="Projeta o diagnostico e graficos preditivos no Companion Canvas">
+          <span>Explorar Detalhes no Canvas</span>
         </button>
       `;
     }
@@ -421,12 +382,15 @@
             displayLabel = `✔ ${label}`;
           }
 
+          const requiresTwoStep = Boolean(act.is_destructive || act.requires_confirmation || variant === 'danger');
+
           return `
             <button type="button"
                     class="genui-action-btn ${btnClass}"
                     data-action-id="${actId}"
                     data-action-type="${escapeHtml(actType)}"
                     data-tool-call-id="${escapeHtml(this.toolCallId)}"
+                    ${requiresTwoStep ? 'data-requires-confirm="true"' : ''}
                     title="${escapeHtml(btnTitle)}"
                     ${shouldDisable ? 'disabled' : ''}>
               <span>${displayLabel}</span>
@@ -4571,7 +4535,14 @@
       {
         name: 'render_MarginAnalysisUI',
         cls: MarginAnalysisUI,
-        aliases: ['MarginAnalysisUI', 'MarginProfitabilityWidget'],
+        aliases: [
+          'MarginAnalysisUI',
+          'MarginProfitabilityWidget',
+          'FinancialErosionUI',
+          'render_FinancialErosionUI',
+          'MarginWaterfallUI',
+          'render_MarginWaterfallUI'
+        ],
         intent: 'analise_margem'
       },
       {
@@ -4645,7 +4616,9 @@
           'AuraSystemGuideWidget',
           'AuraSystemGuideUI',
           'render_FiscalAuditUI',
-          'FiscalAuditUI'
+          'FiscalAuditUI',
+          'SRETelemetryUI',
+          'render_SRETelemetryUI'
         ],
         intent: 'diagnostico_modular'
       },
@@ -4658,7 +4631,13 @@
       {
         name: 'render_PosAuditRadarUI',
         cls: PosAuditRadarUI,
-        aliases: ['PosAuditRadarUI', 'render_PosAuditRadarWidget', 'PosAuditRadarWidget'],
+        aliases: [
+          'PosAuditRadarUI',
+          'render_PosAuditRadarWidget',
+          'PosAuditRadarWidget',
+          'PumpPerformanceUI',
+          'render_PumpPerformanceUI'
+        ],
         intent: 'pos_audit'
       },
       {
@@ -4688,6 +4667,8 @@
           'MacroeconomicInventoryCostUI',
           'MacroeconomicInventoryCostWidget',
           'render_MacroeconomicInventoryCostWidget',
+          'DeadCapitalOpportunityUI',
+          'render_DeadCapitalOpportunityUI',
           'custo_estoque_macro',
           'analisar_custo_estoque_macroeconomico'
         ],
@@ -4700,6 +4681,8 @@
           'render_WhatIfSimulatorUI',
           'WhatIfSimulatorWidget',
           'render_WhatIfSimulatorWidget',
+          'ElasticityBatchSimulatorUI',
+          'render_ElasticityBatchSimulatorUI',
           'simular_cenario_what_if',
           'what_if',
           'whatif'
@@ -4774,6 +4757,29 @@
 
       if (e._genuiActionHandled) return;
       e._genuiActionHandled = true;
+
+      // Confirmacao inline anti-acidente de 2 passos para mutacoes destrutivas (P1-UI4)
+      if (btn.getAttribute('data-requires-confirm') === 'true' && btn.getAttribute('data-confirmed-step') !== 'true') {
+        btn.setAttribute('data-confirmed-step', 'true');
+        btn.classList.add('is-confirming');
+        const originalText = btn.textContent;
+        btn.setAttribute('data-original-label', originalText || '');
+        const span = btn.querySelector('span');
+        if (span) span.textContent = 'Confirmar Envio ERP? (Clique novamente)';
+        setTimeout(() => {
+          if (btn.getAttribute('data-confirmed-step') === 'true') {
+            btn.removeAttribute('data-confirmed-step');
+            btn.classList.remove('is-confirming');
+            const orig = btn.getAttribute('data-original-label');
+            if (span && orig) span.textContent = orig;
+          }
+        }, 5000);
+        return;
+      }
+      if (btn.getAttribute('data-confirmed-step') === 'true') {
+        btn.removeAttribute('data-confirmed-step');
+        btn.classList.remove('is-confirming');
+      }
 
       const actionId = btn.getAttribute('data-action-id');
       const actionType = btn.getAttribute('data-action-type') || 'mutation';

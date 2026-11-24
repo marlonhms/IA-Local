@@ -705,7 +705,15 @@
         event.preventDefault();
       }
 
-      if (!window.confirm('Deseja excluir esta conversa do historico?')) {
+      const confirmed = (window.auraFx && typeof window.auraFx.confirmAction === 'function')
+        ? await window.auraFx.confirmAction({
+            title: 'Excluir Conversa',
+            message: 'Deseja excluir esta conversa do historico operacional?',
+            confirmLabel: 'Excluir',
+            variant: 'danger'
+          })
+        : true;
+      if (!confirmed) {
         return;
       }
 
@@ -732,7 +740,15 @@
     }
 
     async handleClearAll() {
-      if (!window.confirm('Deseja realmente limpar todo o historico de conversas? Esta acao nao pode ser desfeita.')) {
+      const confirmed = (window.auraFx && typeof window.auraFx.confirmAction === 'function')
+        ? await window.auraFx.confirmAction({
+            title: 'Limpar Todo o Historico',
+            message: 'Deseja realmente limpar todo o historico de conversas? Esta acao nao pode ser desfeita.',
+            confirmLabel: 'Limpar Historico',
+            variant: 'danger'
+          })
+        : true;
+      if (!confirmed) {
         return;
       }
 

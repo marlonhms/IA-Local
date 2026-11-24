@@ -1581,6 +1581,10 @@ class SemanticRouter:
             }
             return "catalogo_produtos", 0.0, telemetry
 
+        active_pack = self._get_effective_domain_pack()
+        active_pack_id = active_pack.pack_id if active_pack is not None else "fuel_convenience"
+        cache_key = f"{active_pack_id}::{query_norm}"
+
         # 0.05 Comandos diretos de ajuda / menu do sistema
         if (
             query_norm in ("ajuda", "menu", "help", "socorro", "telas", "comandos", "atalhos", "modulos", "módulos", "sistema")
@@ -1592,6 +1596,7 @@ class SemanticRouter:
                 "confidence": 1.0,
                 "method": "direct_help_command",
                 "matched_phrase": f"Comando direto '{query_norm}'",
+                "pack_id": active_pack_id,
                 "pgvector_latency_ms": 0.0,
                 "embedding_latency_ms": 0.0,
                 "total_routing_latency_ms": round(total_ms, 3),
@@ -1600,12 +1605,8 @@ class SemanticRouter:
             }
             if use_cache:
                 with self._cache_lock:
-                    self._memory_cache[query_norm] = ("ajuda_sistema", 1.0, telemetry)
+                    self._memory_cache[cache_key] = ("ajuda_sistema", 1.0, telemetry)
             return "ajuda_sistema", 1.0, telemetry
-
-        active_pack = self._get_effective_domain_pack()
-        active_pack_id = active_pack.pack_id if active_pack is not None else "fuel_convenience"
-        cache_key = f"{active_pack_id}::{query_norm}"
 
         # 0.055 Deteccao deterministica de specific_intents e mapeamentos do Domain Pack ativo (P1.1)
         pack_match = self._match_active_pack_intent(query_norm, active_pack)
@@ -1651,6 +1652,7 @@ class SemanticRouter:
                 "confidence": 0.98,
                 "method": "procedural_erp_heuristics",
                 "matched_phrase": "Padrao procedural identificado",
+                "pack_id": active_pack_id,
                 "pgvector_latency_ms": 0.0,
                 "embedding_latency_ms": 0.0,
                 "total_routing_latency_ms": round(total_ms, 3),
@@ -1659,7 +1661,7 @@ class SemanticRouter:
             }
             if use_cache:
                 with self._cache_lock:
-                    self._memory_cache[query_norm] = ("procedimento_erp", 0.98, telemetry)
+                    self._memory_cache[cache_key] = ("procedimento_erp", 0.98, telemetry)
             return "procedimento_erp", 0.98, telemetry
 
         # 0.07 Deteccao deterministica de auditoria fiscal e regras SEFAZ (Fast-path lexico)
@@ -1670,6 +1672,7 @@ class SemanticRouter:
                 "confidence": 0.99,
                 "method": "deterministic_fiscal_fastpath",
                 "matched_phrase": "Padrao deterministico fiscal/SEFAZ identificado",
+                "pack_id": active_pack_id,
                 "pgvector_latency_ms": 0.0,
                 "embedding_latency_ms": 0.0,
                 "total_routing_latency_ms": round(total_ms, 3),
@@ -1678,7 +1681,7 @@ class SemanticRouter:
             }
             if use_cache:
                 with self._cache_lock:
-                    self._memory_cache[query_norm] = ("auditoria_fiscal_sefaz", 0.99, telemetry)
+                    self._memory_cache[cache_key] = ("auditoria_fiscal_sefaz", 0.99, telemetry)
             return "auditoria_fiscal_sefaz", 0.99, telemetry
 
         # 0.1 Comandos de repeticao / saudacoes genericas - neutralizacao de falsos positivos operacionais

@@ -211,22 +211,19 @@ def get_active_domain_pack(
 ) -> DomainPackConfig:
     """
     Retorna o Domain Pack ativo isolado por requisicao via ContextVar (Carbon Core P0.4).
+    Nao muta _ACTIVE_PACK_VAR fora de DomainPackContext / set_active_domain_pack.
     Padrao retrocompativel: fuel_convenience.
     """
     current = _ACTIVE_PACK_VAR.get()
     if pack_id is None:
         if current is not None:
             return current
-        target_id = "fuel_convenience"
-    else:
-        target_id = pack_id
+        return _load_domain_pack_cached("fuel_convenience", packs_dir=packs_dir)
 
-    if current is not None and current.pack_id == target_id and packs_dir is None:
+    if current is not None and current.pack_id == pack_id and packs_dir is None:
         return current
 
-    loaded = _load_domain_pack_cached(target_id, packs_dir=packs_dir)
-    _ACTIVE_PACK_VAR.set(loaded)
-    return loaded
+    return _load_domain_pack_cached(pack_id, packs_dir=packs_dir)
 
 
 def peek_active_domain_pack() -> DomainPackConfig | None:

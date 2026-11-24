@@ -20,6 +20,8 @@ const PRECACHE_ASSETS = [
   '/static/vendor/marked.min.js',
   '/static/vendor/lucide.min.js',
   '/static/js/aura-api.js',
+  '/static/js/aura-domain-adapter.js',
+  '/static/js/aura-reasoning-ribbon.js',
   '/static/js/aura-app.js',
   '/static/js/aura-storage.js',
   '/static/js/aura-history-drawer.js',

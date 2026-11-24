@@ -6,7 +6,7 @@
   <title>AURA // Assistente de Prontidão (Gerente Supervisora do Posto)</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.ico">
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#06b6d4">
+  <meta name="theme-color" content="#07090e">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -41,14 +41,14 @@
               dark: '#047857'
             },
             auraCyan: {
-              DEFAULT: '#06b6d4',
-              light: '#22d3ee',
+              DEFAULT: '#22d3ee',
+              light: '#67e8f9',
               dark: '#0891b2'
             },
             auraPurple: {
-              DEFAULT: '#7c3aed',
-              light: '#a855f7',
-              dark: '#581c87'
+              DEFAULT: '#8b5cf6',
+              light: '#a78bfa',
+              dark: '#6d28d9'
             }
           }
         }
@@ -109,7 +109,7 @@
               Deluxe
             </span>
           </div>
-          <p class="text-[11px] text-slate-400 font-sans">Menu Executivo do Posto</p>
+          <p id="sidebar-domain-subtitle" class="text-[11px] text-slate-400 font-sans">Menu Executivo do Posto</p>
         </div>
       </div>
       
@@ -1010,7 +1010,7 @@
     <!-- =======================================================================
          VIEW 3: WORKSPACE DE ASSISTÊNCIA DA AURA (IMERSIVO TOTAL)
          ========================================================================= -->
-    <div id="view-console" class="max-w-3xl lg:max-w-4xl mx-auto w-full view-transition-active flex flex-col h-[calc(100dvh-98px)] max-h-[calc(100dvh-98px)] relative">
+    <div id="view-console" class="max-w-3xl lg:max-w-5xl mx-auto w-full view-transition-active flex flex-col h-[calc(100dvh-98px)] max-h-[calc(100dvh-98px)] relative">
       
       <!-- Container Flex Split (se expande para 2 colunas lado a lado quando o painel auxiliar está aberto) -->
       <div id="console-workspace-container" class="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 relative w-full h-full">
@@ -1025,7 +1025,7 @@
           <div id="chat-column-header" class="flex items-center justify-between px-3.5 py-1.5 rounded-xl bg-slate-900/60 border border-white/5 text-xs flex-shrink-0">
             <div class="flex items-center gap-2">
               <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span class="font-sans font-medium text-xs text-slate-300">Console Conversacional</span>
+              <span id="console-domain-header-label" class="font-sans font-medium text-xs text-slate-300">Console Conversacional</span>
             </div>
             <div class="flex items-center gap-2">
               <button id="btn-chat-reading-density" type="button" class="btn-chat-reading-density flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors text-xs font-mono select-none cursor-pointer" title="Alternar Densidade de Leitura: Conciso (Resumo Executivo, 68ch) vs Conforto (Editorial 0.96rem)" aria-label="Alternar densidade de leitura do chat" data-reading-mode="concise">
@@ -1035,8 +1035,8 @@
             </div>
           </div>
 
-          <!-- Feed de Mensagens (Scrollable) - Ocupa 100% da altura e largura -->
-          <div id="chat-feed-container" class="glass-panel flex-1 min-h-0 p-4 sm:p-5 overflow-y-auto space-y-4 font-sans rounded-2xl relative scroll-smooth flex flex-col">
+          <!-- Feed de Mensagens (Editorial Briefing Stream - Carbon UI P1) -->
+          <div id="chat-feed-container" class="aura-editorial-feed flex-1 min-h-0 px-2 sm:px-4 py-3 overflow-y-auto space-y-5 font-sans rounded-2xl relative scroll-smooth flex flex-col">
             <div id="welcome-message-bubble" class="flex justify-start w-full h-full min-h-full flex-1 animate-fade-in welcome-message-wrapper">
               <div class="chat-bubble-aura chat-bubble-welcome w-full max-w-full h-full min-h-full flex-1 flex flex-col justify-between p-4 sm:p-5 text-slate-100 text-sm space-y-3">
                 <div class="flex items-center justify-between border-b border-white/10 pb-2 flex-shrink-0">
@@ -1055,12 +1055,12 @@
                 </div>
                 <div class="welcome-content-body w-full flex-1 flex flex-col justify-between">
                   <div class="space-y-3 font-sans text-slate-200 leading-relaxed text-sm">
-                    <p>
+                    <p id="welcome-greeting-lead">
                       Olá! Sou a <strong>AURA</strong>. Este é o resumo do seu posto antes mesmo de você perguntar.
                     </p>
                     <!-- Cockpit de Prontidão do Posto (Fase 3): dados reais via aura-welcome-cockpit.js; skeleton até a leitura chegar -->
                     <section id="welcome-readiness-cockpit" class="welcome-cockpit" role="region" aria-label="Cockpit de prontidão do posto" aria-busy="true" aria-live="polite">
-                      <div class="welcome-cockpit-header"><h2 class="welcome-cockpit-title">Prontidão do posto agora</h2><button type="button" id="welcome-cockpit-refresh" class="welcome-cockpit-refresh" aria-label="Atualizar indicadores do posto" onclick="window.auraWelcomeCockpit &amp;&amp; window.auraWelcomeCockpit.refresh({ force: true })"><svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36" stroke-width="1.75" stroke-linecap="round"/><polyline points="21 3 21 9 15 9" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Atualizar</span></button></div>
+                      <div class="welcome-cockpit-header"><h2 id="welcome-cockpit-title" class="welcome-cockpit-title">Prontidão do posto agora</h2><button type="button" id="welcome-cockpit-refresh" class="welcome-cockpit-refresh" aria-label="Atualizar indicadores do posto" onclick="window.auraWelcomeCockpit &amp;&amp; window.auraWelcomeCockpit.refresh({ force: true })"><svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36" stroke-width="1.75" stroke-linecap="round"/><polyline points="21 3 21 9 15 9" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Atualizar</span></button></div>
                       <div class="welcome-cockpit-grid">
                         <button type="button" class="welcome-indicator" data-indicator="tanques" data-state="loading" onclick="window.auraChat.sendUserPrompt('Qual a situação e autonomia de cada tanque agora?')" aria-label="Reserva de Tanques: carregando. Toque para consultar a autonomia de cada tanque."><span class="welcome-indicator-label"><span class="welcome-indicator-dot" aria-hidden="true"></span><svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="3" y="3" width="11" height="18" rx="2" stroke-width="1.75"/><line x1="2" y1="21" x2="15" y2="21" stroke-width="1.75"/><path d="M14 8h2.5a2 2 0 0 1 2 2v6.5a1.5 1.5 0 0 0 3 0V9l-2-2" stroke-width="1.5"/></svg><span>Reserva de Tanques</span></span><span class="welcome-indicator-skeleton" aria-hidden="true"><span class="skeleton-shimmer welcome-skel-value"></span><span class="skeleton-shimmer welcome-skel-detail"></span></span><span class="welcome-indicator-body"><span class="welcome-indicator-value" data-role="value"></span><span class="welcome-indicator-detail" data-role="detail"></span></span></button>
                         <button type="button" class="welcome-indicator" data-indicator="turno" data-state="loading" onclick="window.auraChat.sendUserPrompt('Como fechou o último turno? Teve furo de caixa?')" aria-label="Conciliação do Turno: carregando. Toque para ver como fechou o último turno."><span class="welcome-indicator-label"><span class="welcome-indicator-dot" aria-hidden="true"></span><svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2" stroke-width="1.75"/><circle cx="12" cy="12" r="3" stroke-width="1.75"/><path d="M6 12h.01M18 12h.01" stroke-width="2"/></svg><span>Conciliação do Turno</span></span><span class="welcome-indicator-skeleton" aria-hidden="true"><span class="skeleton-shimmer welcome-skel-value"></span><span class="skeleton-shimmer welcome-skel-detail"></span></span><span class="welcome-indicator-body"><span class="welcome-indicator-value" data-role="value"></span><span class="welcome-indicator-detail" data-role="detail"></span></span></button>
@@ -2692,6 +2692,8 @@
   <script src="/static/js/aura-state-manager.js?v=2.10.22" defer></script>
   <script src="/static/js/aura-genui-widgets.js?v=2.10.26" defer></script>
   <script src="/static/js/aura-api.js?v=2.10.26"></script>
+  <script src="/static/js/aura-domain-adapter.js?v=2.10.27"></script>
+  <script src="/static/js/aura-reasoning-ribbon.js?v=2.10.27"></script>
   <script src="/static/js/aura-cockpit.js?v=2.10.26"></script>
   <script src="/static/js/aura-triggers.js?v=2.10.22"></script>
   <script src="/static/js/aura-automations.js?v=2.10.22"></script>

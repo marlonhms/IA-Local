@@ -107,9 +107,20 @@ def _extract_fuel_query_helpers(query: str) -> tuple[str | None, str | None, str
 
 
 def _handle_lmc_anp(ctx: ToolExecutionContext) -> ToolExecutionResult:
-    data_p, _, comb_p = _extract_fuel_query_helpers(ctx.query)
+    data_q, _, comb_q = _extract_fuel_query_helpers(ctx.query)
+    p = ctx.extra_params or {}
+    data_p = p.get("data") if p.get("data") is not None else data_q
+    comb_p = p.get("combustivel") or p.get("produto") or comb_q
+    tanque_p = p.get("tanque")
     fuel_tools = FuelConvenienceTools(erp_adapter=ctx.erp_adapter, tools_facade=ctx.tools_facade)
-    raw = fuel_tools.auditar_lmc_anp(data=data_p, combustivel=comb_p)
+    if tanque_p is not None:
+        raw = fuel_tools.facade.auditar_conformidade_lmc_anp(
+            data=data_p,
+            tanque=tanque_p,
+            combustivel=comb_p,
+        )
+    else:
+        raw = fuel_tools.auditar_lmc_anp(data=data_p, combustivel=comb_p)
     return ToolExecutionResult(
         intent=ctx.intent,
         pack_id=PACK_ID,
@@ -120,9 +131,17 @@ def _handle_lmc_anp(ctx: ToolExecutionContext) -> ToolExecutionResult:
 
 
 def _handle_vazao_bicos(ctx: ToolExecutionContext) -> ToolExecutionResult:
-    data_p, turno_p, _ = _extract_fuel_query_helpers(ctx.query)
+    data_q, turno_q, _ = _extract_fuel_query_helpers(ctx.query)
+    p = ctx.extra_params or {}
+    data_p = p.get("data") if p.get("data") is not None else data_q
+    turno_p = p.get("turno") if p.get("turno") is not None else turno_q
     fuel_tools = FuelConvenienceTools(erp_adapter=ctx.erp_adapter, tools_facade=ctx.tools_facade)
-    raw = fuel_tools.auditar_vazao_bicos(data=data_p, turno=turno_p)
+    raw = fuel_tools.auditar_vazao_bicos(
+        data=data_p,
+        turno=turno_p,
+        frentista=p.get("frentista"),
+        bico=p.get("bico"),
+    )
     return ToolExecutionResult(
         intent=ctx.intent,
         pack_id=PACK_ID,
@@ -133,9 +152,24 @@ def _handle_vazao_bicos(ctx: ToolExecutionContext) -> ToolExecutionResult:
 
 
 def _handle_benchmark_anp(ctx: ToolExecutionContext) -> ToolExecutionResult:
-    data_p, turno_p, comb_p = _extract_fuel_query_helpers(ctx.query)
+    data_q, turno_q, comb_q = _extract_fuel_query_helpers(ctx.query)
+    p = ctx.extra_params or {}
+    data_p = p.get("data") if p.get("data") is not None else data_q
+    turno_p = p.get("turno") if p.get("turno") is not None else turno_q
+    comb_p = p.get("produto") or comb_q
     fuel_tools = FuelConvenienceTools(erp_adapter=ctx.erp_adapter, tools_facade=ctx.tools_facade)
-    raw = fuel_tools.comparar_benchmark_anp(data=data_p, turno=turno_p, produto=comb_p)
+    if any(k in p for k in ("grupo_benchmark", "grupo", "custom_benchmarks", "filial_nome", "municipio")):
+        raw = fuel_tools.facade.comparar_benchmark_concorrencia(
+            grupo_benchmark=p.get("grupo_benchmark") or p.get("grupo"),
+            data=data_p,
+            turno=turno_p,
+            custom_benchmarks=p.get("custom_benchmarks"),
+            filial_nome=p.get("filial_nome"),
+            municipio=p.get("municipio"),
+            produto=comb_p,
+        )
+    else:
+        raw = fuel_tools.comparar_benchmark_anp(data=data_p, turno=turno_p, produto=comb_p)
     return ToolExecutionResult(
         intent=ctx.intent,
         pack_id=PACK_ID,
@@ -146,9 +180,19 @@ def _handle_benchmark_anp(ctx: ToolExecutionContext) -> ToolExecutionResult:
 
 
 def _handle_custo_estoque_macro(ctx: ToolExecutionContext) -> ToolExecutionResult:
-    _, _, comb_p = _extract_fuel_query_helpers(ctx.query)
+    _, _, comb_q = _extract_fuel_query_helpers(ctx.query)
+    p = ctx.extra_params or {}
+    comb_p = p.get("produto") or comb_q or "GASOLINA COMUM"
     fuel_tools = FuelConvenienceTools(erp_adapter=ctx.erp_adapter, tools_facade=ctx.tools_facade)
-    raw = fuel_tools.analisar_custo_estoque_macro(produto=comb_p or "GASOLINA COMUM")
+    if any(p.get(k) is not None for k in ("volume_total_litros", "custo_medio_litro", "uf")):
+        raw = fuel_tools.facade.analisar_custo_estoque_macroeconomico(
+            volume_total_litros=float(p["volume_total_litros"]) if p.get("volume_total_litros") is not None else None,
+            custo_medio_litro=float(p["custo_medio_litro"]) if p.get("custo_medio_litro") is not None else None,
+            uf=p.get("uf"),
+            produto=comb_p,
+        )
+    else:
+        raw = fuel_tools.analisar_custo_estoque_macro(produto=comb_p)
     return ToolExecutionResult(
         intent=ctx.intent,
         pack_id=PACK_ID,
