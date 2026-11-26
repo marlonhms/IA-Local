@@ -15,6 +15,7 @@ class AuraCockpitController {
     this.isLoading = false;
     this.zeroClickCards = [];
     this.isZeroClickLoading = false;
+    this.governanceFeed = { candidate_rules: [], suggested_simulations: [], pending_count: 0 };
   }
 
   /**
@@ -23,6 +24,150 @@ class AuraCockpitController {
   async init() {
     this.renderInitialPlaceholder();
     this.loadZeroClickFeed();
+    this.loadGovernanceFeed();
+  }
+
+  async loadGovernanceFeed(packId = 'fuel_convenience', tenantId = 'default') {
+    const banner = document.getElementById('aura-hic-governance-banner');
+    if (!banner || !window.auraApi || typeof window.auraApi.getMemoryGovernanceFeed !== 'function') {
+      return;
+    }
+    try {
+      const feed = await window.auraApi.getMemoryGovernanceFeed(packId, tenantId);
+      this.governanceFeed = feed || { candidate_rules: [], suggested_simulations: [], pending_count: 0 };
+      this.renderGovernanceBanner();
+    } catch (err) {
+      console.debug('[AURA HiC Governance] Feed de governanca indisponivel:', err);
+    }
+  }
+
+  renderGovernanceBanner() {
+    const banner = document.getElementById('aura-hic-governance-banner');
+    if (!banner) return;
+
+    const rules = Array.isArray(this.governanceFeed.candidate_rules)
+      ? this.governanceFeed.candidate_rules
+      : [];
+    const suggestions = Array.isArray(this.governanceFeed.suggested_simulations)
+      ? this.governanceFeed.suggested_simulations
+      : [];
+
+    if (rules.length === 0 && suggestions.length === 0) {
+      banner.classList.add('hidden');
+      banner.innerHTML = '';
+      return;
+    }
+
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (ch) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[ch]));
+
+    const rulesHtml = rules.map((r) => `
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-900/80 border border-amber-500/20">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 text-xs">
+            <span class="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold text-[10px] uppercase">Regra Candidate</span>
+            <span class="font-mono text-slate-200 truncate">${esc(r.rule_key)} (${esc(r.operator)} ${esc(r.threshold_value)})</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-0.5">${esc(r.description || 'Aguardando validacao do operador.')}</p>
+        </div>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <button type="button" onclick="window.auraCockpit && window.auraCockpit.handleRuleDecision('${esc(r.rule_id)}', 'approve', '${esc(r.pack_id)}', '${esc(r.tenant_id)}')" class="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 text-xs font-semibold transition-colors">
+            Aprovar
+          </button>
+          <button type="button" onclick="window.auraCockpit && window.auraCockpit.handleRuleDecision('${esc(r.rule_id)}', 'reject', '${esc(r.pack_id)}', '${esc(r.tenant_id)}')" class="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 border border-rose-500/30 text-xs font-semibold transition-colors">
+            Rejeitar
+          </button>
+        </div>
+      </div>
+    `).join('');
+
+    const suggestionsHtml = suggestions.map((card) => `
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-900/80 border border-cyan-500/20">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 text-xs">
+            <span class="px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-semibold text-[10px] uppercase">Simulacao Sugerida</span>
+            <span class="font-semibold text-white truncate">${esc(card.title)}</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-0.5">${esc(card.reason)}</p>
+        </div>
+        <button type="button" onclick="window.auraCockpit && window.auraCockpit.openSuggestedSimulation('${esc(card.card_id)}')" class="px-3 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/35 text-xs font-semibold transition-colors flex-shrink-0">
+          Simular Agora
+        </button>
+      </div>
+    `).join('');
+
+    banner.innerHTML = `
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+          <span class="text-xs font-semibold uppercase tracking-wider text-amber-200">Governanca HiC & Sugestoes Proativas</span>
+        </div>
+        <span class="text-[11px] text-slate-400 tabular-nums">${rules.length + suggestions.length} item(ns) pendente(s)</span>
+      </div>
+      <div class="space-y-2">${rulesHtml}${suggestionsHtml}</div>
+    `;
+    banner.classList.remove('hidden');
+  }
+
+  async handleRuleDecision(ruleId, decision, packId = 'fuel_convenience', tenantId = 'default') {
+    if (!window.auraApi || typeof window.auraApi.decideMemoryRule !== 'function') return;
+    try {
+      await window.auraApi.decideMemoryRule(ruleId, {
+        tenant_id: tenantId,
+        pack_id: packId,
+        decision,
+        decided_by: 'operator',
+        reason: `Decisao HiC via banner do cockpit (${decision})`,
+      });
+      this.governanceFeed.candidate_rules = (this.governanceFeed.candidate_rules || []).filter(
+        (r) => r.rule_id !== ruleId
+      );
+      this.renderGovernanceBanner();
+    } catch (err) {
+      console.warn('[AURA HiC Governance] Erro ao decidir regra:', err);
+    }
+  }
+
+  openSuggestedSimulation(cardId) {
+    const card = (this.governanceFeed.suggested_simulations || []).find((c) => c.card_id === cardId);
+    if (!card) return;
+
+    const WidgetCls = window.AuraGenUI && window.AuraGenUI.WhatIfSimulatorUI;
+    if (WidgetCls) {
+      const widget = new WidgetCls({
+        tool_call_id: `sim_proactive_${card.card_id}`,
+        component_name: 'WhatIfSimulatorUI',
+        executive_summary: card.reason,
+        props: {
+          title: card.title,
+          tenant_id: card.tenant_id,
+          pack_id: card.pack_id,
+          scenario_type: card.recommended_scenario,
+          horizon_days: 30,
+          shocks: card.suggested_shocks || {},
+          recommendation: card.reason,
+        },
+      });
+      if (typeof window.AuraGenUI.registerWidget === 'function') {
+        window.AuraGenUI.registerWidget(widget.toolCallId, widget);
+      }
+      if (typeof widget.projectToCanvas === 'function') {
+        widget.projectToCanvas();
+        if (window.auraAuxPanel && typeof window.auraAuxPanel.open === 'function') {
+          window.auraAuxPanel.open(`art_genui_${widget.toolCallId}`, true);
+        }
+        return;
+      }
+    }
+
+    if (window.auraChat && typeof window.auraChat.sendUserPrompt === 'function') {
+      window.auraChat.sendUserPrompt(`Abrir simulacao What-If: ${card.title}`);
+    }
   }
 
   async loadZeroClickFeed(forceRefresh = false) {

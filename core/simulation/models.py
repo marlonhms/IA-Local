@@ -142,6 +142,18 @@ class SimulationRecomputeRequest(BaseModel):
     created_by: str = "operator"
 
 
+class SimulationProvenance(BaseModel):
+    """Metadados de proveniencia deterministica da simulacao What-If."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    baseline_source: str = "erp_historical"
+    active_rules_count: int = 0
+    yaml_rules_count: int = 0
+    memory_rules_count: int = 0
+    cited_documents: list[str] = Field(default_factory=list)
+
+
 class SimulationRecomputeResponse(BaseModel):
     """Resposta JSON estruturada do endpoint /api/v1/simulate/recompute."""
 
@@ -156,6 +168,84 @@ class SimulationRecomputeResponse(BaseModel):
     violated_rules: list[RuleViolation]
     is_compliant: bool
     elapsed_ms: float
+    llm_calls: int = 0
+    provenance: SimulationProvenance = Field(default_factory=SimulationProvenance)
+
+
+class BacktestItemResult(BaseModel):
+    """Comparacao deterministica entre snapshot vencido (30/60/90d) e resultado realizado."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    simulation_id: str
+    scenario_type: ScenarioType
+    horizon_days: HorizonDays
+    created_at: str | None = None
+    realized_at: str | None = None
+    predicted_p10_brl: float
+    predicted_p50_brl: float
+    predicted_p90_brl: float
+    realized_brl: float
+    error_brl: float
+    error_pct: float
+    within_p10_p90: bool
+
+
+class CalibrationProposal(BaseModel):
+    """Sugestao de auto-calibracao de elasticidade sujeita a aprovacao HiC."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    rule_id: str
+    tenant_id: str
+    pack_id: str
+    metric: str = "elasticity_calibration_factor"
+    current_factor: float = 1.0
+    suggested_factor: float
+    mean_bias_pct: float
+    sample_size: int
+    status: RuleStatus = "candidate"
+    reason: str
+
+
+class BacktestRunRequest(BaseModel):
+    """Payload de entrada para execucao deterministica de backtesting (30/60/90d)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    tenant_id: str = Field(default="default", min_length=1)
+    pack_id: str = Field(min_length=1)
+    as_of: str | None = None
+    limit: int = Field(default=50, ge=1, le=500)
+    dry_run: bool = False
+
+
+class BacktestRunResponse(BaseModel):
+    """Resposta JSON da execucao de backtesting e calibracao sugerida."""
+
+    tenant_id: str
+    pack_id: str
+    evaluated_count: int
+    items: list[BacktestItemResult] = Field(default_factory=list)
+    calibration_proposal: CalibrationProposal | None = None
+    llm_calls: int = 0
+
+
+class RealizedRoiScorecardResponse(BaseModel):
+    """Scorecard consolidado Previsto vs. Realizado para o RealizedRoiScorecardUI."""
+
+    tenant_id: str
+    pack_id: str
+    period_days: int = 90
+    projected_brl: float = 0.0
+    realized_brl: float = 0.0
+    total_realized_brl: float = 0.0
+    hit_rate_pct: float = 0.0
+    mean_abs_error_pct: float = 0.0
+    roi_multiple: float = 0.0
+    audited_actions_count: int = 0
+    items: list[BacktestItemResult] = Field(default_factory=list)
+    pending_calibration: CalibrationProposal | None = None
     llm_calls: int = 0
 
 
@@ -174,10 +264,15 @@ class BusinessProfileSnapshotRecord(BaseModel):
 
 
 __all__ = [
+    "BacktestItemResult",
+    "BacktestRunRequest",
+    "BacktestRunResponse",
     "BusinessProfileSnapshotRecord",
     "BusinessRule",
+    "CalibrationProposal",
     "HorizonDays",
     "MonteCarloBands",
+    "RealizedRoiScorecardResponse",
     "RuleOperator",
     "RuleSeverity",
     "RuleSource",
@@ -187,6 +282,7 @@ __all__ = [
     "SensitivityDriver",
     "ShockVector",
     "SimulationBaseline",
+    "SimulationProvenance",
     "SimulationRecomputeRequest",
     "SimulationRecomputeResponse",
 ]

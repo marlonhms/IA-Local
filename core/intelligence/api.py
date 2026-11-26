@@ -8,16 +8,23 @@ Zero travessoes em todo o arquivo.
 
 from __future__ import annotations
 
+from contextlib import suppress
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
+from core.intelligence.intent_tracker import IntentTracker
 from core.intelligence.memory_manager import MemoryManager
 from core.intelligence.models import (
+    MemoryGovernanceFeedResponse,
     MemoryRuleListResponse,
     RuleDecisionRequest,
     RuleDecisionResponse,
 )
-from core.simulation.models import RuleStatus
+from core.simulation.models import BusinessRule, RuleStatus
 from core.simulation.repository import SimulationRepository
+
+logger = logging.getLogger("AuraMemoryAPI")
 
 memory_router = APIRouter(
     prefix="/api/v1/memory",
@@ -71,6 +78,60 @@ async def list_memory_rules_endpoint(
         pack_id=norm_pack,
         total=len(rules),
         rules=rules,
+    )
+
+
+@memory_router.get(
+    "/suggestions",
+    response_model=MemoryGovernanceFeedResponse,
+    summary="Retorna regras candidate e simulacoes proativas pendentes de decisao HiC",
+    dependencies=[Depends(_verify_memory_auth)],
+)
+async def get_memory_governance_feed_endpoint(
+    pack_id: str = Query(..., min_length=1),
+    tenant_id: str = Query(default="default", min_length=1),
+    window_days: int = Query(default=7, ge=1, le=90),
+    min_hits: int = Query(default=3, ge=1, le=50),
+    manager: MemoryManager = Depends(get_memory_manager),
+) -> MemoryGovernanceFeedResponse:
+    """Alimenta o banner discreto HiC sem chamadas LLM."""
+    norm_pack = pack_id.strip().lower()
+    candidate_rules: list[BusinessRule] = []
+    suggested_simulations = []
+
+    try:
+        candidate_rules = manager.list_rules(
+            tenant_id=tenant_id,
+            pack_id=norm_pack,
+            status="candidate",
+        )
+    except Exception as exc:  # noqa: BLE001
+        with suppress(Exception):
+            logger.debug("Regras candidate indisponiveis no momento: %s", exc)
+
+    try:
+        tracker = IntentTracker(
+            repository=manager._repo,
+            recurrence_threshold=min_hits,
+            window_days=window_days,
+        )
+        _, suggested_simulations = tracker.evaluate_recurrence(
+            tenant_id=tenant_id,
+            pack_id=norm_pack,
+            window_days=window_days,
+            min_hits=min_hits,
+        )
+    except Exception as exc:  # noqa: BLE001
+        with suppress(Exception):
+            logger.debug("Sugestoes de intencao indisponiveis no momento: %s", exc)
+
+    return MemoryGovernanceFeedResponse(
+        tenant_id=tenant_id,
+        pack_id=norm_pack,
+        candidate_rules=candidate_rules,
+        suggested_simulations=suggested_simulations,
+        pending_count=len(candidate_rules) + len(suggested_simulations),
+        llm_calls=0,
     )
 
 

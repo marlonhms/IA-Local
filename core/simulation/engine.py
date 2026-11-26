@@ -28,6 +28,7 @@ from core.simulation.models import (
     SensitivityDriver,
     ShockVector,
     SimulationBaseline,
+    SimulationProvenance,
     SimulationRecomputeRequest,
     SimulationRecomputeResponse,
 )
@@ -265,6 +266,20 @@ class SimulationEngine:
             extra_yaml_rules=extra_yaml_rules,
         )
 
+        yaml_rules_count = (
+            len(resolved_pack_cfg.hard_rules)
+            if resolved_pack_cfg is not None and resolved_pack_cfg.hard_rules
+            else 0
+        ) + (len(extra_yaml_rules) if extra_yaml_rules else 0)
+        memory_rules_count = len(active_memory_rules) if active_memory_rules else 0
+        provenance = SimulationProvenance(
+            baseline_source="persisted_snapshot" if request.baseline is None else "erp_historical",
+            active_rules_count=yaml_rules_count + memory_rules_count,
+            yaml_rules_count=yaml_rules_count,
+            memory_rules_count=memory_rules_count,
+            cited_documents=[],
+        )
+
         if request.persist_snapshot and repository is not None:
             repository.save_simulation_snapshot(
                 simulation_id=simulation_id,
@@ -299,6 +314,7 @@ class SimulationEngine:
             is_compliant=(len(violated_rules) == 0),
             elapsed_ms=elapsed_ms,
             llm_calls=0,
+            provenance=provenance,
         )
 
 

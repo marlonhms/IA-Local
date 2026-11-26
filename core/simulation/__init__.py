@@ -1,16 +1,28 @@
 """Pacote de Simulacao Deterministica What-If e Memoria do Negocio (Fase 1)."""
 
 from core.simulation.api import (
+    get_simulation_backtester,
     get_simulation_repository,
+    set_simulation_backtester,
     set_simulation_repository,
     simulation_router,
 )
+from core.simulation.backtest import (
+    DEFAULT_REALIZED_PROFIT_SQL,
+    SimulationBacktester,
+    build_readonly_realized_sql,
+)
 from core.simulation.engine import SimulationEngine
 from core.simulation.models import (
+    BacktestItemResult,
+    BacktestRunRequest,
+    BacktestRunResponse,
     BusinessProfileSnapshotRecord,
     BusinessRule,
+    CalibrationProposal,
     HorizonDays,
     MonteCarloBands,
+    RealizedRoiScorecardResponse,
     RuleOperator,
     RuleSeverity,
     RuleSource,
@@ -20,6 +32,7 @@ from core.simulation.models import (
     SensitivityDriver,
     ShockVector,
     SimulationBaseline,
+    SimulationProvenance,
     SimulationRecomputeRequest,
     SimulationRecomputeResponse,
 )
@@ -27,10 +40,16 @@ from core.simulation.repository import SimulationRepository
 from core.simulation.rules_evaluator import RulesEvaluator
 
 __all__ = [
+    "BacktestItemResult",
+    "BacktestRunRequest",
+    "BacktestRunResponse",
     "BusinessProfileSnapshotRecord",
     "BusinessRule",
+    "CalibrationProposal",
+    "DEFAULT_REALIZED_PROFIT_SQL",
     "HorizonDays",
     "MonteCarloBands",
+    "RealizedRoiScorecardResponse",
     "RuleOperator",
     "RuleSeverity",
     "RuleSource",
@@ -40,12 +59,17 @@ __all__ = [
     "ScenarioType",
     "SensitivityDriver",
     "ShockVector",
+    "SimulationBacktester",
     "SimulationBaseline",
     "SimulationEngine",
+    "SimulationProvenance",
     "SimulationRecomputeRequest",
     "SimulationRecomputeResponse",
     "SimulationRepository",
+    "build_readonly_realized_sql",
+    "get_simulation_backtester",
     "get_simulation_repository",
+    "set_simulation_backtester",
     "set_simulation_repository",
     "simulation_router",
 ]

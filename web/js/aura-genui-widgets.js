@@ -4414,19 +4414,187 @@
   class WhatIfSimulatorUI extends BaseGenUIWidget {
     constructor(payload = {}) {
       super(payload, 'simular_cenario_what_if', 'WhatIfSimulatorUI');
-      this.cardClass = 'genui-whatif-simulator-card';
-      this.ariaLabel = 'Simulador What-If e Ponto de Equilibrio';
+      this.cardClass = 'genui-whatif-simulator-card bg-[#07090E]';
+      this.ariaLabel = 'Simulador What-If Interativo Zero-Token';
+      this._debounceTimer = null;
+      this._abortController = null;
+
+      const rawMetrics = (this.props && this.props.metrics) || {};
+      const defaultBaseline = {
+        unit_price: coerceNumber(rawMetrics.current_price ?? this.props.unit_price, 6.19),
+        unit_cost: coerceNumber(rawMetrics.unit_cost ?? this.props.unit_cost, 5.45),
+        daily_volume: coerceNumber(rawMetrics.daily_volume ?? this.props.daily_volume, 12000),
+        volume_std_dev_pct: coerceNumber(this.props.volume_std_dev_pct, 5.0),
+        cost_std_dev_pct: coerceNumber(this.props.cost_std_dev_pct, 2.0),
+        elasticity_mean: coerceNumber(this.props.elasticity_mean, -1.2),
+        elasticity_std_dev: coerceNumber(this.props.elasticity_std_dev, 0.25),
+        receivable_days: coerceNumber(this.props.receivable_days, 15.0),
+        payable_days: coerceNumber(this.props.payable_days, 30.0),
+        annual_capital_cost_pct: coerceNumber(this.props.annual_capital_cost_pct, 10.75),
+        fixed_daily_cost: coerceNumber(this.props.fixed_daily_cost, 0.0),
+      };
+
+      this._simState = {
+        tenant_id: String(this.props.tenant_id || 'default'),
+        pack_id: String(this.props.pack_id || 'fuel_convenience'),
+        simulation_id: this.props.simulation_id || null,
+        scenario_type: this.props.scenario_type || 'price_discount_change',
+        horizon_days: [30, 60, 90].includes(Number(this.props.horizon_days)) ? Number(this.props.horizon_days) : 30,
+        baseline: Object.assign(defaultBaseline, this.props.baseline || {}),
+        shocks: Object.assign(
+          {
+            price_delta_pct: coerceNumber(this.props.price_delta_pct, 0.0),
+            discount_pct: coerceNumber(this.props.discount_pct, 0.0),
+            supplier_cost_delta_pct: coerceNumber(this.props.supplier_cost_delta_pct, 0.0),
+            cost_passthrough_pct: coerceNumber(this.props.cost_passthrough_pct, 50.0),
+            receivable_days_delta: coerceNumber(this.props.receivable_days_delta, 0.0),
+            payable_days_delta: coerceNumber(this.props.payable_days_delta, 0.0),
+            capital_cost_delta_pct: coerceNumber(this.props.capital_cost_delta_pct, 0.0),
+          },
+          this.props.shocks || {}
+        ),
+        monte_carlo: this.props.monte_carlo || null,
+        violated_rules: Array.isArray(this.props.violated_rules) ? this.props.violated_rules : [],
+        sensitivity: Array.isArray(this.props.sensitivity) ? this.props.sensitivity : [],
+        provenance: this.props.provenance || {
+          baseline_source: 'erp_historical',
+          active_rules_count: 0,
+          yaml_rules_count: 0,
+          memory_rules_count: 0,
+          cited_documents: Array.isArray(this.props.cited_documents) ? this.props.cited_documents : [],
+        },
+        elapsed_ms: coerceNumber(this.props.elapsed_ms, 0),
+        isLoading: false,
+      };
+    }
+
+    _formatMoney(val) {
+      const n = coerceNumber(val, 0);
+      const sign = n > 0 ? '+' : '';
+      return `${sign}R$ ${formatNumber(n, 2)}`;
+    }
+
+    _renderBandsHtml() {
+      const mc = this._simState.monte_carlo;
+      if (!mc) {
+        const scenarios = Array.isArray(this.props.scenarios) ? this.props.scenarios : [];
+        if (scenarios.length) {
+          const rows = scenarios.map(sc => {
+            const name = escapeHtml(sc.name || sc.label || 'Cenario');
+            const delta = coerceNumber(sc.horizon_net_delta_brl, 0);
+            const cls = delta >= 0 ? 'text-emerald-400' : 'text-rose-400';
+            return `<div class="flex items-center justify-between py-1.5 border-b border-white/10 text-xs tabular-nums">
+              <span class="text-slate-200 font-medium capitalize">${name}</span>
+              <span class="font-bold ${cls}">${this._formatMoney(delta)}</span>
+            </div>`;
+          }).join('');
+          return `<div class="rounded-xl bg-[#07090E]/90 p-3 border border-white/10 min-h-[108px]">${rows}</div>`;
+        }
+        return `
+          <div class="rounded-xl bg-[#07090E]/90 p-3 border border-white/10 min-h-[108px] flex items-center justify-center text-xs text-slate-400">
+            Ajuste os sliders abaixo para calcular as bandas P10 / P50 / P90 em tempo real (Zero-LLM).
+          </div>
+        `;
+      }
+
+      const p10 = coerceNumber(mc.p10, 0);
+      const p50 = coerceNumber(mc.p50, 0);
+      const p90 = coerceNumber(mc.p90, 0);
+      const probPos = coerceNumber(mc.prob_positive_pct, 0);
+      const span = Math.max(Math.abs(p90 - p10), 1);
+      const p50PosPct = Math.max(4, Math.min(96, ((p50 - p10) / span) * 100));
+
+      return `
+        <div class="rounded-xl bg-[#07090E]/95 p-3.5 border border-white/10 min-h-[108px] space-y-2.5">
+          <div class="grid grid-cols-3 gap-2 text-center tabular-nums">
+            <div class="rounded-lg bg-slate-900/70 p-2 border border-white/5">
+              <div class="text-[10px] uppercase tracking-wider text-slate-400">P10 (Pessimista)</div>
+              <div class="text-xs sm:text-sm font-bold ${p10 >= 0 ? 'text-emerald-300' : 'text-rose-400'}">${this._formatMoney(p10)}</div>
+            </div>
+            <div class="rounded-lg bg-cyan-950/35 p-2 border border-cyan-500/30">
+              <div class="text-[10px] uppercase tracking-wider text-cyan-300">P50 (Mediana)</div>
+              <div class="text-xs sm:text-sm font-bold ${p50 >= 0 ? 'text-emerald-400' : 'text-rose-300'}">${this._formatMoney(p50)}</div>
+            </div>
+            <div class="rounded-lg bg-slate-900/70 p-2 border border-white/5">
+              <div class="text-[10px] uppercase tracking-wider text-slate-400">P90 (Otimista)</div>
+              <div class="text-xs sm:text-sm font-bold ${p90 >= 0 ? 'text-emerald-300' : 'text-rose-400'}">${this._formatMoney(p90)}</div>
+            </div>
+          </div>
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 tabular-nums">
+              <span>Dispersao Monte Carlo (${coerceNumber(mc.iterations, 5000)} iteracoes)</span>
+              <span class="font-semibold ${probPos >= 50 ? 'text-emerald-300' : 'text-amber-300'}">${formatNumber(probPos, 1)}% prob. positivo</span>
+            </div>
+            <div class="relative h-2 rounded-full bg-slate-800/90 overflow-hidden border border-white/5">
+              <div class="absolute inset-y-0 left-0 right-0 bg-gradient-to-r from-rose-500/40 via-cyan-400/60 to-emerald-500/50"></div>
+              <div class="absolute top-0 bottom-0 w-1 bg-white shadow" style="left: ${p50PosPct.toFixed(1)}%;"></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    _renderViolationsHtml() {
+      const violations = Array.isArray(this._simState.violated_rules) ? this._simState.violated_rules : [];
+      if (!violations.length) {
+        return `
+          <div class="min-h-[34px] flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-[11px] text-emerald-300">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0"></span>
+            <span>Conforme: nenhuma regra dura de negocio violada neste cenario.</span>
+          </div>
+        `;
+      }
+
+      const badges = violations.map(v => {
+        const sev = String(v.severity || 'HIGH').toUpperCase();
+        const badgeCls = sev === 'CRITICAL'
+          ? 'bg-rose-500/20 text-rose-200 border-rose-500/40'
+          : (sev === 'HIGH'
+            ? 'bg-amber-500/20 text-amber-200 border-amber-500/40'
+            : 'bg-cyan-500/15 text-cyan-200 border-cyan-500/30');
+        return `
+          <div class="flex items-start gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] ${badgeCls}">
+            <span class="font-bold uppercase tracking-wider flex-shrink-0">${escapeHtml(sev)}</span>
+            <span class="font-mono opacity-85 flex-shrink-0">[${escapeHtml(v.rule_key || v.metric || 'regra')}]</span>
+            <span class="leading-snug">${escapeHtml(v.message || '')}</span>
+          </div>
+        `;
+      }).join('');
+
+      return `<div class="min-h-[34px] space-y-1.5">${badges}</div>`;
+    }
+
+    _renderProvenanceHtml() {
+      const prov = this._simState.provenance || {};
+      const srcLabel = prov.baseline_source === 'persisted_snapshot'
+        ? 'Snapshot T0 persistido'
+        : 'Base historica do ERP';
+      const activeRules = coerceNumber(prov.active_rules_count, 0);
+      const docs = Array.isArray(prov.cited_documents) && prov.cited_documents.length
+        ? ` | Docs: ${prov.cited_documents.map(d => escapeHtml(d)).join(', ')}`
+        : '';
+      const elapsed = coerceNumber(this._simState.elapsed_ms, 0);
+      const statusBadge = this._simState.isLoading
+        ? '<span class="text-cyan-300 animate-pulse">Recalculando...</span>'
+        : `<span class="text-emerald-400">0 tokens LLM | ${formatNumber(elapsed, 1)}ms</span>`;
+
+      return `
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/10 text-[11px] text-slate-400 tabular-nums">
+          <span>Origem: ${escapeHtml(srcLabel)} | ${activeRules} regra(s) ativa(s)${docs}</span>
+          ${statusBadge}
+        </div>
+      `;
     }
 
     renderLayer1() {
-      const title = escapeHtml(this.props.title || 'Simulador What-If');
-      const rec = escapeHtml(this.props.recommendation || this.summary || 'Simulacao deterministica de impacto financeiro.');
-      const horizon = coerceNumber(this.props.horizon_days, 30);
+      const title = escapeHtml(this.props.title || 'Simulador What-If (Zero-Token)');
+      const rec = escapeHtml(this.props.recommendation || this.summary || 'Ajuste os parametros para recalculo Monte Carlo deterministico.');
+      const horizon = coerceNumber(this._simState.horizon_days, 30);
       return `
         <div class="genui-layer genui-layer-1 mb-3">
           <div class="flex items-center justify-between gap-2 mb-1">
             <span class="text-xs font-semibold uppercase tracking-wider text-cyan-300">What-If Simulator</span>
-            <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-200 border border-cyan-500/30">${horizon} dias</span>
+            <span class="whatif-horizon-badge text-xs px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-200 border border-cyan-500/30 tabular-nums">${horizon} dias</span>
           </div>
           <h4 class="text-base font-bold text-white">${title}</h4>
           <p class="text-sm text-slate-300 mt-1">${rec}</p>
@@ -4435,37 +4603,244 @@
     }
 
     renderLayer2() {
-      const scenarios = Array.isArray(this.props.scenarios) ? this.props.scenarios : [];
-      if (!scenarios.length) return '<div class="genui-layer genui-layer-2"></div>';
-      const rows = scenarios.map(sc => {
-        const name = escapeHtml(sc.name || sc.label || 'Cenario');
-        const delta = coerceNumber(sc.horizon_net_delta_brl, 0);
-        const cls = delta >= 0 ? 'text-emerald-400' : 'text-rose-400';
-        return `<div class="flex items-center justify-between py-1.5 border-b border-slate-700/50 text-xs">
-          <span class="text-slate-200 font-medium">${name}</span>
-          <span class="font-bold ${cls}">R$ ${formatNumber(delta, 2)}</span>
-        </div>`;
+      const s = this._simState.shocks;
+      const horizon = this._simState.horizon_days;
+      const horizonBtns = [30, 60, 90].map(d => {
+        const active = horizon === d;
+        const cls = active
+          ? 'bg-cyan-500/25 text-cyan-200 border-cyan-400/50'
+          : 'bg-slate-900/70 text-slate-400 border-white/10 hover:text-white';
+        return `<button type="button" class="whatif-horizon-btn px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${cls}" data-horizon="${d}">${d}d</button>`;
       }).join('');
-      return `<div class="genui-layer genui-layer-2 rounded-xl bg-slate-800/60 p-3 border border-slate-700/60">${rows}</div>`;
+
+      return `
+        <div class="genui-layer genui-layer-2 space-y-3 rounded-xl bg-[#07090E]/90 p-3.5 border border-white/10">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Controles Interativos (Debounce 150ms)</span>
+            <div class="flex items-center gap-1.5">${horizonBtns}</div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs tabular-nums">
+            <label class="block space-y-1">
+              <div class="flex justify-between text-slate-300">
+                <span>Variacao de Preco (%)</span>
+                <span class="whatif-val-price font-semibold text-cyan-300">${formatNumber(s.price_delta_pct, 1)}%</span>
+              </div>
+              <input type="range" class="whatif-slider w-full accent-cyan-400 cursor-pointer" data-shock="price_delta_pct" min="-15" max="15" step="0.5" value="${coerceNumber(s.price_delta_pct, 0)}" />
+            </label>
+
+            <label class="block space-y-1">
+              <div class="flex justify-between text-slate-300">
+                <span>Desconto Promocional (%)</span>
+                <span class="whatif-val-discount font-semibold text-cyan-300">${formatNumber(s.discount_pct, 1)}%</span>
+              </div>
+              <input type="range" class="whatif-slider w-full accent-cyan-400 cursor-pointer" data-shock="discount_pct" min="0" max="20" step="0.5" value="${coerceNumber(s.discount_pct, 0)}" />
+            </label>
+
+            <label class="block space-y-1">
+              <div class="flex justify-between text-slate-300">
+                <span>Custo Fornecedor (%)</span>
+                <span class="whatif-val-cost font-semibold text-amber-300">${formatNumber(s.supplier_cost_delta_pct, 1)}%</span>
+              </div>
+              <input type="range" class="whatif-slider w-full accent-amber-400 cursor-pointer" data-shock="supplier_cost_delta_pct" min="-15" max="25" step="0.5" value="${coerceNumber(s.supplier_cost_delta_pct, 0)}" />
+            </label>
+
+            <label class="block space-y-1">
+              <div class="flex justify-between text-slate-300">
+                <span>Repasse de Custo (%)</span>
+                <span class="whatif-val-passthrough font-semibold text-emerald-300">${formatNumber(s.cost_passthrough_pct, 0)}%</span>
+              </div>
+              <input type="range" class="whatif-slider w-full accent-emerald-400 cursor-pointer" data-shock="cost_passthrough_pct" min="0" max="150" step="5" value="${coerceNumber(s.cost_passthrough_pct, 50)}" />
+            </label>
+          </div>
+
+          <div class="whatif-bands-slot">${this._renderBandsHtml()}</div>
+          <div class="whatif-violations-slot">${this._renderViolationsHtml()}</div>
+          <div class="whatif-provenance-slot">${this._renderProvenanceHtml()}</div>
+
+          <div class="flex items-center justify-end pt-1">
+            <button type="button" class="whatif-audit-ai-btn px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-200 border border-cyan-500/35 text-xs font-semibold transition-all flex items-center gap-1.5">
+              <span>Auditar este cenário com IA</span>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    _syncSlotsInPlace(rootElement) {
+      if (!rootElement || typeof rootElement.querySelector !== 'function') return;
+      const bandsSlot = rootElement.querySelector('.whatif-bands-slot');
+      const violationsSlot = rootElement.querySelector('.whatif-violations-slot');
+      const provenanceSlot = rootElement.querySelector('.whatif-provenance-slot');
+      const horizonBadge = rootElement.querySelector('.whatif-horizon-badge');
+
+      if (bandsSlot) bandsSlot.innerHTML = this._renderBandsHtml();
+      if (violationsSlot) violationsSlot.innerHTML = this._renderViolationsHtml();
+      if (provenanceSlot) provenanceSlot.innerHTML = this._renderProvenanceHtml();
+      if (horizonBadge) horizonBadge.textContent = `${this._simState.horizon_days} dias`;
+    }
+
+    async _triggerRecompute(rootElement) {
+      if (this._abortController && typeof this._abortController.abort === 'function') {
+        this._abortController.abort();
+      }
+      this._abortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      this._simState.isLoading = true;
+      this._syncSlotsInPlace(rootElement);
+
+      const shocks = this._simState.shocks;
+      let scenarioType = this._simState.scenario_type || 'price_discount_change';
+      if (Math.abs(coerceNumber(shocks.supplier_cost_delta_pct, 0)) > 0.01) {
+        scenarioType = 'cost_supplier_variation';
+      }
+
+      const payload = {
+        tenant_id: this._simState.tenant_id,
+        pack_id: this._simState.pack_id,
+        simulation_id: this._simState.simulation_id,
+        scenario_type: scenarioType,
+        horizon_days: this._simState.horizon_days,
+        baseline: this._simState.baseline,
+        shocks,
+      };
+
+      try {
+        let result = null;
+        const signal = this._abortController ? this._abortController.signal : undefined;
+        if (typeof window !== 'undefined' && window.auraApi && typeof window.auraApi.recomputeWhatIf === 'function') {
+          result = await window.auraApi.recomputeWhatIf(payload, { signal });
+        } else if (typeof window !== 'undefined' && window.AuraSDK && typeof window.AuraSDK.createClient === 'function') {
+          result = await window.AuraSDK.createClient().recomputeSimulation(payload, signal);
+        }
+
+        if (result) {
+          this._simState.simulation_id = result.simulation_id || this._simState.simulation_id;
+          this._simState.monte_carlo = result.monte_carlo || null;
+          this._simState.violated_rules = Array.isArray(result.violated_rules) ? result.violated_rules : [];
+          this._simState.sensitivity = Array.isArray(result.sensitivity) ? result.sensitivity : [];
+          this._simState.provenance = result.provenance || this._simState.provenance;
+          this._simState.elapsed_ms = coerceNumber(result.elapsed_ms, 0);
+        }
+      } catch (err) {
+        if (!err || err.name !== 'AbortError') {
+          console.warn('[WhatIfSimulatorUI] Falha no recalculo deterministico:', err);
+        }
+      } finally {
+        this._simState.isLoading = false;
+        this._syncSlotsInPlace(rootElement);
+      }
+    }
+
+    bindEvents(rootElement) {
+      super.bindEvents(rootElement);
+      if (!rootElement || typeof rootElement.querySelectorAll !== 'function') return;
+
+      const labelMap = {
+        price_delta_pct: { selector: '.whatif-val-price', fmt: v => `${formatNumber(v, 1)}%` },
+        discount_pct: { selector: '.whatif-val-discount', fmt: v => `${formatNumber(v, 1)}%` },
+        supplier_cost_delta_pct: { selector: '.whatif-val-cost', fmt: v => `${formatNumber(v, 1)}%` },
+        cost_passthrough_pct: { selector: '.whatif-val-passthrough', fmt: v => `${formatNumber(v, 0)}%` },
+      };
+
+      rootElement.querySelectorAll('.whatif-slider').forEach(slider => {
+        if (slider._hasWhatIfInput) return;
+        slider._hasWhatIfInput = true;
+        slider.addEventListener('input', () => {
+          const shockKey = slider.getAttribute('data-shock');
+          const val = coerceNumber(slider.value, 0);
+          if (shockKey) {
+            this._simState.shocks[shockKey] = val;
+            const meta = labelMap[shockKey];
+            if (meta) {
+              const lbl = rootElement.querySelector(meta.selector);
+              if (lbl) lbl.textContent = meta.fmt(val);
+            }
+          }
+          if (this._debounceTimer) {
+            clearTimeout(this._debounceTimer);
+          }
+          this._debounceTimer = setTimeout(() => {
+            this._triggerRecompute(rootElement);
+          }, 150);
+        });
+      });
+
+      rootElement.querySelectorAll('.whatif-horizon-btn').forEach(btn => {
+        if (btn._hasHorizonClick) return;
+        btn._hasHorizonClick = true;
+        btn.addEventListener('click', () => {
+          const h = Number(btn.getAttribute('data-horizon') || 30);
+          if (![30, 60, 90].includes(h)) return;
+          this._simState.horizon_days = h;
+          rootElement.querySelectorAll('.whatif-horizon-btn').forEach(other => {
+            const isSel = Number(other.getAttribute('data-horizon')) === h;
+            other.className = `whatif-horizon-btn px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
+              isSel
+                ? 'bg-cyan-500/25 text-cyan-200 border-cyan-400/50'
+                : 'bg-slate-900/70 text-slate-400 border-white/10 hover:text-white'
+            }`;
+          });
+          this._triggerRecompute(rootElement);
+        });
+      });
+
+      const auditBtn = rootElement.querySelector('.whatif-audit-ai-btn');
+      if (auditBtn && !auditBtn._hasAuditClick) {
+        auditBtn._hasAuditClick = true;
+        auditBtn.addEventListener('click', () => {
+          const s = this._simState.shocks;
+          const mc = this._simState.monte_carlo;
+          const bandsText = mc
+            ? `P10=${this._formatMoney(mc.p10)}, P50=${this._formatMoney(mc.p50)}, P90=${this._formatMoney(mc.p90)} (prob+ ${formatNumber(mc.prob_positive_pct, 1)}%)`
+            : 'sem bandas Monte Carlo calculadas';
+          const violCount = Array.isArray(this._simState.violated_rules) ? this._simState.violated_rules.length : 0;
+          const prompt =
+            `Auditar este cenario What-If (${this._simState.horizon_days} dias, pack ${this._simState.pack_id}): ` +
+            `preco ${s.price_delta_pct}%, desconto ${s.discount_pct}%, custo fornecedor ${s.supplier_cost_delta_pct}%, ` +
+            `repasse ${s.cost_passthrough_pct}%. Resultado deterministico: ${bandsText}; regras violadas: ${violCount}. ` +
+            `Analise riscos de segunda ordem, elasticidade e conformidade.`;
+          if (typeof window !== 'undefined' && window.auraChat && typeof window.auraChat.sendUserPrompt === 'function') {
+            window.auraChat.sendUserPrompt(prompt);
+          }
+        });
+      }
     }
   }
 
   class RealizedRoiScorecardUI extends BaseGenUIWidget {
     constructor(payload = {}) {
       super(payload, 'realized_roi_scorecard', 'RealizedRoiScorecardUI');
-      this.cardClass = 'genui-realized-roi-card';
-      this.ariaLabel = 'Scorecard de ROI Realizado';
+      this.cardClass = 'genui-realized-roi-card bg-[#07090E]';
+      this.ariaLabel = 'Scorecard de Backtesting e ROI Realizado';
+      this._scorecard = {
+        tenant_id: String(this.props.tenant_id || 'default'),
+        pack_id: String(this.props.pack_id || 'fuel_convenience'),
+        period_days: coerceNumber(this.props.period_days, 90),
+        projected_brl: coerceNumber(this.props.projected_brl ?? this.props.total_predicted_brl, 0),
+        realized_brl: coerceNumber(this.props.realized_brl ?? this.props.total_realized_brl, 0),
+        hit_rate_pct: coerceNumber(this.props.hit_rate_pct, 0),
+        mean_abs_error_pct: coerceNumber(this.props.mean_abs_error_pct, 0),
+        items: Array.isArray(this.props.items) ? this.props.items : [],
+        pending_calibration: this.props.pending_calibration || null,
+        calibrationFeedback: null,
+      };
     }
 
     renderLayer1() {
-      const title = escapeHtml(this.props.title || 'Scorecard de ROI Realizado');
-      const totalBrl = coerceNumber(this.props.total_realized_brl, 0);
-      const summary = escapeHtml(this.summary || `Retorno financeiro auditado no ERP: R$ ${formatNumber(totalBrl, 2)}.`);
+      const title = escapeHtml(this.props.title || 'Backtesting: Previsto vs. Realizado');
+      const realizedBrl = coerceNumber(this._scorecard.realized_brl, 0);
+      const projectedBrl = coerceNumber(this._scorecard.projected_brl, 0);
+      const errorPct = coerceNumber(this._scorecard.mean_abs_error_pct, 0);
+      const hitRate = coerceNumber(this._scorecard.hit_rate_pct, 0);
+      const summary = escapeHtml(
+        this.summary ||
+        `Previsto P50: R$ ${formatNumber(projectedBrl, 2)} | Realizado: R$ ${formatNumber(realizedBrl, 2)} | Erro medio: ${formatNumber(errorPct, 2)}%`
+      );
       return `
         <div class="genui-layer genui-layer-1 mb-3">
           <div class="flex items-center justify-between gap-2 mb-1">
-            <span class="text-xs font-semibold uppercase tracking-wider text-emerald-300">Closed-Loop ROI</span>
-            <span class="text-xs font-bold text-emerald-400">R$ ${formatNumber(totalBrl, 2)}</span>
+            <span class="text-xs font-semibold uppercase tracking-wider text-emerald-300">Closed-Loop Backtest</span>
+            <span class="text-xs font-bold text-emerald-400 tabular-nums">Acuracia P10-P90: ${formatNumber(hitRate, 1)}%</span>
           </div>
           <h4 class="text-base font-bold text-white">${title}</h4>
           <p class="text-sm text-slate-300 mt-1">${summary}</p>
@@ -4473,19 +4848,148 @@
       `;
     }
 
+    _renderScorecardBody() {
+      const sc = this._scorecard;
+      const items = Array.isArray(sc.items) ? sc.items : [];
+      const rows = items.length
+        ? items.slice(0, 6).map(it => {
+            const label = escapeHtml(it.action_label || it.action_type || it.simulation_id || 'Simulacao');
+            const predicted = coerceNumber(it.predicted_p50_brl ?? it.predicted_impact_brl, 0);
+            const realized = coerceNumber(it.realized_brl ?? it.realized_impact_brl, 0);
+            const errPct = coerceNumber(it.error_pct, 0);
+            const inBand = it.within_p10_p90 !== false;
+            const cls = realized >= 0 ? 'text-emerald-400' : 'text-rose-400';
+            const bandBadge = inBand
+              ? '<span class="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 text-[10px]">Na banda</span>'
+              : '<span class="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 text-[10px]">Fora</span>';
+            return `<div class="flex items-center justify-between gap-2 py-1.5 border-b border-white/10 text-xs tabular-nums">
+              <div class="min-w-0">
+                <span class="text-slate-200 font-medium truncate block">${label}</span>
+                <span class="text-[11px] text-slate-400">Previsto: R$ ${formatNumber(predicted, 2)} | Erro: ${formatNumber(errPct, 1)}%</span>
+              </div>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                ${bandBadge}
+                <span class="font-bold ${cls}">R$ ${formatNumber(realized, 2)}</span>
+              </div>
+            </div>`;
+          }).join('')
+        : '<div class="text-xs text-slate-400 py-2">Nenhum snapshot vencido (30/60/90d) auditado ainda.</div>';
+
+      const cal = sc.pending_calibration;
+      const calHtml = cal && cal.status === 'candidate'
+        ? `
+          <div class="mt-3 rounded-xl bg-amber-950/25 border border-amber-500/35 p-3 space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-amber-300">Auto-Calibracao Sugerida (HiC)</span>
+              <span class="text-[11px] font-mono text-amber-200 tabular-nums">Fator: ${formatNumber(coerceNumber(cal.suggested_factor, 1), 4)}</span>
+            </div>
+            <p class="text-xs text-slate-300">${escapeHtml(cal.reason || 'Ajuste de elasticidade sugerido pelo backtesting.')}</p>
+            <div class="flex items-center gap-2">
+              <button type="button" class="roi-cal-approve-btn px-3 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 text-xs font-semibold transition-colors" data-rule-id="${escapeHtml(cal.rule_id)}">
+                Aprovar Calibracao
+              </button>
+              <button type="button" class="roi-cal-reject-btn px-3 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 border border-rose-500/30 text-xs font-semibold transition-colors" data-rule-id="${escapeHtml(cal.rule_id)}">
+                Rejeitar
+              </button>
+            </div>
+          </div>
+        `
+        : (sc.calibrationFeedback
+          ? `<div class="mt-2 text-xs text-emerald-300">${escapeHtml(sc.calibrationFeedback)}</div>`
+          : '');
+
+      return `
+        <div class="space-y-2.5">
+          <div class="grid grid-cols-3 gap-2 text-center tabular-nums">
+            <div class="rounded-lg bg-slate-900/70 p-2 border border-white/5">
+              <div class="text-[10px] uppercase text-slate-400">Previsto (P50)</div>
+              <div class="text-xs font-bold text-slate-100">R$ ${formatNumber(sc.projected_brl, 2)}</div>
+            </div>
+            <div class="rounded-lg bg-slate-900/70 p-2 border border-white/5">
+              <div class="text-[10px] uppercase text-slate-400">Realizado</div>
+              <div class="text-xs font-bold text-emerald-400">R$ ${formatNumber(sc.realized_brl, 2)}</div>
+            </div>
+            <div class="rounded-lg bg-slate-900/70 p-2 border border-white/5">
+              <div class="text-[10px] uppercase text-slate-400">Erro % Medio</div>
+              <div class="text-xs font-bold text-cyan-300">${formatNumber(sc.mean_abs_error_pct, 2)}%</div>
+            </div>
+          </div>
+          <div>${rows}</div>
+          ${calHtml}
+          <div class="flex justify-end pt-1">
+            <button type="button" class="roi-refresh-backtest-btn px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-cyan-300 border border-white/10 text-xs font-semibold transition-colors">
+              Atualizar Backtesting
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
     renderLayer2() {
-      const items = Array.isArray(this.props.items) ? this.props.items : [];
-      if (!items.length) return '<div class="genui-layer genui-layer-2"></div>';
-      const rows = items.slice(0, 6).map(it => {
-        const label = escapeHtml(it.action_label || it.action_type || 'Acao Auditada');
-        const val = coerceNumber(it.realized_brl, 0);
-        const cls = val >= 0 ? 'text-emerald-400' : 'text-rose-400';
-        return `<div class="flex items-center justify-between py-1.5 border-b border-slate-700/50 text-xs">
-          <span class="text-slate-200">${label}</span>
-          <span class="font-bold ${cls}">R$ ${formatNumber(val, 2)}</span>
-        </div>`;
-      }).join('');
-      return `<div class="genui-layer genui-layer-2 rounded-xl bg-slate-800/60 p-3 border border-slate-700/60">${rows}</div>`;
+      return `<div class="genui-layer genui-layer-2 rounded-xl bg-[#07090E]/95 p-3.5 border border-white/10 min-h-[140px]">${this._renderScorecardBody()}</div>`;
+    }
+
+    bindEvents(rootElement) {
+      super.bindEvents(rootElement);
+      if (!rootElement || typeof rootElement.querySelector !== 'function') return;
+
+      const refreshBtn = rootElement.querySelector('.roi-refresh-backtest-btn');
+      if (refreshBtn && !refreshBtn._hasRoiRefresh) {
+        refreshBtn._hasRoiRefresh = true;
+        refreshBtn.addEventListener('click', async () => {
+          if (!window.auraApi || typeof window.auraApi.getBacktestScorecard !== 'function') return;
+          try {
+            const data = await window.auraApi.getBacktestScorecard(
+              this._scorecard.pack_id,
+              this._scorecard.tenant_id,
+              20
+            );
+            this._scorecard = Object.assign(this._scorecard, data || {});
+            const l2 = rootElement.querySelector('.genui-layer-2');
+            if (l2) l2.innerHTML = this._renderScorecardBody();
+            this.bindEvents(rootElement);
+          } catch (err) {
+            console.warn('[RealizedRoiScorecardUI] Erro ao atualizar backtesting:', err);
+          }
+        });
+      }
+
+      const handleDecision = async (btn, decision) => {
+        const ruleId = btn.getAttribute('data-rule-id');
+        if (!ruleId || !window.auraApi || typeof window.auraApi.decideMemoryRule !== 'function') return;
+        btn.disabled = true;
+        try {
+          await window.auraApi.decideMemoryRule(ruleId, {
+            tenant_id: this._scorecard.tenant_id,
+            pack_id: this._scorecard.pack_id,
+            decision,
+            decided_by: 'operator',
+            reason: `Decisao HiC via RealizedRoiScorecardUI (${decision})`,
+          });
+          this._scorecard.pending_calibration = null;
+          this._scorecard.calibrationFeedback = decision === 'approve'
+            ? 'Calibracao de elasticidade aprovada e ativada.'
+            : 'Proposta de calibracao rejeitada pelo operador.';
+          const l2 = rootElement.querySelector('.genui-layer-2');
+          if (l2) l2.innerHTML = this._renderScorecardBody();
+          this.bindEvents(rootElement);
+        } catch (err) {
+          btn.disabled = false;
+          console.warn('[RealizedRoiScorecardUI] Erro na decisao HiC:', err);
+        }
+      };
+
+      const approveBtn = rootElement.querySelector('.roi-cal-approve-btn');
+      if (approveBtn && !approveBtn._hasCalApprove) {
+        approveBtn._hasCalApprove = true;
+        approveBtn.addEventListener('click', () => handleDecision(approveBtn, 'approve'));
+      }
+
+      const rejectBtn = rootElement.querySelector('.roi-cal-reject-btn');
+      if (rejectBtn && !rejectBtn._hasCalReject) {
+        rejectBtn._hasCalReject = true;
+        rejectBtn.addEventListener('click', () => handleDecision(rejectBtn, 'reject'));
+      }
     }
   }
 

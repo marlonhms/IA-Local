@@ -14,6 +14,7 @@ from core.intelligence.intent_tracker import IntentTracker
 from core.intelligence.memory_manager import MemoryManager
 from core.intelligence.models import (
     AnomalyFinding,
+    MemoryGovernanceFeedResponse,
     MemoryRuleListResponse,
     MetricSeriesPoint,
     OperatorIntentRecord,
@@ -37,6 +38,7 @@ __all__ = [
     "BusinessProfiler",
     "FUEL_CONVENIENCE_SQL_TEMPLATES",
     "IntentTracker",
+    "MemoryGovernanceFeedResponse",
     "MemoryManager",
     "MemoryRuleListResponse",
     "MetricSeriesPoint",

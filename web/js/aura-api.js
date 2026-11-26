@@ -1176,6 +1176,93 @@ class AuraApiClient {
   }
 
   /**
+   * Recalculo interativo Zero-LLM What-If (POST /api/v1/simulate/recompute)
+   */
+  async recomputeWhatIf(payload, options = {}) {
+    const res = await this.transport.request('/api/v1/simulate/recompute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: options.signal,
+      body: JSON.stringify(payload || {}),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Falha ao recalcular simulacao What-If: HTTP ${res.status} ${errText}`);
+    }
+    return await res.json();
+  }
+
+  /**
+   * Feed consolidado HiC: regras candidate + simulacoes sugeridas (GET /api/v1/memory/suggestions)
+   */
+  async getMemoryGovernanceFeed(packId = 'fuel_convenience', tenantId = 'default') {
+    const params = new URLSearchParams({
+      pack_id: packId,
+      tenant_id: tenantId,
+    });
+    const res = await this.transport.request(`/api/v1/memory/suggestions?${params.toString()}`, {
+      method: 'GET',
+    });
+    if (!res.ok) {
+      throw new Error(`Falha ao consultar feed de governanca HiC: HTTP ${res.status}`);
+    }
+    return await res.json();
+  }
+
+  /**
+   * Decisao explicita HiC sobre regra candidate (POST /api/v1/memory/rules/{rule_id}/decision)
+   */
+  async decideMemoryRule(ruleId, payload) {
+    const res = await this.transport.request(
+      `/api/v1/memory/rules/${encodeURIComponent(ruleId)}/decision`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload || {}),
+      },
+    );
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Falha ao registrar decisao HiC: HTTP ${res.status} ${errText}`);
+    }
+    return await res.json();
+  }
+
+  /**
+   * Execucao deterministica de backtesting 30/60/90d (POST /api/v1/simulate/backtest/run)
+   */
+  async runSimulationBacktest(payload) {
+    const res = await this.transport.request('/api/v1/simulate/backtest/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload || {}),
+    });
+    if (!res.ok) {
+      throw new Error(`Falha ao executar backtesting: HTTP ${res.status}`);
+    }
+    return await res.json();
+  }
+
+  /**
+   * Scorecard Previsto vs. Realizado (GET /api/v1/simulate/backtest/scorecard)
+   */
+  async getBacktestScorecard(packId = 'fuel_convenience', tenantId = 'default', limit = 20) {
+    const params = new URLSearchParams({
+      pack_id: packId,
+      tenant_id: tenantId,
+      limit: String(limit),
+    });
+    const res = await this.transport.request(
+      `/api/v1/simulate/backtest/scorecard?${params.toString()}`,
+      { method: 'GET' },
+    );
+    if (!res.ok) {
+      throw new Error(`Falha ao consultar scorecard de backtesting: HTTP ${res.status}`);
+    }
+    return await res.json();
+  }
+
+  /**
    * Alertas proativos in-app
    */
   async getProactiveAlerts(params = {}) {

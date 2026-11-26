@@ -12,7 +12,7 @@ import json
 import re
 import uuid
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Iterator
 
 from core.sanitizer import sanitize_text
@@ -28,6 +28,28 @@ from core.simulation.models import (
 _REDACTION_MARKER_RE = re.compile(r"\[REDACTED:([A-Z0-9_]+)\]")
 _LONG_DIGITS_RE = re.compile(r"\d{7,}")
 _NON_SLUG_RE = re.compile(r"[^a-z0-9_:-]+")
+
+
+def _parse_utc_timestamp(value: Any) -> datetime | None:
+    """Converte timestamp SQLite/Postgres para datetime timezone-aware UTC."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.astimezone(UTC) if value.tzinfo else value.replace(tzinfo=UTC)
+    raw = str(value).strip()
+    if not raw:
+        return None
+    normalized = raw.replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(normalized)
+        return dt.astimezone(UTC) if dt.tzinfo else dt.replace(tzinfo=UTC)
+    except ValueError:
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(raw, fmt).replace(tzinfo=UTC)
+            except ValueError:
+                continue
+    return None
 
 
 def _sanitize_signal_token(value: str, max_len: int = 64) -> str:
@@ -672,6 +694,133 @@ class SimulationRepository:
                 return True
             finally:
                 cur.close()
+
+    def list_matured_snapshots(
+        self,
+        tenant_id: str,
+        pack_id: str,
+        as_of_dt: datetime,
+        only_pending: bool = True,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Lista snapshots vencidos (created_at + horizon_days <= as_of_dt) isolados por tenant e pack."""
+        norm_pack = pack_id.strip().lower()
+        safe_limit = max(1, min(500, int(limit)))
+        ref_utc = as_of_dt.astimezone(UTC) if as_of_dt.tzinfo else as_of_dt.replace(tzinfo=UTC)
+        pending_clause = "AND realized_outcome_json IS NULL" if only_pending else ""
+
+        with self._connection_scope(tenant_id) as conn:
+            p = self._ph(conn)
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    f"""
+                    SELECT simulation_id, tenant_id, pack_id, scenario_type, horizon_days,
+                           baseline_t0_json, shock_params_json,
+                           p10_value, p50_value, p90_value,
+                           sensitivity_json, violated_rules_json,
+                           seed, iterations, created_by, created_at,
+                           realized_outcome_json, realized_at
+                    FROM simulation_snapshots
+                    WHERE tenant_id = {p} AND pack_id = {p} {pending_clause}
+                    ORDER BY created_at ASC;
+                    """,
+                    (tenant_id, norm_pack),
+                )
+                rows = cur.fetchall()
+            finally:
+                cur.close()
+
+        matured: list[dict[str, Any]] = []
+        for row in rows:
+            created_dt = _parse_utc_timestamp(row[15])
+            if created_dt is None:
+                continue
+            horizon_days = int(row[4])
+            if created_dt + timedelta(days=horizon_days) > ref_utc:
+                continue
+            matured.append(
+                {
+                    "simulation_id": str(row[0]),
+                    "tenant_id": str(row[1]),
+                    "pack_id": str(row[2]),
+                    "scenario_type": str(row[3]),
+                    "horizon_days": horizon_days,
+                    "baseline": json.loads(row[5]),
+                    "shocks": json.loads(row[6]),
+                    "p10_value": float(row[7]),
+                    "p50_value": float(row[8]),
+                    "p90_value": float(row[9]),
+                    "sensitivity": json.loads(row[10]),
+                    "violated_rules": json.loads(row[11]),
+                    "seed": int(row[12]),
+                    "iterations": int(row[13]),
+                    "created_by": str(row[14]),
+                    "created_at": str(row[15]) if row[15] is not None else None,
+                    "realized_outcome": json.loads(row[16]) if row[16] else None,
+                    "realized_at": str(row[17]) if row[17] is not None else None,
+                }
+            )
+            if len(matured) >= safe_limit:
+                break
+        return matured
+
+    def list_realized_snapshots(
+        self,
+        tenant_id: str,
+        pack_id: str,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Lista snapshots com desfecho realizado registrado para compor o scorecard ROI."""
+        norm_pack = pack_id.strip().lower()
+        safe_limit = max(1, min(500, int(limit)))
+        with self._connection_scope(tenant_id) as conn:
+            p = self._ph(conn)
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    f"""
+                    SELECT simulation_id, tenant_id, pack_id, scenario_type, horizon_days,
+                           baseline_t0_json, shock_params_json,
+                           p10_value, p50_value, p90_value,
+                           sensitivity_json, violated_rules_json,
+                           seed, iterations, created_by, created_at,
+                           realized_outcome_json, realized_at
+                    FROM simulation_snapshots
+                    WHERE tenant_id = {p} AND pack_id = {p}
+                      AND realized_outcome_json IS NOT NULL
+                    ORDER BY realized_at DESC, created_at DESC
+                    LIMIT {p};
+                    """,
+                    (tenant_id, norm_pack, safe_limit),
+                )
+                rows = cur.fetchall()
+            finally:
+                cur.close()
+
+        return [
+            {
+                "simulation_id": str(row[0]),
+                "tenant_id": str(row[1]),
+                "pack_id": str(row[2]),
+                "scenario_type": str(row[3]),
+                "horizon_days": int(row[4]),
+                "baseline": json.loads(row[5]),
+                "shocks": json.loads(row[6]),
+                "p10_value": float(row[7]),
+                "p50_value": float(row[8]),
+                "p90_value": float(row[9]),
+                "sensitivity": json.loads(row[10]),
+                "violated_rules": json.loads(row[11]),
+                "seed": int(row[12]),
+                "iterations": int(row[13]),
+                "created_by": str(row[14]),
+                "created_at": str(row[15]) if row[15] is not None else None,
+                "realized_outcome": json.loads(row[16]) if row[16] else None,
+                "realized_at": str(row[17]) if row[17] is not None else None,
+            }
+            for row in rows
+        ]
 
 
 __all__ = ["SimulationRepository"]

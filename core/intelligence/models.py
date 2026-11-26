@@ -131,6 +131,17 @@ class MemoryRuleListResponse(BaseModel):
     rules: list[BusinessRule]
 
 
+class MemoryGovernanceFeedResponse(BaseModel):
+    """Feed consolidado Zero-LLM para governanca HiC (regras candidate + sugestoes proativas)."""
+
+    tenant_id: str
+    pack_id: str
+    candidate_rules: list[BusinessRule] = Field(default_factory=list)
+    suggested_simulations: list[SuggestedSimulationCard] = Field(default_factory=list)
+    pending_count: int = 0
+    llm_calls: int = 0
+
+
 class RuleDecisionRequest(BaseModel):
     """Payload HiC para aprovar ou rejeitar regra candidate."""
 
@@ -162,6 +173,7 @@ __all__ = [
     "AnomalyMethod",
     "AnomalyMetric",
     "AnomalySeverity",
+    "MemoryGovernanceFeedResponse",
     "MemoryRuleListResponse",
     "MetricSeriesPoint",
     "OperatorIntentRecord",

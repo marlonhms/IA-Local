@@ -10,11 +10,21 @@ import type {
   ActionExecuteRequest,
   ActionVoucher,
   ActionableDirectivePayload,
+  BacktestRunRequest,
+  BacktestRunResponse,
+  BusinessMemoryRule,
+  BusinessRuleStatus,
   ComplianceVerificationResult,
   ExecutiveExceptionCard,
   GenUIEnvelope,
   GenUIEvent,
   LiveSecurityTelemetry,
+  MemoryGovernanceFeedResponse,
+  RealizedRoiScorecardResponse,
+  RuleDecisionRequest,
+  RuleDecisionResponse,
+  SimulationRecomputeRequest,
+  SimulationRecomputeResponse,
   TelemetrySLISnapshot,
 } from "../types/aura-contracts";
 
@@ -531,5 +541,116 @@ export class AuraApiClient {
     }
     const data = (await response.json()) as { directives?: ActionableDirectivePayload[] };
     return data.directives ?? [];
+  }
+
+  public async recomputeSimulation(
+    payload: SimulationRecomputeRequest,
+    signal?: AbortSignal,
+  ): Promise<SimulationRecomputeResponse> {
+    const response = await this.transport.request("/api/v1/simulate/recompute", {
+      method: "POST",
+      signal,
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      throw new Error(`Falha ao recalcular simulacao What-If (${response.status}): ${errorText}`);
+    }
+    return (await response.json()) as SimulationRecomputeResponse;
+  }
+
+  public async listMemoryRules(
+    packId: string,
+    tenantId = "default",
+    status?: BusinessRuleStatus,
+  ): Promise<BusinessMemoryRule[]> {
+    const params = new URLSearchParams({
+      pack_id: packId,
+      tenant_id: tenantId,
+    });
+    if (status) {
+      params.set("status", status);
+    }
+    const response = await this.transport.request(`/api/v1/memory/rules?${params.toString()}`, {
+      method: "GET",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Falha ao listar regras de memoria (${response.status})`);
+    }
+    const data = (await response.json()) as { rules?: BusinessMemoryRule[] };
+    return data.rules ?? [];
+  }
+
+  public async decideMemoryRule(
+    ruleId: string,
+    payload: RuleDecisionRequest,
+  ): Promise<RuleDecisionResponse> {
+    const response = await this.transport.request(
+      `/api/v1/memory/rules/${encodeURIComponent(ruleId)}/decision`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      throw new Error(`Falha ao registrar decisao HiC da regra (${response.status}): ${errorText}`);
+    }
+    return (await response.json()) as RuleDecisionResponse;
+  }
+
+  public async getMemoryGovernanceFeed(
+    packId: string,
+    tenantId = "default",
+  ): Promise<MemoryGovernanceFeedResponse> {
+    const params = new URLSearchParams({
+      pack_id: packId,
+      tenant_id: tenantId,
+    });
+    const response = await this.transport.request(`/api/v1/memory/suggestions?${params.toString()}`, {
+      method: "GET",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Falha ao consultar feed de governanca HiC (${response.status})`);
+    }
+    return (await response.json()) as MemoryGovernanceFeedResponse;
+  }
+
+  public async runSimulationBacktest(payload: BacktestRunRequest): Promise<BacktestRunResponse> {
+    const response = await this.transport.request("/api/v1/simulate/backtest/run", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      throw new Error(`Falha ao executar backtesting (${response.status}): ${errorText}`);
+    }
+    return (await response.json()) as BacktestRunResponse;
+  }
+
+  public async getBacktestScorecard(
+    packId: string,
+    tenantId = "default",
+    limit = 20,
+  ): Promise<RealizedRoiScorecardResponse> {
+    const params = new URLSearchParams({
+      pack_id: packId,
+      tenant_id: tenantId,
+      limit: String(limit),
+    });
+    const response = await this.transport.request(
+      `/api/v1/simulate/backtest/scorecard?${params.toString()}`,
+      { method: "GET" },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Falha ao consultar scorecard de backtesting (${response.status})`);
+    }
+    return (await response.json()) as RealizedRoiScorecardResponse;
   }
 }

@@ -8,16 +8,21 @@ from __future__ import annotations
 
 import logging
 from contextlib import suppress
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
+from core.simulation.backtest import SimulationBacktester
 from core.simulation.engine import SimulationEngine
 from core.simulation.models import (
+    BacktestRunRequest,
+    BacktestRunResponse,
     BusinessRule,
+    RealizedRoiScorecardResponse,
     SimulationRecomputeRequest,
     SimulationRecomputeResponse,
 )
-from core.simulation.repository import SimulationRepository
+from core.simulation.repository import SimulationRepository, _parse_utc_timestamp
 
 logger = logging.getLogger("AuraSimulationAPI")
 
@@ -28,6 +33,7 @@ simulation_router = APIRouter(
 
 _engine_singleton = SimulationEngine()
 _repository_instance: SimulationRepository | None = None
+_backtester_instance: SimulationBacktester | None = None
 
 
 def get_simulation_repository() -> SimulationRepository:
@@ -41,6 +47,21 @@ def set_simulation_repository(repo: SimulationRepository | None) -> None:
     """Permite injetar repositorio customizado (ex: SQLite :memory: em testes)."""
     global _repository_instance
     _repository_instance = repo
+
+
+def get_simulation_backtester(
+    repo: SimulationRepository = Depends(get_simulation_repository),
+) -> SimulationBacktester:
+    """Dependency Provider para o motor deterministico de backtesting."""
+    if _backtester_instance is not None:
+        return _backtester_instance
+    return SimulationBacktester(repository=repo)
+
+
+def set_simulation_backtester(backtester: SimulationBacktester | None) -> None:
+    """Permite injetar SimulationBacktester customizado em testes."""
+    global _backtester_instance
+    _backtester_instance = backtester
 
 
 def _verify_simulation_auth(request: Request) -> bool:
@@ -98,8 +119,72 @@ async def recompute_simulation_endpoint(
         ) from exc
 
 
+@simulation_router.post(
+    "/backtest/run",
+    response_model=BacktestRunResponse,
+    summary="Executa backtesting deterministico (30/60/90d) e sugere calibracao HiC",
+    dependencies=[Depends(_verify_simulation_auth)],
+)
+async def run_simulation_backtest_endpoint(
+    payload: BacktestRunRequest,
+    backtester: SimulationBacktester = Depends(get_simulation_backtester),
+) -> BacktestRunResponse:
+    """Compara snapshots vencidos com valores realizados via SQL read-only e propoe ajuste."""
+    as_of_dt: datetime | None = None
+    if payload.as_of:
+        as_of_dt = _parse_utc_timestamp(payload.as_of)
+        if as_of_dt is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Parametro 'as_of' invalido; use formato ISO-8601 UTC.",
+            )
+    try:
+        return backtester.run_backtest(
+            tenant_id=payload.tenant_id,
+            pack_id=payload.pack_id,
+            as_of=as_of_dt,
+            limit=payload.limit,
+            dry_run=payload.dry_run,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+
+@simulation_router.get(
+    "/backtest/scorecard",
+    response_model=RealizedRoiScorecardResponse,
+    summary="Retorna scorecard Previsto vs. Realizado e calibracao pendente HiC",
+    dependencies=[Depends(_verify_simulation_auth)],
+)
+async def get_backtest_scorecard_endpoint(
+    pack_id: str = Query(..., min_length=1),
+    tenant_id: str = Query(default="default", min_length=1),
+    limit: int = Query(default=20, ge=1, le=200),
+    backtester: SimulationBacktester = Depends(get_simulation_backtester),
+) -> RealizedRoiScorecardResponse:
+    """Alimenta o RealizedRoiScorecardUI sem consumir tokens LLM."""
+    try:
+        return backtester.build_scorecard(
+            tenant_id=tenant_id,
+            pack_id=pack_id,
+            limit=limit,
+        )
+    except Exception as exc:  # noqa: BLE001
+        with suppress(Exception):
+            logger.debug("Scorecard fallback vazio por indisponibilidade de banco: %s", exc)
+        return RealizedRoiScorecardResponse(
+            tenant_id=tenant_id,
+            pack_id=pack_id.strip().lower(),
+        )
+
+
 __all__ = [
+    "get_simulation_backtester",
     "get_simulation_repository",
+    "set_simulation_backtester",
     "set_simulation_repository",
     "simulation_router",
 ]

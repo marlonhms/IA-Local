@@ -114,6 +114,7 @@ hiddenimports = [
     'core.simulation.rules_evaluator',
     'core.simulation.repository',
     'core.simulation.engine',
+    'core.simulation.backtest',
     'core.simulation.api',
     'core.intelligence',
     'core.intelligence.models',

@@ -591,9 +591,245 @@ export type AuraDomainPackId =
   | "autocenter_parts"
   | "wholesale_distribution";
 
+export type SimulationScenarioType =
+  | "price_discount_change"
+  | "cost_supplier_variation"
+  | "payment_term_cashflow";
+
+export type SimulationHorizonDays = 30 | 60 | 90;
+export type BusinessRuleStatus = "candidate" | "active" | "rejected";
+export type BusinessRuleSeverity = "CRITICAL" | "HIGH" | "MEDIUM" | "INFO";
+export type BusinessRuleOperator = ">=" | "<=" | ">" | "<" | "==" | "!=" | "between";
+
+export interface SimulationBaseline {
+  unit_price: number;
+  unit_cost: number;
+  daily_volume: number;
+  volume_std_dev_pct?: number;
+  cost_std_dev_pct?: number;
+  elasticity_mean?: number;
+  elasticity_std_dev?: number;
+  receivable_days?: number;
+  payable_days?: number;
+  annual_capital_cost_pct?: number;
+  fixed_daily_cost?: number;
+  extra_metrics?: Record<string, number>;
+}
+
+export interface ShockVector {
+  price_delta_pct?: number;
+  discount_pct?: number;
+  supplier_cost_delta_pct?: number;
+  cost_passthrough_pct?: number;
+  receivable_days_delta?: number;
+  payable_days_delta?: number;
+  capital_cost_delta_pct?: number;
+  custom_shocks?: Record<string, number>;
+}
+
+export interface MonteCarloBands {
+  p10: number;
+  p50: number;
+  p90: number;
+  mean: number;
+  std_dev: number;
+  prob_positive_pct: number;
+  iterations: number;
+  seed: number;
+}
+
+export interface RuleViolation {
+  rule_id: string;
+  source: "yaml" | "business_memory";
+  rule_key: string;
+  metric: string;
+  operator: BusinessRuleOperator;
+  threshold: number;
+  threshold_upper?: number | null;
+  observed_value: number;
+  severity: BusinessRuleSeverity;
+  message: string;
+}
+
+export interface SensitivityDriver {
+  parameter: string;
+  impact_brl: number;
+  impact_pct: number;
+  direction: "positive" | "negative" | "neutral";
+}
+
+export interface SimulationProvenance {
+  baseline_source: string;
+  active_rules_count: number;
+  yaml_rules_count: number;
+  memory_rules_count: number;
+  cited_documents: string[];
+}
+
+export interface SimulationRecomputeRequest {
+  tenant_id?: string;
+  pack_id: string;
+  simulation_id?: string | null;
+  scenario_type: SimulationScenarioType;
+  horizon_days?: SimulationHorizonDays;
+  baseline?: SimulationBaseline | null;
+  shocks?: ShockVector;
+  iterations?: number;
+  seed?: number;
+  persist_snapshot?: boolean;
+  created_by?: string;
+}
+
+export interface SimulationRecomputeResponse {
+  simulation_id: string;
+  tenant_id: string;
+  pack_id: string;
+  scenario_type: SimulationScenarioType;
+  horizon_days: SimulationHorizonDays;
+  monte_carlo: MonteCarloBands;
+  projected_metrics: Record<string, number>;
+  sensitivity: SensitivityDriver[];
+  violated_rules: RuleViolation[];
+  is_compliant: boolean;
+  elapsed_ms: number;
+  llm_calls: number;
+  provenance?: SimulationProvenance;
+}
+
+export interface BusinessMemoryRule {
+  rule_id: string;
+  tenant_id: string;
+  pack_id: string;
+  rule_key: string;
+  metric: string;
+  operator: BusinessRuleOperator;
+  threshold_value: number;
+  threshold_upper?: number | null;
+  severity: BusinessRuleSeverity;
+  status: BusinessRuleStatus;
+  source: "yaml" | "business_memory";
+  origin: string;
+  author: string;
+  description: string;
+}
+
+export interface RuleDecisionRequest {
+  tenant_id?: string;
+  pack_id: string;
+  decision: "approve" | "reject";
+  decided_by?: string;
+  reason?: string;
+}
+
+export interface RuleDecisionResponse {
+  rule_id: string;
+  tenant_id: string;
+  pack_id: string;
+  previous_status: BusinessRuleStatus;
+  new_status: BusinessRuleStatus;
+  decided_by: string;
+  decided_at: string;
+  rule: BusinessMemoryRule;
+}
+
+export interface SuggestedSimulationCard {
+  card_id: string;
+  tenant_id: string;
+  pack_id: string;
+  topic_key: string;
+  entity_type: string;
+  metric_key: string;
+  hit_count: number;
+  recommended_scenario: SimulationScenarioType;
+  suggested_shocks: ShockVector;
+  title: string;
+  reason: string;
+}
+
+export interface MemoryGovernanceFeedResponse {
+  tenant_id: string;
+  pack_id: string;
+  candidate_rules: BusinessMemoryRule[];
+  suggested_simulations: SuggestedSimulationCard[];
+  pending_count: number;
+  llm_calls: number;
+}
+
+export interface BacktestItemResult {
+  simulation_id: string;
+  scenario_type: SimulationScenarioType;
+  horizon_days: SimulationHorizonDays;
+  created_at?: string | null;
+  realized_at?: string | null;
+  predicted_p10_brl: number;
+  predicted_p50_brl: number;
+  predicted_p90_brl: number;
+  realized_brl: number;
+  error_brl: number;
+  error_pct: number;
+  within_p10_p90: boolean;
+}
+
+export interface CalibrationProposal {
+  rule_id: string;
+  tenant_id: string;
+  pack_id: string;
+  metric: string;
+  current_factor: number;
+  suggested_factor: number;
+  mean_bias_pct: number;
+  sample_size: number;
+  status: BusinessRuleStatus;
+  reason: string;
+}
+
+export interface BacktestRunRequest {
+  tenant_id?: string;
+  pack_id: string;
+  as_of?: string | null;
+  limit?: number;
+  dry_run?: boolean;
+}
+
+export interface BacktestRunResponse {
+  tenant_id: string;
+  pack_id: string;
+  evaluated_count: number;
+  items: BacktestItemResult[];
+  calibration_proposal?: CalibrationProposal | null;
+  llm_calls: number;
+}
+
+export interface RealizedRoiScorecardResponse {
+  tenant_id: string;
+  pack_id: string;
+  period_days: number;
+  projected_brl: number;
+  realized_brl: number;
+  total_realized_brl: number;
+  hit_rate_pct: number;
+  mean_abs_error_pct: number;
+  roi_multiple: number;
+  audited_actions_count: number;
+  items: BacktestItemResult[];
+  pending_calibration?: CalibrationProposal | null;
+  llm_calls: number;
+}
+
 export interface WhatIfSimulatorProps {
   title?: string;
   product_name?: string;
+  tenant_id?: string;
+  pack_id?: string;
+  simulation_id?: string;
+  scenario_type?: SimulationScenarioType;
+  horizon_days?: SimulationHorizonDays;
+  baseline?: SimulationBaseline;
+  shocks?: ShockVector;
+  monte_carlo?: MonteCarloBands;
+  violated_rules?: RuleViolation[];
+  sensitivity?: SensitivityDriver[];
+  provenance?: SimulationProvenance;
   baseline_margin_brl?: number;
   simulated_margin_brl?: number;
   delta_margin_brl?: number;
@@ -603,12 +839,19 @@ export interface WhatIfSimulatorProps {
 }
 
 export interface RealizedRoiScorecardProps {
+  title?: string;
+  tenant_id?: string;
+  pack_id?: string;
   period_days?: number;
   projected_brl?: number;
   realized_brl?: number;
+  total_realized_brl?: number;
   hit_rate_pct?: number;
+  mean_abs_error_pct?: number;
   roi_multiple?: number;
   audited_actions_count?: number;
+  items?: BacktestItemResult[];
+  pending_calibration?: CalibrationProposal | null;
 }
 
 export interface McpActionConfirmationProps {
