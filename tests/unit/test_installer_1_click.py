@@ -111,7 +111,7 @@ def test_full_setup_and_receipt_generation(tmp_path: Path) -> None:
     )
 
     assert receipt["status"] == "installed"
-    assert receipt["database_migrations"]["current_revision"] == "0002_compliance"
+    assert receipt["database_migrations"]["current_revision"] == "0003_simulation_memory"
     assert receipt["database_migrations"]["is_valid"] is True
     assert receipt["compliance_opt_in"]["status"] == "active"
     assert receipt["compliance_opt_in"]["loja_cnpj"] == "12.345.678/0001-99"

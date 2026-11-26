@@ -37,6 +37,12 @@ EXPECTED_TABLES_BY_REVISION: dict[str, list[str]] = {
         "aura_compliance_optin",
         "aura_automations",
     ],
+    "0003_simulation_memory": [
+        "business_profile_snapshots",
+        "business_memory_rules",
+        "operator_intent_signals",
+        "simulation_snapshots",
+    ],
 }
 
 

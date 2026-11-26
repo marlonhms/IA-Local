@@ -95,6 +95,8 @@ from core.webhooks import (
 router = APIRouter(prefix="/api/v1/aura", tags=["AURA Core Engine"])
 cockpit_router = APIRouter(prefix="/api/v1/cockpit", tags=["AURA Cockpit Zero-Click"])
 from core.partner_api import partner_router
+from core.simulation.api import simulation_router
+from core.intelligence.api import memory_router
 from core.voice_api import voice_router
 from core.voice_live_bridge import voice_live_router
 
@@ -3100,6 +3102,8 @@ def create_aura_app(
     app.include_router(router)
     app.include_router(cockpit_router)
     app.include_router(partner_router)
+    app.include_router(simulation_router)
+    app.include_router(memory_router)
     app.include_router(voice_router)
     app.include_router(voice_live_router)
 

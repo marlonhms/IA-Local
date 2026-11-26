@@ -59,6 +59,10 @@ class DomainPackConfig(BaseModel):
         default_factory=list,
         description="Lista de intencoes operacionais especificas da vertical",
     )
+    hard_rules: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Regras duras declarativas para avaliacao binaria em simulacoes What-If",
+    )
 
     @field_validator("tolerances", mode="before")
     @classmethod

@@ -3390,6 +3390,8 @@ class AuraEngine:
         watchdog: Optional[Any] = None,
         pack_id: Optional[str] = None,
         tool_registry: Optional[Any] = None,
+        intent_tracker: Optional[Any] = None,
+        memory_manager: Optional[Any] = None,
     ):
         self.tenant_id = tenant_id or "default_tenant"
         self.filial_id = filial_id or "posto_01"
@@ -3407,8 +3409,60 @@ class AuraEngine:
         self._proactive_daemon = proactive_daemon
         self._watchdog = watchdog
         self._tool_registry = tool_registry
+        self._intent_tracker = intent_tracker
+        self._memory_manager = memory_manager
         self._dados_filial_cache: Dict[str, Dict[str, Any]] = {}
         self._token_budget = None
+
+    def _record_chat_intelligence_signals(
+        self,
+        tenant_id: str,
+        pack_id: str,
+        raw_query: str,
+        intent_name: str,
+    ) -> None:
+        """Registra telemetria sanitizada de intencao e extrai regra candidate HiC."""
+        if self._intent_tracker is not None:
+            try:
+                self._intent_tracker.record_query(
+                    tenant_id=tenant_id,
+                    pack_id=pack_id,
+                    raw_query=raw_query,
+                    intent_name=intent_name,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Falha nao-critica ao registrar telemetria de intencao: %s", exc)
+
+        if self._memory_manager is not None:
+            try:
+                self._memory_manager.extract_candidate_from_message(
+                    message=raw_query,
+                    tenant_id=tenant_id,
+                    pack_id=pack_id,
+                    author="operator",
+                    origin="chat_operator_correction",
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Falha nao-critica ao extrair regra candidate do chat: %s", exc)
+
+    def format_active_business_rules_for_prompt(
+        self,
+        tenant_id: Optional[str] = None,
+        pack_id: Optional[str] = None,
+    ) -> str:
+        """Retorna exclusivamente regras aprovadas (status='active') para contexto LLM."""
+        if self._memory_manager is None:
+            return ""
+        eff_tenant = tenant_id or self.tenant_id
+        eff_pack = pack_id or self._resolve_current_pack().pack_id
+        try:
+            return self._memory_manager.format_active_rules_for_llm(
+                tenant_id=eff_tenant,
+                pack_id=eff_pack,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Falha nao-critica ao ler memoria institucional ativa: %s", exc)
+            return ""
 
     def _resolve_current_pack(self, pack_id: Optional[str] = None) -> DomainPackConfig:
         """Resolve o Domain Pack efetivo sem mutar o ContextVar global."""
@@ -4124,6 +4178,13 @@ class AuraEngine:
             contexto_sanitizado = f"{memoria_bloco}\n\n{contexto_sanitizado}".strip()
 
         active_pack = domain_pack or peek_active_domain_pack() or get_active_domain_pack(self.pack_id)
+
+        regras_ativas_bloco = self.format_active_business_rules_for_prompt(
+            tenant_id=self.tenant_id,
+            pack_id=active_pack.pack_id,
+        )
+        if regras_ativas_bloco:
+            contexto_sanitizado = f"{regras_ativas_bloco}\n\n{contexto_sanitizado}".strip()
 
         return build_system_prompt(
             pergunta_sanitizada=pergunta_sanitizada,
@@ -6089,6 +6150,15 @@ class AuraEngine:
 
             query_vector = telemetria_rota.get("query_vector")
             tool_call_id = generate_tool_call_id()
+
+            if self._intent_tracker is not None or self._memory_manager is not None:
+                await asyncio.to_thread(
+                    self._record_chat_intelligence_signals,
+                    t_id,
+                    active_pack.pack_id,
+                    pergunta_efetiva,
+                    intencao,
+                )
 
             tool_start_msg = (
                 f"Repetindo consulta anterior: '{retry_pergunta_anterior}'..."
