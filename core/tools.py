@@ -9144,16 +9144,26 @@ class PostoTools:
             except Exception:
                 pass
 
-            if anp_rows:
-                parsed_blocks.append(
-                    LegoBlock(
-                        block_id="block_confronto_precos",
-                        block_type="comparison_table",
-                        title="Confronto de Precos vs Mercado Municipal (ANP)",
-                        subtitle="Comparativo real contra base ANP sincronizada",
-                        comparison_rows=anp_rows,
+            if not anp_rows:
+                anp_rows.append(
+                    LegoComparisonRow(
+                        name="Referencia ANP",
+                        primary_value="N/D",
+                        secondary_value="N/D",
+                        gap="0",
+                        status="neutral",
+                        observation="Base ANP nao sincronizada neste ambiente",
                     )
                 )
+            parsed_blocks.append(
+                LegoBlock(
+                    block_id="block_confronto_precos",
+                    block_type="comparison_table",
+                    title="Confronto de Precos vs Mercado Municipal (ANP)",
+                    subtitle="Comparativo real contra base ANP sincronizada",
+                    comparison_rows=anp_rows,
+                )
+            )
 
             # Bloco 4: ranking_list (top produtos reais do ERP)
             ranking_items: list[LegoRankingItem] = []
@@ -9171,16 +9181,26 @@ class PostoTools:
                         status="success" if idx == 1 else "neutral",
                     )
                 )
-            if ranking_items:
-                parsed_blocks.append(
-                    LegoBlock(
-                        block_id="block_ranking_produtos",
-                        block_type="ranking_list",
-                        title="Top Produtos por Giro (ERP)",
-                        subtitle="Participacao apurada nas vendas fiscais reais",
-                        ranking_items=ranking_items,
+            if not ranking_items:
+                ranking_items.append(
+                    LegoRankingItem(
+                        rank=1,
+                        title="Sem vendas fiscais no periodo",
+                        subtitle="ERP local",
+                        value="N/D",
+                        tag="ERP Real",
+                        status="neutral",
                     )
                 )
+            parsed_blocks.append(
+                LegoBlock(
+                    block_id="block_ranking_produtos",
+                    block_type="ranking_list",
+                    title="Top Produtos por Giro (ERP)",
+                    subtitle="Participacao apurada nas vendas fiscais reais",
+                    ranking_items=ranking_items,
+                )
+            )
 
             # Bloco 5: timeline_feed
             parsed_blocks.append(

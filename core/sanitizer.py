@@ -472,6 +472,21 @@ _STAFF_CONTAINER_KEYS: Set[str] = {
     "maior_ticket_medio",
 }
 
+# Colecoes/chaves explicitas de dados pessoais de clientes/terceiros (redacao irreversivel mesmo sem spaCy NER)
+_CUSTOMER_CONTAINER_KEYS: Set[str] = {
+    "clientes",
+    "pacientes",
+    "compradores",
+    "consumidores",
+    "motoristas",
+}
+_CUSTOMER_NAME_KEYS: Set[str] = {
+    "cliente_nome",
+    "nome_cliente",
+    "paciente_nome",
+    "nome_paciente",
+}
+
 # Chaves tecnicas estruturais de widgets GenUI (pass-through sem NER)
 _UI_TECHNICAL_ID_KEYS: Set[str] = {
     "action_id",
@@ -1134,27 +1149,57 @@ class CentralLogSanitizer:
         clean_payload = copy.deepcopy(payload)
         aggregated_counts: Dict[str, int] = {}
 
-        def _walk_and_clean(obj, key_name: Optional[str] = None, is_staff_ctx: bool = False):
+        def _walk_and_clean(
+            obj,
+            key_name: Optional[str] = None,
+            is_staff_ctx: bool = False,
+            is_customer_ctx: bool = False,
+        ):
             if isinstance(obj, dict):
                 key_norm = key_name.lower() if isinstance(key_name, str) else ""
-                dict_staff_ctx = is_staff_ctx or (key_norm in _STAFF_CONTAINER_KEYS) or any(
-                    marker in obj for marker in ("operador_matricula", "vendedor_matr", "total_abastecimentos")
+                dict_customer_ctx = is_customer_ctx or (key_norm in _CUSTOMER_CONTAINER_KEYS)
+                dict_staff_ctx = (not dict_customer_ctx) and (
+                    is_staff_ctx
+                    or (key_norm in _STAFF_CONTAINER_KEYS)
+                    or any(
+                        marker in obj
+                        for marker in ("operador_matricula", "vendedor_matr", "total_abastecimentos")
+                    )
                 )
                 return {
-                    k: _walk_and_clean(v, key_name=k, is_staff_ctx=dict_staff_ctx)
+                    k: _walk_and_clean(
+                        v,
+                        key_name=k,
+                        is_staff_ctx=dict_staff_ctx,
+                        is_customer_ctx=dict_customer_ctx,
+                    )
                     for k, v in obj.items()
                 }
             elif isinstance(obj, list):
                 list_key_norm = key_name.lower() if isinstance(key_name, str) else ""
-                list_staff_ctx = is_staff_ctx or (list_key_norm in _STAFF_CONTAINER_KEYS)
+                list_customer_ctx = is_customer_ctx or (list_key_norm in _CUSTOMER_CONTAINER_KEYS)
+                list_staff_ctx = (not list_customer_ctx) and (
+                    is_staff_ctx or (list_key_norm in _STAFF_CONTAINER_KEYS)
+                )
                 return [
-                    _walk_and_clean(item, key_name=key_name, is_staff_ctx=list_staff_ctx)
+                    _walk_and_clean(
+                        item,
+                        key_name=key_name,
+                        is_staff_ctx=list_staff_ctx,
+                        is_customer_ctx=list_customer_ctx,
+                    )
                     for item in obj
                 ]
             elif isinstance(obj, str):
                 key_norm = key_name.lower() if isinstance(key_name, str) else ""
                 # Preservar identificadores estruturais e metadados tecnicos de widgets
                 if key_norm in _UI_TECHNICAL_ID_KEYS:
+                    return obj
+                # Redacao irreversivel deterministica para nomes de clientes/terceiros (independe do spaCy NER)
+                if key_norm in _CUSTOMER_NAME_KEYS or (is_customer_ctx and key_norm == "nome"):
+                    if obj.strip() and not _is_allowlisted_entity(obj):
+                        aggregated_counts["person"] = aggregated_counts.get("person", 0) + 1
+                        return REDACTED_PERSON
                     return obj
                 # Pseudonimizacao reversivel para campos explicitos de operadores internos
                 if key_norm in _OPERATOR_NAME_KEYS or (is_staff_ctx and key_norm == "nome"):
