@@ -33,6 +33,7 @@ import com.example.aurapostoassitance.data.security.AuraHardwareAuthManager
 import com.example.aurapostoassitance.data.vision.AuraSharedIntakeRelay
 import com.example.aurapostoassitance.data.vision.AuraVisionNpuScanner
 import com.example.aurapostoassitance.data.vision.ScannedDocumentTelemetry
+import com.example.aurapostoassitance.ui.components.AuraTrustMetadata
 import com.example.aurapostoassitance.ui.genui.GenUiAction
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -61,7 +62,11 @@ data class ChatMessage(
     /** Envelope GenUI (JSON) para renderizar card nativo abaixo do texto. */
     val envelopeJson: String? = null,
     /** Trilha cronológica das etapas e ferramentas consultadas pela IA. */
-    val reasoningSteps: List<String> = emptyList()
+    val reasoningSteps: List<String> = emptyList(),
+    /** Título do slot Zero-CLS reservado ao receber SSE ui_skeleton antes de ui_complete. */
+    val pendingSkeletonTitle: String? = null,
+    /** Metadados auditáveis de confiança exibidos na Trust Pill do AuraReasoningRibbon. */
+    val trust: AuraTrustMetadata = AuraTrustMetadata()
 )
 
 data class IncomingHandoffAlert(
@@ -88,6 +93,9 @@ class ChatViewModel @Inject constructor(
     val memoryVault: AuraSemanticMemoryVault,
     private val sharedIntakeRelay: AuraSharedIntakeRelay
 ) : ViewModel() {
+
+    val activePackId: String
+        get() = serverConfig.activePackId
 
     // --- Fluxos de Voz e Fala Hands-Free ---
     val isListening: StateFlow<Boolean> = voiceManager.isListening
@@ -578,26 +586,14 @@ class ChatViewModel @Inject constructor(
 
         streamJob?.cancel()
 
-        // 1. Roteamento semântico instantâneo na NPU Hexagon (< 2ms)
-        val npuResult = npuEngine.classifyIntent(effectiveQuery)
-        val npuStep = "⚡ Qualcomm Hexagon NPU (${"%.1f".format(npuResult.latencyMs)}ms): ${npuResult.intent.friendlyName}"
-
-        // 2. Busca vetorial na Memória Semântica On-Device (< 2ms)
-        val memoryMatches = memoryVault.searchMemories(effectiveQuery, topK = 2, minSimilarity = 0.28f)
-        val memoryStep = if (memoryMatches.isNotEmpty()) {
-            val best = memoryMatches.first()
-            "🧠 RAG Vetorial NPU: '${best.item.title}' (${"%.1f".format(best.latencyMs)}ms, sim: ${"%.2f".format(best.similarity)})"
-        } else null
-
-        val initialSteps = listOfNotNull(npuStep, memoryStep)
-
+        val activePackId = serverConfig.activePackId
         val auraMessageId = "aura_" + System.currentTimeMillis().toString()
         val streamingMessage = ChatMessage(
             id = auraMessageId,
             text = "",
             isFromUser = false,
             isStreaming = true,
-            reasoningSteps = initialSteps
+            reasoningSteps = emptyList()
         )
         // Adiciona imediatamente tanto a mensagem do usuario quanto o orbe de resposta da AURA
         _messages.value = _messages.value + userMessage + streamingMessage
@@ -605,9 +601,39 @@ class ChatViewModel @Inject constructor(
         _auraStatusMessage.value = "Processando via NPU & AURA..."
 
         streamJob = viewModelScope.launch {
+            // 1 & 2. Classificação NPU + Busca Vetorial RAG On-Device fora da Main Thread
+            val (npuResult, memoryMatches) = withContext(Dispatchers.Default) {
+                val intentRes = npuEngine.classifyIntent(effectiveQuery)
+                val memories = memoryVault.searchMemories(
+                    query = effectiveQuery,
+                    segment = activePackId,
+                    topK = 2,
+                    minSimilarity = 0.28f
+                )
+                intentRes to memories
+            }
+
+            val npuStep = "⚡ ${npuResult.delegateUsed} (${"%.1f".format(npuResult.latencyMs)}ms): ${npuResult.intent.friendlyName}"
+            val memoryStep = if (memoryMatches.isNotEmpty()) {
+                val best = memoryMatches.first()
+                "🧠 RAG Vetorial NPU: '${best.item.title}' (${"%.1f".format(best.latencyMs)}ms, sim: ${"%.2f".format(best.similarity)})"
+            } else null
+
+            val reasoningSteps = listOfNotNull(npuStep, memoryStep).toMutableList()
+            updateAuraMessage(auraMessageId, "", true, null, reasoningSteps.toList())
+
+            val edgeRagContext = memoryMatches
+                .filter { it.similarity >= 0.38f }
+                .take(2)
+                .joinToString(" | ") { "[${it.item.category}] ${it.item.title}: ${it.item.content.take(220)}" }
+                .takeIf { it.isNotBlank() }
+
             var currentAuraText = ""
             var currentEnvelope: String? = null
-            val reasoningSteps = initialSteps.toMutableList()
+            var pendingSkeleton: String? = null
+            val requestStartedAt = System.currentTimeMillis()
+            var firstTokenAt: Long? = null
+            var trustMeta = AuraTrustMetadata()
 
             suspend fun persist(text: String) {
                 if (text.isBlank() && currentEnvelope == null) return
@@ -627,7 +653,14 @@ class ChatViewModel @Inject constructor(
             }
 
             var hasSpokenReply = false
-            sseRepository.streamChat(effectiveQuery, sessionId = activeSessionId, voiceMode = voiceMode)
+            sseRepository.streamChat(
+                query = effectiveQuery,
+                sessionId = activeSessionId,
+                voiceMode = voiceMode,
+                packId = activePackId,
+                npuIntentHint = npuResult.intent.code,
+                edgeRagContext = edgeRagContext
+            )
                 .catch { e ->
                     val isNetworkFailure = e is ConnectException ||
                         e is SocketTimeoutException ||
@@ -635,21 +668,28 @@ class ChatViewModel @Inject constructor(
                         e is java.net.UnknownHostException ||
                         e is java.io.IOException
                     if (isNetworkFailure) {
-                        val cachedBriefing = offlineVault.getBriefing("postos_redes")
-                        val resilientText = "📡 **Modo Resiliente Offline Ativado (Hexagon NPU SM7435)**\n\n" +
-                            "O servidor local da AURA está temporariamente inacessível. O classificador neural identificou sua consulta como **${npuResult.intent.friendlyName}** e recuperou o último diagnóstico auditado em cofre local:\n\n" +
-                            "${cachedBriefing.oralVoiceScript}\n\n" +
+                        val cachedBriefing = offlineVault.getBriefing(activePackId)
+                        val ragSummary = if (memoryMatches.isNotEmpty()) {
+                            "\n\n🧠 **Memória Episódica Local Recuperada:**\n" +
+                                memoryMatches.joinToString("\n") { m ->
+                                    "• **${m.item.title}:** ${m.item.content}"
+                                }
+                        } else ""
+                        val resilientText = "📡 **Modo Resiliente Offline Ativado (${npuResult.delegateUsed})**\n\n" +
+                            "O servidor local da AURA está temporariamente inacessível. O classificador on-device identificou sua consulta como **${npuResult.intent.friendlyName}** e recuperou o último diagnóstico auditado em cofre local:\n\n" +
+                            "${cachedBriefing.oralVoiceScript}$ragSummary\n\n" +
                             "💡 *Diretriz NPU:* ${npuResult.suggestedActionHint}"
 
-                        reasoningSteps.add("Cofre Offline: Snapshot preditivo recuperado (0ms)")
-                        updateAuraMessage(auraMessageId, resilientText, false, cachedBriefing.genUiCard?.toString(), reasoningSteps.toList())
+                        reasoningSteps.add("Cofre Offline ($activePackId): Snapshot preditivo recuperado (0ms)")
+                        trustMeta = trustMeta.copy(sourceLabel = "Vault Offline", isCacheHit = true, latencyMs = 0L)
+                        updateAuraMessage(auraMessageId, resilientText, false, cachedBriefing.genUiCard?.toString(), reasoningSteps.toList(), null, trustMeta)
                         _isAuraTyping.value = false
                         _auraStatusMessage.value = null
                         persist(resilientText)
                         if (speakResponse && !hasSpokenReply) {
                             hasSpokenReply = true
                             val spokenOffline = if (voiceMode) {
-                                "Tô sem conexão com o computador agora, mas pelo último registro aqui: ${cachedBriefing.oralVoiceScript}"
+                                "Tô sem conexão com o servidor agora, mas pelo último registro aqui: ${cachedBriefing.oralVoiceScript}"
                             } else {
                                 "Modo offline ativado na NPU. ${cachedBriefing.oralVoiceScript}"
                             }
@@ -660,7 +700,7 @@ class ChatViewModel @Inject constructor(
                     } else {
                         val errorMessage = "Erro de conexão com a AURA: ${e.message}"
                         val finalErrorText = if (currentAuraText.isBlank()) errorMessage else currentAuraText + "\n\n" + errorMessage
-                        updateAuraMessage(auraMessageId, finalErrorText, false, currentEnvelope, reasoningSteps.toList())
+                        updateAuraMessage(auraMessageId, finalErrorText, false, currentEnvelope, reasoningSteps.toList(), null, trustMeta)
                         _isAuraTyping.value = false
                         _auraStatusMessage.value = null
                         persist(finalErrorText)
@@ -674,7 +714,9 @@ class ChatViewModel @Inject constructor(
                 }
                 .onCompletion {
                     if (_isAuraTyping.value) {
-                        updateAuraMessage(auraMessageId, currentAuraText, false, currentEnvelope, reasoningSteps.toList())
+                        val total = System.currentTimeMillis() - requestStartedAt
+                        trustMeta = trustMeta.copy(latencyMs = trustMeta.latencyMs ?: total)
+                        updateAuraMessage(auraMessageId, currentAuraText, false, currentEnvelope, reasoningSteps.toList(), null, trustMeta)
                         _isAuraTyping.value = false
                         _auraStatusMessage.value = null
                         persist(currentAuraText)
@@ -693,26 +735,76 @@ class ChatViewModel @Inject constructor(
                             _auraStatusMessage.value = sanitized
                             if (sanitized.isNotBlank() && (reasoningSteps.isEmpty() || reasoningSteps.last() != sanitized)) {
                                 reasoningSteps.add(sanitized)
-                                updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList())
+                                updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList(), pendingSkeleton, trustMeta)
                             }
                         }
+                        is SseEvent.ToolResult -> {
+                            _auraStatusMessage.value = "Cálculo Python Auditado"
+                            trustMeta = trustMeta.copy(isDeterministic = true)
+                            if (event.summary.isNotBlank()) reasoningSteps.add(event.summary)
+                            updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList(), pendingSkeleton, trustMeta)
+                        }
+                        is SseEvent.CacheHit -> {
+                            _auraStatusMessage.value = event.label
+                            trustMeta = trustMeta.copy(isCacheHit = true, sourceLabel = "Cache Local")
+                            reasoningSteps.add(event.label)
+                            updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList(), pendingSkeleton, trustMeta)
+                        }
+                        is SseEvent.UiSkeleton -> {
+                            pendingSkeleton = event.title ?: "Preparando diagnóstico executivo..."
+                            updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList(), pendingSkeleton, trustMeta)
+                        }
+                        is SseEvent.UiDelta -> {
+                            // Mantém slot reservado sem alterar altura externa (Zero-CLS)
+                            if (pendingSkeleton == null) {
+                                pendingSkeleton = "Hidratando indicadores..."
+                                updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList(), pendingSkeleton, trustMeta)
+                            }
+                        }
+                        is SseEvent.Telemetry -> {
+                            trustMeta = trustMeta.copy(
+                                ttftMs = event.ttftMs ?: trustMeta.ttftMs,
+                                latencyMs = event.totalMs ?: trustMeta.latencyMs,
+                                piiRedactedCount = event.piiRedactedCount,
+                                sourceLabel = event.sourceLabel ?: trustMeta.sourceLabel,
+                                isCacheHit = event.cacheHit || trustMeta.isCacheHit
+                            )
+                            updateAuraMessage(auraMessageId, currentAuraText, _isAuraTyping.value, currentEnvelope, reasoningSteps.toList(), pendingSkeleton, trustMeta)
+                        }
+                        is SseEvent.StreamReset -> {
+                            currentAuraText = ""
+                            currentEnvelope = null
+                            pendingSkeleton = null
+                            trustMeta = trustMeta.copy(didStreamReset = true)
+                            _auraStatusMessage.value = "Recalibrando síntese com modelo de contingência..."
+                            reasoningSteps.add("Recalibrando síntese com modelo de contingência...")
+                            updateAuraMessage(auraMessageId, "", true, null, reasoningSteps.toList(), null, trustMeta)
+                        }
                         is SseEvent.TextDelta -> {
+                            if (firstTokenAt == null) {
+                                firstTokenAt = System.currentTimeMillis()
+                                trustMeta = trustMeta.copy(ttftMs = firstTokenAt!! - requestStartedAt)
+                                _auraStatusMessage.value = "Sintetizando recomendação..."
+                            }
                             currentAuraText += event.text
-                            updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList())
+                            updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList(), pendingSkeleton, trustMeta)
                         }
                         is SseEvent.UiComplete -> {
                             currentEnvelope = event.envelopeJson
-                            updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList())
+                            pendingSkeleton = null
+                            updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList(), null, trustMeta)
                         }
                         is SseEvent.Error -> {
-                            val finalErrorText = currentAuraText + "\n\n" + event.message
-                            updateAuraMessage(auraMessageId, finalErrorText, false, currentEnvelope, reasoningSteps.toList())
+                            val finalErrorText = if (currentAuraText.isBlank()) event.message else currentAuraText + "\n\n" + event.message
+                            updateAuraMessage(auraMessageId, finalErrorText, false, currentEnvelope, reasoningSteps.toList(), null, trustMeta)
                             _isAuraTyping.value = false
                             _auraStatusMessage.value = null
                             persist(finalErrorText)
                         }
                         is SseEvent.Done -> {
-                            updateAuraMessage(auraMessageId, currentAuraText, false, currentEnvelope, reasoningSteps.toList())
+                            val total = System.currentTimeMillis() - requestStartedAt
+                            trustMeta = trustMeta.copy(latencyMs = trustMeta.latencyMs ?: total)
+                            updateAuraMessage(auraMessageId, currentAuraText, false, currentEnvelope, reasoningSteps.toList(), null, trustMeta)
                             _isAuraTyping.value = false
                             _auraStatusMessage.value = null
                             persist(currentAuraText)
@@ -755,7 +847,9 @@ class ChatViewModel @Inject constructor(
         newText: String,
         isStreaming: Boolean,
         envelopeJson: String?,
-        reasoningSteps: List<String> = emptyList()
+        reasoningSteps: List<String> = emptyList(),
+        pendingSkeletonTitle: String? = null,
+        trust: AuraTrustMetadata = AuraTrustMetadata()
     ) {
         val currentList = _messages.value.toMutableList()
         val index = currentList.indexOfFirst { it.id == id }
@@ -765,7 +859,9 @@ class ChatViewModel @Inject constructor(
                 text = newText,
                 isStreaming = isStreaming,
                 envelopeJson = envelopeJson,
-                reasoningSteps = if (reasoningSteps.isNotEmpty()) reasoningSteps else existing.reasoningSteps
+                reasoningSteps = if (reasoningSteps.isNotEmpty()) reasoningSteps else existing.reasoningSteps,
+                pendingSkeletonTitle = pendingSkeletonTitle,
+                trust = trust
             )
             _messages.value = currentList
         } else {
@@ -776,7 +872,9 @@ class ChatViewModel @Inject constructor(
                     isFromUser = false,
                     isStreaming = isStreaming,
                     envelopeJson = envelopeJson,
-                    reasoningSteps = reasoningSteps
+                    reasoningSteps = reasoningSteps,
+                    pendingSkeletonTitle = pendingSkeletonTitle,
+                    trust = trust
                 )
             )
             _messages.value = currentList
@@ -832,7 +930,7 @@ class ChatViewModel @Inject constructor(
                 endVoiceConversation()
             }
             com.example.aurapostoassitance.data.audio.AuraDirectVoiceAction.PLAY_BRIEFING -> {
-                val cached = offlineVault.getBriefing("postos_redes")
+                val cached = offlineVault.getBriefing(serverConfig.activePackId)
                 voiceManager.speak("voice_cmd_briefing", cached.oralVoiceScript) {
                     relistenIfConversationActive()
                 }
@@ -1000,7 +1098,7 @@ class ChatViewModel @Inject constructor(
                         category = "HANDOFF_WHATSAPP",
                         title = "WhatsApp ($targetName): ${action.label}",
                         content = "Handoff enviado para $targetName ($targetPhone) — ${action.label} (Recibo: $receipt)",
-                        segment = "postos_redes"
+                        segment = serverConfig.activePackId
                     )
 
                     if (signature != null) {
@@ -1126,7 +1224,7 @@ class ChatViewModel @Inject constructor(
                         category = "DECISAO_EXECUTIVA",
                         title = action.label,
                         content = "Comando executivo '${action.label}' ($resolvedActionType) registrado no Command Journal (Recibo: $receipt, TEE: $isHardwareBacked)",
-                        segment = "postos_redes"
+                        segment = serverConfig.activePackId
                     )
 
                     if (signature != null) {
@@ -1148,6 +1246,9 @@ class ChatViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        voiceManager.release()
+        // Não chamar voiceManager.release() pois AuraVoiceManager é @Singleton compartilhado
+        // com DashboardViewModel, AuraAssistActivity e AuraQuickTileService.
+        voiceManager.stopListening()
+        voiceManager.stopSpeaking()
     }
 }

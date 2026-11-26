@@ -120,6 +120,60 @@ class HybridRAGEngine:
         self.ef_search = _validate_positive_int(ef_search, "ef_search", min_val=1, max_val=2000)
         self.rrf_k = _validate_positive_int(rrf_k, "rrf_k", min_val=1, max_val=1000)
         self._cache_schema_ready = False
+        self._cache_schema_partitioned: Optional[bool] = None
+
+    def _ensure_cache_partition_columns(self, conn) -> bool:
+        """
+        Verifica se perguntas_cache possui as colunas de particionamento
+        (tenant_id, filial_id, pack_id, created_at). Executa rollback seguro caso
+        a role de servico nao seja proprietaria da tabela para evitar transacao abortada.
+        """
+        if self._cache_schema_ready and self._cache_schema_partitioned is not None:
+            return self._cache_schema_partitioned
+
+        required = {"tenant_id", "filial_id", "pack_id", "created_at"}
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = 'perguntas_cache'
+                      AND table_schema = ANY(current_schemas(false));
+                    """
+                )
+                present = {row[0] for row in cur.fetchall() if row}
+            if required.issubset(present):
+                self._cache_schema_ready = True
+                self._cache_schema_partitioned = True
+                return True
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
+        try:
+            ensure_semantic_cache_partition_schema(conn)
+            self._cache_schema_ready = True
+            self._cache_schema_partitioned = True
+            return True
+        except Exception as exc:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            if isinstance(exc, psycopg2.Error):
+                logger.warning(
+                    "Cache semantico particionado indisponivel nesta base (aguardando migracao DDL): %s",
+                    exc,
+                )
+                self._cache_schema_ready = True
+                self._cache_schema_partitioned = False
+                return False
+            self._cache_schema_ready = True
+            self._cache_schema_partitioned = True
+            return True
 
     def _resolve_cache_partition(
         self,
@@ -245,12 +299,8 @@ class HybridRAGEngine:
         try:
             rls_filial_int = int(re.sub(r"\D", "", eff_filial) or 1)
             with self._get_connection(tenant_id=eff_tenant, filial_id=rls_filial_int) as conn:
-                if not self._cache_schema_ready:
-                    try:
-                        ensure_semantic_cache_partition_schema(conn)
-                    except Exception:
-                        pass
-                    self._cache_schema_ready = True
+                if not self._ensure_cache_partition_columns(conn):
+                    return {"query_vector": query_vector}
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     vec_str = str(query_vector)
                     cur.execute(sql, (vec_str, eff_tenant, eff_filial, eff_pack, eff_ttl, vec_str))
@@ -304,12 +354,8 @@ class HybridRAGEngine:
         try:
             rls_filial_int = int(re.sub(r"\D", "", eff_filial) or 1)
             with self._get_connection(tenant_id=eff_tenant, filial_id=rls_filial_int) as conn:
-                if not self._cache_schema_ready:
-                    try:
-                        ensure_semantic_cache_partition_schema(conn)
-                    except Exception:
-                        pass
-                    self._cache_schema_ready = True
+                if not self._ensure_cache_partition_columns(conn):
+                    return
                 with conn.cursor() as cur:
                     cur.execute(
                         sql,

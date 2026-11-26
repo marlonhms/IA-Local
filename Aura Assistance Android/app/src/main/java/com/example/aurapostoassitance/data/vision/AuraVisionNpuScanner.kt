@@ -9,6 +9,8 @@ import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.util.Xml
+import com.example.aurapostoassitance.data.local.ServerConfig
+import com.example.aurapostoassitance.data.local.memory.AuraSemanticMemoryVault
 import com.example.aurapostoassitance.data.npu.AuraNpuEngine
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
@@ -89,21 +91,27 @@ private data class XmlItemRow(
 @Singleton
 class AuraVisionNpuScanner @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val npuEngine: AuraNpuEngine
+    private val npuEngine: AuraNpuEngine,
+    private val memoryVault: AuraSemanticMemoryVault,
+    private val serverConfig: ServerConfig
 ) {
 
-    private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-    private val barcodeScanner = BarcodeScanning.getClient(
-        BarcodeScannerOptions.Builder()
-            .setBarcodeFormats(
-                Barcode.FORMAT_CODE_128,
-                Barcode.FORMAT_ITF,
-                Barcode.FORMAT_QR_CODE,
-                Barcode.FORMAT_PDF417,
-                Barcode.FORMAT_DATA_MATRIX
-            )
-            .build()
-    )
+    private val recognizer by lazy {
+        TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    }
+    private val barcodeScanner by lazy {
+        BarcodeScanning.getClient(
+            BarcodeScannerOptions.Builder()
+                .setBarcodeFormats(
+                    Barcode.FORMAT_CODE_128,
+                    Barcode.FORMAT_ITF,
+                    Barcode.FORMAT_QR_CODE,
+                    Barcode.FORMAT_PDF417,
+                    Barcode.FORMAT_DATA_MATRIX
+                )
+                .build()
+        )
+    }
 
     private val cnpjPattern = Pattern.compile("\\b\\d{2}\\.?\\d{3}\\.?\\d{3}/?\\d{4}-?\\d{2}\\b")
     private val currencyPattern = Pattern.compile("(?:R\\$\\s*|TOTAL[:\\s]*R?\\$?)([\\d]{1,3}(?:\\.[\\d]{3})*,[\\d]{2})", Pattern.CASE_INSENSITIVE)
@@ -159,18 +167,48 @@ class AuraVisionNpuScanner @Inject constructor(
     }
 
     private suspend fun scanImageUri(uri: Uri, startTimeMs: Long): ScannedDocumentTelemetry {
-        val image = InputImage.fromFilePath(context, uri)
-        val (text, barcodeInfo) = runOcrAndBarcodes(image)
-        val previewPath = saveUriImagePreview(uri)
+        val decoded = decodeDownsampledBitmap(uri, maxEdge = 1920)
+        val (text, barcodeInfo, previewPath) = if (decoded != null) {
+            try {
+                val image = InputImage.fromBitmap(decoded, 0)
+                val (ocrText, barcodes) = runOcrAndBarcodes(image)
+                val preview = saveBitmapPreview(decoded, "img_preview_${System.currentTimeMillis()}.jpg")
+                Triple(ocrText, barcodes, preview)
+            } finally {
+                decoded.recycle()
+            }
+        } else {
+            val image = InputImage.fromFilePath(context, uri)
+            val (ocrText, barcodes) = runOcrAndBarcodes(image)
+            val preview = saveUriImagePreview(uri)
+            Triple(ocrText, barcodes, preview)
+        }
         val latency = System.currentTimeMillis() - startTimeMs
 
         return parseOperationalDocument(
             rawText = text,
             latencyMs = latency,
             barcodeInfo = barcodeInfo,
-            sourceFormat = "Imagem (NPU + Código de Barras)",
+            sourceFormat = "Imagem (ML Kit + Código de Barras)",
             previewImagePath = previewPath
         )
+    }
+
+    private fun decodeDownsampledBitmap(uri: Uri, maxEdge: Int): Bitmap? {
+        return runCatching {
+            val resolver = context.contentResolver
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+            val maxDim = maxOf(bounds.outWidth, bounds.outHeight)
+            var sample = 1
+            while (maxDim / sample > maxEdge) sample *= 2
+            val opts = BitmapFactory.Options().apply {
+                inSampleSize = sample
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+        }.getOrNull()
     }
 
     private suspend fun scanPdfUri(uri: Uri, startTimeMs: Long): ScannedDocumentTelemetry {
@@ -630,7 +668,7 @@ class AuraVisionNpuScanner @Inject constructor(
             if (totalVolume != null) append("• Volume Detectado: ${"%,.0f".format(Locale("pt", "BR"), totalVolume)} L\n")
             if (detectedFuels.isNotEmpty()) append("• Produtos: ${detectedFuels.joinToString(", ")}\n")
             if (detectedDates.isNotEmpty()) append("• Data: ${detectedDates.first()}\n")
-            append("• Aceleração: Hexagon NPU / Barcode ML Kit (${latencyMs}ms)")
+            append("• Aceleração: ${npuEngine.hardwareStatus.value.delegateType} + ML Kit (${latencyMs}ms)")
         }.trim()
 
         val compactHighlights = buildList {
@@ -673,7 +711,7 @@ class AuraVisionNpuScanner @Inject constructor(
             append(taskDirective)
         }
 
-        return ScannedDocumentTelemetry(
+        val telemetry = ScannedDocumentTelemetry(
             docType = docType,
             title = title,
             rawText = enrichedText,
@@ -696,6 +734,23 @@ class AuraVisionNpuScanner @Inject constructor(
             previewImagePath = previewImagePath,
             compactHighlights = compactHighlights
         )
+
+        // Auto-indexação no Cofre Semântico RAG On-Device
+        runCatching {
+            val ragContent = buildString {
+                append(docType.label)
+                if (compactHighlights.isNotBlank()) append(" • $compactHighlights")
+                if (accessKey != null) append(" • Chave: $accessKey")
+            }
+            memoryVault.indexMemory(
+                category = "SCAN_DOCUMENTO",
+                title = title,
+                content = ragContent,
+                segment = serverConfig.activePackId
+            )
+        }
+
+        return telemetry
     }
 
     private fun readHeaderSnippet(uri: Uri): String {
@@ -730,8 +785,20 @@ class AuraVisionNpuScanner @Inject constructor(
                 scaled.compress(Bitmap.CompressFormat.JPEG, 84, fos)
             }
             if (scaled !== bitmap) scaled.recycle()
+            pruneVisionCacheDir(dir, maxFiles = 20)
             outFile.absolutePath
         }.getOrNull()
+    }
+
+    private fun pruneVisionCacheDir(dir: File, maxFiles: Int) {
+        runCatching {
+            val files = dir.listFiles()?.filter { it.isFile } ?: return
+            if (files.size > maxFiles) {
+                files.sortedBy { it.lastModified() }
+                    .take(files.size - maxFiles)
+                    .forEach { it.delete() }
+            }
+        }
     }
 
     private fun saveUriImagePreview(uri: Uri): String? {

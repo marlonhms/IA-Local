@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.aurapostoassitance.ui.components.AuraHaptics
 import com.example.aurapostoassitance.ui.components.AuraLivingOrb
+import com.example.aurapostoassitance.ui.components.AuraOrbMode
 import com.example.aurapostoassitance.ui.components.StatusDot
 import com.example.aurapostoassitance.ui.theme.AuraAmbientCyan
 import com.example.aurapostoassitance.ui.theme.AuraAmbientPetroleum
@@ -238,24 +239,29 @@ fun AuraEntranceScreen(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.padding(horizontal = 24.dp)
         ) {
-            // Entidade Viva Holográfica: Orbe da AURA totalmente livre e fluido (sem anéis ou bolhas contendo)
+            // Entidade Viva Holográfica: Orbe da AURA com Aurora Boreal livre (giro sincronizado enquanto conecta)
+            val orbMode = when (step) {
+                is EntranceStep.Awakening, is EntranceStep.Connecting -> AuraOrbMode.THINKING
+                else -> AuraOrbMode.IDLE
+            }
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(240.dp)
+                    .size(260.dp)
                     .graphicsLayer {
-                        translationX = roll * 52f
-                        translationY = pitch * 52f
-                        rotationZ = roll * 14f
+                        translationX = roll * 42f
+                        translationY = pitch * 42f
+                        rotationZ = roll * 10f
                         scaleX = orbScale
                         scaleY = orbScale
                         alpha = orbAlpha
                     }
             ) {
                 AuraLivingOrb(
-                    sizeDp = 195.dp,
-                    voiceRms = 0.40f,
-                    pulsing = true
+                    sizeDp = 250.dp,
+                    voiceRms = 0.08f,
+                    pulsing = true,
+                    mode = orbMode
                 )
             }
 

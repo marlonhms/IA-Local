@@ -59,6 +59,7 @@ from core.domain.domain_pack_loader import (
 from core.sanitizer import (
     StreamingOutputSanitizerGuard,
     central_log_sanitizer,
+    operator_pseudonym_scope,
     sanitize_erp_brand_data,
     sanitize_erp_brand_names,
 )
@@ -3393,6 +3394,7 @@ class AuraEngine:
         self.tenant_id = tenant_id or "default_tenant"
         self.filial_id = filial_id or "posto_01"
         self.pack_id = pack_id
+        self.llm_model = DEFAULT_LLM_MODEL
 
         # Lazy / Dependency Injection de componentes essenciais
         self._rag_engine = rag_engine
@@ -4232,9 +4234,12 @@ class AuraEngine:
                 )
                 if exec_res is not None:
                     resultado_bruto = exec_res.raw_result
-                    contexto_extra = (
-                        f"{exec_res.context_header}\n"
-                        f"{json.dumps(resultado_bruto, ensure_ascii=False, indent=2, default=str)}\n"
+                    from core.brain_optimizer import distill_tool_context
+
+                    contexto_extra = distill_tool_context(
+                        resultado_bruto,
+                        header=exec_res.context_header,
+                        model_name=self.llm_model,
                     )
                     return contexto_extra, resultado_bruto, None, False, (time.perf_counter() - t0) * 1000
 
@@ -6019,7 +6024,7 @@ class AuraEngine:
         )
         pack_ctx_arg: Any = requested_pack_id if requested_pack_id else peek_active_domain_pack()
 
-        with DomainPackContext(pack_ctx_arg) as active_pack:
+        with DomainPackContext(pack_ctx_arg) as active_pack, operator_pseudonym_scope() as op_vault:
             domain_greeting_label = (
                 "no posto ou na loja de conveniência"
                 if active_pack.pack_id == "fuel_convenience"
@@ -6231,6 +6236,30 @@ class AuraEngine:
                 )
                 return
 
+            # 3b. Injecao ultra-enxuta de conhecimento especializado da unidade (posto_ai)
+            if not os.getenv("PYTEST_CURRENT_TEST"):
+                try:
+                    from core.brain_optimizer import AutonomousBrainStore
+
+                    brain_store = AutonomousBrainStore()
+                    recalled = await asyncio.to_thread(
+                        brain_store.recall_compact_knowledge,
+                        query=pergunta_efetiva,
+                        tenant_id=str(t_id),
+                        filial_id=str(f_id),
+                        pack_id=active_pack.pack_id,
+                        model_name=self.llm_model,
+                        query_vector=query_vector,
+                    )
+                    learned_block = AutonomousBrainStore.format_recalled_knowledge_block(
+                        recalled,
+                        model_name=self.llm_model,
+                    )
+                    if learned_block:
+                        contexto_extra = f"{learned_block}\n{contexto_extra}".strip()
+                except Exception:
+                    pass
+
             yield AuraChunk(
                 chunk_type=AuraChunkType.TOOL_RESULT,
                 data={
@@ -6238,7 +6267,7 @@ class AuraEngine:
                     "tool_name": intencao,
                     "latency_ms": round(tool_latency_ms, 2),
                     "has_structured_data": resultado_bruto is not None,
-                    "result": resultado_bruto,
+                    "result": op_vault.rehydrate_data(resultado_bruto),
                 },
                 session_id=sess_id,
             )
@@ -6300,7 +6329,9 @@ class AuraEngine:
                     telemetry=self.telemetry,
                 )
                 if envelope:
-                    envelope_payload = sanitize_erp_brand_data(envelope.to_sse_payload())
+                    envelope_payload = op_vault.rehydrate_data(
+                        sanitize_erp_brand_data(envelope.to_sse_payload())
+                    )
                     if t_skeleton_emitted is not None:
                         backend_hydration_ms = (time.perf_counter() - t_skeleton_emitted) * 1000
                         self.telemetry.record_hydration(
@@ -6342,6 +6373,12 @@ class AuraEngine:
                 asyncio.to_thread(central_log_sanitizer.sanitize_text, pergunta_para_prompt),
             )
             total_redacted = sum(counts_ctx.values()) + sum(counts_perg.values())
+            if op_vault.has_mappings():
+                contexto_sanitizado = (
+                    "[INSTRUCAO LGPD DE PSEUDONIMIZACAO] Os identificadores [OP_01], [OP_02], etc. "
+                    "representam operadores/frentistas internos do negocio. Cite-os EXATAMENTE no "
+                    "formato [OP_XX] sem traduzir ou remover os colchetes.\n\n" + contexto_sanitizado
+                )
 
             # 6. Montagem do Prompt Sistêmico fora do event loop (evita bloqueio em get_dados_filial/SQLite)
             prompt_sistema = await asyncio.to_thread(
@@ -6500,7 +6537,9 @@ class AuraEngine:
 
             total_llm_ms = (time.perf_counter() - t_llm_start) * 1000
             texto_acumulado_str = "".join(texto_completo).strip()
-            resposta_final = normalize_aura_color_markup(texto_acumulado_str)
+            resposta_final = op_vault.rehydrate_text(
+                normalize_aura_color_markup(texto_acumulado_str)
+            )
             pontuacao_valida = ('.', '!', '?', ')', '"', "'", ':', ']')
             precisa_contingencia = (
                 not sucesso_llm
@@ -6530,7 +6569,9 @@ class AuraEngine:
                         texto_completo.clear()
                         emitted_any_delta = False
 
-                    resposta_final = normalize_aura_color_markup(sintese_contingencia)
+                    resposta_final = op_vault.rehydrate_text(
+                        normalize_aura_color_markup(sintese_contingencia)
+                    )
                     sucesso_llm = True
                     if ttft_ms is None:
                         ttft_ms = (time.perf_counter() - t_global_start) * 1000
@@ -6558,7 +6599,9 @@ class AuraEngine:
                     telemetry=self.telemetry,
                 )
                 if envelope:
-                    envelope_payload = sanitize_erp_brand_data(envelope.to_sse_payload())
+                    envelope_payload = op_vault.rehydrate_data(
+                        sanitize_erp_brand_data(envelope.to_sse_payload())
+                    )
                     if t_skeleton_emitted is not None:
                         backend_hydration_ms = (time.perf_counter() - t_skeleton_emitted) * 1000
                         self.telemetry.record_hydration(

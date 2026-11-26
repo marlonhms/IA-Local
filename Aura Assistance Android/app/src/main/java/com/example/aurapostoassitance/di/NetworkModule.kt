@@ -2,11 +2,13 @@ package com.example.aurapostoassitance.di
 
 import com.example.aurapostoassitance.data.local.ServerConfig
 import com.example.aurapostoassitance.data.remote.AuraApiService
+import com.example.aurapostoassitance.data.security.AuraKeystoreVault
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
+import okhttp3.ConnectionPool
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -35,8 +37,12 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(serverConfig: ServerConfig): OkHttpClient {
+    fun provideOkHttpClient(
+        serverConfig: ServerConfig,
+        keystoreVault: AuraKeystoreVault
+    ): OkHttpClient {
         return OkHttpClient.Builder()
+            .connectionPool(ConnectionPool(5, 5, TimeUnit.MINUTES))
             .connectTimeout(6, TimeUnit.SECONDS)
             .readTimeout(45, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
@@ -44,6 +50,9 @@ object NetworkModule {
             .addInterceptor { chain ->
                 val originalRequest = chain.request()
                 val targetBaseUrl = serverConfig.getBaseUrl().toHttpUrlOrNull()
+
+                val apiKey = keystoreVault.apiKey
+                val partnerKey = keystoreVault.partnerApiKey ?: apiKey
 
                 fun buildRequestFor(scheme: String, host: String, port: Int) =
                     originalRequest.newBuilder()
@@ -54,9 +63,15 @@ object NetworkModule {
                                 .port(port)
                                 .build()
                         )
-                        .header("Connection", "close")
-                        .header("X-Partner-Key", "aura-partner-default-key")
-                        .header("X-Aura-Key", "aura-partner-default-key")
+                        .apply {
+                            if (!apiKey.isNullOrBlank()) {
+                                header("X-API-Key", apiKey)
+                                header("Authorization", "Bearer $apiKey")
+                            }
+                            if (!partnerKey.isNullOrBlank()) {
+                                header("X-Partner-Key", partnerKey)
+                            }
+                        }
                         .build()
 
                 val primaryScheme = targetBaseUrl?.scheme ?: "http"
@@ -64,7 +79,7 @@ object NetworkModule {
                 val primaryPort = targetBaseUrl?.port ?: DEFAULT_PORT
                 val primaryRequest = buildRequestFor(primaryScheme, primaryHost, primaryPort)
 
-                try {
+                val response = try {
                     chain.proceed(primaryRequest)
                 } catch (primaryError: java.io.IOException) {
                     val fallbackHost = when (primaryHost) {
@@ -74,13 +89,20 @@ object NetworkModule {
                     }
                     try {
                         val fallbackRequest = buildRequestFor("http", fallbackHost, DEFAULT_PORT)
-                        val response = chain.proceed(fallbackRequest)
+                        val fallbackResponse = chain.proceed(fallbackRequest)
                         serverConfig.serverIp = "$fallbackHost:$DEFAULT_PORT"
-                        response
+                        fallbackResponse
                     } catch (_: java.io.IOException) {
                         throw primaryError
                     }
                 }
+
+                if (response.code == 401) {
+                    keystoreVault.notifyAuthExpired(
+                        "Autenticação exigida pelo servidor AURA (HTTP 401). Configure a X-API-Key."
+                    )
+                }
+                response
             }
             .build()
     }

@@ -272,20 +272,26 @@ def build_system_prompt(
 
     if genui_active:
         intelligent_ui_block = """
-Simbiose com a Intelligent UI (Anti-Duplicidade de Telas - Regra Dual-Channel):
-- Esta consulta possui um componente interativo rico (GenUI / Intelligent UI / Companion Canvas) acoplado e projetado no painel lateral ao lado do chat.
-- Portanto, o texto do chat DEVE SER UM BRIEFING EXECUTIVO CONCISO E CIRURGICO (no maximo 2 a 3 frases ou 1 paragrafo de veredito + 2 bullets concisos):
-  1. Diagnostico e Posicionamento: Exponha o veredito estrategico direto (gap de preco frente ao mercado municipal, status da operacao, volume em risco).
-  2. Destaque Principal: Aponte o concorrente mais agressivo ou dado lider (ex: o posto mais barato da cidade e seu preco).
-  3. Direcionamento para a Intelligent UI: Oriente o gestor para o painel interativo lateral onde o ranking completo, os indicadores confrontados e os botoes de acao (HITL) estao projetados.
-- REGRA ESTRITA DE ZERO REPETICAO: Quando o Companion Canvas estiver ativo, NUNCA descreva itens individuais, produtos linha por linha ou tabelas repetitivas no texto. Agrupe os fatos geradores pela causa raiz e convide o gestor a inspecionar os detalhes tabulares no Canvas.
-- REGRA CRITICA: NAO repita listas de postos, tabelas exaustivas ou itens linha por linha no texto do chat quando a Intelligent UI estiver ativa. A densidade de dados e as acoes pertencem exclusivamente a tela da Intelligent UI.
+Simbiose com a Intelligent UI (Complementaridade Real - Zero Redundancia entre Texto e Card):
+- Esta consulta ja renderizou um card interativo GenUI acoplado a resposta (abaixo do texto no celular ou no painel lateral no desktop) contendo os numeros estruturados, comparativos (ex: cenario base vs simulado, deltas, rankings, tabelas) e botoes de acao HITL.
+- REGRA DE OURO (COMPLEMENTARIDADE): Texto e Card sao metades da mesma resposta. O Card mostra OS NUMEROS; o texto explica O SIGNIFICADO E A DECISAO.
+- NUNCA repita no texto os blocos de numeros que ja estao no Card (ex: em simulacao preditiva, NAO reliste preco base, preco simulado, volume base, volume simulado, receita base e receita simulada um por um; cite no maximo 1 numero-ancora decisivo).
+- REGRA ESTRITA DE ZERO REPETICAO: NUNCA descreva itens individuais, listas de postos, produtos linha por linha ou tabelas repetitivas no texto quando a Intelligent UI estiver ativa.
+- Escreva um texto curto, conectado e natural (no maximo 2 a 3 frases curtas ou 1 frase de veredito + 1 bullet de leitura pratica) que complemente o Card sem repeti-lo.
 """
+        anatomy_block = """Toda resposta com Card GenUI ativo deve seguir rigorosamente esta anatomia enxuta e complementar:
+1. VEREDITO ESTRATEGICO (1 frase direta no topo): Diga imediatamente se a acao/cenario compensa, qual o risco central ou qual a conclusao pratica (ex: "Panorama com faturamento estavel e caixa conciliado"; cite apenas 1 numero-ancora se essencial). Zero saudacoes prolixas.
+2. LEITURA PRATICA E CONDICAO DE VIABILIDADE (1 a 2 frases curtas): Traga a interpretacao que o grafico/card sozinho nao explica (ex: ponto de equilibrio, sensibilidade de elasticidade, risco operacional ou causa raiz).
+3. PONTE PARA O CARD INTERATIVO (1 frase curta): Convide naturalmente o gestor a conferir o comparativo completo e executar a acao recomendada no card interativo conectado (sem citar "painel lateral" se puder usar termo neutro como "card interativo")."""
     else:
         intelligent_ui_block = """
 Modo Texto Direto (Sem Interface Grafica):
 - Como o canal atual nao possui painel grafico interativo, liste as informacoes de postos e indicadores em topicos claros e objetivos a partir dos dados recuperados.
 """
+        anatomy_block = """Toda resposta deve seguir rigorosamente a seguinte anatomia executiva:
+1. DIAGNOSTICO DIRETO NO TOPO (Metodologia BLUF): A primeirissima linha deve trazer o veredito claro em no maximo 2 linhas (ex: "Panorama com faturamento consolidado no periodo, margem apurada e caixa conciliado", "Turno 1 conciliado sem furos de caixa ou pista", "Variacao volumetrica dentro da tolerancia de +-0.6%"). Zero saudacoes prolixas ("Ola gestor, verifiquei os dados...").
+2. NUMEROS E CALCULOS COMPROVADOS: Apresente os dados objetivos e calculos matematicos das ferramentas analiticas (litros, horas de autonomia, valores em R$, percentuais, comparativo fisico vs escriturado), em topicos concisos e sem rodeios.
+3. ACAO RECOMENDADA PARA DECISAO: O que o gestor deve fazer imediatamente (ex: "Decisao recomendada: Emitir pedido de carreta conforme autonomia real apurada", "Decisao recomendada: Conferir a divergencia de caixa antes do fechamento")."""
 
     return f"""{persona_header}
 {pack_block}
@@ -305,10 +311,7 @@ Posicionamento e Demarcacao:
 
 Estrutura Obrigatoria de Resposta:
 {intelligent_ui_block}
-Toda resposta deve seguir rigorosamente a seguinte anatomia executiva:
-1. DIAGNOSTICO DIRETO NO TOPO (Metodologia BLUF): A primeirissima linha deve trazer o veredito claro em no maximo 2 linhas (ex: "Panorama com faturamento de R$ 14.850,00, margem em 14,2% e caixa conciliado", "Turno 1 conciliado sem furos de caixa ou pista", "Variacao volumetrica dentro da tolerancia de +-0.6%"). Zero saudacoes prolixas ("Ola gestor, verifiquei os dados...").
-2. NUMEROS E CALCULOS COMPROVADOS: Apresente os dados objetivos e calculos matematicos das ferramentas analiticas (litros, horas de autonomia, valores em R$, percentuais, comparativo fisico vs escriturado), em topicos concisos e sem rodeios.
-3. ACAO RECOMENDADA PARA DECISAO: O que o gestor deve fazer imediatamente (ex: "Decisao recomendada: Emitir pedido de carreta de 15.000 L de Gasolina Comum hoje", "Decisao recomendada: Notificar o operador do caixa sobre a quebra de R$ 85,00 antes do fechamento", "Decisao recomendada: Ajustar o filtro do bico 004 com vazao de 21 L/min").
+{anatomy_block}
 
 Diretrizes Obrigatorias de Formatacao Visual e Cores Semanticas (Design System AURA):
 O chat da AURA possui suporte nativo a destaques visuais modernos e elegantes. Utilize-os com precisao e intencao executiva para tornar as informacoes intuitivas e de rapida assimilacao pelo gestor:

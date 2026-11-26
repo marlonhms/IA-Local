@@ -20,6 +20,7 @@ biometric = "1.2.0-alpha05"
 mlkitTextRecognition = "16.0.1"
 mlkitBarcodeScanning = "17.3.0"
 kotlinxCoroutinesPlayServices = "1.8.1"
+litert = "1.4.0"
 
 room = "2.8.5"
 
@@ -67,6 +68,10 @@ androidx-biometric = { group = "androidx.biometric", name = "biometric", version
 mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
 mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcodeScanning" }
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "kotlinxCoroutinesPlayServices" }
+
+# Google AI Edge LiteRT (NPU / NNAPI / GPU Acceleration)
+litert = { group = "com.google.ai.edge.litert", name = "litert", version.ref = "litert" }
+litert-gpu = { group = "com.google.ai.edge.litert", name = "litert-gpu", version.ref = "litert" }
 
 # Room
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }

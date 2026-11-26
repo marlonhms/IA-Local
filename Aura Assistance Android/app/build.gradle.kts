@@ -83,6 +83,10 @@ dependencies {
     implementation(libs.mlkit.barcode.scanning)
     implementation(libs.kotlinx.coroutines.play.services)
 
+    // Google AI Edge LiteRT (NPU / NNAPI / GPU Acceleration)
+    implementation(libs.litert)
+    implementation(libs.litert.gpu)
+
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

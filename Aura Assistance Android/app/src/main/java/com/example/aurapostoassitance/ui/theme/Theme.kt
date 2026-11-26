@@ -1,18 +1,17 @@
 package com.example.aurapostoassitance.ui.theme
 
 import android.app.Activity
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
-// Tema unico "Obsidian Aurora": sempre escuro, coerente com o painel web.
+// Tema unico "Obsidian Aurora 2.0": AMOLED escuro, coerente com a Carbon UI.
 private val ObsidianColorScheme = darkColorScheme(
     primary = AuraCyan,
     onPrimary = ObsidianBase,
@@ -29,7 +28,7 @@ private val ObsidianColorScheme = darkColorScheme(
     surfaceContainerHigh = ObsidianHigh,
     surfaceContainerHighest = ObsidianBright,
     outline = OutlineStrong,
-    outlineVariant = OutlineSoft,
+    outlineVariant = BorderHairline,
     error = StatusDanger
 )
 
@@ -46,9 +45,7 @@ fun AuraPostoAssitanceTheme(content: @Composable () -> Unit) {
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as Activity).window
-            window.statusBarColor = ObsidianBase.toArgb()
-            window.navigationBarColor = ObsidianBase.toArgb()
+            val window = (view.context as? Activity)?.window ?: return@SideEffect
             val controller = WindowCompat.getInsetsController(window, view)
             controller.isAppearanceLightStatusBars = false
             controller.isAppearanceLightNavigationBars = false

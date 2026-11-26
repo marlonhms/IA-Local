@@ -99,6 +99,7 @@ import com.example.aurapostoassitance.ui.theme.AuraCyan
 import com.example.aurapostoassitance.ui.theme.AuraEmerald
 import com.example.aurapostoassitance.ui.theme.AuraPurple
 import com.example.aurapostoassitance.ui.theme.AuroraBrush
+import com.example.aurapostoassitance.ui.theme.BorderHairline
 import com.example.aurapostoassitance.ui.theme.GlassBorderBrush
 import com.example.aurapostoassitance.ui.theme.GlassHighlight
 import com.example.aurapostoassitance.ui.theme.LiquidGlassElevatedBrush
@@ -461,7 +462,7 @@ fun AuraPill(
     }
 }
 
-/** Chip de sugestao moderno com acabamento de cápsula e microtoque. */
+/** Chip de sugestao moderno com acabamento de cápsula, estado selecionado e microtoque. */
 @Composable
 fun AuraChip(
     label: String,
@@ -469,7 +470,8 @@ fun AuraChip(
     modifier: Modifier = Modifier,
     tag: String? = null,
     icon: ImageVector? = null,
-    accentColor: Color = AuraCyan
+    accentColor: Color = AuraCyan,
+    selected: Boolean = false
 ) {
     val haptic = LocalHapticFeedback.current
     val interactionSource = remember { MutableInteractionSource() }
@@ -487,8 +489,12 @@ fun AuraChip(
                 scaleY = scale
             }
             .clip(RoundedCornerShape(50))
-            .background(ObsidianMid)
-            .border(1.dp, OutlineSoft, RoundedCornerShape(50))
+            .background(if (selected) accentColor.copy(alpha = 0.16f) else ObsidianMid.copy(alpha = 0.85f))
+            .border(
+                width = 1.dp,
+                color = if (selected) accentColor.copy(alpha = 0.65f) else BorderHairline,
+                shape = RoundedCornerShape(50)
+            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = null
@@ -502,6 +508,14 @@ fun AuraChip(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(accentColor)
+                )
+            }
             if (tag != null) {
                 Text(
                     text = tag.uppercase(),
@@ -514,14 +528,16 @@ fun AuraChip(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = accentColor,
+                    tint = if (selected) accentColor else accentColor.copy(alpha = 0.82f),
                     modifier = Modifier.size(13.dp)
                 )
             }
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = TextPrimary
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                ),
+                color = if (selected) TextPrimary else TextSecondary
             )
         }
     }
@@ -753,7 +769,7 @@ fun SpatialGlassCard(
     shape: Shape = RoundedCornerShape(22.dp),
     accent: Color? = null,
     glowActive: Boolean = false,
-    iridescentBorder: Boolean = true,
+    iridescentBorder: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(16.dp),
@@ -782,10 +798,10 @@ fun SpatialGlassCard(
             listOf(accent.copy(alpha = glowAlpha), accent.copy(alpha = glowAlpha * 0.45f))
         )
         glowActive -> LiquidIridescentBorderBrush
+        iridescentBorder -> LiquidIridescentSubtleBrush
         accent != null -> Brush.verticalGradient(
-            listOf(accent.copy(alpha = 0.70f), OutlineSoft)
+            listOf(accent.copy(alpha = 0.35f), BorderHairline)
         )
-        iridescentBorder -> LiquidIridescentBorderBrush
         else -> GlassBorderBrush
     }
 
@@ -1061,47 +1077,73 @@ fun AuraReasoningAccordion(
 }
 
 /**
- * Orbe Vivo e Fluido da AURA (Dynamic Liquid Plasma Consciousness)
- * Ondula em fluxo orgânico contínuo em repouso e reage com ondas senoidais
- * harmônicas de alta fidelidade à amplitude e tons de voz (60fps).
+ * Orbe Vivo e Fluido da AURA (Dynamic Liquid Plasma + Aurora Boreal)
+ * Usa AGSL RuntimeShader em Android 13+ (GPU pura, zero GC) e Canvas Zero-GC em APIs 26-32.
  */
 @Composable
 fun AuraLivingOrb(
     modifier: Modifier = Modifier,
     sizeDp: Dp = 40.dp,
     voiceRms: Float = 0.05f,
-    pulsing: Boolean = true
+    pulsing: Boolean = true,
+    activeColor: Color = AuraCyan,
+    mode: AuraOrbMode = AuraOrbMode.IDLE
+) {
+    AuraAdrenoShaderOrb(
+        modifier = modifier,
+        size = sizeDp,
+        amplitude = voiceRms,
+        activeColor = activeColor,
+        pulsing = pulsing,
+        mode = mode
+    )
+}
+
+/**
+ * Fallback Canvas Zero-GC (API 26-32): movimento sereno em IDLE, giro sincronizado em THINKING e halo Aurora suave.
+ */
+@Composable
+internal fun AuraLivingOrbCanvas(
+    modifier: Modifier = Modifier,
+    sizeDp: Dp = 40.dp,
+    voiceRms: Float = 0.05f,
+    activeColor: Color = AuraCyan,
+    pulsing: Boolean = true,
+    mode: AuraOrbMode = AuraOrbMode.IDLE
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "livingOrbInfinite")
 
-    // Tempo contínuo para fluxo líquido das ondas (60fps)
     val timePhase by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 2f * Math.PI.toFloat(),
         animationSpec = infiniteRepeatable(
-            animation = tween(3800, easing = LinearEasing),
+            animation = tween(if (mode == AuraOrbMode.THINKING) 2600 else 9600, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "timePhase"
     )
 
-    // Respiração orgânica lenta (mesmo no silêncio absoluto)
     val idleBreath by infiniteTransition.animateFloat(
-        initialValue = 0.90f,
-        targetValue = 1.10f,
+        initialValue = 0.96f,
+        targetValue = 1.04f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = FastOutSlowInEasing),
+            animation = tween(4200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "idleBreath"
     )
 
-    // Amortecimento suave do RMS da voz para eliminar saltos rígidos
     val smoothRms by animateFloatAsState(
-        targetValue = voiceRms.coerceIn(0.05f, 1.0f),
-        animationSpec = spring(stiffness = 300f, dampingRatio = 0.70f),
+        targetValue = if (mode == AuraOrbMode.ACTIVE) voiceRms.coerceIn(0.05f, 1.0f) else 0.04f,
+        animationSpec = spring(stiffness = 180f, dampingRatio = 0.82f),
         label = "smoothRms"
     )
+
+    val steps = 36
+    val outerPath = remember { Path() }
+    val innerPath = remember { Path() }
+    val xs = remember { FloatArray(steps) }
+    val ys = remember { FloatArray(steps) }
 
     Box(
         modifier = modifier.size(sizeDp),
@@ -1109,101 +1151,97 @@ fun AuraLivingOrb(
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val center = Offset(size.width / 2f, size.height / 2f)
-            val baseRadius = (size.minDimension / 2.6f) * (if (pulsing) idleBreath else 1f)
+            val maxR = size.minDimension * 0.48f
+            val baseRadius = (size.minDimension / 4.2f) * (if (pulsing) idleBreath else 1f)
 
-            // 1. Halo Difuso Atmosférico
-            val haloRadius = baseRadius * (1.6f + (smoothRms * 0.70f))
+            // Halo Aurora Boreal contido dentro de maxR (alpha = 0 na borda -> zero quadrado)
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        AuraCyan.copy(alpha = 0.40f * (0.5f + smoothRms * 0.5f)),
-                        AuraPurple.copy(alpha = 0.25f * (0.5f + smoothRms * 0.5f)),
+                        AuraEmerald.copy(alpha = 0.24f),
+                        activeColor.copy(alpha = 0.16f),
+                        AuraPurple.copy(alpha = 0.10f),
                         Color.Transparent
                     ),
                     center = center,
-                    radius = haloRadius
+                    radius = maxR
                 ),
-                radius = haloRadius,
+                radius = maxR,
                 center = center
             )
 
-            // 2. Ondas Harmônicas de Ressonância (Ondulação líquida polar)
-            val steps = 36
             val stepAngle = (2f * Math.PI.toFloat()) / steps
 
-            // Função geradora de contorno orgânico líquido
-            fun buildLiquidPath(phaseOffset: Float, rMultiplier: Float, waveAmp: Float): Path {
-                val path = Path()
-                val points = ArrayList<Offset>(steps)
-
+            fun fillLiquidPath(targetPath: Path, phaseOffset: Float, rMultiplier: Float, waveAmp: Float) {
+                targetPath.reset()
                 for (i in 0 until steps) {
                     val angle = i * stepAngle
-                    // Modulação harmônica com 3 frequências (octaves) senoidais
-                    val harm1 = sin(3f * angle + timePhase + phaseOffset) * (0.09f + waveAmp * 0.22f)
-                    val harm2 = cos(2f * angle - (timePhase * 1.3f) + phaseOffset) * (0.07f + waveAmp * 0.18f)
-                    val harm3 = sin(4f * angle + (timePhase * 0.8f)) * (0.05f + waveAmp * 0.12f)
-
-                    val r = baseRadius * rMultiplier * (1f + harm1 + harm2 + harm3)
-                    val x = center.x + r * cos(angle.toDouble()).toFloat()
-                    val y = center.y + r * sin(angle.toDouble()).toFloat()
-                    points.add(Offset(x, y))
+                    val harm1 = sin(2f * angle + timePhase + phaseOffset) * (0.045f + waveAmp * 0.14f)
+                    val harm2 = cos(3f * angle - (timePhase * 0.618f) + phaseOffset) * (0.032f + waveAmp * 0.10f)
+                    val r = baseRadius * rMultiplier * (1f + harm1 + harm2)
+                    xs[i] = center.x + r * cos(angle.toDouble()).toFloat()
+                    ys[i] = center.y + r * sin(angle.toDouble()).toFloat()
                 }
-
-                // Interpolação Bézier quadrática suave entre os pontos médios
-                val firstMid = Offset(
-                    (points[0].x + points[steps - 1].x) / 2f,
-                    (points[0].y + points[steps - 1].y) / 2f
-                )
-                path.moveTo(firstMid.x, firstMid.y)
-
+                val firstMidX = (xs[0] + xs[steps - 1]) / 2f
+                val firstMidY = (ys[0] + ys[steps - 1]) / 2f
+                targetPath.moveTo(firstMidX, firstMidY)
                 for (i in 0 until steps) {
-                    val current = points[i]
-                    val next = points[(i + 1) % steps]
-                    val mid = Offset((current.x + next.x) / 2f, (current.y + next.y) / 2f)
-                    path.quadraticTo(current.x, current.y, mid.x, mid.y)
+                    val next = (i + 1) % steps
+                    targetPath.quadraticTo(xs[i], ys[i], (xs[i] + xs[next]) / 2f, (ys[i] + ys[next]) / 2f)
                 }
-                path.close()
-                return path
+                targetPath.close()
             }
 
-            // Camada 1: Manto Líquido Externo
-            val outerPath = buildLiquidPath(phaseOffset = 0f, rMultiplier = 1.0f + (smoothRms * 0.25f), waveAmp = smoothRms)
+            fillLiquidPath(outerPath, phaseOffset = 0f, rMultiplier = 1.0f + (smoothRms * 0.16f), waveAmp = smoothRms)
             drawPath(
                 path = outerPath,
                 brush = Brush.sweepGradient(
                     colors = listOf(
-                        AuraCyan.copy(alpha = 0.88f),
-                        AuraEmerald.copy(alpha = 0.80f),
-                        AuraPurple.copy(alpha = 0.85f),
-                        AuraCyan.copy(alpha = 0.88f)
+                        activeColor.copy(alpha = 0.85f),
+                        AuraEmerald.copy(alpha = 0.78f),
+                        AuraPurple.copy(alpha = 0.82f),
+                        activeColor.copy(alpha = 0.85f)
                     ),
                     center = center
                 )
             )
 
-            // Camada 2: Núcleo Secundário Contra-Rotativo (Efeito Moire Cósmico)
-            val innerPath = buildLiquidPath(phaseOffset = 2.1f, rMultiplier = 0.78f, waveAmp = smoothRms * 0.8f)
+            fillLiquidPath(innerPath, phaseOffset = 2.1f, rMultiplier = 0.76f, waveAmp = smoothRms * 0.6f)
             drawPath(
                 path = innerPath,
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        AuraPurple.copy(alpha = 0.70f),
-                        AuraCyan.copy(alpha = 0.85f),
+                        AuraPurple.copy(alpha = 0.65f),
+                        activeColor.copy(alpha = 0.80f),
                         Color.Transparent
                     ),
                     center = center,
-                    radius = baseRadius * 0.95f
+                    radius = baseRadius * 0.92f
                 )
             )
 
-            // Camada 3: Núcleo Incandescente de Plasma Branco/Ciano
-            val coreR = baseRadius * 0.38f * (1f + smoothRms * 0.30f)
+            if (mode == AuraOrbMode.THINKING) {
+                val arcR = baseRadius * 1.24f
+                drawArc(
+                    brush = Brush.sweepGradient(
+                        colors = listOf(Color.Transparent, activeColor, AuraPurple, Color.Transparent),
+                        center = center
+                    ),
+                    startAngle = Math.toDegrees(timePhase.toDouble()).toFloat(),
+                    sweepAngle = 210f,
+                    useCenter = false,
+                    topLeft = Offset(center.x - arcR, center.y - arcR),
+                    size = androidx.compose.ui.geometry.Size(arcR * 2f, arcR * 2f),
+                    style = Stroke(width = 2.2.dp.toPx())
+                )
+            }
+
+            val coreR = baseRadius * 0.36f * (1f + smoothRms * 0.22f)
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color.White,
-                        Color.White.copy(alpha = 0.92f),
-                        AuraCyan.copy(alpha = 0.85f),
+                        Color.White.copy(alpha = 0.95f),
+                        activeColor.copy(alpha = 0.75f),
                         Color.Transparent
                     ),
                     center = center,
@@ -1212,20 +1250,13 @@ fun AuraLivingOrb(
                 radius = coreR,
                 center = center
             )
-
-            // Centelha Diamante no Centro
-            drawCircle(
-                color = Color.White,
-                radius = baseRadius * 0.12f,
-                center = center
-            )
         }
     }
 }
 
 /**
- * Orbe de Voz Holográfico Reativo (Push-to-Talk Hands-Free da AURA)
- * Apresenta a consciência viva da AURA reagindo à voz e transcrição em tempo real.
+ * Orbe de Voz Holográfico Imersivo (Modo AMOLED Full-Duplex / Hands-Free)
+ * Pronto para WS /api/v1/voice/live com barge-in por toque no orbe e transcrição editorial.
  */
 @Composable
 fun AuraVoiceOrbSheet(
@@ -1246,25 +1277,38 @@ fun AuraVoiceOrbSheet(
     val haptic = LocalHapticFeedback.current
     val statusText = when {
         isListening -> "OUVINDO VOCÊ • PODE FALAR"
-        isThinking -> "AURA PENSANDO..."
-        isAuraSpeaking -> "AURA FALANDO • TOQUE NO ORBE"
-        voiceError != null -> "PAUSADA • TOQUE PARA FALAR"
-        isConversationActive -> "MODO CONVERSA ATIVO"
-        else -> "TRANSCRIÇÃO CONCLUÍDA"
+        isThinking -> "AURA SINTETIZANDO..."
+        isAuraSpeaking -> "AURA FALANDO • TOQUE PARA INTERROMPER"
+        voiceError != null -> "PAUSADA • TOQUE NO ORBE"
+        isConversationActive -> "VOZ FULL-DUPLEX ATIVA"
+        else -> "TRANSCRIÇÃO PRONTA"
     }
-    val dotColor = if (voiceError != null && !isListening && !isAuraSpeaking) StatusDanger else AuraCyan
+    val stateColor = when {
+        voiceError != null && !isListening && !isAuraSpeaking -> StatusDanger
+        isThinking -> AuraPurple
+        isAuraSpeaking -> AuraEmerald
+        else -> AuraCyan
+    }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-            .background(LiquidGlassElevatedBrush)
-            .border(1.dp, LiquidIridescentBorderBrush, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-            .padding(horizontal = 20.dp, vertical = 18.dp),
+            .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+            .background(ObsidianDeep.copy(alpha = 0.98f))
+            .border(1.dp, stateColor.copy(alpha = 0.35f), RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+            .padding(horizontal = 22.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        // Barra Superior
+        // Handle discreto
+        Box(
+            modifier = Modifier
+                .width(36.dp)
+                .height(4.dp)
+                .clip(CircleShape)
+                .background(BorderHairline)
+        )
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1274,51 +1318,54 @@ fun AuraVoiceOrbSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                StatusDot(color = dotColor, size = 8.dp, pulsing = isListening || isAuraSpeaking || isThinking)
+                StatusDot(color = stateColor, size = 7.dp, pulsing = isListening || isAuraSpeaking || isThinking)
                 SectionLabel(statusText)
             }
 
             AuraGhostButton(
                 text = if (isConversationActive) "Encerrar" else "Cancelar",
                 onClick = onCancel,
-                tint = TextMuted
+                tint = TextSecondary
             )
         }
 
-        // Orbe Vivo e Fluido da AURA (Toque para interromper ou falar novamente)
+        // Orbe AGSL Imersivo (168dp) com gesto de barge-in e modos IDLE/THINKING/ACTIVE
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(CircleShape)
                 .clickable {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onOrbTap()
                 }
         ) {
             AuraLivingOrb(
-                sizeDp = 120.dp,
+                sizeDp = 168.dp,
                 voiceRms = voiceRms,
-                pulsing = isListening || isAuraSpeaking || isThinking
+                pulsing = true,
+                activeColor = stateColor,
+                mode = when {
+                    isThinking -> AuraOrbMode.THINKING
+                    isListening || isAuraSpeaking -> AuraOrbMode.ACTIVE
+                    else -> AuraOrbMode.IDLE
+                }
             )
         }
 
-        // Pré-visualização do texto falado / estado da conversa
+        // Transcrição editorial limpa
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(ObsidianMid)
-                .border(1.dp, OutlineSoft.copy(alpha = 0.40f), RoundedCornerShape(16.dp))
-                .padding(14.dp),
+                .clip(RoundedCornerShape(18.dp))
+                .background(ObsidianLow)
+                .border(1.dp, BorderHairline, RoundedCornerShape(18.dp))
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             contentAlignment = Alignment.Center
         ) {
             when {
                 spokenText.isNotBlank() -> {
                     Text(
                         text = "\"$spokenText\"",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.Medium,
-                            color = TextPrimary
-                        ),
+                        style = MaterialTheme.typography.titleLarge.copy(color = TextPrimary),
                         textAlign = TextAlign.Center
                     )
                 }
@@ -1332,26 +1379,26 @@ fun AuraVoiceOrbSheet(
                 }
                 isThinking -> {
                     Text(
-                        text = "Formulando resposta rápida para você...",
+                        text = "Consultando dados determinísticos e preparando síntese...",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextMuted,
+                        color = TextSecondary,
                         textAlign = TextAlign.Center
                     )
                 }
                 isAuraSpeaking -> {
                     Text(
-                        text = "AURA está falando... Toque no orbe se quiser interromper",
+                        text = "Toque no orbe a qualquer momento para interromper e falar",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextMuted,
+                        color = TextSecondary,
                         textAlign = TextAlign.Center
                     )
                 }
                 else -> {
                     Text(
                         text = if (isConversationActive) {
-                            "Pode falar naturalmente... envio automático ao pausar"
+                            "Fale naturalmente — envio automático ao pausar"
                         } else {
-                            "AURA está ouvindo... Fale sobre bombas, tanques ou fechamento"
+                            "Ouvindo sua consulta operacional..."
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextMuted,
@@ -1361,7 +1408,6 @@ fun AuraVoiceOrbSheet(
             }
         }
 
-        // Botões de Ação
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -1369,7 +1415,8 @@ fun AuraVoiceOrbSheet(
             AuraGhostButton(
                 text = if (isConversationActive) "Encerrar" else "Descartar",
                 onClick = onCancel,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                tint = TextSecondary
             )
 
             if (spokenText.isNotBlank()) {
@@ -1406,24 +1453,28 @@ fun AuraVoiceOrbSheet(
 }
 
 // ============================================================================
-// PILAR 3: AURA DYNAMIC ISLAND & BOTTOM GLASS DOCK (SPATIAL UI DELUXE)
+// PILAR 3: AURA DYNAMIC ISLAND & BOTTOM GLASS DOCK (CARBON OBSIDIAN 2.0)
 // ============================================================================
 
-/** Telemetria em tempo real da pista consumida pela Aura Dynamic Island. */
+data class AuraIslandMetric(
+    val title: String,
+    val value: String,
+    val detail: String,
+    val status: String = "info",
+    val actionLabel: String = "Investigar",
+    val actionQuery: String = "Monte um diagnóstico executivo atualizado da operação."
+)
+
+/** Telemetria real consumida pela Aura Dynamic Island (zero valores fictícios hardcoded). */
 data class AuraIslandTelemetry(
-    val tankAlert: String = "T-01: 18%",
-    val isTankAlertCritical: Boolean = true,
-    val todayVolume: String = "42.8k L",
-    val anpStatus: String = "LMC ±0.18%",
-    val tankDetail: String = "T-01 Gasolina Comum • 3.600 L / 20.000 L • Autonomia: 6.4 h",
-    val lmcDetail: String = "Variação LMC hoje: +0.18% (Tolerância legal ANP: ±0.60%)",
-    val shiftDetail: String = "Turno Manhã (5.3h abertas) • Sangrias 100% conciliadas"
+    val isLive: Boolean = false,
+    val summaryPill: String = "Radar operacional pronto • Toque para auditar",
+    val items: List<AuraIslandMetric> = emptyList()
 )
 
 /**
- * Aura Dynamic Island: Cápsula de telemetria operacional com micro-status ao vivo.
- * Ao tocar, expande via mola elástica (Spring HUD) revelando diagnósticos de tancagem,
- * LMC e conciliação de caixa com gatilhos de 1 toque para o Cockpit AURA.
+ * Aura Dynamic Island: Cápsula de telemetria operacional ao vivo.
+ * Exibe métricas reais do Zero-Click Feed do backend ou estado honesto quando aguardando sync.
  */
 @Composable
 fun AuraDynamicIsland(
@@ -1433,108 +1484,96 @@ fun AuraDynamicIsland(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
+    val hasCritical = telemetry.items.any {
+        it.status.equals("danger", true) || it.status.equals("critical", true) || it.status.equals("warning", true)
+    }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+            .padding(vertical = 2.dp),
         contentAlignment = Alignment.Center
     ) {
         Surface(
             modifier = Modifier
+                .fillMaxWidth()
                 .animateContentSize(
                     animationSpec = spring(
                         dampingRatio = 0.82f,
                         stiffness = 380f
                     )
                 ),
-            shape = if (expanded) RoundedCornerShape(22.dp) else RoundedCornerShape(50),
-            color = ObsidianMid.copy(alpha = 0.94f),
+            shape = if (expanded) RoundedCornerShape(20.dp) else RoundedCornerShape(50),
+            color = ObsidianLow.copy(alpha = 0.94f),
             border = BorderStroke(
                 width = 1.dp,
-                brush = if (expanded) LiquidIridescentBorderBrush else LiquidIridescentSubtleBrush
+                color = when {
+                    hasCritical -> StatusWarning.copy(alpha = 0.45f)
+                    expanded -> AuraCyan.copy(alpha = 0.35f)
+                    else -> BorderHairline
+                }
             ),
-            shadowElevation = if (expanded) 10.dp else 2.dp
+            shadowElevation = if (expanded) 8.dp else 1.dp
         ) {
             Column(
                 modifier = Modifier
+                    .fillMaxWidth()
                     .then(
-                        if (expanded) Modifier.fillMaxWidth().padding(14.dp)
-                        else Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                        if (expanded) Modifier.padding(14.dp)
+                        else Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
                     )
             ) {
                 if (!expanded) {
-                    // Cápsula Compacta
                     Row(
                         modifier = Modifier
+                            .fillMaxWidth()
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
                             ) {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                expanded = true
+                                if (telemetry.items.isNotEmpty()) {
+                                    expanded = true
+                                } else {
+                                    onQueryAction("Monte um diagnóstico executivo ao vivo da operação hoje.")
+                                }
                             },
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        StatusDot(
-                            color = if (telemetry.isTankAlertCritical) StatusWarning else StatusSuccess,
-                            size = 7.dp,
-                            pulsing = true
-                        )
-                        Icon(
-                            imageVector = Icons.Rounded.LocalGasStation,
-                            contentDescription = null,
-                            tint = if (telemetry.isTankAlertCritical) StatusWarning else AuraCyan,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Text(
-                            text = telemetry.tankAlert,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 11.sp
-                            ),
-                            color = TextPrimary
-                        )
-
-                        Text(
-                            text = "•",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextMuted.copy(alpha = 0.45f)
-                        )
-
-                        Text(
-                            text = "📊 ${telemetry.todayVolume}",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                            color = TextSecondary
-                        )
-
-                        Text(
-                            text = "•",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextMuted.copy(alpha = 0.45f)
-                        )
-
-                        Text(
-                            text = "🛡️ ${telemetry.anpStatus}",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium
-                            ),
-                            color = AuraEmerald
-                        )
-
-                        Spacer(modifier = Modifier.width(2.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            StatusDot(
+                                color = when {
+                                    hasCritical -> StatusWarning
+                                    telemetry.isLive -> StatusSuccess
+                                    else -> AuraCyan
+                                },
+                                size = 7.dp,
+                                pulsing = telemetry.isLive || hasCritical
+                            )
+                            Text(
+                                text = telemetry.summaryPill,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 11.5.sp
+                                ),
+                                color = TextPrimary,
+                                maxLines = 1
+                            )
+                        }
 
                         Icon(
                             imageVector = Icons.Filled.KeyboardArrowDown,
                             contentDescription = "Expandir HUD",
                             tint = TextMuted,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 } else {
-                    // HUD Expandido
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1544,9 +1583,9 @@ fun AuraDynamicIsland(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            StatusDot(color = AuraCyan, size = 6.dp, pulsing = true)
+                            StatusDot(color = AuraCyan, size = 6.dp, pulsing = telemetry.isLive)
                             Text(
-                                text = "TELEMETRIA AO VIVO DA PISTA",
+                                text = if (telemetry.isLive) "TELEMETRIA AO VIVO" else "RADAR OPERACIONAL",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 10.sp,
@@ -1573,47 +1612,21 @@ fun AuraDynamicIsland(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // 1. Tanques & Autonomia
-                        IslandDiagnosticItem(
-                            icon = Icons.Rounded.LocalGasStation,
-                            badgeColor = StatusWarning,
-                            title = "Tanques & Autonomia",
-                            headline = telemetry.tankDetail,
-                            actionLabel = "Simular Compra 5.000 L",
-                            onAction = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                expanded = false
-                                onQueryAction("Simular compra de combustível para abastecer o T-01 considerando compartimentos de 5.000 L")
-                            }
-                        )
-
-                        // 2. Livro Fiscal LMC ANP
-                        IslandDiagnosticItem(
-                            icon = Icons.Rounded.Assessment,
-                            badgeColor = AuraEmerald,
-                            title = "Livro Fiscal LMC (ANP)",
-                            headline = telemetry.lmcDetail,
-                            actionLabel = "Auditar LMC",
-                            onAction = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                expanded = false
-                                onQueryAction("Gere o relatório completo do LMC ANP de hoje.")
-                            }
-                        )
-
-                        // 3. Fechamento de Turno & Sangrias
-                        IslandDiagnosticItem(
-                            icon = Icons.Rounded.PointOfSale,
-                            badgeColor = AuraPurple,
-                            title = "Conciliação de Turno & Caixa",
-                            headline = telemetry.shiftDetail,
-                            actionLabel = "Auditar Turno",
-                            onAction = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                expanded = false
-                                onQueryAction("Audite o fechamento de turno de hoje.")
-                            }
-                        )
+                        telemetry.items.take(3).forEach { metric ->
+                            val color = statusColor(metric.status)
+                            IslandDiagnosticItem(
+                                icon = Icons.Rounded.Assessment,
+                                badgeColor = color,
+                                title = "${metric.title} • ${metric.value}",
+                                headline = metric.detail,
+                                actionLabel = metric.actionLabel,
+                                onAction = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    expanded = false
+                                    onQueryAction(metric.actionQuery)
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -1715,7 +1728,9 @@ fun AuraBottomGlassDock(
     onTabSelected: (AuraNavTab) -> Unit,
     modifier: Modifier = Modifier,
     handoffUnreadCount: Int = 0,
-    handoffThreadCount: Int = 0
+    handoffThreadCount: Int = 0,
+    resourceTabLabel: String = AuraNavTab.TANQUES.label,
+    resourceTabIcon: ImageVector = AuraNavTab.TANQUES.icon
 ) {
     val haptic = LocalHapticFeedback.current
 
@@ -1729,8 +1744,8 @@ fun AuraBottomGlassDock(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(28.dp),
-            color = ObsidianMid.copy(alpha = 0.90f),
-            border = BorderStroke(1.2.dp, LiquidIridescentBorderBrush),
+            color = ObsidianLow.copy(alpha = 0.94f),
+            border = BorderStroke(1.dp, BorderHairline),
             shadowElevation = 10.dp
         ) {
             Row(
@@ -1741,6 +1756,8 @@ fun AuraBottomGlassDock(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AuraNavTab.values().forEach { tab ->
+                    val effectiveLabel = if (tab == AuraNavTab.TANQUES) resourceTabLabel else tab.label
+                    val effectiveIcon = if (tab == AuraNavTab.TANQUES) resourceTabIcon else tab.icon
                     val isReturnsTab = tab == AuraNavTab.RETORNOS
                     val hasUnreadReturns = isReturnsTab && handoffUnreadCount > 0
                     val hasAnyReturns = isReturnsTab && handoffThreadCount > 0
@@ -1764,24 +1781,17 @@ fun AuraBottomGlassDock(
                             .then(
                                 when {
                                     isSelected -> Modifier
-                                        .background(
-                                            Brush.horizontalGradient(
-                                                listOf(
-                                                    AuraCyan.copy(alpha = 0.20f),
-                                                    AuraPurple.copy(alpha = 0.15f)
-                                                )
-                                            )
-                                        )
+                                        .background(AuraCyan.copy(alpha = 0.14f))
                                         .border(
                                             1.dp,
-                                            AuraCyan.copy(alpha = 0.40f),
+                                            AuraCyan.copy(alpha = 0.35f),
                                             RoundedCornerShape(20.dp)
                                         )
                                     hasUnreadReturns -> Modifier
-                                        .background(AuraEmerald.copy(alpha = 0.16f))
+                                        .background(AuraEmerald.copy(alpha = 0.14f))
                                         .border(
                                             1.dp,
-                                            AuraEmerald.copy(alpha = 0.55f),
+                                            AuraEmerald.copy(alpha = 0.45f),
                                             RoundedCornerShape(20.dp)
                                         )
                                     else -> Modifier
@@ -1803,8 +1813,8 @@ fun AuraBottomGlassDock(
                         ) {
                             Box(contentAlignment = Alignment.TopEnd) {
                                 Icon(
-                                    imageVector = tab.icon,
-                                    contentDescription = tab.label,
+                                    imageVector = effectiveIcon,
+                                    contentDescription = effectiveLabel,
                                     tint = when {
                                         isSelected -> AuraCyan
                                         hasUnreadReturns -> AuraEmerald
@@ -1842,7 +1852,7 @@ fun AuraBottomGlassDock(
                                 }
                             }
                             Text(
-                                text = tab.label,
+                                text = effectiveLabel,
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = if (isSelected || hasUnreadReturns) FontWeight.Bold else FontWeight.Normal,
                                     fontSize = 9.5.sp

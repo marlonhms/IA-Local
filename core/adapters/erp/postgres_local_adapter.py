@@ -161,6 +161,65 @@ class PostgresLocalERPAdapter(BaseERPAdapter):
             self._last_offline_incident = time.monotonic()
             raise
 
+    def get_employee_sales_ranking(
+        self,
+        target_date: str | date | None = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Recupera ranking real de vendas no PDV/Loja por vendedor/funcionario (pedido + funcionarios)."""
+        if self.is_temporarily_offline:
+            return []
+
+        dt_alvo = normalize_date_filter(target_date)
+        lim = max(1, min(int(limit), 100))
+
+        base_sql = """
+            SELECT
+                TRIM(COALESCE(p.vendedor, '0')) AS matricula,
+                COALESCE(TRIM(f.nome), 'OPERADOR NAO INFORMADO') AS nome,
+                COUNT(p.codi) AS total_pedidos,
+                ROUND(COALESCE(SUM(p.valortotal), 0)::numeric, 2) AS faturamento_reais,
+                MIN(p.dtem) AS primeira_data,
+                MAX(p.dtem) AS ultima_data
+            FROM pedido p
+            LEFT JOIN funcionarios f ON f.matr = p.vendedor
+            WHERE COALESCE(p.situ, '') != 'C'
+              AND p.dtcanc IS NULL
+              {date_filter}
+            GROUP BY TRIM(COALESCE(p.vendedor, '0')), COALESCE(TRIM(f.nome), 'OPERADOR NAO INFORMADO')
+            ORDER BY faturamento_reais DESC
+            LIMIT %s;
+        """
+
+        rows: list[dict[str, Any]] = []
+        if dt_alvo is not None:
+            rows = self._execute_query(
+                base_sql.format(date_filter="AND p.dtem = %s"),
+                (dt_alvo, lim),
+            )
+        if not rows:
+            rows = self._execute_query(
+                base_sql.format(date_filter=""),
+                (lim,),
+            )
+
+        ranking: list[dict[str, Any]] = []
+        for row in rows:
+            qtd_i = int(row.get("total_pedidos") or 0)
+            fat_f = float(row.get("faturamento_reais") or 0.0)
+            dt_min = row.get("primeira_data")
+            dt_max = row.get("ultima_data")
+            ranking.append({
+                "matricula": str(row.get("matricula") or ""),
+                "nome": str(row.get("nome") or "OPERADOR NAO INFORMADO"),
+                "total_pedidos": qtd_i,
+                "faturamento_reais": round(fat_f, 2),
+                "ticket_medio_reais": round(fat_f / qtd_i, 2) if qtd_i > 0 else 0.0,
+                "primeira_data": str(dt_min) if dt_min else None,
+                "ultima_data": str(dt_max) if dt_max else None,
+            })
+        return ranking
+
     def get_recent_sales(
         self,
         start_date: str | date | datetime | None = None,

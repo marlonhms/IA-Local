@@ -41,6 +41,8 @@ _last_working_erp_cred: tuple[str, str] | None = None
 _erp_last_fail_ts: float = 0.0
 _vector_last_fail_ts: float = 0.0
 _POOL_FAIL_COOLDOWN_SEC: float = 15.0
+_role_heal_lock = threading.Lock()
+_role_heal_in_progress: bool = False
 
 
 class PooledConnectionWrapper:
@@ -279,14 +281,61 @@ def _is_pool_mocked(creator_fn: Any) -> bool:
     return ("mock" in pool_mod) or ("mock" in fn_mod) or hasattr(creator_fn, "assert_called")
 
 
+def _trigger_role_self_healing_if_needed(error_msg: str, background: bool = True) -> bool:
+    """
+    Detecta bloqueio da role aura_service_ro e aciona o AuraSelfHealer automaticamente
+    fora do _pool_lock para evitar deadlock quando close_all_pools() for chamado.
+    Retorna True se o disparo de auto-cura foi iniciado.
+    """
+    global _role_heal_in_progress
+    if not error_msg:
+        return False
+
+    try:
+        from core.self_healing import AuraSelfHealer, IncidentType, get_self_healer
+    except ImportError:
+        return False
+
+    if AuraSelfHealer.diagnose_erp_error(error_msg) != IncidentType.ERP_ROLE_LOCKED:
+        return False
+
+    with _role_heal_lock:
+        if _role_heal_in_progress:
+            return False
+        _role_heal_in_progress = True
+
+    def _run_heal() -> None:
+        global _role_heal_in_progress
+        try:
+            healer = get_self_healer()
+            res = healer.heal_erp_role_locked(dry_run=False)
+            logger.warning(
+                f"Auto-cura de role ERP finalizada: action={res.action_taken} resolved={res.resolved}"
+            )
+        except Exception as heal_exc:  # noqa: BLE001
+            logger.warning(f"Falha ao acionar auto-cura da role ERP: {heal_exc}")
+        finally:
+            with _role_heal_lock:
+                _role_heal_in_progress = False
+
+    if background:
+        t = threading.Thread(target=_run_heal, name="AuraRoleSelfHeal", daemon=True)
+        t.start()
+    else:
+        _run_heal()
+    return True
+
+
 def get_erp_pool() -> pool.ThreadedConnectionPool:
     """Retorna o pool singleton do banco ERP de forma thread-safe com fast-fail em modo offline."""
     global _erp_pool, _erp_last_fail_ts
     if _erp_pool is None:
+        failed_msg: str | None = None
+        is_mocked = _is_pool_mocked(_create_erp_pool)
         with _pool_lock:
             if _erp_pool is None:
                 if (
-                    not _is_pool_mocked(_create_erp_pool)
+                    not is_mocked
                     and _erp_last_fail_ts > 0.0
                     and (time.monotonic() - _erp_last_fail_ts) < _POOL_FAIL_COOLDOWN_SEC
                 ):
@@ -294,9 +343,14 @@ def get_erp_pool() -> pool.ThreadedConnectionPool:
                 try:
                     _erp_pool = _create_erp_pool()
                     _erp_last_fail_ts = 0.0
-                except Exception:
+                except Exception as exc:
                     _erp_last_fail_ts = time.monotonic()
-                    raise
+                    failed_msg = str(exc)
+                    caught_exc = exc
+        if failed_msg is not None:
+            if not is_mocked and not os.getenv("PYTEST_CURRENT_TEST"):
+                _trigger_role_self_healing_if_needed(failed_msg, background=True)
+            raise caught_exc
     return _erp_pool
 
 
@@ -304,10 +358,12 @@ def get_vector_pool() -> pool.ThreadedConnectionPool:
     """Retorna o pool singleton do banco vetorial pgvector de forma thread-safe com fast-fail em modo offline."""
     global _vector_pool, _vector_last_fail_ts
     if _vector_pool is None:
+        failed_msg: str | None = None
+        is_mocked = _is_pool_mocked(_create_vector_pool)
         with _pool_lock:
             if _vector_pool is None:
                 if (
-                    not _is_pool_mocked(_create_vector_pool)
+                    not is_mocked
                     and _vector_last_fail_ts > 0.0
                     and (time.monotonic() - _vector_last_fail_ts) < _POOL_FAIL_COOLDOWN_SEC
                 ):
@@ -315,9 +371,14 @@ def get_vector_pool() -> pool.ThreadedConnectionPool:
                 try:
                     _vector_pool = _create_vector_pool()
                     _vector_last_fail_ts = 0.0
-                except Exception:
+                except Exception as exc:
                     _vector_last_fail_ts = time.monotonic()
-                    raise
+                    failed_msg = str(exc)
+                    caught_exc = exc
+        if failed_msg is not None:
+            if not is_mocked and not os.getenv("PYTEST_CURRENT_TEST"):
+                _trigger_role_self_healing_if_needed(failed_msg, background=True)
+            raise caught_exc
     return _vector_pool
 
 

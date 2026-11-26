@@ -154,3 +154,38 @@ def test_self_healing_fastapi_endpoint(client, tmp_path: Path) -> None:
         assert body["recent_events"][0]["incident_type"] == "ERP_ROLE_LOCKED"
     finally:
         reset_self_healer()
+
+
+def test_db_pool_triggers_role_self_healing_only_for_role_locked(tmp_path: Path) -> None:
+    """Valida que db_pool aciona auto-cura apenas para erro de role bloqueada e sem deadlock."""
+    from core import db_pool
+
+    dummy_script = tmp_path / "reparar_banco.ps1"
+    dummy_script.write_text("# ok\n", encoding="utf-8")
+    healer = AuraSelfHealer(
+        db_path=tmp_path / "pool_heal.db",
+        cooldown_seconds=60,
+        repair_script_path=dummy_script,
+    )
+    set_self_healer(healer)
+    mock_proc = SimpleNamespace(returncode=0, stdout="AURA_OK", stderr="")
+    try:
+        # Erro generico nao deve acionar auto-cura
+        assert db_pool._trigger_role_self_healing_if_needed("timeout qualquer", background=False) is False
+
+        # Erro de role bloqueada deve acionar heal_erp_role_locked e resetar pools sem deadlock
+        with (
+            patch("core.self_healing._is_windows_admin", return_value=True),
+            patch("core.self_healing.subprocess.run", return_value=mock_proc) as run_mock,
+        ):
+            triggered = db_pool._trigger_role_self_healing_if_needed(
+                'FATAL: a função de banco de dados (role) "aura_service_ro" não tem permissão para conectar',
+                background=False,
+            )
+
+        assert triggered is True
+        assert run_mock.call_count == 1
+        assert healer.get_status()["recent_events_count"] == 1
+        assert healer.get_status()["recent_events"][0]["resolved"] is True
+    finally:
+        reset_self_healer()

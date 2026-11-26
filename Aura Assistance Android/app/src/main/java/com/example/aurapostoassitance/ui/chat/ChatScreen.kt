@@ -13,6 +13,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -134,6 +135,13 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.aurapostoassitance.data.local.HandoffContact
 import com.example.aurapostoassitance.data.remote.HandoffThreadDto
+import androidx.compose.animation.Crossfade
+import com.example.aurapostoassitance.ui.components.AuraReasoningRibbon
+import com.example.aurapostoassitance.ui.domain.AuraDomainAdapter
+import com.example.aurapostoassitance.ui.domain.DomainPackUiProfile
+import com.example.aurapostoassitance.ui.genui.GenUiSkeletonSlot
+import com.example.aurapostoassitance.ui.theme.BorderHairline
+import com.example.aurapostoassitance.ui.theme.ObsidianHigh
 import com.example.aurapostoassitance.ui.components.AuraAmbientBackground
 import com.example.aurapostoassitance.ui.components.AuraBrandTitle
 import com.example.aurapostoassitance.ui.components.AuraCard
@@ -144,6 +152,7 @@ import com.example.aurapostoassitance.ui.vision.AuraVisionBottomSheet
 import com.example.aurapostoassitance.ui.components.AuraGhostButton
 import com.example.aurapostoassitance.ui.components.AuraGradientButton
 import com.example.aurapostoassitance.ui.components.AuraLivingOrb
+import com.example.aurapostoassitance.ui.components.AuraOrbMode
 import com.example.aurapostoassitance.ui.components.AuraMessageActionType
 import com.example.aurapostoassitance.ui.components.AuraMessageContextMenuSheet
 import com.example.aurapostoassitance.ui.components.AuraQuickCommandHubSheet
@@ -209,6 +218,7 @@ fun ChatScreen(
     val incomingHandoffAlert by viewModel.incomingHandoffAlert.collectAsState()
     val isWhatsAppReturnsMode by viewModel.isWhatsAppReturnsMode.collectAsState()
     val isSyncingHandoffs by viewModel.isSyncingHandoffs.collectAsState()
+    val activeProfile = remember(viewModel.activePackId) { AuraDomainAdapter.profileFor(viewModel.activePackId) }
 
     LaunchedEffect(initialQuery) {
         if (initialQuery == "OPEN_WHATSAPP_RETURNS") {
@@ -539,7 +549,10 @@ fun ChatScreen(
                             text = inputText,
                             onTextChange = { inputText = it },
                             enabled = !isTyping,
-                            placeholderText = "Pergunte à AURA sobre o posto...",
+                            placeholderText = activeProfile.composerPlaceholder,
+                            suggestions = activeProfile.emptySuggestions.map {
+                                Triple(it.tag, it.label, it.prompt)
+                            },
                             showSuggestions = true,
                             onSend = {
                                 val toSend = inputText
@@ -577,6 +590,7 @@ fun ChatScreen(
                     )
                 } else if (messages.isEmpty() && !isTyping) {
                     EmptyState(
+                        profile = activeProfile,
                         onSuggestion = { inputText = it },
                         onOpenCommandHub = { showCommandHubSheet = true }
                     )
@@ -595,6 +609,7 @@ fun ChatScreen(
                             items(reversedMessages, key = { "${currentSessionId}:${it.id}" }) { message ->
                                 MessageItem(
                                     message = message,
+                                    profile = activeProfile,
                                     onAction = onAction,
                                     onDrillDown = { send(it) },
                                     speakingMessageId = speakingMessageId,
@@ -607,7 +622,7 @@ fun ChatScreen(
                                     },
                                     onAuditAnp = {
                                         val clean = message.text.replace("\n", " ").replace("\"", "'").trim().take(110)
-                                        send("Audite a conformidade deste dado segundo as normas da ANP, LMC (±0.60%) e critérios fiscais: '$clean'")
+                                        send("${activeProfile.complianceAuditPromptPrefix}: '$clean'")
                                     }
                                 )
                             }
@@ -1695,7 +1710,7 @@ private fun ChatHeader(
                     ) {
                         StatusDot(color = AuraEmerald, size = 6.dp, pulsing = isTyping)
                         Text(
-                            text = if (isTyping) "AURA sintetizando..." else "Online na rede do posto",
+                            text = if (isTyping) "AURA sintetizando..." else "Carbon Core conectado",
                             style = MaterialTheme.typography.labelSmall,
                             color = TextMuted
                         )
@@ -1708,9 +1723,6 @@ private fun ChatHeader(
                         contentDescription = if (isVoiceConversationActive) "Encerrar Voz" else "Conversa por Voz",
                         tint = if (isVoiceConversationActive) StatusDanger else AuraCyan
                     )
-                }
-                IconButton(onClick = onOpenCommandHub) {
-                    Icon(Icons.Rounded.Tune, "Aura Hub", tint = AuraCyan)
                 }
                 IconButton(onClick = onHistory) {
                     Box {
@@ -1732,16 +1744,11 @@ private fun ChatHeader(
                 menuContent()
             }
 
-            // Aura Dynamic Island: Cápsula de telemetria operacional ao vivo
-            AuraDynamicIsland(
-                onQueryAction = onQueryAction
-            )
-
             Box(
                 Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(LiquidIridescentSubtleBrush)
+                    .background(BorderHairline)
             )
         }
     }
@@ -1771,36 +1778,43 @@ private fun AuraAvatar(size: Dp = 32.dp) {
 
 @Composable
 private fun EmptyState(
+    profile: DomainPackUiProfile,
     onSuggestion: (String) -> Unit,
     onOpenCommandHub: () -> Unit
 ) {
     Column(
         Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp),
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.Center
     ) {
-        AuraAvatar(size = 56.dp)
-        Spacer(Modifier.height(22.dp))
+        AuraLivingOrb(
+            sizeDp = 96.dp,
+            voiceRms = 0.06f,
+            pulsing = true,
+            mode = AuraOrbMode.IDLE
+        )
+        Spacer(Modifier.height(18.dp))
         Text(
-            text = "Como posso ajudar\nno posto hoje?",
+            text = profile.emptyHeadline,
             style = MaterialTheme.typography.displayMedium,
             color = TextPrimary
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Peça diagnósticos, compare preços da ANP ou audite a conformidade da pista.",
+            text = profile.emptySubtitle,
             style = MaterialTheme.typography.bodyLarge,
             color = TextSecondary
         )
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(22.dp))
 
         // Botão de acesso ao Aura Hub
         SpatialGlassCard(
             onClick = onOpenCommandHub,
             modifier = Modifier.fillMaxWidth(),
             accent = AuraCyan,
-            iridescentBorder = true
+            iridescentBorder = false
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1810,7 +1824,7 @@ private fun EmptyState(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(AuraCyan.copy(alpha = 0.20f)),
+                        .background(AuraCyan.copy(alpha = 0.16f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Rounded.Tune, null, tint = AuraCyan, modifier = Modifier.size(18.dp))
@@ -1823,7 +1837,7 @@ private fun EmptyState(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Gatilhos operacionais para Pista, Gerência e Compliance",
+                        text = "Modos cognitivos e gatilhos • ${profile.displayName}",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextMuted
                     )
@@ -1832,25 +1846,25 @@ private fun EmptyState(
             }
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(22.dp))
         SectionLabel("Sugestões Rápidas")
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SUGGESTIONS.forEach { (tag, label, prompt) ->
+            profile.emptySuggestions.forEach { item ->
                 AuraCard(
-                    onClick = { onSuggestion(prompt) },
+                    onClick = { onSuggestion(item.prompt) },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(
-                                text = tag.uppercase(),
+                                text = item.tag.uppercase(),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = AuraCyan,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = label,
+                                text = item.label,
                                 style = MaterialTheme.typography.titleMedium,
                                 color = TextPrimary
                             )
@@ -1871,6 +1885,7 @@ private fun EmptyState(
 @Composable
 private fun MessageItem(
     message: ChatMessage,
+    profile: DomainPackUiProfile,
     onAction: (GenUiAction) -> Unit,
     onDrillDown: (String) -> Unit = {},
     speakingMessageId: String? = null,
@@ -1891,6 +1906,7 @@ private fun MessageItem(
     } else {
         AuraMessage(
             message = message,
+            profile = profile,
             onAction = onAction,
             onDrillDown = onDrillDown,
             speakingMessageId = speakingMessageId,
@@ -1961,20 +1977,10 @@ private fun UserBubble(
     ) {
         Box(
             modifier = Modifier
-                .widthIn(max = 320.dp)
+                .widthIn(max = 310.dp)
                 .clip(shape)
-                .background(AuroraBrushSoft)
-                .drawBehind {
-                    drawLine(
-                        brush = Brush.horizontalGradient(
-                            listOf(Color.Transparent, LiquidSpecularHighlight.copy(alpha = 0.45f), Color.Transparent)
-                        ),
-                        start = Offset(0f, 1f),
-                        end = Offset(size.width, 1f),
-                        strokeWidth = 1.dp.toPx()
-                    )
-                }
-                .border(1.dp, LiquidIridescentSubtleBrush, shape)
+                .background(ObsidianHigh.copy(alpha = 0.78f))
+                .border(1.dp, BorderHairline, shape)
                 .combinedClickable(
                     onClick = {},
                     onLongClick = {
@@ -1982,7 +1988,7 @@ private fun UserBubble(
                         onLongClick()
                     }
                 )
-                .padding(horizontal = 14.dp, vertical = 12.dp)
+                .padding(horizontal = 14.dp, vertical = 11.dp)
         ) {
             if (visionCard != null) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2054,6 +2060,7 @@ private fun UserBubble(
 @Composable
 private fun AuraMessage(
     message: ChatMessage,
+    profile: DomainPackUiProfile,
     onAction: (GenUiAction) -> Unit,
     onDrillDown: (String) -> Unit = {},
     speakingMessageId: String? = null,
@@ -2077,58 +2084,57 @@ private fun AuraMessage(
             contextUpper.contains(it)
         }
     }
-    val isTankContext = remember(contextUpper) {
-        listOf("TANQUE", "LMC", "BOMBA", "BICO", "LITROS", "ESTOQUE").any {
-            contextUpper.contains(it)
-        }
-    }
-    val domainBadgeLabel = when {
-        message.isStreaming -> "Analisando..."
-        isFiscalContext -> "Fiscal • SEFAZ"
-        isTankContext -> "Pista • ANP"
-        else -> "Consultor"
-    }
-    val domainBadgeAccent = when {
-        message.isStreaming -> AuraCyan
-        isFiscalContext -> AuraCyan
-        isTankContext -> AuraEmerald
-        else -> AuraPurple
-    }
+
+    val isThinkingBeforeText = message.isStreaming && message.text.isBlank()
+    val headerOrbSize by animateDpAsState(
+        targetValue = if (isThinkingBeforeText) 48.dp else 30.dp,
+        animationSpec = spring(dampingRatio = 0.80f, stiffness = 320f),
+        label = "auraHeaderOrbSize"
+    )
 
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Cabeçalho compacto libera toda a largura horizontal para o texto e cards GenUI
+        // Cabeçalho Editorial Único: Orbe Vivo (48dp em THINKING -> 30dp em IDLE) + AURA (zero duplicação!)
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            AuraAvatar(size = 22.dp)
-            Text(
-                text = "AURA",
-                style = MaterialTheme.typography.labelMedium,
-                color = TextPrimary
+            AuraLivingOrb(
+                sizeDp = headerOrbSize,
+                voiceRms = 0.08f,
+                pulsing = true,
+                activeColor = if (message.isStreaming) AuraPurple else AuraCyan,
+                mode = if (message.isStreaming) AuraOrbMode.THINKING else AuraOrbMode.IDLE
             )
-            LiquidGlassPill(
-                text = domainBadgeLabel,
-                accentColor = domainBadgeAccent
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(
+                    text = "AURA",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = TextPrimary
+                )
+                if (isThinkingBeforeText) {
+                    Text(
+                        text = "Consultando base segura Read-Only e motor Python...",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextMuted
+                    )
+                }
+            }
         }
 
-        // Acordeão de Raciocínio Transparente (visível tanto durante streaming quanto após concluído)
-        if (message.reasoningSteps.isNotEmpty()) {
-            AuraReasoningAccordion(
-                reasoningSteps = message.reasoningSteps,
-                isStreaming = message.isStreaming
-            )
-        }
+        // AuraReasoningRibbon (4 estágios em tempo real -> Trust Pill auditável)
+        AuraReasoningRibbon(
+            reasoningSteps = message.reasoningSteps,
+            isStreaming = message.isStreaming,
+            liveStatusLabel = auraStatusMessage,
+            trust = message.trust,
+            trailFooterLabel = profile.complianceTrailLabel
+        )
 
-        if (message.isStreaming && message.text.isBlank()) {
-            val thinkingLabel = auraStatusMessage ?: "AURA sintetizando resposta..."
-            ThinkingIndicator(label = thinkingLabel)
-        } else if (message.text.isNotBlank()) {
+        if (message.text.isNotBlank()) {
             if (isError) {
                 Text(message.text, style = MaterialTheme.typography.bodyMedium, color = StatusDanger)
             } else {
@@ -2136,23 +2142,10 @@ private fun AuraMessage(
                     if (message.isStreaming) message.text + " \u258A" else message.text
                 )
 
-                // Card de vidro espacial envolvendo a resposta da IA
+                // Editorial Briefing Stream: sem caixa box-in-box, deixando o texto respirar sobre o Obsidian
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp, 20.dp, 20.dp, 20.dp))
-                        .background(LiquidGlassSurfaceBrush)
-                        .drawBehind {
-                            drawLine(
-                                brush = Brush.horizontalGradient(
-                                    listOf(Color.Transparent, LiquidSpecularHighlight, Color.Transparent)
-                                ),
-                                start = Offset(0f, 1f),
-                                end = Offset(size.width, 1f),
-                                strokeWidth = 1.dp.toPx()
-                            )
-                        }
-                        .border(1.dp, LiquidIridescentSubtleBrush, RoundedCornerShape(6.dp, 20.dp, 20.dp, 20.dp))
                         .combinedClickable(
                             onClick = {},
                             onLongClick = {
@@ -2160,19 +2153,19 @@ private fun AuraMessage(
                                 onLongClick()
                             }
                         )
-                        .padding(14.dp)
+                        .padding(horizontal = 2.dp, vertical = 2.dp)
                 ) {
                     MarkdownText(
                         markdown = formattedText,
                         style = MaterialTheme.typography.bodyLarge.copy(
                             color = TextPrimary,
-                            lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.25f
+                            lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.22f
                         ),
                         linkColor = AuraCyan
                     )
                 }
 
-                // Barra de Micro-Ações de Contexto da Aura (rolável horizontalmente e sensível ao domínio)
+                // Barra discreta de Micro-Ações Pós-Resposta
                 if (!message.isStreaming) {
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -2212,7 +2205,7 @@ private fun AuraMessage(
                                 )
                             } else {
                                 LiquidGlassPill(
-                                    text = "ANP",
+                                    text = profile.complianceButtonLabel,
                                     icon = Icons.Rounded.Security,
                                     accentColor = AuraPurple,
                                     onClick = onAuditAnp
@@ -2232,23 +2225,38 @@ private fun AuraMessage(
                 }
             }
         }
-        card?.let { parsedCard ->
-            GenUiCardView(
-                card = parsedCard,
-                onAction = { action ->
-                    if (action.isHandoffAction()) {
-                        val richReport = AuraWhatsAppReportFormatter.buildReport(
-                            card = parsedCard,
-                            narrativeText = message.text,
-                            actionLabel = action.label
-                        )
-                        onAction(action.copy(contextSummary = richReport))
-                    } else {
-                        onAction(action)
-                    }
-                },
-                onDrillDown = onDrillDown
-            )
+
+        // Slot Zero-CLS com Crossfade suave: Skeleton reservado -> Micro-Widget GenUI protagonista
+        val hasGenUiSlot = card != null || message.pendingSkeletonTitle != null
+        if (hasGenUiSlot) {
+            Crossfade(
+                targetState = card,
+                animationSpec = tween(220),
+                label = "genUiHydration"
+            ) { hydratedCard ->
+                if (hydratedCard != null) {
+                    GenUiCardView(
+                        card = hydratedCard,
+                        companionText = message.text,
+                        onAction = { action ->
+                            if (action.isHandoffAction()) {
+                                val richReport = AuraWhatsAppReportFormatter.buildReport(
+                                    card = hydratedCard,
+                                    narrativeText = message.text,
+                                    actionLabel = action.label,
+                                    unitLabel = profile.displayName
+                                )
+                                onAction(action.copy(contextSummary = richReport))
+                            } else {
+                                onAction(action)
+                            }
+                        },
+                        onDrillDown = onDrillDown
+                    )
+                } else {
+                    GenUiSkeletonSlot(title = message.pendingSkeletonTitle)
+                }
+            }
         }
     }
 }
@@ -2259,7 +2267,8 @@ private fun Composer(
     text: String,
     onTextChange: (String) -> Unit,
     enabled: Boolean,
-    placeholderText: String = "Pergunte à AURA sobre o posto...",
+    placeholderText: String = "Pergunte à AURA...",
+    suggestions: List<Triple<String, String, String>> = SUGGESTIONS,
     showSuggestions: Boolean = true,
     onSend: () -> Unit,
     onStartVoice: () -> Unit = {},
@@ -2317,7 +2326,7 @@ private fun Composer(
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(SUGGESTIONS) { (tag, label, prompt) ->
+                items(suggestions) { (tag, label, prompt) ->
                     AuraChip(
                         label = label,
                         tag = tag,

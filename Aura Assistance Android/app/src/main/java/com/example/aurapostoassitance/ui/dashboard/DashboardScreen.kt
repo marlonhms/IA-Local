@@ -1,8 +1,8 @@
 package com.example.aurapostoassitance.ui.dashboard
 
-import android.content.Context
-import android.content.ContextWrapper
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -15,11 +15,11 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,37 +31,29 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Chat
-import androidx.compose.material.icons.rounded.Assessment
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.Business
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DirectionsCar
-import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.Fingerprint
-import androidx.compose.material.icons.rounded.LocalGasStation
-import androidx.compose.material.icons.rounded.LocalShipping
-import androidx.compose.material.icons.rounded.MedicalServices
-import androidx.compose.material.icons.rounded.People
+import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.PointOfSale
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material.icons.rounded.Stop
-import androidx.compose.material.icons.rounded.Storefront
-import androidx.compose.material.icons.automirrored.rounded.Chat
-import androidx.compose.material.icons.automirrored.rounded.TrendingDown
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,103 +61,44 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.fragment.app.FragmentActivity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.aurapostoassitance.ui.components.AuraAmbientBackground
-import com.example.aurapostoassitance.ui.components.AuraLivingOrb
 import com.example.aurapostoassitance.ui.components.AuraBottomGlassDock
 import com.example.aurapostoassitance.ui.components.AuraBrandTitle
 import com.example.aurapostoassitance.ui.components.AuraChip
 import com.example.aurapostoassitance.ui.components.AuraDynamicIsland
 import com.example.aurapostoassitance.ui.components.AuraGradientButton
+import com.example.aurapostoassitance.ui.components.AuraLivingOrb
 import com.example.aurapostoassitance.ui.components.AuraNavTab
+import com.example.aurapostoassitance.ui.components.AuraOrbMode
 import com.example.aurapostoassitance.ui.components.LiquidGlassPill
 import com.example.aurapostoassitance.ui.components.SectionLabel
 import com.example.aurapostoassitance.ui.components.SpatialGlassCard
-import com.example.aurapostoassitance.ui.vision.AuraVisionBottomSheet
-import com.example.aurapostoassitance.ui.components.StatusDot
 import com.example.aurapostoassitance.ui.components.findFragmentActivity
+import com.example.aurapostoassitance.ui.domain.AuraDomainAdapter
+import com.example.aurapostoassitance.ui.domain.DomainTrigger
 import com.example.aurapostoassitance.ui.theme.AuraCyan
 import com.example.aurapostoassitance.ui.theme.AuraEmerald
 import com.example.aurapostoassitance.ui.theme.AuraPurple
+import com.example.aurapostoassitance.ui.theme.AuraTypographyExt
+import com.example.aurapostoassitance.ui.theme.BorderHairline
 import com.example.aurapostoassitance.ui.theme.NewsreaderFamily
 import com.example.aurapostoassitance.ui.theme.ObsidianBase
-import com.example.aurapostoassitance.ui.theme.ObsidianHigh
+import com.example.aurapostoassitance.ui.theme.ObsidianLow
+import com.example.aurapostoassitance.ui.theme.StatusDanger
 import com.example.aurapostoassitance.ui.theme.StatusSuccess
 import com.example.aurapostoassitance.ui.theme.StatusWarning
 import com.example.aurapostoassitance.ui.theme.TextMuted
 import com.example.aurapostoassitance.ui.theme.TextPrimary
 import com.example.aurapostoassitance.ui.theme.TextSecondary
-
-private data class QuickTrigger(
-    val title: String,
-    val description: String,
-    val icon: ImageVector,
-    val accentColor: Color,
-    val query: String
-)
-
-private val universalTriggers = listOf(
-    QuickTrigger(
-        title = "Previsão de Ruptura & Autonomia",
-        description = "Previsão de esgotamento e economia estimada em compras preventivas antecipadas.",
-        icon = Icons.Rounded.LocalGasStation,
-        accentColor = AuraCyan,
-        query = "Faça a previsão de esgotamento (Run-Out) e compras antecipadas dos estoques."
-    ),
-    QuickTrigger(
-        title = "Detector de Fuga Invisível",
-        description = "Auditoria de descontos sem alçada, divergências de caixa e vazamento de margem.",
-        icon = Icons.AutoMirrored.Rounded.TrendingDown,
-        accentColor = StatusWarning,
-        query = "Audite as fugas invisíveis de lucro, desvios de caixa e descontos sem alçada."
-    ),
-    QuickTrigger(
-        title = "Máquina Anti-Churn RFM",
-        description = "Lote de clientes VIP e recorrentes em risco com templates Spintax de reativação.",
-        icon = Icons.Rounded.People,
-        accentColor = AuraPurple,
-        query = "Gere o lote de clientes VIPs em risco de churn com mensagens de reativação no WhatsApp."
-    ),
-    QuickTrigger(
-        title = "Conciliação Operacional & LMC",
-        description = "Fechamento de turnos, conformidade legal ANP e conciliação de sangrias.",
-        icon = Icons.Rounded.Assessment,
-        accentColor = AuraEmerald,
-        query = "Audite o fechamento de turno de hoje e conformidade operacional."
-    ),
-    QuickTrigger(
-        title = "Olhos da AURA (Scanner Neural)",
-        description = "Extração instantânea na NPU de Notas Fiscais (DANFE), tanques e fechamento.",
-        icon = Icons.Rounded.DocumentScanner,
-        accentColor = AuraPurple,
-        query = "VISION_SCANNER_TRIGGER"
-    ),
-    QuickTrigger(
-        title = "Monitor de Gatilhos",
-        description = "Acompanhe entrega, visualização e recebimento dos alertas enviados pela AURA.",
-        icon = Icons.AutoMirrored.Rounded.Chat,
-        accentColor = AuraEmerald,
-        query = "OPEN_WHATSAPP_RETURNS"
-    )
-)
-
-private val chipPrompts = listOf(
-    "Previsão de Ruptura 24h",
-    "Fuga Invisível de Margem",
-    "Clientes VIP em Risco",
-    "Divergência de Caixa",
-    "Auditoria LMC ANP",
-    "Custo de Estoque Ocioso"
-)
+import com.example.aurapostoassitance.ui.vision.AuraVisionBottomSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -178,8 +111,13 @@ fun DashboardScreen(
     val context = LocalContext.current
     val activity = remember(context) { context.findFragmentActivity() }
     var showVisionScanner by remember { mutableStateOf(false) }
+    var showSiliconSheet by remember { mutableStateOf(false) }
 
     val selectedSegment by viewModel.selectedSegment.collectAsState()
+    val activeProfile = remember(selectedSegment) { AuraDomainAdapter.profileFor(selectedSegment) }
+    val isServerOnline by viewModel.isServerOnline.collectAsState()
+    val authExpiredMessage by viewModel.authExpiredMessage.collectAsState()
+    val islandTelemetry by viewModel.islandTelemetry.collectAsState()
     val briefingState by viewModel.briefingState.collectAsState()
     val hardwareStatus by viewModel.hardwareStatus.collectAsState()
     val isSpeaking by viewModel.isSpeaking.collectAsState()
@@ -192,12 +130,19 @@ fun DashboardScreen(
     val handoffUnreadCount by viewModel.handoffUnreadCount.collectAsState()
     val handoffThreadCount by viewModel.handoffThreadCount.collectAsState()
 
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    LaunchedEffect(Unit) {
         selectedTab = AuraNavTab.PULSO
         viewModel.refreshHandoffSummary()
+        viewModel.refreshLiveTelemetry(selectedSegment)
     }
 
     val isPlayingBriefing = isSpeaking && speakingMessageId == "briefing_$selectedSegment"
+
+    val (statusLabel, statusAccent, statusPulse) = when (isServerOnline) {
+        true -> Triple("Online", StatusSuccess, true)
+        false -> Triple("Vault Offline", StatusWarning, false)
+        null -> Triple("Sincronizando...", AuraCyan, true)
+    }
 
     AuraAmbientBackground {
         Scaffold(
@@ -205,18 +150,31 @@ fun DashboardScreen(
             topBar = {
                 TopAppBar(
                     title = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             AuraBrandTitle(
                                 text = "AURA",
                                 style = MaterialTheme.typography.titleLarge
                             )
-                            Spacer(modifier = Modifier.width(10.dp))
                             LiquidGlassPill(
-                                text = "Super-Inteligência Online",
-                                accentColor = StatusSuccess,
-                                pulsingDot = true
+                                text = statusLabel,
+                                accentColor = statusAccent,
+                                pulsingDot = statusPulse,
+                                onClick = { viewModel.refreshLiveTelemetry(selectedSegment) }
                             )
                         }
+                    },
+                    actions = {
+                        // Telemetria de Silício compacta sob demanda (libera o topo do Dashboard)
+                        LiquidGlassPill(
+                            text = "${"%.0f".format(hardwareStatus.lastInferenceLatencyMs)}ms NPU",
+                            icon = Icons.Rounded.Memory,
+                            accentColor = AuraPurple,
+                            onClick = { showSiliconSheet = true },
+                            modifier = Modifier.padding(end = 12.dp)
+                        )
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = Color.Transparent
@@ -228,13 +186,15 @@ fun DashboardScreen(
                     selectedTab = selectedTab,
                     handoffUnreadCount = handoffUnreadCount,
                     handoffThreadCount = handoffThreadCount,
+                    resourceTabLabel = activeProfile.resourceTabLabel,
+                    resourceTabIcon = activeProfile.resourceTabIcon,
                     onTabSelected = { tab ->
                         selectedTab = tab
                         when (tab) {
-                            AuraNavTab.PULSO -> { /* Já no Pulso */ }
+                            AuraNavTab.PULSO -> Unit
                             AuraNavTab.COCKPIT -> onNavigateToChat(null)
                             AuraNavTab.RETORNOS -> onNavigateToChat("OPEN_WHATSAPP_RETURNS")
-                            AuraNavTab.TANQUES -> onNavigateToChat("Faça a previsão de esgotamento (Run-Out) dos recursos e mostre a situação de todos os compartimentos.")
+                            AuraNavTab.TANQUES -> onNavigateToChat(activeProfile.resourceTabQuery)
                             AuraNavTab.CONEXAO -> onNavigateToSetup()
                         }
                     }
@@ -246,14 +206,58 @@ fun DashboardScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
             ) {
-                // Banner de Modo Carro / Hands-Free Inteligente
+                // Alerta de Sessão 401 (Alinhamento Carbon Core P0.1)
+                AnimatedVisibility(visible = authExpiredMessage != null) {
+                    authExpiredMessage?.let { msg ->
+                        SpatialGlassCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp),
+                            accent = StatusDanger,
+                            glowActive = true,
+                            contentPadding = PaddingValues(14.dp),
+                            onClick = {
+                                viewModel.dismissAuthExpired()
+                                onNavigateToSetup()
+                            }
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Key,
+                                    contentDescription = null,
+                                    tint = StatusDanger,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "CHAVE DE ACESSO NECESSÁRIA",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = StatusDanger
+                                    )
+                                    Text(
+                                        text = "$msg Toque para configurar.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = TextPrimary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Banner de Modo Carro / Hands-Free
                 if (physicalContext.isCarModeActive) {
                     SpatialGlassCard(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
                         accent = AuraEmerald,
-                        iridescentBorder = true,
                         contentPadding = PaddingValues(12.dp)
                     ) {
                         Row(
@@ -269,7 +273,7 @@ fun DashboardScreen(
                                     imageVector = Icons.Rounded.DirectionsCar,
                                     contentDescription = null,
                                     tint = AuraEmerald,
-                                    modifier = Modifier.size(22.dp)
+                                    modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column {
@@ -292,7 +296,6 @@ fun DashboardScreen(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(14.dp))
                 }
 
                 // Header Editorial Deluxe
@@ -304,113 +307,55 @@ fun DashboardScreen(
                     ),
                     color = TextPrimary
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = "Radar cognitivo da AURA com telemetria preditiva e modo sócio.",
+                    text = activeProfile.subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Telemetria de Silício & Hardware NPU (Qualcomm Snapdragon 7s Gen 2 / garnet)
-                SpatialGlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    accent = AuraPurple,
-                    iridescentBorder = true,
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .background(AuraPurple.copy(alpha = 0.22f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.AutoAwesome,
-                                    contentDescription = null,
-                                    tint = AuraPurple,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = hardwareStatus.marketingName,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 0.5.sp
-                                    ),
-                                    color = TextPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = "${hardwareStatus.activeAccelerator} • ${hardwareStatus.cpuCores} Cores • Qualcomm TEE",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = TextMuted,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                        LiquidGlassPill(
-                            text = "${"%.1f".format(hardwareStatus.lastInferenceLatencyMs)} ms",
-                            accentColor = AuraEmerald,
-                            pulsingDot = true
-                        )
-                    }
-                }
+                // Dynamic Island de Telemetria Real (Zero-Click Feed)
+                AuraDynamicIsland(
+                    telemetry = islandTelemetry,
+                    onQueryAction = { query -> onNavigateToChat(query) }
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Seletor de Segmentos Universais
-                SectionLabel(text = "Segmento de Negócio Ativo")
+                // Seletor dos 5 Domain Packs Oficiais (com estado selecionado corrigido!)
+                SectionLabel(text = "Vertical Operacional (Domain Pack)")
                 Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 4.dp)
                 ) {
-                    items(viewModel.availableSegments) { segment ->
-                        val isSelected = segment.key == selectedSegment
-                        val segIcon = when (segment.key) {
-                            "postos_redes" -> Icons.Rounded.LocalGasStation
-                            "varejo" -> Icons.Rounded.Storefront
-                            "saas_b2b" -> Icons.Rounded.Business
-                            "saude_clinicas" -> Icons.Rounded.MedicalServices
-                            "ecommerce" -> Icons.Rounded.ShoppingCart
-                            "logistica" -> Icons.Rounded.LocalShipping
-                            else -> Icons.Rounded.AutoAwesome
-                        }
-
+                    items(viewModel.availableProfiles, key = { it.packId }) { profile ->
+                        val isSelected = profile.packId == activeProfile.packId
                         AuraChip(
-                            label = segment.label,
-                            icon = segIcon,
-                            onClick = { viewModel.selectSegment(segment.key) }
+                            label = profile.shortLabel,
+                            icon = profile.icon,
+                            selected = isSelected,
+                            accentColor = AuraCyan,
+                            onClick = { viewModel.selectSegment(profile.packId) }
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // =============================================================
-                // CARD BRIEFING MATINAL VOICE-FIRST (MODO SÓCIO)
-                // =============================================================
+                // CARD BRIEFING MATINAL VOICE-FIRST (Orbe integrado no header, sem espaço morto)
+                val briefingOrbSize by animateDpAsState(
+                    targetValue = if (isPlayingBriefing) 54.dp else 48.dp,
+                    animationSpec = spring(dampingRatio = 0.78f, stiffness = 320f),
+                    label = "briefingOrbSize"
+                )
                 SpatialGlassCard(
                     modifier = Modifier.fillMaxWidth(),
                     accent = if (isPlayingBriefing) AuraPurple else AuraCyan,
                     glowActive = isPlayingBriefing,
-                    iridescentBorder = true,
+                    iridescentBorder = isPlayingBriefing,
                     contentPadding = PaddingValues(18.dp)
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -419,21 +364,21 @@ fun DashboardScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isPlayingBriefing) AuraPurple.copy(alpha = 0.25f) else AuraCyan.copy(alpha = 0.16f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = if (isPlayingBriefing) Icons.AutoMirrored.Rounded.VolumeUp else Icons.Rounded.AutoAwesome,
-                                        contentDescription = null,
-                                        tint = if (isPlayingBriefing) AuraPurple else AuraCyan,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                AuraLivingOrb(
+                                    sizeDp = briefingOrbSize,
+                                    voiceRms = if (isPlayingBriefing) voiceAmplitude else 0.06f,
+                                    pulsing = true,
+                                    activeColor = if (isPlayingBriefing) AuraPurple else AuraCyan,
+                                    mode = when {
+                                        briefingState is BriefingUiState.Loading -> AuraOrbMode.THINKING
+                                        isPlayingBriefing -> AuraOrbMode.ACTIVE
+                                        else -> AuraOrbMode.IDLE
+                                    }
+                                )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column {
                                     Text(
@@ -447,10 +392,14 @@ fun DashboardScreen(
                                     Text(
                                         text = "Modo Sócio Consultor (45s)",
                                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                                        color = TextPrimary
+                                        color = TextPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
+
+                            Spacer(modifier = Modifier.width(8.dp))
 
                             LiquidGlassPill(
                                 text = if (isPlayingBriefing) "Voz Ativa" else "Pronto",
@@ -459,39 +408,25 @@ fun DashboardScreen(
                             )
                         }
 
-                        // Orbe Vivo e Fluido da AURA (Consciência visual orgânica líquida)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            AuraLivingOrb(
-                                sizeDp = 64.dp,
-                                voiceRms = if (isPlayingBriefing) voiceAmplitude else 0.05f,
-                                pulsing = true
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
                         when (val state = briefingState) {
                             is BriefingUiState.Loading -> {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 16.dp),
+                                        .padding(vertical = 14.dp),
                                     horizontalArrangement = Arrangement.Center,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp),
+                                        modifier = Modifier.size(20.dp),
                                         color = AuraCyan,
                                         strokeWidth = 2.dp
                                     )
-                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Spacer(modifier = Modifier.width(10.dp))
                                     Text(
-                                        text = "Sintetizando diagnóstico executivo matinal...",
+                                        text = "Sintetizando diagnóstico executivo...",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = TextSecondary
                                     )
@@ -518,17 +453,14 @@ fun DashboardScreen(
                                 val briefing = state.briefing
                                 Text(
                                     text = briefing.oralVoiceScript,
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        lineHeight = 18.sp
-                                    ),
+                                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 19.sp),
                                     color = TextSecondary,
                                     maxLines = 4,
                                     overflow = TextOverflow.Ellipsis
                                 )
 
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(14.dp))
 
-                                // Botão de Áudio Voice-First
                                 AuraGradientButton(
                                     text = if (isPlayingBriefing) "Pausar Áudio do Dia" else "Ouvir Resumo do Dia (45s)",
                                     icon = if (isPlayingBriefing) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
@@ -536,118 +468,110 @@ fun DashboardScreen(
                                     modifier = Modifier.fillMaxWidth()
                                 )
 
-                                Spacer(modifier = Modifier.height(16.dp))
+                                if (briefing.suggestedActions.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "GATILHOS DE 1 TOQUE (ASSINATURA TEE)",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            letterSpacing = 0.8.sp,
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        color = TextMuted
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
 
-                                // Ações de 1-Toque
-                                Text(
-                                    text = "GATILHOS DE 1 TOQUE (COMMAND JOURNAL)",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        letterSpacing = 0.8.sp,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = TextMuted
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    briefing.suggestedActions.forEach { action ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(ObsidianBase.copy(alpha = 0.6f))
-                                                .border(
-                                                    width = 1.dp,
-                                                    color = Color.White.copy(alpha = 0.08f),
-                                                    shape = RoundedCornerShape(12.dp)
-                                                )
-                                                .clickable(enabled = !isExecutingAction && signedActions[action.code] == null) {
-                                                    val act = activity ?: context.findFragmentActivity()
-                                                    if (act != null) {
-                                                        viewModel.authenticateAndExecuteBriefingAction(
-                                                            act,
-                                                            action.code,
-                                                            action.description ?: action.label
-                                                        )
-                                                    } else {
-                                                        viewModel.executeBriefingAction(
-                                                            action.code,
-                                                            action.description ?: action.label
-                                                        )
-                                                    }
-                                                }
-                                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.weight(1f),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(24.dp)
-                                                        .clip(CircleShape)
-                                                        .background(AuraCyan.copy(alpha = 0.2f)),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        text = action.code,
-                                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                                        color = AuraCyan
-                                                    )
-                                                }
-                                                Spacer(modifier = Modifier.width(10.dp))
-                                                Text(
-                                                    text = action.label,
-                                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                                                    color = TextPrimary,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        briefing.suggestedActions.forEach { action ->
                                             val signedReceipt = signedActions[action.code]
                                             Row(
-                                                verticalAlignment = Alignment.CenterVertically
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(ObsidianBase.copy(alpha = 0.65f))
+                                                    .border(
+                                                        width = 1.dp,
+                                                        color = if (signedReceipt != null) AuraEmerald.copy(alpha = 0.45f) else BorderHairline,
+                                                        shape = RoundedCornerShape(12.dp)
+                                                    )
+                                                    .clickable(enabled = !isExecutingAction && signedReceipt == null) {
+                                                        val act = activity ?: context.findFragmentActivity()
+                                                        if (act != null) {
+                                                            viewModel.authenticateAndExecuteBriefingAction(
+                                                                act,
+                                                                action.code,
+                                                                action.description ?: action.label
+                                                            )
+                                                        } else {
+                                                            viewModel.executeBriefingAction(
+                                                                action.code,
+                                                                action.description ?: action.label
+                                                            )
+                                                        }
+                                                    }
+                                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
                                             ) {
-                                                if (signedReceipt != null) {
-                                                    Icon(
-                                                        imageVector = Icons.Rounded.CheckCircle,
-                                                        contentDescription = "Assinado TEE",
-                                                        tint = AuraEmerald,
-                                                        modifier = Modifier.size(15.dp)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                Row(
+                                                    modifier = Modifier.weight(1f),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(24.dp)
+                                                            .clip(CircleShape)
+                                                            .background(AuraCyan.copy(alpha = 0.16f)),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = action.code,
+                                                            style = AuraTypographyExt.kpiCompact.copy(fontSize = 11.sp),
+                                                            color = AuraCyan
+                                                        )
+                                                    }
+                                                    Spacer(modifier = Modifier.width(10.dp))
                                                     Text(
-                                                        text = "Assinado ($signedReceipt)",
-                                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                                        color = AuraEmerald
+                                                        text = action.label,
+                                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                                                        color = TextPrimary,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
                                                     )
-                                                } else if (isExecutingAction) {
-                                                    CircularProgressIndicator(
-                                                        modifier = Modifier.size(14.dp),
-                                                        strokeWidth = 2.dp,
-                                                        color = AuraCyan
-                                                    )
-                                                    Spacer(modifier = Modifier.width(4.dp))
-                                                    Text(
-                                                        text = "Assinando...",
-                                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                                        color = AuraCyan
-                                                    )
-                                                } else {
-                                                    Icon(
-                                                        imageVector = Icons.Rounded.Fingerprint,
-                                                        contentDescription = "Assinatura TEE",
-                                                        tint = AuraCyan,
-                                                        modifier = Modifier.size(15.dp)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(4.dp))
-                                                    Text(
-                                                        text = "Assinar TEE",
-                                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                                        color = AuraCyan
-                                                    )
+                                                }
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    if (signedReceipt != null) {
+                                                        Icon(
+                                                            imageVector = Icons.Rounded.CheckCircle,
+                                                            contentDescription = "Assinado TEE",
+                                                            tint = AuraEmerald,
+                                                            modifier = Modifier.size(15.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text(
+                                                            text = signedReceipt,
+                                                            style = AuraTypographyExt.monoAudit,
+                                                            color = AuraEmerald
+                                                        )
+                                                    } else if (isExecutingAction) {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(14.dp),
+                                                            strokeWidth = 2.dp,
+                                                            color = AuraCyan
+                                                        )
+                                                    } else {
+                                                        Icon(
+                                                            imageVector = Icons.Rounded.Fingerprint,
+                                                            contentDescription = "Assinar TEE",
+                                                            tint = AuraCyan,
+                                                            modifier = Modifier.size(15.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text(
+                                                            text = "Assinar",
+                                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                                            color = AuraCyan
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
@@ -655,12 +579,12 @@ fun DashboardScreen(
                                 }
                             }
 
-                            BriefingUiState.Idle -> { /* Idle */ }
+                            BriefingUiState.Idle -> Unit
                         }
                     }
                 }
 
-                // Banner de Feedback do Command Journal
+                // Feedback do Command Journal
                 AnimatedVisibility(
                     visible = actionFeedback != null,
                     enter = fadeIn(),
@@ -671,7 +595,6 @@ fun DashboardScreen(
                         SpatialGlassCard(
                             modifier = Modifier.fillMaxWidth(),
                             accent = AuraEmerald,
-                            iridescentBorder = true,
                             contentPadding = PaddingValues(14.dp)
                         ) {
                             Row(
@@ -687,7 +610,7 @@ fun DashboardScreen(
                                         imageVector = Icons.Rounded.CheckCircle,
                                         contentDescription = null,
                                         tint = StatusSuccess,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Text(
@@ -712,41 +635,14 @@ fun DashboardScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(22.dp))
 
-                // Dynamic Island de Telemetria Operacional
-                AuraDynamicIsland(
-                    onQueryAction = { query -> onNavigateToChat(query) }
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Pulse Status Bar (Glassmorphism Telemetria)
-                SpatialGlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    accent = AuraCyan,
-                    iridescentBorder = true,
-                    contentPadding = PaddingValues(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        PulseStatItem(label = "Recursos", value = "100% Ativos", dotColor = StatusSuccess)
-                        PulseStatItem(label = "Fuga", value = "Monitorada", dotColor = AuraCyan)
-                        PulseStatItem(label = "Anti-Churn", value = "Auditado", dotColor = AuraPurple)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                SectionLabel(text = "Motores de Super-Inteligência Preditiva")
+                SectionLabel(text = "Motores Preditivos • ${activeProfile.shortLabel}")
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // 2x2 Triggers Grid Universais
+                // Grid 2x2 de Triggers Dinâmicos por Pack (Contenção 85-10-5)
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    universalTriggers.chunked(2).forEach { rowTriggers ->
+                    activeProfile.triggers.chunked(2).forEach { rowTriggers ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -754,7 +650,7 @@ fun DashboardScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             rowTriggers.forEach { trigger ->
-                                ExecutiveCard(
+                                ExecutiveTriggerCard(
                                     trigger = trigger,
                                     modifier = Modifier
                                         .weight(1f)
@@ -772,16 +668,16 @@ fun DashboardScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(26.dp))
+                Spacer(modifier = Modifier.height(22.dp))
 
-                SectionLabel(text = "Consultas Frequentes")
-                Spacer(modifier = Modifier.height(12.dp))
+                SectionLabel(text = "Consultas Rápidas")
+                Spacer(modifier = Modifier.height(10.dp))
 
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 8.dp)
                 ) {
-                    items(chipPrompts) { prompt ->
+                    items(activeProfile.quickPrompts) { prompt ->
                         AuraChip(
                             label = prompt,
                             icon = Icons.Rounded.AutoAwesome,
@@ -790,17 +686,16 @@ fun DashboardScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
-                // Main CTA AURA Button
                 AuraGradientButton(
-                    text = "Abrir AURA Chat",
+                    text = "Abrir Cockpit AURA",
                     onClick = { onNavigateToChat(null) },
                     icon = Icons.AutoMirrored.Rounded.Chat,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
             }
         }
 
@@ -814,41 +709,61 @@ fun DashboardScreen(
                 scanner = viewModel.visionScanner
             )
         }
-    }
-}
 
-@Composable
-private fun PulseStatItem(label: String, value: String, dotColor: Color) {
-    Column {
-        Text(
-            text = label.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = TextMuted,
-            letterSpacing = 0.5.sp
-        )
-        Spacer(modifier = Modifier.height(3.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StatusDot(color = dotColor, size = 6.dp, pulsing = true)
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = TextPrimary
-            )
+        if (showSiliconSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showSiliconSheet = false },
+                containerColor = ObsidianLow,
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 22.dp, vertical = 12.dp)
+                        .padding(bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    SectionLabel("Diagnóstico de Silício & Rede")
+                    Text(
+                        text = hardwareStatus.marketingName,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "${hardwareStatus.activeAccelerator} • ${hardwareStatus.cpuCores} Cores • Android Keystore + TEE",
+                        style = AuraTypographyExt.monoAudit,
+                        color = TextSecondary
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        LiquidGlassPill(
+                            text = "Inferência: ${"%.1f".format(hardwareStatus.lastInferenceLatencyMs)} ms",
+                            accentColor = AuraEmerald
+                        )
+                        LiquidGlassPill(
+                            text = "Pack: ${activeProfile.packId}",
+                            accentColor = AuraCyan
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun ExecutiveCard(
-    trigger: QuickTrigger,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
+private fun ExecutiveTriggerCard(
+    trigger: DomainTrigger,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     SpatialGlassCard(
-        modifier = modifier.defaultMinSize(minHeight = 170.dp),
+        modifier = modifier,
         accent = trigger.accentColor,
-        iridescentBorder = true,
+        iridescentBorder = false,
         onClick = onClick,
         contentPadding = PaddingValues(14.dp)
     ) {
@@ -858,8 +773,8 @@ private fun ExecutiveCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(10.dp))
                     .background(trigger.accentColor.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -867,25 +782,22 @@ private fun ExecutiveCard(
                     imageVector = trigger.icon,
                     contentDescription = null,
                     tint = trigger.accentColor,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
-
+            Spacer(modifier = Modifier.height(12.dp))
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = trigger.title,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        lineHeight = 19.sp
-                    ),
-                    color = TextPrimary
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = TextPrimary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = trigger.description,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        lineHeight = 15.sp
-                    ),
-                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 16.sp),
+                    color = TextMuted,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis
                 )

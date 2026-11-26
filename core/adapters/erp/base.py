@@ -140,6 +140,14 @@ class BaseERPAdapter(ABC):
         """
         return []
 
+    def get_employee_sales_ranking(
+        self,
+        target_date: str | date | None = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Recupera ranking de vendas/pedidos do PDV consolidado por funcionario/vendedor."""
+        return []
+
     @abstractmethod
     def get_pump_dispenses(
         self,

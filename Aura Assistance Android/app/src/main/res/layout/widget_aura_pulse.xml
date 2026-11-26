@@ -7,7 +7,7 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <!-- Header com Marca e Status de NPU -->
+    <!-- Header Carbon Obsidian -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -19,22 +19,22 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="AURA SÓCIO"
-            android:textColor="#00F0FF"
-            android:textSize="14sp"
+            android:text="AURA • PULSO"
+            android:textColor="#22D3EE"
+            android:textSize="13sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tv_widget_npu_tag"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="HEXAGON NPU"
+            android:text="CARBON READY"
             android:textColor="#10B981"
             android:textSize="10sp"
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Linha de Telemetria e Diagnóstico -->
+    <!-- Diagnóstico Sincronizado -->
     <TextView
         android:id="@+id/tv_widget_body"
         android:layout_width="match_parent"
@@ -43,11 +43,11 @@
         android:layout_weight="1"
         android:ellipsize="end"
         android:maxLines="2"
-        android:text="Autonomia 18.5h | Fuga R$ 3.654/mês | Ruptura monitorada em tempo real."
+        android:text="Toque para ouvir o resumo executivo ou abrir o cockpit AURA."
         android:textColor="#94A3B8"
         android:textSize="12sp" />
 
-    <!-- Ações Rápidas do Widget -->
+    <!-- Ações Rápidas -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -61,8 +61,8 @@
             android:layout_height="38dp"
             android:layout_weight="1.2"
             android:background="@drawable/widget_button_bg"
-            android:text="▶ Ouvir Briefing (45s)"
-            android:textColor="#FFFFFF"
+            android:text="▶ Ouvir Briefing"
+            android:textColor="#F1F5F9"
             android:textSize="11sp"
             android:textStyle="bold" />
 
@@ -76,8 +76,8 @@
             android:layout_height="38dp"
             android:layout_weight="1"
             android:background="@drawable/widget_button_bg"
-            android:text="Abrir AURA"
-            android:textColor="#00F0FF"
+            android:text="Abrir Cockpit"
+            android:textColor="#22D3EE"
             android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>

@@ -1096,23 +1096,41 @@ class PostoTools:
                     data_alvo = str(hoje_date)
                 else:
                     recent_shifts = self.erp_adapter.get_cashier_shifts(limit=10)
-                    recent_dispenses = self.erp_adapter.get_pump_dispenses(limit=10)
-                    recent_dates = []
-                    for s in recent_shifts:
-                        if s.data_movimento:
-                            recent_dates.append(s.data_movimento)
-                    for d in recent_dispenses:
-                        if d.timestamp_registro:
-                            recent_dates.append(d.timestamp_registro.date())
-                    if recent_dates:
-                        max_d = max(recent_dates)
-                        data_alvo = str(max_d)
+                    open_shifts = [s for s in recent_shifts if not s.fechado and s.data_movimento]
+                    if open_shifts:
+                        latest_open = max(
+                            open_shifts,
+                            key=lambda s: (s.data_movimento, str(s.caixa_id or "")),
+                        )
+                        data_alvo = str(latest_open.data_movimento)
+                        abertura_str = (
+                            latest_open.timestamp_abertura.strftime("%d/%m/%Y %H:%M")
+                            if latest_open.timestamp_abertura
+                            else latest_open.data_movimento.strftime("%d/%m/%Y")
+                        )
                         aviso_data = (
-                            f"Nenhum fechamento registrado para hoje ({hoje_date}). "
-                            f"Exibindo auditoria da data mais recente com movimentação: {data_alvo}."
+                            f"Sem movimentação registrada hoje ({hoje_date.strftime('%d/%m/%Y')}). "
+                            f"Exibindo o turno em aberto mais recente do PDV "
+                            f"(Caixa {latest_open.caixa_id} · PDV {latest_open.pdv} · aberto em {abertura_str})."
                         )
                     else:
-                        data_alvo = str(hoje_date)
+                        recent_dispenses = self.erp_adapter.get_pump_dispenses(limit=10)
+                        recent_dates = []
+                        for s in recent_shifts:
+                            if s.data_movimento:
+                                recent_dates.append(s.data_movimento)
+                        for d in recent_dispenses:
+                            if d.timestamp_registro:
+                                recent_dates.append(d.timestamp_registro.date())
+                        if recent_dates:
+                            max_d = max(recent_dates)
+                            data_alvo = str(max_d)
+                            aviso_data = (
+                                f"Nenhum fechamento registrado para hoje ({hoje_date}). "
+                                f"Exibindo auditoria da data mais recente com movimentação: {data_alvo}."
+                            )
+                        else:
+                            data_alvo = str(hoje_date)
             elif data_param == "ontem":
                 data_alvo = str(hoje_date - timedelta(days=1))
             elif data_param == "anteontem":
@@ -4268,8 +4286,92 @@ class PostoTools:
                 )
 
             exp_bico_alert = f"Alerta de filtro obstruído em {len(bicos_com_alerta)} bico(s). " if bicos_com_alerta else "Vazão hidráulica em níveis adequados. "
-            exp_lider = f"Líder em faturamento: {campeao_faturamento['nome']} (R$ {campeao_faturamento['faturamento_reais']:.2f})." if campeao_faturamento else ""
-            explanation_piste_text = f"Pista com {tot_abast_count} abastecimento(s) auditado(s) totalizando R$ {tot_fat_pista:.2f}. {exp_bico_alert}{exp_lider}"
+            exp_lider = f"Líder em faturamento na pista: {campeao_faturamento['nome']} (R$ {campeao_faturamento['faturamento_reais']:.2f})." if campeao_faturamento else ""
+
+            # Consulta complementar via Clean-Room AUPS (pedido + funcionarios) para consolidar vendas no PDV/Loja
+            ranking_vendedores_pdv: List[Dict[str, Any]] = []
+            ranking_funcionarios_consolidado: List[Dict[str, Any]] = []
+            campeao_vendas_pdv: Optional[Dict[str, Any]] = None
+            try:
+                if hasattr(self.erp_adapter, "get_employee_sales_ranking"):
+                    ranking_vendedores_pdv = self.erp_adapter.get_employee_sales_ranking(
+                        target_date=data_filtro_db if data_alvo else None,
+                        limit=20,
+                    ) or []
+            except Exception as pdv_exc:
+                logger.debug("Consulta complementar ranking_vendedores_pdv falhou nao-bloqueante: %s", pdv_exc)
+
+            if ranking_vendedores_pdv:
+                campeao_vendas_pdv = ranking_vendedores_pdv[0]
+
+            # Consolidado ERP (PDV/Loja + Abastecimentos de Pista) por funcionario
+            cons_map: Dict[str, Dict[str, Any]] = {}
+            for pv in ranking_vendedores_pdv:
+                k_nome = pv["nome"].strip().upper()
+                cons_map[k_nome] = {
+                    "matricula": pv["matricula"],
+                    "nome": pv["nome"],
+                    "pedidos_pdv": pv["total_pedidos"],
+                    "faturamento_pdv_reais": pv["faturamento_reais"],
+                    "abastecimentos_pista": 0,
+                    "litros_pista": 0.0,
+                    "faturamento_pista_reais": 0.0,
+                    "faturamento_total_reais": pv["faturamento_reais"],
+                }
+            for fr in ranking_frentistas:
+                if not fr.get("identificado"):
+                    continue
+                k_nome = str(fr.get("nome") or "").strip().upper()
+                if not k_nome:
+                    continue
+                if k_nome not in cons_map:
+                    cons_map[k_nome] = {
+                        "matricula": fr.get("matricula", ""),
+                        "nome": fr["nome"],
+                        "pedidos_pdv": 0,
+                        "faturamento_pdv_reais": 0.0,
+                        "abastecimentos_pista": 0,
+                        "litros_pista": 0.0,
+                        "faturamento_pista_reais": 0.0,
+                        "faturamento_total_reais": 0.0,
+                    }
+                cons_map[k_nome]["abastecimentos_pista"] += int(fr.get("total_abastecimentos") or 0)
+                cons_map[k_nome]["litros_pista"] = round(
+                    cons_map[k_nome]["litros_pista"] + float(fr.get("total_litros") or 0.0), 3
+                )
+                cons_map[k_nome]["faturamento_pista_reais"] = round(
+                    cons_map[k_nome]["faturamento_pista_reais"] + float(fr.get("faturamento_reais") or 0.0), 2
+                )
+                cons_map[k_nome]["faturamento_total_reais"] = round(
+                    cons_map[k_nome]["faturamento_pdv_reais"] + cons_map[k_nome]["faturamento_pista_reais"], 2
+                )
+
+            ranking_funcionarios_consolidado = sorted(
+                cons_map.values(),
+                key=lambda item: (item["faturamento_total_reais"], item["litros_pista"]),
+                reverse=True,
+            )
+            exp_pdv = (
+                f" Líder de vendas no PDV/ERP: {campeao_vendas_pdv['nome']} "
+                f"({campeao_vendas_pdv['total_pedidos']} pedidos, R$ {campeao_vendas_pdv['faturamento_reais']:.2f})."
+                if campeao_vendas_pdv else ""
+            )
+            periodo_datas_all = []
+            if stats_base and stats_base.get("min_data"):
+                periodo_datas_all.append(str(stats_base["min_data"]))
+            if stats_base and stats_base.get("max_data"):
+                periodo_datas_all.append(str(stats_base["max_data"]))
+            for pv in ranking_vendedores_pdv:
+                if pv.get("primeira_data"):
+                    periodo_datas_all.append(str(pv["primeira_data"]))
+                if pv.get("ultima_data"):
+                    periodo_datas_all.append(str(pv["ultima_data"]))
+            exp_periodo = ""
+            if periodo_datas_all:
+                dt_min_exp = min(periodo_datas_all)
+                dt_max_exp = max(periodo_datas_all)
+                exp_periodo = f" Período real dos registros no ERP: {dt_min_exp} a {dt_max_exp}."
+            explanation_piste_text = f"Pista com {tot_abast_count} abastecimento(s) auditado(s) totalizando R$ {tot_fat_pista:.2f}. {exp_bico_alert}{exp_lider}{exp_pdv}{exp_periodo}"
 
             resp_id_piste = f"pump-perf-{str(data_filtro_db or 'all').replace('-', '')}"
             contrato_pista = PumpPerformanceContract(
@@ -4366,9 +4468,13 @@ class PostoTools:
                         "faturamento_reais": maior_ticket_medio['faturamento_reais']
                     } if maior_ticket_medio else None,
                     "bicos_com_alerta_filtro": len(bicos_com_alerta),
-                    "total_anomalias_detectadas": len(anomalias)
+                    "total_anomalias_detectadas": len(anomalias),
+                    "campeao_vendas_pdv": campeao_vendas_pdv,
+                    "campeao_geral_erp": ranking_funcionarios_consolidado[0] if ranking_funcionarios_consolidado else None,
                 },
                 "ranking_frentistas": ranking_frentistas,
+                "ranking_vendedores_pdv": ranking_vendedores_pdv,
+                "ranking_funcionarios_consolidado": ranking_funcionarios_consolidado,
                 "auditoria_vazao_bicos": bicos_auditoria,
                 "anomalias_detectadas": anomalias,
                 "recomendacoes_operacionais": recomendacoes
@@ -8910,17 +9016,29 @@ class PostoTools:
                     except Exception:
                         pass
 
-        # Se nenhum bloco valido foi fornecido, sintetiza blocos modulares dinamicamente
+        # Se nenhum bloco valido foi fornecido, sintetiza blocos modulares com dados reais do ERP/ANP
         if not parsed_blocks:
-            fat_total = 14850.0
-            volume_total = 2850.0
-            margem_pct = 14.2
-            diff_caixa = 0.0
+            fat_total: float | None = None
+            volume_total: float | None = None
+            margem_pct: float | None = None
+            diff_caixa: float | None = None
+            top_itens_erp: list[dict[str, Any]] = []
             try:
                 dados_vendas = self.consultar_analise_vendas_erp(tipo="mais_vendidos")
                 if isinstance(dados_vendas, dict):
                     resumo_v = dados_vendas.get("resumo_geral") or {}
-                    fat_total = float(resumo_v.get("faturamento_total") or fat_total)
+                    raw_fat = resumo_v.get("faturamento_total") or dados_vendas.get("faturamento_total")
+                    if raw_fat is not None:
+                        fat_total = float(raw_fat)
+                    raw_vol = resumo_v.get("volume_total") or resumo_v.get("quantidade_total")
+                    if raw_vol is not None:
+                        volume_total = float(raw_vol)
+                    raw_marg = resumo_v.get("margem_media_pct") or resumo_v.get("margem_pct")
+                    if raw_marg is not None:
+                        margem_pct = float(raw_marg)
+                    itens = dados_vendas.get("top_produtos") or dados_vendas.get("produtos") or []
+                    if isinstance(itens, list):
+                        top_itens_erp = [it for it in itens[:5] if isinstance(it, dict)]
             except Exception:
                 pass
 
@@ -8928,48 +9046,59 @@ class PostoTools:
                 dados_turno = self.auditar_fechamento_turno()
                 if isinstance(dados_turno, dict):
                     metr_t = dados_turno.get("metrics") or {}
-                    diff_caixa = float(metr_t.get("diferenca_total_reais") or 0.0)
+                    if metr_t.get("diferenca_total_reais") is not None:
+                        diff_caixa = float(metr_t.get("diferenca_total_reais"))
             except Exception:
                 pass
 
-            # Bloco 1: kpi_grid
+            def _fmt_brl(val: float | None) -> str:
+                if val is None:
+                    return "N/D (sem registro)"
+                return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+            # Bloco 1: kpi_grid (100% real, sem constantes sinteticas)
+            diff_abs = abs(diff_caixa) if diff_caixa is not None else 0.0
             parsed_blocks.append(
                 LegoBlock(
                     block_id="block_kpis_executivos",
                     block_type="kpi_grid",
-                    title="Indicadores Operacionais Consolidados",
-                    subtitle="Monitoramento em tempo real da pista e conveniencia",
+                    title="Indicadores Operacionais Consolidados (ERP Real)",
+                    subtitle="Dados apurados diretamente no PostgreSQL local",
                     kpis=[
                         LegoKpiItem(
-                            label="Faturamento do Dia",
-                            value=f"R$ {fat_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
-                            delta="+4.8%",
-                            trend="up",
-                            status="success",
-                            subtext="Meta: R$ 14.000,00",
+                            label="Faturamento Consolidado",
+                            value=_fmt_brl(fat_total),
+                            delta="ERP Local" if fat_total is not None else "Indisponivel",
+                            trend="up" if (fat_total or 0.0) > 0 else "neutral",
+                            status="success" if fat_total is not None else "neutral",
+                            subtext="Base de vendas fiscais ERP",
                         ),
                         LegoKpiItem(
-                            label="Volume Vendido",
-                            value=f"{volume_total:,.0f} L".replace(",", "."),
-                            delta="+2.1%",
-                            trend="up",
-                            status="success",
-                            subtext="Combustiveis totais",
+                            label="Volume / Itens",
+                            value=f"{volume_total:,.0f}".replace(",", ".") if volume_total is not None else "N/D",
+                            delta="ERP Local" if volume_total is not None else "Indisponivel",
+                            trend="neutral",
+                            status="success" if volume_total is not None else "neutral",
+                            subtext="Movimentacao apurada",
                         ),
                         LegoKpiItem(
                             label="Margem Media",
-                            value=f"{margem_pct:.1f}%",
-                            delta="-0.8 pp",
-                            trend="down",
-                            status="warning",
-                            subtext="Meta diretoria: 15.0%",
+                            value=f"{margem_pct:.1f}%" if margem_pct is not None else "N/D",
+                            delta="Calculo ERP" if margem_pct is not None else "Sem custo cadastrado",
+                            trend="neutral",
+                            status="info" if margem_pct is not None else "neutral",
+                            subtext="Sem estimativa sintetica",
                         ),
                         LegoKpiItem(
                             label="Quebra de Caixa",
-                            value=f"R$ {abs(diff_caixa):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
-                            delta=f"{'+' if diff_caixa >= 0 else '-'} R$ {abs(diff_caixa):.2f}",
-                            trend="neutral" if abs(diff_caixa) < 10 else "down",
-                            status="success" if abs(diff_caixa) < 10 else "danger",
+                            value=_fmt_brl(diff_abs) if diff_caixa is not None else "N/D",
+                            delta=(
+                                f"{'+' if diff_caixa >= 0 else '-'} R$ {diff_abs:.2f}"
+                                if diff_caixa is not None
+                                else "Sem turno fechado"
+                            ),
+                            trend="neutral" if diff_abs < 10 else "down",
+                            status="success" if diff_abs < 10 else "danger",
                             subtext="Tolerancia: R$ 50,00",
                         ),
                     ],
@@ -8981,91 +9110,77 @@ class PostoTools:
                 LegoBlock(
                     block_id="block_alerta_operacional",
                     block_type="alert_callout",
-                    title="Alerta de Monitoramento Ativo",
+                    title="Status de Auditoria Operacional",
                     alert=LegoAlertItem(
-                        severity="warning" if abs(diff_caixa) >= 10 else "info",
-                        title="Atencao a Sangria e Estoque" if abs(diff_caixa) >= 10 else "Operacao Estavel",
+                        severity="warning" if diff_abs >= 10 else "info",
+                        title="Atencao a Divergencia de Caixa" if diff_abs >= 10 else "Operacao Monitorada no ERP",
                         message=(
-                            f"Identificada divergencia de R$ {abs(diff_caixa):.2f} no caixa e tanques operando em nivel normal."
-                            if abs(diff_caixa) >= 10
-                            else "Todos os bicos e tanques operando dentro dos parametros normativos do INMETRO e ANP."
+                            f"Identificada divergencia de R$ {diff_abs:.2f} na auditoria de fechamento de turno no ERP."
+                            if diff_abs >= 10
+                            else "Auditoria conectada ao banco local sem divergencias criticas de caixa registradas."
                         ),
                         action_label="Auditar Detalhes",
                     ),
                 )
             )
 
-            # Bloco 3: comparison_table
-            parsed_blocks.append(
-                LegoBlock(
-                    block_id="block_confronto_precos",
-                    block_type="comparison_table",
-                    title="Confronto de Precos vs Mercado Municipal",
-                    subtitle="Comparativo contra dados abertos da ANP na cidade",
-                    comparison_rows=[
-                        LegoComparisonRow(
-                            name="Gasolina Comum",
-                            primary_value="R$ 5,89",
-                            secondary_value="R$ 5,74",
-                            gap="+R$ 0,15",
-                            status="warning",
-                            observation="Acima da media municipal",
-                        ),
-                        LegoComparisonRow(
-                            name="Etanol Hidratado",
-                            primary_value="R$ 3,89",
-                            secondary_value="R$ 3,92",
-                            gap="-R$ 0,03",
-                            status="success",
-                            observation="Paridade competitiva em 66.0%",
-                        ),
-                        LegoComparisonRow(
-                            name="Diesel S-10",
-                            primary_value="R$ 5,99",
-                            secondary_value="R$ 5,98",
-                            gap="+R$ 0,01",
-                            status="neutral",
-                            observation="Alinhado com a media local",
-                        ),
-                    ],
-                )
-            )
+            # Bloco 3: comparison_table (ANP real)
+            anp_rows: list[LegoComparisonRow] = []
+            try:
+                bench = self.comparar_benchmark_concorrencia(produto="GASOLINA COMUM")
+                if isinstance(bench, dict):
+                    for m in (bench.get("metricas") or [])[:4]:
+                        if isinstance(m, dict) and m.get("indicador"):
+                            anp_rows.append(
+                                LegoComparisonRow(
+                                    name=str(m.get("indicador")),
+                                    primary_value=str(m.get("valor_filial") or "N/D"),
+                                    secondary_value=str(m.get("valor_mercado") or "N/D"),
+                                    gap=str(m.get("gap") or "0"),
+                                    status=str(m.get("status") or "neutral"),
+                                    observation=str(m.get("observacao") or "Fonte ANP / ERP local"),
+                                )
+                            )
+            except Exception:
+                pass
 
-            # Bloco 4: ranking_list
-            parsed_blocks.append(
-                LegoBlock(
-                    block_id="block_ranking_produtos",
-                    block_type="ranking_list",
-                    title="Top Produtos por Giro",
-                    subtitle="Participacao nas vendas fiscais do turno",
-                    ranking_items=[
-                        LegoRankingItem(
-                            rank=1,
-                            title="Gasolina Comum",
-                            subtitle="Tanque 01: Bicos 01 a 04",
-                            value="R$ 8.420,00",
-                            tag="Lider Giro",
-                            status="success",
-                        ),
-                        LegoRankingItem(
-                            rank=2,
-                            title="Diesel S-10",
-                            subtitle="Tanque 03: Bicos 07 e 08",
-                            value="R$ 4.150,00",
-                            tag="Frotas",
-                            status="neutral",
-                        ),
-                        LegoRankingItem(
-                            rank=3,
-                            title="Etanol Hidratado",
-                            subtitle="Tanque 02: Bicos 05 e 06",
-                            value="R$ 2.280,00",
-                            tag="Varejo",
-                            status="neutral",
-                        ),
-                    ],
+            if anp_rows:
+                parsed_blocks.append(
+                    LegoBlock(
+                        block_id="block_confronto_precos",
+                        block_type="comparison_table",
+                        title="Confronto de Precos vs Mercado Municipal (ANP)",
+                        subtitle="Comparativo real contra base ANP sincronizada",
+                        comparison_rows=anp_rows,
+                    )
                 )
-            )
+
+            # Bloco 4: ranking_list (top produtos reais do ERP)
+            ranking_items: list[LegoRankingItem] = []
+            for idx, item in enumerate(top_itens_erp[:5], start=1):
+                nome_it = str(item.get("nompro") or item.get("descricao") or item.get("produto") or f"Item {idx}")
+                val_it = item.get("faturamento") or item.get("valor_total") or item.get("total")
+                qtd_it = item.get("quantidade") or item.get("qtd")
+                ranking_items.append(
+                    LegoRankingItem(
+                        rank=idx,
+                        title=nome_it,
+                        subtitle=f"Qtd: {qtd_it}" if qtd_it is not None else "ERP local",
+                        value=_fmt_brl(float(val_it)) if val_it is not None else "N/D",
+                        tag="ERP Real",
+                        status="success" if idx == 1 else "neutral",
+                    )
+                )
+            if ranking_items:
+                parsed_blocks.append(
+                    LegoBlock(
+                        block_id="block_ranking_produtos",
+                        block_type="ranking_list",
+                        title="Top Produtos por Giro (ERP)",
+                        subtitle="Participacao apurada nas vendas fiscais reais",
+                        ranking_items=ranking_items,
+                    )
+                )
 
             # Bloco 5: timeline_feed
             parsed_blocks.append(

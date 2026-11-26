@@ -17,6 +17,7 @@ import sys
 import time
 import logging
 import threading
+from contextlib import suppress
 from typing import Dict, List, Tuple, Optional, Any
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -694,7 +695,8 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
 
     # -1.87 Diagnostico Executivo de ROI e Perdas (90 Dias)
     if re.search(r"\b(?:roi|diagnostico\s+de\s+roi|diagnostico\s+executivo|perdas\s+operacionais|quanto\s+(?:o\s+posto\s+)?est[a?]\s+perdendo|quanto\s+estou\s+perdendo|projecao\s+de\s+roi|retorno\s+em\s+90\s+dias|garantia\s+de\s+3x|garantia\s+3x|recuperar\s+perdas|recuperacao\s+de\s+perdas)\b", p):
-        return "roi_diagnostic"
+        if "turno" not in p or "roi" in p:
+            return "roi_diagnostic"
 
     # -1.86 Radar de Anomalias de PDV & Caixa (Z-Score)
     if re.search(r"\b(?:radar\s+de\s+anomalias|anomalias\s+de\s+pdv|anomalias\s+no\s+pdv|z-score|zscore|cancelamentos?\s+por\s+operador(?:es)?|operador(?:es)?\s+com\s+cancelamentos?|auditoria\s+de\s+cancelamentos?|art\s*462|artigo\s+462\s+clt|quebra\s+de\s+caixa\s+clt)\b", p):
@@ -1006,9 +1008,17 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
             "bateu", "caixa", "bomba", "bico", "sobra", "sobro", "sobrou", "falta", "faltou", "troco",
             "1º", "2º", "3º", "1o", "2o", "3o", "1", "2", "3",
             "primeiro", "segundo", "terceiro", "manhã", "manha", "tarde", "noite", "madrugada", "teve", "houve",
-            "pista", "pdv", "operador", "diferença", "diferenca", "diferenças", "diferencas", "sangria"
+            "pista", "pdv", "operador", "diferença", "diferenca", "diferenças", "diferencas", "sangria",
+            "executiva", "executivo", "consulta", "consultar", "relatorio", "relatório",
+            "diagnostico", "diagnóstico", "panorama", "status", "movimento", "movimentacao", "movimentação",
+            "geral", "detalhe", "detalhar", "situacao", "situação", "atual", "agora", "aberto", "aberta", "andamento"
         ]):
             return "auditoria_turno"
+
+    if "caixa" in p and any(w in p for w in ["aberto", "aberta", "em aberto", "atual", "agora", "em andamento", "movimentacao", "movimentação"]) and not any(
+        w in p for w in ["pix", "cartao", "cartão", "debito", "débito", "credito", "crédito", "dinheiro", "forma de pagamento", "formas de pagamento"]
+    ):
+        return "auditoria_turno"
 
     # 1. Previsão de Esgotamento de Combustível (Run-Out Forecast) & Sugestão de Pedidos
     termos_previsao_exatos = [
@@ -1141,6 +1151,21 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
         return "desempenho_pista_frentistas"
 
     if "frentista" in p or "frentistas" in p:
+        return "desempenho_pista_frentistas"
+
+    tem_pessoa_equipe = any(w in p for w in [
+        "funcionario", "funcionário", "funcionarios", "funcionários",
+        "colaborador", "colaboradores", "vendedor", "vendedores",
+        "operador", "operadores", "atendente", "atendentes", "equipe", "time",
+    ])
+    tem_metrica_venda_equipe = any(w in p for w in [
+        "vendeu", "vendas", "venda", "faturou", "faturamento", "ranking",
+        "desempenho", "produtividade", "campeao", "campeão", "lider", "líder",
+        "melhor", "top", "mais", "litros", "conversao", "conversão",
+    ])
+    if tem_pessoa_equipe and tem_metrica_venda_equipe and not any(
+        w in p for w in ["fechamento", "quebra", "furo", "sangria", "conciliacao", "conciliação"]
+    ):
         return "desempenho_pista_frentistas"
 
     if any(w in p for w in ["bico", "bicos", "bomba", "bombas"]) and any(w in p for w in ["vazão", "vazao", "filtro", "lenta", "lento", "lerdo", "lerda", "sujo", "suja", "problema", "obstruído", "obstruido", "baixa", "baixo"]):
@@ -1730,21 +1755,55 @@ class SemanticRouter:
                 emb_latency_ms = (time.perf_counter() - t_emb) * 1000
 
             t_pg = time.perf_counter()
-            sql = """
-                SELECT 
-                    intencao, 
-                    exemplo_frase, 
-                    descricao,
-                    1 - (embedding <=> %s::halfvec) AS similarity
-                FROM intencoes_vetores
-                WHERE embedding IS NOT NULL
-                  AND (pack_id = 'global' OR pack_id = %s)
-                ORDER BY embedding <=> %s::halfvec
-                LIMIT 1;
-            """
             vec_str = str(emb_gerado)
             with self._get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(sql, (vec_str, active_pack_id, vec_str))
+                has_pack_col = getattr(self, "_intencoes_has_pack_id", None)
+                if has_pack_col is None:
+                    try:
+                        cur.execute(
+                            """
+                            SELECT 1
+                            FROM information_schema.columns
+                            WHERE table_name = 'intencoes_vetores'
+                              AND column_name = 'pack_id'
+                              AND table_schema = ANY(current_schemas(false))
+                            LIMIT 1;
+                            """
+                        )
+                        has_pack_col = cur.fetchone() is not None
+                    except Exception:
+                        with suppress(Exception):
+                            conn.rollback()
+                        has_pack_col = True
+                    self._intencoes_has_pack_id = has_pack_col
+
+                if has_pack_col:
+                    sql = """
+                        SELECT 
+                            intencao, 
+                            exemplo_frase, 
+                            descricao,
+                            1 - (embedding <=> %s::halfvec) AS similarity
+                        FROM intencoes_vetores
+                        WHERE embedding IS NOT NULL
+                          AND (pack_id = 'global' OR pack_id = %s)
+                        ORDER BY embedding <=> %s::halfvec
+                        LIMIT 1;
+                    """
+                    cur.execute(sql, (vec_str, active_pack_id, vec_str))
+                else:
+                    sql = """
+                        SELECT 
+                            intencao, 
+                            exemplo_frase, 
+                            descricao,
+                            1 - (embedding <=> %s::halfvec) AS similarity
+                        FROM intencoes_vetores
+                        WHERE embedding IS NOT NULL
+                        ORDER BY embedding <=> %s::halfvec
+                        LIMIT 1;
+                    """
+                    cur.execute(sql, (vec_str, vec_str))
                 melhor_match = cur.fetchone()
 
             pg_latency_ms = (time.perf_counter() - t_pg) * 1000

@@ -2,14 +2,30 @@ package com.example.aurapostoassitance.data.local.memory
 
 import android.content.Context
 import com.example.aurapostoassitance.data.npu.AuraNpuEngine
+import com.example.aurapostoassitance.data.npu.LiteRtNpuRuntime
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
+import java.io.DataInputStream
+import java.io.DataOutputStream
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.util.UUID
+import java.util.concurrent.locks.ReentrantReadWriteLock
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.concurrent.read
+import kotlin.concurrent.write
 
 @Serializable
 data class SerializedMemoryItem(
@@ -39,32 +55,54 @@ data class AuraMemoryMatch(
 )
 
 /**
- * Cofre de Memória Semântica Vetorial On-Device (RAG Local na NPU).
- * Indexa decisões executivas, auditorias, documentos e insights com embeddings de 128d,
- * permitindo busca contextual instantânea (< 2ms) sem necessidade de rede.
+ * Cofre de Memória Semântica Vetorial On-Device 2.0 (RAG Local na NPU).
+ * - Persistência binária compacta (IEEE-754 packed floats) com escrita assíncrona debounced e atômica.
+ * - Matriz vetorial contígua em RAM (cache-friendly) com proteção thread-safe via ReentrantReadWriteLock.
+ * - Zero I/O na Main Thread e isolamento multi-domínio por segment/pack_id.
  */
 @Singleton
-class AuraSemanticMemoryVault @Inject constructor(
-    @param:ApplicationContext private val context: Context,
-    private val npuEngine: AuraNpuEngine
+class AuraSemanticMemoryVault internal constructor(
+    private val storageDir: File,
+    private val npuEngine: AuraNpuEngine,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val saveDebounceMs: Long = 400L
 ) {
+    @Inject
+    constructor(
+        @ApplicationContext context: Context,
+        npuEngine: AuraNpuEngine
+    ) : this(context.filesDir, npuEngine, Dispatchers.IO, 400L)
 
-    private val json = Json { ignoreUnknownKeys = true; prettyPrint = false }
-    private val memoryFile: File by lazy { File(context.filesDir, "aura_semantic_memories_v1.json") }
-    private val inMemoryVault = mutableListOf<AuraMemoryItem>()
+    companion object {
+        private const val BINARY_MAGIC = 0x41555241 // "AURA"
+        private const val BINARY_VERSION = 2
+        private const val MAX_MEMORIES = 500
+        private const val EMBEDDING_DIM = LiteRtNpuRuntime.EMBEDDING_DIM
+    }
+
+    private val vaultScope = CoroutineScope(SupervisorJob() + ioDispatcher)
+    private val rwLock = ReentrantReadWriteLock()
+    private val legacyJson = Json { ignoreUnknownKeys = true; prettyPrint = false }
+
+    private val binaryFile: File by lazy { File(storageDir, "aura_semantic_memories_v2.bin") }
+    private val legacyJsonFile: File by lazy { File(storageDir, "aura_semantic_memories_v1.json") }
+
+    private val inMemoryVault = ArrayList<AuraMemoryItem>(64)
+    private var contiguousMatrix = FloatArray(0)
+
+    @Volatile
+    private var pendingSaveJob: Job? = null
 
     init {
-        loadFromDisk()
-        if (inMemoryVault.isEmpty()) {
-            seedDefaultMemories()
-            saveToDisk()
+        vaultScope.launch {
+            loadFromDiskInternal()
         }
     }
 
     /**
-     * Indexa uma nova memória episódica calculando o embedding na NPU em < 0.5ms.
+     * Indexa uma nova memória episódica calculando o embedding via AuraNpuEngine
+     * e agendando persistência binária assíncrona em background.
      */
-    @Synchronized
     fun indexMemory(
         category: String,
         title: String,
@@ -81,17 +119,20 @@ class AuraSemanticMemoryVault @Inject constructor(
             embedding = vector,
             timestamp = System.currentTimeMillis()
         )
-        inMemoryVault.add(0, item)
-        // Mantém cofre compacto limitado às últimas 500 memórias
-        if (inMemoryVault.size > 500) {
-            inMemoryVault.removeAt(inMemoryVault.lastIndex)
+        rwLock.write {
+            inMemoryVault.add(0, item)
+            if (inMemoryVault.size > MAX_MEMORIES) {
+                inMemoryVault.removeAt(inMemoryVault.lastIndex)
+            }
+            rebuildContiguousMatrixLocked()
         }
-        saveToDisk()
+        scheduleSaveToDisk()
         return item
     }
 
     /**
-     * Busca as memórias semanticamente mais similares à consulta do executivo (< 2ms).
+     * Busca as memórias semanticamente mais similares usando produto escalar sobre matriz contígua.
+     * Thread-safe para execução concorrente em Dispatchers.Default.
      */
     fun searchMemories(
         query: String,
@@ -101,82 +142,165 @@ class AuraSemanticMemoryVault @Inject constructor(
     ): List<AuraMemoryMatch> {
         val startNano = System.nanoTime()
         val queryEmbedding = npuEngine.computeDenseEmbedding(query)
+        if (queryEmbedding.size != EMBEDDING_DIM) return emptyList()
 
-        val candidateList = if (segment != null) {
-            inMemoryVault.filter { it.segment.equals(segment, ignoreCase = true) || it.segment == "universal" }
-        } else {
-            inMemoryVault
+        return rwLock.read {
+            val count = inMemoryVault.size
+            if (count == 0) return@read emptyList()
+
+            val matrix = contiguousMatrix
+            val scored = ArrayList<AuraMemoryMatch>(minOf(count, 16))
+            for (i in 0 until count) {
+                val item = inMemoryVault[i]
+                if (segment != null && !item.segment.equals(segment, ignoreCase = true) && item.segment != "universal") {
+                    continue
+                }
+                val offset = i * EMBEDDING_DIM
+                var dot = 0.0f
+                for (d in 0 until EMBEDDING_DIM) {
+                    dot += queryEmbedding[d] * matrix[offset + d]
+                }
+                val sim = dot.coerceIn(-1.0f, 1.0f)
+                if (sim >= minSimilarity) {
+                    scored.add(
+                        AuraMemoryMatch(
+                            item = item,
+                            similarity = sim,
+                            latencyMs = ((System.nanoTime() - startNano) / 1_000_000f).coerceAtLeast(0.05f)
+                        )
+                    )
+                }
+            }
+            scored.sortByDescending { it.similarity }
+            if (scored.size > topK) scored.subList(0, topK).toList() else scored
         }
-
-        val matches = candidateList.map { item ->
-            val sim = npuEngine.cosineSimilarity(queryEmbedding, item.embedding)
-            AuraMemoryMatch(
-                item = item,
-                similarity = sim,
-                latencyMs = ((System.nanoTime() - startNano) / 1_000_000f)
-            )
-        }
-            .filter { it.similarity >= minSimilarity }
-            .sortedByDescending { it.similarity }
-            .take(topK)
-
-        return matches
     }
 
     fun getAllMemories(segment: String? = null): List<AuraMemoryItem> {
-        return if (segment != null) {
-            inMemoryVault.filter { it.segment.equals(segment, ignoreCase = true) || it.segment == "universal" }
-        } else {
-            inMemoryVault.toList()
+        return rwLock.read {
+            if (segment != null) {
+                inMemoryVault.filter { it.segment.equals(segment, ignoreCase = true) || it.segment == "universal" }
+            } else {
+                inMemoryVault.toList()
+            }
         }
     }
 
-    @Synchronized
-    private fun saveToDisk() {
-        try {
-            val list = inMemoryVault.map {
-                SerializedMemoryItem(
-                    id = it.id,
-                    segment = it.segment,
-                    category = it.category,
-                    title = it.title,
-                    content = it.content,
-                    embeddingCsv = it.embedding.joinToString(","),
-                    timestamp = it.timestamp
-                )
+    private fun rebuildContiguousMatrixLocked() {
+        val count = inMemoryVault.size
+        val matrix = FloatArray(count * EMBEDDING_DIM)
+        for (i in 0 until count) {
+            val emb = inMemoryVault[i].embedding
+            if (emb.size == EMBEDDING_DIM) {
+                System.arraycopy(emb, 0, matrix, i * EMBEDDING_DIM, EMBEDDING_DIM)
             }
-            memoryFile.writeText(json.encodeToString(list))
-        } catch (_: Exception) {}
+        }
+        contiguousMatrix = matrix
     }
 
-    @Synchronized
-    private fun loadFromDisk() {
+    private fun scheduleSaveToDisk() {
+        pendingSaveJob?.cancel()
+        pendingSaveJob = vaultScope.launch {
+            if (saveDebounceMs > 0L) delay(saveDebounceMs)
+            flushToDiskNow()
+        }
+    }
+
+    internal fun flushToDiskNow() {
+        val snapshot = rwLock.read { inMemoryVault.toList() }
         try {
-            if (memoryFile.exists()) {
-                val raw = memoryFile.readText()
-                val list = json.decodeFromString<List<SerializedMemoryItem>>(raw)
-                inMemoryVault.clear()
-                list.forEach { s ->
-                    val floats = s.embeddingCsv.split(",").mapNotNull { it.toFloatOrNull() }.toFloatArray()
-                    if (floats.size == 128) {
-                        inMemoryVault.add(
-                            AuraMemoryItem(
-                                id = s.id,
-                                segment = s.segment,
-                                category = s.category,
-                                title = s.title,
-                                content = s.content,
-                                embedding = floats,
-                                timestamp = s.timestamp
-                            )
-                        )
+            if (!storageDir.exists()) storageDir.mkdirs()
+            val tmpFile = File(storageDir, "${binaryFile.name}.tmp")
+            DataOutputStream(BufferedOutputStream(FileOutputStream(tmpFile))).use { out ->
+                out.writeInt(BINARY_MAGIC)
+                out.writeInt(BINARY_VERSION)
+                out.writeInt(EMBEDDING_DIM)
+                out.writeInt(snapshot.size)
+                for (item in snapshot) {
+                    out.writeUTF(item.id)
+                    out.writeUTF(item.segment)
+                    out.writeUTF(item.category)
+                    out.writeUTF(item.title)
+                    out.writeUTF(item.content)
+                    out.writeLong(item.timestamp)
+                    val vec = item.embedding
+                    for (d in 0 until EMBEDDING_DIM) {
+                        out.writeFloat(if (d < vec.size) vec[d] else 0f)
                     }
                 }
             }
-        } catch (_: Exception) {}
+            if (binaryFile.exists()) binaryFile.delete()
+            if (!tmpFile.renameTo(binaryFile)) {
+                tmpFile.copyTo(binaryFile, overwrite = true)
+                tmpFile.delete()
+            }
+        } catch (_: Exception) {
+        }
     }
 
-    private fun seedDefaultMemories() {
+    internal fun loadFromDiskInternal() {
+        val loaded = loadBinaryFile() ?: migrateLegacyJsonFile()
+        rwLock.write {
+            inMemoryVault.clear()
+            if (loaded != null && loaded.isNotEmpty()) {
+                inMemoryVault.addAll(loaded.take(MAX_MEMORIES))
+            } else {
+                seedDefaultMemoriesLocked()
+            }
+            rebuildContiguousMatrixLocked()
+        }
+        if (loaded == null || !binaryFile.exists()) {
+            flushToDiskNow()
+        }
+    }
+
+    private fun loadBinaryFile(): List<AuraMemoryItem>? {
+        if (!binaryFile.exists() || binaryFile.length() == 0L) return null
+        return runCatching {
+            DataInputStream(BufferedInputStream(FileInputStream(binaryFile))).use { inp ->
+                val magic = inp.readInt()
+                val version = inp.readInt()
+                val dim = inp.readInt()
+                if (magic != BINARY_MAGIC || version != BINARY_VERSION || dim != EMBEDDING_DIM) {
+                    return null
+                }
+                val count = inp.readInt().coerceIn(0, MAX_MEMORIES)
+                val list = ArrayList<AuraMemoryItem>(count)
+                for (i in 0 until count) {
+                    val id = inp.readUTF()
+                    val segment = inp.readUTF()
+                    val category = inp.readUTF()
+                    val title = inp.readUTF()
+                    val content = inp.readUTF()
+                    val timestamp = inp.readLong()
+                    val vec = FloatArray(dim)
+                    for (d in 0 until dim) {
+                        vec[d] = inp.readFloat()
+                    }
+                    list.add(AuraMemoryItem(id, segment, category, title, content, vec, timestamp))
+                }
+                list
+            }
+        }.getOrNull()
+    }
+
+    private fun migrateLegacyJsonFile(): List<AuraMemoryItem>? {
+        if (!legacyJsonFile.exists()) return null
+        return runCatching {
+            val raw = legacyJsonFile.readText()
+            val list = legacyJson.decodeFromString<List<SerializedMemoryItem>>(raw)
+            list.mapNotNull { s ->
+                val floats = s.embeddingCsv.split(",").mapNotNull { it.toFloatOrNull() }.toFloatArray()
+                if (floats.size == EMBEDDING_DIM) {
+                    AuraMemoryItem(s.id, s.segment, s.category, s.title, s.content, floats, s.timestamp)
+                } else {
+                    null
+                }
+            }
+        }.getOrNull()
+    }
+
+    private fun seedDefaultMemoriesLocked() {
         val seeds = listOf(
             Triple(
                 "postos_redes",
@@ -201,10 +325,11 @@ class AuraSemanticMemoryVault @Inject constructor(
             Triple(
                 "universal",
                 "Assinatura Criptográfica de Alçada no Silício",
-                "Toda ordem executiva com impacto financeiro superior a R$ 5.000,00 requer biometria Class 3 e assinatura ECDSA no Qualcomm TEE do Snapdragon 7s Gen 2."
+                "Toda ordem executiva com impacto financeiro superior a R$ 5.000,00 requer biometria Class 3 e assinatura ECDSA no TEE/StrongBox do dispositivo."
             )
         )
 
+        val yesterday = System.currentTimeMillis() - 86_400_000L
         seeds.forEach { (seg, tit, cont) ->
             val vec = npuEngine.computeDenseEmbedding("$tit $cont")
             inMemoryVault.add(
@@ -215,7 +340,7 @@ class AuraSemanticMemoryVault @Inject constructor(
                     title = tit,
                     content = cont,
                     embedding = vec,
-                    timestamp = System.currentTimeMillis() - 86400000L
+                    timestamp = yesterday
                 )
             )
         }

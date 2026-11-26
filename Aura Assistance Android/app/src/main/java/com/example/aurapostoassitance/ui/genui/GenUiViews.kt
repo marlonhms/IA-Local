@@ -40,10 +40,14 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -75,11 +79,15 @@ import com.example.aurapostoassitance.ui.components.AuraGhostButton
 import com.example.aurapostoassitance.ui.components.AuraGradientButton
 import com.example.aurapostoassitance.ui.components.AuraPill
 import com.example.aurapostoassitance.ui.components.SectionLabel
+import com.example.aurapostoassitance.ui.components.ShimmerBox
 import com.example.aurapostoassitance.ui.components.StatusDot
 import com.example.aurapostoassitance.ui.components.statusColor
 import com.example.aurapostoassitance.ui.theme.AuraCyan
 import com.example.aurapostoassitance.ui.theme.AuraEmerald
+import com.example.aurapostoassitance.ui.theme.AuraPurple
+import com.example.aurapostoassitance.ui.theme.AuraTypographyExt
 import com.example.aurapostoassitance.ui.theme.AuroraBrush
+import com.example.aurapostoassitance.ui.theme.BorderHairline
 import com.example.aurapostoassitance.ui.theme.GlassBorderSoft
 import com.example.aurapostoassitance.ui.theme.GlassHighlight
 import com.example.aurapostoassitance.ui.theme.NewsreaderFamily
@@ -96,17 +104,73 @@ import com.example.aurapostoassitance.ui.theme.TextSecondary
 import kotlinx.coroutines.delay
 import kotlin.math.sin
 
-/** Card executivo nativo deluxe: cabecalho com glow, blocos empilhados com entrada escalonada e acoes HITL. */
+/** Slot geométrico estável Zero-CLS reservado ao receber SSE ui_skeleton antes de ui_complete. */
+@Composable
+fun GenUiSkeletonSlot(
+    title: String? = null,
+    modifier: Modifier = Modifier
+) {
+    AuraCard(
+        modifier = modifier.fillMaxWidth(),
+        accent = AuraCyan,
+        contentPadding = PaddingValues(16.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                StatusDot(color = AuraCyan, size = 7.dp, pulsing = true)
+                Text(
+                    text = title?.takeIf { it.isNotBlank() } ?: "Hidratando diagnóstico determinístico...",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextSecondary
+                )
+            }
+            ShimmerBox(
+                modifier = Modifier
+                    .fillMaxWidth(0.55f)
+                    .height(28.dp)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                ShimmerBox(modifier = Modifier.weight(1f).height(58.dp))
+                ShimmerBox(modifier = Modifier.weight(1f).height(58.dp))
+                ShimmerBox(modifier = Modifier.weight(1f).height(58.dp))
+            }
+            ShimmerBox(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(42.dp),
+                shape = RoundedCornerShape(14.dp)
+            )
+        }
+    }
+}
+
+/** Card executivo nativo deluxe: hierarquia 1-3-N, confirmação inline 2-passos e ações HITL. */
 @Composable
 fun GenUiCardView(
     card: GenUiCard,
     onAction: (GenUiAction) -> Unit,
     onDrillDown: (String) -> Unit = {},
+    companionText: String? = null,
     modifier: Modifier = Modifier
 ) {
-    var pending by remember { mutableStateOf<GenUiAction?>(null) }
+    var armedActionId by remember(card.title) { mutableStateOf<String?>(null) }
+    val haptic = LocalHapticFeedback.current
     val isCritical = card.severity.equals("critical", true) || card.severity.equals("danger", true)
     val accent = if (isCritical) StatusDanger else AuraCyan
+
+    // Desarma confirmação inline após 6 segundos para evitar acionamento acidental
+    LaunchedEffect(armedActionId) {
+        if (armedActionId != null) {
+            delay(6000L)
+            armedActionId = null
+        }
+    }
     val cardContextSummary = remember(card) {
         buildList {
             add(card.title)
@@ -141,7 +205,7 @@ fun GenUiCardView(
             verticalArrangement = Arrangement.spacedBy(14.dp),
             modifier = Modifier.padding(16.dp)
         ) {
-            CardHeader(card)
+            CardHeader(card, companionText = companionText)
 
             Box(
                 modifier = Modifier
@@ -166,77 +230,48 @@ fun GenUiCardView(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     card.actions.forEach { action ->
                         val primary = action.variant == "primary"
-                        val click = {
-                            val enriched = action.copy(
-                                contextSummary = action.contextSummary ?: cardContextSummary
-                            )
-                            if (enriched.isHandoffAction()) {
-                                onAction(enriched)
-                            } else if (enriched.requiresConfirmation) {
-                                pending = enriched
+                        val enriched = action.copy(
+                            contextSummary = action.contextSummary ?: cardContextSummary
+                        )
+                        val isArmed = armedActionId == action.actionId
+                        val formattedLabel = action.label.replace(" L)", "\u00A0L)")
+
+                        if (isArmed) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                AuraGhostButton(
+                                    text = "Cancelar",
+                                    onClick = { armedActionId = null },
+                                    modifier = Modifier.weight(0.85f),
+                                    tint = TextSecondary
+                                )
+                                AuraGradientButton(
+                                    text = "Confirmar TEE",
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        armedActionId = null
+                                        onAction(enriched)
+                                    },
+                                    modifier = Modifier.weight(1.35f)
+                                )
+                            }
+                        } else {
+                            val click = {
+                                if (enriched.isHandoffAction() || !enriched.requiresConfirmation) {
+                                    onAction(enriched)
+                                } else {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    armedActionId = action.actionId
+                                }
+                            }
+                            if (primary) {
+                                AuraGradientButton(formattedLabel, click, Modifier.fillMaxWidth())
                             } else {
-                                onAction(enriched)
+                                AuraGhostButton(formattedLabel, click, Modifier.fillMaxWidth())
                             }
                         }
-                        val formattedLabel = action.label.replace(" L)", "\u00A0L)")
-                        if (primary) {
-                            AuraGradientButton(formattedLabel, click, Modifier.fillMaxWidth())
-                        } else {
-                            AuraGhostButton(formattedLabel, click, Modifier.fillMaxWidth())
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    pending?.let { action ->
-        val haptic = LocalHapticFeedback.current
-        Dialog(onDismissRequest = { pending = null }) {
-            AuraCard(
-                shape = RoundedCornerShape(26.dp),
-                accent = AuraCyan,
-                glowActive = true,
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(22.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        StatusDot(color = AuraCyan, pulsing = true, size = 7.dp)
-                        SectionLabel("CONFIRMAÇÃO HITL")
-                    }
-                    Text(
-                        "Confirmar Ação",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = TextPrimary
-                    )
-                    Text(
-                        "Você está prestes a solicitar:\n\n${action.label}\n\nA AURA registrará esta solicitação para validação executiva na rede do posto.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        AuraGhostButton(
-                            text = "Cancelar",
-                            onClick = { pending = null },
-                            modifier = Modifier.weight(1f),
-                            tint = TextSecondary
-                        )
-                        AuraGradientButton(
-                            text = "Confirmar",
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                pending = null
-                                onAction(action)
-                            },
-                            modifier = Modifier.weight(1.2f)
-                        )
                     }
                 }
             }
@@ -245,7 +280,7 @@ fun GenUiCardView(
 }
 
 @Composable
-private fun CardHeader(card: GenUiCard) {
+private fun CardHeader(card: GenUiCard, companionText: String? = null) {
     val isCritical = card.severity.equals("critical", true) || card.severity.equals("danger", true)
     val isWarning = card.severity.equals("warning", true)
     val titleUpper = card.title.uppercase()
@@ -260,6 +295,16 @@ private fun CardHeader(card: GenUiCard) {
         isCritical -> StatusDanger
         isWarning -> StatusWarning
         else -> AuraCyan
+    }
+
+    // Quando ja existe texto narrativo acoplado acima do card, evita duplicar o paragrafo longo de diagnostico
+    val hasCompanionNarrative = !companionText.isNullOrBlank() && companionText.trim().length >= 30
+    val headerSummary = remember(card.diagnosis, card.subtitle, hasCompanionNarrative) {
+        if (hasCompanionNarrative) {
+            card.subtitle?.takeIf { it.isNotBlank() && it.length <= 120 }
+        } else {
+            (card.diagnosis ?: card.subtitle)?.takeIf { it.isNotBlank() }
+        }
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -283,7 +328,7 @@ private fun CardHeader(card: GenUiCard) {
             style = MaterialTheme.typography.headlineSmall.copy(lineHeight = 28.sp),
             color = TextPrimary
         )
-        (card.diagnosis ?: card.subtitle)?.let {
+        headerSummary?.let {
             Text(
                 text = it,
                 style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
@@ -316,6 +361,9 @@ private fun BlockView(block: GenUiBlock, onDrillDown: (String) -> Unit) {
         is GenUiBlock.AlertCallout -> AlertBlock(block.alert)
         is GenUiBlock.Tanks -> TanksBlock(block, onDrillDown)
         is GenUiBlock.Note -> NoteBlock(block)
+        is GenUiBlock.WhatIfSimulator -> WhatIfSimulatorBlock(block, onDrillDown)
+        is GenUiBlock.RealizedRoiScorecard -> RealizedRoiScorecardBlock(block)
+        is GenUiBlock.McpActionConfirmation -> McpActionConfirmationBlock(block)
     }
 }
 
@@ -328,12 +376,99 @@ private fun BlockTitle(title: String?, subtitle: String?) {
     }
 }
 
-// ---------------------------------------------------------------- KPIs
+// ---------------------------------------------------------------- KPIs (Hierarquia 1-3-N)
 
 @Composable
 private fun KpiGridBlock(block: GenUiBlock.KpiGrid, onDrillDown: (String) -> Unit) {
     Column {
         BlockTitle(block.title, block.subtitle)
+        if (block.kpis.size >= 3) {
+            val hero = block.kpis.first()
+            val supporting = block.kpis.drop(1).take(3)
+            val rest = block.kpis.drop(4)
+            HeroKpiTile(
+                kpi = hero,
+                onClick = {
+                    onDrillDown("Explique em detalhes o indicador '${hero.label}' (${hero.value}${hero.delta?.let { " com variação $it" } ?: ""}) e sugira ações operacionais.")
+                }
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(ObsidianLow)
+                    .border(1.dp, BorderHairline, RoundedCornerShape(14.dp))
+                    .padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                supporting.forEachIndexed { idx, kpi ->
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                onDrillDown("Detalhe o indicador '${kpi.label}' (${kpi.value}).")
+                            }
+                            .padding(horizontal = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            text = kpi.label,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            color = TextMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = kpi.value.replace(" L", "\u00A0L").replace(" h", "\u00A0h"),
+                            style = AuraTypographyExt.kpiCompact,
+                            color = TextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        kpi.delta?.let { d ->
+                            Text(
+                                text = d,
+                                style = AuraTypographyExt.monoAudit.copy(fontSize = 10.sp),
+                                color = statusColor(kpi.status),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    if (idx < supporting.lastIndex) {
+                        Box(
+                            modifier = Modifier
+                                .width(1.dp)
+                                .fillMaxHeight()
+                                .background(BorderHairline)
+                        )
+                    }
+                }
+            }
+            if (rest.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    rest.chunked(2).forEach { pair ->
+                        Row(
+                            Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            pair.forEach { kpi ->
+                                KpiTile(
+                                    kpi = kpi,
+                                    onClick = { onDrillDown("Explique o indicador '${kpi.label}' (${kpi.value}).") },
+                                    modifier = Modifier.weight(1f).fillMaxHeight()
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            return
+        }
+
         val rows = remember(block.kpis) {
             val result = mutableListOf<List<GenUiKpi>>()
             var pair = mutableListOf<GenUiKpi>()
@@ -392,6 +527,62 @@ private fun KpiGridBlock(block: GenUiBlock.KpiGrid, onDrillDown: (String) -> Uni
 }
 
 @Composable
+private fun HeroKpiTile(kpi: GenUiKpi, onClick: () -> Unit) {
+    val haptic = LocalHapticFeedback.current
+    val color = statusColor(kpi.status)
+    val formattedValue = kpi.value.replace(" L", "\u00A0L").replace(" h", "\u00A0h").trim()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(ObsidianLow)
+            .border(1.dp, color.copy(alpha = 0.30f), RoundedCornerShape(16.dp))
+            .clickable {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                StatusDot(color = color, size = 7.dp)
+                Text(
+                    text = kpi.label.uppercase(),
+                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.6.sp),
+                    color = TextSecondary
+                )
+            }
+            kpi.delta?.let { d ->
+                AuraPill(text = d, color = color)
+            }
+        }
+        Text(
+            text = formattedValue,
+            style = AuraTypographyExt.kpiHero,
+            color = TextPrimary,
+            maxLines = 2
+        )
+        kpi.subtext?.let {
+            Text(
+                text = it.replace(" L", "\u00A0L").replace(" h", "\u00A0h"),
+                style = MaterialTheme.typography.bodySmall,
+                color = TextMuted,
+                maxLines = 2
+            )
+        }
+    }
+}
+
+@Composable
 private fun KpiTile(kpi: GenUiKpi, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val haptic = LocalHapticFeedback.current
     val color = statusColor(kpi.status)
@@ -441,7 +632,7 @@ private fun KpiTile(kpi: GenUiKpi, onClick: () -> Unit, modifier: Modifier = Mod
         }
         Text(
             text = formattedValue,
-            style = MaterialTheme.typography.headlineSmall.copy(
+            style = AuraTypographyExt.kpiValue.copy(
                 fontSize = valueSize,
                 lineHeight = valueLineHeight,
                 fontWeight = FontWeight.SemiBold
@@ -704,6 +895,299 @@ private fun NoteBlock(block: GenUiBlock.Note) {
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------- Core P1.3: What-If, Realized ROI & MCP HITL
+
+@Composable
+private fun WhatIfSimulatorBlock(
+    block: GenUiBlock.WhatIfSimulator,
+    onDrillDown: (String) -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    var priceDelta by remember(block) { mutableFloatStateOf(block.initialPriceDeltaPct.toFloat()) }
+    var volumeDelta by remember(block) { mutableFloatStateOf(block.initialVolumeDeltaPct.toFloat()) }
+    var batchDelta by remember(block) { mutableFloatStateOf(block.initialBatchDeltaPct.toFloat()) }
+
+    // Cálculo determinístico instantâneo local (espelha POST /api/v1/aura/what-if/simulate)
+    val effectiveVolumeFactor = 1.0 + (volumeDelta / 100.0) + ((priceDelta / 100.0) * block.elasticityFactor * 0.35)
+    val marginBoostFactor = 1.0 + (priceDelta / 100.0) * (100.0 / block.baseMarginPct.coerceAtLeast(5.0)) * 0.45 + (batchDelta / 100.0) * 0.12
+    val simulatedProfit = (block.baseMonthlyProfit * effectiveVolumeFactor * marginBoostFactor).coerceAtLeast(0.0)
+    val deltaProfit = simulatedProfit - block.baseMonthlyProfit
+    val deltaColor = if (deltaProfit >= 0) AuraEmerald else StatusDanger
+    val deltaSign = if (deltaProfit >= 0) "+" else "-"
+    val maxBar = maxOf(block.baseMonthlyProfit, simulatedProfit, 1.0)
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        BlockTitle(block.title ?: "Simulador Interativo What-If", block.productScope)
+
+        // Hero KPI do Impacto Simulado
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(ObsidianLow)
+                .border(1.dp, AuraPurple.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "IMPACTO NO LUCRO MENSAL",
+                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.6.sp),
+                    color = TextSecondary
+                )
+                AuraPill(
+                    text = "${deltaSign}R$ ${GenUiParser.fmtNumber(kotlin.math.abs(deltaProfit))}",
+                    color = deltaColor
+                )
+            }
+            Text(
+                text = "R$ ${GenUiParser.fmtNumber(simulatedProfit)}",
+                style = AuraTypographyExt.kpiHero,
+                color = TextPrimary
+            )
+            // Micro-barras comparativas Base (Cyan) vs Simulado (Violet)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                ComparisonBarRow("Base", "R$ ${GenUiParser.fmtNumber(block.baseMonthlyProfit)}", (block.baseMonthlyProfit / maxBar).toFloat(), AuraCyan)
+                ComparisonBarRow("Simulado", "R$ ${GenUiParser.fmtNumber(simulatedProfit)}", (simulatedProfit / maxBar).toFloat(), AuraPurple)
+            }
+        }
+
+        // Sliders Táteis
+        WhatIfSliderRow(
+            label = "Ajuste de Preço",
+            value = priceDelta,
+            range = -10f..10f,
+            suffix = "%",
+            accent = AuraCyan,
+            onValueChange = {
+                if (it.toInt() != priceDelta.toInt()) {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
+                priceDelta = it
+            }
+        )
+        WhatIfSliderRow(
+            label = "Variação de Volume",
+            value = volumeDelta,
+            range = -20f..25f,
+            suffix = "%",
+            accent = AuraPurple,
+            onValueChange = {
+                if (it.toInt() != volumeDelta.toInt()) {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
+                volumeDelta = it
+            }
+        )
+        WhatIfSliderRow(
+            label = "Otimização de Lote",
+            value = batchDelta,
+            range = -15f..30f,
+            suffix = "%",
+            accent = AuraEmerald,
+            onValueChange = {
+                if (it.toInt() != batchDelta.toInt()) {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
+                batchDelta = it
+            }
+        )
+
+        AuraGhostButton(
+            text = "Validar Cenário no Motor Python",
+            onClick = {
+                onDrillDown(
+                    "Valide no motor determinístico o cenário What-If para ${block.productScope}: " +
+                        "preço ${"%+.1f".format(priceDelta)}%, volume ${"%+.1f".format(volumeDelta)}%, lote ${"%+.1f".format(batchDelta)}%."
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+            tint = AuraPurple
+        )
+    }
+}
+
+@Composable
+private fun ComparisonBarRow(label: String, valueText: String, fraction: Float, color: Color) {
+    val animated by animateFloatAsState(
+        targetValue = fraction.coerceIn(0.05f, 1f),
+        animationSpec = tween(220),
+        label = "whatIfBar"
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = TextMuted)
+            Text(valueText, style = AuraTypographyExt.monoAudit, color = TextSecondary)
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(50))
+                .background(ObsidianBase)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(animated)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(50))
+                    .background(color)
+            )
+        }
+    }
+}
+
+@Composable
+private fun WhatIfSliderRow(
+    label: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    suffix: String,
+    accent: Color,
+    onValueChange: (Float) -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+            Text(
+                text = "${"%+.1f".format(value)}$suffix",
+                style = AuraTypographyExt.monoAudit,
+                color = accent
+            )
+        }
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = range,
+            colors = SliderDefaults.colors(
+                thumbColor = accent,
+                activeTrackColor = accent,
+                inactiveTrackColor = ObsidianBright
+            )
+        )
+    }
+}
+
+@Composable
+private fun RealizedRoiScorecardBlock(block: GenUiBlock.RealizedRoiScorecard) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        BlockTitle(block.title ?: "Outcome Tracker • ROI Realizado", "Impacto financeiro auditado em R$")
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(ObsidianLow)
+                .border(1.dp, AuraEmerald.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "ROI LÍQUIDO ACUMULADO",
+                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.6.sp),
+                    color = AuraEmerald
+                )
+                block.roiMultiple?.let { AuraPill(text = it, color = AuraEmerald) }
+            }
+            Text(
+                text = block.totalRoiValue,
+                style = AuraTypographyExt.kpiHero,
+                color = AuraEmerald
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Max)
+                .clip(RoundedCornerShape(14.dp))
+                .background(ObsidianLow)
+                .border(1.dp, BorderHairline, RoundedCornerShape(14.dp))
+                .padding(vertical = 10.dp)
+        ) {
+            listOf(
+                "Vazamentos" to block.leaksStopped,
+                "Ganho Margem" to block.marginGain,
+                "Captura" to block.captureRatePct
+            ).forEachIndexed { idx, (label, v) ->
+                Column(
+                    modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(label, style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = TextMuted)
+                    Text(v, style = AuraTypographyExt.kpiCompact, color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                if (idx < 2) {
+                    Box(Modifier.width(1.dp).fillMaxHeight().background(BorderHairline))
+                }
+            }
+        }
+
+        if (block.auditedVouchers.isNotEmpty()) {
+            TimelineBlock(GenUiBlock.Timeline("Últimos Action Vouchers", null, block.auditedVouchers))
+        }
+    }
+}
+
+@Composable
+private fun McpActionConfirmationBlock(block: GenUiBlock.McpActionConfirmation) {
+    var remainingSec by remember(block) { mutableIntStateOf(block.ttlSeconds.coerceAtLeast(0)) }
+    LaunchedEffect(block) {
+        while (remainingSec > 0) {
+            delay(1000L)
+            remainingSec--
+        }
+    }
+    val expired = remainingSec <= 0
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        BlockTitle(block.title ?: "Governança MCP • Human-in-the-Loop", "${block.targetSystem} • ${block.operation}")
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            AuraPill(
+                text = if (block.reversible) "Reversível" else "Irreversível",
+                color = if (block.reversible) AuraCyan else StatusWarning
+            )
+            AuraPill(
+                text = if (expired) "Proposta Expirada" else "TTL ${remainingSec}s",
+                color = if (expired) StatusDanger else AuraEmerald
+            )
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(ObsidianLow)
+                .border(1.dp, BorderHairline, RoundedCornerShape(14.dp))
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text("ANTES", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = TextMuted)
+            Text(block.beforeSummary, style = AuraTypographyExt.monoAudit, color = TextSecondary)
+            Box(Modifier.fillMaxWidth().height(1.dp).background(BorderHairline))
+            Text("DEPOIS", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = AuraCyan)
+            Text(block.afterSummary, style = AuraTypographyExt.monoAudit, color = TextPrimary)
+            block.voucherHash?.let { hash ->
+                Spacer(Modifier.height(2.dp))
+                Text("HMAC Voucher: ${hash.take(18)}...", style = AuraTypographyExt.monoAudit.copy(fontSize = 10.sp), color = AuraEmerald)
             }
         }
     }

@@ -1,16 +1,18 @@
 package com.example.aurapostoassitance.data.npu
 
-import android.content.Context
-import android.os.Build
-import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.text.Normalizer
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.sqrt
 
 data class NpuHardwareStatus(
     val deviceCodename: String,
@@ -22,7 +24,10 @@ data class NpuHardwareStatus(
     val cpuCores: Int,
     val lastInferenceLatencyMs: Float,
     val totalInferences: Int,
-    val isHardwareAccelerated: Boolean
+    val isHardwareAccelerated: Boolean,
+    val delegateType: String = NpuDelegateType.FAST_PATH_VECTOR.label,
+    val thermalState: String = ThermalGuardState.NOMINAL.label,
+    val modelLoaded: Boolean = false
 )
 
 enum class LocalAuraIntent(
@@ -79,19 +84,28 @@ data class NpuClassificationResult(
     val intent: LocalAuraIntent,
     val confidence: Float,
     val latencyMs: Float,
-    val suggestedActionHint: String
+    val suggestedActionHint: String,
+    val delegateUsed: String = NpuDelegateType.FAST_PATH_VECTOR.label
 )
 
 @Singleton
 class AuraNpuEngine @Inject constructor(
-    @param:ApplicationContext private val context: Context
+    private val capabilityProbe: NpuCapabilityProbe,
+    private val runtime: NpuInferenceRuntime
 ) {
-    private val _hardwareStatus = MutableStateFlow(detectHardwareSignature())
+    companion object {
+        private val REGEX_COMBINING_MARKS = Regex("\\p{M}")
+        private val REGEX_WHITESPACE = Regex("\\s+")
+        private val ALL_INTENTS = LocalAuraIntent.entries
+    }
+
+    private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val inferenceCounter = AtomicInteger(0)
+
+    private val _hardwareStatus = MutableStateFlow(buildInitialStatus())
     val hardwareStatus: StateFlow<NpuHardwareStatus> = _hardwareStatus.asStateFlow()
 
-    private var inferenceCount = 0
-
-    // Âncoras semânticas ponderadas para classificação neural veloz (< 2ms)
+    // Âncoras semânticas ponderadas para roteamento imediato (< 1ms) e sinalização de embeddings
     private val intentAnchors: Map<LocalAuraIntent, List<Pair<String, Float>>> = mapOf(
         LocalAuraIntent.PREDICTIVE_RUNOUT to listOf(
             "ruptura" to 3.0f, "autonomia" to 3.0f, "runout" to 3.5f, "run out" to 3.5f,
@@ -133,84 +147,90 @@ class AuraNpuEngine @Inject constructor(
         )
     )
 
-    private fun detectHardwareSignature(): NpuHardwareStatus {
-        val deviceCodename = Build.DEVICE.orEmpty()
-        val model = Build.MODEL.orEmpty()
-        val hardware = Build.HARDWARE.orEmpty()
-        val cpuCores = Runtime.getRuntime().availableProcessors()
-
-        val socModel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Build.SOC_MODEL.orEmpty()
-        } else {
-            hardware
+    init {
+        // Pré-aquece o runtime LiteRT em background sem bloquear a Main Thread
+        engineScope.launch {
+            warmUp()
         }
+    }
 
-        val isGarnet = deviceCodename.equals("garnet", ignoreCase = true) ||
-            model.contains("2312DRA50G", ignoreCase = true)
-        val isSnapdragon7s = socModel.contains("SM7435", ignoreCase = true) ||
-            hardware.contains("SM7435", ignoreCase = true)
-        val isQualcomm = isGarnet || isSnapdragon7s || hardware.contains("qcom", ignoreCase = true)
-
-        val marketingName = when {
-            isGarnet && isSnapdragon7s -> "Qualcomm Snapdragon 7s Gen 2 (Hexagon NPU)"
-            isGarnet -> "Redmi Note 13 Pro 5G (Snapdragon 7s Gen 2)"
-            isSnapdragon7s -> "Snapdragon 7s Gen 2 (SM7435 • Hexagon NPU)"
-            isQualcomm -> "Qualcomm Snapdragon AI Engine"
-            else -> "${Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} $model (Universal NPU/NNAPI)"
+    suspend fun warmUp() {
+        val delegate = runtime.warmUp()
+        val (thermalState, _) = capabilityProbe.readThermalGuard()
+        _hardwareStatus.update { curr ->
+            curr.copy(
+                activeAccelerator = formatActiveAccelerator(delegate, curr.marketingName),
+                isHardwareAccelerated = delegate.isHardwareNpuOrGpu,
+                delegateType = delegate.label,
+                thermalState = thermalState.label,
+                modelLoaded = runtime.isModelLoaded()
+            )
         }
+    }
 
-        val activeAccelerator = when {
-            isSnapdragon7s || isGarnet -> "Qualcomm Hexagon Tensor NPU + Adreno 710"
-            isQualcomm -> "Qualcomm Hexagon NPU / NNAPI FP16"
-            else -> "Android NNAPI / SIMD CPU Vectorized"
-        }
-
+    private fun buildInitialStatus(): NpuHardwareStatus {
+        val profile = capabilityProbe.probeHardware()
+        val delegate = runtime.activeDelegate()
         return NpuHardwareStatus(
-            deviceCodename = deviceCodename,
-            modelName = model,
-            socModel = if (socModel.isNotBlank()) socModel else if (isGarnet) "SM7435" else "Universal",
-            marketingName = marketingName,
-            isHexagonAvailable = isQualcomm,
-            activeAccelerator = activeAccelerator,
-            cpuCores = cpuCores,
-            lastInferenceLatencyMs = 0.8f,
+            deviceCodename = profile.deviceCodename,
+            modelName = profile.modelName,
+            socModel = profile.socModel,
+            marketingName = profile.marketingName,
+            isHexagonAvailable = profile.vendor == SiliconVendor.QUALCOMM_HEXAGON,
+            activeAccelerator = formatActiveAccelerator(delegate, profile.marketingName),
+            cpuCores = profile.cpuCores,
+            lastInferenceLatencyMs = 0.0f,
             totalInferences = 0,
-            isHardwareAccelerated = true
+            isHardwareAccelerated = delegate.isHardwareNpuOrGpu,
+            delegateType = delegate.label,
+            thermalState = profile.thermalState.label,
+            modelLoaded = runtime.isModelLoaded()
         )
     }
 
+    private fun formatActiveAccelerator(delegate: NpuDelegateType, marketingName: String): String {
+        return when (delegate) {
+            NpuDelegateType.NNAPI_NPU -> "$marketingName • NNAPI NPU"
+            NpuDelegateType.GPU_DELEGATE -> "LiteRT GPU Delegate (FP16)"
+            NpuDelegateType.CPU_XNNPACK -> "LiteRT XNNPACK SIMD"
+            NpuDelegateType.FAST_PATH_VECTOR -> "${delegate.label} (Pronto p/ LiteRT)"
+        }
+    }
+
     /**
-     * Executa classificação semântica de intenção vetorial acelerada localmente.
-     * Tempo de inferência típico no garnet SM7435: entre 0.4ms e 2.0ms.
+     * Executa classificação semântica de intenção on-device com medição real de latência
+     * e atualização atômica da telemetria de silício e estado térmico.
      */
     fun classifyIntent(rawQuery: String): NpuClassificationResult {
         val startTime = System.nanoTime()
         val normalized = normalizeText(rawQuery)
+        val scores = scoreIntents(normalized)
 
         var bestIntent = LocalAuraIntent.GENERAL_ADVISORY
         var maxScore = 0.0f
-
-        for ((intent, anchors) in intentAnchors) {
-            var intentScore = 0.0f
-            for ((keyword, weight) in anchors) {
-                if (normalized.contains(keyword)) {
-                    intentScore += weight
-                }
-            }
-            if (intentScore > maxScore) {
-                maxScore = intentScore
-                bestIntent = intent
+        for (i in scores.indices) {
+            if (scores[i] > maxScore) {
+                maxScore = scores[i]
+                bestIntent = ALL_INTENTS[i]
             }
         }
 
-        val latencyMs = ((System.nanoTime() - startTime) / 1_000_000.0f).coerceAtLeast(0.1f)
+        val latencyMs = ((System.nanoTime() - startTime) / 1_000_000.0f).coerceAtLeast(0.05f)
         val confidence = if (maxScore > 0f) (maxScore / (maxScore + 3.0f)).coerceIn(0.55f, 0.99f) else 0.45f
+        val count = inferenceCounter.incrementAndGet()
+        val delegate = runtime.activeDelegate()
+        val (thermalState, _) = capabilityProbe.readThermalGuard()
 
-        inferenceCount++
-        _hardwareStatus.value = _hardwareStatus.value.copy(
-            lastInferenceLatencyMs = latencyMs,
-            totalInferences = inferenceCount
-        )
+        _hardwareStatus.update { curr ->
+            curr.copy(
+                lastInferenceLatencyMs = latencyMs,
+                totalInferences = count,
+                delegateType = delegate.label,
+                thermalState = thermalState.label,
+                isHardwareAccelerated = delegate.isHardwareNpuOrGpu,
+                modelLoaded = runtime.isModelLoaded()
+            )
+        }
 
         val hint = when (bestIntent) {
             LocalAuraIntent.PREDICTIVE_RUNOUT -> "Autonomia e janela crítica de reposição detectadas."
@@ -226,75 +246,29 @@ class AuraNpuEngine @Inject constructor(
             intent = bestIntent,
             confidence = confidence,
             latencyMs = latencyMs,
-            suggestedActionHint = hint
+            suggestedActionHint = hint,
+            delegateUsed = delegate.label
         )
     }
 
     fun getHardwareSummary(): String {
         val status = _hardwareStatus.value
-        return "${status.marketingName} | Latência NPU: ${"%.1f".format(status.lastInferenceLatencyMs)}ms"
+        return "${status.marketingName} | ${status.delegateType} | ${"%.1f".format(status.lastInferenceLatencyMs)}ms | Térmico: ${status.thermalState}"
     }
 
     /**
-     * Gera um vetor denso normalizado de 128 dimensões acelerado pela NPU
-     * combinando projeção hash LSH de n-gramas e âncoras conceituais operacionais.
-     * Latência típica: < 0.2ms.
+     * Gera um vetor denso L2-normalizado de 128 dimensões delegando ao runtime LiteRT (NNAPI/GPU/XNNPACK)
+     * quando o modelo quantizado estiver carregado, ou ao Fast-Path determinístico otimizado.
      */
     fun computeDenseEmbedding(text: String): FloatArray {
-        val dim = 128
-        val vector = FloatArray(dim)
         val normalized = normalizeText(text)
-        val words = normalized.split(Regex("\\s+")).filter { it.isNotBlank() }
-
-        // 1. Projeção de palavras e trigramas morfológicos
-        for (word in words) {
-            val hash = word.hashCode()
-            val idx1 = Math.abs(hash) % dim
-            val idx2 = Math.abs(hash.ushr(7)) % dim
-            val sign1 = if (hash and 1 == 0) 1.5f else -1.5f
-            val sign2 = if (hash and 2 == 0) 1.0f else -1.0f
-            vector[idx1] += sign1
-            vector[idx2] += sign2
-
-            if (word.length >= 3) {
-                for (i in 0..(word.length - 3)) {
-                    val triHash = word.substring(i, i + 3).hashCode()
-                    val triIdx = Math.abs(triHash) % dim
-                    val triSign = if (triHash and 1 == 0) 0.6f else -0.6f
-                    vector[triIdx] += triSign
-                }
-            }
-        }
-
-        // 2. Projeção de âncoras semânticas de domínio de negócios
-        for ((intent, anchors) in intentAnchors) {
-            val intentOffset = (intent.ordinal * 16) % dim
-            for ((anchor, weight) in anchors) {
-                if (normalized.contains(anchor)) {
-                    for (k in 0..3) {
-                        val pos = (intentOffset + k) % dim
-                        vector[pos] += weight * 0.9f
-                    }
-                }
-            }
-        }
-
-        // 3. Normalização L2 (norma euclidiana unitária para cálculo imediato de cosseno)
-        var normSq = 0.0f
-        for (v in vector) {
-            normSq += v * v
-        }
-        val norm = sqrt(normSq)
-        if (norm > 1e-6f) {
-            for (i in 0 until dim) {
-                vector[i] /= norm
-            }
-        }
-        return vector
+        val tokens = if (normalized.isEmpty()) emptyList() else normalized.split(REGEX_WHITESPACE).filter { it.isNotBlank() }
+        val scores = scoreIntents(normalized)
+        return runtime.embed(normalized, tokens, scores)
     }
 
     /**
-     * Calcula a similaridade de cosseno entre dois vetores unitários de 128 dimensões em < 0.01ms.
+     * Produto escalar (similaridade de cosseno) entre vetores L2-normalizados.
      */
     fun cosineSimilarity(vecA: FloatArray, vecB: FloatArray): Float {
         if (vecA.size != vecB.size || vecA.isEmpty()) return 0.0f
@@ -305,8 +279,23 @@ class AuraNpuEngine @Inject constructor(
         return dot.coerceIn(-1.0f, 1.0f)
     }
 
-    private fun normalizeText(text: String): String {
+    private fun scoreIntents(normalized: String): FloatArray {
+        val scores = FloatArray(ALL_INTENTS.size)
+        for (intent in ALL_INTENTS) {
+            val anchors = intentAnchors[intent] ?: continue
+            var intentScore = 0.0f
+            for ((keyword, weight) in anchors) {
+                if (normalized.contains(keyword)) {
+                    intentScore += weight
+                }
+            }
+            scores[intent.ordinal] = intentScore
+        }
+        return scores
+    }
+
+    internal fun normalizeText(text: String): String {
         val n = Normalizer.normalize(text.lowercase(Locale.ROOT), Normalizer.Form.NFD)
-        return n.replace(Regex("\\p{M}"), "").trim()
+        return REGEX_COMBINING_MARKS.replace(n, "").trim()
     }
 }

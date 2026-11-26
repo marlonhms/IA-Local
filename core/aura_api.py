@@ -2384,6 +2384,71 @@ async def get_cockpit_zero_click_feed_alias(
     )
 
 
+@router.get(
+    "/zero-click-feed",
+    summary="Feed Executivo Zero-Click da AURA (Alias Mobile/Android)",
+    tags=["AURA Cockpit Zero-Click"],
+    include_in_schema=False,
+)
+async def get_aura_zero_click_feed_mobile_alias(
+    request: Request,
+    pack_id: str | None = Query(default=None, description="Domain Pack ativo"),
+    tenant_id: str = Query(default="default"),
+    limit: int = Query(default=5, ge=1, le=20),
+    force_refresh: bool = Query(default=False),
+    daemon: AuraProactiveDaemon = Depends(get_proactive_daemon),
+):
+    """
+    Alias de compatibilidade para o app Android (/api/v1/aura/zero-click-feed).
+    Retorna os cards reais do daemon e projeta headline/metrics/alerts no contrato mobile.
+    """
+    cards = await asyncio.to_thread(
+        daemon.generate_executive_zero_click_feed,
+        tenant_id=tenant_id,
+        force_refresh=force_refresh,
+        limit=limit,
+    )
+    serialized_cards = [c.model_dump() for c in cards]
+    alerts = []
+    metrics = []
+    for card in serialized_cards:
+        sev = str(card.get("severity") or "info").lower()
+        impact = float(card.get("financial_impact_brl") or 0.0)
+        val_txt = (
+            f"R$ {impact:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            if impact > 0
+            else str(card.get("category") or "Monitoramento")
+        )
+        item = {
+            "label": str(card.get("title") or "Alerta Operacional"),
+            "value": val_txt,
+            "status": "critical" if sev in ("critical", "critico", "high") else ("warning" if sev in ("warning", "alerta") else "info"),
+            "detail": str(card.get("diagnostico_direto") or card.get("summary") or ""),
+            "action_query": str(card.get("recommended_action") or f"Audite {card.get('title') or 'este indicador'} no banco real."),
+        }
+        if sev in ("critical", "critico", "high", "warning", "alerta"):
+            alerts.append(item)
+        else:
+            metrics.append(item)
+
+    headline = (
+        str(serialized_cards[0].get("title"))
+        if serialized_cards
+        else "Operacao monitorada em tempo real"
+    )
+    return {
+        "success": True,
+        "status": "success",
+        "pack_id": pack_id or "fuel_convenience",
+        "tenant_id": tenant_id,
+        "headline": headline,
+        "metrics": metrics,
+        "alerts": alerts,
+        "total_cards": len(serialized_cards),
+        "cards": serialized_cards,
+    }
+
+
 # =============================================================================
 # LOOP FECHADO DE ACAO: ACTIONABLE DIRECTIVES & OUTBOX (FASE 4)
 # =============================================================================
@@ -2908,6 +2973,13 @@ def create_aura_app(
 
     @app.on_event("startup")
     async def startup_proactive_daemon():
+        if not _is_test_runtime():
+            try:
+                from core.migrations import bootstrap_autonomous_brain_schema
+
+                await asyncio.to_thread(bootstrap_autonomous_brain_schema)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"Bootstrap do cerebro autonomo no startup falhou: {exc}")
         if os.getenv("AURA_PROACTIVE_DAEMON_AUTOSTART", "0").lower() in ("1", "true", "yes"):
             d = get_proactive_daemon()
             await d.start()

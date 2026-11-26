@@ -1,6 +1,8 @@
 package com.example.aurapostoassitance.data.local
 
 import android.content.Context
+import com.example.aurapostoassitance.data.security.AuraKeystoreVault
+import com.example.aurapostoassitance.ui.domain.AuraDomainAdapter
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -17,7 +19,8 @@ data class HandoffContact(
 
 @Singleton
 class ServerConfig @Inject constructor(
-    @ApplicationContext context: Context
+    @ApplicationContext context: Context,
+    private val keystoreVault: AuraKeystoreVault
 ) {
     private val prefs = context.getSharedPreferences("aura_config", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
@@ -38,6 +41,44 @@ class ServerConfig @Inject constructor(
         get() = prefs.getString("handoff_last_role", "Contador") ?: "Contador"
         set(value) {
             prefs.edit().putString("handoff_last_role", value).apply()
+        }
+
+    var activePackId: String
+        get() = AuraDomainAdapter.normalizePackId(
+            prefs.getString("active_pack_id", AuraDomainAdapter.PACK_FUEL)
+        )
+        set(value) {
+            prefs.edit().putString("active_pack_id", AuraDomainAdapter.normalizePackId(value)).apply()
+        }
+
+    /** Chave de API armazenada de forma criptografada no Android Keystore (AES-256-GCM). */
+    var apiKey: String
+        get() = keystoreVault.apiKey.orEmpty()
+        set(value) {
+            keystoreVault.apiKey = value.trim().ifBlank { null }
+            // Limpa eventual legado em texto claro
+            if (prefs.contains("aura_api_key")) {
+                prefs.edit().remove("aura_api_key").apply()
+            }
+        }
+
+    /** Chave dedicada de Parceiro (AURA_PARTNER_API_KEY) para rotas partner (Carbon Core P0.1). */
+    var partnerApiKey: String
+        get() = keystoreVault.partnerApiKey.orEmpty()
+        set(value) {
+            keystoreVault.partnerApiKey = value.trim().ifBlank { null }
+        }
+
+    var tenantId: String
+        get() = keystoreVault.tenantId
+        set(value) {
+            keystoreVault.tenantId = value
+        }
+
+    var filialId: String
+        get() = keystoreVault.filialId
+        set(value) {
+            keystoreVault.filialId = value
         }
 
     fun getHandoffContacts(): List<HandoffContact> {

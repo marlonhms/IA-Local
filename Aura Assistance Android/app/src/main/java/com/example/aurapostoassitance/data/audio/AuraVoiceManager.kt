@@ -2,6 +2,7 @@ package com.example.aurapostoassitance.data.audio
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -183,14 +184,24 @@ class AuraVoiceManager @Inject constructor(
 
         mainHandler.post {
             try {
-                if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+                val useOnDevice = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+
+                if (!useOnDevice && !SpeechRecognizer.isRecognitionAvailable(context)) {
                     _isListening.value = false
                     _voiceError.value = "Reconhecimento de voz indisponível neste dispositivo."
                     return@post
                 }
 
                 speechRecognizer?.destroy()
-                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+                speechRecognizer = (
+                    if (useOnDevice && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        runCatching { SpeechRecognizer.createOnDeviceSpeechRecognizer(context) }
+                            .getOrElse { SpeechRecognizer.createSpeechRecognizer(context) }
+                    } else {
+                        SpeechRecognizer.createSpeechRecognizer(context)
+                    }
+                ).apply {
                     setRecognitionListener(createRecognitionListener())
                 }
 
@@ -200,6 +211,9 @@ class AuraVoiceManager @Inject constructor(
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "pt-BR")
                     putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                     putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                    if (useOnDevice) {
+                        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                    }
                     putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1400L)
                     putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1100L)
                 }

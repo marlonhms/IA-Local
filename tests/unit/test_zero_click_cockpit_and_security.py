@@ -360,12 +360,21 @@ def test_api_cockpit_zero_click_feed_endpoint(api_client: TestClient) -> None:
 
 
 def test_api_cockpit_zero_click_feed_alias_endpoint(api_client: TestClient) -> None:
-    """Valida alias GET /api/v1/aura/cockpit/zero-click-feed."""
+    """Valida alias GET /api/v1/aura/cockpit/zero-click-feed e GET /api/v1/aura/zero-click-feed."""
     response = api_client.get("/api/v1/aura/cockpit/zero-click-feed?tenant_id=teste_alias")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "success"
     assert len(data["cards"]) >= 3
+
+    mobile_resp = api_client.get("/api/v1/aura/zero-click-feed?pack_id=fuel_convenience")
+    assert mobile_resp.status_code == 200
+    mobile_data = mobile_resp.json()
+    assert mobile_data["success"] is True
+    assert mobile_data["pack_id"] == "fuel_convenience"
+    assert isinstance(mobile_data["alerts"], list)
+    assert isinstance(mobile_data["metrics"], list)
+    assert len(mobile_data["cards"]) >= 3
 
 
 def test_api_cockpit_zero_click_feed_streaming_sse(api_client: TestClient) -> None:

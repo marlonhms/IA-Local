@@ -202,6 +202,42 @@ sealed class GenUiBlock {
     data class AlertCallout(val alert: GenUiAlert) : GenUiBlock()
     data class Tanks(val title: String?, val tanks: List<GenUiTank>, val hiddenInactive: Int) : GenUiBlock()
     data class Note(val title: String?, val text: String) : GenUiBlock()
+
+    /** Core P1.3 / P2.4: Simulador interativo What-If de elasticidade preço-volume-margem. */
+    data class WhatIfSimulator(
+        val title: String?,
+        val productScope: String,
+        val baseMonthlyProfit: Double,
+        val baseMarginPct: Double,
+        val initialPriceDeltaPct: Double = 0.0,
+        val initialVolumeDeltaPct: Double = 0.0,
+        val initialBatchDeltaPct: Double = 0.0,
+        val elasticityFactor: Double = -1.2,
+        val recommendation: String? = null
+    ) : GenUiBlock()
+
+    /** Core P1.3: Scorecard de ROI Realizado (Outcome Tracker: Projetado vs Realizado). */
+    data class RealizedRoiScorecard(
+        val title: String?,
+        val totalRoiValue: String,
+        val roiMultiple: String?,
+        val leaksStopped: String,
+        val marginGain: String,
+        val captureRatePct: String,
+        val auditedVouchers: List<GenUiTimelineEvent> = emptyList()
+    ) : GenUiBlock()
+
+    /** Core P1.3: Cartão HITL para confirmação de ação externa MCP / Outbox ERP com TTL e HMAC. */
+    data class McpActionConfirmation(
+        val title: String?,
+        val targetSystem: String,
+        val operation: String,
+        val reversible: Boolean,
+        val ttlSeconds: Int,
+        val beforeSummary: String,
+        val afterSummary: String,
+        val voucherHash: String? = null
+    ) : GenUiBlock()
 }
 
 data class GenUiCard(
@@ -229,7 +265,23 @@ object GenUiParser {
             "render_TankRunOutForecastUI" to "Tanques e Autonomia",
             "mentoria_decisao" to "Mentor de Decisões",
             "lmc_anp" to "LMC ANP",
-            "auditoria_turno" to "Conciliação de Turno"
+            "auditoria_turno" to "Conciliação de Turno",
+            "WhatIfSimulatorUI" to "Simulador What-If de Margem",
+            "render_WhatIfSimulatorUI" to "Simulador What-If de Margem",
+            "WhatIfSimulatorWidget" to "Simulador What-If de Margem",
+            "ElasticityBatchSimulatorUI" to "Simulador de Elasticidade & Lote",
+            "render_ElasticityBatchSimulatorUI" to "Simulador de Elasticidade & Lote",
+            "RealizedRoiScorecardUI" to "Scorecard de ROI Realizado",
+            "render_RealizedRoiScorecardUI" to "Scorecard de ROI Realizado",
+            "RealizedRoiScorecardWidget" to "Scorecard de ROI Realizado",
+            "McpActionConfirmationUI" to "Governança de Ação MCP (HITL)",
+            "render_McpActionConfirmationUI" to "Governança de Ação MCP (HITL)",
+            "McpActionConfirmationWidget" to "Governança de Ação MCP (HITL)",
+            "FinancialErosionUI" to "Auditoria de Erosão de Margem",
+            "MarginWaterfallUI" to "Cascata de Margem Operacional",
+            "DeadCapitalOpportunityUI" to "Oportunidade de Capital Ocioso",
+            "PumpPerformanceUI" to "Performance Operacional",
+            "SRETelemetryUI" to "Telemetria Operacional AURA"
         )
         map[intent]?.let { return it }
         map[componentName]?.let { return it }
@@ -264,6 +316,34 @@ object GenUiParser {
         if (props["tanks"] is JsonArray) {
             (props["assessment"] as? JsonObject)?.str("severity")?.let { severity = it }
             blocks += tankBlocks(props)
+        }
+
+        // Core P1.3: WhatIfSimulatorUI / ElasticityBatchSimulatorUI
+        val compNorm = component.lowercase()
+        if (compNorm.contains("whatif") || compNorm.contains("elasticity")) {
+            blocks += parseWhatIfBlock(props)
+        }
+
+        // Core P1.3: RealizedRoiScorecardUI
+        if (compNorm.contains("realizedroi") || compNorm.contains("roiscorecard")) {
+            blocks += parseRealizedRoiBlock(props)
+        }
+
+        // Core P1.3: McpActionConfirmationUI
+        if (compNorm.contains("mcpaction")) {
+            severity = props.str("severity") ?: "warning"
+            blocks += parseMcpConfirmationBlock(props)
+        }
+
+        // LMC Compliance Report (Portaria ANP 26/1992)
+        if (compNorm.contains("lmccompliance") || (blocks.isEmpty() && props.str("status_conformidade") != null)) {
+            val lmcStatus = props.str("status_conformidade") ?: props.str("status_geral") ?: "INFO"
+            if (lmcStatus.contains("CRITIC", true) || lmcStatus.contains("ALERTA", true)) {
+                severity = "critical"
+            } else if (lmcStatus.contains("CONFORME", true)) {
+                severity = "success"
+            }
+            blocks += parseLmcComplianceBlocks(props)
         }
 
         // Fallback textual quando nao ha bloco estruturado
@@ -419,9 +499,115 @@ object GenUiParser {
                 )
             }
 
+            "what_if_simulator" -> parseWhatIfBlock(o)
+            "realized_roi_scorecard" -> parseRealizedRoiBlock(o)
+            "mcp_action_confirmation" -> parseMcpConfirmationBlock(o)
             "custom_content" -> o.str("custom_content")?.let { GenUiBlock.Note(title, it) }
             else -> null
         }
+    }
+
+    private fun parseWhatIfBlock(props: JsonObject): GenUiBlock.WhatIfSimulator {
+        return GenUiBlock.WhatIfSimulator(
+            title = props.str("title"),
+            productScope = props.str("product_or_scope") ?: props.str("product_name") ?: props.str("scope") ?: "Mix Operacional",
+            baseMonthlyProfit = props.dbl("base_monthly_profit") ?: props.dbl("base_profit") ?: 48500.0,
+            baseMarginPct = props.dbl("base_margin_pct") ?: 14.5,
+            initialPriceDeltaPct = props.dbl("price_delta_pct") ?: 0.0,
+            initialVolumeDeltaPct = props.dbl("volume_delta_pct") ?: 0.0,
+            initialBatchDeltaPct = props.dbl("batch_size_delta_pct") ?: 0.0,
+            elasticityFactor = props.dbl("elasticity_factor") ?: -1.15,
+            recommendation = props.str("recommendation") ?: props.str("diagnosis")
+        )
+    }
+
+    private fun parseRealizedRoiBlock(props: JsonObject): GenUiBlock.RealizedRoiScorecard {
+        val vouchers = (props["vouchers"] as? JsonArray ?: props["audited_actions"] as? JsonArray).orEmpty().mapNotNull { el ->
+            val o = el as? JsonObject ?: return@mapNotNull null
+            GenUiTimelineEvent(
+                timestamp = o.str("timestamp") ?: o.str("date") ?: "",
+                title = o.str("title") ?: o.str("action_label") ?: return@mapNotNull null,
+                description = o.str("impact_value") ?: o.str("description"),
+                status = o.str("status") ?: "success"
+            )
+        }
+        return GenUiBlock.RealizedRoiScorecard(
+            title = props.str("title"),
+            totalRoiValue = props.str("total_roi_formatted") ?: props.str("realized_roi") ?: "R$ 0,00",
+            roiMultiple = props.str("roi_multiple"),
+            leaksStopped = props.str("leaks_stopped") ?: "R$ 0,00",
+            marginGain = props.str("margin_gain") ?: "R$ 0,00",
+            captureRatePct = props.str("capture_rate_pct") ?: "0%",
+            auditedVouchers = vouchers
+        )
+    }
+
+    private fun parseMcpConfirmationBlock(props: JsonObject): GenUiBlock.McpActionConfirmation {
+        return GenUiBlock.McpActionConfirmation(
+            title = props.str("title"),
+            targetSystem = props.str("target_system") ?: props.str("connector") ?: "ERP Local",
+            operation = props.str("operation") ?: props.str("action_name") ?: "Atualização Operacional",
+            reversible = props.bool("reversible") ?: true,
+            ttlSeconds = props.int("ttl_seconds") ?: 300,
+            beforeSummary = props.str("before_summary") ?: props.str("current_state") ?: "Estado atual",
+            afterSummary = props.str("after_summary") ?: props.str("proposed_state") ?: "Estado proposto",
+            voucherHash = props.str("voucher_hmac") ?: props.str("voucher_id")
+        )
+    }
+
+    private fun parseLmcComplianceBlocks(props: JsonObject): List<GenUiBlock> {
+        val out = mutableListOf<GenUiBlock>()
+        val statusConf = props.str("status_conformidade") ?: props.str("status_geral") ?: "AUDITORIA"
+        val varPct = props.dbl("variacao_volumetrica_pct")
+        val tolPct = props.dbl("tolerancia_legal_pct") ?: 0.60
+        val isCrit = statusConf.contains("CRITIC", true) || statusConf.contains("ALERTA", true)
+
+        val kpis = mutableListOf<GenUiKpi>()
+        kpis += GenUiKpi(
+            label = "Variação Volumétrica LMC",
+            value = varPct?.let { "${"%+.2f".format(it)}%" } ?: statusConf,
+            delta = "Tolerância ±${"%.2f".format(tolPct)}%",
+            trend = if (isCrit) "down" else "up",
+            status = if (isCrit) "danger" else "success",
+            subtext = "Portaria ANP 26/1992"
+        )
+        props.dbl("total_vendas_litros")?.let {
+            kpis += GenUiKpi("Vendas", "${fmtNumber(it)} L", null, "neutral", "info", null)
+        }
+        props.dbl("total_estoque_fisico_litros")?.let {
+            kpis += GenUiKpi("Físico", "${fmtNumber(it)} L", null, "neutral", "neutral", null)
+        }
+        props.dbl("total_estoque_escriturado_litros")?.let {
+            kpis += GenUiKpi("Escriturado", "${fmtNumber(it)} L", null, "neutral", "neutral", null)
+        }
+        if (kpis.isNotEmpty()) {
+            out += GenUiBlock.KpiGrid("Auditoria LMC ANP", null, kpis)
+        }
+
+        props.str("parecer_regulatorio")?.let { parecer ->
+            out += GenUiBlock.AlertCallout(
+                GenUiAlert(
+                    title = if (isCrit) "Risco Regulatório ANP" else "Conformidade ANP",
+                    message = parecer,
+                    severity = if (isCrit) "danger" else "success",
+                    actionLabel = null
+                )
+            )
+        }
+
+        val tanquesRows = (props["tanques"] as? JsonArray).orEmpty().mapNotNull { el ->
+            val t = el as? JsonObject ?: return@mapNotNull null
+            val name = t.str("combustivel") ?: t.str("tanque") ?: return@mapNotNull null
+            val fis = t.dbl("estoque_final_fisico_litros")?.let { "${fmtNumber(it)} L" } ?: "-"
+            val esc = t.dbl("estoque_contabil_litros")?.let { "${fmtNumber(it)} L" } ?: "-"
+            val vp = t.dbl("variacao_pct")?.let { "${"%+.2f".format(it)}%" }
+            val st = if ((t.str("status_anp") ?: "").contains("ALERTA", true) || (t.str("status_anp") ?: "").contains("CRIT", true)) "danger" else "success"
+            GenUiComparisonRow(name = name, primary = fis, secondary = esc, gap = vp, status = st, observation = null)
+        }
+        if (tanquesRows.isNotEmpty()) {
+            out += GenUiBlock.Comparison("Conciliação por Tanque (Físico vs Escriturado)", null, tanquesRows)
+        }
+        return out
     }
 
     private fun tankBlocks(props: JsonObject): List<GenUiBlock> {

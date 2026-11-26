@@ -185,12 +185,36 @@ VECTOR_DB_DRIVER_OPTIONS = os.getenv(
     f"-c search_path={AURA_CORE_SCHEMA},public -c statement_timeout=5000 -c lock_timeout=1500",
 )
 
+def get_vector_password() -> str:
+    """
+    Resolve a senha dedicada do banco cognitivo posto_ai (preferencia aura_brain_rw).
+    Prioridade:
+    1. Variavel de ambiente VECTOR_DB_PASSWORD (quando diferente de DPAPI_ENCRYPTED)
+    2. Cofre criptografico DPAPI de maquina ('aura_brain_rw_password')
+    3. Fallback compativel com instalacoes legadas (get_erp_password)
+    """
+    env_vec = os.getenv("VECTOR_DB_PASSWORD")
+    if env_vec and env_vec != "DPAPI_ENCRYPTED":
+        return env_vec
+
+    try:
+        from core.identity_vault import get_vault_secret
+
+        vault_vec = get_vault_secret("aura_brain_rw_password")
+        if vault_vec:
+            return vault_vec
+    except Exception:
+        pass
+
+    return get_erp_password()
+
+
 DB_VECTOR_CONFIG = {
     "host": os.getenv("VECTOR_DB_HOST", "localhost"),
     "port": int(os.getenv("VECTOR_DB_PORT", "5433")),
     "dbname": os.getenv("VECTOR_DB_NAME", "posto_ai"),
     "user": os.getenv("VECTOR_DB_USER", "suporte"),
-    "password": (os.getenv("VECTOR_DB_PASSWORD") if os.getenv("VECTOR_DB_PASSWORD") not in (None, "", "DPAPI_ENCRYPTED") else get_erp_password()),
+    "password": get_vector_password(),
     "connect_timeout": int(os.getenv("VECTOR_DB_CONNECT_TIMEOUT", "5")),
     "options": VECTOR_DB_DRIVER_OPTIONS,
 }

@@ -180,10 +180,58 @@ data class SegmentBaselineResponse(
     val genUiCards: JsonObject? = null
 )
 
+@Serializable
+data class ZeroClickMetricDto(
+    val label: String,
+    val value: String,
+    val status: String = "info",
+    val detail: String? = null,
+    val action_query: String? = null
+)
+
+@Serializable
+data class ZeroClickFeedResponse(
+    val success: Boolean = true,
+    val pack_id: String? = null,
+    val headline: String? = null,
+    val metrics: List<ZeroClickMetricDto> = emptyList(),
+    val alerts: List<ZeroClickMetricDto> = emptyList()
+)
+
+@Serializable
+data class WhatIfSimulateRequest(
+    val pack_id: String,
+    val product_or_scope: String? = null,
+    val price_delta_pct: Double = 0.0,
+    val volume_delta_pct: Double = 0.0,
+    val batch_size_delta_pct: Double = 0.0,
+    val base_monthly_profit: Double? = null
+)
+
+@Serializable
+data class WhatIfSimulateResponse(
+    val success: Boolean = true,
+    val base_profit: Double = 0.0,
+    val simulated_profit: Double = 0.0,
+    val delta_profit: Double = 0.0,
+    val delta_margin_pct: Double = 0.0,
+    val recommendation: String? = null
+)
+
 interface AuraApiService {
 
     @GET("api/v1/aura/health")
     suspend fun checkHealth(): HealthResponse
+
+    @GET("api/v1/aura/zero-click-feed")
+    suspend fun getZeroClickFeed(
+        @Query("pack_id") packId: String? = null
+    ): ZeroClickFeedResponse
+
+    @POST("api/v1/aura/what-if/simulate")
+    suspend fun simulateWhatIf(
+        @Body request: WhatIfSimulateRequest
+    ): WhatIfSimulateResponse
 
     @GET("api/v1/aura/stations")
     suspend fun getStations(): String

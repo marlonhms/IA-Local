@@ -27,8 +27,8 @@ data class AuraPhysicalContext(
 
 /**
  * Gerenciador de Fusão de Sensores e Detecção Automática de Modo Carro / Hands-Free.
- * Monitora conexões de áudio Bluetooth automotivo via AudioDeviceCallback (sem exigir
- * permissões invasivas em runtime) e acelerômetro para adaptar a interface executiva.
+ * Otimizado para eficiência energética: o acelerômetro só é registrado enquanto houver
+ * dispositivo de áudio Bluetooth/Headset conectado, evitando dreno contínuo de bateria.
  */
 @Singleton
 class AuraContextSensorManager @Inject constructor(
@@ -44,10 +44,12 @@ class AuraContextSensorManager @Inject constructor(
     private var manualCarModeOverride: Boolean? = null
     private var lastMovementCheckTime: Long = 0
 
+    @Volatile
+    private var isMotionSensorRegistered: Boolean = false
+
     init {
         checkCurrentAudioDevices()
         registerAudioCallback()
-        registerMotionSensor()
     }
 
     fun toggleManualCarMode() {
@@ -97,28 +99,46 @@ class AuraContextSensorManager @Inject constructor(
                 }
             }
 
+            // Só liga o acelerômetro quando houver Bluetooth/Headset ativo (zero dreno em idle)
+            if (hasBt) {
+                registerMotionSensor()
+            } else {
+                unregisterMotionSensor()
+            }
+
             _contextState.value = _contextState.value.copy(
                 isCarOrBluetoothConnected = hasBt,
-                audioDeviceName = devName
+                audioDeviceName = devName,
+                isMoving = if (hasBt) _contextState.value.isMoving else false
             )
             updateState()
         }
     }
 
+    @Synchronized
     private fun registerMotionSensor() {
+        if (isMotionSensorRegistered) return
         sensorManager?.let { sm ->
             val accel = sm.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
                 ?: sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
             accel?.let {
                 sm.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+                isMotionSensorRegistered = true
             }
         }
+    }
+
+    @Synchronized
+    private fun unregisterMotionSensor() {
+        if (!isMotionSensorRegistered) return
+        runCatching { sensorManager?.unregisterListener(this) }
+        isMotionSensorRegistered = false
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (event == null) return
         val now = System.currentTimeMillis()
-        if (now - lastMovementCheckTime < 2500) return // Avalia a cada 2.5s para economizar bateria
+        if (now - lastMovementCheckTime < 2500) return
         lastMovementCheckTime = now
 
         val x = event.values[0]
@@ -129,7 +149,6 @@ class AuraContextSensorManager @Inject constructor(
         val isMoving = if (event.sensor.type == Sensor.TYPE_LINEAR_ACCELERATION) {
             magnitude > 1.2f
         } else {
-            // Se for acelerômetro padrão (com gravidade ~9.8)
             kotlin.math.abs(magnitude - 9.8f) > 1.8f
         }
 

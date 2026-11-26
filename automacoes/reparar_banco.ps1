@@ -1,111 +1,127 @@
-# Script de Provisionamento Soberano e Nao-Invasivo da Role aura_service_ro no PostgreSQL 16
-# Preserva 100% intocadas as senhas de 'postgres' e 'suporte' do ERP e aplica reload sem downtime
-# Executado como Administrador
+# Script de Desbloqueio Cirurgico e Nao-Invasivo da Role aura_service_ro no PostgreSQL 16
+# Zero Downtime no PDV: usa pg_ctl reload (nunca reinicia o servico PostgreSQL)
+# Preserva 100% intocadas as senhas e permissoes de 'postgres' e 'suporte' do ERP
+# Executado como Administrador ou LocalSystem (AuraBackendService)
 # Zero travessoes
 
-$ErrorActionPreference = "Continue"
+$ErrorActionPreference = "Stop"
 
 Write-Host "===============================================================================" -ForegroundColor Cyan
-Write-Host "  PROVISIONAMENTO SOBERANO E NAO-INVASIVO AURA (PORTA 5433) - ZERO DOWNTIME" -ForegroundColor Cyan
+Write-Host "  DESBLOQUEIO CIRURGICO AURA (PORTA 5433) - ZERO DOWNTIME NO PDV" -ForegroundColor Cyan
 Write-Host "===============================================================================" -ForegroundColor Cyan
-Write-Host ""
 
 $pgData = "C:\Program Files\PostgreSQL\16\data"
 $pgCtl = "C:\Program Files\PostgreSQL\16\bin\pg_ctl.exe"
-$pgHba = "C:\Program Files\PostgreSQL\16\data\pg_hba.conf"
-$pgHbaBak = "C:\Program Files\PostgreSQL\16\data\pg_hba.conf.bak"
+$pgHba = Join-Path $pgData "pg_hba.conf"
+$pgHbaBak = Join-Path $pgData "pg_hba.conf.aura_bak"
 $psql = "C:\Program Files\PostgreSQL\16\bin\psql.exe"
-$sqlScript = Join-Path (Split-Path -Parent $PSScriptRoot) "scripts\desbloquear_usuarios.sql"
+$pgPort = if ($env:ERP_DB_PORT) { $env:ERP_DB_PORT } else { "5433" }
 
-function Reload-Or-Start-PostgreSql {
-    param([int]$waitPort = 5433)
-    $status = (Get-Service postgresql-x64-16 -ErrorAction SilentlyContinue).Status
-    if ($status -eq "Running") {
-        Write-Host "  Recarregando pg_hba.conf a quente (pg_ctl reload - Zero Downtime no PDV)..." -ForegroundColor Gray
-        & $pgCtl reload -D $pgData 2>&1 | Out-Null
-        Start-Sleep -Milliseconds 600
-        return $true
+function Invoke-PgReload {
+    $svc = Get-Service postgresql-x64-16 -ErrorAction SilentlyContinue
+    if ($null -eq $svc -or $svc.Status -ne "Running") {
+        throw "Servico postgresql-x64-16 nao esta em execucao; abortando para nao interferir no PDV."
     }
-    Write-Host "  Iniciando servico postgresql-x64-16..." -ForegroundColor Gray
-    Start-Service postgresql-x64-16 -ErrorAction SilentlyContinue
-    for ($i = 0; $i -lt 15; $i++) {
-        $listening = netstat -ano | findstr ":$waitPort" | findstr "LISTENING"
-        if ($listening) { return $true }
-        Start-Sleep -Seconds 1
+    $out = & $pgCtl reload -D $pgData 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "Falha ao recarregar pg_hba.conf via pg_ctl reload: $($out | Out-String)"
     }
-    return $false
+    Start-Sleep -Milliseconds 350
 }
 
-# 1. Backup e insercao de trust local temporario no topo do pg_hba.conf (sem BOM)
-Write-Host "[1/4] Preparando canal local de manutencao no pg_hba.conf..." -ForegroundColor Yellow
-Copy-Item $pgHba $pgHbaBak -Force
+# Mutex global entre processos para evitar colisao entre workers Uvicorn
+$mutex = New-Object System.Threading.Mutex($false, "Global\AuraPgRepairLock")
+$hasLock = $false
+$hbaModified = $false
 
-$trustHeader = @"
-# --- REGRA TEMPORARIA DO REPARO AURA (TRUST LOCAL) ---
-host    all             all             127.0.0.1/32            trust
-host    all             all             ::1/128                 trust
-local   all             all                                     trust
+try {
+    try {
+        $hasLock = $mutex.WaitOne(15000)
+    } catch [System.Threading.AbandonedMutexException] {
+        $hasLock = $true
+    }
+    if (-not $hasLock) {
+        throw "Timeout aguardando mutex Global\AuraPgRepairLock."
+    }
+
+    if (-not (Test-Path $pgHba)) {
+        throw "Arquivo pg_hba.conf nao encontrado em $pgHba"
+    }
+    if (-not (Test-Path $psql)) {
+        throw "Executavel psql.exe nao encontrado em $psql"
+    }
+
+    # 1. Backup e insercao de regra trust local restrita APENAS ao usuario postgres
+    Write-Host "[1/3] Abrindo canal local temporario restrito no pg_hba.conf (sem reiniciar PG)..." -ForegroundColor Yellow
+    $originalBytes = [System.IO.File]::ReadAllBytes($pgHba)
+    [System.IO.File]::WriteAllBytes($pgHbaBak, $originalBytes)
+
+    $trustHeader = @"
+# --- REGRA TEMPORARIA DO REPARO AURA (TRUST LOCAL RESTRITO) ---
+host    posto           postgres        127.0.0.1/32            trust
+host    posto           postgres        ::1/128                 trust
+host    posto_ai        postgres        127.0.0.1/32            trust
+host    posto_ai        postgres        ::1/128                 trust
 
 "@
-$rawContent = [System.IO.File]::ReadAllText($pgHba)
-$tempContent = $trustHeader + $rawContent
-$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-[System.IO.File]::WriteAllText($pgHba, $tempContent, $utf8NoBom)
+    $rawContent = [System.IO.File]::ReadAllText($pgHba)
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($pgHba, $trustHeader + $rawContent, $utf8NoBom)
+    $hbaModified = $true
 
-Reload-Or-Start-PostgreSql -waitPort 5433 | Out-Null
+    Invoke-PgReload
 
-# 2. Executar SQL de desbloqueio da aura_service_ro sem tocar nas senhas de postgres/suporte
-Write-Host "[2/4] Ativando role somente-leitura 'aura_service_ro' (preservando senhas do ERP)..." -ForegroundColor Yellow
-$sqlOut = & $psql -h 127.0.0.1 -p 5433 -U postgres -d posto -w -f $sqlScript 2>&1
-Write-Host ($sqlOut | Out-String) -ForegroundColor Cyan
-
-# Concede privilegios na base vetorial posto_ai para aura_service_ro
-$vectorGrants = @"
-GRANT USAGE ON SCHEMA public TO aura_service_ro;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO aura_service_ro;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO aura_service_ro;
+    # 2. Desbloqueio online exclusivo das roles de servico AURA (sem alterar senhas de postgres/suporte)
+    Write-Host "[2/3] Desbloqueando roles 'aura_service_ro' e 'aura_brain_rw' (lock_timeout=1000ms)..." -ForegroundColor Yellow
+    $unlockSql = @"
+SET lock_timeout = '1000ms';
+SET statement_timeout = '3000ms';
 DO `$`$
 BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'aura_core') THEN
-        EXECUTE 'GRANT USAGE, CREATE ON SCHEMA aura_core TO aura_service_ro';
-        EXECUTE 'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA aura_core TO aura_service_ro';
-        EXECUTE 'GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA aura_core TO aura_service_ro';
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'aura_service_ro') THEN
+        ALTER ROLE aura_service_ro WITH LOGIN CONNECTION LIMIT -1 VALID UNTIL 'infinity';
+    ELSE
+        RAISE EXCEPTION 'Role aura_service_ro nao existe no catalogo pg_roles.';
     END IF;
-    IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'n3_sre') THEN
-        EXECUTE 'GRANT USAGE, CREATE ON SCHEMA n3_sre TO aura_service_ro';
-        EXECUTE 'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA n3_sre TO aura_service_ro';
-        EXECUTE 'GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA n3_sre TO aura_service_ro';
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'aura_brain_rw') THEN
+        ALTER ROLE aura_brain_rw WITH LOGIN CONNECTION LIMIT -1 VALID UNTIL 'infinity';
     END IF;
 END
 `$`$;
+SELECT CASE
+    WHEN rolcanlogin AND rolconnlimit <> 0 THEN 'AURA_OK'
+    ELSE 'AURA_LOCKED'
+END AS status
+FROM pg_roles
+WHERE rolname = 'aura_service_ro';
 "@
-& $psql -h 127.0.0.1 -p 5433 -U postgres -d posto_ai -w -c $vectorGrants 2>&1 | Out-Null
 
-# 3. Restaurar pg_hba.conf original (md5) e recarregar a quente
-Write-Host "[3/4] Restaurando seguranca md5 no pg_hba.conf (Zero Downtime)..." -ForegroundColor Yellow
-Copy-Item $pgHbaBak $pgHba -Force
-Reload-Or-Start-PostgreSql -waitPort 5433 | Out-Null
+    $sqlOut = & $psql -h 127.0.0.1 -p $pgPort -U postgres -d posto -w -v ON_ERROR_STOP=1 -t -A -c $unlockSql 2>&1
+    $sqlExit = $LASTEXITCODE
+    $sqlText = ($sqlOut | Out-String).Trim()
+    Write-Host $sqlText -ForegroundColor Cyan
 
-# 4. Teste de validacao final da role aura_service_ro
-Write-Host "[4/4] Validando autenticacao permanente da role 'aura_service_ro'..." -ForegroundColor Yellow
-if (-not $env:PGPASSWORD) {
-    if ($env:ERP_SERVICE_RO_PASSWORD) {
-        $env:PGPASSWORD = $env:ERP_SERVICE_RO_PASSWORD
-    } elseif ($env:ERP_SERVICE_PASS) {
-        $env:PGPASSWORD = $env:ERP_SERVICE_PASS
+    if ($sqlExit -ne 0 -or $sqlText -notmatch "AURA_OK") {
+        throw "Falha ao confirmar desbloqueio da role aura_service_ro (exit=$sqlExit): $sqlText"
     }
+} finally {
+    # 3. Restauracao garantida do pg_hba.conf original e reload imediato
+    if ($hbaModified -and (Test-Path $pgHbaBak)) {
+        Write-Host "[3/3] Restaurando pg_hba.conf original (Zero Downtime)..." -ForegroundColor Yellow
+        try {
+            $bakBytes = [System.IO.File]::ReadAllBytes($pgHbaBak)
+            [System.IO.File]::WriteAllBytes($pgHba, $bakBytes)
+            Invoke-PgReload
+            Remove-Item $pgHbaBak -Force -ErrorAction SilentlyContinue
+        } catch {
+            Write-Error "CRITICO: falha ao restaurar pg_hba.conf: $_"
+        }
+    }
+    if ($hasLock) {
+        $mutex.ReleaseMutex()
+    }
+    $mutex.Dispose()
 }
-$testAura = & $psql -h 127.0.0.1 -p 5433 -U aura_service_ro -d posto -w -c "SELECT 'AURA_OK' as status;" 2>&1
 
-Write-Host ""
-Write-Host "===============================================================================" -ForegroundColor Green
-if ($testAura -match "AURA_OK") {
-    Write-Host "  [SUCESSO] ROLE 'aura_service_ro' ATIVA E PERMANENTE (VALID UNTIL INFINITY)!" -ForegroundColor Green
-    Write-Host "  - Senhas de 'postgres' e 'suporte' do ERP preservadas 100% intocadas" -ForegroundColor Green
-    Write-Host "  - Validade do 'suporte' estendida para 'infinity' sem alterar a senha atual" -ForegroundColor Green
-    Write-Host "  - Role 'aura_service_ro' ativa em modo estrito somente-leitura (SELECT)" -ForegroundColor Green
-} else {
-    Write-Host "  [AVISO] Resultado da validacao:" -ForegroundColor Yellow
-    Write-Host "  AURA: $testAura" -ForegroundColor Gray
-}
-Write-Host "===============================================================================" -ForegroundColor Green
+Write-Host "[SUCESSO] Role aura_service_ro desbloqueada com seguranca (AURA_OK)." -ForegroundColor Green
+exit 0

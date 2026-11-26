@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aurapostoassitance.data.audio.AuraVoiceManager
 import com.example.aurapostoassitance.data.local.AuraOfflineVault
+import com.example.aurapostoassitance.data.local.ServerConfig
 import com.example.aurapostoassitance.data.local.memory.AuraSemanticMemoryVault
 import com.example.aurapostoassitance.data.npu.AuraNpuEngine
 import com.example.aurapostoassitance.data.npu.NpuHardwareStatus
@@ -13,11 +14,16 @@ import com.example.aurapostoassitance.data.remote.MorningBriefingRequest
 import com.example.aurapostoassitance.data.remote.MorningBriefingResponse
 import com.example.aurapostoassitance.data.remote.QuickActionRequest
 import com.example.aurapostoassitance.data.security.AuraHardwareAuthManager
+import com.example.aurapostoassitance.data.security.AuraKeystoreVault
 import com.example.aurapostoassitance.data.sensors.AuraContextSensorManager
 import com.example.aurapostoassitance.data.sensors.AuraPhysicalContext
 import com.example.aurapostoassitance.data.vision.AuraSharedIntakeRelay
 import com.example.aurapostoassitance.data.vision.AuraVisionNpuScanner
 import com.example.aurapostoassitance.data.vision.ScannedDocumentTelemetry
+import com.example.aurapostoassitance.ui.components.AuraIslandMetric
+import com.example.aurapostoassitance.ui.components.AuraIslandTelemetry
+import com.example.aurapostoassitance.ui.domain.AuraDomainAdapter
+import com.example.aurapostoassitance.ui.domain.DomainPackUiProfile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,6 +55,8 @@ class DashboardViewModel @Inject constructor(
     private val voiceManager: AuraVoiceManager,
     private val npuEngine: AuraNpuEngine,
     private val offlineVault: AuraOfflineVault,
+    private val serverConfig: ServerConfig,
+    private val keystoreVault: AuraKeystoreVault,
     val hardwareAuthManager: AuraHardwareAuthManager,
     val visionScanner: AuraVisionNpuScanner,
     val memoryVault: AuraSemanticMemoryVault,
@@ -60,17 +68,23 @@ class DashboardViewModel @Inject constructor(
         sharedIntakeRelay.publishTelemetry(telemetry)
     }
 
-    val availableSegments = listOf(
-        SegmentChoice("postos_redes", "Postos & Redes", "Tanques, LMC & Pista"),
-        SegmentChoice("varejo", "Varejo & Franquias", "Giro, PDV & Ruptura"),
-        SegmentChoice("saas_b2b", "SaaS & Consultoria", "Contratos & Churn B2B"),
-        SegmentChoice("saude_clinicas", "Saúde & Clínicas", "Agendas & No-Show"),
-        SegmentChoice("ecommerce", "E-commerce & D2C", "Carrinhos & Estoque"),
-        SegmentChoice("logistica", "Logística & Frotas", "Cargas & Ociosidade")
-    )
+    val availableProfiles: List<DomainPackUiProfile> = AuraDomainAdapter.allProfiles
 
-    private val _selectedSegment = MutableStateFlow("postos_redes")
+    val availableSegments = availableProfiles.map {
+        SegmentChoice(it.packId, it.shortLabel, it.subtitle)
+    }
+
+    private val _selectedSegment = MutableStateFlow(serverConfig.activePackId)
     val selectedSegment: StateFlow<String> = _selectedSegment.asStateFlow()
+
+    private val _isServerOnline = MutableStateFlow<Boolean?>(null)
+    val isServerOnline: StateFlow<Boolean?> = _isServerOnline.asStateFlow()
+
+    private val _authExpiredMessage = MutableStateFlow<String?>(null)
+    val authExpiredMessage: StateFlow<String?> = _authExpiredMessage.asStateFlow()
+
+    private val _islandTelemetry = MutableStateFlow(AuraIslandTelemetry())
+    val islandTelemetry: StateFlow<AuraIslandTelemetry> = _islandTelemetry.asStateFlow()
 
     private val _briefingState = MutableStateFlow<BriefingUiState>(BriefingUiState.Loading)
     val briefingState: StateFlow<BriefingUiState> = _briefingState.asStateFlow()
@@ -100,9 +114,58 @@ class DashboardViewModel @Inject constructor(
 
     fun toggleCarMode() = contextSensorManager.toggleManualCarMode()
 
+    fun dismissAuthExpired() {
+        _authExpiredMessage.value = null
+    }
+
     init {
         loadBriefing(_selectedSegment.value)
+        refreshLiveTelemetry(_selectedSegment.value)
         startHandoffSummaryPolling()
+        viewModelScope.launch {
+            keystoreVault.authExpiredEvents.collect { msg ->
+                _authExpiredMessage.value = msg
+                _isServerOnline.value = false
+            }
+        }
+    }
+
+    fun refreshLiveTelemetry(packId: String = _selectedSegment.value) {
+        viewModelScope.launch {
+            runCatching { apiService.checkHealth() }
+                .onSuccess { _isServerOnline.value = true }
+                .onFailure { _isServerOnline.value = false }
+
+            runCatching { apiService.getZeroClickFeed(packId = packId) }
+                .onSuccess { feed ->
+                    val allItems = (feed.alerts + feed.metrics).map { m ->
+                        AuraIslandMetric(
+                            title = m.label,
+                            value = m.value,
+                            detail = m.detail ?: m.value,
+                            status = m.status,
+                            actionLabel = "Analisar",
+                            actionQuery = m.action_query ?: "Detalhe o indicador ${m.label} (${m.value}) e recomende ações."
+                        )
+                    }
+                    val summary = feed.headline?.takeIf { it.isNotBlank() }
+                        ?: allItems.take(2).joinToString(" • ") { "${it.title}: ${it.value}" }
+                            .ifBlank { "Telemetria ao vivo conectada • Toque para auditar" }
+                    _islandTelemetry.value = AuraIslandTelemetry(
+                        isLive = true,
+                        summaryPill = summary,
+                        items = allItems
+                    )
+                }
+                .onFailure {
+                    val profile = AuraDomainAdapter.profileFor(packId)
+                    _islandTelemetry.value = AuraIslandTelemetry(
+                        isLive = false,
+                        summaryPill = "${profile.shortLabel} • Toque para diagnóstico ao vivo",
+                        items = emptyList()
+                    )
+                }
+        }
     }
 
     private fun startHandoffSummaryPolling() {
@@ -126,30 +189,35 @@ class DashboardViewModel @Inject constructor(
     }
 
     fun selectSegment(segmentKey: String) {
-        if (_selectedSegment.value == segmentKey) return
-        _selectedSegment.value = segmentKey
+        val normalized = AuraDomainAdapter.normalizePackId(segmentKey)
+        if (_selectedSegment.value == normalized) return
+        _selectedSegment.value = normalized
+        serverConfig.activePackId = normalized
         stopBriefingAudio()
-        loadBriefing(segmentKey)
+        loadBriefing(normalized)
+        refreshLiveTelemetry(normalized)
     }
 
     fun loadBriefing(segmentKey: String = _selectedSegment.value) {
         viewModelScope.launch {
             _actionFeedback.value = null
+            val profile = AuraDomainAdapter.profileFor(segmentKey)
 
             // 1. Resposta instantânea em 0ms através do cofre offline (Offline Vault)
-            val cached = offlineVault.getBriefing(segmentKey)
+            val cached = offlineVault.getBriefing(profile.legacySegmentKey)
             _briefingState.value = BriefingUiState.Success(cached, isOfflineCached = true)
 
             // 2. Sincronização em segundo plano com a AURA Local
             try {
                 val response = apiService.getMorningBriefing(
                     MorningBriefingRequest(
-                        segment = segmentKey,
+                        segment = profile.legacySegmentKey,
                         manager_name = "Marlon Henrique",
-                        business_name = availableSegments.firstOrNull { it.key == segmentKey }?.label
+                        business_name = profile.displayName
                     )
                 )
-                offlineVault.saveBriefing(segmentKey, response)
+                offlineVault.saveBriefing(profile.legacySegmentKey, response)
+                _isServerOnline.value = true
                 _briefingState.value = BriefingUiState.Success(response, isOfflineCached = false)
             } catch (e: Exception) {
                 // Mantém a visualização com o cofre offline ativo

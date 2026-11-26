@@ -22,11 +22,13 @@ Garantias e Recursos:
 
 from __future__ import annotations
 
+import contextvars
 import copy
 import logging
 import re
 import threading
-from typing import Any, Dict, List, Optional, Set, Tuple
+from contextlib import contextmanager
+from typing import Any, Dict, Iterator, List, Optional, Set, Tuple
 
 try:
     import spacy
@@ -289,7 +291,325 @@ _PII_ENTITY_ALLOWLIST_TOKENS: Set[str] = {
     "refrigerante",
     "redacted",
     "neutralized",
+    # Termos executivos, acoes de botoes GenUI e vocabulario operacional PT-BR
+    "aprovar",
+    "revisao",
+    "margem",
+    "ajustar",
+    "metas",
+    "meta",
+    "auditoria",
+    "auditar",
+    "fechamento",
+    "diagnostico",
+    "operacional",
+    "executivo",
+    "executiva",
+    "resumo",
+    "relatorio",
+    "alerta",
+    "conforme",
+    "conformidade",
+    "critico",
+    "critica",
+    "simular",
+    "simulacao",
+    "pauta",
+    "preco",
+    "precos",
+    "compra",
+    "compras",
+    "venda",
+    "vendas",
+    "lucro",
+    "rentabilidade",
+    "estoque",
+    "autonomia",
+    "faturamento",
+    "conciliacao",
+    "divergencia",
+    "quebra",
+    "turnos",
+    "indicador",
+    "indicadores",
+    "scorecard",
+    "benchmark",
+    "compliance",
+    "radar",
+    "briefing",
+    "matinal",
+    "painel",
+    "acao",
+    "acoes",
+    "recomendada",
+    "recomendado",
+    "danfe",
+    "fiscal",
+    "tributario",
+    "tributaria",
+    "contabil",
+    "financeiro",
+    "financeira",
+    "abastecimento",
+    "abastecimentos",
+    "medicao",
+    "medicoes",
+    "sonda",
+    "sondas",
+    "lote",
+    "cartao",
+    "cartoes",
+    "dinheiro",
+    "credito",
+    "debito",
+    "operacao",
+    "gestao",
+    "gestor",
+    "socio",
+    "consultor",
+    "aplicar",
+    "recomendacoes",
+    "prioritarias",
+    "prioritario",
+    "prioritaria",
+    "telemetria",
+    "volumetrica",
+    "volumetrico",
+    "minima",
+    "minimo",
+    "maxima",
+    "maximo",
+    "escala",
+    "cenario",
+    "cenarios",
+    "canvas",
+    "projetar",
+    "analise",
+    "analises",
+    "diferenca",
+    "diferencas",
+    "saldo",
+    "saldos",
+    "comparativo",
+    "comparativa",
+    "monitoramento",
+    "eficiencia",
+    "equipe",
+    "lider",
+    "campeao",
+    "conversao",
+    "desempenho",
+    "produtividade",
+    "frentista",
+    "frentistas",
+    "vendedor",
+    "vendedores",
+    "funcionario",
+    "funcionarios",
+    "ranking",
+    "vazao",
+    "hidraulica",
 }
+
+# Papeis de equipe interna elegiveis para pseudonimizacao reversivel ([OP_01], [OP_02]...)
+# Clientes, pacientes, medicos e terceiros continuam com redacao irreversivel ([REDACTED:PERSON]).
+_INTERNAL_STAFF_ROLES: Set[str] = {
+    "operador",
+    "operadora",
+    "frentista",
+    "vendedor",
+    "vendedora",
+    "funcionario",
+    "funcionaria",
+    "gerente",
+    "caixa",
+    "supervisor",
+    "supervisora",
+    "atendente",
+    "colaborador",
+    "colaboradora",
+}
+
+# Chaves JSON conhecidas de operadores/funcionarios internos em payloads de ERP/ferramentas
+_OPERATOR_NAME_KEYS: Set[str] = {
+    "operador",
+    "operador_nome",
+    "nome_operador",
+    "operador_responsavel",
+    "frentista",
+    "frentista_nome",
+    "nome_frentista",
+    "melhor_frentista_nome",
+    "funcionario",
+    "funcionario_nome",
+    "nome_funcionario",
+    "vendedor",
+    "vendedor_nome",
+    "nome_vendedor",
+    "caixa_operador",
+    "operador_caixa",
+    "atendente",
+    "responsavel_turno",
+    "colaborador",
+}
+
+# Colecoes/objetos cujos itens contem campo 'nome' de colaborador/operador interno (nao de cliente)
+_STAFF_CONTAINER_KEYS: Set[str] = {
+    "ranking",
+    "ranking_frentistas",
+    "ranking_vendedores",
+    "ranking_vendedores_pdv",
+    "ranking_funcionarios_consolidado",
+    "vendedores",
+    "operadores",
+    "frentistas",
+    "caixas",
+    "equipe",
+    "campeao_volume",
+    "campeao_faturamento",
+    "campeao_aditivada",
+    "campeao_vendas_pdv",
+    "maior_ticket_medio",
+}
+
+# Chaves tecnicas estruturais de widgets GenUI (pass-through sem NER)
+_UI_TECHNICAL_ID_KEYS: Set[str] = {
+    "action_id",
+    "tool_call_id",
+    "idempotency_key",
+    "component_name",
+    "client_component",
+    "block_type",
+    "block_id",
+    "intent",
+    "icon",
+    "variant",
+    "severity",
+}
+
+# Chaves de rotulos/titulos estruturais de GenUI (mantem filtro de CPF/credenciais/injection, pula NER de pessoa)
+_UI_LABEL_KEYS: Set[str] = {
+    "title",
+    "subtitle",
+    "label",
+    "badge_label",
+    "cta_label",
+    "button_label",
+    "action_label",
+    "status",
+    "status_geral",
+    "status_conformidade",
+    "status_anp",
+    "unit",
+}
+
+_OP_TOKEN_RE = re.compile(r"\[OP_\d{2,4}\]")
+
+
+class OperatorPseudonymVault:
+    """
+    Cofre efemero por requisicao (isolado via ContextVar e thread-safe) para
+    pseudonimizacao reversivel de operadores/funcionarios internos.
+    - Saida para LLM externo (Gemini): substitui nomes de operadores por [OP_01], [OP_02]...
+    - Saida para cliente autenticado (Web, Android, WhatsApp): re-hidrata [OP_XX] para o nome real.
+    - Clientes, pacientes e dados pessoais de terceiros nunca entram neste cofre.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._norm_to_token: Dict[str, str] = {}
+        self._token_to_real: Dict[str, str] = {}
+        self._counter: int = 0
+
+    @staticmethod
+    def _normalize_key(name: str) -> str:
+        collapsed = re.sub(r"[\s_]+", " ", name.strip())
+        return _normalize_ascii_lower(collapsed)
+
+    @staticmethod
+    def _format_display_name(name: str) -> str:
+        cleaned = re.sub(r"\s+", " ", name.strip())
+        if "_" in cleaned and " " not in cleaned:
+            parts = [p for p in cleaned.split("_") if p]
+            if parts:
+                return " ".join(p.capitalize() if p.isupper() else p for p in parts)
+        return cleaned
+
+    def pseudonymize(self, real_name: str) -> str:
+        """Retorna um token deterministico [OP_XX] para o operador na requisicao atual."""
+        if not real_name or not isinstance(real_name, str):
+            return real_name
+        stripped = real_name.strip()
+        if not stripped or _OP_TOKEN_RE.fullmatch(stripped) or "[REDACTED:" in stripped:
+            return stripped
+
+        norm_key = self._normalize_key(stripped)
+        if not norm_key:
+            return stripped
+
+        with self._lock:
+            existing = self._norm_to_token.get(norm_key)
+            if existing is not None:
+                return existing
+            self._counter += 1
+            token = f"[OP_{self._counter:02d}]"
+            self._norm_to_token[norm_key] = token
+            self._token_to_real[token] = self._format_display_name(stripped)
+            return token
+
+    def has_mappings(self) -> bool:
+        with self._lock:
+            return bool(self._token_to_real)
+
+    def rehydrate_text(self, text: str) -> str:
+        """Restaura tokens [OP_XX] para os nomes reais dos operadores internos."""
+        if not text or "[OP_" not in text:
+            return text
+        with self._lock:
+            if not self._token_to_real:
+                return text
+            mapping = dict(self._token_to_real)
+
+        def _replace(match: re.Match[str]) -> str:
+            tok = match.group(0)
+            return mapping.get(tok, tok)
+
+        return _OP_TOKEN_RE.sub(_replace, text)
+
+    def rehydrate_data(self, obj: Any) -> Any:
+        """Restaura recursivamente tokens [OP_XX] em dicionarios, listas e strings."""
+        if not self.has_mappings():
+            return obj
+        if isinstance(obj, str):
+            return self.rehydrate_text(obj)
+        if isinstance(obj, dict):
+            return {k: self.rehydrate_data(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [self.rehydrate_data(item) for item in obj]
+        return obj
+
+
+_active_operator_vault: contextvars.ContextVar[Optional[OperatorPseudonymVault]] = (
+    contextvars.ContextVar("aura_operator_pseudonym_vault", default=None)
+)
+
+
+def get_active_operator_vault() -> Optional[OperatorPseudonymVault]:
+    """Retorna o cofre de pseudonimizacao de operadores ativo no contexto atual, se houver."""
+    return _active_operator_vault.get()
+
+
+@contextmanager
+def operator_pseudonym_scope(
+    vault: Optional[OperatorPseudonymVault] = None,
+) -> Iterator[OperatorPseudonymVault]:
+    """Ativa um escopo isolado por requisicao para pseudonimizacao reversivel de operadores."""
+    active_vault = vault if vault is not None else OperatorPseudonymVault()
+    token = _active_operator_vault.set(active_vault)
+    try:
+        yield active_vault
+    finally:
+        _active_operator_vault.reset(token)
 
 # Heuristica deterministica contextual PT-BR para nomes proprios (Carbon Core P0.3)
 # Nota: case-insensitivity (?i:...) restrito estritamente ao papel para exigir
@@ -326,7 +646,7 @@ def _normalize_ascii_lower(value: str) -> str:
 
 def _is_allowlisted_entity(candidate: str) -> bool:
     """Retorna True se o termo pertence a razoes sociais ANP, marcas, combustiveis ou termos tecnicos."""
-    if not candidate or "[REDACTED:" in candidate or "[NEUTRALIZED_" in candidate:
+    if not candidate or "[REDACTED:" in candidate or "[NEUTRALIZED_" in candidate or "[OP_" in candidate:
         return True
     norm = _normalize_ascii_lower(candidate)
     for pref in _PII_ENTITY_ALLOWLIST_PREFIXES:
@@ -494,7 +814,9 @@ class CentralLogSanitizer:
         self._category_counts: Dict[str, int] = {}
         self._lock = threading.Lock()
 
-    def sanitize_text(self, text: str) -> Tuple[str, Dict[str, int]]:
+    def sanitize_text(
+        self, text: str, *, skip_person_ner: bool = False
+    ) -> Tuple[str, Dict[str, int]]:
         """
         Higieniza uma string completa, substituindo dados sensíveis por marcadores canônicos.
         Retorna (texto_sanitizado, contadores_por_categoria).
@@ -700,7 +1022,9 @@ class CentralLogSanitizer:
         result = _BASE64_PATTERN.sub(_sub_b64, result)
 
         # 25. Redacao LGPD de Nomes Proprios (PER) e Enderecos Contextualizados (LOC) (Carbon Core P0.3)
-        result = self._redact_person_and_address_pii(result, counts)
+        result = self._redact_person_and_address_pii(
+            result, counts, skip_person_ner=skip_person_ner
+        )
 
         total_found = sum(counts.values())
         if total_found > 0:
@@ -711,17 +1035,22 @@ class CentralLogSanitizer:
 
         return result, counts
 
-    def _redact_person_and_address_pii(self, text: str, counts: Dict[str, int]) -> str:
+    def _redact_person_and_address_pii(
+        self, text: str, counts: Dict[str, int], *, skip_person_ner: bool = False
+    ) -> str:
         """
         Aplica redacao deterministica contextual PT-BR e NER spaCy (pt_core_news_sm quando
         disponivel) para nomes proprios (PER -> [REDACTED:PERSON]) e enderecos fisicos
         contextualizados com logradouro/numero (LOC -> [REDACTED:ADDRESS]), preservando
         razoes sociais ANP, marcas comerciais e nomes de produtos via allowlist.
+        Quando um OperatorPseudonymVault esta ativo no escopo da requisicao, nomes de
+        operadores/frentistas internos recebem pseudonimo reversivel [OP_XX].
         """
         if not text:
             return text
 
         result = text
+        active_vault = get_active_operator_vault()
 
         # 25.1 Enderecos contextualizados (logradouro + numero)
         def _sub_ctx_address(m):
@@ -741,6 +1070,11 @@ class CentralLogSanitizer:
             name = m.group("name").strip()
             if _is_allowlisted_entity(name):
                 return m.group(0)
+            role_norm = _normalize_ascii_lower(role)
+            if active_vault is not None and role_norm in _INTERNAL_STAFF_ROLES:
+                token = active_vault.pseudonymize(name)
+                counts["operator_pseudonym"] = counts.get("operator_pseudonym", 0) + 1
+                return f"{role}{sep}{token}"
             counts["person"] = counts.get("person", 0) + 1
             return f"{role}{sep}{REDACTED_PERSON}"
 
@@ -756,7 +1090,7 @@ class CentralLogSanitizer:
                     ent_text = ent.text.strip()
                     if not ent_text or _is_allowlisted_entity(ent_text):
                         continue
-                    if ent.label_ in ("PER", "PERSON"):
+                    if ent.label_ in ("PER", "PERSON") and not skip_person_ner:
                         # Exige nome composto (minimo 2 palavras) para evitar falsos positivos em siglas/marcas
                         words = [w for w in ent_text.split() if len(w) >= 2]
                         if len(words) >= 2:
@@ -800,15 +1134,48 @@ class CentralLogSanitizer:
         clean_payload = copy.deepcopy(payload)
         aggregated_counts: Dict[str, int] = {}
 
-        def _walk_and_clean(obj, key_name: Optional[str] = None):
+        def _walk_and_clean(obj, key_name: Optional[str] = None, is_staff_ctx: bool = False):
             if isinstance(obj, dict):
-                return {k: _walk_and_clean(v, key_name=k) for k, v in obj.items()}
+                key_norm = key_name.lower() if isinstance(key_name, str) else ""
+                dict_staff_ctx = is_staff_ctx or (key_norm in _STAFF_CONTAINER_KEYS) or any(
+                    marker in obj for marker in ("operador_matricula", "vendedor_matr", "total_abastecimentos")
+                )
+                return {
+                    k: _walk_and_clean(v, key_name=k, is_staff_ctx=dict_staff_ctx)
+                    for k, v in obj.items()
+                }
             elif isinstance(obj, list):
-                return [_walk_and_clean(item, key_name=key_name) for item in obj]
+                list_key_norm = key_name.lower() if isinstance(key_name, str) else ""
+                list_staff_ctx = is_staff_ctx or (list_key_norm in _STAFF_CONTAINER_KEYS)
+                return [
+                    _walk_and_clean(item, key_name=key_name, is_staff_ctx=list_staff_ctx)
+                    for item in obj
+                ]
             elif isinstance(obj, str):
+                key_norm = key_name.lower() if isinstance(key_name, str) else ""
                 # Preservar identificadores estruturais e metadados tecnicos de widgets
-                if key_name in ("action_id", "tool_call_id", "idempotency_key", "component_name", "client_component"):
+                if key_norm in _UI_TECHNICAL_ID_KEYS:
                     return obj
+                # Pseudonimizacao reversivel para campos explicitos de operadores internos
+                if key_norm in _OPERATOR_NAME_KEYS or (is_staff_ctx and key_norm == "nome"):
+                    active_vault = get_active_operator_vault()
+                    cleaned_op, counts = self.sanitize_text(obj, skip_person_ner=True)
+                    for cat, c in counts.items():
+                        aggregated_counts[cat] = aggregated_counts.get(cat, 0) + c
+                    if active_vault is not None:
+                        if cleaned_op.strip() and "[REDACTED:" not in cleaned_op:
+                            aggregated_counts["operator_pseudonym"] = (
+                                aggregated_counts.get("operator_pseudonym", 0) + 1
+                            )
+                            return active_vault.pseudonymize(cleaned_op)
+                        return cleaned_op
+                    return cleaned_op
+                # Titulos e rotulos de UI: mantem blindagem de CPF/credenciais/injection sem falso-positivo NER
+                if key_norm in _UI_LABEL_KEYS:
+                    cleaned, counts = self.sanitize_text(obj, skip_person_ner=True)
+                    for cat, c in counts.items():
+                        aggregated_counts[cat] = aggregated_counts.get(cat, 0) + c
+                    return cleaned
                 cleaned, counts = self.sanitize_text(obj)
                 for cat, c in counts.items():
                     aggregated_counts[cat] = aggregated_counts.get(cat, 0) + c
@@ -1282,6 +1649,9 @@ class StreamingOutputSanitizerGuard:
 
         emit = cleaned[:cut]
         self._buffer = cleaned[cut:]
+        active_vault = get_active_operator_vault()
+        if active_vault is not None and active_vault.has_mappings():
+            emit = active_vault.rehydrate_text(emit)
         return emit
 
     def flush(self) -> str:
@@ -1290,6 +1660,9 @@ class StreamingOutputSanitizerGuard:
             return ""
         remaining = self._clean(self._buffer)
         self._buffer = ""
+        active_vault = get_active_operator_vault()
+        if active_vault is not None and active_vault.has_mappings():
+            remaining = active_vault.rehydrate_text(remaining)
         return remaining
 
     def reset(self) -> None:

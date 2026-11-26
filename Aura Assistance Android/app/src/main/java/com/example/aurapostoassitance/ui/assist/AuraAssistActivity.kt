@@ -57,7 +57,9 @@ import com.example.aurapostoassitance.data.audio.AuraDirectVoiceAction
 import com.example.aurapostoassitance.data.audio.AuraVoiceCommandRouter
 import com.example.aurapostoassitance.data.audio.AuraVoiceManager
 import com.example.aurapostoassitance.data.local.AuraOfflineVault
+import com.example.aurapostoassitance.data.local.ServerConfig
 import com.example.aurapostoassitance.data.npu.AuraNpuEngine
+import com.example.aurapostoassitance.ui.domain.AuraDomainAdapter
 import com.example.aurapostoassitance.ui.components.AuraBrandTitle
 import com.example.aurapostoassitance.ui.components.AuraLivingOrb
 import com.example.aurapostoassitance.ui.components.AuraChip
@@ -90,12 +92,16 @@ class AuraAssistActivity : FragmentActivity() {
     @Inject
     lateinit var voiceCommandRouter: AuraVoiceCommandRouter
 
+    @Inject
+    lateinit var serverConfig: ServerConfig
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
             AuraPostoAssitanceTheme {
                 AssistOverlayContent(
+                    activePackId = serverConfig.activePackId,
                     onDismiss = { finish() },
                     onNavigateToChat = { query ->
                         val intent = Intent(this, MainActivity::class.java).apply {
@@ -119,6 +125,7 @@ class AuraAssistActivity : FragmentActivity() {
 
 @Composable
 private fun AssistOverlayContent(
+    activePackId: String,
     onDismiss: () -> Unit,
     onNavigateToChat: (String?) -> Unit,
     voiceManager: AuraVoiceManager,
@@ -131,7 +138,8 @@ private fun AssistOverlayContent(
     val voiceAmplitude by voiceManager.voiceAmplitude.collectAsState()
     val hardwareStatus by npuEngine.hardwareStatus.collectAsState()
 
-    val briefing = remember { offlineVault.getBriefing("postos_redes") }
+    val profile = remember(activePackId) { AuraDomainAdapter.profileFor(activePackId) }
+    val briefing = remember(profile.legacySegmentKey) { offlineVault.getBriefing(profile.legacySegmentKey) }
 
     Box(
         modifier = Modifier

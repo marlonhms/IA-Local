@@ -547,7 +547,8 @@ def ensure_semantic_cache_partition_schema(
         if hasattr(conn, "commit"):
             conn.commit()
     finally:
-        cur.close()
+        if hasattr(cur, "close"):
+            cur.close()
 
     return {
         "status": "ok",
@@ -555,6 +556,181 @@ def ensure_semantic_cache_partition_schema(
         "dialect": resolved_dialect,
         "columns": ["tenant_id", "filial_id", "pack_id", "created_at"],
     }
+
+
+def ensure_autonomous_brain_schema(conn: Any, dialect: str | None = None) -> dict[str, Any]:
+    """
+    Garante de forma idempotente o esquema completo do cerebro cognitivo autonomo
+    da AURA no banco posto_ai (ou SQLite em testes):
+    1. perguntas_cache particionada por (tenant_id, filial_id, pack_id, created_at)
+    2. intencoes_vetores com coluna pack_id e indice de filtragem
+    3. aura_learned_knowledge para auto-especializacao compacta de baixo custo de tokens
+    """
+    resolved_dialect = dialect
+    if resolved_dialect is None:
+        mod_name = type(conn).__module__.lower()
+        resolved_dialect = "sqlite" if "sqlite" in mod_name else "postgresql"
+
+    cache_res = ensure_semantic_cache_partition_schema(conn, dialect=resolved_dialect)
+    cur = conn.cursor()
+    try:
+        if resolved_dialect == "postgresql":
+            cur.execute(
+                """
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.tables
+                        WHERE table_name = 'intencoes_vetores'
+                          AND table_schema = ANY(current_schemas(false))
+                    ) THEN
+                        ALTER TABLE intencoes_vetores
+                        ADD COLUMN IF NOT EXISTS pack_id VARCHAR(64) NOT NULL DEFAULT 'global';
+                    END IF;
+                END
+                $$;
+                """
+            )
+            cur.execute(
+                """
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.tables
+                        WHERE table_name = 'intencoes_vetores'
+                          AND table_schema = ANY(current_schemas(false))
+                    ) THEN
+                        CREATE INDEX IF NOT EXISTS idx_intencoes_vetores_pack_id
+                        ON intencoes_vetores (pack_id);
+                    END IF;
+                END
+                $$;
+                """
+            )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS aura_learned_knowledge (
+                    id SERIAL PRIMARY KEY,
+                    tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
+                    filial_id VARCHAR(32) NOT NULL DEFAULT '1',
+                    pack_id VARCHAR(64) NOT NULL DEFAULT 'fuel_convenience',
+                    topic_key VARCHAR(128) NOT NULL,
+                    fact_type VARCHAR(48) NOT NULL DEFAULT 'operational_rule',
+                    summary_compact VARCHAR(320) NOT NULL,
+                    structured_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    embedding halfvec(768),
+                    confidence REAL NOT NULL DEFAULT 0.90,
+                    usage_count INTEGER NOT NULL DEFAULT 0,
+                    status VARCHAR(24) NOT NULL DEFAULT 'approved',
+                    source VARCHAR(64) NOT NULL DEFAULT 'aura_engine',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    CONSTRAINT uq_aura_learned_knowledge_scope
+                        UNIQUE (tenant_id, filial_id, pack_id, topic_key)
+                );
+                """
+            )
+            cur.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_aura_learned_knowledge_scope_status
+                ON aura_learned_knowledge (tenant_id, filial_id, pack_id, status, updated_at DESC);
+                """
+            )
+        else:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS intencoes_vetores (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    intencao TEXT NOT NULL,
+                    descricao TEXT,
+                    exemplo_frase TEXT,
+                    embedding TEXT,
+                    pack_id TEXT NOT NULL DEFAULT 'global',
+                    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                """
+            )
+            cur.execute("PRAGMA table_info(intencoes_vetores);")
+            int_cols = {str(r[1]).lower() for r in cur.fetchall()}
+            if "pack_id" not in int_cols:
+                cur.execute("ALTER TABLE intencoes_vetores ADD COLUMN pack_id TEXT NOT NULL DEFAULT 'global';")
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_intencoes_vetores_pack_id ON intencoes_vetores (pack_id);"
+            )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS aura_learned_knowledge (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id TEXT NOT NULL DEFAULT 'default',
+                    filial_id TEXT NOT NULL DEFAULT '1',
+                    pack_id TEXT NOT NULL DEFAULT 'fuel_convenience',
+                    topic_key TEXT NOT NULL,
+                    fact_type TEXT NOT NULL DEFAULT 'operational_rule',
+                    summary_compact TEXT NOT NULL,
+                    structured_data TEXT NOT NULL DEFAULT '{}',
+                    embedding TEXT,
+                    confidence REAL NOT NULL DEFAULT 0.90,
+                    usage_count INTEGER NOT NULL DEFAULT 0,
+                    status TEXT NOT NULL DEFAULT 'approved',
+                    source TEXT NOT NULL DEFAULT 'aura_engine',
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE (tenant_id, filial_id, pack_id, topic_key)
+                );
+                """
+            )
+            cur.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_aura_learned_knowledge_scope_status
+                ON aura_learned_knowledge (tenant_id, filial_id, pack_id, status, updated_at);
+                """
+            )
+
+        if hasattr(conn, "commit"):
+            conn.commit()
+    finally:
+        if hasattr(cur, "close"):
+            cur.close()
+
+    return {
+        "status": "ok",
+        "dialect": resolved_dialect,
+        "cache": cache_res,
+        "tables": ["perguntas_cache", "intencoes_vetores", "aura_learned_knowledge"],
+    }
+
+
+def bootstrap_autonomous_brain_schema() -> dict[str, Any]:
+    """
+    Executa a auto-migracao nao-bloqueante do cerebro cognitivo (posto_ai) no startup.
+    Quando conectada como aura_brain_rw (dona de posto_ai), cria/atualiza automaticamente
+    todas as tabelas e indices sem intervencao humana. Se a role atual nao tiver privilegio
+    de ownership, faz rollback limpo e retorna status degradado sem derrubar o servico.
+    """
+    try:
+        from core.db_pool import get_vector_connection
+
+        with get_vector_connection() as conn:
+            try:
+                result = ensure_autonomous_brain_schema(conn, dialect="postgresql")
+                logger.info(
+                    "Cerebro autonomo AURA (posto_ai) sincronizado no startup: %s",
+                    ",".join(result.get("tables", [])),
+                )
+                return result
+            except Exception as exc:  # noqa: BLE001
+                try:
+                    conn.rollback()
+                except Exception:  # noqa: BLE001
+                    pass
+                logger.warning(
+                    "Auto-migracao do cerebro autonomo (posto_ai) adiada (provisione aura_brain_rw): %s",
+                    exc,
+                )
+                return {"status": "deferred", "reason": str(exc)}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Banco vetorial posto_ai indisponivel durante bootstrap de startup: %s", exc)
+        return {"status": "offline", "reason": str(exc)}
 
 
 def run_startup_migrations(db_path: str | Path | None = None) -> dict[str, Any]:
