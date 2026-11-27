@@ -38,6 +38,14 @@
 
 ---
 
+> **Documentacao Estruturada (Portal Publico vs. Engenharia Interna)**
+> - **Portal Publico (Clientes e Parceiros):** [`docs/public/README.md`](docs/public/README.md)
+> - **Novidades Fases 1 a 4B (What-If Zero-Token, Governanca HiC e Backtesting ROI):** [`docs/public/02-funcionalidades/motor-whatif-hic-backtesting.md`](docs/public/02-funcionalidades/motor-whatif-hic-backtesting.md)
+> - **Referencia de API (`/api/v1/simulate/*` e `/api/v1/memory/*`):** [`docs/public/04-referencia-api/simulacao-memoria-backtesting.md`](docs/public/04-referencia-api/simulacao-memoria-backtesting.md)
+> - **Indice Mestre (Publico + Engenharia Interna):** [`docs/INDEX.md`](docs/INDEX.md)
+
+---
+
 ## 📌 Visão Geral do Produto: AURA (Assistente de Prontidão)
 
 A **AURA** (antigo Ai.la) é a **Assistente de Prontidão Executiva e Gerente Supervisora de Postos de Combustíveis e Lojas de Conveniência**, com foco absoluto em **chat inteligente sob demanda e suporte à tomada de decisão rápida**.
