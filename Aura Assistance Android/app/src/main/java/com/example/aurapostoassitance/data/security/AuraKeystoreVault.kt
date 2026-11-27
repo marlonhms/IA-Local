@@ -4,6 +4,7 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import com.example.aurapostoassitance.data.remote.AuraAuthCredentialsProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -24,15 +25,19 @@ import javax.inject.Singleton
 @Singleton
 class AuraKeystoreVault @Inject constructor(
     @ApplicationContext context: Context
-) {
+) : AuraAuthCredentialsProvider {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private val _authExpiredEvents = MutableSharedFlow<String>(extraBufferCapacity = 4)
     val authExpiredEvents: SharedFlow<String> = _authExpiredEvents.asSharedFlow()
 
-    fun notifyAuthExpired(reason: String) {
+    override fun notifyAuthExpired(reason: String) {
         _authExpiredEvents.tryEmit(reason)
     }
+
+    override fun resolveApiKey(): String? = apiKey
+
+    override fun resolvePartnerApiKey(): String? = partnerApiKey
 
     var apiKey: String?
         get() = getDecrypted(KEY_API_KEY)

@@ -1996,6 +1996,10 @@ def build_canonical_genui_envelope(
         PaymentMethodsBreakdownProps,
     )):
         props = resultado_bruto.model_dump(mode="json")
+    elif isinstance(resultado_bruto, dict) and isinstance(resultado_bruto.get("genui_envelope"), dict) and isinstance(resultado_bruto["genui_envelope"].get("props"), dict):
+        props = dict(resultado_bruto["genui_envelope"]["props"])
+        if "pack_id" in resultado_bruto and "pack_id" not in props:
+            props["pack_id"] = resultado_bruto["pack_id"]
     elif isinstance(resultado_bruto, dict) and "props" in resultado_bruto and isinstance(resultado_bruto["props"], dict):
         props = dict(resultado_bruto["props"])
         if "ranking_postos_anp" in resultado_bruto and "ranking_postos_anp" not in props:

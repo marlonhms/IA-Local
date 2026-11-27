@@ -229,20 +229,68 @@ def _run_universal_market_basket(ctx: ToolExecutionContext) -> ToolExecutionResu
 
 def _run_universal_what_if(ctx: ToolExecutionContext) -> ToolExecutionResult:
     """Despacha simulacao deterministica What-If em Python puro."""
+    import re as _re
     from core.whatif_simulator import run_whatif_simulation
 
     params = dict(ctx.extra_params)
     sim_type = str(params.get("simulation_type") or "price_change")
     params["simulation_type"] = sim_type
+
+    query_lower = str(ctx.query or "").lower()
+    if "horizon_days" not in params:
+        m_days = _re.search(r"\b(30|60|90)\s*dias?\b", query_lower)
+        if m_days:
+            params["horizon_days"] = int(m_days.group(1))
+
     if sim_type == "price_change" and "current_price" not in params:
-        catalog = ctx.erp_adapter.get_product_catalog(limit=5)
-        first_item = catalog[0] if catalog else None
-        price = float(first_item.preco_unitario_reais) if first_item and first_item.preco_unitario_reais > 0 else 10.0
+        catalog = ctx.erp_adapter.get_product_catalog(limit=25)
+        matched_item = None
+        for item in catalog:
+            desc = str(getattr(item, "descricao_produto", "") or "").strip().lower()
+            if desc and desc in query_lower:
+                matched_item = item
+                break
+        if matched_item is None and catalog:
+            for item in catalog:
+                desc = str(getattr(item, "descricao_produto", "") or "").strip().lower()
+                tokens = [tok for tok in desc.split() if len(tok) >= 4]
+                if tokens and any(tok in query_lower for tok in tokens):
+                    matched_item = item
+                    break
+        first_item = matched_item or (catalog[0] if catalog else None)
+        price = float(first_item.preco_unitario_reais) if first_item and first_item.preco_unitario_reais > 0 else 6.19
+        unit_cost = round(price * 0.86, 2)
+        if first_item is not None:
+            raw_cost = getattr(first_item, "custo_unitario_reais", None)
+            if raw_cost is not None and 0 < float(raw_cost) < price:
+                unit_cost = round(float(raw_cost), 4)
+
+        is_reduction = any(w in query_lower for w in ("reduz", "baix", "descont", "cair", "queda", "menor"))
+        sign = -1.0 if is_reduction else 1.0
+        parsed_delta: float | None = None
+        m_cent = _re.search(r"(\d+(?:[.,]\d+)?)\s*centav", query_lower)
+        if m_cent:
+            parsed_delta = sign * (float(m_cent.group(1).replace(",", ".")) / 100.0)
+        else:
+            m_pct = _re.search(r"(\d+(?:[.,]\d+)?)\s*%", query_lower)
+            if m_pct:
+                parsed_delta = sign * round(price * (float(m_pct.group(1).replace(",", ".")) / 100.0), 4)
+            else:
+                m_brl = _re.search(r"r\$\s*(\d+(?:[.,]\d+)?)", query_lower)
+                if m_brl:
+                    parsed_delta = sign * float(m_brl.group(1).replace(",", "."))
+
+        margin = max(price - unit_cost, 0.05)
+        if parsed_delta is None:
+            parsed_delta = round(sign * min(price * 0.03, margin * 0.4), 4)
+        elif parsed_delta < 0 and abs(parsed_delta) >= margin:
+            parsed_delta = round(-(margin * 0.5), 4)
+
         params.setdefault("product_name", first_item.descricao_produto if first_item else "Produto Principal")
         params.setdefault("current_price", price)
-        params.setdefault("unit_cost", round(price * 0.72, 2))
-        params.setdefault("daily_volume", 100.0)
-        params.setdefault("price_delta", round(price * 0.05, 2))
+        params.setdefault("unit_cost", unit_cost)
+        params.setdefault("daily_volume", 1000.0)
+        params.setdefault("price_delta", round(parsed_delta, 4))
 
     res = run_whatif_simulation(params)
     res["pack_id"] = ctx.domain_pack.pack_id

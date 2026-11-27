@@ -68,11 +68,16 @@ async def list_memory_rules_endpoint(
 ) -> MemoryRuleListResponse:
     """Lista regras candidate, active ou rejected com isolamento estrito."""
     norm_pack = pack_id.strip().lower()
-    rules = manager.list_rules(
-        tenant_id=tenant_id,
-        pack_id=norm_pack,
-        status=status_filter,
-    )
+    try:
+        rules = manager.list_rules(
+            tenant_id=tenant_id,
+            pack_id=norm_pack,
+            status=status_filter,
+        )
+    except Exception as exc:  # noqa: BLE001
+        with suppress(Exception):
+            logger.warning("Regras da memoria institucional indisponiveis no momento: %s", exc)
+        rules = []
     return MemoryRuleListResponse(
         tenant_id=tenant_id,
         pack_id=norm_pack,

@@ -84,6 +84,10 @@ import com.example.aurapostoassitance.ui.components.SpatialGlassCard
 import com.example.aurapostoassitance.ui.components.findFragmentActivity
 import com.example.aurapostoassitance.ui.domain.AuraDomainAdapter
 import com.example.aurapostoassitance.ui.domain.DomainTrigger
+import com.example.aurapostoassitance.ui.genui.GovernanceHiCBanner
+import com.example.aurapostoassitance.ui.genui.RealizedRoiScorecardCard
+import com.example.aurapostoassitance.ui.genui.WhatIfSimulatorCard
+import com.example.aurapostoassitance.ui.intelligence.AuraIntelligenceViewModel
 import com.example.aurapostoassitance.ui.theme.AuraCyan
 import com.example.aurapostoassitance.ui.theme.AuraEmerald
 import com.example.aurapostoassitance.ui.theme.AuraPurple
@@ -105,15 +109,20 @@ import com.example.aurapostoassitance.ui.vision.AuraVisionBottomSheet
 fun DashboardScreen(
     onNavigateToChat: (String?) -> Unit,
     onNavigateToSetup: () -> Unit = {},
-    viewModel: DashboardViewModel = hiltViewModel()
+    viewModel: DashboardViewModel = hiltViewModel(),
+    intelligenceViewModel: AuraIntelligenceViewModel = hiltViewModel()
 ) {
     var selectedTab by remember { mutableStateOf(AuraNavTab.PULSO) }
     val context = LocalContext.current
     val activity = remember(context) { context.findFragmentActivity() }
     var showVisionScanner by remember { mutableStateOf(false) }
     var showSiliconSheet by remember { mutableStateOf(false) }
+    var showWhatIfSheet by remember { mutableStateOf(false) }
 
     val selectedSegment by viewModel.selectedSegment.collectAsState()
+    val whatIfState by intelligenceViewModel.whatIfState.collectAsState()
+    val governanceState by intelligenceViewModel.governanceState.collectAsState()
+    val scorecardState by intelligenceViewModel.scorecardState.collectAsState()
     val activeProfile = remember(selectedSegment) { AuraDomainAdapter.profileFor(selectedSegment) }
     val isServerOnline by viewModel.isServerOnline.collectAsState()
     val authExpiredMessage by viewModel.authExpiredMessage.collectAsState()
@@ -635,6 +644,34 @@ fun DashboardScreen(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(18.dp))
+
+                if (governanceState.hasContent) {
+                    GovernanceHiCBanner(
+                        state = governanceState,
+                        onToggleExpanded = { intelligenceViewModel.toggleGovernanceExpanded() },
+                        onApproveRule = { ruleId ->
+                            intelligenceViewModel.decideCandidateRule(ruleId, approve = true)
+                        },
+                        onRejectRule = { ruleId ->
+                            intelligenceViewModel.decideCandidateRule(ruleId, approve = false)
+                        },
+                        onSimulateSuggestion = { card ->
+                            intelligenceViewModel.applySuggestedSimulation(card)
+                            showWhatIfSheet = true
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                RealizedRoiScorecardCard(
+                    state = scorecardState,
+                    onSelectHorizon = { days -> intelligenceViewModel.selectScorecardHorizon(days) },
+                    onApproveCalibration = { intelligenceViewModel.decideCalibration(approve = true) },
+                    onRejectCalibration = { intelligenceViewModel.decideCalibration(approve = false) },
+                    onRefresh = { intelligenceViewModel.refreshScorecard(activeProfile.packId) }
+                )
+
                 Spacer(modifier = Modifier.height(22.dp))
 
                 SectionLabel(text = "Motores Preditivos • ${activeProfile.shortLabel}")
@@ -708,6 +745,34 @@ fun DashboardScreen(
                 },
                 scanner = viewModel.visionScanner
             )
+        }
+
+        if (showWhatIfSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showWhatIfSheet = false },
+                containerColor = ObsidianLow,
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(bottom = 24.dp)
+                ) {
+                    WhatIfSimulatorCard(
+                        state = whatIfState,
+                        onShocksChange = { intelligenceViewModel.onShocksChanged(it) },
+                        onHorizonChange = { intelligenceViewModel.onHorizonChanged(it) },
+                        onAuditWithAi = { prompt ->
+                            showWhatIfSheet = false
+                            onNavigateToChat(prompt)
+                        },
+                        onRetry = { intelligenceViewModel.recomputeNow() }
+                    )
+                }
+            }
         }
 
         if (showSiliconSheet) {

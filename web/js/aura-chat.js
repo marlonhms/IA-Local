@@ -1195,12 +1195,15 @@ class AuraChatController {
       const isMobile = this.isMobileDevice();
       const startExpanded = isMobile;
 
-      // 1. Projeta no Companion Canvas; se ja estiver aberto no Desktop, sincroniza automaticamente
+      // 1. Projeta no Companion Canvas; se ja estiver aberto no Desktop (ou se for WhatIfSimulatorUI), abre automaticamente
+      const isInteractiveWhatIf =
+        envelopeData.component_name === 'WhatIfSimulatorUI' ||
+        envelopeData.client_component === 'WhatIfSimulatorUI';
       const shouldAutoSyncCanvas = Boolean(
         !isMobile &&
         typeof window !== 'undefined' &&
         window.auraAuxPanel &&
-        window.auraAuxPanel.isOpen
+        (window.auraAuxPanel.isOpen || isInteractiveWhatIf)
       );
       if (typeof window !== 'undefined' && window.auraAuxPanel && typeof window.auraAuxPanel.projectArtifact === 'function') {
         try {

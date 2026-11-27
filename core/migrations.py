@@ -706,6 +706,29 @@ def ensure_autonomous_brain_schema(conn: Any, dialect: str | None = None) -> dic
     }
 
 
+def ensure_simulation_memory_schema(conn: Any) -> list[str]:
+    """
+    Garante de forma idempotente as tabelas da revisao 0003_simulation_memory
+    (business_profile_snapshots, business_memory_rules, operator_intent_signals,
+    simulation_snapshots) reutilizando as instrucoes DDL declarativas da revisao.
+    """
+    rev_path = (BASE_DIR / "alembic" / "versions" / "0003_simulation_and_business_memory.py").resolve()
+    if not rev_path.exists():
+        return []
+
+    spec = importlib.util.spec_from_file_location("aura_alembic_rev_0003_bootstrap", rev_path)
+    if spec is None or spec.loader is None:
+        return []
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    upgrade_fn = getattr(module, "upgrade", None)
+    if callable(upgrade_fn):
+        upgrade_fn(connection=conn)
+    if hasattr(conn, "commit"):
+        conn.commit()
+    return list(EXPECTED_TABLES_BY_REVISION.get("0003_simulation_memory", []))
+
+
 def bootstrap_autonomous_brain_schema() -> dict[str, Any]:
     """
     Executa a auto-migracao nao-bloqueante do cerebro cognitivo (posto_ai) no startup.
@@ -719,9 +742,12 @@ def bootstrap_autonomous_brain_schema() -> dict[str, Any]:
         with get_vector_connection() as conn:
             try:
                 result = ensure_autonomous_brain_schema(conn, dialect="postgresql")
+                sim_tables = ensure_simulation_memory_schema(conn)
+                if sim_tables:
+                    result["simulation_tables"] = sim_tables
                 logger.info(
                     "Cerebro autonomo AURA (posto_ai) sincronizado no startup: %s",
-                    ",".join(result.get("tables", [])),
+                    ",".join(result.get("tables", []) + sim_tables),
                 )
                 return result
             except Exception as exc:  # noqa: BLE001

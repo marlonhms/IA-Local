@@ -74,8 +74,7 @@ class DashboardViewModel @Inject constructor(
         SegmentChoice(it.packId, it.shortLabel, it.subtitle)
     }
 
-    private val _selectedSegment = MutableStateFlow(serverConfig.activePackId)
-    val selectedSegment: StateFlow<String> = _selectedSegment.asStateFlow()
+    val selectedSegment: StateFlow<String> = serverConfig.activePackIdFlow
 
     private val _isServerOnline = MutableStateFlow<Boolean?>(null)
     val isServerOnline: StateFlow<Boolean?> = _isServerOnline.asStateFlow()
@@ -119,8 +118,8 @@ class DashboardViewModel @Inject constructor(
     }
 
     init {
-        loadBriefing(_selectedSegment.value)
-        refreshLiveTelemetry(_selectedSegment.value)
+        loadBriefing(selectedSegment.value)
+        refreshLiveTelemetry(selectedSegment.value)
         startHandoffSummaryPolling()
         viewModelScope.launch {
             keystoreVault.authExpiredEvents.collect { msg ->
@@ -130,7 +129,7 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    fun refreshLiveTelemetry(packId: String = _selectedSegment.value) {
+    fun refreshLiveTelemetry(packId: String = selectedSegment.value) {
         viewModelScope.launch {
             runCatching { apiService.checkHealth() }
                 .onSuccess { _isServerOnline.value = true }
@@ -190,15 +189,14 @@ class DashboardViewModel @Inject constructor(
 
     fun selectSegment(segmentKey: String) {
         val normalized = AuraDomainAdapter.normalizePackId(segmentKey)
-        if (_selectedSegment.value == normalized) return
-        _selectedSegment.value = normalized
+        if (selectedSegment.value == normalized) return
         serverConfig.activePackId = normalized
         stopBriefingAudio()
         loadBriefing(normalized)
         refreshLiveTelemetry(normalized)
     }
 
-    fun loadBriefing(segmentKey: String = _selectedSegment.value) {
+    fun loadBriefing(segmentKey: String = selectedSegment.value) {
         viewModelScope.launch {
             _actionFeedback.value = null
             val profile = AuraDomainAdapter.profileFor(segmentKey)
@@ -230,7 +228,7 @@ class DashboardViewModel @Inject constructor(
         val state = _briefingState.value
         if (state !is BriefingUiState.Success) return
 
-        val messageId = "briefing_${_selectedSegment.value}"
+        val messageId = "briefing_${selectedSegment.value}"
         if (voiceManager.isSpeaking.value && voiceManager.speakingMessageId.value == messageId) {
             voiceManager.stopSpeaking()
         } else {
@@ -252,7 +250,7 @@ class DashboardViewModel @Inject constructor(
         optionKey: String,
         description: String
     ) {
-        val payload = "ACTION:BRIEFING|SEGMENT:${_selectedSegment.value}|OPT:$optionKey|DESC:$description|TS:${System.currentTimeMillis()}"
+        val payload = "ACTION:BRIEFING|SEGMENT:${selectedSegment.value}|OPT:$optionKey|DESC:$description|TS:${System.currentTimeMillis()}"
         hardwareAuthManager.authenticateAndSignOrder(
             activity = activity,
             orderTitle = "Alçada Executiva • $description",
@@ -288,8 +286,8 @@ class DashboardViewModel @Inject constructor(
                 memoryVault.indexMemory(
                     category = "DECISAO_EXECUTIVA",
                     title = description,
-                    content = "Opção $optionKey ($description) assinada para ${_selectedSegment.value}. Recibo: $localReceipt. TEE: $isHardwareBacked",
-                    segment = _selectedSegment.value
+                    content = "Opção $optionKey ($description) assinada para ${selectedSegment.value}. Recibo: $localReceipt. TEE: $isHardwareBacked",
+                    segment = selectedSegment.value
                 )
 
                 _signedActions.update { it + (optionKey to localReceipt) }
@@ -300,7 +298,7 @@ class DashboardViewModel @Inject constructor(
                 }
 
                 // 2. Sincronização resiliente com o Backend (AURA Local :8000)
-                val stationId = when (_selectedSegment.value) {
+                val stationId = when (selectedSegment.value) {
                     "postos_redes", "POSTOS" -> "posto_01"
                     "varejo", "VAREJO" -> "varejo_01"
                     else -> "posto_01"
@@ -311,7 +309,7 @@ class DashboardViewModel @Inject constructor(
                     option_key = optionKey,
                     actor_name = "Marlon Henrique",
                     parameters = buildMap {
-                        put("segment", _selectedSegment.value)
+                        put("segment", selectedSegment.value)
                         put("description", description)
                         if (signature != null) {
                             put("tee_signature", signature)

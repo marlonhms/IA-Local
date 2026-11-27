@@ -53,4 +53,30 @@ class SseParserTest {
         val toolRes = SseChunkParser.parse("tool_result", """{"chunk_type":"tool_result","text":"Cálculo Python OK"}""")
         assertTrue(toolRes is SseEvent.ToolResult)
     }
+
+    @Test
+    fun `parses proactive_alert without leaking as text delta and extracts pack_id in telemetry`() {
+        val alert = SseChunkParser.parse(
+            "proactive_alert",
+            """{"chunk_type":"proactive_alert","title":"Alerta de Ruptura","text":"Diesel S10 abaixo de 12h","data":{"pack_id":"fuel_convenience"}}"""
+        )
+        assertTrue(alert is SseEvent.ProactiveAlert)
+        val a = alert as SseEvent.ProactiveAlert
+        assertEquals("Alerta de Ruptura", a.title)
+        assertEquals("Diesel S10 abaixo de 12h", a.message)
+        assertEquals("fuel_convenience", a.packId)
+
+        val telemetry = SseChunkParser.parse(
+            "telemetry",
+            """{"chunk_type":"telemetry","data":{"ttft_ms":92,"total_ms":410,"pack_id":"pharmacy_health"}}"""
+        )
+        assertTrue(telemetry is SseEvent.Telemetry)
+        assertEquals("pharmacy_health", (telemetry as SseEvent.Telemetry).packId)
+    }
+
+    @Test
+    fun `parses stream_reset event even with empty data payload`() {
+        val ev = SseChunkParser.parse("stream_reset", "")
+        assertTrue(ev is SseEvent.StreamReset)
+    }
 }

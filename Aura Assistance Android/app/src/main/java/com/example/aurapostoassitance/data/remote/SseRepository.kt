@@ -34,10 +34,12 @@ object SseChunkParser {
     private val defaultJson = Json { ignoreUnknownKeys = true; isLenient = true }
 
     fun parse(type: String?, data: String, json: Json = defaultJson): SseEvent? {
+        val normalizedType = type?.trim()?.lowercase().orEmpty()
+        if (normalizedType == "stream_reset") return SseEvent.StreamReset
         if (data.isBlank() || data == "[DONE]") return null
         return try {
             val jsonObj = json.parseToJsonElement(data).jsonObject
-            val chunkType = (type?.takeIf { it.isNotBlank() }
+            val chunkType = (normalizedType.takeIf { it.isNotBlank() }
                 ?: jsonObj["chunk_type"]?.jsonPrimitive?.contentOrNull
                 ?: "").lowercase()
 
@@ -89,7 +91,16 @@ object SseChunkParser {
                             ?: payload.int("lgpd_redacted")
                             ?: 0,
                         sourceLabel = payload.str("source") ?: payload.str("data_source"),
-                        cacheHit = payload.bool("cache_hit") ?: false
+                        cacheHit = payload.bool("cache_hit") ?: false,
+                        packId = payload.str("pack_id") ?: jsonObj.str("pack_id")
+                    )
+                }
+                "proactive_alert" -> {
+                    val payload = (jsonObj["data"] as? JsonObject) ?: jsonObj
+                    SseEvent.ProactiveAlert(
+                        title = jsonObj.str("title") ?: payload.str("title"),
+                        message = jsonObj.str("text") ?: payload.str("message"),
+                        packId = payload.str("pack_id") ?: jsonObj.str("pack_id")
                     )
                 }
                 "stream_reset" -> SseEvent.StreamReset

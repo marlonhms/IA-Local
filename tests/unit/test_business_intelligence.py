@@ -520,6 +520,39 @@ def test_economic_llm_synthesizer_uses_singleton_compact_sanitized_json_and_pgve
 
 
 @pytest.mark.unit
+def test_list_memory_rules_returns_empty_200_when_table_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Garante resiliencia sem HTTP 500 quando business_memory_rules ainda nao existe."""
+    monkeypatch.setenv("AURA_ALLOW_DEV_SECRET_FALLBACK", "1")
+    monkeypatch.setenv("AURA_API_KEY", "mem-test-secret-key")
+    from fastapi.testclient import TestClient
+    from core.aura_api import create_aura_app
+    from core.intelligence.api import set_memory_manager
+
+    class BrokenManager:
+        def list_rules(self, **_kwargs):
+            raise RuntimeError('relation "business_memory_rules" does not exist')
+
+    set_memory_manager(BrokenManager())  # type: ignore[arg-type]
+    try:
+        app = create_aura_app()
+        client = TestClient(app)
+        resp = client.get(
+            "/api/v1/memory/rules",
+            params={"tenant_id": "default", "pack_id": "fuel_convenience", "status": "candidate"},
+            headers={"X-API-Key": "mem-test-secret-key"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 0
+        assert data["rules"] == []
+        assert data["pack_id"] == "fuel_convenience"
+    finally:
+        set_memory_manager(None)
+
+
+@pytest.mark.unit
 def test_zero_em_dashes_in_intelligence_files() -> None:
     """Garante conformidade estrita com a regra de zero travessoes nos modulos da Fase 2."""
     files = [

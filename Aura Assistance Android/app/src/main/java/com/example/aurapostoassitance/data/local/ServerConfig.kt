@@ -1,9 +1,11 @@
 package com.example.aurapostoassitance.data.local
 
 import android.content.Context
+import com.example.aurapostoassitance.data.remote.AuraNetworkEndpointProvider
 import com.example.aurapostoassitance.data.security.AuraKeystoreVault
 import com.example.aurapostoassitance.ui.domain.AuraDomainAdapter
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -20,10 +22,20 @@ data class HandoffContact(
 @Singleton
 class ServerConfig @Inject constructor(
     @ApplicationContext context: Context,
-    private val keystoreVault: AuraKeystoreVault
-) {
+    private val keystoreVault: AuraKeystoreVault,
+    private val domainPackStateHolder: DomainPackStateHolder
+) : AuraNetworkEndpointProvider {
     private val prefs = context.getSharedPreferences("aura_config", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
+
+    init {
+        domainPackStateHolder.seedPackId(
+            prefs.getString("active_pack_id", AuraDomainAdapter.PACK_FUEL)
+        )
+    }
+
+    val activePackIdFlow: StateFlow<String>
+        get() = domainPackStateHolder.activePackId
 
     var serverIp: String
         get() = prefs.getString("server_ip", "192.168.11.247:8000") ?: "192.168.11.247:8000"
@@ -44,11 +56,10 @@ class ServerConfig @Inject constructor(
         }
 
     var activePackId: String
-        get() = AuraDomainAdapter.normalizePackId(
-            prefs.getString("active_pack_id", AuraDomainAdapter.PACK_FUEL)
-        )
+        get() = domainPackStateHolder.activePackId.value
         set(value) {
-            prefs.edit().putString("active_pack_id", AuraDomainAdapter.normalizePackId(value)).apply()
+            val normalized = domainPackStateHolder.updatePackId(value)
+            prefs.edit().putString("active_pack_id", normalized).apply()
         }
 
     /** Chave de API armazenada de forma criptografada no Android Keystore (AES-256-GCM). */
@@ -112,6 +123,14 @@ class ServerConfig @Inject constructor(
             .putString("handoff_contacts_json", json.encodeToString(current))
             .putString("handoff_last_role", sanitized.role)
             .apply()
+    }
+
+    override fun resolveBaseUrl(): String = getBaseUrl()
+
+    override fun resolveActivePackId(): String = activePackId
+
+    override fun updateServerHostPort(hostPort: String) {
+        serverIp = hostPort
     }
 
     fun getBaseUrl(): String {

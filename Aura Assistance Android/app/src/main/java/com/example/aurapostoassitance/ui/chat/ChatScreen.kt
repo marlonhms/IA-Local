@@ -135,11 +135,17 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.aurapostoassitance.data.local.HandoffContact
 import com.example.aurapostoassitance.data.remote.HandoffThreadDto
+import com.example.aurapostoassitance.data.remote.ShockVectorDto
 import androidx.compose.animation.Crossfade
 import com.example.aurapostoassitance.ui.components.AuraReasoningRibbon
 import com.example.aurapostoassitance.ui.domain.AuraDomainAdapter
 import com.example.aurapostoassitance.ui.domain.DomainPackUiProfile
 import com.example.aurapostoassitance.ui.genui.GenUiSkeletonSlot
+import com.example.aurapostoassitance.ui.genui.GovernanceHiCBanner
+import com.example.aurapostoassitance.ui.genui.WhatIfSimulatorCard
+import com.example.aurapostoassitance.ui.intelligence.AuraIntelligenceViewModel
+import com.example.aurapostoassitance.ui.intelligence.BacktestScorecardUiState
+import com.example.aurapostoassitance.ui.intelligence.WhatIfUiState
 import com.example.aurapostoassitance.ui.theme.BorderHairline
 import com.example.aurapostoassitance.ui.theme.ObsidianHigh
 import com.example.aurapostoassitance.ui.components.AuraAmbientBackground
@@ -205,7 +211,8 @@ private val SUGGESTIONS = listOf(
 fun ChatScreen(
     onNavigateBack: () -> Unit,
     initialQuery: String? = null,
-    viewModel: ChatViewModel = hiltViewModel()
+    viewModel: ChatViewModel = hiltViewModel(),
+    intelligenceViewModel: AuraIntelligenceViewModel = hiltViewModel()
 ) {
     val messages by viewModel.messages.collectAsState()
     val isTyping by viewModel.isAuraTyping.collectAsState()
@@ -218,7 +225,11 @@ fun ChatScreen(
     val incomingHandoffAlert by viewModel.incomingHandoffAlert.collectAsState()
     val isWhatsAppReturnsMode by viewModel.isWhatsAppReturnsMode.collectAsState()
     val isSyncingHandoffs by viewModel.isSyncingHandoffs.collectAsState()
-    val activeProfile = remember(viewModel.activePackId) { AuraDomainAdapter.profileFor(viewModel.activePackId) }
+    val activePackId by viewModel.activePackIdFlow.collectAsState()
+    val activeProfile = remember(activePackId) { AuraDomainAdapter.profileFor(activePackId) }
+    val whatIfState by intelligenceViewModel.whatIfState.collectAsState()
+    val governanceState by intelligenceViewModel.governanceState.collectAsState()
+    val scorecardState by intelligenceViewModel.scorecardState.collectAsState()
 
     LaunchedEffect(initialQuery) {
         if (initialQuery == "OPEN_WHATSAPP_RETURNS") {
@@ -279,6 +290,7 @@ fun ChatScreen(
     var showSessionsSheet by remember { mutableStateOf(false) }
     var showCommandHubSheet by remember { mutableStateOf(false) }
     var showVisionScanner by remember { mutableStateOf(false) }
+    var showWhatIfSheet by remember { mutableStateOf(false) }
     var selectedMenuMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var pendingHandoffAction by remember { mutableStateOf<GenUiAction?>(null) }
     var activeModeTitle by remember { mutableStateOf<String?>(null) }
@@ -588,46 +600,108 @@ fun ChatScreen(
                         onAskAura = { th -> viewModel.askAuraAboutHandoff(th) },
                         onBackToAura = { viewModel.switchToAuraMode("default", "AURA") }
                     )
-                } else if (messages.isEmpty() && !isTyping) {
-                    EmptyState(
-                        profile = activeProfile,
-                        onSuggestion = { inputText = it },
-                        onOpenCommandHub = { showCommandHubSheet = true }
-                    )
                 } else {
-                    val reversedMessages = remember(messages) { messages.asReversed() }
-                    key(currentSessionId) {
-                        LazyColumn(
-                            state = listState,
-                            reverseLayout = true,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clipToBounds(),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(18.dp)
-                        ) {
-                            items(reversedMessages, key = { "${currentSessionId}:${it.id}" }) { message ->
-                                MessageItem(
-                                    message = message,
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        if (governanceState.hasContent) {
+                            GovernanceHiCBanner(
+                                state = governanceState,
+                                onToggleExpanded = { intelligenceViewModel.toggleGovernanceExpanded() },
+                                onApproveRule = { ruleId ->
+                                    intelligenceViewModel.decideCandidateRule(ruleId, approve = true)
+                                },
+                                onRejectRule = { ruleId ->
+                                    intelligenceViewModel.decideCandidateRule(ruleId, approve = false)
+                                },
+                                onSimulateSuggestion = { card ->
+                                    intelligenceViewModel.applySuggestedSimulation(card)
+                                    showWhatIfSheet = true
+                                },
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
+                        if (messages.isEmpty() && !isTyping) {
+                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                EmptyState(
                                     profile = activeProfile,
-                                    onAction = onAction,
-                                    onDrillDown = { send(it) },
-                                    speakingMessageId = speakingMessageId,
-                                    onToggleSpeech = { id, text -> viewModel.toggleSpeech(id, text) },
-                                    auraStatusMessage = auraStatusMessage,
-                                    onMessageLongClick = { selectedMenuMessage = it },
-                                    onDeepDive = {
-                                        val clean = message.text.replace("\n", " ").replace("\"", "'").trim().take(110)
-                                        send("Aprofunde o raciocínio detalhado, cálculos e fontes desta resposta: '$clean'")
-                                    },
-                                    onAuditAnp = {
-                                        val clean = message.text.replace("\n", " ").replace("\"", "'").trim().take(110)
-                                        send("${activeProfile.complianceAuditPromptPrefix}: '$clean'")
-                                    }
+                                    onSuggestion = { inputText = it },
+                                    onOpenCommandHub = { showCommandHubSheet = true }
                                 )
+                            }
+                        } else {
+                            val reversedMessages = remember(messages) { messages.asReversed() }
+                            key(currentSessionId) {
+                                LazyColumn(
+                                    state = listState,
+                                    reverseLayout = true,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxWidth()
+                                        .clipToBounds(),
+                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                                ) {
+                                    items(reversedMessages, key = { "${currentSessionId}:${it.id}" }) { message ->
+                                        MessageItem(
+                                            message = message,
+                                            profile = activeProfile,
+                                            onAction = onAction,
+                                            onDrillDown = { send(it) },
+                                            speakingMessageId = speakingMessageId,
+                                            onToggleSpeech = { id, text -> viewModel.toggleSpeech(id, text) },
+                                            auraStatusMessage = auraStatusMessage,
+                                            onMessageLongClick = { selectedMenuMessage = it },
+                                            onDeepDive = {
+                                                val clean = message.text.replace("\n", " ").replace("\"", "'").trim().take(110)
+                                                send("Aprofunde o raciocínio detalhado, cálculos e fontes desta resposta: '$clean'")
+                                            },
+                                            onAuditAnp = {
+                                                val clean = message.text.replace("\n", " ").replace("\"", "'").trim().take(110)
+                                                send("${activeProfile.complianceAuditPromptPrefix}: '$clean'")
+                                            },
+                                            whatIfState = whatIfState,
+                                            onWhatIfShocksChange = { intelligenceViewModel.onShocksChanged(it) },
+                                            onWhatIfHorizonChange = { intelligenceViewModel.onHorizonChanged(it) },
+                                            onWhatIfAuditWithAi = { prompt -> send(prompt) },
+                                            onWhatIfRetry = { intelligenceViewModel.recomputeNow() },
+                                            scorecardState = scorecardState,
+                                            onScorecardHorizonChange = { intelligenceViewModel.selectScorecardHorizon(it) },
+                                            onApproveCalibration = { intelligenceViewModel.decideCalibration(approve = true) },
+                                            onRejectCalibration = { intelligenceViewModel.decideCalibration(approve = false) },
+                                            onRefreshScorecard = { intelligenceViewModel.refreshScorecard(activeProfile.packId) }
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
+                }
+            }
+        }
+
+        if (showWhatIfSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showWhatIfSheet = false },
+                containerColor = ObsidianLow,
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(bottom = 24.dp)
+                ) {
+                    WhatIfSimulatorCard(
+                        state = whatIfState,
+                        onShocksChange = { intelligenceViewModel.onShocksChanged(it) },
+                        onHorizonChange = { intelligenceViewModel.onHorizonChanged(it) },
+                        onAuditWithAi = { prompt ->
+                            showWhatIfSheet = false
+                            send(prompt)
+                        },
+                        onRetry = { intelligenceViewModel.recomputeNow() }
+                    )
                 }
             }
         }
@@ -1894,6 +1968,16 @@ private fun MessageItem(
     onMessageLongClick: (ChatMessage) -> Unit,
     onDeepDive: () -> Unit,
     onAuditAnp: () -> Unit,
+    whatIfState: WhatIfUiState? = null,
+    onWhatIfShocksChange: ((ShockVectorDto) -> Unit)? = null,
+    onWhatIfHorizonChange: ((Int) -> Unit)? = null,
+    onWhatIfAuditWithAi: ((String) -> Unit)? = null,
+    onWhatIfRetry: (() -> Unit)? = null,
+    scorecardState: BacktestScorecardUiState? = null,
+    onScorecardHorizonChange: ((Int) -> Unit)? = null,
+    onApproveCalibration: (() -> Unit)? = null,
+    onRejectCalibration: (() -> Unit)? = null,
+    onRefreshScorecard: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (message.isFromUser) {
@@ -1915,6 +1999,16 @@ private fun MessageItem(
             onLongClick = { onMessageLongClick(message) },
             onDeepDive = onDeepDive,
             onAuditAnp = onAuditAnp,
+            whatIfState = whatIfState,
+            onWhatIfShocksChange = onWhatIfShocksChange,
+            onWhatIfHorizonChange = onWhatIfHorizonChange,
+            onWhatIfAuditWithAi = onWhatIfAuditWithAi,
+            onWhatIfRetry = onWhatIfRetry,
+            scorecardState = scorecardState,
+            onScorecardHorizonChange = onScorecardHorizonChange,
+            onApproveCalibration = onApproveCalibration,
+            onRejectCalibration = onRejectCalibration,
+            onRefreshScorecard = onRefreshScorecard,
             modifier = modifier
         )
     }
@@ -2069,6 +2163,16 @@ private fun AuraMessage(
     onLongClick: () -> Unit,
     onDeepDive: () -> Unit,
     onAuditAnp: () -> Unit,
+    whatIfState: WhatIfUiState? = null,
+    onWhatIfShocksChange: ((ShockVectorDto) -> Unit)? = null,
+    onWhatIfHorizonChange: ((Int) -> Unit)? = null,
+    onWhatIfAuditWithAi: ((String) -> Unit)? = null,
+    onWhatIfRetry: (() -> Unit)? = null,
+    scorecardState: BacktestScorecardUiState? = null,
+    onScorecardHorizonChange: ((Int) -> Unit)? = null,
+    onApproveCalibration: (() -> Unit)? = null,
+    onRejectCalibration: (() -> Unit)? = null,
+    onRefreshScorecard: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val card = remember(message.envelopeJson) { message.envelopeJson?.let(GenUiParser::parse) }
@@ -2238,6 +2342,17 @@ private fun AuraMessage(
                     GenUiCardView(
                         card = hydratedCard,
                         companionText = message.text,
+                        activePackId = profile.packId,
+                        whatIfState = whatIfState,
+                        onWhatIfShocksChange = onWhatIfShocksChange,
+                        onWhatIfHorizonChange = onWhatIfHorizonChange,
+                        onWhatIfAuditWithAi = onWhatIfAuditWithAi,
+                        onWhatIfRetry = onWhatIfRetry,
+                        scorecardState = scorecardState,
+                        onScorecardHorizonChange = onScorecardHorizonChange,
+                        onApproveCalibration = onApproveCalibration,
+                        onRejectCalibration = onRejectCalibration,
+                        onRefreshScorecard = onRefreshScorecard,
                         onAction = { action ->
                             if (action.isHandoffAction()) {
                                 val richReport = AuraWhatsAppReportFormatter.buildReport(

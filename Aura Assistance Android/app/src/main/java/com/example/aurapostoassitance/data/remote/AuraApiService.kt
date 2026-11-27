@@ -267,4 +267,42 @@ interface AuraApiService {
     suspend fun markHandoffThreadRead(
         @Path("phone") phone: String
     ): HandoffMarkReadResponse
+
+    @POST("api/v1/simulate/recompute")
+    suspend fun recomputeSimulation(
+        @Body request: SimulationRecomputeRequestDto
+    ): SimulationRecomputeResponseDto
+
+    @GET("api/v1/memory/rules")
+    suspend fun listMemoryRules(
+        @Query("pack_id") packId: String,
+        @Query("tenant_id") tenantId: String = "default",
+        @Query("status") status: String? = null
+    ): MemoryRuleListResponseDto
+
+    @GET("api/v1/memory/suggestions")
+    suspend fun getMemorySuggestions(
+        @Query("pack_id") packId: String,
+        @Query("tenant_id") tenantId: String = "default",
+        @Query("window_days") windowDays: Int = 7,
+        @Query("min_hits") minHits: Int = 3
+    ): MemoryGovernanceFeedResponseDto
+
+    @POST("api/v1/memory/rules/{rule_id}/decision")
+    suspend fun decideMemoryRule(
+        @Path("rule_id") ruleId: String,
+        @Body request: RuleDecisionRequestDto
+    ): RuleDecisionResponseDto
+
+    @POST("api/v1/simulate/backtest/run")
+    suspend fun runBacktest(
+        @Body request: BacktestRunRequestDto
+    ): BacktestRunResponseDto
+
+    @GET("api/v1/simulate/backtest/scorecard")
+    suspend fun getBacktestScorecard(
+        @Query("pack_id") packId: String,
+        @Query("tenant_id") tenantId: String = "default",
+        @Query("limit") limit: Int = 20
+    ): RealizedRoiScorecardResponseDto
 }

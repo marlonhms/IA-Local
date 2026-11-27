@@ -842,10 +842,25 @@ def classificar_intencao_heuristica(pergunta: str) -> str:
     if any(t in p for t in termos_mentoria_exatos):
         return "mentoria_decisao"
 
-    # F6-02: Simulador de Cenarios "What-If" & Demanda
+    # F3-WhatIf: Simulador Interativo What-If Zero-Token (WhatIfSimulatorUI)
+    termos_whatif_interativo = [
+        "cenário what-if", "cenario what-if", "cenário what if", "cenario what if",
+        "simulador what-if", "simulador what if", "what if", "what-if",
+        "simule o impacto", "simular o impacto", "simular impacto",
+        "simular redução", "simular reducao", "simular aumento", "simular desconto",
+    ]
+    if any(t in p for t in termos_whatif_interativo):
+        return "simular_cenario_what_if"
+
+    if re.search(
+        r"\b(?:simule|simular)\b.{0,45}\b(?:impacto|reduzir|redu[çc][ãa]o|baixar|aumentar|aumento|subir|desconto|custo)\b",
+        p,
+    ):
+        return "simular_cenario_what_if"
+
+    # F6-02: Simulador de Cenarios Preditivos & Demanda
     termos_cenario_exatos = [
         "cenário preditivo", "cenario preditivo", "simulação preditiva", "simulacao preditiva",
-        "cenário what-if", "cenario what-if", "cenário what if", "cenario what if", "what if", "what-if",
         "simular preço", "simular preco", "simular cenario", "simular cenário",
         "elasticidade de preço", "elasticidade de preco", "elasticidade de demanda", "elasticidade-preço",
         "precificação dinâmica", "precificacao dinamica", "paridade etanol", "regra dos 70%", "paridade 70%",

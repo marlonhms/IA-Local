@@ -29,6 +29,7 @@ import com.example.aurapostoassitance.data.remote.HandoffThreadDto
 import com.example.aurapostoassitance.data.remote.QuickActionRequest
 import com.example.aurapostoassitance.data.remote.SseEvent
 import com.example.aurapostoassitance.data.remote.SseRepository
+import com.example.aurapostoassitance.data.remote.SseStreamBuffer
 import com.example.aurapostoassitance.data.security.AuraHardwareAuthManager
 import com.example.aurapostoassitance.data.vision.AuraSharedIntakeRelay
 import com.example.aurapostoassitance.data.vision.AuraVisionNpuScanner
@@ -94,8 +95,10 @@ class ChatViewModel @Inject constructor(
     private val sharedIntakeRelay: AuraSharedIntakeRelay
 ) : ViewModel() {
 
+    val activePackIdFlow: StateFlow<String> = serverConfig.activePackIdFlow
+
     val activePackId: String
-        get() = serverConfig.activePackId
+        get() = serverConfig.activePackIdFlow.value
 
     // --- Fluxos de Voz e Fala Hands-Free ---
     val isListening: StateFlow<Boolean> = voiceManager.isListening
@@ -628,15 +631,13 @@ class ChatViewModel @Inject constructor(
                 .joinToString(" | ") { "[${it.item.category}] ${it.item.title}: ${it.item.content.take(220)}" }
                 .takeIf { it.isNotBlank() }
 
-            var currentAuraText = ""
-            var currentEnvelope: String? = null
-            var pendingSkeleton: String? = null
+            val streamBuffer = SseStreamBuffer()
             val requestStartedAt = System.currentTimeMillis()
             var firstTokenAt: Long? = null
             var trustMeta = AuraTrustMetadata()
 
             suspend fun persist(text: String) {
-                if (text.isBlank() && currentEnvelope == null) return
+                if (text.isBlank() && streamBuffer.envelopeJson == null) return
                 val reasoningJson = if (reasoningSteps.isNotEmpty()) {
                     buildJsonArray { reasoningSteps.forEach { add(JsonPrimitive(it)) } }.toString()
                 } else null
@@ -646,7 +647,7 @@ class ChatViewModel @Inject constructor(
                         sessionId = activeSessionId,
                         text = text,
                         isFromUser = false,
-                        envelopeJson = currentEnvelope,
+                        envelopeJson = streamBuffer.envelopeJson,
                         reasoningJson = reasoningJson
                     )
                 )
@@ -699,8 +700,8 @@ class ChatViewModel @Inject constructor(
                         }
                     } else {
                         val errorMessage = "Erro de conexão com a AURA: ${e.message}"
-                        val finalErrorText = if (currentAuraText.isBlank()) errorMessage else currentAuraText + "\n\n" + errorMessage
-                        updateAuraMessage(auraMessageId, finalErrorText, false, currentEnvelope, reasoningSteps.toList(), null, trustMeta)
+                        val finalErrorText = if (streamBuffer.text.isBlank()) errorMessage else streamBuffer.text + "\n\n" + errorMessage
+                        updateAuraMessage(auraMessageId, finalErrorText, false, streamBuffer.envelopeJson, reasoningSteps.toList(), null, trustMeta)
                         _isAuraTyping.value = false
                         _auraStatusMessage.value = null
                         persist(finalErrorText)
@@ -716,52 +717,50 @@ class ChatViewModel @Inject constructor(
                     if (_isAuraTyping.value) {
                         val total = System.currentTimeMillis() - requestStartedAt
                         trustMeta = trustMeta.copy(latencyMs = trustMeta.latencyMs ?: total)
-                        updateAuraMessage(auraMessageId, currentAuraText, false, currentEnvelope, reasoningSteps.toList(), null, trustMeta)
+                        updateAuraMessage(auraMessageId, streamBuffer.text, false, streamBuffer.envelopeJson, reasoningSteps.toList(), null, trustMeta)
                         _isAuraTyping.value = false
                         _auraStatusMessage.value = null
-                        persist(currentAuraText)
-                        if (speakResponse && !hasSpokenReply && currentAuraText.isNotBlank()) {
+                        persist(streamBuffer.text)
+                        if (speakResponse && !hasSpokenReply && streamBuffer.text.isNotBlank()) {
                             hasSpokenReply = true
-                            voiceManager.speak(auraMessageId, currentAuraText) {
+                            voiceManager.speak(auraMessageId, streamBuffer.text) {
                                 relistenIfConversationActive()
                             }
                         }
                     }
                 }
                 .collect { event ->
+                    streamBuffer.consume(event)
                     when (event) {
                         is SseEvent.StatusUpdate -> {
                             val sanitized = sanitizeStatusMessage(event.statusMessage)
                             _auraStatusMessage.value = sanitized
                             if (sanitized.isNotBlank() && (reasoningSteps.isEmpty() || reasoningSteps.last() != sanitized)) {
                                 reasoningSteps.add(sanitized)
-                                updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList(), pendingSkeleton, trustMeta)
+                                updateAuraMessage(auraMessageId, streamBuffer.text, true, streamBuffer.envelopeJson, reasoningSteps.toList(), streamBuffer.pendingSkeleton, trustMeta)
                             }
                         }
                         is SseEvent.ToolResult -> {
                             _auraStatusMessage.value = "Cálculo Python Auditado"
                             trustMeta = trustMeta.copy(isDeterministic = true)
                             if (event.summary.isNotBlank()) reasoningSteps.add(event.summary)
-                            updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList(), pendingSkeleton, trustMeta)
+                            updateAuraMessage(auraMessageId, streamBuffer.text, true, streamBuffer.envelopeJson, reasoningSteps.toList(), streamBuffer.pendingSkeleton, trustMeta)
                         }
                         is SseEvent.CacheHit -> {
                             _auraStatusMessage.value = event.label
                             trustMeta = trustMeta.copy(isCacheHit = true, sourceLabel = "Cache Local")
                             reasoningSteps.add(event.label)
-                            updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList(), pendingSkeleton, trustMeta)
+                            updateAuraMessage(auraMessageId, streamBuffer.text, true, streamBuffer.envelopeJson, reasoningSteps.toList(), streamBuffer.pendingSkeleton, trustMeta)
                         }
                         is SseEvent.UiSkeleton -> {
-                            pendingSkeleton = event.title ?: "Preparando diagnóstico executivo..."
-                            updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList(), pendingSkeleton, trustMeta)
+                            updateAuraMessage(auraMessageId, streamBuffer.text, true, streamBuffer.envelopeJson, reasoningSteps.toList(), streamBuffer.pendingSkeleton, trustMeta)
                         }
                         is SseEvent.UiDelta -> {
                             // Mantém slot reservado sem alterar altura externa (Zero-CLS)
-                            if (pendingSkeleton == null) {
-                                pendingSkeleton = "Hidratando indicadores..."
-                                updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList(), pendingSkeleton, trustMeta)
-                            }
+                            updateAuraMessage(auraMessageId, streamBuffer.text, true, streamBuffer.envelopeJson, reasoningSteps.toList(), streamBuffer.pendingSkeleton, trustMeta)
                         }
                         is SseEvent.Telemetry -> {
+                            event.packId?.takeIf { it.isNotBlank() }?.let { serverConfig.activePackId = it }
                             trustMeta = trustMeta.copy(
                                 ttftMs = event.ttftMs ?: trustMeta.ttftMs,
                                 latencyMs = event.totalMs ?: trustMeta.latencyMs,
@@ -769,16 +768,21 @@ class ChatViewModel @Inject constructor(
                                 sourceLabel = event.sourceLabel ?: trustMeta.sourceLabel,
                                 isCacheHit = event.cacheHit || trustMeta.isCacheHit
                             )
-                            updateAuraMessage(auraMessageId, currentAuraText, _isAuraTyping.value, currentEnvelope, reasoningSteps.toList(), pendingSkeleton, trustMeta)
+                            updateAuraMessage(auraMessageId, streamBuffer.text, _isAuraTyping.value, streamBuffer.envelopeJson, reasoningSteps.toList(), streamBuffer.pendingSkeleton, trustMeta)
+                        }
+                        is SseEvent.ProactiveAlert -> {
+                            event.packId?.takeIf { it.isNotBlank() }?.let { serverConfig.activePackId = it }
+                            val alertLabel = event.title?.takeIf { it.isNotBlank() } ?: event.message?.takeIf { it.isNotBlank() }
+                            if (!alertLabel.isNullOrBlank()) {
+                                reasoningSteps.add("Alerta Proativo: $alertLabel")
+                                updateAuraMessage(auraMessageId, streamBuffer.text, true, streamBuffer.envelopeJson, reasoningSteps.toList(), streamBuffer.pendingSkeleton, trustMeta)
+                            }
                         }
                         is SseEvent.StreamReset -> {
-                            currentAuraText = ""
-                            currentEnvelope = null
-                            pendingSkeleton = null
                             trustMeta = trustMeta.copy(didStreamReset = true)
                             _auraStatusMessage.value = "Recalibrando síntese com modelo de contingência..."
                             reasoningSteps.add("Recalibrando síntese com modelo de contingência...")
-                            updateAuraMessage(auraMessageId, "", true, null, reasoningSteps.toList(), null, trustMeta)
+                            updateAuraMessage(auraMessageId, streamBuffer.text, true, streamBuffer.envelopeJson, reasoningSteps.toList(), streamBuffer.pendingSkeleton, trustMeta)
                         }
                         is SseEvent.TextDelta -> {
                             if (firstTokenAt == null) {
@@ -786,17 +790,14 @@ class ChatViewModel @Inject constructor(
                                 trustMeta = trustMeta.copy(ttftMs = firstTokenAt!! - requestStartedAt)
                                 _auraStatusMessage.value = "Sintetizando recomendação..."
                             }
-                            currentAuraText += event.text
-                            updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList(), pendingSkeleton, trustMeta)
+                            updateAuraMessage(auraMessageId, streamBuffer.text, true, streamBuffer.envelopeJson, reasoningSteps.toList(), streamBuffer.pendingSkeleton, trustMeta)
                         }
                         is SseEvent.UiComplete -> {
-                            currentEnvelope = event.envelopeJson
-                            pendingSkeleton = null
-                            updateAuraMessage(auraMessageId, currentAuraText, true, currentEnvelope, reasoningSteps.toList(), null, trustMeta)
+                            updateAuraMessage(auraMessageId, streamBuffer.text, true, streamBuffer.envelopeJson, reasoningSteps.toList(), streamBuffer.pendingSkeleton, trustMeta)
                         }
                         is SseEvent.Error -> {
-                            val finalErrorText = if (currentAuraText.isBlank()) event.message else currentAuraText + "\n\n" + event.message
-                            updateAuraMessage(auraMessageId, finalErrorText, false, currentEnvelope, reasoningSteps.toList(), null, trustMeta)
+                            val finalErrorText = if (streamBuffer.text.isBlank()) event.message else streamBuffer.text + "\n\n" + event.message
+                            updateAuraMessage(auraMessageId, finalErrorText, false, streamBuffer.envelopeJson, reasoningSteps.toList(), null, trustMeta)
                             _isAuraTyping.value = false
                             _auraStatusMessage.value = null
                             persist(finalErrorText)
@@ -804,13 +805,13 @@ class ChatViewModel @Inject constructor(
                         is SseEvent.Done -> {
                             val total = System.currentTimeMillis() - requestStartedAt
                             trustMeta = trustMeta.copy(latencyMs = trustMeta.latencyMs ?: total)
-                            updateAuraMessage(auraMessageId, currentAuraText, false, currentEnvelope, reasoningSteps.toList(), null, trustMeta)
+                            updateAuraMessage(auraMessageId, streamBuffer.text, false, streamBuffer.envelopeJson, reasoningSteps.toList(), null, trustMeta)
                             _isAuraTyping.value = false
                             _auraStatusMessage.value = null
-                            persist(currentAuraText)
-                            if (speakResponse && !hasSpokenReply && currentAuraText.isNotBlank()) {
+                            persist(streamBuffer.text)
+                            if (speakResponse && !hasSpokenReply && streamBuffer.text.isNotBlank()) {
                                 hasSpokenReply = true
-                                voiceManager.speak(auraMessageId, currentAuraText) {
+                                voiceManager.speak(auraMessageId, streamBuffer.text) {
                                     relistenIfConversationActive()
                                 }
                             }

@@ -28,7 +28,15 @@ sealed class SseEvent {
         val totalMs: Long? = null,
         val piiRedactedCount: Int = 0,
         val sourceLabel: String? = null,
-        val cacheHit: Boolean = false
+        val cacheHit: Boolean = false,
+        val packId: String? = null
+    ) : SseEvent()
+
+    /** Alerta proativo emitido pelo daemon sem contaminar o buffer textual da resposta. */
+    data class ProactiveAlert(
+        val title: String? = null,
+        val message: String? = null,
+        val packId: String? = null
     ) : SseEvent()
 
     /** Sinal emitido pelo backend em retentativas/fallbacks para limpar buffer parcial antes de retomar. */

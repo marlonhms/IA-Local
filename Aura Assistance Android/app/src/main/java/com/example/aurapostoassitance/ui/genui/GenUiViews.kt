@@ -74,6 +74,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.aurapostoassitance.data.remote.ShockVectorDto
 import com.example.aurapostoassitance.ui.components.AuraCard
 import com.example.aurapostoassitance.ui.components.AuraGhostButton
 import com.example.aurapostoassitance.ui.components.AuraGradientButton
@@ -82,6 +83,9 @@ import com.example.aurapostoassitance.ui.components.SectionLabel
 import com.example.aurapostoassitance.ui.components.ShimmerBox
 import com.example.aurapostoassitance.ui.components.StatusDot
 import com.example.aurapostoassitance.ui.components.statusColor
+import com.example.aurapostoassitance.ui.domain.AuraDomainAdapter
+import com.example.aurapostoassitance.ui.intelligence.BacktestScorecardUiState
+import com.example.aurapostoassitance.ui.intelligence.WhatIfUiState
 import com.example.aurapostoassitance.ui.theme.AuraCyan
 import com.example.aurapostoassitance.ui.theme.AuraEmerald
 import com.example.aurapostoassitance.ui.theme.AuraPurple
@@ -150,6 +154,10 @@ fun GenUiSkeletonSlot(
     }
 }
 
+/** Regra estrita multi-domínio: TankTile renderiza somente para o pack fuel_convenience. */
+fun isTankTileAllowedForPack(packId: String?): Boolean =
+    AuraDomainAdapter.normalizePackId(packId) == AuraDomainAdapter.PACK_FUEL
+
 /** Card executivo nativo deluxe: hierarquia 1-3-N, confirmação inline 2-passos e ações HITL. */
 @Composable
 fun GenUiCardView(
@@ -157,6 +165,17 @@ fun GenUiCardView(
     onAction: (GenUiAction) -> Unit,
     onDrillDown: (String) -> Unit = {},
     companionText: String? = null,
+    activePackId: String = AuraDomainAdapter.PACK_FUEL,
+    whatIfState: WhatIfUiState? = null,
+    onWhatIfShocksChange: ((ShockVectorDto) -> Unit)? = null,
+    onWhatIfHorizonChange: ((Int) -> Unit)? = null,
+    onWhatIfAuditWithAi: ((String) -> Unit)? = null,
+    onWhatIfRetry: (() -> Unit)? = null,
+    scorecardState: BacktestScorecardUiState? = null,
+    onScorecardHorizonChange: ((Int) -> Unit)? = null,
+    onApproveCalibration: (() -> Unit)? = null,
+    onRejectCalibration: (() -> Unit)? = null,
+    onRefreshScorecard: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var armedActionId by remember(card.title) { mutableStateOf<String?>(null) }
@@ -215,7 +234,23 @@ fun GenUiCardView(
             )
 
             card.blocks.forEachIndexed { index, block ->
-                Staggered(index) { BlockView(block, onDrillDown) }
+                Staggered(index) {
+                    BlockView(
+                        block = block,
+                        onDrillDown = onDrillDown,
+                        activePackId = activePackId,
+                        whatIfState = whatIfState,
+                        onWhatIfShocksChange = onWhatIfShocksChange,
+                        onWhatIfHorizonChange = onWhatIfHorizonChange,
+                        onWhatIfAuditWithAi = onWhatIfAuditWithAi,
+                        onWhatIfRetry = onWhatIfRetry,
+                        scorecardState = scorecardState,
+                        onScorecardHorizonChange = onScorecardHorizonChange,
+                        onApproveCalibration = onApproveCalibration,
+                        onRejectCalibration = onRejectCalibration,
+                        onRefreshScorecard = onRefreshScorecard
+                    )
+                }
             }
 
             if (card.limitations.isNotEmpty()) {
@@ -352,17 +387,66 @@ private fun Staggered(index: Int, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun BlockView(block: GenUiBlock, onDrillDown: (String) -> Unit) {
+private fun BlockView(
+    block: GenUiBlock,
+    onDrillDown: (String) -> Unit,
+    activePackId: String = AuraDomainAdapter.PACK_FUEL,
+    whatIfState: WhatIfUiState? = null,
+    onWhatIfShocksChange: ((ShockVectorDto) -> Unit)? = null,
+    onWhatIfHorizonChange: ((Int) -> Unit)? = null,
+    onWhatIfAuditWithAi: ((String) -> Unit)? = null,
+    onWhatIfRetry: (() -> Unit)? = null,
+    scorecardState: BacktestScorecardUiState? = null,
+    onScorecardHorizonChange: ((Int) -> Unit)? = null,
+    onApproveCalibration: (() -> Unit)? = null,
+    onRejectCalibration: (() -> Unit)? = null,
+    onRefreshScorecard: (() -> Unit)? = null
+) {
     when (block) {
         is GenUiBlock.KpiGrid -> KpiGridBlock(block, onDrillDown)
         is GenUiBlock.Comparison -> ComparisonBlock(block, onDrillDown)
         is GenUiBlock.Ranking -> RankingBlock(block, onDrillDown)
         is GenUiBlock.Timeline -> TimelineBlock(block)
         is GenUiBlock.AlertCallout -> AlertBlock(block.alert)
-        is GenUiBlock.Tanks -> TanksBlock(block, onDrillDown)
+        is GenUiBlock.Tanks -> {
+            if (isTankTileAllowedForPack(activePackId)) {
+                TanksBlock(block, onDrillDown)
+            } else {
+                NoteBlock(
+                    GenUiBlock.Note(
+                        title = block.title ?: "Visão de Estoque",
+                        text = "Visualização de tanques físicos disponível apenas para o domínio Postos & Conveniência."
+                    )
+                )
+            }
+        }
         is GenUiBlock.Note -> NoteBlock(block)
-        is GenUiBlock.WhatIfSimulator -> WhatIfSimulatorBlock(block, onDrillDown)
-        is GenUiBlock.RealizedRoiScorecard -> RealizedRoiScorecardBlock(block)
+        is GenUiBlock.WhatIfSimulator -> {
+            if (whatIfState != null && onWhatIfShocksChange != null && onWhatIfHorizonChange != null) {
+                WhatIfSimulatorCard(
+                    state = whatIfState,
+                    onShocksChange = onWhatIfShocksChange,
+                    onHorizonChange = onWhatIfHorizonChange,
+                    onAuditWithAi = onWhatIfAuditWithAi ?: onDrillDown,
+                    onRetry = onWhatIfRetry ?: {}
+                )
+            } else {
+                WhatIfSimulatorBlock(block, onDrillDown)
+            }
+        }
+        is GenUiBlock.RealizedRoiScorecard -> {
+            if (scorecardState != null && scorecardState.scorecard != null && onScorecardHorizonChange != null) {
+                RealizedRoiScorecardCard(
+                    state = scorecardState,
+                    onSelectHorizon = onScorecardHorizonChange,
+                    onApproveCalibration = onApproveCalibration ?: {},
+                    onRejectCalibration = onRejectCalibration ?: {},
+                    onRefresh = onRefreshScorecard ?: {}
+                )
+            } else {
+                RealizedRoiScorecardBlock(block)
+            }
+        }
         is GenUiBlock.McpActionConfirmation -> McpActionConfirmationBlock(block)
     }
 }
